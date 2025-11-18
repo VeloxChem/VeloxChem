@@ -41,8 +41,8 @@
 
 #include <hip/hip_runtime.h>
 #include <hipblas/hipblas.h>
-//#include <hipsolver/hipsolver.h>
-#include <magma_v2.h>
+#include <hipsolver/hipsolver.h>
+//#include <magma_v2.h>
 
 #endif
 
@@ -471,19 +471,19 @@ diagonalizeMatrix(double* A, double* D, const int64_t nrows_A) -> void
 
     gpuSafe(gpuSetDevice(0));
 
-#if defined(USE_CUDA)
-
     auto n = static_cast<int32_t>(nrows_A);
     int32_t lwork, info;
 
     double *d_A, *d_D, *d_work;
     int32_t *d_info;
 
-    cudaSafe(cudaMalloc(&d_A, n * n * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_D, n * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_info, sizeof(int32_t)));
+    gpuSafe(gpuMalloc(&d_A, n * n * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_D, n * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_info, sizeof(int32_t)));
 
-    cudaSafe(cudaMemcpy(d_A, A, n * n * sizeof(double), cudaMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_A, A, n * n * sizeof(double), gpuMemcpyHostToDevice));
+
+#if defined(USE_CUDA)
 
     cusolverDnHandle_t handle;
     cusolverSafe(cusolverDnCreate(&handle));
@@ -496,109 +496,74 @@ diagonalizeMatrix(double* A, double* D, const int64_t nrows_A) -> void
 
     cusolverSafe(cusolverDnDestroy(handle));
 
-    cudaSafe(cudaMemcpy(A, d_A, n * n * sizeof(double), cudaMemcpyDeviceToHost));
-    cudaSafe(cudaMemcpy(D, d_D, n * sizeof(double), cudaMemcpyDeviceToHost));
-    cudaSafe(cudaMemcpy(&info, d_info, sizeof(int32_t), cudaMemcpyDeviceToHost));
+#elif defined(USE_HIP)
+
+    hipsolverHandle_t handle;
+    hipsolverSafe(hipsolverCreate(&handle));
+
+    hipsolverSafe(hipsolverDsyevd_bufferSize(handle, HIPSOLVER_EIG_MODE_VECTOR, HIPSOLVER_FILL_MODE_UPPER, n, d_A, n, d_D, &lwork));
+
+    hipSafe(hipMalloc(&d_work, lwork * sizeof(double)));
+
+    hipsolverSafe(hipsolverDsyevd(handle, HIPSOLVER_EIG_MODE_VECTOR, HIPSOLVER_FILL_MODE_UPPER, n, d_A, n, d_D, d_work, lwork, d_info));
+
+    hipsolverSafe(hipsolverDestroy(handle));
+
+#endif
+
+    gpuSafe(gpuMemcpy(A, d_A, n * n * sizeof(double), gpuMemcpyDeviceToHost));
+    gpuSafe(gpuMemcpy(D, d_D, n * sizeof(double), gpuMemcpyDeviceToHost));
+    gpuSafe(gpuMemcpy(&info, d_info, sizeof(int32_t), gpuMemcpyDeviceToHost));
 
     // TODO: check info
 
-    cudaSafe(cudaFree(d_A));
-    cudaSafe(cudaFree(d_D));
-    cudaSafe(cudaFree(d_info));
-    cudaSafe(cudaFree(d_work));
-
-#elif defined(USE_HIP)
-
-    magmaSafe(magma_init());
-
-    magma_setdevice(0);
-
-    magma_int_t n = static_cast<magma_int_t>(nrows_A);
-    //magma_int_t ldda = magma_roundup(n, 32);
-
-    double *d_A;
-    //hipSafe(hipMalloc(&d_A, n * ldda * sizeof(double)));
-    //hipblasSafe(hipblasSetMatrix(n, n, sizeof(double), A, n, d_A, ldda));
-    hipSafe(hipMalloc(&d_A, n * n * sizeof(double)));
-    hipSafe(hipMemcpy(d_A, A, n * n * sizeof(double), hipMemcpyHostToDevice));
-
-    auto nb = magma_get_dsytrd_nb(n);
-    auto lwork = static_cast<magma_int_t>(std::max(2*n + n*nb, 1 + 6*n + 2*n*n));
-    auto liwork = 3 + 5*n;
-
-    double *wA, *work;
-    magma_int_t *iwork;
-
-    hipSafe(hipHostMalloc(&wA, n * n * sizeof(double)));
-    hipSafe(hipHostMalloc(&work, lwork * sizeof(double)));
-    hipSafe(hipHostMalloc(&iwork, liwork * sizeof(magma_int_t)));
-
-    magma_int_t info;
-    //magma_dsyevd_gpu(MagmaVec, MagmaUpper, n, d_A, ldda, D, wA, n, work, lwork, iwork, liwork, &info);
-    magma_dsyevd_gpu(MagmaVec, MagmaUpper, n, d_A, n, D, wA, n, work, lwork, iwork, liwork, &info);
-
-    if (info != 0)
-    {
-        std::stringstream ss;
-        ss << "gpu::diagonalizeMatrix: (magma error) " << magma_strerror(info);
-        errors::assertMsgCritical(false, ss.str());
-    }
-
-    //hipblasSafe(hipblasGetMatrix(n, n, sizeof(double), d_A, ldda, A, n));
-    hipSafe(hipMemcpy(A, d_A, n * n * sizeof(double), hipMemcpyDeviceToHost));
-
-    hipSafe(hipFree(d_A));
-
-    hipSafe(hipHostFree(wA));
-    hipSafe(hipHostFree(work));
-    hipSafe(hipHostFree(iwork));
-
-    magmaSafe(magma_finalize());
-
-#endif
+    gpuSafe(gpuFree(d_A));
+    gpuSafe(gpuFree(d_D));
+    gpuSafe(gpuFree(d_info));
+    gpuSafe(gpuFree(d_work));
 }
 
-#if defined(USE_HIP)
-auto
-diagonalizeMatrixMultiGPU(double* A, double* D, const int64_t nrows_A, const int64_t num_gpus_per_node) -> void
-{
-    // Note: Should only be called from MPI master rank
-
-    // TODO: allow diagonalizeMatrix on non-master MPI rank
-
-    magmaSafe(magma_init());
-
-    magma_int_t n = static_cast<magma_int_t>(nrows_A);
-
-    magma_int_t ngpu = static_cast<magma_int_t>(num_gpus_per_node);
-
-    auto nb = magma_get_dsytrd_nb(n);
-    auto lwork = static_cast<magma_int_t>(std::max(2*n + n*nb, 1 + 6*n + 2*n*n));
-    auto liwork = 3 + 5*n;
-
-    double *wA, *work;
-    magma_int_t *iwork;
-
-    hipSafe(hipHostMalloc(&wA, n * n * sizeof(double)));
-    hipSafe(hipHostMalloc(&work, lwork * sizeof(double)));
-    hipSafe(hipHostMalloc(&iwork, liwork * sizeof(magma_int_t)));
-
-    magma_int_t info;
-    magma_dsyevd_m(ngpu, MagmaVec, MagmaUpper, n, A, n, D, work, lwork, iwork, liwork, &info);
-
-    if (info != 0)
-    {
-        std::stringstream ss;
-        ss << "gpu::diagonalizeMatrixMultiGPU: (magma error) " << magma_strerror(info);
-        errors::assertMsgCritical(false, ss.str());
-    }
-
-    hipSafe(hipHostFree(wA));
-    hipSafe(hipHostFree(work));
-    hipSafe(hipHostFree(iwork));
-
-    magmaSafe(magma_finalize());
-}
-#endif
+//#if defined(USE_HIP)
+//auto
+//diagonalizeMatrixMultiGPU(double* A, double* D, const int64_t nrows_A, const int64_t num_gpus_per_node) -> void
+//{
+//    // Note: Should only be called from MPI master rank
+//
+//    // TODO: allow diagonalizeMatrix on non-master MPI rank
+//
+//    magmaSafe(magma_init());
+//
+//    magma_int_t n = static_cast<magma_int_t>(nrows_A);
+//
+//    magma_int_t ngpu = static_cast<magma_int_t>(num_gpus_per_node);
+//
+//    auto nb = magma_get_dsytrd_nb(n);
+//    auto lwork = static_cast<magma_int_t>(std::max(2*n + n*nb, 1 + 6*n + 2*n*n));
+//    auto liwork = 3 + 5*n;
+//
+//    double *wA, *work;
+//    magma_int_t *iwork;
+//
+//    hipSafe(hipHostMalloc(&wA, n * n * sizeof(double)));
+//    hipSafe(hipHostMalloc(&work, lwork * sizeof(double)));
+//    hipSafe(hipHostMalloc(&iwork, liwork * sizeof(magma_int_t)));
+//
+//    magma_int_t info;
+//    magma_dsyevd_m(ngpu, MagmaVec, MagmaUpper, n, A, n, D, work, lwork, iwork, liwork, &info);
+//
+//    if (info != 0)
+//    {
+//        std::stringstream ss;
+//        ss << "gpu::diagonalizeMatrixMultiGPU: (magma error) " << magma_strerror(info);
+//        errors::assertMsgCritical(false, ss.str());
+//    }
+//
+//    hipSafe(hipHostFree(wA));
+//    hipSafe(hipHostFree(work));
+//    hipSafe(hipHostFree(iwork));
+//
+//    magmaSafe(magma_finalize());
+//}
+//#endif
 
 }  // namespace gpu
