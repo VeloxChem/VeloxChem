@@ -510,7 +510,7 @@ diagonalizeMatrix(double* A, double* D, const int64_t n_int64) -> void
 
     gpuSafe(gpuMemcpyStaged(d_A, A, n_size * n_size * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-    auto n = static_cast<int32_t>(n_int64);
+    auto n = static_cast<size_t>(n_int64);
 
 #if defined(USE_CUDA)
 
