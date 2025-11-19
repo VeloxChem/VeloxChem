@@ -127,7 +127,8 @@ class HessianDriver:
                 'profiling': ('bool', 'whether profiling is needed'),
                 'memory_profiling': ('bool', 'whether to profile memory'),
                 'memory_tracing': ('bool', 'whether to trace memory'),
-            },
+                'print_level': ('int', 'verbosity of output (1-3)'),
+                },
             'method_settings': {
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
                 'grid_level': ('int', 'accuracy level of DFT grid'),

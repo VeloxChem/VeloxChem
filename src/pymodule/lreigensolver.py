@@ -119,6 +119,7 @@ class LinearResponseEigenSolver(LinearSolver):
         self.nto_cubes = False
         self.detach_attach = False
         self.detach_attach_cubes = False
+        self.detach_attach_charges = False
         self.cube_origin = None
         self.cube_stepsize = None
         self.cube_points = [80, 80, 80]
@@ -136,6 +137,8 @@ class LinearResponseEigenSolver(LinearSolver):
             'detach_attach': ('bool', 'analyze detachment/attachment density'),
             'detach_attach_cubes':
                 ('bool', 'write detachment/attachment density cube files'),
+            'detach_attach_charges':
+                ('bool', 'print detachment/attachment charges on atoms'),
             'esa': ('bool', 'compute excited state absorption'),
             'esa_from_state':
                 ('int', 'the state to excite from (e.g. 1 for S1)'),
@@ -180,7 +183,10 @@ class LinearResponseEigenSolver(LinearSolver):
         if self.detach_attach_cubes:
             self.detach_attach = True
 
-    def compute(self, molecule, basis, scf_tensors):
+        if self.detach_attach_charges:
+            self.detach_attach = True
+
+    def compute(self, molecule, basis, scf_results):
         """
         Performs linear response calculation for a molecule and a basis set.
 
@@ -188,7 +194,7 @@ class LinearResponseEigenSolver(LinearSolver):
             The molecule.
         :param basis:
             The AO basis set.
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
 
         :return:
@@ -213,7 +219,7 @@ class LinearResponseEigenSolver(LinearSolver):
         molecule_sanity_check(molecule)
 
         # check SCF results
-        scf_results_sanity_check(self, scf_tensors)
+        scf_results_sanity_check(self, scf_results)
 
         # update checkpoint_file after scf_results_sanity_check
         if self.filename is not None and self.checkpoint_file is None:
@@ -253,7 +259,7 @@ class LinearResponseEigenSolver(LinearSolver):
             'LinearResponseEigenSolver: not implemented for unrestricted case')
 
         if self.rank == mpi_master():
-            orb_ene = scf_tensors['E_alpha']
+            orb_ene = scf_results['E_alpha']
         else:
             orb_ene = None
         orb_ene = self.comm.bcast(orb_ene, root=mpi_master())
@@ -278,7 +284,7 @@ class LinearResponseEigenSolver(LinearSolver):
         eri_dict = self._init_eri(molecule, basis)
 
         # DFT information
-        dft_dict = self._init_dft(molecule, scf_tensors)
+        dft_dict = self._init_dft(molecule, scf_results)
 
         # PE information
         pe_dict = self._init_pe(molecule, basis)
@@ -343,7 +349,7 @@ class LinearResponseEigenSolver(LinearSolver):
 
                 profiler.set_timing_key('Preparation')
 
-                self._e2n_half_size(bger, bung, molecule, basis, scf_tensors,
+                self._e2n_half_size(bger, bung, molecule, basis, scf_results,
                                     eri_dict, dft_dict, pe_dict, profiler)
 
         # generate initial guess from scratch
@@ -353,7 +359,7 @@ class LinearResponseEigenSolver(LinearSolver):
 
             profiler.set_timing_key('Preparation')
 
-            self._e2n_half_size(bger, bung, molecule, basis, scf_tensors,
+            self._e2n_half_size(bger, bung, molecule, basis, scf_results,
                                 eri_dict, dft_dict, pe_dict, profiler)
 
         profiler.check_memory_usage('Initial guess')
@@ -552,7 +558,7 @@ class LinearResponseEigenSolver(LinearSolver):
                 self._add_nstates_to_checkpoint()
 
             self._e2n_half_size(new_trials_ger, new_trials_ung, molecule, basis,
-                                scf_tensors, eri_dict, dft_dict, pe_dict,
+                                scf_results, eri_dict, dft_dict, pe_dict,
                                 profiler)
 
             iter_in_hours = (tm.time() - iter_start_time) / 3600
@@ -586,11 +592,11 @@ class LinearResponseEigenSolver(LinearSolver):
         # calculate properties
         if self.is_converged:
             edip_grad = self.get_prop_grad('electric dipole', 'xyz', molecule,
-                                           basis, scf_tensors)
+                                           basis, scf_results)
             lmom_grad = self.get_prop_grad('linear momentum', 'xyz', molecule,
-                                           basis, scf_tensors)
+                                           basis, scf_results)
             mdip_grad = self.get_prop_grad('magnetic dipole', 'xyz', molecule,
-                                           basis, scf_tensors)
+                                           basis, scf_results)
 
             eigvals = np.array([exc_energies[s] for s in range(self.nstates)])
 
@@ -616,21 +622,32 @@ class LinearResponseEigenSolver(LinearSolver):
 
                 if self.rank == mpi_master():
                     if self.core_excitation:
-                        mo_occ = scf_tensors['C_alpha'][:, :self.
+                        mo_occ = scf_results['C_alpha'][:, :self.
                                                         num_core_orbitals]
-                        mo_vir = scf_tensors['C_alpha'][:, nocc:]
+                        mo_vir = scf_results['C_alpha'][:, nocc:]
                         z_mat = eigvec[:eigvec.size // 2].reshape(
                             self.num_core_orbitals, -1)
                         y_mat = eigvec[eigvec.size // 2:].reshape(
                             self.num_core_orbitals, -1)
                     else:
-                        mo_occ = scf_tensors['C_alpha'][:, :nocc]
-                        mo_vir = scf_tensors['C_alpha'][:, nocc:]
+                        mo_occ = scf_results['C_alpha'][:, :nocc]
+                        mo_vir = scf_results['C_alpha'][:, nocc:]
                         z_mat = eigvec[:eigvec.size // 2].reshape(nocc, -1)
                         y_mat = eigvec[eigvec.size // 2:].reshape(nocc, -1)
 
                 if self.nto or self.detach_attach:
                     vis_drv = VisualizationDriver(self.comm)
+
+                    if self.detach_attach_charges:
+                        atom_to_ao = vis_drv.map_atom_to_atomic_orbitals(
+                            molecule, basis)
+                        S = scf_results['S']
+                        S_eigvals, S_eigvecs = np.linalg.eigh(S)
+                        S_eigvals = np.where(S_eigvals > 1.0e-12, S_eigvals,
+                                             0.0)
+                        S_sqrt = np.matmul(S_eigvecs * np.sqrt(S_eigvals),
+                                           S_eigvecs.T)
+
                     if self.cube_origin is None or self.cube_stepsize is None:
                         cubic_grid = vis_drv.gen_cubic_grid(
                             molecule, self.cube_points)
@@ -680,13 +697,42 @@ class LinearResponseEigenSolver(LinearSolver):
                         dens_D, dens_A = self.get_detach_attach_densities(
                             z_mat, y_mat, mo_occ, mo_vir)
 
+                        chg_detach, chg_attach = None, None
+
+                        if self.detach_attach_charges:
+                            diag_DS = np.diag(
+                                np.linalg.multi_dot([S_sqrt, dens_D, S_sqrt]))
+                            diag_AS = np.diag(
+                                np.linalg.multi_dot([S_sqrt, dens_A, S_sqrt]))
+
+                            chg_detach = np.zeros(molecule.number_of_atoms())
+                            chg_attach = np.zeros(molecule.number_of_atoms())
+                            for atomidx, aoinds in enumerate(atom_to_ao):
+                                chg_detach[atomidx] += np.sum(diag_DS[aoinds])
+                                chg_attach[atomidx] += np.sum(diag_AS[aoinds])
+
+                            text = f'{"Atom index":>12s} '
+                            text += f'{"Detachment charge":>20s} '
+                            text += f'{"Attachment charge":>20s}'
+                            self.ostream.print_blank()
+                            self.ostream.print_header(text.ljust(92))
+                            self.ostream.print_header(
+                                ('-' * (len(text))).ljust(92))
+                            for atomidx in range(molecule.number_of_atoms()):
+                                text = f'{atomidx + 1:>12d} '
+                                text += f'{chg_detach[atomidx]:20.5f} '
+                                text += f'{chg_attach[atomidx]:20.5f}'
+                                self.ostream.print_header(text.ljust(92))
+                            self.ostream.print_blank()
+
                         # Add the detachment and attachment density matrices
                         # to the checkpoint file
                         state_label = f'S{s + 1}'
                         if final_h5_fname is not None:
                             write_detach_attach_to_hdf5(final_h5_fname,
                                                         state_label, dens_D,
-                                                        dens_A)
+                                                        dens_A, chg_detach,
+                                                        chg_attach)
 
                     if self.detach_attach_cubes:
                         if self.rank == mpi_master():
@@ -816,8 +862,12 @@ class LinearResponseEigenSolver(LinearSolver):
                         if self.nto_cubes:
                             ret_dict['nto_cubes'] = nto_cube_files
 
-                    if self.detach_attach_cubes:
-                        ret_dict['density_cubes'] = dens_cube_files
+                    if self.detach_attach:
+                        if self.detach_attach_charges:
+                            ret_dict['detachment_charges'] = chg_detach
+                            ret_dict['attachment_charges'] = chg_attach
+                        if self.detach_attach_cubes:
+                            ret_dict['density_cubes'] = dens_cube_files
 
                     if self.esa:
                         ret_dict['esa_results'] = esa_results
@@ -1134,7 +1184,7 @@ class LinearResponseEigenSolver(LinearSolver):
 
         return DistributedArray(v_mat, self.comm, distribute=False)
 
-    def get_e2(self, molecule, basis, scf_tensors):
+    def get_e2(self, molecule, basis, scf_results):
         """
         Calculates the E[2] matrix.
 
@@ -1142,7 +1192,7 @@ class LinearResponseEigenSolver(LinearSolver):
             The molecule.
         :param basis:
             The AO basis set.
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
 
         :return:
@@ -1167,7 +1217,7 @@ class LinearResponseEigenSolver(LinearSolver):
             'LinearResponseEigenSolver: not implemented for unrestricted case')
 
         if self.rank == mpi_master():
-            orb_ene = scf_tensors['E_alpha']
+            orb_ene = scf_results['E_alpha']
         else:
             orb_ene = None
         orb_ene = self.comm.bcast(orb_ene, root=mpi_master())
@@ -1178,7 +1228,7 @@ class LinearResponseEigenSolver(LinearSolver):
         eri_dict = self._init_eri(molecule, basis)
 
         # DFT information
-        dft_dict = self._init_dft(molecule, scf_tensors)
+        dft_dict = self._init_dft(molecule, scf_results)
 
         # PE information
         pe_dict = self._init_pe(molecule, basis)
@@ -1208,7 +1258,7 @@ class LinearResponseEigenSolver(LinearSolver):
 
         bger, bung = self._setup_trials(igs, precond=None, renormalize=False)
 
-        self._e2n_half_size(bger, bung, molecule, basis, scf_tensors, eri_dict,
+        self._e2n_half_size(bger, bung, molecule, basis, scf_results, eri_dict,
                             dft_dict, pe_dict)
 
         if self.rank == mpi_master():

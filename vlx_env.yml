@@ -23,7 +23,7 @@ dependencies:
   - setuptools
   - wheel
   - pybind11-global
-  - python>=3.9
+  - python>=3.10
   - psutil
   - pytest
   - mdanalysis
