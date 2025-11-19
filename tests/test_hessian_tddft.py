@@ -10,7 +10,6 @@ from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.tdaeigensolver import TdaEigenSolver
 from veloxchem.lreigensolver import LinearResponseEigenSolver
-from veloxchem.tddftgradientdriver import TddftGradientDriver
 from veloxchem.tddfthessiandriver import TddftHessianDriver
 
 
@@ -46,16 +45,13 @@ class TestTddftHessianDriver:
         rsp_drv.nstates = 5
         rsp_results = rsp_drv.compute(molecule, basis, scf_results)
 
-        grad_drv = TddftGradientDriver(scf_drv)
-        grad_dict = {'state_deriv_index': [1], 'do_first_order_prop': 'yes'}
+        grad_dict = {}
         cphf_dict = {'conv_thresh': 1e-8, 'use_subspace_solver': 'yes'}
-        grad_drv.update_settings(grad_dict=grad_dict,
-                                 rsp_dict={'conv_thresh': 1e-8},
-                                 orbrsp_dict=cphf_dict)
 
         hessian_drv = TddftHessianDriver(scf_drv,
-                                         rsp_drv=rsp_drv,
-                                         tddft_grad_drv=grad_drv)
+                                         rsp_drv=rsp_drv)
+        hessian_drv.update_settings(method_dict={}, grad_dict=grad_dict,
+                                     cphf_dict=cphf_dict) 
         hessian_drv.do_dipole_gradient = True
         hessian_drv.compute(molecule, basis)
 

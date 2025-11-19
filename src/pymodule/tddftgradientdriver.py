@@ -124,7 +124,7 @@ class TddftGradientDriver(GradientDriver):
 
     def update_settings(self,
                         grad_dict,
-                        rsp_dict,
+                        rsp_dict=None,
                         orbrsp_dict=None,
                         method_dict=None):
         """
@@ -139,6 +139,9 @@ class TddftGradientDriver(GradientDriver):
         :param method_dict:
             The input dicitonary of method settings group.
         """
+
+        if rsp_dict is None:
+            rsp_dict = {}
 
         if method_dict is None:
             method_dict = {}
@@ -249,7 +252,7 @@ class TddftGradientDriver(GradientDriver):
 
     def compute_excited_state_densities(self, molecule, basis, rsp_results):
         """
-        Performs calculation of analytical gradient.
+        Performs calculation of the one-particle density matrices.
 
         :param molecule:
             The molecule.

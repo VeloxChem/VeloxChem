@@ -82,6 +82,7 @@ class VibrationalAnalysis:
         - int_pol: Parallel Raman (in A**4/amu).
         - int_depol: Perpendicular Raman (in A**4/amu).
         - depol_ratio: Depolarization ratio (in A**4/amu).
+        - state_deriv_index: index of excited state for excited-state vib. analysis.
         - frequencies: the frequency/ies of external electric field (for
           resonance Raman)
         - flag: The name of the driver.
@@ -105,7 +106,7 @@ class VibrationalAnalysis:
         - result_file: The name of the vibrational analysis output file (txt format).
     """
 
-    def __init__(self, drv, rsp_drv=None, grad_drv=None):
+    def __init__(self, drv, rsp_drv=None):
         """
         Initializes vibrational analysis driver.
         """
@@ -140,6 +141,10 @@ class VibrationalAnalysis:
         self.rr_damping = None
         self.frequencies = (0,)
 
+        # Excited-state index in case of
+        # excited-state vibrational analysis.
+        self.state_deriv_index = None
+
         # Hessian driver etc
         self.is_scf = False
         self.is_xtb = False
@@ -154,10 +159,7 @@ class VibrationalAnalysis:
                 self.is_tddft = True
                 self.scf_driver = drv
                 self.rsp_driver = rsp_drv
-                if self.do_ir:
-                    # Ensure that the excited state dipole moment is calculated
-                    grad_drv.do_first_order_prop = True
-                self.hessian_driver = TddftHessianDriver(drv, rsp_drv, grad_drv)
+                self.hessian_driver = TddftHessianDriver(drv, rsp_drv)
         elif isinstance(drv, XtbDriver):
             self.is_xtb = True
             self.scf_driver = None
@@ -224,6 +226,7 @@ class VibrationalAnalysis:
                     ('bool', 'whether to print Raman depolarization ratio'),
                 'temperature': ('float', 'the temperature'),
                 'pressure': ('float', 'the pressure'),
+                'state_deriv_index': ('int', 'excited state index'),
                 'frequencies':
                     ('seq_range', 'frequencies of external electric field'),
                 'filename': ('str', 'base name of output files'),
@@ -616,6 +619,8 @@ class VibrationalAnalysis:
             # since XtbHessianDriver will always be numerical
             if self.numerical_hessian and not hessian_drv.numerical:
                 hessian_drv.numerical = self.numerical_hessian
+        if self.is_tddft:
+            hessian_drv.state_deriv_index = self.state_deriv_index
         hessian_drv.do_four_point = self.do_four_point_hessian
         hessian_drv.do_dipole_gradient = self.do_ir
         hessian_drv.do_print_hessian = self.do_print_hessian

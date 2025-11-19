@@ -26,6 +26,8 @@ import time as tm
 
 from .veloxchemlib import mpi_master
 from .hessiandriver import HessianDriver
+from .tdaeigensolver import TdaEigenSolver
+from .tddftgradientdriver import TddftGradientDriver
 from .dftutils import get_default_grid_level
 from .errorhandler import assert_msg_critical
 
@@ -39,14 +41,13 @@ class TddftHessianDriver(HessianDriver):
         The SCF driver.
     :param rsp_driver:
         The response driver.
-    :param tddft_gradient_driver:
-        The TDDFT or TDHF gradient driver
 
     Instance variables
         - hessian: The Hessian in Hartree per Bohr**2.
+        - state_deriv_index: The index of the excited state of interest.
     """
 
-    def __init__(self, scf_drv, rsp_drv, tddft_grad_drv):
+    def __init__(self, scf_drv, rsp_drv):
         """
         Initializes the TDDFT Hessian driver.
 
@@ -54,8 +55,6 @@ class TddftHessianDriver(HessianDriver):
             The SCF driver.
         :param rsp_drv:
             The linear response driver.
-        :param tddft_grad_drv:
-            The TDDFT gradient driver.
         """
         super().__init__(scf_drv.comm, scf_drv.ostream)
         
@@ -67,11 +66,31 @@ class TddftHessianDriver(HessianDriver):
             self.flag = "TDHF Hessian Driver"
         self.scf_driver = scf_drv
         self.rsp_driver = rsp_drv
-        self.tddft_gradient_driver = tddft_grad_drv
         self.do_print_hessian = False
-        self.tamm_dancoff = tddft_grad_drv.tamm_dancoff
 
-    def update_settings(self, method_dict, hessian_dict=None, cphf_dict=None):
+        # excited state information; if set to None,
+        # the first excited state will be calculated.
+        self.state_deriv_index = None
+
+        # excited-state relaxed dipole moment for IR
+        self.relaxed_dipole_moment = None
+
+        # option dictionaries from input
+        # TODO: cleanup
+        self.cphf_dict = {}
+        self.grad_dict = {}
+
+        if isinstance(rsp_drv, TdaEigenSolver):
+            self.tamm_dancoff = True
+        else:
+            self.tamm_dancoff = False
+
+        self._input_keywords['hessian'].update({
+            'state_deriv_index': ('int', 'excited state index'),
+        })
+
+    def update_settings(self, method_dict, hessian_dict=None,
+                        grad_dict=None, cphf_dict=None):
         """
         Updates settings in TddftHessianDriver.
 
@@ -79,7 +98,9 @@ class TddftHessianDriver(HessianDriver):
             The input dictionary of method settings group.
         :param hessian_dict:
             The input dictionary of Hessian settings group.
-        :param cphf_dict:
+        :param grad_dict:
+            The input dictionary for TDDFT gradient settings.
+        :param orbrsp_dict:
             The input dictionary of orbital response settings.
         """
         if hessian_dict is None:
@@ -87,10 +108,14 @@ class TddftHessianDriver(HessianDriver):
 
         super().update_settings(method_dict, hessian_dict)
 
+        if grad_dict is None:
+            grad_dict = {}
+
         if cphf_dict is None:
             cphf_dict = {}
 
-        self.cphf_dict = cphf_dict
+        self.grad_dict = dict(grad_dict)
+        self.cphf_dict = dict(cphf_dict)
 
     def compute(self, molecule, basis):
         """
@@ -104,6 +129,11 @@ class TddftHessianDriver(HessianDriver):
 
         if self.rank == mpi_master():
             self.print_header()
+            if self.state_deriv_index is None:
+                self.state_deriv_index = 1
+
+        self.state_deriv_index = self.comm.bcast(self.state_deriv_index,
+                                                 root=mpi_master())
 
         start_time = tm.time()
 
@@ -155,11 +185,7 @@ class TddftHessianDriver(HessianDriver):
                             'TddftHessianDriver: response did not converge')
 
         if self.rank == mpi_master():
-            if isinstance(self.tddft_gradient_driver.state_deriv_index, int):
-                index = self.tddft_gradient_driver.state_deriv_index - 1
-            else:
-                index = self.tddft_gradient_driver.state_deriv_index[0] - 1
-
+            index = self.state_deriv_index - 1
             scf_energy = self.scf_driver.get_scf_energy()
             excitation_energy = rsp_results['eigenvalues'][index]
 
@@ -178,6 +204,7 @@ class TddftHessianDriver(HessianDriver):
         :param basis:
             The AO basis set.
         """
+        # Recalculate the ground state energy for the new geometry
         self.scf_driver.restart = False
         self.scf_driver.ostream.mute()
         scf_results = self.scf_driver.compute(molecule, basis)
@@ -185,6 +212,7 @@ class TddftHessianDriver(HessianDriver):
         assert_msg_critical(self.scf_driver.is_converged,
                             'TddftHessianDriver: SCF did not converge')
 
+        # Recalculate the excited state energies for the new geometry
         self.rsp_driver.restart = False
         self.rsp_driver.ostream.mute()
         rsp_results = self.rsp_driver.compute(molecule, basis, scf_results)
@@ -192,17 +220,30 @@ class TddftHessianDriver(HessianDriver):
         assert_msg_critical(self.rsp_driver.is_converged,
                             'TddftHessianDriver: response did not converge')
 
-        # set tddft_grad_drv scf_drv and rsp_results
-        # instance variable to the results
-        # for the current molecular geometry.
-        self.tddft_gradient_driver._scf_drv = self.scf_driver
-        self.tddft_gradient_driver._rsp_results = None
-        self.tddft_gradient_driver.ostream.mute()
-        self.tddft_gradient_driver.compute(molecule, basis, self.scf_driver,
-                                           self.rsp_driver, rsp_results)
-        self.tddft_gradient_driver.ostream.unmute()
+        # Calculate the excited state gradient.
+        tddft_gradient_driver = TddftGradientDriver(self.scf_driver)
+        tddft_gradient_driver.update_settings(grad_dict=self.grad_dict,
+                                              orbrsp_dict=self.cphf_dict)  
 
-        return self.tddft_gradient_driver.gradient[0].copy()
+        tddft_gradient_driver.state_deriv_index = self.state_deriv_index
+
+        if self.rank == mpi_master():
+            # Calculate excited-state relaxed dipole moment
+            if self.do_dipole_gradient:
+                tddft_gradient_driver.do_first_order_prop = True
+
+        tddft_gradient_driver.ostream.mute()
+        tddft_gradient_driver.compute(molecule, basis, self.scf_driver,
+                                           self.rsp_driver, rsp_results)
+        tddft_gradient_driver.ostream.unmute()
+
+        if self.rank == mpi_master():
+            if self.do_dipole_gradient:
+                self.relaxed_dipole_moment = (
+                    tddft_gradient_driver.relaxed_dipole_moment[0].copy()
+                )
+
+        return tddft_gradient_driver.gradient[0].copy()
 
     # The relaxed dipole moment is calculated at the same time as
     # the gradient so, to avoid re-calculating everything, here the value
@@ -222,7 +263,7 @@ class TddftHessianDriver(HessianDriver):
             # Multiple excited states can be computed simultaneously
             # by TddftGradientDriver.
             # Take the first excited state in the list
-            return self.tddft_gradient_driver.relaxed_dipole_moment[0].copy()
+            return self.relaxed_dipole_moment
         else:
             return None
 
@@ -247,13 +288,10 @@ class TddftHessianDriver(HessianDriver):
             cur_str2 += 'Symmetric Difference Quotient'
         cur_str3 = 'Finite Difference Step Size     : '
         cur_str3 += str(self.delta_h) + ' a.u.'
-        if self.tddft_gradient_driver.state_deriv_index is None:
+        if self.state_deriv_index is None:
             s = 1
         else:
-            if isinstance(self.tddft_gradient_driver.state_deriv_index, int):
-                s = self.tddft_gradient_driver.state_deriv_index
-            else:
-                s = self.tddft_gradient_driver.state_deriv_index[0]
+            s = self.state_deriv_index
 
         cur_str4 = "Exited State                    : %d" % s
 
