@@ -24,12 +24,12 @@
 
 import time as tm
 
-from .veloxchemlib import mpi_master
+from .dftutils import get_default_grid_level
+from .errorhandler import assert_msg_critical
 from .hessiandriver import HessianDriver
 from .tdaeigensolver import TdaEigenSolver
 from .tddftgradientdriver import TddftGradientDriver
-from .dftutils import get_default_grid_level
-from .errorhandler import assert_msg_critical
+from .veloxchemlib import mpi_master
 
 
 class TddftHessianDriver(HessianDriver):
@@ -57,9 +57,9 @@ class TddftHessianDriver(HessianDriver):
             The linear response driver.
         """
         super().__init__(scf_drv.comm, scf_drv.ostream)
-        
+
         self._xcfun_ldstaging = scf_drv._xcfun_ldstaging
-        
+
         if scf_drv._dft:
             self.flag = "TDDFT Hessian Driver"
         else:
@@ -85,12 +85,15 @@ class TddftHessianDriver(HessianDriver):
         else:
             self.tamm_dancoff = False
 
-        self._input_keywords['hessian'].update({
-            'state_deriv_index': ('int', 'excited state index'),
-        })
+        self._input_keywords["hessian"].update(
+            {
+                "state_deriv_index": ("int", "excited state index"),
+            }
+        )
 
-    def update_settings(self, method_dict, hessian_dict=None,
-                        grad_dict=None, cphf_dict=None):
+    def update_settings(
+        self, method_dict, hessian_dict=None, grad_dict=None, cphf_dict=None
+    ):
         """
         Updates settings in TddftHessianDriver.
 
@@ -100,7 +103,7 @@ class TddftHessianDriver(HessianDriver):
             The input dictionary of Hessian settings group.
         :param grad_dict:
             The input dictionary for TDDFT gradient settings.
-        :param orbrsp_dict:
+        :param cphf_dict:
             The input dictionary of orbital response settings.
         """
         if hessian_dict is None:
@@ -132,8 +135,9 @@ class TddftHessianDriver(HessianDriver):
             if self.state_deriv_index is None:
                 self.state_deriv_index = 1
 
-        self.state_deriv_index = self.comm.bcast(self.state_deriv_index,
-                                                 root=mpi_master())
+        self.state_deriv_index = self.comm.bcast(
+            self.state_deriv_index, root=mpi_master()
+        )
 
         start_time = tm.time()
 
@@ -148,8 +152,8 @@ class TddftHessianDriver(HessianDriver):
                 title += "gradient (Hartree/Bohr**2)"
                 self.print_hessian(molecule, title=title)
 
-            valstr = '*** Time spent in Hessian calculation: '
-            valstr += '{:.2f} sec ***'.format(tm.time() - start_time)
+            valstr = "*** Time spent in Hessian calculation: "
+            valstr += "{:.2f} sec ***".format(tm.time() - start_time)
             self.ostream.print_header(valstr)
             self.ostream.print_blank()
             self.ostream.print_blank()
@@ -163,31 +167,28 @@ class TddftHessianDriver(HessianDriver):
             The molecule.
         :param basis:
             The AO basis set.
-        :param scf_drv:
-            The ScfDriver.
-        :pram rsp_drv:
-            The response driver.
-        :param tddft_grad_drv:
-            The TddftGradientDriver.
         """
         self.scf_driver.restart = False
         self.scf_driver.ostream.mute()
         scf_results = self.scf_driver.compute(molecule, basis)
         self.scf_driver.ostream.unmute()
-        assert_msg_critical(self.scf_driver.is_converged,
-                            'TddftHessianDriver: SCF did not converge')
+        assert_msg_critical(
+            self.scf_driver.is_converged, "TddftHessianDriver: SCF did not converge"
+        )
 
         self.rsp_driver.restart = False
         self.rsp_driver.ostream.mute()
         rsp_results = self.rsp_driver.compute(molecule, basis, scf_results)
         self.rsp_driver.ostream.unmute()
-        assert_msg_critical(self.rsp_driver.is_converged,
-                            'TddftHessianDriver: response did not converge')
+        assert_msg_critical(
+            self.rsp_driver.is_converged,
+            "TddftHessianDriver: response did not converge",
+        )
 
         if self.rank == mpi_master():
             index = self.state_deriv_index - 1
             scf_energy = self.scf_driver.get_scf_energy()
-            excitation_energy = rsp_results['eigenvalues'][index]
+            excitation_energy = rsp_results["eigenvalues"][index]
 
             energy = scf_energy + excitation_energy
 
@@ -209,21 +210,25 @@ class TddftHessianDriver(HessianDriver):
         self.scf_driver.ostream.mute()
         scf_results = self.scf_driver.compute(molecule, basis)
         self.scf_driver.ostream.unmute()
-        assert_msg_critical(self.scf_driver.is_converged,
-                            'TddftHessianDriver: SCF did not converge')
+        assert_msg_critical(
+            self.scf_driver.is_converged, "TddftHessianDriver: SCF did not converge"
+        )
 
         # Recalculate the excited state energies for the new geometry
         self.rsp_driver.restart = False
         self.rsp_driver.ostream.mute()
         rsp_results = self.rsp_driver.compute(molecule, basis, scf_results)
         self.rsp_driver.ostream.unmute()
-        assert_msg_critical(self.rsp_driver.is_converged,
-                            'TddftHessianDriver: response did not converge')
+        assert_msg_critical(
+            self.rsp_driver.is_converged,
+            "TddftHessianDriver: response did not converge",
+        )
 
         # Calculate the excited state gradient.
         tddft_gradient_driver = TddftGradientDriver(self.scf_driver)
-        tddft_gradient_driver.update_settings(grad_dict=self.grad_dict,
-                                              orbrsp_dict=self.cphf_dict)  
+        tddft_gradient_driver.update_settings(
+            grad_dict=self.grad_dict, orbrsp_dict=self.cphf_dict
+        )
 
         tddft_gradient_driver.state_deriv_index = self.state_deriv_index
 
@@ -233,8 +238,9 @@ class TddftHessianDriver(HessianDriver):
                 tddft_gradient_driver.do_first_order_prop = True
 
         tddft_gradient_driver.ostream.mute()
-        tddft_gradient_driver.compute(molecule, basis, self.scf_driver,
-                                           self.rsp_driver, rsp_results)
+        tddft_gradient_driver.compute(
+            molecule, basis, self.scf_driver, self.rsp_driver, rsp_results
+        )
         tddft_gradient_driver.ostream.unmute()
 
         if self.rank == mpi_master():
@@ -260,9 +266,6 @@ class TddftHessianDriver(HessianDriver):
         """
 
         if self.rank == mpi_master():
-            # Multiple excited states can be computed simultaneously
-            # by TddftGradientDriver.
-            # Take the first excited state in the list
             return self.relaxed_dipole_moment
         else:
             return None
@@ -276,18 +279,18 @@ class TddftHessianDriver(HessianDriver):
 
         self.ostream.print_blank()
         self.ostream.print_header(self.flag)
-        self.ostream.print_header((len(self.flag) + 2) * '=')
+        self.ostream.print_header((len(self.flag) + 2) * "=")
         self.ostream.flush()
 
-        cur_str = 'Hessian Type                    : '
-        cur_str += 'Numerical using analytical gradient'
-        cur_str2 = 'Numerical Method                : '
+        cur_str = "Hessian Type                    : "
+        cur_str += "Numerical using analytical gradient"
+        cur_str2 = "Numerical Method                : "
         if self.do_four_point:
-            cur_str2 += 'Five-Point Stencil'
+            cur_str2 += "Five-Point Stencil"
         else:
-            cur_str2 += 'Symmetric Difference Quotient'
-        cur_str3 = 'Finite Difference Step Size     : '
-        cur_str3 += str(self.delta_h) + ' a.u.'
+            cur_str2 += "Symmetric Difference Quotient"
+        cur_str3 = "Finite Difference Step Size     : "
+        cur_str3 += str(self.delta_h) + " a.u."
         if self.state_deriv_index is None:
             s = 1
         else:
@@ -302,12 +305,15 @@ class TddftHessianDriver(HessianDriver):
         self.ostream.print_header(cur_str4.ljust(str_width))
 
         if self.scf_driver._dft:
-            cur_str = 'Exchange-Correlation Functional : '
+            cur_str = "Exchange-Correlation Functional : "
             cur_str += self.scf_driver.xcfun.get_func_label().upper()
             self.ostream.print_header(cur_str.ljust(str_width))
-            grid_level = (get_default_grid_level(self.scf_driver.xcfun)
-                          if self.scf_driver.grid_level is None else self.scf_driver.grid_level)
-            cur_str = 'Molecular Grid Level            : ' + str(grid_level)
+            grid_level = (
+                get_default_grid_level(self.scf_driver.xcfun)
+                if self.scf_driver.grid_level is None
+                else self.scf_driver.grid_level
+            )
+            cur_str = "Molecular Grid Level            : " + str(grid_level)
             self.ostream.print_header(cur_str.ljust(str_width))
 
         self.ostream.print_blank()
