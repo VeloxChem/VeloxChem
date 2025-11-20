@@ -80,6 +80,9 @@ class TddftHessianDriver(HessianDriver):
         self.cphf_dict = {}
         self.grad_dict = {}
 
+        # Only numerical Hessian available for TDDFT/TDHF.
+        self.numerical = True
+
         if isinstance(rsp_drv, TdaEigenSolver):
             self.tamm_dancoff = True
         else:
