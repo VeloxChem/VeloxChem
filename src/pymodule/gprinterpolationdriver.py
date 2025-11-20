@@ -937,7 +937,6 @@ class GPRInterpolationDriver:
             return float(np.quantile(arr, q))
 
         # Good-only: let the max distance creep up toward the good tail
-        print('n good, min good', n_good, min_good)
         if n_good >= min_good and n_bad == 0:
             d_hi_good = robust_q(good, 0.80 if n_good < 5 else q_good)
             if d_hi_good is None: return
@@ -1040,8 +1039,6 @@ class GPRInterpolationDriver:
         #     # percentile policy: use a stored running threshold; fall back to fixed if missing
         #     d_thresh = getattr(self, "_d_thresh_dyn", d_fixed)
         
-        print('sigma hihg ', sigma_high)
-        
         # Secondary: only if uncertainty is near prior AND similarity is low
         # prior_std   = float(self.model.covar_module.outputscale.sqrt()) * float(self.y_std)
         # sigma_high  = 0.7 * prior_std
@@ -1049,10 +1046,7 @@ class GPRInterpolationDriver:
         s_thresh    = getattr(self, "_s_thresh_dyn", 0.2)  # learned percentile; default conservative
         s_max       = self.max_kernel_similarity(Xq_std, Xtr_std, topk=5)
         
-        print('INFOOOO', s_thresh, s_max, d_thresh, d_norm)
-        
         trigger = (sig >= sigma_high) and (s_max < s_thresh) 
-        print('Kernel similarity', trigger, s_thresh, s_max)
 
         should_add_by_risk, diag = self.decide_add_by_risk(s_max, d_norm, sig,
                                                   R_add=0.60, R_clear=0.45)
@@ -1253,7 +1247,7 @@ class GPRInterpolationDriver:
         R = float(w_s * s_risk + w_d * d_risk + w_u * u_risk)
         parts = {"s_risk": float(s_risk), "d_risk": float(d_risk), "u_risk": float(u_risk),
                  "s_thr": s_thr, "d_thr": d_thr, "u_thr": u_thr}
-        print('in risk score function', R, parts)
+
         return R, parts
 
     def decide_add_by_risk(self, s_max: float, d_norm: float, sigma: float,

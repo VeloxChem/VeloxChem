@@ -251,7 +251,6 @@ class InterpolationDatapoint:
                     self.original_b_matrix[i] = derivative
 
         if self.inv_sqrt_masses is not None:
-            print('using_inverse masses')
             self.b_matrix = self.b_matrix * self.inv_sqrt_masses
             if self.use_inverse_bond_length:
                 self.original_b_matrix = self.original_b_matrix * self.inv_sqrt_masses
@@ -433,6 +432,7 @@ class InterpolationDatapoint:
             g_minus_matrix, intermediate_matrix, self.b_matrix.T, g_minus_matrix.T
         ])
         self.internal_hessian = 0.5 * (self.internal_hessian + self.internal_hessian.T)
+
     
     def backtransform_internal_gradient_to_cartesian_coordinates(self):
         '''

@@ -292,6 +292,8 @@ class IMDatabasePointCollecter:
 
         # Default value for the C-H linker distance
         self.linking_atom_distance = 1.0705 
+
+        self.eq_bond_force_constants = {}
             
     # Method to generate OpenMM system from VeloxChem objects
     def system_from_molecule(self,
@@ -943,6 +945,8 @@ class IMDatabasePointCollecter:
             # Initialize the object
             driver_object = InterpolationDriver(self.z_matrix)
             driver_object.update_settings(self.interpolation_settings[root])
+            # driver_object.eq_bond_force_constants = self.eq_bond_force_constants
+            # print('Interpolation driver settings updated for root', root, self.eq_bond_force_constants)
             
             driver_object.impes_coordinate.inv_sqrt_masses = inv_sqrt_masses
             if root == 0:
@@ -2267,11 +2271,9 @@ class IMDatabasePointCollecter:
                     trigger, information = self.impes_drivers[self.current_state].gpr_intdriver.should_qm_check(X_new, T=self.energy_threshold)
                     
                     error_p_variance = abs(mean) + std
-
-                    print('###. Predictions: ', mean, std, error_p_variance, (error_p_variance / len(new_molecule.get_labels())) * 1.3, self.energy_threshold, self.last_gpr_addition)
                     
                     error_proxy = float(np.abs(mean).ravel()[0] + std.ravel()[0])
-                    print('Error proxy', error_proxy, trigger, information)
+                    # print('Error proxy', error_proxy, trigger, information)
                     Xt, yt = self.impes_drivers[self.current_state].gpr_intdriver._transform(self.impes_drivers[self.current_state].gpr_intdriver.X_raw, self.impes_drivers[self.current_state].gpr_intdriver.y_raw)
                       
 
@@ -2294,6 +2296,7 @@ class IMDatabasePointCollecter:
 
             self.point_checker += 1 
             self.last_gpr_addition += 1
+
             print('current state', self.current_state)
             if self.add_a_point == True:
                 self.point_correlation_check(new_molecule)
@@ -2496,13 +2499,36 @@ class IMDatabasePointCollecter:
 
      
                 gradient_difference = (grad - self.impes_drivers[self.roots_to_follow[identification_state + e_idx]].impes_coordinate.gradient) * hartree_in_kcalpermol() * bohr_in_angstrom()
-                print('predicted Grad', self.impes_drivers[self.roots_to_follow[identification_state + e_idx]].impes_coordinate.gradient)
+                # print('predicted Grad', self.impes_drivers[self.roots_to_follow[identification_state + e_idx]].impes_coordinate.gradient)
                 rmsd_gradient    = np.sqrt((gradient_difference**2).mean())
-                gq = grad.ravel()
-                gi = self.impes_drivers[self.roots_to_follow[identification_state + e_idx]].impes_coordinate.gradient.ravel()
-                cos_theta = np.dot(gq, gi) / (np.linalg.norm(gq) * np.linalg.norm(gi))
+                
+                cos_theta = 1.0
+                if rmsd_gradient > 0.5 and energy_difference > 0.01:
+                    
+                    gq = grad.ravel()
+                    gi = self.impes_drivers[self.roots_to_follow[identification_state + e_idx]].impes_coordinate.gradient.ravel()
+                    
+                    # print('gq', gq, 'gi', gi)
+                    cos_theta = 0.0
+                    significant_mask = (np.abs(gq) > 1e-4) | (np.abs(gi) > 1e-4)
+                    if np.sum(significant_mask) == 0:
+                        cos_theta = 1.0
+                    # print('significant components', np.sum(significant_mask))
+                    gq_clean = gq[significant_mask]
+                    gi_clean = gi[significant_mask]
+
+                    norm_gq_clean = np.linalg.norm(gq_clean)
+                    norm_gi_clean = np.linalg.norm(gi_clean)
+                    
+                    if norm_gq_clean == 0 and norm_gi_clean == 0:
+                        cos_theta = 1.0
+                    
+                    cos_theta = np.dot(gq_clean, gi_clean) / (norm_gq_clean * norm_gi_clean)
+                # cos_theta_old = np.dot(gq, gi) / (np.linalg.norm(gq) * np.linalg.norm(gi))
+                # print('gq', cos_theta, cos_theta_old)
+                
                 print('Energy difference', energy_difference, energy_difference * hartree_in_kcalpermol(), 'kcal/mol', 'energy differences rmsd', energy_difference / natms * hartree_in_kcalpermol())
-                print('gradients alignment', cos_theta, 'rmsd gradient', rmsd_gradient, 'kcal/mol/bohr')
+                print('gradients alignment', cos_theta, 'rmsd gradient', rmsd_gradient, 'kcal/mol/angstrom')
 
 
                 state_specific_energies[self.roots_to_follow[identification_state + e_idx]] = [qm_energy[e_idx], self.impes_drivers[self.roots_to_follow[identification_state + e_idx]].impes_coordinate.energy]
@@ -2545,6 +2571,9 @@ class IMDatabasePointCollecter:
                     if self.add_gpr_model:
 
                        for root in self.roots_to_follow:
+
+                            if len(self.allowed_molecules[state]['molecules']) < 2:
+                                continue
 
                             x_list, y_list = [], []
                             interpolation_driver = InterpolationDriver(self.z_matrix)
@@ -2652,6 +2681,7 @@ class IMDatabasePointCollecter:
                     interpolation_driver.symmetry_information = self.impes_drivers[root].symmetry_information
                     interpolation_driver.qm_symmetry_data_points = self.impes_drivers[root].qm_symmetry_data_points
                     interpolation_driver.distance_thrsh = 1000
+                    # interpolation_driver.eq_bond_force_constants = self.impes_drivers.eq_bond_force_constants
                     interpolation_driver.exponent_p = self.impes_drivers[root].exponent_p
                     interpolation_driver.print = False
                     interpolation_driver.qm_data_points = self.impes_drivers[root].qm_data_points
@@ -2997,6 +3027,7 @@ class IMDatabasePointCollecter:
                         interpolation_driver.qm_symmetry_data_points = self.impes_drivers[state_to_optim].qm_symmetry_data_points
                         interpolation_driver.distance_thrsh = 1000
                         interpolation_driver.exponent_p = self.impes_drivers[state_to_optim].exponent_p
+                        # interpolation_driver.eq_bond_force_constants = self.eq_bond_force_constants
                         interpolation_driver.print = False
                         interpolation_driver.qm_data_points = self.impes_drivers[state_to_optim].qm_data_points
                         interpolation_driver.calc_optim_trust_radius = True
@@ -3802,6 +3833,7 @@ class IMDatabasePointCollecter:
             qm_energy = qm_driver.scf_energy
             qm_energy = np.array([qm_energy])
             qm_driver.ostream.unmute()
+            qm_driver.filename = None
         
         elif isinstance(qm_driver, ExternalScfDriver):
             qm_energy = qm_driver.compute_energy(molecule, qm_driver.basis_set_label)

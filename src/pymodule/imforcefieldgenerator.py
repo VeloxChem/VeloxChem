@@ -316,6 +316,8 @@ class IMForceFieldGenerator:
         self.identfy_relevant_int_coordinates = True
         self.add_gpr_model = True
         self.use_opt_confidence_radius = [False, 'single', 0.5, 0.3]
+    
+        self.eq_bond_force_constants = {}
 
 
     def set_up_the_system(self, molecule, extract_z_matrix=None):
@@ -1594,6 +1596,9 @@ class IMForceFieldGenerator:
             
             #TODO: implement a determination of the bond expression 
             
+
+            
+            
             for counter, (state, dihedral_dict) in enumerate(self.molecules_along_rp.items()):
                 for key, mol_info in dihedral_dict.items():
                     molecules, start = mol_info
@@ -1626,6 +1631,7 @@ class IMForceFieldGenerator:
                         im_database_driver.add_gpr_model = self.add_gpr_model
                         im_database_driver.ghost_atom = self.ghost_atom
                         im_database_driver.use_opt_confidence_radius = self.use_opt_confidence_radius
+                        # im_database_driver.eq_bond_force_constants = self.eq_bond_force_constants
                         
                         
                         im_database_driver.system_from_molecule(mol, self.z_matrix, forcefield_generator, solvent=self.solvent, qm_atoms='all')  
@@ -2638,6 +2644,20 @@ class IMForceFieldGenerator:
                     impes_coordinate.hessian = mw_hess_mat.reshape(hess.shape)
                     impes_coordinate.transform_gradient_and_hessian()
 
+                    
+                    #TODO: Grimme QF correction dictionary for force constants
+                    # for elem_idx, element in enumerate(self.z_matrix):
+                        
+                    #     if len(element) == 2:
+
+                    #         bond_value = impes_coordinate.internal_coordinates_values[elem_idx]
+
+                    #         force_constant = np.linalg.multi_dot([impes_coordinate.b_matrix[elem_idx, :], impes_coordinate.hessian, impes_coordinate.b_matrix[elem_idx, :].T])
+
+                    #         self.eq_bond_force_constants[tuple(element)] = {'k_st':force_constant, 'r_eq': bond_value}
+                    #         print('Force constant hatree/bohr^2', force_constant, 'bond distance bohr', bond_value, 'dictionary', self.eq_bond_force_constants)
+
+
                     print('Org Molecules', mol_basis[0].get_xyz_string())
                     if mol_basis[2] > 1:
                         
@@ -2848,6 +2868,7 @@ class IMForceFieldGenerator:
             scf_results = qm_driver.compute(molecule, basis)
             qm_energy = np.array([qm_driver.scf_energy])
             qm_driver.ostream.unmute()
+            qm_driver.filename = None
 
             print('qm_energy in SCF driver', qm_energy)
 

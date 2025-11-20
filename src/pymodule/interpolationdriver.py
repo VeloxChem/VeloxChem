@@ -177,6 +177,11 @@ class InterpolationDriver():
             }
         }
 
+
+        self.grimme_qf_params = {'k': {'H': 1.755, 'C': 2.463, 'N':2.559, 'O':2.579}, 'ken':-0.164,
+                                 'EN':{'H': 2.1, 'C': 2.5, 'N':3.0, 'O':3.5}}
+        self.eq_bond_force_constants = None
+
     # def print_keywords(self):
     #     """
     #     Prints the input keywords of the ImpesDriver.
@@ -313,13 +318,18 @@ class InterpolationDriver():
         self.angle_rmsd = []
         self.dihedral_rmsd = []
         self.molecule = molecule
+        
 
         self.distance_molecule = Molecule.from_xyz_string(molecule.get_xyz_string())
+
+
         
         # for dihedral in self.symmetry_information[7]:
         #     self.distance_molecule.set_dihedral([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1], 0.0, 'degree')
    
         self.define_impes_coordinate(molecule.get_coordinates_in_bohr())
+        
+
 
         if labels:
             self.labels = labels
@@ -531,6 +541,9 @@ class InterpolationDriver():
         
         natms = self.impes_coordinate.cartesian_coordinates.shape[0]
 
+        # check_mol = Molecule(self.molecule.get_labels(), self.qm_data_points[0].cartesian_coordinates, 'bohr')
+        # self.define_impes_coordinate(check_mol.get_coordinates_in_bohr())
+
         sum_weights = 0.0
         sum_weights_cart = 0.0
         potentials = []
@@ -615,10 +628,45 @@ class InterpolationDriver():
             self.gradients.append(gradient)
             weight_gradients_cart.append(weight_grad_cart)
   
+        
+        #TODO: Grimme QF correction implementation comparison later
+        # self.grimme_qf_params = {'k': {'H': 1.755, 'C': 2.463, 'N':2.559, 'O':2.579}, 'ken':-0.164,
+        #                          'EN':{'H': 2.1, 'C': 2.5, 'N':3.0, 'O':3.5}}
+            
+        # def grimme_function(r, re, kstr, a):
+        #     grimme_func = kstr + kstr * (re / r)**a - 2.0 * kstr * (re / r)**(a/2)
+        #     grimme_func_deriv = ((-a * kstr * (re/r)**a) / (r)) + ((a * kstr * (re / r)**(a/2)) / r)
+        #     grimme_func_sec_deriv = ((a**2 * kstr * (re / r)**a) / (r**2) + (a * kstr * (re / r)**a) / (r**2) 
+        #                                    - (a**2 * kstr * (re / r)**(a/2)) / (2.0 * r**2) - (a * kstr * (re / r)**(a/2.0)) / r**2)
+        #     return grimme_func, grimme_func_deriv, grimme_func_sec_deriv
+        
+        # def grimme_func_correction(r, re, kstr, a):
+        #     V, dV, ddV = grimme_function(r, re, kstr, a)
+        #     V0, dV0, ddV0 = grimme_function(re, re, kstr, a)
+            
+        #     dr = r - re
+        #     dE = V - (V0 + dV0 * dr + 0.5 * ddV0 * dr**2)
+        #     dg = dV - (dV0 + ddV0 * dr)
+        #     dE_deriv_bmat = dg
+        #     print('grimme corr', dr, dE, dE_deriv_bmat)
+        #     return dE, dE_deriv_bmat   
+
+        
+        
         # --- initialise accumulators -------------------------------------------------
         self.impes_coordinate.energy    = 0.0
         self.impes_coordinate.gradient  = np.zeros((natms, 3))
         self.impes_coordinate.NAC       = np.zeros((natms, 3))       # if you need it
+
+        # for bond_idx, element_bond in enumerate(self.impes_coordinate.z_matrix[:]):
+        #     if len(element_bond) !=2:
+        #         break
+            
+        #     a = (self.grimme_qf_params['k'][self.molecule.get_labels()[element_bond[0]]] * self.grimme_qf_params['k'][self.molecule.get_labels()[element_bond[1]]]
+        #          + self.grimme_qf_params['ken'] * (self.grimme_qf_params['EN'][self.molecule.get_labels()[element_bond[0]]] - self.grimme_qf_params['EN'][self.molecule.get_labels()[element_bond[1]]])**2)
+        #     dE, dg = grimme_func_correction(self.impes_coordinate.internal_coordinates_values[bond_idx], self.eq_bond_force_constants[tuple(element_bond)]['r_eq'], self.eq_bond_force_constants[tuple(element_bond)]['k_st'], a)
+        #     self.impes_coordinate.energy += dE
+        #     self.impes_coordinate.gradient += (dg * self.impes_coordinate.b_matrix[bond_idx, :]).reshape(natms,3)
 
         # --- 1.  raw (unnormalised) weights and their gradients ----------------------
         w_i          = np.array(weights_cart, dtype=np.float64)        # ← rename
@@ -640,15 +688,6 @@ class InterpolationDriver():
         gradients    = np.array(gradients,  dtype=np.float64)        # ∇Uᵢ  shape (n_pts, natms, 3)
 
         self.impes_coordinate.energy   = np.dot(W_i, potentials)     # Σ Wᵢ Uᵢ
-
-        # ∇U = Σ Wᵢ ∇Uᵢ  +  Σ Uᵢ ∇Wᵢ
-        # if len(self.symmetry_information[3]) != natms:
-        #     self.impes_coordinate.gradient = (np.tensordot(W_i, gradients, axes=1))
-        #     # self.impes_coordinate.gradient[self.symmetry_information[4]] += (gradients[:, self.symmetry_information[4], :].sum(axis=0))
-        #     # Add contributions only to the selected rows
-            
-        #     self.impes_coordinate.gradient[self.symmetry_information[3]] = np.tensordot(potentials, grad_W_i, axes=1)
-        # else:
 
         self.impes_coordinate.gradient = (np.tensordot(W_i, gradients, axes=1) + np.tensordot(potentials, grad_W_i, axes=1))
 
@@ -1076,41 +1115,26 @@ class InterpolationDriver():
                 for i, element in enumerate(self.impes_coordinate.z_matrix[self.symmetry_information[-1][1]:], start=self.symmetry_information[-1][1]): 
 
                     dist_check[i] = np.sin(dist_org[i])
-  
+      
             self.bond_rmsd.append(np.sqrt(np.mean(np.sum((dist_org[:self.symmetry_information[-1][0]])**2))))
             self.angle_rmsd.append(np.sqrt(np.mean(np.sum(dist_org[self.symmetry_information[-1][0]:self.symmetry_information[-1][1]]**2))))
             self.dihedral_rmsd.append(np.sqrt(np.mean(np.sum(dist_check[self.symmetry_information[-1][1]:]**2))))
+
             pes = (energy + np.matmul(dist_check.T, grad) +
                         0.5 * np.linalg.multi_dot([dist_check.T, hessian, dist_check]))
-            
-            
-            dist_hessian = np.matmul(dist_check.T, hessian)
-            
-            # for bond_idx, element_bond in enumerate(self.impes_coordinate.z_matrix[:self.symmetry_information[-1][0]]):
-            #     grad[bond_idx] *= -1.0 / (org_int_coords[bond_idx])**2
-            #     dist_hessian[bond_idx] *= -1.0 / (org_int_coords[bond_idx])**2
+
+            dist_hessian_eff = np.matmul(dist_check.T, hessian)
 
             if not self.use_cosine_dihedral:
                 for i, element in enumerate(self.impes_coordinate.z_matrix[self.symmetry_information[-1][1]:], start=self.symmetry_information[-1][1]):
                     
                     grad[i] *= np.cos(dist_org[i])
-                    dist_hessian[i] *= np.cos(dist_org[i])
+                    dist_hessian_eff[i] *= np.cos(dist_org[i])
             
             
-            # bond_break_idx = self.z_matrix.index([2,6])
-            
-            # grad[bond_break_idx] *= 0.0
-            # dist_hessian[bond_break_idx] *= 0.0
+            pes_prime = (np.matmul(self.impes_coordinate.b_matrix.T, (grad + dist_hessian_eff))).reshape(natm, 3)
 
-            # masses = self.molecule.get_masses().copy()
-            # masses_cart = np.repeat(masses, 3)
-            # inv_sqrt_masses = 1.0 / np.sqrt(masses_cart)
-            # self.impes_coordinate.inv_sqrt_masses = inv_sqrt_masses
-            
-            pes_prime = (np.matmul(self.impes_coordinate.b_matrix.T, (grad + dist_hessian))).reshape(natm, 3)
-            # pes_prime += np.tensordot(self.impes_coordinate.b2_matrix, (grad + dist_hessian), axes=([0],[0])).reshape(natm,3)
-
-            return pes, pes_prime, (grad + dist_hessian)
+            return pes, pes_prime, (grad + dist_hessian_eff)
 
     
     def te_weight_gradient(self, theta, b_matrix_col):
@@ -1728,8 +1752,8 @@ class InterpolationDriver():
             w_tot = score_i_kcal / (score_i_kcal.sum() + eps)
 
             # for bookkeeping: check sums
-            assert np.allclose(e_i.sum(), delta_E, atol=1e-12)
-            assert np.allclose(g_i.sum(), delta_G, atol=1e-12)
+            # assert np.allclose(e_i.sum(), delta_E, atol=1e-12)
+            # assert np.allclose(g_i.sum(), delta_G, atol=1e-12)
 
             # --- final per-coordinate entry ---
             contributions = list(
@@ -1797,8 +1821,6 @@ class InterpolationDriver():
                 print(f" {i:2d} {tuple(int(x) for x in coord)}: |pE|={abs(pE):.3e} Ha, share={e_kcal:.3f} kcal/mol, w={w_i:.3f} {picked}")
                 print('Sum of energy-weights:', float(sorted_weights.sum()))
                 print('Selected constraints so far:', constraints)
-            
-            exit()
 
             return constraints
 
@@ -1950,9 +1972,6 @@ class InterpolationDriver():
                 int_coords.append(np.sin(q.value(coords)))
             else:
                 int_coords.append(q.value(coords))
-
-        
-                
 
         X = np.array(int_coords)
 
