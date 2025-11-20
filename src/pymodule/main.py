@@ -35,11 +35,13 @@ from datetime import datetime, timedelta
 
 from .veloxchemlib import mpi_master
 from .mpitask import MpiTask
+from .molecularbasis import MolecularBasis
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .scfrestopendriver import ScfRestrictedOpenDriver
 from .mmforcefieldgenerator import MMForceFieldGenerator
 from .respchargesdriver import RespChargesDriver
+from .espchargesdriver import EspChargesDriver
 from .excitondriver import ExcitonModelDriver
 from .numerovdriver import NumerovDriver
 from .mp2driver import Mp2Driver
@@ -57,8 +59,8 @@ from .rspcdspec import CircularDichroismSpectrum
 from .rspc6 import C6
 from .rspshg import SHG
 from .rsptpatransition import TpaTransition
+from .rspdoublerestrans import DoubleResTransition
 from .rspthreepatransition import ThreePATransition
-
 from .rsptpa import TPA
 from .tdhfhessiandriver import TdhfHessianDriver
 from .polarizabilitygradient import PolarizabilityGradient
@@ -106,6 +108,9 @@ def select_scf_driver(task, scf_type):
         scf_drv = ScfRestrictedOpenDriver(task.mpi_comm, task.ostream)
     else:
         assert_msg_critical(False, f'SCF: invalid scf_type {scf_type}')
+
+    # set print level for input file based calculation
+    scf_drv.print_level = 2
 
     return scf_drv
 
@@ -180,6 +185,9 @@ def select_rsp_property(task, mol_orbs, rsp_dict, method_dict):
     elif prop_type == 'tpa transition':
         rsp_prop = TpaTransition(rsp_dict, method_dict)
 
+    elif prop_type == 'transition dipole moment':
+        rsp_prop = DoubleResTransition(rsp_dict, method_dict)
+
     elif prop_type == '3pa transition':
         rsp_prop = ThreePATransition(rsp_dict, method_dict)
 
@@ -192,6 +200,9 @@ def select_rsp_property(task, mol_orbs, rsp_dict, method_dict):
     else:
         assert_msg_critical(False,
                             f'Response: invalid response property {prop_type}')
+
+    # set print level for input file based calculation
+    rsp_prop.print_level = 2
 
     return rsp_prop
 
@@ -379,11 +390,15 @@ def main():
 
             if use_xtb:
                 grad_drv = XtbGradientDriver(xtb_drv)
+                # set print level for input file based calculation
+                grad_drv.print_level = 2
                 grad_drv.update_settings(grad_dict, method_dict)
                 grad_drv.compute(task.molecule)
 
             else:
                 grad_drv = ScfGradientDriver(scf_drv)
+                # set print level for input file based calculation
+                grad_drv.print_level = 2
                 grad_drv.update_settings(grad_dict, method_dict)
                 grad_drv.compute(task.molecule, task.ao_basis, scf_results)
 
@@ -407,6 +422,8 @@ def main():
             rsp_prop.compute(task.molecule, task.ao_basis, scf_results)
 
             tddftgrad_drv = TddftGradientDriver(scf_drv)
+            # set print level for input file based calculation
+            tddftgrad_drv.print_level = 2
             tddftgrad_drv.update_settings(grad_dict, rsp_dict, orbrsp_dict,
                                           method_dict)
             tddftgrad_drv.compute(task.molecule, task.ao_basis, scf_drv,
@@ -425,11 +442,15 @@ def main():
 
         if use_xtb:
             hessian_drv = XtbHessianDriver(xtb_drv)
+            # set print level for input file based calculation
+            hessian_drv.print_level = 2
             hessian_drv.update_settings(method_dict, hessian_dict)
             hessian_drv.compute(task.molecule)
 
         else:
             hessian_drv = ScfHessianDriver(scf_drv)
+            # set print level for input file based calculation
+            hessian_drv.print_level = 2
             hessian_drv.update_settings(method_dict, hessian_dict, orbrsp_dict)
             hessian_drv.compute(task.molecule, task.ao_basis)
 
@@ -525,6 +546,8 @@ def main():
 
         if use_xtb:
             vibrational_drv = VibrationalAnalysis(xtb_drv)
+            # set print level for input file based calculation
+            vibrational_drv.print_level = 2
             vibrational_drv.update_settings(method_dict,
                                             vib_dict,
                                             hessian_dict=hessian_dict,
@@ -534,6 +557,8 @@ def main():
 
         else:
             vibrational_drv = VibrationalAnalysis(scf_drv)
+            # set print level for input file based calculation
+            vibrational_drv.print_level = 2
             vibrational_drv.update_settings(method_dict,
                                             vib_dict,
                                             hessian_dict=hessian_dict,
@@ -570,7 +595,9 @@ def main():
 
     # Response
 
-    if task_type == 'response' and scf_drv.scf_type == 'restricted':
+    if (task_type == 'response' and
+            scf_drv.scf_type in ['restricted', 'unrestricted']):
+
         rsp_dict = (dict(task.input_dict['response'])
                     if 'response' in task.input_dict else {})
         rsp_dict['program_end_time'] = program_end_time
@@ -578,7 +605,9 @@ def main():
         rsp_dict = updated_dict_with_eri_settings(rsp_dict, scf_drv)
 
         rsp_prop = select_rsp_property(task, mol_orbs, rsp_dict, method_dict)
-        rsp_prop.init_driver(task.mpi_comm, task.ostream)
+        rsp_prop.init_driver(task.mpi_comm,
+                             task.ostream,
+                             method_type=scf_drv.scf_type)
         rsp_prop.compute(task.molecule, task.ao_basis, scf_results)
 
         if not rsp_prop.is_converged:
@@ -615,6 +644,8 @@ def main():
             if 'gradient' in task.input_dict:
                 grad_dict = task.input_dict['gradient']
                 tddftgrad_drv = TddftGradientDriver(scf_drv)
+                # set print level for input file based calculation
+                tddftgrad_drv.print_level = 2
                 tddftgrad_drv.update_settings(grad_dict, rsp_dict, orbrsp_dict,
                                               method_dict)
                 tddftgrad_drv.compute(task.molecule, task.ao_basis, scf_drv,
@@ -684,7 +715,7 @@ def main():
         pe_ff_gen = PEForceFieldGenerator(task.mpi_comm, task.ostream)
         pe_ff_gen.compute(task.molecule, task.ao_basis, scf_results)
 
-    # RESP and ESP charges
+    # RESP/ESP charges
 
     if task_type in ['resp charges', 'esp charges']:
         if (task_type == 'resp charges' and 'resp_charges' in task.input_dict):
@@ -696,15 +727,23 @@ def main():
 
         charges_dict['filename'] = task.input_dict['filename']
 
-        chg_drv = RespChargesDriver(task.mpi_comm, task.ostream)
+        if task_type == 'resp charges':
+            chg_drv = RespChargesDriver(task.mpi_comm, task.ostream)
+        elif task_type == 'esp charges':
+            chg_drv = EspChargesDriver(task.mpi_comm, task.ostream)
+
         chg_drv.update_settings(charges_dict, method_dict)
 
-        if task_type == 'resp charges':
-            # TODO: use scf_results
-            chg_drv.compute(task.molecule, task.ao_basis, 'resp')
-        elif task_type == 'esp charges':
-            # TODO: use scf_results
-            chg_drv.compute(task.molecule, task.ao_basis, 'esp')
+        if task.molecule.number_of_atoms() == 0:
+            molecules = chg_drv.read_multiple_molecules()
+            basis_name = task.input_dict['method_settings']['basis'].upper()
+            basis_sets = [
+                MolecularBasis.read(mol, basis_name, verbose=False)
+                for mol in molecules
+            ]
+            chg_drv.compute(molecules, basis_sets)
+        else:
+            chg_drv.compute(task.molecule, task.ao_basis)
 
     # All done
 

@@ -118,6 +118,7 @@ from .molecularbasis import MolecularBasis
 from .aodensitymatrix import AODensityMatrix
 from .molecularorbitals import MolecularOrbitals
 from .rifockdriver import RIFockDriver
+from .rijkfockdriver import RIJKFockDriver
 from .fockdriver import FockDriver
 from .griddriver import GridDriver
 from .scfrestdriver import ScfRestrictedDriver
@@ -137,9 +138,12 @@ from .cubicgrid import CubicGrid
 from .visualizationdriver import VisualizationDriver
 from .excitondriver import ExcitonModelDriver
 from .tdaeigensolver import TdaEigenSolver
+from .tdaeigensolverunrest import TdaUnrestrictedEigenSolver
 from .blockdavidson import BlockDavidsonSolver
 from .lreigensolver import LinearResponseEigenSolver
+from .lreigensolverunrest import LinearResponseUnrestrictedEigenSolver
 from .lrsolver import LinearResponseSolver
+from .lrsolverunrest import LinearResponseUnrestrictedSolver
 from .cppsolver import ComplexResponse
 from .c6driver import C6Driver
 from .quadraticresponsedriver import QuadraticResponseDriver
@@ -149,6 +153,7 @@ from .tpatransitiondriver import TpaTransitionDriver
 from .threepatransitiondriver import ThreePATransitionDriver
 from .tpafulldriver import TpaFullDriver
 from .tpareddriver import TpaReducedDriver
+from .espchargesdriver import EspChargesDriver
 from .respchargesdriver import RespChargesDriver
 from .rspproperty import ResponseProperty
 from .rsplinabscross import LinearAbsorptionCrossSection
@@ -169,6 +174,7 @@ from .hessiandriver import HessianDriver
 from .scfhessiandriver import ScfHessianDriver
 from .cphfsolver import CphfSolver
 from .hessianorbitalresponse import HessianOrbitalResponse
+from .hessianorbitalresponseunrest import UnrestrictedHessianOrbitalResponse
 from .tdhfhessiandriver import TdhfHessianDriver
 from .polorbitalresponse import PolOrbitalResponse
 from .polarizabilitygradient import PolarizabilityGradient
@@ -187,7 +193,7 @@ from .solvationfepdriver import SolvationFepDriver
 from .openmmdynamics import OpenMMDynamics
 from .excitedstateanalysisdriver import ExcitedStateAnalysisDriver
 from .evbdriver import EvbDriver
-from .evbffbuilder import EvbForceFieldBuilder
+from .reaffbuilder import ReactionForceFieldBuilder
 from .evbsystembuilder import EvbSystemBuilder
 from .evbsystembuilder import EvbForceGroup
 from .evbfepdriver import EvbFepDriver
@@ -200,7 +206,9 @@ from .interpolationdatapoint import InterpolationDatapoint
 from .mofbuilder import MofBuilder
 from .conformergenerator import ConformerGenerator
 from .tsguesser import TransitionStateGuesser
-
+from .reactionmatcher import ReactionMatcher
+from .smddriver import SmdDriver
+from .atombdedriver import AtomBdeDriver
 # for backward compatibility only
 from .peforcefieldgenerator import PEForceFieldGenerator as LoPropDriver
 

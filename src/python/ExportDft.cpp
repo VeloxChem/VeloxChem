@@ -140,7 +140,11 @@ CXCIntegrator_integrate_fxc_fock(const CXCIntegrator&                    self,
     auto        num_gs_dens = static_cast<int>(gsDensityArrays.size());
     std::string errnum("integrate_fxc_fock: Inconsistent number of numpy arrays");
     errors::assertMsgCritical(num_rw_dens == num_focks, errnum);
-    errors::assertMsgCritical(num_gs_dens == 1, errnum);
+    errors::assertMsgCritical((num_gs_dens == 1) || (num_gs_dens == 2), errnum);
+    if (num_gs_dens == 2)
+    {
+        errors::assertMsgCritical(num_rw_dens % 2 == 0, errnum);
+    }
 
     auto nao = static_cast<int>(basis.dimensions_of_basis());
     check_arrays("integrate_fxc_fock", aoFockArrays, nao);
@@ -429,9 +433,22 @@ CXCMolecularHessian_integrate_vxc_fock_gradient(CXCMolecularHessian&       self,
     py::list ret;
     for (int vecind = 0; vecind < static_cast<int>(atomIdxVec.size()); vecind++)
     {
-        ret.append(vlx_general::pointer_to_numpy(vxcgrad[vecind * 3 + 0].values(), {nao, nao}));
-        ret.append(vlx_general::pointer_to_numpy(vxcgrad[vecind * 3 + 1].values(), {nao, nao}));
-        ret.append(vlx_general::pointer_to_numpy(vxcgrad[vecind * 3 + 2].values(), {nao, nao}));
+        if (num_gs_dens == 1)
+        {
+            ret.append(vlx_general::pointer_to_numpy(vxcgrad[vecind * 3 + 0].values(), {nao, nao}));
+            ret.append(vlx_general::pointer_to_numpy(vxcgrad[vecind * 3 + 1].values(), {nao, nao}));
+            ret.append(vlx_general::pointer_to_numpy(vxcgrad[vecind * 3 + 2].values(), {nao, nao}));
+        }
+        else
+        {
+            ret.append(vlx_general::pointer_to_numpy(vxcgrad[vecind * 6 + 0].values(), {nao, nao}));
+            ret.append(vlx_general::pointer_to_numpy(vxcgrad[vecind * 6 + 1].values(), {nao, nao}));
+            ret.append(vlx_general::pointer_to_numpy(vxcgrad[vecind * 6 + 2].values(), {nao, nao}));
+
+            ret.append(vlx_general::pointer_to_numpy(vxcgrad[vecind * 6 + 3].values(), {nao, nao}));
+            ret.append(vlx_general::pointer_to_numpy(vxcgrad[vecind * 6 + 4].values(), {nao, nao}));
+            ret.append(vlx_general::pointer_to_numpy(vxcgrad[vecind * 6 + 5].values(), {nao, nao}));
+        }
     }
     return ret;
 }

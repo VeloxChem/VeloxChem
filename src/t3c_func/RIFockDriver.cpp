@@ -32,11 +32,14 @@
 
 #include "RIFockDriver.hpp"
 
+#include "BatchFunc.hpp"
 #include "ThreeCenterElectronRepulsionDriver.hpp"
 
 CRIFockDriver::CRIFockDriver()
 
     : _j_metric(nullptr)
+
+    , _k_metric(nullptr)
 
     , _eri_buffer(CT3FlatBuffer<double>())
 {
@@ -46,6 +49,20 @@ CRIFockDriver::CRIFockDriver()
 CRIFockDriver::CRIFockDriver(const CSubMatrix& j_metric)
 
     : _j_metric(new CSubMatrix(j_metric))
+
+    , _k_metric(nullptr)
+
+    , _eri_buffer(CT3FlatBuffer<double>())
+{
+    
+}
+
+CRIFockDriver::CRIFockDriver(const CSubMatrix& j_metric,
+                             const CSubMatrix& k_metric)
+
+    : _j_metric(new CSubMatrix(j_metric))
+
+    , _k_metric(new CSubMatrix(k_metric))
 
     , _eri_buffer(CT3FlatBuffer<double>())
 {
@@ -57,6 +74,11 @@ CRIFockDriver::~CRIFockDriver()
     if (_j_metric != nullptr)
     {
         delete _j_metric;
+    }
+    
+    if (_k_metric != nullptr)
+    {
+        delete _k_metric;
     }
 }
 
@@ -161,6 +183,19 @@ CRIFockDriver::compute_local_bq_vector(const CMatrix &density) const -> std::vec
 }
 
 auto
+CRIFockDriver::compute_bq_vector(const CSubMatrix& lambda_p, const CSubMatrix& lambda_h) const -> std::vector<double>
+{
+    const auto mask = _eri_buffer.mask_indices();
+    
+    if (!mask.empty())
+    {
+        //std::cout << "mask size:" << std::endl;
+    }
+    
+    return std::vector<double>();
+}
+
+auto
 CRIFockDriver::_comp_gamma_vector(const CMatrix &density) const -> std::vector<double>
 {
     const auto ndim = _eri_buffer.aux_width();
@@ -179,6 +214,7 @@ CRIFockDriver::_comp_gamma_vector(const CMatrix &density) const -> std::vector<d
     
     auto gvec_ptr = gvec.data();
     
+#pragma omp parallel for shared(dvec_ptr, buff_ptr, gvec_ptr, nelems, ndim) schedule(dynamic)
     for (size_t i = 0; i < ndim; i++)
     {
         auto tint_ptr = buff_ptr->data(i);
@@ -210,6 +246,7 @@ CRIFockDriver::_trafo_gamma_vector(const std::vector<double>& gvector) const -> 
     
     auto tmat_ptr = _j_metric->data();
     
+#pragma omp parallel for shared(tvec_ptr, tmat_ptr, gvec_ptr, ndim) schedule(dynamic)
     for (size_t i = 0; i < ndim; i++)
     {
         auto row_ptr = &tmat_ptr[i * ndim];
@@ -241,15 +278,16 @@ CRIFockDriver::_trafo_local_gamma_vector(const std::vector<double>& gvector) con
     
     auto tmat_ptr = _j_metric->data();
     
-    const auto mask_indices = _eri_buffer.mask_indices();
+    auto buff_ptr = &_eri_buffer;
     
+#pragma omp parallel for shared(tvec_ptr, tmat_ptr, gvec_ptr, buff_ptr, ndim) schedule(dynamic)
     for (size_t i = 0; i < ndim; i++)
     {
         auto row_ptr = &tmat_ptr[i * ndim];
         
         double fsum = 0.0;
         
-        for (const auto [gidx, lidx] : mask_indices)
+        for (const auto [gidx, lidx] : buff_ptr->mask_indices())
         {
             fsum += row_ptr[gidx] * gvec_ptr[lidx];
         }
@@ -308,20 +346,42 @@ CRIFockDriver::_comp_local_j_vector(const std::vector<double>& gvector) const ->
     
     auto buff_ptr = &_eri_buffer;
     
-    const auto mask_indices = _eri_buffer.mask_indices();
+    // set up batch size for OMP region
     
-    for (const auto [gidx, lidx] : mask_indices)
+    const size_t bsize = 500;
+    
+    #pragma omp parallel shared(buff_ptr, gvec_ptr, jvec_ptr, nelems, bsize)
     {
-        auto tint_ptr = buff_ptr->data(lidx);
-        
-        const auto fact = gvec_ptr[gidx];
-         
-#pragma omp simd
-        for (size_t j = 0; j < nelems; j++)
+        #pragma omp single nowait
         {
-            jvec_ptr[j] += tint_ptr[j] * fact;
+            const auto nbatches = batch::number_of_batches(nelems, bsize);
+            
+            for (size_t i = 0; i < nbatches; i++)
+            {
+                const auto bpair = batch::batch_range(i, nelems, bsize);
+                
+                #pragma omp task firstprivate(bpair)
+                {
+                    const size_t bstart = bpair.first;
+                    
+                    const size_t bend = bpair.second;
+                    
+                    for (const auto [gidx, lidx] : buff_ptr->mask_indices())
+                    {
+                        auto tint_ptr = buff_ptr->data(lidx);
+                        
+                        const auto fact = gvec_ptr[gidx];
+                         
+                        #pragma omp simd
+                        for (size_t j = bstart; j < bend; j++)
+                        {
+                            jvec_ptr[j] += tint_ptr[j] * fact;
+                        }
+                    }
+                }
+            }
         }
     }
-        
+
     return jvec;
 }

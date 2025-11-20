@@ -52,6 +52,12 @@ class CRIFockDriver
     /// Creates a Fock matrices  driver.
     /// @param j_metric The metric matrix for J fitting.
     CRIFockDriver(const CSubMatrix& j_metric);
+    
+    /// Creates a Fock matrices  driver.
+    /// @param j_metric The metric matrix for J fitting.
+    /// @param k_metric The metric matrix for K fitting.
+    CRIFockDriver(const CSubMatrix& j_metric,
+                  const CSubMatrix& k_metric);
 
     /// @brief The default copy constructor.
     /// @param other The Fock matrices driver to be copied.
@@ -137,9 +143,18 @@ class CRIFockDriver
     /// @return The transformed Gamma vector.
     auto compute_local_bq_vector(const CMatrix &density) const -> std::vector<double>;
     
+    /// @brief Computes transformed Bq vector with K metric for given similarity transformed MOs.
+    /// @param lambda_p The MOs augmented by particle single excitations.
+    /// @param lambda_h The MOs augmented by hole single excitations.
+    /// @return The transformed Gamma vector.
+    auto compute_bq_vector(const CSubMatrix& lambda_p, const CSubMatrix& lambda_h) const -> std::vector<double>;
+    
     private:
     /// @brief Pointer to metric matrix for J fitting.
     CSubMatrix* _j_metric;
+    
+    /// @brief Pointer to metric matrix for K fitting.
+    CSubMatrix* _k_metric;
     
     /// @brief Three center electron repulsion integrals buffer.
     CT3FlatBuffer<double> _eri_buffer;

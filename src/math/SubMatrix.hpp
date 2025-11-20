@@ -59,6 +59,14 @@ class CSubMatrix
     /// @param values The vector of values to initialize submatrix values.
     /// @param dimensions The dimensions of submatrix.
     CSubMatrix(const std::vector<double> &values, const std::array<size_t, 4> &dimensions);
+    
+    /// @brief The constructor with submatrix dimensions and vector of initial values.
+    /// @param values The vector of values to initialize submatrix values.
+    /// @param mask The vector with reduction indices.
+    /// @param dimensions The dimensions of submatrix.
+    CSubMatrix(const std::vector<double>&                    values,
+               const std::vector<std::pair<size_t, size_t>>& mask,
+               const std::array<size_t, 4>&                  dimensions);
 
     /// @brief The default copy constructor.
     /// @param other The submatrix to be copied.

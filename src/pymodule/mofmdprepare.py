@@ -129,19 +129,6 @@ def ff_gen_xyz(
     return str(Path("Residues", f"{gromacs_file}.itp"))
 
 
-# 1.ff_gen to generate ff for user_linker
-# 2. parse ff
-# 3. mapping and replace new mof_edge ff
-
-###ff_name = ff_gen_xyz(linker_file,charge=-3)
-##ff_name='/Users/chenxili/GitHub/MOFbuilder/tests/Residues/triph.itp'
-##mapping = get_mapping_between_nometal_linker_xyz(linker_topic,center_frag_nodes_num,center_Xs,single_frag_nodes_num,frag_Xs,linker_file, new_xyz='Residues/EDGE.xyz')
-##map_name = 'linker_ff_mapping'
-##parsed_path=parseff(ff_name)
-##map_path = write_mapping_file(parsed_path,mapping,map_name)
-##map_forcefield_by_xyz(parsed_path,map_path,linker_file, new_xyz='EDGE.xyz')
-
-
 def get_residues_forcefield(
     arr,
     node_split_dict,
@@ -155,7 +142,7 @@ def get_residues_forcefield(
     frag_Xs,
 ):
     new_arr_list = []
-    print("fetching residues...")
+    #print("fetching residues...")
     restypes = [name for name in np.unique(arr[:, 1])]
 
     Path("Residues").mkdir(parents=True, exist_ok=True)
@@ -185,21 +172,21 @@ def get_residues_forcefield(
             # print(res_previous_sum,res_sum,res)
             xyz_file = Path("Residues", f"{res}.xyz")
             temp_xyz_nm(xyz_file, sample_arr)
-            if res == "O":
-                # xtb_residue(xyz_file,-2)
-                # ff_gen_xyz(xyz_file,charge=-2)
-                print(res, "  fetched/optimized")
-            elif res == "HO":
-                # xtb_residue(xyz_file,-1)
-                # ff_gen_xyz(xyz_file,charge=-1)
-                print(res, "  fetched/optimized")
-            elif res == "HHO":
-                # xtb_residue(xyz_file,0)
-                # ff_gen_xyz(xyz_file,charge=0)
-                print(res, "  fetched/optimized")
-
-            elif res == "METAL":
-                print(res, "  fetched")
+            #if res == "O":
+            #    # xtb_residue(xyz_file,-2)
+            #    # ff_gen_xyz(xyz_file,charge=-2)
+            #    #print(res, "  fetched/optimized")
+            #elif res == "HO":
+            #    # xtb_residue(xyz_file,-1)
+            #    # ff_gen_xyz(xyz_file,charge=-1)
+            #    ##print(res, "  fetched/optimized")
+            #elif res == "HHO":
+            #    # xtb_residue(xyz_file,0)
+            #    # ff_gen_xyz(xyz_file,charge=0)
+            #    print(res, "  fetched/optimized")
+#
+            #elif res == "METAL":
+            #    print(res, "  fetched")
 
             ##reindex resnumber
             new_arr_list.append(type_arr)
@@ -239,17 +226,17 @@ def get_residues_forcefield(
                                       map_path,
                                       linker_file,
                                       new_xyz="EDG.xyz")
-                print(res, "  mapped")
-            elif res in ["HEDGE"]:
-                # xtb_residue(xyz_file,-1*linker_topic+1)
-                print(res, "   mapped/optimized")
-            elif res in ["HHEDGE"]:
-                # xtb_residue(xyz_file,-1*linker_topic+2)
-                print(res, "   mapped/optimized")
-            elif res in ["TERM"]:
-                # xtb_residue(xyz_file,-1)
-                # ff_gen_xyz(xyz_file,charge=-1,residue_name=res[:3])
-                print(res, "  fetched/optimized")
+                #print(res, "  mapped")
+            #elif res in ["HEDGE"]:
+            #    # xtb_residue(xyz_file,-1*linker_topic+1)
+            #    #print(res, "   mapped/optimized")
+            #elif res in ["HHEDGE"]:
+            #    # xtb_residue(xyz_file,-1*linker_topic+2)
+            #    #print(res, "   mapped/optimized")
+            #elif res in ["TERM"]:
+            #    # xtb_residue(xyz_file,-1)
+            #    # ff_gen_xyz(xyz_file,charge=-1,residue_name=res[:3])
+            #    print(res, "  fetched/optimized")
 
             ##reindex resnumber
             new_arr_list.append(type_arr)
@@ -294,7 +281,7 @@ def parseff(INPUT):
         if title == 'dihedrals':
             if 'impropers' in middlelines[1]:
                 title = 'dihedrals_im'
-        print(title)
+        #print(title)
         fp_w = open(newpath + title + '.txt', 'w')
         for key in middlelines:
             fp_w.write(key)
@@ -730,7 +717,7 @@ def map_forcefield_by_xyz(path, map_path, ff_xyz, new_xyz='EDGE.xyz'):
         if dihedrals_im:
             f.writelines(dihedrals_im)
             f.write("\n")
-    print(str(new_itp) + ' is generated')
+    #print(str(new_itp) + ' is generated')
 
 
 ######below are from write_mapping_between.py##########
@@ -755,10 +742,10 @@ def find_isomorphism_and_mapping(matrix1, matrix2):
     if gm.is_isomorphic():
         return True, gm.mapping
     else:
-        print("The graphs are not isomorphic.", len(G1.nodes()),
-              len(G2.nodes()))
-        print("G1.edges()", G1.edges())
-        print("G2.edges()", G2.edges())
+        #print("The graphs are not isomorphic.", len(G1.nodes()),
+        #      len(G2.nodes()))
+        #print("G1.edges()", G1.edges())
+        #print("G2.edges()", G2.edges())
         return False, None
 
 
@@ -783,14 +770,14 @@ def get_mapping_between_nometal_linker_xyz(
         # G_user = create_graph_from_matrix(matrix_user)
         isomorphic, mapping = find_isomorphism_and_mapping(
             matrix_mof, matrix_user)
-        if isomorphic:
-            print("The graphs are isomorphic.")
-            print("Node mapping:", mapping)
-            # permuted_matrix = permute_matrix(matrix1, mapping)
-            # print("Permuted Matrix:\n", permuted_matrix)
-        else:
-            print("The graphs are not isomorphic.")
-            #plot2dedge(G, coords, G.edges())
+        #if isomorphic:
+        #    #print("The graphs are isomorphic.")
+        #    print("Node mapping:", mapping)
+        #    # permuted_matrix = permute_matrix(matrix1, mapping)
+        #    # print("Permuted Matrix:\n", permuted_matrix)
+        #else:
+        #    print("The graphs are not isomorphic.")
+        #    #plot2dedge(G, coords, G.edges())
         return mapping, metals, mol_metals
     else:
         if len(metals) == 1:
@@ -832,7 +819,7 @@ def get_mapping_between_nometal_linker_xyz(
             left_xs = list(
                 set(frag1_Xs + frag2_Xs + frag3_Xs) -
                 set(i[1] for i in cn_bond))
-            print(left_xs, "left_xs")
+            #print(left_xs, "left_xs")
             if linker_topic == 3:
                 for m in range(len(labels) - 3 * 3, len(labels)):
                     if labels[m] == "C":
@@ -859,7 +846,7 @@ def get_mapping_between_nometal_linker_xyz(
             left_xs = list(
                 set(frag1_Xs + frag2_Xs + frag3_Xs + frag4_Xs) -
                 set(i[1] for i in cn_bond))
-            print(left_xs, "left_xs")
+            #print(left_xs, "left_xs")
             for m in range(len(labels) - 4 * 3, len(labels)):
                 if labels[m] == "C":
                     x_ooc = coords[m]
@@ -868,12 +855,12 @@ def get_mapping_between_nometal_linker_xyz(
 
                         if np.linalg.norm(x_frag - x_ooc) < 5:
                             cn_bond.append((n, m))
-                            print(
-                                "np.linalg.norm(x_frag-x_ooc)",
-                                n,
-                                m,
-                                np.linalg.norm(x_frag - x_ooc),
-                            )
+                            #print(
+                            #    "np.linalg.norm(x_frag-x_ooc)",
+                            #    n,
+                            #    m,
+                            #    np.linalg.norm(x_frag - x_ooc),
+                            #)
 
         # seperate all frags and clean bonds between frags
 
@@ -881,23 +868,23 @@ def get_mapping_between_nometal_linker_xyz(
             if edge[0] in center_range:
                 if edge[1] not in center_range:
                     G.remove_edge(edge[0], edge[1])
-                    print(edge)
+                    #print(edge)
             elif edge[0] in frag1_range:
                 if edge[1] not in frag1_range:
                     G.remove_edge(edge[0], edge[1])
-                    print(edge)
+                    #print(edge)
             elif edge[0] in frag2_range:
                 if edge[1] not in frag2_range:
                     G.remove_edge(edge[0], edge[1])
-                    print(edge)
+                    #print(edge)
             elif edge[0] in frag3_range:
                 if edge[1] not in frag3_range:
                     G.remove_edge(edge[0], edge[1])
-                    print(edge)
+                    #print(edge)
             elif edge[0] in frag4_range:
                 if edge[1] not in frag4_range:
                     G.remove_edge(edge[0], edge[1])
-                    print(edge)
+                    #print(edge)
 
         if len(metals) > 0:
             # remove all edges from metal
@@ -905,26 +892,26 @@ def get_mapping_between_nometal_linker_xyz(
             edges_with_Metal = list(G.edges(int(metals[0])))
             G.remove_edges_from(edges_with_Metal)
 
-        if len(metals) == 0:
-            if len(sorted(nx.connected_components(G))) == 2 * linker_topic + 1:
-                print(len(sorted(nx.connected_components(G))),
-                      " parts are seperated")
-            else:
-                print(len(sorted(nx.connected_components(G))),
-                      " parts are seperated")
+        #if len(metals) == 0:
+            #if len(sorted(nx.connected_components(G))) == 2 * linker_topic + 1:
+                #print(len(sorted(nx.connected_components(G))),
+                #      " parts are seperated")
+            #else:
+                #print(len(sorted(nx.connected_components(G))),
+                #      " parts are seperated")
                 # plot2dedge(G,coords,G.edges())
-                raise ValueError(
-                    "nx.connected_components is not linker_topic+1")
-        else:
-            if len(sorted(nx.connected_components(G))) == 2 * linker_topic + 2:
-                print(len(sorted(nx.connected_components(G))),
-                      " parts are seperated")
-            else:
-                print(len(sorted(nx.connected_components(G))),
-                      " parts are seperated")
-                # plot2dedge(G,coords,G.edges())
-                raise ValueError(
-                    "nx.connected_components is not linker_topic+2")
+                #raise ValueError(
+                #    "nx.connected_components is not linker_topic+1")
+        #else:
+        #    if len(sorted(nx.connected_components(G))) == 2 * linker_topic + 2:
+        #        print(len(sorted(nx.connected_components(G))),
+        #              " parts are seperated")
+        #    else:
+        #        print(len(sorted(nx.connected_components(G))),
+        #              " parts are seperated")
+        #        # plot2dedge(G,coords,G.edges())
+        #        raise ValueError(
+        #            "nx.connected_components is not linker_topic+2")
 
         # rebuild bond between fragXs and get_connectivity matrix of EDGE
         cn_matrix = np.zeros((G.number_of_nodes(), G.number_of_nodes()))
@@ -938,17 +925,17 @@ def get_mapping_between_nometal_linker_xyz(
             cn_matrix[xx_cn[1], xx_cn[0]] = 1
             G.add_edge(int(xx_cn[0]), int(xx_cn[1]))
         if len(metals) == 0:
-            if len(sorted(nx.connected_components(G))) == 1:
-                print("reconnect succeed")
-            else:
-                print(len(sorted(nx.connected_components(G))), cn_bond)
+            if len(sorted(nx.connected_components(G))) != 1:
+                #print("reconnect succeed")
+            #else:
+                #print(len(sorted(nx.connected_components(G))), cn_bond)
                 #plot2dedge(G, coords, G.edges())
                 raise ValueError("reconnect failed")
-        elif len(metals) == 1:
-            if len(sorted(nx.connected_components(G))) == 2:
-                print("reconnect succeed")
-            else:
-                print(len(sorted(nx.connected_components(G))), cn_bond)
+        elif len(metals) != 1:
+            #if len(sorted(nx.connected_components(G))) == 2:
+            #    print("reconnect succeed")
+            #else:
+            #   print(len(sorted(nx.connected_components(G))), cn_bond)
                 #plot2dedge(G, coords, G.edges())
                 raise ValueError("reconnect failed")
 
@@ -962,14 +949,14 @@ def get_mapping_between_nometal_linker_xyz(
 
         isomorphic, mapping = find_isomorphism_and_mapping(
             matrix_mof, matrix_user)
-        if isomorphic:
-            print("The graphs are isomorphic.")
-            print("Node mapping:", mapping)
-            # permuted_matrix = permute_matrix(matrix1, mapping)
-            # print("Permuted Matrix:\n", permuted_matrix)
-        else:
-            print("The graphs are not isomorphic.")
-            #plot2dedge(G, coords, G.edges())
+        #if isomorphic:
+        #    print("The graphs are isomorphic.")
+        #    print("Node mapping:", mapping)
+        #    # permuted_matrix = permute_matrix(matrix1, mapping)
+        #    # print("Permuted Matrix:\n", permuted_matrix)
+        #else:
+        #    print("The graphs are not isomorphic.")
+        #    #plot2dedge(G, coords, G.edges())
     return mapping, metals, mol_metals
 
 
@@ -1099,7 +1086,7 @@ def atoms2c(output, dx, dy, dz, x, y, z):
 
         newgro.append(box)
         fp.writelines(newgro)
-        print(f_name, ' is generated')
+        #print(f_name, ' is generated')
         return f_name
 
 
@@ -1134,7 +1121,7 @@ def extract_atomstypes(itp_path):
     all_secs = []
     for f in Path(itp_path).rglob("*itp"):
         if str(Path(f).parent) not in ["posre.itp"]:
-            print(f)
+            #print(f)
             sec_atomtypes = itp_extract(f)
             all_secs += sec_atomtypes
     return all_secs
@@ -1185,7 +1172,7 @@ def genrate_top_file(itp_path, data_path, res_info, model_name=None):
     top_path = "MD_run/" + topname
     with open(top_path, "w") as f:
         f.writelines(newtop)
-    print(topname, "is generated")
+    #print(topname, "is generated")
     return top_path
 
 

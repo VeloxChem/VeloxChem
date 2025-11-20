@@ -30,6 +30,7 @@
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+from collections import Counter
 import numpy as np
 import time as tm
 import math
@@ -45,7 +46,6 @@ from .matrices import Matrices
 from .profiler import Profiler
 from .distributedarray import DistributedArray
 from .cphfsolver import CphfSolver
-from .errorhandler import assert_msg_critical
 from .dftutils import get_default_grid_level
 from .batchsize import get_batch_size
 
@@ -59,10 +59,6 @@ class HessianOrbitalResponse(CphfSolver):
         The MPI communicator.
     :param ostream:
         The output stream.
-
-    Instance variables
-        - use_subspace_solver: flag to use subspace solver
-          instead of conjugate gradient.
     """
 
     def __init__(self, comm=None, ostream=None):
@@ -88,8 +84,14 @@ class HessianOrbitalResponse(CphfSolver):
 
         super().update_settings(cphf_dict, method_dict)
 
-    def compute_rhs(self, molecule, basis, scf_tensors, eri_dict, dft_dict,
-                    pe_dict):
+    def compute_rhs(self,
+                    molecule,
+                    basis,
+                    scf_tensors,
+                    eri_dict,
+                    dft_dict,
+                    pe_dict,
+                    atom_pairs=None):
         """
         Computes the right hand side for the CPHF equations for
         the analytical Hessian, all atomic coordinates.
@@ -148,9 +150,23 @@ class HessianOrbitalResponse(CphfSolver):
         omega_ao = -1.0 * np.linalg.multi_dot([mo_occ, np.diag(eocc), mo_occ.T])
 
         # partition atoms for parallellisation
-        # TODO: use partition_atoms in e.g. scfgradientdriver
-        local_atoms = partition_atoms(natm, self.rank, self.nodes)
+        if atom_pairs is None:
+            local_atoms = partition_atoms(natm, self.rank, self.nodes)
+        else:
+            atoms_in_pairs = []
+            for i, j in atom_pairs:
+                if i not in atoms_in_pairs:
+                    atoms_in_pairs.append(i)
+                if j not in atoms_in_pairs:
+                    atoms_in_pairs.append(j)
+            # Note: sort the list for consistency with scfhessiandriver
+            atoms_in_pairs = sorted(atoms_in_pairs)
+            # Note: keep this consistent with scfhessiandriver
+            local_atoms = atoms_in_pairs[self.rank::self.nodes]
+            natm_in_pairs = len(atoms_in_pairs)
 
+        # Gathers information of which rank has which atom,
+        # and then broadcasts this to all ranks
         atom_idx_rank = [(iatom, self.rank) for iatom in local_atoms]
         gathered_atom_idx_rank = self.comm.gather(atom_idx_rank)
         if self.rank == mpi_master():
@@ -249,19 +265,34 @@ class HessianOrbitalResponse(CphfSolver):
 
             naos = basis.get_dimensions_of_basis()
 
-            batch_size = get_batch_size(None, natm * 3, naos, self.comm)
-            batch_size = batch_size // 3
+            if atom_pairs is None:
+                batch_size = get_batch_size(None, natm * 3, naos, self.comm)
+                batch_size = batch_size // 3
 
-            num_batches = natm // batch_size
-            if natm % batch_size != 0:
-                num_batches += 1
+                num_batches = natm // batch_size
+                if natm % batch_size != 0:
+                    num_batches += 1
+            else:
+                batch_size = get_batch_size(None, natm_in_pairs * 3, naos,
+                                            self.comm)
+                batch_size = batch_size // 3
+
+                num_batches = natm_in_pairs // batch_size
+                if natm % batch_size != 0:
+                    num_batches += 1
 
             for batch_ind in range(num_batches):
 
-                batch_start = batch_ind * batch_size
-                batch_end = min(batch_start + batch_size, natm)
+                if atom_pairs is None:
+                    batch_start = batch_ind * batch_size
+                    batch_end = min(batch_start + batch_size, natm)
 
-                atom_list = list(range(batch_start, batch_end))
+                    atom_list = list(range(batch_start, batch_end))
+                else:
+                    batch_start = batch_ind * batch_size
+                    batch_end = min(batch_start + batch_size, natm_in_pairs)
+
+                    atom_list = atoms_in_pairs[batch_start:batch_end]
 
                 vxc_deriv_batch = xc_mol_hess.integrate_vxc_fock_gradient(
                     molecule, basis, gs_density, mol_grid,
@@ -321,6 +352,13 @@ class HessianOrbitalResponse(CphfSolver):
                 for jatom, root_rank_j in all_atom_idx_rank:
                     if jatom < iatom:
                         continue
+
+                    if atom_pairs is not None:
+                        if ((iatom, jatom) not in atom_pairs and
+                            (jatom, iatom) not in atom_pairs and
+                                iatom != jatom):
+                            continue
+
                     for y in range(3):
                         key_jy = (jatom, y)
 
@@ -398,6 +436,12 @@ class HessianOrbitalResponse(CphfSolver):
                 for jatom, root_rank_j in all_atom_idx_rank:
                     if jatom < iatom:
                         continue
+
+                    if atom_pairs is not None:
+                        if ((iatom, jatom) not in atom_pairs and
+                            (jatom, iatom) not in atom_pairs and
+                                iatom != jatom):
+                            continue
 
                     for y in range(3):
                         key_jy = (jatom, y)
@@ -581,7 +625,9 @@ class HessianOrbitalResponse(CphfSolver):
             gmats_100 = Matrices()
 
         if self._embedding_hess_drv is not None:
-            pe_fock_grad_contr = self._embedding_hess_drv.compute_pe_fock_gradient_contributions(i=i)
+            pe_fock_grad_contr = (
+                self._embedding_hess_drv.compute_pe_fock_gradient_contributions(
+                    i=i))
             for x in range(3):
                 fmat_deriv[x] += pe_fock_grad_contr[x]
 
@@ -596,12 +642,14 @@ class HessianOrbitalResponse(CphfSolver):
             exchange_scaling_factor = 1.0
             fock_type = "2jk"
 
-        # TODO: range-separated Fock
         need_omega = (self._dft and self.xcfun.is_range_separated())
         if need_omega:
-            assert_msg_critical(
-                False, 'HessianOrbitalResponse: Not implemented for' +
-                ' range-separated functional')
+            exchange_scaling_factor = (self.xcfun.get_rs_alpha() +
+                                       self.xcfun.get_rs_beta())
+            erf_k_coef = -self.xcfun.get_rs_beta()
+            omega = self.xcfun.get_rs_omega()
+        else:
+            erf_k_coef, omega = None, None
 
         den_mat_for_fock = make_matrix(basis, mat_t.symmetric)
         den_mat_for_fock.set_values(density)
@@ -625,10 +673,21 @@ class HessianOrbitalResponse(CphfSolver):
         # scaling of Fock gradient for non-hybrid functionals
         factor = 2.0 if fock_type == 'j' else 1.0
 
+        if need_omega:
+            # for range-separated functional
+            gmats_eri_rs = fock_grad_drv.compute(basis, screener_atom, screener,
+                                                 den_mat_for_fock, i, 'kx_rs',
+                                                 erf_k_coef, omega, thresh_int)
+
         # calculate gradient contributions
         for x, label in enumerate(['X', 'Y', 'Z']):
             gmat_eri = gmats_eri.matrix_to_numpy(label)
             fmat_deriv[x] += gmat_eri * factor
+
+            if need_omega:
+                # range-separated functional contribution
+                gmat_eri_rs = gmats_eri_rs.matrix_to_numpy(label)
+                fmat_deriv[x] -= gmat_eri_rs
 
         gmats_eri = Matrices()
 
@@ -648,10 +707,7 @@ class HessianOrbitalResponse(CphfSolver):
 
         # print general info
         cur_str = 'Solver Type                     : '
-        if self.use_subspace_solver:
-            cur_str += 'Iterative Subspace Algorithm'
-        else:
-            cur_str += 'Conjugate Gradient'
+        cur_str += 'Iterative Subspace Algorithm'
         self.ostream.print_header(cur_str.ljust(str_width))
 
         cur_str = 'Max. Number of Iterations       : ' + str(self.max_iter)

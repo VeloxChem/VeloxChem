@@ -77,11 +77,11 @@ class MofBuilder:
         # necessary for MofBuilder to start building
         preparation = self.preparation
         if preparation.check_status():
-            print("-" * 80)
-            print(" " * 20, "Preparation is completed", " " * 20)
-            print("-" * 80)
-
-            print("MOF builder is ready to build")
+            #print("-" * 80)
+            #print(" " * 20, "Preparation is completed", " " * 20)
+            #print("-" * 80)
+#
+            #print("MOF builder is ready to build")
             self.mof_family = preparation.mof_family
             self.template_cif = preparation.selected_template_cif_file
             self.node_pdb = preparation.selected_node_pdb_file
@@ -93,8 +93,8 @@ class MofBuilder:
             self.linker_xyz = preparation.linker_xyz
             return True
         else:
-            print("Error: Could not find the required files")
-            print("Please redo the preparation steps")
+            #print("Error: Could not find the required files")
+            #print("Please redo the preparation steps")
             return False
 
     def set_bridge_node(self, brigde_node=False, range=0.5, max_neighbor=2):
@@ -148,12 +148,12 @@ class MofBuilder:
         if Path(saved_optimized_rotations).exists():
             self.saved_optimized_rotations = np.load(saved_optimized_rotations,
                                                      allow_pickle=True)
-            print("Optimized rotations are loaded from: ",
-                  saved_optimized_rotations)
+            #print("Optimized rotations are loaded from: ",
+            #     saved_optimized_rotations)
         else:
-            print(
-                f"Could not find the saved optimized rotations:  {saved_optimized_rotations} will start the optimization from the beginning"
-            )
+            #print(
+            #    f"Could not find the saved optimized rotations:  {saved_optimized_rotations} will start the optimization from the beginning"
+            #)
             pass
 
     def set_use_saved_rotations_as_initial_guess(
@@ -165,9 +165,9 @@ class MofBuilder:
             self.use_saved_rotations_as_initial_guess = (
                 use_saved_rotations_as_initial_guess)
         else:
-            print(
-                "saved_optimized_rotations is not found, will start the optimization from the beginning"
-            )
+            #print(
+            #    "saved_optimized_rotations is not found, will start the optimization from the beginning"
+            #)
             pass
 
     def set_supercell_cleaved_buffer_plus(self, buffer_plus_ratio):
@@ -184,8 +184,8 @@ class MofBuilder:
         self.preparation.fetch_node()
         self.preparation.fetch_linker(self.linker_xyz_file)
         if not self.preparation_check():
-            print("Error: Could not find the required files")
-            print("Please redo the preparation steps")
+            #print("Error: Could not find the required files")
+            #print("Please redo the preparation steps")
             return
 
         # check before building
@@ -195,7 +195,7 @@ class MofBuilder:
             [self.supercell[0], self.supercell[1], self.supercell[2]])
 
         if self.linker_topic == 2:
-            print("ditopic mof builder driver is called")
+            #print("ditopic mof builder driver is called")
             start_time = time.time()
             linker_pdb = self.linker_pdb
             template_cif = self.template_cif
@@ -236,13 +236,13 @@ class MofBuilder:
             self.net.node_info(node_pdb)
             self.net.linker_info(linker_pdb)
             self.net.optimize()
-            print("-" * 80)
-            print(
-                " " * 15,
-                "Building time cost: %.5f seconds " %
-                (time.time() - start_time),
-            )
-            print("-" * 80)
+            #print("-" * 80)
+            #print(
+            #    " " * 15,
+            #    "Building time cost: %.5f seconds " %
+            #    (time.time() - start_time),
+            #)
+            #print("-" * 80)
             if hasattr(self, "supercell_cleaved_buffer_plus"):
                 cleaved_buffer_plus = self.supercell_cleaved_buffer_plus
             else:
@@ -292,7 +292,7 @@ class MofBuilder:
             # self.net = net
 
         elif self.linker_topic > 2:
-            print("multitopic mof builder driver is called")
+            #print("multitopic mof builder driver is called")
             start_time = time.time()
             linker_pdb = self.linker_pdb
             linker_center_pdb = self.linker_center_pdb
@@ -338,13 +338,13 @@ class MofBuilder:
             self.net.linker_info(linker_pdb)
             self.net.linker_center_info(linker_center_pdb)
             self.net.optimize()
-            print("-" * 80)
-            print(
-                " " * 15,
-                "Building time cost: %.5f seconds " %
-                (time.time() - start_time),
-            )
-            print("-" * 80)
+            #print("-" * 80)
+            #print(
+            #    " " * 15,
+            #    "Building time cost: %.5f seconds " %
+            #    (time.time() - start_time),
+            #)
+            #print("-" * 80)
             if hasattr(self, "supercell_cleaved_buffer_plus"):
                 cleaved_buffer_plus = self.supercell_cleaved_buffer_plus
             else:
@@ -398,22 +398,22 @@ class MofBuilder:
     def write_gromacs_files(self, gro_name=None):
         if gro_name is not None:
             self.gro_name = Path(gro_name).stem + ".gro"
-            print("gro_name is set, will be saved as: ", self.gro_name)
+            #print("gro_name is set, will be saved as: ", self.gro_name)
         else:
             self.gro_name = ("mof_" + str(self.mof_family.split(".")[0]) + "_" +
                              self.linker_xyz.strip(".xyz").split("/")[-1] +
                              ".gro")
-            print("gro_name is not set, will be saved as: ", self.gro_name)
+            #print("gro_name is not set, will be saved as: ", self.gro_name)
         grolines = self.get_gro_lines_list(self.mofG)
         Path("output_gros").mkdir(parents=True, exist_ok=True)
         gro_file_path = str(Path("output_gros", self.gro_name))
-        print("writing the gromacs file", gro_file_path)
+        #print("writing the gromacs file", gro_file_path)
         with open(gro_file_path, "w") as f:
             f.writelines(grolines)
         if hasattr(self, "defective_mofG"):
             defective_gro_path = str(
                 Path("output_gros", "defective_" + self.gro_name))
-            print("writing the gromacs file", defective_gro_path)
+            #print("writing the gromacs file", defective_gro_path)
             defective_gro_lines = self.get_gro_lines_list(self.defective_mofG)
             with open(defective_gro_path, "w") as f:
                 f.writelines(defective_gro_lines)
@@ -440,13 +440,13 @@ class MofBuilder:
         if not hasattr(self, "defective_net"):
             self.defective_net = deepcopy(self.net)
 
-        print(
-            "built MOF is saved",
+        #print(
+        #    "built MOF is saved",
             #    "nodes: ",
             #    len(self.saved_eG.nodes),
             #    "edges: ",
             #    len(self.saved_eG.edges),
-        )
+        #)
 
         #self.defective_net.eG = self.archive_eG.copy()
         remove_node_list = nodes
@@ -481,16 +481,16 @@ class MofBuilder:
         for node_name in self.to_remove_nodes_name:
             if node_name in self.defective_net.eG.nodes():
                 self.defective_net.eG.remove_node(node_name)
-            else:
-                print("node ", node_name, " is not in this MOF")
+            #else:
+                #print("node ", node_name, " is not in this MOF")
         for edge_name in self.to_remove_edges_name:
             neighbors = list(self.defective_net.eG.neighbors(edge_name))
             if len(neighbors) == 2:  # ditopic linker case
                 self.defective_net.eG.remove_edge(neighbors[0], neighbors[1])
             if edge_name in self.defective_net.eG.nodes():
                 self.defective_net.eG.remove_node(edge_name)
-            else:
-                print("edge ", edge_name, " is not in this MOF")
+            #else:
+                #print("edge ", edge_name, " is not in this MOF")
 
         #print(self.to_remove_edges_name, " will be removed edge")
         #print(self.to_remove_nodes_name, " will be removed node")
@@ -502,13 +502,13 @@ class MofBuilder:
         )
         # sort subgraph by connectivity
 
-        print(
-            "defective MOF is updated",
-            #    "nodes: ",
-            #    len(self.defective_net.eG.nodes),
-            #    "edges: ",
-            #    len(self.defective_net.eG.edges),
-        )
+        #print(
+        #    "defective MOF is updated",
+        #    "nodes: ",
+        #    len(self.defective_net.eG.nodes),
+        #    "edges: ",
+        #    len(self.defective_net.eG.edges),
+        #)
 
         self.defective_net.make_supercell_range_cleaved_eG(
             buffer_plus=cleaved_buffer_plus, buffer_minus=cleaved_buffer_minus)
@@ -563,11 +563,11 @@ class MofBuilder:
 
     def write_defective_split_node_gro_again(self, gro_name):
         if not self.preparation.dummy_node:
-            print("dummy node is not used, splitting node is not possible")
+            #print("dummy node is not used, splitting node is not possible")
             return
-        print(
-            "splitting node and saving gro again, called after write_defect_gro()"
-        )
+        #print(
+        #    "splitting node and saving gro again, called after write_defect_gro()"
+        #)
         nodes_eG = self.defective_mof_nodes_eG
         edges_eG = self.defective_mof_edges_eG
         terms_eG = self.defective_mof_terms_eG
@@ -579,7 +579,7 @@ class MofBuilder:
         merged_split_node_edge_term = []
         line_num = 0
         res_count = 0
-        print("writing split node gro")
+        #print("writing split node gro")
         for splitted_node in [
                 metals_list,
                 hho_list,
@@ -593,21 +593,21 @@ class MofBuilder:
                                                splitted_node, line_num,
                                                res_count))
 
-        print("metal_res_num: ", len(metals_list))
-        print("hho_res_num: ", len(hho_list))
-        print("ho_res_num: ", len(ho_list))
-        print("o_res_num: ", len(o_list))
-        print("edge_res_num: ", len(edges_eG))
-        print("term_res_num: ", len(terms_eG))
+        #print("metal_res_num: ", len(metals_list))
+        #print("hho_res_num: ", len(hho_list))
+        #print("ho_res_num: ", len(ho_list))
+        #print("o_res_num: ", len(o_list))
+        #print("edge_res_num: ", len(edges_eG))
+        #print("term_res_num: ", len(terms_eG))
 
         save_node_edge_term_gro(merged_split_node_edge_term, gro_name)
 
     def write_split_node_gro_again(self, gro_name):
         if not self.preparation.dummy_node:
-            print("dummy node is not used, splitting node is not possible")
+            #print("dummy node is not used, splitting node is not possible")
             return
 
-        print("splitting node and saving gro again, called after write_gro()")
+        #print("splitting node and saving gro again, called after write_gro()")
 
         nodes_eG = self.nodes_eG
         edges_eG = self.edges_eG
@@ -621,7 +621,7 @@ class MofBuilder:
         merged_split_node_edge_term = []
         line_num = 0
         res_count = 0
-        print("writing split node gro")
+        #print("writing split node gro")
         for splitted_node in [
                 metals_list,
                 hho_list,
@@ -637,12 +637,12 @@ class MofBuilder:
 
         save_node_edge_term_gro(merged_split_node_edge_term, gro_name)
 
-        print("metal_res_num: ", len(metals_list))
-        print("hho_res_num: ", len(hho_list))
-        print("ho_res_num: ", len(ho_list))
-        print("o_res_num: ", len(o_list))
-        print("edge_res_num: ", len(edges_eG))
-        print("term_res_num: ", len(terms_eG))
+        #print("metal_res_num: ", len(metals_list))
+        #print("hho_res_num: ", len(hho_list))
+        #print("ho_res_num: ", len(ho_list))
+        #print("o_res_num: ", len(o_list))
+        #print("edge_res_num: ", len(edges_eG))
+        #print("term_res_num: ", len(terms_eG))
 
     def md_prepare(self):
         if not hasattr(self, "linker_file_ff"):

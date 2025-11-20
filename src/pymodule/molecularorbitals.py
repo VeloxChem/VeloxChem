@@ -393,6 +393,13 @@ class MolecularOrbitals:
             errmsg += " Invalid molecular orbitals type"
             assert_msg_critical(False, errmsg)
 
+    def is_empty(self):
+        """
+        Checks if the molecular orbitals object is empty.
+        """
+
+        return (self._orbitals is None)
+
     def broadcast(self, comm, root=mpi_master()):
         """
         Broadcasts the molecular orbitals object.
@@ -619,34 +626,31 @@ class MolecularOrbitals:
             The molecular orbitals object for NTO.
         """
 
-        assert_msg_critical(
-            len(nto_orbitals_list) == 1 and len(nto_lambdas_list) == 1 and
-            mo_type == molorb.rest,
-            'MolecularOrbitals.create_nto: Only restricted case is implemented')
+        # sanity checks
 
-        nto_orbitals = nto_orbitals_list[0]
-        nto_lambdas = nto_lambdas_list[0]
+        for nto_orbitals, nto_lambdas in zip(nto_orbitals_list, nto_lambdas_list):
 
-        assert_msg_critical(nto_orbitals.shape[1] == nto_lambdas.shape[0],
-                            'MolecularOrbitals.create_nto: Inconsistent size')
+            assert_msg_critical(nto_orbitals.shape[1] == nto_lambdas.shape[0],
+                                'MolecularOrbitals.create_nto: Inconsistent size')
 
-        negative_lambdas = [x for x in nto_lambdas if x < 0.0]
-        positive_lambdas = [x for x in nto_lambdas if x > 0.0]
+            negative_lambdas = [x for x in nto_lambdas if x < 0.0]
+            positive_lambdas = [x for x in nto_lambdas if x > 0.0]
 
-        assert_msg_critical(
-            len(negative_lambdas) == len(positive_lambdas),
-            'MolecularOrbitals.create_nto: Inconsistent number of lambda values'
-        )
-
-        for m, p in zip(negative_lambdas[::-1], positive_lambdas):
             assert_msg_critical(
-                abs(m + p) < 1.0e-6,
-                'MolecularOrbitals.create_nto: Inconsistent lambda values')
+                len(negative_lambdas) == len(positive_lambdas),
+                'MolecularOrbitals.create_nto: Inconsistent number of lambda values'
+            )
 
-        nto_energies = np.zeros(nto_lambdas.shape[0])
+            for m, p in zip(negative_lambdas[::-1], positive_lambdas):
+                assert_msg_critical(
+                    abs(m + p) < 1.0e-6,
+                    'MolecularOrbitals.create_nto: Inconsistent lambda values')
 
-        return MolecularOrbitals([nto_orbitals], [nto_energies], [nto_lambdas],
-                                 mo_type)
+        nto_energies_list = [np.zeros(nto_lambdas_list[idx].shape[0])
+                             for idx in range(len(nto_lambdas_list))]
+
+        return MolecularOrbitals(nto_orbitals_list, nto_energies_list,
+                                 nto_lambdas_list, mo_type)
 
     def is_nto(self):
         """

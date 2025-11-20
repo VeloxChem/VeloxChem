@@ -262,7 +262,7 @@ def optimize_rotations_pre(
     assert_msg_critical("scipy" in sys.modules,
                         "scipy is required for optimize_rotations_pre.")
 
-    print("optimize_rotations_step1")
+    #print("optimize_rotations_step1")
     # initial_rotations = np.tile(np.eye(3), (num_nodes, 1)).flatten()
     # get a better initial guess, use random rotation matrix combination
     # initial_rotations  = np.array([reorthogonalize_matrix(np.random.rand(3,3)) for i in range(num_nodes)]).flatten()
@@ -331,9 +331,9 @@ def optimize_rotations_after(
     assert_msg_critical("scipy" in sys.modules,
                         "scipy is required for optimize_rotations_after.")
 
-    print("optimize_rotations information:")
-    print("opt_method:", opt_method)
-    print("\n")
+    #print("optimize_rotations information:")
+    #print("opt_method:", opt_method)
+    #print("\n")
 
     # get a better initial guess, use random rotation matrix combination
     # initial_rotations  = np.array([reorthogonalize_matrix(np.random.rand(3,3)) for i in range(num_nodes)]).flatten()
@@ -493,12 +493,12 @@ def optimize_cell_parameters(cell_info, original_ccoords, updated_ccoords):
 
     # Extract optimized parameters
     optimized_params = np.round(result.x, 5)
-    print(
-        "Optimized New Cell Parameters:",
-        optimized_params,
-        "\nTemplate Cell Parameters:",
-        cell_info,
-    )
+    #print(
+    #    "Optimized New Cell Parameters:",
+    #    optimized_params,
+    #    "\nTemplate Cell Parameters:",
+    #    cell_info,
+    #)
 
     return optimized_params
 

@@ -8,7 +8,6 @@ from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.scfgradientdriver import ScfGradientDriver
 
 
-@pytest.mark.solvers
 class TestGrad:
 
     def run_grad(self,
@@ -33,6 +32,7 @@ class TestGrad:
 
         assert np.max(np.abs(grad - ref_grad)) < tol
 
+    @pytest.mark.solvers
     def test_nh3_sto3g(self):
 
         molstr = """
@@ -79,6 +79,7 @@ class TestGrad:
 
         self.run_grad(mol, 'tpssh', 'sto-3g', ref_grad, 1.0e-3)
 
+    @pytest.mark.solvers
     def test_nh3_def2svp(self):
 
         molstr = """
@@ -125,6 +126,16 @@ class TestGrad:
 
         self.run_grad(mol, 'm06-l', 'def2-svp', ref_grad, 1.0e-3)
 
+        ref_grad = np.array([
+            [-2.559553919745, 1.082333802614, 0.117229249007],
+            [-0.051263304275, -2.490953706815, -0.123145983366],
+            [1.256127965366, 0.804370356178, -1.999366609038],
+            [1.354689250487, 0.604249823020, 2.005283348876],
+        ])
+
+        self.run_grad(mol, 'lrc-wpbeh', 'def2-svp', ref_grad, 1.0e-3)
+
+    @pytest.mark.solvers
     def test_nh3_def2tzvp(self):
 
         molstr = """
@@ -162,6 +173,7 @@ class TestGrad:
 
         self.run_grad(mol, 'b3lyp', 'def2-tzvp', ref_grad, 1.0e-3)
 
+    @pytest.mark.solvers
     def test_c2h4_sto3g(self):
 
         xyzstr = """
@@ -209,6 +221,7 @@ class TestGrad:
 
         self.run_grad(mol, 'b3lyp', 'sto-3g', ref_grad, 1.0e-4)
 
+    @pytest.mark.solvers
     def test_dimer_def2svp(self):
 
         molstr_au = """
@@ -266,6 +279,21 @@ class TestGrad:
 
         self.run_grad(mol, 'b3lyp', 'def2-svp', ref_grad, 1.0e-4)
 
+        ref_grad = np.array([
+            [-0.001417808718, 0.000916163074, 0.000124613948],
+            [-0.000082427917, -0.000961225979, -0.000057592352],
+            [0.000620870836, 0.000312839212, -0.000832015388],
+            [0.000617867940, 0.000213040863, 0.000759722568],
+            [-0.000581798680, -0.000148222490, -0.000140614127],
+            [-0.007912399553, 0.016485714532, 0.009115119163],
+            [0.017661154125, -0.004423557833, 0.008347743965],
+            [-0.011412754354, -0.016320291060, 0.002211275898],
+            [0.002507286183, 0.003925566055, -0.019528224655],
+        ])
+
+        self.run_grad(mol, 'cam-b3lyp', 'def2-svp', ref_grad, 1.0e-4)
+
+    @pytest.mark.solvers
     @pytest.mark.skipif(not DispersionModel.is_available(),
                         reason='dftd4-python not available')
     def test_dimer_def2svp_d4(self):
@@ -321,6 +349,7 @@ class TestGrad:
 
         self.run_grad(mol, 'tpssh', 'def2-svp', ref_grad, 1.0e-4, 'd4')
 
+    @pytest.mark.timeconsuming
     def test_dimer_def2tzvp(self):
 
         molstr_au = """

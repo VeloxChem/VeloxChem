@@ -110,6 +110,7 @@ class OptimizationDriver:
         self.conv_dmax = None
 
         self.transition = False
+        self.irc = False
         self.hessian = 'never'
 
         self.ref_xyz = None
@@ -131,6 +132,7 @@ class OptimizationDriver:
                 'tmax': ('float', 'maximum value of trust radius'),
                 'max_iter': ('int', 'maximum number of optimization steps'),
                 'transition': ('bool', 'transition state search'),
+                'irc': ('bool', 'flag for intrinsic reaction coordinate'),
                 'hessian': ('str_lower', 'hessian flag'),
                 'ref_xyz': ('str', 'reference geometry'),
                 'keep_files': ('bool', 'flag to keep output files'),
@@ -186,7 +188,7 @@ class OptimizationDriver:
             self.filename = opt_dict['filename']
 
         # update hessian option for transition state search
-        if ('hessian' not in opt_dict) and self.transition:
+        if ('hessian' not in opt_dict) and (self.transition or self.irc):
             self.hessian = 'first'
 
     def _pick_driver(self, drv):
@@ -238,10 +240,10 @@ class OptimizationDriver:
         """
 
         # update hessian option for transition state search
-        if self.hessian == 'never' and self.transition:
+        if self.hessian == 'never' and (self.transition or self.irc):
             self.hessian = 'first'
 
-        if self.hessian or self.transition:
+        if self.hessian or (self.transition or self.irc):
             err_msg = (
                 'The installed geometric package does not support\n' +
                 '  Hessian or transition state search. Please install\n' +
@@ -271,7 +273,8 @@ class OptimizationDriver:
 
         # check that the args contain molecular basis and scf_results
         # note that we only check the type of scf_results on the master rank
-        if (len(args) >= 2) and isinstance(args[0], MolecularBasis):
+        if (isinstance(self.grad_drv, ScfGradientDriver) and
+                isinstance(args[0], MolecularBasis) and (len(args) >= 2)):
             args_filename = None
             if self.rank == mpi_master():
                 # read filename from scf_results
@@ -306,12 +309,9 @@ class OptimizationDriver:
             name_string = get_random_string_parallel(self.comm)
             base_fname = 'vlx_' + name_string
 
-        if self.is_scf and self.grad_drv.scf_driver.checkpoint_file is None:
-            # make sure that the scfdriver has checkpoint_file
-            fpath = Path(base_fname)
-            fpath = fpath.with_name(f'{fpath.stem}_scf{fpath.suffix}')
-            fpath = fpath.with_suffix('.h5')
-            self.grad_drv.scf_driver.checkpoint_file = str(fpath)
+        if self.is_scf and self.grad_drv.scf_driver.filename is None:
+            # make sure that the scfdriver has filename
+            self.grad_drv.scf_driver.filename = base_fname
 
         if self.rank == mpi_master() and self.keep_files:
             filename = base_fname
@@ -368,7 +368,8 @@ class OptimizationDriver:
 
         if self.tmax is None:
             # from geomeTRIC params.py
-            default_tmax = 0.03 if self.transition else 0.3
+            default_tmax = (0.03 if self.transition else
+                            (default_trust if self.irc else 0.3))
         else:
             default_tmax = self.tmax
 
@@ -387,6 +388,7 @@ class OptimizationDriver:
                     converge=self.conv_flags(),
                     constraints=constr_filename,
                     transition=self.transition,
+                    irc=self.irc,
                     hessian=self.hessian,
                     input=optinp_filename)
             except geometric.errors.HessianExit:
@@ -422,7 +424,8 @@ class OptimizationDriver:
                     'Geometry optimization completed.')
                 self.ostream.print_blank()
 
-                self.ostream.print_block(final_mol.get_string())
+                self.ostream.print_block(
+                    final_mol.get_string(title='Final Geometry'))
 
                 is_scan_job = False
                 if self.constraints:
@@ -833,6 +836,8 @@ class OptimizationDriver:
         lines.append('Max. Number of Steps    :    ' + str(self.max_iter))
         lines.append('Transition State        :    ' +
                      ('Yes' if self.transition else 'No'))
+        lines.append('IRC                     :    ' +
+                     ('Yes' if self.irc else 'No'))
         lines.append('Hessian                 :    ' + self.hessian)
 
         maxlen = max([len(line.split(':')[0]) * 2 for line in lines])

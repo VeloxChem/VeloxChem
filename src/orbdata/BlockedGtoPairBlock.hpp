@@ -105,6 +105,12 @@ class CBlockedGtoPairBlock
     /// @brief Gets array of basis function pairs blocks.
     /// @return The array of basis function pairs blocks.
     auto gto_pair_blocks() const -> std::array<CGtoPairBlock, 16>;
+    
+    /// @brief Gets number of unique terms (integral bra or ket side of integral) generated
+    /// by selected basis function pairs block.
+    /// @param index  The index of basis function pairs block.
+    /// @return The number of unique terms.
+    auto unique_terms(const int index) const -> size_t;
 
    private:
     /// @brief The array of basis function pairs blocks.

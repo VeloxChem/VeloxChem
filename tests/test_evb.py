@@ -5,10 +5,11 @@ import sys
 
 from veloxchem.molecule import Molecule
 from veloxchem.evbdriver import EvbDriver
-from veloxchem.evbffbuilder import EvbForceFieldBuilder
+from veloxchem.reaffbuilder import ReactionForceFieldBuilder
 from veloxchem.evbsystembuilder import EvbSystemBuilder
 from veloxchem.evbdataprocessing import EvbDataProcessing
 from veloxchem.xtbdriver import XtbDriver
+from veloxchem.mmforcefieldgenerator import MMForceFieldGenerator
 
 try:
     import openmm as mm
@@ -22,14 +23,12 @@ except ImportError:
 @pytest.mark.timeconsuming
 class TestEvb:
 
-    @pytest.mark.skipif('openmm' not in sys.modules,
-                        reason='openmm not available')
-    @pytest.mark.timeconsuming
     def test_forcefield_builder(self):
         # build reactant and product forcefields from unordered xyz inputs and compare outputs with reference
 
-        ffbuilder = EvbForceFieldBuilder()
-        ffbuilder.water_model = 'spce'
+        ffbuilder = ReactionForceFieldBuilder()
+        ffbuilder.ostream.mute()
+        ffbuilder.water_model = 'cspce'
         ethanol_xyz = """
         9
 
@@ -62,36 +61,25 @@ class TestEvb:
         H         -1.89040        1.13075       -0.65905
         O         -1.56707        0.49671        0.00000
         """
+        reactant = Molecule.from_xyz_string(ethanol_xyz)
+        product = [
+            Molecule.from_xyz_string(ethene_xyz),
+            Molecule.from_xyz_string(water_xyz),
+        ]
 
-        reactant_input = {
-            "molecule": Molecule.from_xyz_string(ethanol_xyz),
-            "optimize": False,
-            "forcefield": None,
-            "hessian": None,
-            "charges": None,
-        }
-        product_input = [{
-            "molecule": Molecule.from_xyz_string(ethene_xyz),
-            "optimize": False,
-            "forcefield": None,
-            "hessian": None,
-            "charges": None,
-        }, {
-            "molecule": Molecule.from_xyz_string(water_xyz),
-            "optimize": False,
-            "forcefield": None,
-            "hessian": None,
-            "charges": None,
-        }]
-
-        reactant, product, formed_bonds, broken_bonds, reactants, products = ffbuilder.build_forcefields(
-            [reactant_input], product_input, 1, 1)
+        # todo how robust do I need to test these different input options?
+        reactant, product, formed_bonds, broken_bonds, reactants, products, mapping = ffbuilder.build_forcefields(
+            reactant=reactant,
+            product=product,
+        )
 
         here = Path(__file__).parent
         reapath = str(here / 'data' / 'evb_ethanol_ff_data.json')
         propath = str(here / 'data' / 'evb_ethene_H2O_ff_data.json')
-        reactant_ref = EvbDriver.load_forcefield_from_json(reapath)
-        product_ref = EvbDriver.load_forcefield_from_json(propath)
+        reactant_ref = MMForceFieldGenerator.load_forcefield_from_json_file(
+            reapath)
+        product_ref = MMForceFieldGenerator.load_forcefield_from_json_file(
+            propath)
 
         self._compare_dict(reactant.bonds, reactant_ref.bonds)
         self._compare_dict(reactant.angles, reactant_ref.angles)
@@ -128,18 +116,15 @@ class TestEvb:
                     assert False
 
             # compare val1 with val2
-            if type1 is dict:
+            if isinstance(val1, dict):
                 self._compare_dict(val1, val2)
-            elif type1 is float or type1 is np.float64:
+            elif isinstance(val1, (float, np.float64)):
                 assert abs(val1 - val2) < float_tol
-            elif type1 is list or type1 is np.ndarray:
+            elif isinstance(val1, (list, np.ndarray)):
                 assert np.allclose(val1, val2, atol=float_tol)
             else:
                 assert val1 == val2
 
-    @pytest.mark.skipif('openmm' not in sys.modules,
-                        reason='openmm not available')
-    @pytest.mark.timeconsuming
     def test_system_builder(self):
         data_path = Path(__file__).parent / 'data'
         # load forcefields
@@ -147,12 +132,14 @@ class TestEvb:
         propath = str(data_path / 'evb_ethene_H2O_ff_data.json')
 
         # build systems in water and vacuum
+        system_builder = EvbSystemBuilder()
+        system_builder.ostream.mute()
 
         reactant_mol = Molecule.read_xyz_file(
             str(data_path / 'evb_ethanol.xyz'), )
-        reactant = EvbDriver.load_forcefield_from_json(reapath)
+        reactant = MMForceFieldGenerator.load_forcefield_from_json_file(reapath)
         reactant.molecule = reactant_mol
-        product = EvbDriver.load_forcefield_from_json(propath)
+        product = MMForceFieldGenerator.load_forcefield_from_json_file(propath)
         product_mol = Molecule.read_xyz_file(
             str(data_path / 'evb_ethene_H2O.xyz'), )
         product.molecule = product_mol
@@ -163,8 +150,7 @@ class TestEvb:
 
         # 0.4 is chosen instead of 0.5 because for lambda=0.4, 1-lambda=/=lambda
         Lambda = [0, 0.4, 1]
-        system_builder = EvbSystemBuilder()
-        system_builder.water_model = EVB.water_model
+        system_builder.water_model = 'cspce'
         vac_systems, vac_topology, vac_positions = system_builder.build_systems(
             reactant,
             product,
@@ -218,6 +204,11 @@ class TestEvb:
             min_len = min(len(sys_lines), len(ref_lines))
             for i, (sys_line, ref_line) in enumerate(
                     zip(sys_lines[:min_len], ref_lines[:min_len])):
+
+                # skip the line with openmm version
+                if 'openmmVersion' in sys_line:
+                    continue
+
                 cond = TestEvb._round_numbers_in_line(
                     sys_line) == TestEvb._round_numbers_in_line(ref_line)
 
@@ -242,9 +233,6 @@ class TestEvb:
                 pass
         return '"'.join(line)
 
-    @pytest.mark.skipif('openmm' not in sys.modules,
-                        reason='openmm not available')
-    @pytest.mark.timeconsuming
     def test_data_processing(self):
         # Load simulation data
         input_results = {}
@@ -256,15 +244,21 @@ class TestEvb:
         E_file = folder / 'evb_Sn2_vacuum_Energies.csv'
         data_file = folder / 'evb_Sn2_vacuum_Data_combined.csv'
         options_file = folder / 'evb_options.json'
-        specific, common = EVB._load_output_files(E_file, data_file,
-                                                  options_file)
+        specific, common = EVB._load_output_files(
+            E_file,
+            data_file,
+            options_file,
+        )
         specific_results.update({'vacuum': specific})
 
         E_file = folder / 'evb_Sn2_water_Energies.csv'
         data_file = folder / 'evb_Sn2_water_Data_combined.csv'
         options_file = folder / 'evb_options.json'
-        specific, common = EVB._load_output_files(E_file, data_file,
-                                                  options_file)
+        specific, common = EVB._load_output_files(
+            E_file,
+            data_file,
+            options_file,
+        )
         specific_results.update({'water': specific})
 
         input_results.update(common)
@@ -274,6 +268,7 @@ class TestEvb:
         # EVB.load_initialisation(str(water_folder), 'water', skip_systems=True, skip_pdb=True)
         # do data processing
         dp = EvbDataProcessing()
+        dp.ostream.mute()
 
         comp_results = dp.compute(input_results, 5, 10)
 

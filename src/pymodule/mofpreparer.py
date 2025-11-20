@@ -62,12 +62,12 @@ class MofPreparer:
 
     def list_mof_family(self):
         # print mof_top_dict keys fit to screen
-        print("Available MOF Family:")
+        print("Available MOF Families:")
         print(" ".join(self.mof_top_dict.keys()))
 
     def select_template_dir(self, template_dir):
         self.set_template_dir = template_dir
-        print(f"{template_dir} is selected for template cif files")
+        #print(f"{template_dir} is selected for template cif files")
 
     def select_mof_family(self, mof_family):
         self.mof_family = mof_family
@@ -76,14 +76,14 @@ class MofPreparer:
         self.linker_topic = self.mof_top_dict[mof_family]["linker_topic"]
         self.template_cif = self.mof_top_dict[mof_family]["topology"] + ".cif"
         # check if template cif exists
-        print(f"{mof_family} selected")
+        #print(f"{mof_family} selected")
         print(
             f"available metal nodes: {self.mof_top_dict[mof_family]['metal']}")
-        print("please select a metal node")
+        #print("please select a metal node")
         if not hasattr(self, "set_template_dir"):
             self.set_template_dir = str(
                 Path(self.data_path, "template_database"))  # default
-            print(f"will search template cif files in {self.set_template_dir}")
+            #print(f"will search template cif files in {self.set_template_dir}")
 
         template_cif_file = str(Path(self.set_template_dir, self.template_cif))
 
@@ -97,8 +97,8 @@ class MofPreparer:
             )
             return
         else:
-            print(f"{self.template_cif} is found in template_database")
-            print(f"{self.template_cif} will be used for MOF building")
+            #print(f"{self.template_cif} is found in template_database")
+            #print(f"{self.template_cif} will be used for MOF building")
             self.selected_template_cif_file = template_cif_file
 
     def submit_template(
@@ -166,23 +166,23 @@ class MofPreparer:
 
     def select_node_metal(self, node_metal):
         self.node_metal = node_metal
-        print(f"{node_metal} node is selected")
+        #print(f"{node_metal} node is selected")
 
     def use_dummy_node(self, dummy_node):
         self.dummy_node = dummy_node
 
     def fetch_node(self):
         if not hasattr(self, "node_metal"):
-            print("please select a metal node with select_node_metal method")
+            #print("please select a metal node with select_node_metal method")
             return
         if not hasattr(self, "node_connectivity"):
-            print("please select a MOF family with select_mof_family method")
+            #print("please select a MOF family with select_mof_family method")
             return
         if not hasattr(self, "dummy_node"):
-            print(
-                "if you want to use dummy node, please select dummy node type with select_dummy_node method"
-            )
-            print("now we are going to fetch the node pdb file")
+            #print(
+            #    "if you want to use dummy node, please select dummy node type with select_dummy_node method"
+            #)
+            #print("now we are going to fetch the node pdb file")
             self.dummy_node = False
 
         data_path = self.data_path
@@ -205,18 +205,18 @@ class MofPreparer:
             all_lines, dummy_node_file = add_dummy_atoms_nodepdb(
                 target_node_path, self.node_metal, nodeG)
             Path(target_node_path).unlink()
-            print(target_node_path, "removed")
-            print(f"new dummy node file {dummy_node_file} created")
-        else:
-            print(f"{target_node_path} is fetched")
-            print(
-                f"default node without dummy atoms will be used{target_node_path}"
-            )
+            #print(target_node_path, "removed")
+            #print(f"new dummy node file {dummy_node_file} created")
+        #else:
+            #print(f"{target_node_path} is fetched")
+            #print(
+            #    f"default node without dummy atoms will be used{target_node_path}"
+            #)
 
         nodes_dir = str(
             Path(target_node_path).parent
         )  #'nodes' #default  #NOTE: this is the path to the nodes
-        print(f"nodes will be saved in {nodes_dir}")
+        #print(f"nodes will be saved in {nodes_dir}")
 
         if self.dummy_node:
             keywords = [
@@ -236,11 +236,11 @@ class MofPreparer:
 
     def set_split_linker_topic(self, split_linker_topic):
         self.split_linker_topic = split_linker_topic
-        print(f"{split_linker_topic} is selected for linker splitting")
+        #print(f"{split_linker_topic} is selected for linker splitting")
 
     def set_save_edge_dir(self, edges_dir):
         self.save_edges_dir = edges_dir
-        print(f"{edges_dir} is selected for saving edges")
+        #print(f"{edges_dir} is selected for saving edges")
 
     def fetch_linker(self, linker_file):
         self.linker_xyz = linker_file
@@ -254,18 +254,20 @@ class MofPreparer:
             raise FileNotFoundError(f"{linker_file} not found")
         if not hasattr(self, "split_linker_topic"):
             split_linker_topic = self.linker_topic
-            print(f"{split_linker_topic} is selected for linker splitting")
+            #print(f"{split_linker_topic} is selected for linker splitting")
         else:
             split_linker_topic = self.split_linker_topic
             if split_linker_topic != self.linker_topic:
                 # warning
-                print(
-                    f"{split_linker_topic} topic linker is selected for linker splitting"
-                )
-                print(
-                    f"but {self.linker_topic} topic linker is selected for MOF family"
-                )
-                print("please make sure they are compatible")
+                #print(
+                #    f"{split_linker_topic} topic linker is selected for linker splitting"
+                #)
+                #print(
+                #    f"but {self.linker_topic} topic linker is selected for MOF family"
+                #)
+                #print("please make sure they are compatible")
+                raise ValueError(
+                    "linker connectivity and MOF family linker connectivity are not compatible")
 
         molecule = Molecule.read_xyz_file(linker_file)
 
@@ -283,21 +285,21 @@ class MofPreparer:
             save_edges_dir=self.save_edges_dir,
         )
 
-        if self.selected_linker_center_pdb:
-            if Path(self.selected_linker_center_pdb).exists():
-                print(
-                    f"linker center fragment {self.selected_linker_center_pdb} is saved and will be used for MOF building"
-                )
-        else:
-            if self.linker_topic > 2:
-                print("Warning: linker center fragment is not saved")
+        #if self.selected_linker_center_pdb:
+        #    if Path(self.selected_linker_center_pdb).exists():
+        #        print(
+        #            f"linker center fragment {self.selected_linker_center_pdb} is saved and will be used for MOF building"
+        #        )
+        #else:
+        #    if self.linker_topic > 2:
+        #        print("Warning: linker center fragment is not saved")
 
-        if Path(self.selected_linker_edge_pdb).exists():
-            print(
-                f"linker edge fragment {self.selected_linker_edge_pdb} is saved and will be used for MOF building"
-            )
-        else:
-            print("Warning: linker edge fragment is not saved")
+        #if Path(self.selected_linker_edge_pdb).exists():
+        #    print(
+        #        f"linker edge fragment {self.selected_linker_edge_pdb} is saved and will be used for MOF building"
+        #    )
+        #else:
+        #    print("Warning: linker edge fragment is not saved")
 
     def check_status(self):
         if not hasattr(self, "selected_node_pdb_file"):
