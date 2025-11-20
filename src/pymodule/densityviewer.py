@@ -82,6 +82,9 @@ class DensityViewer:
         self.use_visualization_driver = False
         self.interpolate = False
 
+        # flag to indicate if using k3d
+        self.use_k3d = False
+
         # flag for the type of density
         self.den_type = denmat.rest
 
@@ -309,7 +312,8 @@ class DensityViewer:
 
         # Loop over atoms
         for i_atom in range(natms):
-            self.progress.value = i_atom
+            if self.use_k3d:
+                self.progress.value = i_atom
             ao_indices_i = self._atom_to_ao[i_atom]
             atom_id_i = identifiers[i_atom]
             atom_orbs_i = np.array(self._ao_dict[atom_id_i])
@@ -479,7 +483,10 @@ class DensityViewer:
             and their labels).
         """
 
-        self._plot_using_py3dmol(molecule, basis, den_inp, width, height)
+        if self.use_k3d:
+            self.plot_usink_k3d(molecule, basis, den_inp)
+        else:
+            self._plot_using_py3dmol(molecule, basis, den_inp, width, height)
 
     def plot_using_k3d(self, molecule, basis, den_inp):
         """
@@ -513,6 +520,8 @@ class DensityViewer:
         else:
             assert_msg_critical(False,
                                 'DensityViewer.plot: Invalid density input')
+
+        self.use_k3d = True
 
         self.initialize(molecule, basis)
 
