@@ -484,7 +484,7 @@ class DensityViewer:
         """
 
         if self.use_k3d:
-            self.plot_usink_k3d(molecule, basis, den_inp)
+            self.plot_using_k3d(molecule, basis, den_inp)
         else:
             self._plot_using_py3dmol(molecule, basis, den_inp, width, height)
 
