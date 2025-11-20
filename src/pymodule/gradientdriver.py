@@ -99,6 +99,9 @@ class GradientDriver:
 
         self.checkpoint_file = None
 
+        # verbosity of output (1-3)
+        self.print_level = 1
+
         self._input_keywords = {
             'gradient': {
                 'numerical': ('bool', 'do numerical integration'),
@@ -456,7 +459,7 @@ class GradientDriver:
             The molecule.
         """
 
-        self.ostream.print_block(molecule.get_string())
+        self.ostream.print_block(molecule.get_string(sep='-'))
         self.ostream.flush()
 
     def print_gradient(self, molecule, state_deriv_index=None):

@@ -27,7 +27,8 @@ class TestEvb:
         # build reactant and product forcefields from unordered xyz inputs and compare outputs with reference
 
         ffbuilder = ReactionForceFieldBuilder()
-        ffbuilder.water_model = 'spce'
+        ffbuilder.ostream.mute()
+        ffbuilder.water_model = 'cspce'
         ethanol_xyz = """
         9
 
@@ -115,11 +116,11 @@ class TestEvb:
                     assert False
 
             # compare val1 with val2
-            if type1 is dict:
+            if isinstance(val1, dict):
                 self._compare_dict(val1, val2)
-            elif type1 is float or type1 is np.float64:
+            elif isinstance(val1, (float, np.float64)):
                 assert abs(val1 - val2) < float_tol
-            elif type1 is list or type1 is np.ndarray:
+            elif isinstance(val1, (list, np.ndarray)):
                 assert np.allclose(val1, val2, atol=float_tol)
             else:
                 assert val1 == val2
@@ -132,6 +133,7 @@ class TestEvb:
 
         # build systems in water and vacuum
         system_builder = EvbSystemBuilder()
+        system_builder.ostream.mute()
 
         reactant_mol = Molecule.read_xyz_file(
             str(data_path / 'evb_ethanol.xyz'), )
@@ -148,7 +150,7 @@ class TestEvb:
 
         # 0.4 is chosen instead of 0.5 because for lambda=0.4, 1-lambda=/=lambda
         Lambda = [0, 0.4, 1]
-        system_builder.water_model = 'spce'
+        system_builder.water_model = 'cspce'
         vac_systems, vac_topology, vac_positions = system_builder.build_systems(
             reactant,
             product,
@@ -266,6 +268,7 @@ class TestEvb:
         # EVB.load_initialisation(str(water_folder), 'water', skip_systems=True, skip_pdb=True)
         # do data processing
         dp = EvbDataProcessing()
+        dp.ostream.mute()
 
         comp_results = dp.compute(input_results, 5, 10)
 

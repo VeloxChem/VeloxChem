@@ -459,21 +459,20 @@ def _Molecule_get_connectivity_matrix(self, factor=1.3, H2_factor=1.7):
     covalent_radii_in_au = self.covalent_radii_to_numpy()
 
     natoms = coords_in_au.shape[0]
-    connectivity_matrix = np.zeros((natoms, natoms), dtype='int32')
+    connectivity_matrix = np.zeros((natoms, natoms), dtype=int)
     labels = self.get_labels()
 
     for i in range(natoms):
         for j in range(i + 1, natoms):
             distance = np.linalg.norm(coords_in_au[j] - coords_in_au[i])
-            threshold = (covalent_radii_in_au[i] +
-                         covalent_radii_in_au[j])
-            
+            threshold = (covalent_radii_in_au[i] + covalent_radii_in_au[j])
+
             # Special case for H2 molecule
             if labels[i] == 'H' and labels[j] == 'H':
                 threshold *= H2_factor
             else:
                 threshold *= factor
-                
+
             if distance <= threshold:
                 connectivity_matrix[i, j] = 1
                 connectivity_matrix[j, i] = 1
@@ -591,6 +590,326 @@ def _Molecule_rotate_around_vector(self, coords, origin, vector, rotation_angle,
     return np.matmul(coords - origin, rotation_mat.T) + origin
 
 
+def _Molecule_get_distance_in_angstroms(self, distance_indices_one_based):
+    """
+    Gets distance.
+
+    :param distance_indices_one_based:
+        The indices (1-based).
+
+    :return:
+        The distance.
+    """
+
+    return self.get_distance(distance_indices_one_based, 'angstrom')
+
+
+def _Molecule_get_distance(self, distance_indices_one_based, distance_unit):
+    """
+    Gets distance.
+
+    :param distance_indices_one_based:
+        The distance indices (1-based).
+    :param distance_unit:
+        The unit of distance (angstrom or bohr).
+
+    :return:
+        The distance.
+    """
+
+    assert_msg_critical(
+        len(distance_indices_one_based) == 2,
+        'Molecule.get_distance: Expecting two atom indices (1-based)')
+
+    assert_msg_critical(distance_unit.lower() in ['angstrom', 'bohr'],
+                        'Molecule.get_distance: Invalid distance unit')
+
+    a = distance_indices_one_based[0] - 1
+    b = distance_indices_one_based[1] - 1
+
+    coords_in_au = self.get_coordinates_in_bohr()
+
+    v21 = coords_in_au[a] - coords_in_au[b]
+
+    r21 = float(np.linalg.norm(v21))
+
+    if distance_unit.lower() == 'angstrom':
+        return r21 * bohr_in_angstrom()
+    else:
+        return r21
+
+
+def _Molecule_set_distance_in_angstroms(self,
+                                        distance_indices_one_based,
+                                        target_distance,
+                                        verbose=True):
+    """
+    Sets distance.
+
+    :param distance_indices_one_based:
+        The distance indices (1-based).
+    :param target_distance:
+        The target value of distance.
+    """
+
+    self.set_distance(distance_indices_one_based, target_distance, 'angstrom',
+                      verbose)
+
+
+def _Molecule_set_distance(self,
+                           distance_indices_one_based,
+                           target_distance,
+                           distance_unit,
+                           verbose=True):
+    """
+    Sets distance.
+
+    :param distance_indices_one_based:
+        The distance indices (1-based).
+    :param target_distance:
+        The target value of distance.
+    :param distance_unit:
+        The unit of distance (angstrom or bohr).
+    """
+
+    assert_msg_critical(
+        len(distance_indices_one_based) == 2,
+        'Molecule.set_distance: Expecting two atom indices (1-based)')
+
+    assert_msg_critical(distance_unit.lower() in ['angstrom', 'bohr'],
+                        'Molecule.set_distance: Invalid distance unit')
+
+    # get the 0-based atom indices for the i-j pair
+    i = distance_indices_one_based[0] - 1
+    j = distance_indices_one_based[1] - 1
+
+    # disconnect i-j and find all atoms that at connected to j
+    connectivity_matrix = self.get_connectivity_matrix()
+    connectivity_matrix[i, j] = 0
+    connectivity_matrix[j, i] = 0
+
+    atoms_connected_to_j = self._find_connected_atoms(j, connectivity_matrix)
+
+    assert_msg_critical(
+        i not in atoms_connected_to_j,
+        'Molecule.set_distance: Cannot rotate distance ' +
+        '(Maybe it is part of a ring?)')
+
+    # rotate whole molecule around normal vector of i-j-k
+    coords_in_au = self.get_coordinates_in_bohr()
+
+    v21 = coords_in_au[i] - coords_in_au[j]
+
+    u21 = v21 / np.linalg.norm(v21)
+
+    current_distance = self.get_distance(distance_indices_one_based,
+                                         distance_unit)
+
+    # make several attempts to rotate the distance, with the constraint
+    # that the connectivity matrix should not change
+    for attempt in range(10, -1, -1):
+
+        shift_distance = (target_distance - current_distance) * (0.1 * attempt)
+
+        if distance_unit.lower() == 'angstrom':
+            shift_distance_in_bohr = shift_distance / bohr_in_angstrom()
+        else:
+            shift_distance_in_bohr = shift_distance
+
+        new_mol = Molecule(self)
+        for idx in atoms_connected_to_j:
+            new_mol.set_atom_coordinates(
+                idx, coords_in_au[idx] - u21 * shift_distance_in_bohr)
+
+        new_conn_mat = new_mol.get_connectivity_matrix()
+        conn_mat = self.get_connectivity_matrix()
+
+        # allowing i-j bond to be broken by set_distance
+        new_conn_mat[i, j] = 0
+        new_conn_mat[j, i] = 0
+        conn_mat[i, j] = 0
+        conn_mat[j, i] = 0
+
+        if np.max(np.abs(new_conn_mat - conn_mat)) < 1.0e-10:
+            new_coords_in_au = new_mol.get_coordinates_in_bohr()
+
+            for idx in atoms_connected_to_j:
+                self.set_atom_coordinates(idx, new_coords_in_au[idx])
+
+            current_distance = self.get_distance(distance_indices_one_based,
+                                                 distance_unit)
+            if abs(target_distance - current_distance) > 1.0e-6 and verbose:
+                warn_msg = "* Warning * New distance is "
+                warn_msg += f"{current_distance:.3f} {distance_unit.lower()}\n"
+                print(warn_msg)
+
+            return
+
+    assert_msg_critical(
+        False, 'Molecule.set_distance: Cannot set distance due to ' +
+        'overlapping atoms')
+
+
+def _Molecule_get_angle_in_degrees(self, angle_indices_one_based):
+    """
+    Gets angle.
+
+    :param angle_indices_one_based:
+        The indices (1-based).
+
+    :return:
+        The angle.
+    """
+
+    return self.get_angle(angle_indices_one_based, 'degree')
+
+
+def _Molecule_get_angle(self, angle_indices_one_based, angle_unit):
+    """
+    Gets angle.
+
+    :param angle_indices_one_based:
+        The angle indices (1-based).
+    :param angle_unit:
+        The unit of angle (degree or radian).
+
+    :return:
+        The angle.
+    """
+
+    assert_msg_critical(
+        len(angle_indices_one_based) == 3,
+        'Molecule.get_angle: Expecting three atom indices (1-based)')
+
+    assert_msg_critical(angle_unit.lower() in ['degree', 'radian'],
+                        'Molecule.get_angle: Invalid angle unit')
+
+    a = angle_indices_one_based[0] - 1
+    b = angle_indices_one_based[1] - 1
+    c = angle_indices_one_based[2] - 1
+
+    coords_in_au = self.get_coordinates_in_bohr()
+
+    v21 = coords_in_au[a] - coords_in_au[b]
+    v32 = coords_in_au[b] - coords_in_au[c]
+
+    u21 = v21 / np.linalg.norm(v21)
+    u32 = v32 / np.linalg.norm(v32)
+
+    cos_theta = -np.vdot(u21, u32)
+
+    theta_in_radian = safe_arccos(cos_theta)
+
+    if angle_unit.lower() == 'degree':
+        return 180.0 * theta_in_radian / math.pi
+    else:
+        return theta_in_radian
+
+
+def _Molecule_set_angle_in_degrees(self,
+                                   angle_indices_one_based,
+                                   target_angle,
+                                   verbose=True):
+    """
+    Sets angle.
+
+    :param angle_indices_one_based:
+        The angle indices (1-based).
+    :param target_angle:
+        The target value of angle.
+    """
+
+    self.set_angle(angle_indices_one_based, target_angle, 'degree', verbose)
+
+
+def _Molecule_set_angle(self,
+                        angle_indices_one_based,
+                        target_angle,
+                        angle_unit,
+                        verbose=True):
+    """
+    Sets angle.
+
+    :param angle_indices_one_based:
+        The angle indices (1-based).
+    :param target_angle:
+        The target value of angle.
+    :param angle_unit:
+        The unit of angle (degree or radian).
+    """
+
+    assert_msg_critical(
+        len(angle_indices_one_based) == 3,
+        'Molecule.set_angle: Expecting three atom indices (1-based)')
+
+    assert_msg_critical(angle_unit.lower() in ['degree', 'radian'],
+                        'Molecule.set_angle: Invalid angle unit')
+
+    # get the 0-based atom indices for the i-j bond of the i-j-k angle
+    i = angle_indices_one_based[0] - 1
+    j = angle_indices_one_based[1] - 1
+    k = angle_indices_one_based[2] - 1
+
+    # disconnect i-j and find all atoms that at connected to j
+    connectivity_matrix = self.get_connectivity_matrix()
+    connectivity_matrix[i, j] = 0
+    connectivity_matrix[j, i] = 0
+
+    atoms_connected_to_j = self._find_connected_atoms(j, connectivity_matrix)
+
+    assert_msg_critical(
+        i not in atoms_connected_to_j,
+        'Molecule.set_angle: Cannot rotate angle ' +
+        '(Maybe it is part of a ring?)')
+
+    # rotate whole molecule around normal vector of i-j-k
+    coords_in_au = self.get_coordinates_in_bohr()
+
+    v21 = coords_in_au[i] - coords_in_au[j]
+    v32 = coords_in_au[j] - coords_in_au[k]
+
+    u21 = v21 / np.linalg.norm(v21)
+    u32 = v32 / np.linalg.norm(v32)
+
+    nijk = np.cross(u32, u21)
+    nijk = nijk / np.linalg.norm(nijk)
+
+    current_angle = self.get_angle(angle_indices_one_based, angle_unit)
+
+    # make several attempts to rotate the angle, with the constraint
+    # that the connectivity matrix should not change
+    for attempt in range(10, -1, -1):
+
+        rotation_angle = (target_angle - current_angle) * (0.1 * attempt)
+
+        new_coords_in_au = self._rotate_around_vector(coords_in_au,
+                                                      coords_in_au[j], nijk,
+                                                      rotation_angle,
+                                                      angle_unit)
+
+        new_mol = Molecule(self)
+        for idx in atoms_connected_to_j:
+            new_mol.set_atom_coordinates(idx, new_coords_in_au[idx])
+
+        new_conn_mat = new_mol.get_connectivity_matrix()
+        conn_mat = self.get_connectivity_matrix()
+        if np.max(np.abs(new_conn_mat - conn_mat)) < 1.0e-10:
+            for idx in atoms_connected_to_j:
+                self.set_atom_coordinates(idx, new_coords_in_au[idx])
+
+            current_angle = self.get_angle(angle_indices_one_based, angle_unit)
+            if abs(target_angle - current_angle) > 1.0e-6 and verbose:
+                warn_msg = "* Warning * After rotation, the angle is "
+                warn_msg += f"{current_angle:.3f} {angle_unit.lower()}\n"
+                print(warn_msg)
+
+            return
+
+    assert_msg_critical(
+        False,
+        'Molecule.set_angle: Cannot set angle due to ' + 'overlapping atoms')
+
+
 def _Molecule_get_dihedral_in_degrees(self, dihedral_indices_one_based):
     """
     Gets dihedral angle.
@@ -621,6 +940,9 @@ def _Molecule_get_dihedral(self, dihedral_indices_one_based, angle_unit):
     assert_msg_critical(
         len(dihedral_indices_one_based) == 4,
         'Molecule.get_dihedral: Expecting four atom indices (1-based)')
+
+    assert_msg_critical(angle_unit.lower() in ['degree', 'radian'],
+                        'Molecule.get_dihedral: Invalid angle unit')
 
     a = dihedral_indices_one_based[0] - 1
     b = dihedral_indices_one_based[1] - 1
@@ -654,17 +976,16 @@ def _Molecule_get_dihedral(self, dihedral_indices_one_based, angle_unit):
     if sin_phi < 0.0:
         phi_in_radian *= -1.0
 
-    assert_msg_critical(angle_unit.lower() in ['degree', 'radian'],
-                        'Molecule.get_dihedral: Invalid angle unit')
-
     if angle_unit.lower() == 'degree':
         return 180.0 * phi_in_radian / math.pi
     else:
         return phi_in_radian
 
 
-def _Molecule_set_dihedral_in_degrees(self, dihedral_indices_one_based,
-                                      target_angle):
+def _Molecule_set_dihedral_in_degrees(self,
+                                      dihedral_indices_one_based,
+                                      target_angle,
+                                      verbose=True):
     """
     Sets dihedral angle.
 
@@ -674,11 +995,15 @@ def _Molecule_set_dihedral_in_degrees(self, dihedral_indices_one_based,
         The target value of dihedral angle.
     """
 
-    self.set_dihedral(dihedral_indices_one_based, target_angle, 'degree')
+    self.set_dihedral(dihedral_indices_one_based, target_angle, 'degree',
+                      verbose)
 
 
-def _Molecule_set_dihedral(self, dihedral_indices_one_based, target_angle,
-                           angle_unit):
+def _Molecule_set_dihedral(self,
+                           dihedral_indices_one_based,
+                           target_angle,
+                           angle_unit,
+                           verbose=True):
     """
     Sets dihedral angle.
 
@@ -693,6 +1018,9 @@ def _Molecule_set_dihedral(self, dihedral_indices_one_based, target_angle,
     assert_msg_critical(
         len(dihedral_indices_one_based) == 4,
         'Molecule.set_dihedral: Expecting four atom indices (1-based)')
+
+    assert_msg_critical(angle_unit.lower() in ['degree', 'radian'],
+                        'Molecule.set_dihedral: Invalid angle unit')
 
     # get the 0-based atom indices for central bond
     i = dihedral_indices_one_based[1] - 1
@@ -745,6 +1073,18 @@ def _Molecule_set_dihedral(self, dihedral_indices_one_based, target_angle,
         if np.max(np.abs(new_conn_mat - conn_mat)) < 1.0e-10:
             for idx in atoms_connected_to_j:
                 self.set_atom_coordinates(idx, new_coords_in_au[idx])
+
+            current_angle = self.get_dihedral(dihedral_indices_one_based,
+                                              angle_unit)
+            while updated_target_angle - current_angle > half_period:
+                updated_target_angle -= 2.0 * half_period
+            while updated_target_angle - current_angle < -half_period:
+                updated_target_angle += 2.0 * half_period
+            if abs(updated_target_angle - current_angle) > 1.0e-6 and verbose:
+                warn_msg = "* Warning * After rotation, the dihedral angle is "
+                warn_msg += f"{current_angle:.3f} {angle_unit.lower()}\n"
+                print(warn_msg)
+
             return
 
     assert_msg_critical(
@@ -781,7 +1121,7 @@ def _Molecule_center_of_mass_in_angstrom(self):
     return self.center_of_mass_in_bohr() * bohr_in_angstrom()
 
 
-def _Molecule_get_string(self):
+def _Molecule_get_string(self, title='Molecular Geometry', sep='='):
     """
     Returns string representation of molecule.
 
@@ -789,8 +1129,10 @@ def _Molecule_get_string(self):
         A string with representation of molecule.
     """
 
-    mol_str = 'Molecular Geometry (Angstroms)\n'
-    mol_str += '================================\n\n'
+    mol_str_title = f'{title} (Angstroms)'
+
+    mol_str = mol_str_title + '\n'
+    mol_str += sep * (len(mol_str_title) + 2) + '\n\n'
     mol_str += '  Atom'
     mol_str += '         Coordinate X '
     mol_str += '         Coordinate Y '
@@ -961,6 +1303,7 @@ def _Molecule_show(self,
                    height=300,
                    atom_indices=False,
                    atom_labels=False,
+                   gradient=None,
                    starting_index=1,
                    bonds=None,
                    dashed_bonds=None):
@@ -974,7 +1317,10 @@ def _Molecule_show(self,
     :param atom_indices:
         The flag for showing atom indices (1-based).
     :param atom_labels:
-        The flag for showing atom labels. If provided with a list, will use that list as labels.
+        The flag for showing atom labels. If provided with a list, will use
+        that list as labels.
+    :param gradient:
+        The molecular gradient.
     :starting_index:
         The starting index for atom indices.
     :bonds:
@@ -990,6 +1336,44 @@ def _Molecule_show(self,
 
         if bonds is None:
             viewer.addModel(self.get_xyz_string())
+
+            if gradient is not None:
+                coords = self.get_coordinates_in_bohr()
+                assert_msg_critical(coords.shape == gradient.shape,
+                                    'Molecule.show: Invalid shape of gradient')
+
+                # use some scaling factor so that the length of gradient arrow
+                # looks reasonable
+                scaling_f = 50
+
+                for coord, grad in zip(coords, gradient):
+                    center = coord * bohr_in_angstrom()
+                    start = center
+                    end = center + scaling_f * grad
+                    viewer.addArrow({
+                        'start': {
+                            'x': start[0],
+                            'y': start[1],
+                            'z': start[2],
+                        },
+                        'end': {
+                            'x': end[0],
+                            'y': end[1],
+                            'z': end[2],
+                        },
+                        'radius': 0.1,
+                        'color': 'green',
+                    })
+                    viewer.addSphere({
+                        'center': {
+                            'x': center[0],
+                            'y': center[1],
+                            'z': center[2],
+                        },
+                        'radius': 0.1,
+                        'color': 'green',
+                    })
+
         else:
             from rdkit import Chem
             import re
@@ -1315,6 +1699,37 @@ def _Molecule_partition_atoms(self, comm):
     return list(list_atoms[rank::nnodes])
 
 
+def _Molecule_is_water_molecule(self):
+    """
+    Checks if a molecule is a water molecule.
+
+    :return:
+        True if the molecule is a water molecule, False otherwise.
+    """
+
+    natoms = self.number_of_atoms()
+    if natoms != 3:
+        return False
+
+    labels = self.get_labels()
+    if sorted(labels) != ['H', 'H', 'O']:
+        return False
+
+    conn = self.get_connectivity_matrix()
+
+    bond_labels = [
+        sorted([labels[i], labels[j]])
+        for i in range(natoms)
+        for j in range(i, natoms)
+        if conn[i, j] == 1
+    ]
+
+    if bond_labels != [['H', 'O'], ['H', 'O']]:
+        return False
+
+    return True
+
+
 @staticmethod
 def _Molecule_read_name(mol_name):
     """
@@ -1432,6 +1847,14 @@ Molecule.read_xyz_string = _Molecule_read_xyz_string
 Molecule.from_dict = _Molecule_from_dict
 Molecule.get_connectivity_matrix = _Molecule_get_connectivity_matrix
 Molecule.identify_monovalent_elements = _Molecule_identify_monovalent_elements
+Molecule.get_distance = _Molecule_get_distance
+Molecule.set_distance = _Molecule_set_distance
+Molecule.get_distance_in_angstroms = _Molecule_get_distance_in_angstroms
+Molecule.set_distance_in_angstroms = _Molecule_set_distance_in_angstroms
+Molecule.get_angle = _Molecule_get_angle
+Molecule.set_angle = _Molecule_set_angle
+Molecule.get_angle_in_degrees = _Molecule_get_angle_in_degrees
+Molecule.set_angle_in_degrees = _Molecule_set_angle_in_degrees
 Molecule.get_dihedral = _Molecule_get_dihedral
 Molecule.set_dihedral = _Molecule_set_dihedral
 Molecule.get_dihedral_in_degrees = _Molecule_get_dihedral_in_degrees
@@ -1455,6 +1878,7 @@ Molecule.check_multiplicity = _Molecule_check_multiplicity
 Molecule.number_of_alpha_electrons = _Molecule_number_of_alpha_electrons
 Molecule.number_of_beta_electrons = _Molecule_number_of_beta_electrons
 Molecule.partition_atoms = _Molecule_partition_atoms
+Molecule.is_water_molecule = _Molecule_is_water_molecule
 
 Molecule.read_name = _Molecule_read_name
 Molecule.name_to_smiles = _Molecule_name_to_smiles

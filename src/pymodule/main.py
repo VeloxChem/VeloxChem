@@ -109,6 +109,9 @@ def select_scf_driver(task, scf_type):
     else:
         assert_msg_critical(False, f'SCF: invalid scf_type {scf_type}')
 
+    # set print level for input file based calculation
+    scf_drv.print_level = 2
+
     return scf_drv
 
 
@@ -197,6 +200,9 @@ def select_rsp_property(task, mol_orbs, rsp_dict, method_dict):
     else:
         assert_msg_critical(False,
                             f'Response: invalid response property {prop_type}')
+
+    # set print level for input file based calculation
+    rsp_prop.print_level = 2
 
     return rsp_prop
 
@@ -384,11 +390,15 @@ def main():
 
             if use_xtb:
                 grad_drv = XtbGradientDriver(xtb_drv)
+                # set print level for input file based calculation
+                grad_drv.print_level = 2
                 grad_drv.update_settings(grad_dict, method_dict)
                 grad_drv.compute(task.molecule)
 
             else:
                 grad_drv = ScfGradientDriver(scf_drv)
+                # set print level for input file based calculation
+                grad_drv.print_level = 2
                 grad_drv.update_settings(grad_dict, method_dict)
                 grad_drv.compute(task.molecule, task.ao_basis, scf_results)
 
@@ -412,6 +422,8 @@ def main():
             rsp_prop.compute(task.molecule, task.ao_basis, scf_results)
 
             tddftgrad_drv = TddftGradientDriver(scf_drv)
+            # set print level for input file based calculation
+            tddftgrad_drv.print_level = 2
             tddftgrad_drv.update_settings(grad_dict, rsp_dict, orbrsp_dict,
                                           method_dict)
             tddftgrad_drv.compute(task.molecule, task.ao_basis, scf_drv,
@@ -430,11 +442,15 @@ def main():
 
         if use_xtb:
             hessian_drv = XtbHessianDriver(xtb_drv)
+            # set print level for input file based calculation
+            hessian_drv.print_level = 2
             hessian_drv.update_settings(method_dict, hessian_dict)
             hessian_drv.compute(task.molecule)
 
         else:
             hessian_drv = ScfHessianDriver(scf_drv)
+            # set print level for input file based calculation
+            hessian_drv.print_level = 2
             hessian_drv.update_settings(method_dict, hessian_dict, orbrsp_dict)
             hessian_drv.compute(task.molecule, task.ao_basis)
 
@@ -530,6 +546,8 @@ def main():
 
         if use_xtb:
             vibrational_drv = VibrationalAnalysis(xtb_drv)
+            # set print level for input file based calculation
+            vibrational_drv.print_level = 2
             vibrational_drv.update_settings(method_dict,
                                             vib_dict,
                                             hessian_dict=hessian_dict,
@@ -539,6 +557,8 @@ def main():
 
         else:
             vibrational_drv = VibrationalAnalysis(scf_drv)
+            # set print level for input file based calculation
+            vibrational_drv.print_level = 2
             vibrational_drv.update_settings(method_dict,
                                             vib_dict,
                                             hessian_dict=hessian_dict,
@@ -624,6 +644,8 @@ def main():
             if 'gradient' in task.input_dict:
                 grad_dict = task.input_dict['gradient']
                 tddftgrad_drv = TddftGradientDriver(scf_drv)
+                # set print level for input file based calculation
+                tddftgrad_drv.print_level = 2
                 tddftgrad_drv.update_settings(grad_dict, rsp_dict, orbrsp_dict,
                                               method_dict)
                 tddftgrad_drv.compute(task.molecule, task.ao_basis, scf_drv,

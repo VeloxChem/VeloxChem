@@ -95,9 +95,9 @@ class EvbDriver():
         self.mute_scf = True
 
         self.t_label = int(time.time())
-        self.water_model = 'spce'
+        self.water_model = 'cspce'
         
-        self.ffbuilder = ReactionForceFieldBuilder()
+        self.ffbuilder = ReactionForceFieldBuilder(ostream=self.ostream)
 
     def build_and_run_default_water_EVB(
         self,

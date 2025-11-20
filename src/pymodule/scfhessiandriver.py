@@ -95,10 +95,6 @@ class ScfHessianDriver(HessianDriver):
 
         self.perturbed_density = None
 
-        # TODO TEMPORARY FLAG
-        # Only run orbital response for performance testing
-        self.orbrsp_only = False
-
         # flag for printing the Hessian
         self.do_print_hessian = False
 
@@ -172,16 +168,6 @@ class ScfHessianDriver(HessianDriver):
 
         # Save the electronic energy
         self.elec_energy = self.scf_driver.get_scf_energy()
-
-        # TODO TEMPORARY
-        if self.orbrsp_only:
-            self.ostream.print_header(
-                '*** WARNING only computing Hessian orbital response!')
-            self.compute_orbital_response(molecule, ao_basis)
-            self.ostream.print_header(
-                '*** Hessian orbital response only: DONE  ***')
-            self.ostream.flush()
-            return
 
         if self.numerical:
             self.compute_numerical(molecule, ao_basis)
@@ -391,11 +377,10 @@ class ScfHessianDriver(HessianDriver):
 
         if self.scf_driver._pe:
 
-            # TODO: double check
             cphf_solver.embedding = self.scf_driver.embedding
             pe_sanity_check(cphf_solver, molecule=molecule)
 
-            # TODO: unrestricted
+            # TODO: double check
             from .embedding import PolarizableEmbeddingHess
             cphf_solver._embedding_hess_drv = PolarizableEmbeddingHess(
                 molecule=molecule,
@@ -407,7 +392,7 @@ class ScfHessianDriver(HessianDriver):
         # TODO: double check propagation of cphf settings
         cphf_keywords = {
             'timing', 'profiling', 'memory_profiling', 'memory_tracing',
-            'use_subcomms', 'filename'
+            'use_subcomms', 'filename', 'print_level'
         }
         for key in cphf_keywords:
             setattr(cphf_solver, key, getattr(self, key))
@@ -1037,9 +1022,6 @@ class ScfHessianDriver(HessianDriver):
             nocc_b = molecule.number_of_beta_electrons()
             mo_occ_a = mo_a[:, :nocc_a]
             mo_occ_b = mo_b[:, :nocc_b]
-            nmo = mo_occ_a.shape[1]
-            nvir_a = nmo - nocc_a
-            nvir_b = nmo - nocc_b
             orb_ene_a = scf_tensors['E_alpha']
             orb_ene_b = scf_tensors['E_beta']
             eocc_a = orb_ene_a[:nocc_a]
@@ -1047,18 +1029,14 @@ class ScfHessianDriver(HessianDriver):
             omega_ao_a = -np.linalg.multi_dot([mo_occ_a, np.diag(eocc_a), mo_occ_a.T])
             omega_ao_b = -np.linalg.multi_dot([mo_occ_b, np.diag(eocc_b), mo_occ_b.T])
             omega_ao = omega_ao_a + omega_ao_b
-            nov_a = nocc_a * nvir_a
-            nov_b = nocc_b * nvir_b
         else:
             density_a = None
             omega_ao = None
             density_b = None
-            nov_a = None
 
         density_a = self.comm.bcast(density_a, root=mpi_master())
         omega_ao = self.comm.bcast(omega_ao, root=mpi_master())
         density_b = self.comm.bcast(density_b, root=mpi_master())
-        nov_a = self.comm.bcast(nov_a, root=mpi_master())
 
         # CPHF equations
 
@@ -1073,22 +1051,22 @@ class ScfHessianDriver(HessianDriver):
 
         if self.scf_driver._pe:
 
-            # TODO: double check
             cphf_solver.embedding = self.scf_driver.embedding
             pe_sanity_check(cphf_solver, molecule=molecule)
 
+            # TODO: double check
             from .embedding import PolarizableEmbeddingHess
             cphf_solver._embedding_hess_drv = PolarizableEmbeddingHess(
                 molecule=molecule,
                 ao_basis=ao_basis,
                 options=self.scf_driver.embedding,
                 comm=self.comm,
-                density=density * 2)
+                density=density_a + density_b)
 
         # TODO: double check propagation of cphf settings
         cphf_keywords = {
             'timing', 'profiling', 'memory_profiling', 'memory_tracing',
-            'use_subcomms', 'filename'
+            'use_subcomms', 'filename', 'print_level'
         }
         for key in cphf_keywords:
             setattr(cphf_solver, key, getattr(self, key))
@@ -1141,12 +1119,8 @@ class ScfHessianDriver(HessianDriver):
                             continue
                     for y in range(3):
                         hess_ijxy = 2.0 * (np.dot(
-                            dist_cphf_ov_ix_data[:nov_a],
-                            dist_cphf_rhs[idx_j * 3 + y].data[:nov_a])
-                           + np.dot(
-                            dist_cphf_ov_ix_data[nov_a:],
-                            dist_cphf_rhs[idx_j * 3 + y].data[nov_a:])
-                            )
+                            dist_cphf_ov_ix_data,
+                            dist_cphf_rhs[idx_j * 3 + y].data))
 
                         hessian_cphf_coeff_rhs[i, x, j, y] += hess_ijxy
                         if i != j:
@@ -1921,24 +1895,3 @@ class ScfHessianDriver(HessianDriver):
 
         if self.rank == mpi_master():
             self.dipole_gradient = dipole_gradient.reshape(3, 3 * natm)
-
-    def compute_orbital_response(self, molecule, ao_basis):
-        """
-        TEMPORARY FUNCTION FOR PERFORMANCE TESTING
-        Computes the CPHF orbital response.
-
-        :param molecule:
-            The molecule.
-        :param ao_basis:
-            Tha AO basis.
-        """
-
-        # get SCF tensors
-        scf_tensors = self.scf_driver.scf_tensors
-
-        # Set up a CPHF solver
-        cphf_solver = HessianOrbitalResponse(self.comm, self.ostream)
-        cphf_solver.update_settings(self.cphf_dict, self.method_dict)
-
-        # Solve the CPHF equations
-        cphf_solver.compute(molecule, ao_basis, scf_tensors, self.scf_driver)

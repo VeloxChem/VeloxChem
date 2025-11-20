@@ -924,7 +924,7 @@ class ScfGradientDriver(GradientDriver):
 
         self.gradient = self.comm.allreduce(self.gradient, op=MPI.SUM)
 
-    def compute_energy(self, molecule, ao_basis, scf_results):
+    def compute_energy(self, molecule, ao_basis, scf_results=None):
         """
         Computes the energy at current geometry.
 
@@ -955,7 +955,7 @@ class ScfGradientDriver(GradientDriver):
         # if not self._debug:
         #     self.ostream.unmute()
 
-        if self.rank == mpi_master():
+        if (self.rank == mpi_master()) and (scf_results is not None):
             scf_results.update(new_scf_results)
 
         return self.scf_driver.get_scf_energy()

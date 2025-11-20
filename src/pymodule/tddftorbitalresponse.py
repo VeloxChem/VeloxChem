@@ -114,6 +114,14 @@ class TddftOrbitalResponse(CphfSolver):
         if self.do_first_order_prop:
             first_order_prop = FirstOrderProperties(self.comm, self.ostream)
 
+            orbrsp_results = self.cphf_results
+
+            dist_cphf_ov = orbrsp_results['dist_cphf_ov']
+            lambda_ov = [
+                dist_cphf_ov[s].get_full_vector(0)
+                for s in range(len(dist_cphf_ov))
+            ]
+
             # unrelaxed density and dipole moment
             if self.rank == mpi_master():
                 if self.tamm_dancoff:
@@ -124,15 +132,15 @@ class TddftOrbitalResponse(CphfSolver):
                 mo = scf_tensors['C_alpha']
                 mo_occ = mo[:, :nocc]
                 mo_vir = mo[:, nocc:]
+                nvir = mo_vir.shape[1]
 
-                orbrsp_results = self.cphf_results
-
-                lambda_ov = orbrsp_results['cphf_ov']
                 unrel_dm_ao = orbrsp_results['unrelaxed_density_ao']
                 lambda_ao = np.array([
-                    np.linalg.multi_dot([mo_occ, lambda_ov[s], mo_vir.T])
-                    for s in range(lambda_ov.shape[0])
+                    np.linalg.multi_dot(
+                        [mo_occ, lambda_ov[s].reshape(nocc, nvir), mo_vir.T])
+                    for s in range(len(lambda_ov))
                 ])
+
                 rel_dm_ao = (unrel_dm_ao + 2.0 * lambda_ao +
                              2.0 * lambda_ao.transpose(0, 2, 1))
 

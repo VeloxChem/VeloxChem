@@ -38,6 +38,7 @@
 #include <vector>
 #include <map>
 #include <ranges>
+#include <array>
 
 #include "SubMatrix.hpp"
 #include "MathFunc.hpp"
@@ -63,12 +64,35 @@ class CT3FlatBuffer
         
         _width = width;
         
+        _reduced = false;
+        
         _data.reserve(_indices.size());
         
         if (const auto nelems = _width * (_width + 1) / 2;  nelems > 0)
         {
             std::ranges::for_each(_indices, [&](const auto& index) {
                 _data.push_back(std::vector<T>(nelems, T{0.0}));
+            });
+        }
+    }
+    
+    /// @brief The default constructor.
+    /// @param indices The vector of indices along x axis of tensor.
+    /// @param dimensions The dimensions of reduced tensor along  y,z axes.
+    CT3FlatBuffer(const std::vector<size_t>& indices, const std::array<size_t, 4>& dimensions)
+    {
+        _indices = indices;
+        
+        _width = dimensions[2] + dimensions[3];
+        
+        _reduced = true;
+        
+        _data.reserve(_indices.size());
+        
+        if (_width > 0)
+        {
+            std::ranges::for_each(_indices, [&](const auto& index) {
+                _data.push_back(std::vector<T>(_width, T{0.0}));
             });
         }
     }
@@ -82,12 +106,35 @@ class CT3FlatBuffer
         
         _width = width;
         
+        _reduced = false;
+        
         _data.reserve(_mask_indices.size());
         
         if (const auto nelems = _width * (_width + 1) / 2;  nelems > 0)
         {
             std::ranges::for_each(_mask_indices, [&](const auto& index) {
                 _data.push_back(std::vector<T>(nelems, T{0.0}));
+            });
+        }
+    }
+    
+    /// @brief The default constructor.
+    /// @param mask_indices The map of indices along x axis of tensor.
+    /// @param dimensions The dimensions of reduced tensor along  y,z axes.
+    CT3FlatBuffer(const std::map<size_t, size_t>& mask_indices, const std::array<size_t, 4>& dimensions)
+    {
+        _mask_indices = mask_indices;
+        
+        _width = dimensions[2] + dimensions[3];
+        
+        _reduced = true;
+        
+        _data.reserve(_mask_indices.size());
+        
+        if (_width > 0)
+        {
+            std::ranges::for_each(_mask_indices, [&](const auto& index) {
+                _data.push_back(std::vector<T>(_width, T{0.0}));
             });
         }
     }
@@ -101,6 +148,8 @@ class CT3FlatBuffer
         _indices = indices;
         
         _width = width;
+        
+        _reduced = false;
         
         _data.reserve(_indices.size() * nbatches);
         
@@ -123,6 +172,8 @@ class CT3FlatBuffer
         _mask_indices = mask_indices;
         
         _width = width;
+        
+        _reduced = false; 
         
         _data.reserve(_mask_indices.size() * nbatches);
         
@@ -216,6 +267,31 @@ class CT3FlatBuffer
         }
     }
     
+    /// @brief Unpacks specific tensor slice into matrix.
+    /// @param matrix The matrix to unpack tensor slice.
+    /// @param indices The vector of reduction indices.
+    /// @param index The index of tensor slice.
+    auto
+    reduced_unpack_data(CSubMatrix& matrix, const std::vector<std::pair<size_t, size_t>>& indices, const size_t index) const -> void
+    {
+        matrix.zero();
+        
+        auto ptr_data = _data[index].data();
+         
+        size_t idx = 0;
+            
+        for (const auto& index : indices)
+        {
+            const auto fact = ptr_data[idx];
+                
+            matrix.at(index) = fact;
+                
+            matrix.at({index.second, index.first}) = fact;
+                
+            idx++;
+        }
+    }
+    
     /// @brief Gets the constant pointer to slice of tensor data.
     /// @param index The index of tensor slice.
     /// @return The constant pointer to slice of tensor.
@@ -231,6 +307,21 @@ class CT3FlatBuffer
     width() const -> size_t
     {
         return _width;
+    }
+    
+    /// @brief Gets number of elements in tensor slice along y,z axes.
+    /// @return The width of tensor along  y,z axes.
+    inline auto
+    elements() const -> size_t
+    {
+        if (_reduced)
+        {
+            return _width;
+        }
+        else
+        {
+            return _width * (_width + 1) / 2;
+        }
     }
     
     /// @brief Gets tensor width along x axis.
@@ -264,6 +355,14 @@ class CT3FlatBuffer
         }
     }
     
+    /// @brief Checks if  tensor slice along y,z axes.
+    /// @return The flag of tensor slice reduction along  y,z axes.
+    inline auto
+    is_reduced() const -> bool
+    {
+        return _reduced;
+    }
+    
    private:
     
     /// @brief Memory block for data storage of tensor slices along flatenned symmetrizes y,z axis.
@@ -277,6 +376,9 @@ class CT3FlatBuffer
     
     /// @brief The width of tensor along y,z axes.
     size_t _width;
+    
+    /// @brief The form of tensor alongf y,z axis.
+    bool _reduced;
 };
 
 #endif /* T3FlatBuffer_hpp */
