@@ -480,3 +480,32 @@ class RIJKFockDriver:
 
         return self._ri_drv.compute_mo_bq_vectors(lambda_p, lambda_h, bstart,
                                                   bend)
+    
+    def estimate_memory_for_bq_vectors(self,
+                                        screener,
+                                        molecule,
+                                        auxiliary_basis,
+                                        ithreshold):
+        """
+        Estimate size of B^Q vectors (screened, distributed) for the RI-JK Fock driver.
+        
+        :param screener:
+            The two-electron ERI screener data.
+        :param molecule:
+            The molecule to compute three-center integrals.
+        :param auxiliary_basis:
+            The auxiliary basis to compute three-center integrals.
+        :param ithreshold: 
+            The integer threshold of screening important integral pairs.
+        """
+        
+        if isinstance(auxiliary_basis, str):
+            if self.rank == mpi_master():
+                basis_ri = MolecularBasis.read(molecule, auxiliary_basis)
+            else:
+                basis_ri = None
+            basis_ri = self.comm.bcast(basis_ri, root=mpi_master())
+        else:
+            basis_ri = MolecularBasis(auxiliary_basis)
+            
+        return self._ri_drv.estimate_memory_for_bq_vectors(screener, molecule, basis_ri, ithreshold, self.rank, self.nodes)
