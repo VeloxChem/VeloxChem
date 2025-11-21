@@ -198,6 +198,72 @@ CRIJKFockDriver::compute_screened_bq_vectors(const CT4CScreener&     screener,
 }
 
 auto
+CRIJKFockDriver::local_compute_screened_bq_vectors(const CT4CScreener&        screener,
+                                                   const CMolecule&           molecule,
+                                                   const CMolecularBasis&     aux_basis,
+                                                   const CSubMatrix&          metric,
+                                                   const int                  ithreshold,
+                                                   const std::vector<size_t>& indices) -> void
+{
+    // allocate B^Q vectors
+    
+    const auto bra_indices = omp::partition_flat_buffer(screener.gto_pair_blocks(), ithreshold);
+    
+    _bq_mask = omp::generate_flat_buffer_mask(screener.gto_pair_blocks(), bra_indices);
+    
+    _bq_vectors = CT3FlatBuffer<double>(indices, bra_indices.back());
+    
+    const auto nelems = _bq_vectors.elements();
+    
+    // set up atomic batching
+    
+    const auto natoms = molecule.number_of_atoms();
+    
+    const auto nbatches = ((natoms % 10) == 0) ? natoms / 10 : natoms / 10 + 1;
+    
+    // set up pointers for OMP region
+    
+    auto ptr_bq_vectors = &_bq_vectors;
+    
+    auto ptr_metric = &metric;
+    
+    // compute atomic batches contributions to B^Q vectors
+    
+    CThreeCenterElectronRepulsionDriver eri_drv;
+    
+    for (int i = 0; i < nbatches; i++)
+    {
+        const auto atoms = omp::partition_atoms(natoms, i, nbatches);
+        
+        const auto buffer = eri_drv.compute(screener, aux_basis, molecule, atoms, ithreshold);
+        
+        auto ptr_buffer = &buffer;
+        
+        const auto nlocaux = indices.size();
+     
+#pragma omp parallel for shared(ptr_bq_vectors, ptr_metric, ptr_buffer) schedule(dynamic)
+        for (size_t j = 0; j < nlocaux; j++)
+        {
+            auto ptr_bq_vec = ptr_bq_vectors->data(j);
+            
+            for (const auto [gidx, lidx] : ptr_buffer->mask_indices())
+            {
+                if (const auto fact = ptr_metric->at({gidx, indices[j]}); std::fabs(fact) > 1.0e-15)
+                {
+                    auto ptr_tints = ptr_buffer->data(lidx);
+                    
+                    #pragma omp simd
+                    for (size_t k = 0; k < nelems; k++)
+                    {
+                        ptr_bq_vec[k] += ptr_tints[k] * fact;
+                    }
+                }
+            }
+        }
+    }
+}
+
+auto
 CRIJKFockDriver::compute_j_fock(const CMatrix     &density,
                                 const std::string &label) const -> CMatrix
 {
