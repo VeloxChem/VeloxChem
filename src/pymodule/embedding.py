@@ -658,42 +658,25 @@ class PolarizableEmbeddingSCF(PolarizableEmbedding):
     def compute_pe_contributions(self, density_matrix):
 
         if self._e_nuc_es is None:
-            start_time = time.time()
             self._e_nuc_es = electrostatic_interactions.compute_electrostatic_nuclear_energy(
                 quantum_subsystem=self.quantum_subsystem,
                 classical_subsystem=self.classical_subsystem)
-            end_time = time.time()
-            elapsed_time = end_time - start_time
-            print(f'Electrostatic nuclear energy computed in: {elapsed_time:.4f} seconds')
 
         if self._f_elec_es is None:
-            start_time = time.time()
             self._f_elec_es = electrostatic_interactions.es_fock_matrix_contributions(
                 classical_subsystem=self.classical_subsystem,
                 integral_driver=self._integral_driver)
-            end_time = time.time()
-            elapsed_time = end_time - start_time
-            print(f'Electrostatic Fock matrix contributions computed in: {elapsed_time:.4f} seconds')
 
         e_elec_es = np.sum(self._f_elec_es * density_matrix)
 
-        start_time = time.time()
         el_fields = self.quantum_subsystem.compute_electronic_fields(
             coordinates=self.classical_subsystem.coordinates,
             density_matrix=density_matrix,
             integral_driver=self._integral_driver)
-        end_time = time.time()
-        elapsed_time = end_time - start_time
-        print(f'Electrostatic fields computed in: {elapsed_time:.4f} seconds')
 
-        start_time = time.time()
         nuc_fields = self.quantum_subsystem.compute_nuclear_fields(
             self.classical_subsystem.coordinates)
-        end_time = time.time()
-        elapsed_time = end_time - start_time
-        print(f'Nuclear fields computed in: {elapsed_time:.4f} seconds')
 
-        start_time = time.time()
         self.classical_subsystem.solve_induced_dipoles(
             external_fields=(el_fields + nuc_fields),
             threshold=self._threshold,
@@ -701,27 +684,16 @@ class PolarizableEmbeddingSCF(PolarizableEmbedding):
             solver=self._solver,
             mic=self._mic,
             box=self.simulation_box.box)
-        end_time = time.time()
-        elapsed_time = end_time - start_time
-        print(f'Induced dipoles solved in: {elapsed_time:.4f} seconds')
 
-        start_time = time.time()
         self._e_induction = induction_interactions.compute_induction_energy(
             induced_dipoles=self.classical_subsystem.induced_dipoles.
             induced_dipoles,
             total_fields=el_fields + nuc_fields +
             self.classical_subsystem.multipole_fields)
-        end_time = time.time()
-        elapsed_time = end_time - start_time
-        print(f'Induction energy computed in: {elapsed_time:.4f} seconds')
 
-        start_time = time.time()
         f_elec_ind = induction_interactions.ind_fock_matrix_contributions(
             classical_subsystem=self.classical_subsystem,
             integral_driver=self._integral_driver)
-        end_time = time.time()
-        elapsed_time = end_time - start_time
-        print(f'Induction Fock matrix computed in: {elapsed_time:.4f} seconds')
 
         e_emb = self._e_induction + self._e_nuc_es + e_elec_es + self._e_vdw
 
