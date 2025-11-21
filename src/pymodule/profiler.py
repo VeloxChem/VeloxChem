@@ -243,7 +243,7 @@ class Profiler:
                 self.timing_dict[key][label] = 0.0
             self.timing_dict[key][label] += dt
 
-    def print_timing(self, ostream, scf_flag=False):
+    def print_timing(self, ostream, scf_flag=False, rank_name=None):
         """
         Prints timing.
 
@@ -260,12 +260,17 @@ class Profiler:
             width = 92
 
             valstr = 'Timing (in sec)'
+            if rank_name is not None:
+                valstr = f'Timing on {rank_name} (in sec)'
             ostream.print_header(valstr.ljust(width))
             ostream.print_header(('-' * len(valstr)).ljust(width))
 
             labels = []
             for key in reversed(self.timing_dict.keys()):
                 for label in self.timing_dict[key]:
+                    # skip labels with a leading underscore, such as _FockCount_
+                    if label.startswith('_'):
+                        continue
                     if label not in labels:
                         labels.append(label)
 

@@ -605,8 +605,8 @@ class PolOrbitalResponse(CphfSolver):
             dist_cphf_rhs_im = []
             for k in range(dof_red):
                 if self.rank == mpi_master():
-                    cphf_rhs_k_re = rhs_red[k].real.reshape(nocc * nvir)
-                    cphf_rhs_k_im = rhs_red[k].imag.reshape(nocc * nvir)
+                    cphf_rhs_k_re = rhs_red[k].real.copy().reshape(nocc * nvir)
+                    cphf_rhs_k_im = rhs_red[k].imag.copy().reshape(nocc * nvir)
                 else:
                     cphf_rhs_k_re = None
                     cphf_rhs_k_im = None
@@ -2140,8 +2140,8 @@ class PolOrbitalResponse(CphfSolver):
 
             for xy in range(dof_red):
                 if self.rank == mpi_master():
-                    polorb_omega_xy_re = omega_red[xy].real.reshape(nao * nao)
-                    polorb_omega_xy_im = omega_red[xy].imag.reshape(nao * nao)
+                    polorb_omega_xy_re = omega_red[xy].real.copy().reshape(nao * nao)
+                    polorb_omega_xy_im = omega_red[xy].imag.copy().reshape(nao * nao)
                 else:
                     polorb_omega_xy_re = None
                     polorb_omega_xy_im = None
