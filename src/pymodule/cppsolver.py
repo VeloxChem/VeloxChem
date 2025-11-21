@@ -1407,45 +1407,8 @@ class ComplexResponse(LinearSolver):
             A dictionary containing property densities at given frequency.
         """
 
-        if self.cpp_flag == 'absorption':
-            return self._get_cpp_absorption_densities(molecule, basis,
-                                                      scf_results, cpp_results,
-                                                      w, normalize_densities)
-
-        elif self.cpp_flag == 'ecd':
-            assert_msg_critical(
-                False,
-                'get_cpp_property_densities: Not yet implemented for ECD')
-            return None
-
-        return None
-
-    def _get_cpp_absorption_densities(self,
-                                      molecule,
-                                      basis,
-                                      scf_results,
-                                      cpp_results,
-                                      w,
-                                      normalize_densities=True):
-        """
-        Gets property densities for CPP absorption at a given frequency.
-
-        :param molecule:
-            The molecule.
-        :param basis:
-            The AO basis set.
-        :param scf_results:
-            The SCF results dictionary.
-        :param cpp_results:
-            The CPP results dictionary.
-        :param w:
-            The given frequency.
-        :param normalize_densities:
-            Whether or not to normalize the property densities.
-
-        :return:
-            A dictionary containing property densities at given frequency.
-        """
+        assert_msg_critical(self.cpp_flag in ['absorption', 'ecd'],
+                            'get_cpp_property_densities: Invalid cpp_flag')
 
         assert_msg_critical(
             ('x', w) in cpp_results['solutions'] and
@@ -1476,11 +1439,19 @@ class ComplexResponse(LinearSolver):
             mo_occ = scf_results['C_alpha'][:, :nocc]
             mo_vir = scf_results['C_alpha'][:, nocc:]
 
-            # vector representation of absorption cross-section
-            vec = (a_prop_grad[0] * cpp_solution_vector_x +
-                   a_prop_grad[1] * cpp_solution_vector_y +
-                   a_prop_grad[2] * cpp_solution_vector_z).imag / 3.0
-            vec *= 4.0 * np.pi * w * fine_structure_constant()
+            if self.cpp_flag == 'absorption':
+                # vector representation of absorption cross-section
+                vec = (a_prop_grad[0] * cpp_solution_vector_x +
+                       a_prop_grad[1] * cpp_solution_vector_y +
+                       a_prop_grad[2] * cpp_solution_vector_z).imag / 3.0
+                vec *= 4.0 * np.pi * w * fine_structure_constant()
+            elif self.cpp_flag == 'ecd':
+                # vector representation of Delta epsilon
+                vec = (a_prop_grad[0] * cpp_solution_vector_x / w +
+                       a_prop_grad[1] * cpp_solution_vector_y / w +
+                       a_prop_grad[2] * cpp_solution_vector_z / w).imag
+                vec /= (3.0 * w)
+                vec *= w**2 * extinction_coefficient_from_beta()
 
             # excitation (positive and negative parts)
             vec_ov = vec[:n_ov].reshape(nocc, nvir)
@@ -1509,10 +1480,10 @@ class ComplexResponse(LinearSolver):
 
                 sum_val = -np.sum(prop_detach_ao * scf_results['S'])
 
-                sqrt_vec_ov_p /= np.sqrt(sum_val)
-                sqrt_vec_ov_m /= np.sqrt(sum_val)
-                sqrt_vec_vo_p /= np.sqrt(sum_val)
-                sqrt_vec_vo_m /= np.sqrt(sum_val)
+                sqrt_vec_ov_p /= np.sqrt(np.abs(sum_val))
+                sqrt_vec_ov_m /= np.sqrt(np.abs(sum_val))
+                sqrt_vec_vo_p /= np.sqrt(np.abs(sum_val))
+                sqrt_vec_vo_m /= np.sqrt(np.abs(sum_val))
 
             prop_detach_mo = -(np.matmul(sqrt_vec_ov_p, sqrt_vec_ov_p.T) -
                                np.matmul(sqrt_vec_ov_m, sqrt_vec_ov_m.T) +
