@@ -1379,3 +1379,159 @@ class ComplexResponse(LinearSolver):
                 hf.create_dataset(ylabel, data=y_data)
 
             hf.close()
+
+    def get_cpp_property_densities(self,
+                                   molecule,
+                                   basis,
+                                   scf_results,
+                                   cpp_results,
+                                   w,
+                                   normalize_densities=True):
+        """
+        Gets CPP property densities.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param scf_results:
+            The SCF results dictionary.
+        :param cpp_results:
+            The CPP results dictionary.
+        :param w:
+            The given frequency.
+        :param normalize_densities:
+            Whether or not to normalize the property densities.
+
+        :return:
+            A dictionary containing property densities at given frequency.
+        """
+
+        if self.cpp_flag == 'absorption':
+            return self._get_cpp_absorption_densities(molecule, basis,
+                                                      scf_results, cpp_results,
+                                                      w, normalize_densities)
+
+        elif self.cpp_flag == 'ecd':
+            assert_msg_critical(
+                False,
+                'get_cpp_property_densities: Not yet implemented for ECD')
+            return None
+
+        return None
+
+    def _get_cpp_absorption_densities(self,
+                                      molecule,
+                                      basis,
+                                      scf_results,
+                                      cpp_results,
+                                      w,
+                                      normalize_densities=True):
+        """
+        Gets property densities for CPP absorption at a given frequency.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param scf_results:
+            The SCF results dictionary.
+        :param cpp_results:
+            The CPP results dictionary.
+        :param w:
+            The given frequency.
+        :param normalize_densities:
+            Whether or not to normalize the property densities.
+
+        :return:
+            A dictionary containing property densities at given frequency.
+        """
+
+        assert_msg_critical(
+            ('x', w) in cpp_results['solutions'] and
+            ('y', w) in cpp_results['solutions'] and
+            ('z', w) in cpp_results['solutions'],
+            'get_cpp_property_densities: Could not find frequency ' +
+            f'{w} in CPP results')
+
+        # solution vectors
+        cpp_solution_vector_x = self.get_full_solution_vector(
+            cpp_results['solutions'][('x', w)])
+        cpp_solution_vector_y = self.get_full_solution_vector(
+            cpp_results['solutions'][('y', w)])
+        cpp_solution_vector_z = self.get_full_solution_vector(
+            cpp_results['solutions'][('z', w)])
+
+        # property gradient for a operator
+        a_prop_grad = self.get_complex_prop_grad(self.a_operator,
+                                                 self.a_components, molecule,
+                                                 basis, scf_results)
+
+        if self.rank == mpi_master():
+            nocc = molecule.number_of_alpha_electrons()
+            norb = scf_results['E_alpha'].shape[0]
+            nvir = norb - nocc
+            n_ov = nocc * nvir
+
+            mo_occ = scf_results['C_alpha'][:, :nocc]
+            mo_vir = scf_results['C_alpha'][:, nocc:]
+
+            # vector representation of absorption cross-section
+            vec = (a_prop_grad[0] * cpp_solution_vector_x +
+                   a_prop_grad[1] * cpp_solution_vector_y +
+                   a_prop_grad[2] * cpp_solution_vector_z).imag / 3.0
+            vec *= 4.0 * np.pi * w * fine_structure_constant()
+
+            # excitation (positive and negative parts)
+            vec_ov = vec[:n_ov].reshape(nocc, nvir)
+            vec_ov_p = (vec_ov + np.abs(vec_ov)) / 2.0
+            vec_ov_m = (vec_ov - np.abs(vec_ov)) / 2.0
+
+            # de-excitation (positive and negative parts)
+            vec_vo = vec[n_ov:].reshape(nocc, nvir).T
+            vec_vo_p = (vec_vo + np.abs(vec_vo)) / 2.0
+            vec_vo_m = (vec_vo - np.abs(vec_vo)) / 2.0
+
+            # take square root to get "orbital pair" contributions
+            sqrt_vec_ov_p = np.sqrt(vec_ov_p)
+            sqrt_vec_ov_m = np.sqrt(np.abs(vec_ov_m))
+            sqrt_vec_vo_p = np.sqrt(vec_vo_p)
+            sqrt_vec_vo_m = np.sqrt(np.abs(vec_vo_m))
+
+            if normalize_densities:
+                prop_detach_mo = -(np.matmul(sqrt_vec_ov_p, sqrt_vec_ov_p.T) -
+                                   np.matmul(sqrt_vec_ov_m, sqrt_vec_ov_m.T) +
+                                   np.matmul(sqrt_vec_vo_p.T, sqrt_vec_vo_p) -
+                                   np.matmul(sqrt_vec_vo_m.T, sqrt_vec_vo_m))
+
+                prop_detach_ao = np.linalg.multi_dot(
+                    [mo_occ, prop_detach_mo, mo_occ.T])
+
+                sum_val = -np.sum(prop_detach_ao * scf_results['S'])
+
+                sqrt_vec_ov_p /= np.sqrt(sum_val)
+                sqrt_vec_ov_m /= np.sqrt(sum_val)
+                sqrt_vec_vo_p /= np.sqrt(sum_val)
+                sqrt_vec_vo_m /= np.sqrt(sum_val)
+
+            prop_detach_mo = -(np.matmul(sqrt_vec_ov_p, sqrt_vec_ov_p.T) -
+                               np.matmul(sqrt_vec_ov_m, sqrt_vec_ov_m.T) +
+                               np.matmul(sqrt_vec_vo_p.T, sqrt_vec_vo_p) -
+                               np.matmul(sqrt_vec_vo_m.T, sqrt_vec_vo_m))
+
+            prop_attach_mo = (np.matmul(sqrt_vec_vo_p, sqrt_vec_vo_p.T) -
+                              np.matmul(sqrt_vec_vo_m, sqrt_vec_vo_m.T) +
+                              np.matmul(sqrt_vec_ov_p.T, sqrt_vec_ov_p) -
+                              np.matmul(sqrt_vec_ov_m.T, sqrt_vec_ov_m))
+
+            prop_detach_ao = np.linalg.multi_dot(
+                [mo_occ, prop_detach_mo, mo_occ.T])
+            prop_attach_ao = np.linalg.multi_dot(
+                [mo_vir, prop_attach_mo, mo_vir.T])
+
+            return {
+                'property_density_detachment': prop_detach_ao,
+                'property_density_attachment': prop_attach_ao,
+            }
+        else:
+            return None
