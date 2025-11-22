@@ -39,6 +39,7 @@ from .xtbhessiandriver import XtbHessianDriver
 from .scfrestdriver import ScfRestrictedDriver
 from .scfgradientdriver import ScfGradientDriver
 from .scfhessiandriver import ScfHessianDriver
+from .tdaeigensolver import TdaEigenSolver
 from .lreigensolver import LinearResponseEigenSolver
 from .tddftgradientdriver import TddftGradientDriver
 from .tddfthessiandriver import TddftHessianDriver
@@ -180,7 +181,7 @@ class IMForceFieldGenerator:
         - nstruc_to_confirm_database_quality: Number of randomly selected strucutures for the database quality check.
     """
     
-    def __init__(self, ground_state_driver=None, excited_state_driver=None, roots_to_follow=[0]):
+    def __init__(self, ground_state_driver=None, excited_state_driver=None, roots_to_follow=[0], rsp_method='tda'):
 
         self.density_of_datapoints = None
         self.qm_data_points = None
@@ -217,7 +218,9 @@ class IMForceFieldGenerator:
 
         if isinstance(excited_state_driver, ScfRestrictedDriver):
             
-            excited_state_response_driver = LinearResponseEigenSolver()
+            excited_state_response_driver = TdaEigenSolver()
+            if rsp_method == 'tddft':
+                excited_state_response_driver = LinearResponseEigenSolver()
             excited_state_response_driver.nstates = 10
             excited_state_grad_driver = TddftGradientDriver(excited_state_driver)
             excitated_roots = [root for root in roots_to_follow if root != 0]
@@ -317,7 +320,7 @@ class IMForceFieldGenerator:
         self.add_gpr_model = True
         self.use_opt_confidence_radius = [False, 'single', 0.5, 0.3]
     
-        self.eq_bond_force_constants = {}
+        self.eq_bond_force_constants = None
 
 
     def set_up_the_system(self, molecule, extract_z_matrix=None):
@@ -942,7 +945,7 @@ class IMForceFieldGenerator:
                             print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', molecule.get_xyz_string())
                             molecule = optimized_molecule
 
-                        elif opt_roots >= 1 and isinstance(self.drivers['es'][0], LinearResponseEigenSolver):
+                        elif opt_roots >= 1 and isinstance(self.drivers['es'][0], LinearResponseEigenSolver) or opt_roots >= 1 and isinstance(self.drivers['es'][0], TdaEigenSolver):
                             
                             self.drivers['es'][1].state_deriv_index = [opt_roots]
                             opt_drv = OptimizationDriver(self.drivers['es'][1])
@@ -1277,7 +1280,7 @@ class IMForceFieldGenerator:
 
                                 print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', molecule.get_xyz_string())
                             
-                            elif self.roots_to_follow[0] >= 1 and isinstance(self.drivers['es'][0], LinearResponseEigenSolver):
+                            elif self.roots_to_follow[0] >= 1 and isinstance(self.drivers['es'][0], LinearResponseEigenSolver) or self.roots_to_follow[0] >= 1 and isinstance(self.drivers['es'][0], TdaEigenSolver):
 
                                     opt_drv = OptimizationDriver(self.drivers['es'][1])
                                     current_basis = MolecularBasis.read(mol, states_basis['es'])
@@ -1410,7 +1413,7 @@ class IMForceFieldGenerator:
 
                         print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', molecule.get_xyz_string())
                     
-                    elif self.roots_to_follow[0] >= 1 and isinstance(self.drivers['es'][0], LinearResponseEigenSolver):
+                    elif self.roots_to_follow[0] >= 1 and isinstance(self.drivers['es'][0], LinearResponseEigenSolver) or self.roots_to_follow[0] >= 1 and isinstance(self.drivers['es'][0], TdaEigenSolver):
 
                             opt_drv = OptimizationDriver(self.drivers['es'][1])
                             current_basis = MolecularBasis.read(molecule, states_basis['es'])
@@ -1631,7 +1634,7 @@ class IMForceFieldGenerator:
                         im_database_driver.add_gpr_model = self.add_gpr_model
                         im_database_driver.ghost_atom = self.ghost_atom
                         im_database_driver.use_opt_confidence_radius = self.use_opt_confidence_radius
-                        # im_database_driver.eq_bond_force_constants = self.eq_bond_force_constants
+                        im_database_driver.eq_bond_force_constants = self.eq_bond_force_constants
                         
                         
                         im_database_driver.system_from_molecule(mol, self.z_matrix, forcefield_generator, solvent=self.solvent, qm_atoms='all')  
@@ -2560,7 +2563,7 @@ class IMForceFieldGenerator:
             if isinstance(drivers[0], ExternalExcitedStatesScfDriver):
                 org_roots = drivers[0].roots.copy()        
 
-            elif isinstance(drivers[0], LinearResponseEigenSolver):           
+            elif isinstance(drivers[0], LinearResponseEigenSolver) or isinstance(drivers[0], TdaEigenSolver):           
                     org_roots = drivers[1].state_deriv_index  
 
             label_counter = 0
@@ -2574,7 +2577,7 @@ class IMForceFieldGenerator:
                     drivers[1].roots_to_follow = root_to_follow_calc 
                     drivers[2].roots_to_follow = root_to_follow_calc
 
-                elif isinstance(drivers[0], LinearResponseEigenSolver):
+                elif isinstance(drivers[0], LinearResponseEigenSolver) or isinstance(drivers[0], TdaEigenSolver):
                     root_to_follow_calc = mol_basis[4]           
                     drivers[1].state_deriv_index = root_to_follow_calc 
                     # drivers[2].roots_to_follow = root_to_follow_calc
@@ -2583,7 +2586,7 @@ class IMForceFieldGenerator:
                 energies, scf_results, rsp_results = self.compute_energy(drivers[0], mol_basis[0], mol_basis[1])
                 print(energies)
                 
-                if isinstance(drivers[0], LinearResponseEigenSolver):
+                if isinstance(drivers[0], LinearResponseEigenSolver) or isinstance(drivers[0], TdaEigenSolver):
                     energies = energies[mol_basis[4]]
 
                 # gradients = [np.zeros((len(mol_basis[0].get_labels()), 3)) for _ in range(len(energies))]
@@ -2635,7 +2638,25 @@ class IMForceFieldGenerator:
                         current_label = f'point_{len(sorted_labels) + 1}'
                     else:
                         label = f'{old_label}_symmetry_{label_counter}'
+
+                    if self.eq_bond_force_constants is None:
+                        if 1 == 1:
+                            self.eq_bond_force_constants = {}
+
+                        for elem_idx, element in enumerate(self.z_matrix):
+                            
+                            if len(element) == 2:
+
+                                bond_value = mol_basis[0].get_distance([element[0], element[1]], 'bohr')
+
+                                force_constant = 0.0
+
+                                self.eq_bond_force_constants[tuple(element)] = {'k_st':force_constant, 'r_eq': bond_value}
+
+                    print('force dict', self.eq_bond_force_constants)
+
                     impes_coordinate = InterpolationDatapoint(self.z_matrix)
+                    impes_coordinate.eq_bond_force_constants = self.eq_bond_force_constants
                     impes_coordinate.update_settings(interpolation_settings[mol_basis[4][number]])
                     impes_coordinate.cartesian_coordinates = mol_basis[0].get_coordinates_in_bohr()
                     impes_coordinate.inv_sqrt_masses = inv_sqrt_masses
@@ -2644,8 +2665,10 @@ class IMForceFieldGenerator:
                     impes_coordinate.hessian = mw_hess_mat.reshape(hess.shape)
                     impes_coordinate.transform_gradient_and_hessian()
 
-                    
+
                     #TODO: Grimme QF correction dictionary for force constants
+                    # if 1 == 1:
+                    #     self.eq_bond_force_constants = {}
                     # for elem_idx, element in enumerate(self.z_matrix):
                         
                     #     if len(element) == 2:
@@ -2657,7 +2680,8 @@ class IMForceFieldGenerator:
                     #         self.eq_bond_force_constants[tuple(element)] = {'k_st':force_constant, 'r_eq': bond_value}
                     #         print('Force constant hatree/bohr^2', force_constant, 'bond distance bohr', bond_value, 'dictionary', self.eq_bond_force_constants)
 
-
+                    # print('force dict', self.eq_bond_force_constants)
+                    
                     print('Org Molecules', mol_basis[0].get_xyz_string())
                     if mol_basis[2] > 1:
                         
@@ -2753,7 +2777,7 @@ class IMForceFieldGenerator:
                         drivers[1].roots_to_follow = org_roots
                         drivers[2].roots_to_follow = org_roots
                     
-                    elif isinstance(drivers[0], LinearResponseEigenSolver):           
+                    elif isinstance(drivers[0], LinearResponseEigenSolver) or isinstance(drivers[0], TdaEigenSolver):           
                         
                         drivers[1].state_deriv_index = org_roots
                     
@@ -2879,7 +2903,7 @@ class IMForceFieldGenerator:
         elif isinstance(qm_driver, ExternalExcitedStatesScfDriver):
             qm_energy = qm_driver.compute_energy(molecule, qm_driver.basis_set_label)
 
-        elif isinstance(qm_driver, LinearResponseEigenSolver):
+        elif isinstance(qm_driver, LinearResponseEigenSolver) or isinstance(qm_driver, TdaEigenSolver):
             self.drivers['es'][0].ostream.mute()
             scf_results = self.drivers['es'][3].compute(molecule, basis)
             scf_energy = self.drivers['es'][3].scf_energy
@@ -2934,6 +2958,7 @@ class IMForceFieldGenerator:
 
         elif isinstance(grad_driver, TddftGradientDriver):
             grad_driver.ostream.mute()
+            grad_driver._rsp_results = None
             grad_driver.compute(molecule, basis, self.drivers['es'][3], self.drivers['es'][0], rsp_results)
             qm_gradient = grad_driver.gradient
         

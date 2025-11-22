@@ -116,6 +116,7 @@ class InterpolationDatapoint:
         self.use_inverse_bond_length = True
         self.use_cosine_dihedral = False
         self.NAC = False
+        self.eq_bond_force_constants = None
         
         # internal_coordinates is a list of geomeTRIC objects which represent
         # different types of internal coordinates (distances, angles, dihedrals)
@@ -211,7 +212,7 @@ class InterpolationDatapoint:
 
         self.b_matrix = np.zeros((len(self.z_matrix), n_atoms * 3))
         # self.b_matrix = np.zeros((len(self.internal_coordinates), n_atoms * 3))
-        if self.use_inverse_bond_length or self.use_cosine_dihedral:
+        if self.use_inverse_bond_length or self.use_cosine_dihedral or self.eq_bond_force_constants is not None:
             self.original_b_matrix = np.zeros((len(self.z_matrix), n_atoms * 3))
             # self.original_b_matrix = np.zeros((len(self.internal_coordinates), n_atoms * 3))
 
@@ -226,6 +227,19 @@ class InterpolationDatapoint:
                 self.b_matrix[i, :derivative.shape[0]] = -r_inv_2 * derivative
                 
                 self.original_b_matrix[i, :derivative.shape[0]] = derivative
+            
+            elif len(z) == 2 and self.eq_bond_force_constants is not None:
+                print('Calculating B matrix with eq bond force constants')
+                r = q.value(coords)
+                # r_deriv_2 = ((2.0 / (r + self.eq_bond_force_constants[tuple(z)]['r_eq'])) 
+                #                         - (2.0 * (r - self.eq_bond_force_constants[tuple(z)]['r_eq']) / ((r + self.eq_bond_force_constants[tuple(z)]['r_eq'])**2))) 
+                
+                r_deriv_2 = ((2.0 / (r)) - (2.0 * (r - self.eq_bond_force_constants[tuple(z)]['r_eq']) / ((r)**2))) 
+
+                self.b_matrix[i, :derivative.shape[0]] = r_deriv_2 * derivative
+                
+                self.original_b_matrix[i, :derivative.shape[0]] = derivative
+            
             elif len(z) == 4 and self.use_cosine_dihedral:
                 if prev_dihedral != z:
                     prev_dihedral = z
@@ -291,6 +305,26 @@ class InterpolationDatapoint:
                         self.b2_matrix[i, m*3:(m+1)*3, n*3:(n+1)*3] += 2 * r_inv_3 * np.outer(self.original_b_matrix[i, m*3:(m+1)*3], self.original_b_matrix[i, n*3:(n+1)*3])
                 # self.b2_matrix[i] = 0.5 * (self.b2_matrix[i] + self.b2_matrix[i].T)
 
+            elif len(z) == 2 and self.eq_bond_force_constants is not None:
+                
+                r = q.value(coords)
+                
+                # r_deriv_2 = ((2.0 / (r + self.eq_bond_force_constants[tuple(z)]['r_eq'])) 
+                #                         - (2.0 * (r - self.eq_bond_force_constants[tuple(z)]['r_eq']) / ((r + self.eq_bond_force_constants[tuple(z)]['r_eq'])**2))) 
+                
+                # r_deriv_3 = ((-4.0 / ((r + self.eq_bond_force_constants[tuple(z)]['r_eq'])**2))
+                #              + (4.0 * ((r - self.eq_bond_force_constants[tuple(z)]['r_eq'])) / ((r + self.eq_bond_force_constants[tuple(z)]['r_eq'])**3))) 
+                
+                r_deriv_2 = ((2.0 / (r)) - (2.0 * (r - self.eq_bond_force_constants[tuple(z)]['r_eq']) / ((r)**2))) 
+                
+                r_deriv_3 = ((-4.0 / ((r)**2))
+                             + (4.0 * ((r - self.eq_bond_force_constants[tuple(z)]['r_eq'])) / ((r)**3))) 
+                
+                self.b2_matrix[i] = r_deriv_2 * second_derivative
+                for m in range(n_atoms):
+                    for n in range(n_atoms):
+                        self.b2_matrix[i, m*3:(m+1)*3, n*3:(n+1)*3] += r_deriv_3 * np.outer(self.original_b_matrix[i, m*3:(m+1)*3], self.original_b_matrix[i, n*3:(n+1)*3])
+            
             elif len(z) == 4 and self.use_cosine_dihedral:
                 
                 if prev_dihedral != z:
@@ -599,10 +633,18 @@ class InterpolationDatapoint:
 
         int_coords = []
         prev_dihedral = None
-        for q in self.internal_coordinates:
+        for idx, q in enumerate(self.internal_coordinates):
+            
             if (isinstance(q, geometric.internal.Distance) and
                     self.use_inverse_bond_length):
                 int_coords.append(1.0 / q.value(coords))
+            
+            elif (isinstance(q, geometric.internal.Distance) and
+                    self.eq_bond_force_constants is not None):
+                
+                # int_coords.append((2.0 * (q.value(coords) - self.eq_bond_force_constants[tuple(self.z_matrix[idx])]['r_eq'])) / ((q.value(coords) + self.eq_bond_force_constants[tuple(self.z_matrix[idx])]['r_eq'])))
+
+                int_coords.append((2.0 * (q.value(coords) - self.eq_bond_force_constants[tuple(self.z_matrix[idx])]['r_eq'])) / (q.value(coords)))
             elif (isinstance(q, geometric.internal.Dihedral) and
                   self.use_cosine_dihedral):
                 

@@ -60,6 +60,7 @@ from .molecularbasis import MolecularBasis
 from .scfgradientdriver import ScfGradientDriver
 from .scfhessiandriver import ScfHessianDriver
 from .externalscfdriver import ExternalScfDriver
+from .tdaeigensolver import TdaEigenSolver
 from .lreigensolver import LinearResponseEigenSolver
 from .tddftgradientdriver import TddftGradientDriver
 from .tddfthessiandriver import TddftHessianDriver
@@ -293,7 +294,7 @@ class IMDatabasePointCollecter:
         # Default value for the C-H linker distance
         self.linking_atom_distance = 1.0705 
 
-        self.eq_bond_force_constants = {}
+        self.eq_bond_force_constants = None
             
     # Method to generate OpenMM system from VeloxChem objects
     def system_from_molecule(self,
@@ -945,7 +946,8 @@ class IMDatabasePointCollecter:
             # Initialize the object
             driver_object = InterpolationDriver(self.z_matrix)
             driver_object.update_settings(self.interpolation_settings[root])
-            # driver_object.eq_bond_force_constants = self.eq_bond_force_constants
+            driver_object.eq_bond_force_constants = self.eq_bond_force_constants
+            driver_object.impes_coordinate.eq_bond_force_constants = self.eq_bond_force_constants
             # print('Interpolation driver settings updated for root', root, self.eq_bond_force_constants)
             
             driver_object.impes_coordinate.inv_sqrt_masses = inv_sqrt_masses
@@ -2305,6 +2307,7 @@ class IMDatabasePointCollecter:
                 
                 
                 self.swap_back = True
+                self.current_state = self.starting_state
                 context.setPositions(self.coordinates[0])
                 self.coordinates = [self.coordinates[0]]
                 # context.setVelocities(self.velocities[0])
@@ -2485,9 +2488,10 @@ class IMDatabasePointCollecter:
             
    
             qm_energy, scf_results, rsp_results = self.compute_energy(drivers[0], molecule, current_basis)
+            print(qm_energy)
+            if isinstance(drivers[0], LinearResponseEigenSolver) or isinstance(drivers[0], TdaEigenSolver):
+                qm_energy = [qm_energy[identification_state]]
 
-            if isinstance(drivers[0], LinearResponseEigenSolver):
-                qm_energy = [qm_energy[self.current_state]]
 
             gradients = self.compute_gradient(drivers[1], molecule, current_basis, scf_results, rsp_results)
 
@@ -2536,7 +2540,6 @@ class IMDatabasePointCollecter:
                 current_state_difference[self.roots_to_follow[identification_state + e_idx]][1] = rmsd_gradient
                 current_state_difference[self.roots_to_follow[identification_state + e_idx]][2] = cos_theta
                 state_specific_gradients[self.roots_to_follow[identification_state + e_idx]] = [grad, self.impes_drivers[self.roots_to_follow[identification_state + e_idx]].impes_coordinate.gradient]
-            
 
         if current_state_difference[self.current_state][0] > self.energy_threshold or current_state_difference[self.current_state][1] > self.gradient_rmsd_thrsh or current_state_difference[self.current_state][2] < self.force_orient_thrsh:
             print('The point would be added due to the thresholds')
@@ -2545,7 +2548,7 @@ class IMDatabasePointCollecter:
         for comb in all_combinations:
             current_state_to_state_difference[comb][0] = abs((state_specific_energies[comb[0]][0] - state_specific_energies[comb[1]][0]) * hartree_in_kjpermol())
             current_state_to_state_difference[comb][1] = abs((state_specific_energies[comb[0]][1] - state_specific_energies[comb[1]][1]) * hartree_in_kjpermol())
-
+            print('current state to state', comb, current_state_to_state_difference[comb])
             if current_state_to_state_difference[comb][0] < 30.0 and abs(current_state_to_state_difference[comb][1] - current_state_to_state_difference[comb][0]) > 10.0:
                 if comb[0] not in addition_of_state_specific_points:
                     addition_of_state_specific_points.append(comb[0])
@@ -2554,7 +2557,7 @@ class IMDatabasePointCollecter:
                 
         
         if len(addition_of_state_specific_points) > 0:
-            
+
             for state in self.roots_to_follow:
                 if self.use_opt_confidence_radius[0] and len(self.allowed_molecules[state]['molecules']) > 20 and 1 == 2:
                     self.add_a_point = True
@@ -2681,7 +2684,8 @@ class IMDatabasePointCollecter:
                     interpolation_driver.symmetry_information = self.impes_drivers[root].symmetry_information
                     interpolation_driver.qm_symmetry_data_points = self.impes_drivers[root].qm_symmetry_data_points
                     interpolation_driver.distance_thrsh = 1000
-                    # interpolation_driver.eq_bond_force_constants = self.impes_drivers.eq_bond_force_constants
+                    interpolation_driver.eq_bond_force_constants = self.impes_drivers.eq_bond_force_constants
+                    interpolation_driver.impes_coordinate.eq_bond_force_constants = self.eq_bond_force_constants
                     interpolation_driver.exponent_p = self.impes_drivers[root].exponent_p
                     interpolation_driver.print = False
                     interpolation_driver.qm_data_points = self.impes_drivers[root].qm_data_points
@@ -2769,7 +2773,7 @@ class IMDatabasePointCollecter:
                 self.last_added = len(self.allowed_molecules[root]['molecules'])
 
 
-            if self.use_opt_confidence_radius[0] and len(self.allowed_molecules[self.current_state]['molecules']) >= 2 and self.density_around_data_point[0][self.current_state] > 1 and self.density_around_data_point[0][self.current_state] % 1 == 0 and self.prev_dens_of_points[self.current_state] != self.density_around_data_point[0][self.current_state]:
+            if self.use_opt_confidence_radius[0] and len(self.allowed_molecules[self.current_state]['molecules']) >= 2 and self.density_around_data_point[0][self.current_state] > 1 and self.density_around_data_point[0][self.current_state] % 5 == 0 and self.prev_dens_of_points[self.current_state] != self.density_around_data_point[0][self.current_state]:
                 self.prev_dens_of_points[self.current_state] = self.density_around_data_point[0][self.current_state]        
                 trust_radius = None
                 sym_dict = self.non_core_symmetry_groups['gs']
@@ -3027,7 +3031,8 @@ class IMDatabasePointCollecter:
                         interpolation_driver.qm_symmetry_data_points = self.impes_drivers[state_to_optim].qm_symmetry_data_points
                         interpolation_driver.distance_thrsh = 1000
                         interpolation_driver.exponent_p = self.impes_drivers[state_to_optim].exponent_p
-                        # interpolation_driver.eq_bond_force_constants = self.eq_bond_force_constants
+                        interpolation_driver.eq_bond_force_constants = self.eq_bond_force_constants
+                        interpolation_driver.impes_coordinate.eq_bond_force_constants = self.eq_bond_force_constants
                         interpolation_driver.print = False
                         interpolation_driver.qm_data_points = self.impes_drivers[state_to_optim].qm_data_points
                         interpolation_driver.calc_optim_trust_radius = True
@@ -3197,7 +3202,7 @@ class IMDatabasePointCollecter:
             if any(root > 0 for root in self.roots_to_follow):
                 if isinstance(drivers[0], ExternalExcitedStatesScfDriver):
                     org_roots = drivers[0].roots
-                elif isinstance(drivers[0], LinearResponseEigenSolver):           
+                elif isinstance(drivers[0], LinearResponseEigenSolver) or isinstance(drivers[0], TdaEigenSolver):           
                     org_roots = drivers[1].state_deriv_index  
             label_counter = 0
             for mol_basis in entries:
@@ -3206,14 +3211,14 @@ class IMDatabasePointCollecter:
                         drivers[0].roots = mol_basis[4]           
                         drivers[1].roots_to_follow = mol_basis[4]
                         drivers[2].roots_to_follow = mol_basis[4]
-                    elif isinstance(drivers[0], LinearResponseEigenSolver):
+                    elif isinstance(drivers[0], LinearResponseEigenSolver) or isinstance(drivers, TdaEigenSolver):
                         root_to_follow_calc = mol_basis[4]           
                         drivers[1].state_deriv_index = root_to_follow_calc 
                 
                 energies, scf_results, rsp_results = self.compute_energy(drivers[0], mol_basis[0], mol_basis[1])
                 print(energies)
                 
-                if isinstance(drivers[0], LinearResponseEigenSolver):
+                if isinstance(drivers[0], LinearResponseEigenSolver) or isinstance(drivers[0], TdaEigenSolver):
                     energies = energies[mol_basis[4]]
 
                 print(energies)
@@ -3427,7 +3432,7 @@ class IMDatabasePointCollecter:
                     drivers[1].roots_to_follow = org_roots
                     drivers[2].roots_to_follow = org_roots
                 
-                elif isinstance(drivers[0], LinearResponseEigenSolver):           
+                elif isinstance(drivers[0], LinearResponseEigenSolver) or isinstance(drivers[0], TdaEigenSolver):           
                     
                     drivers[1].state_deriv_index = org_roots
     
@@ -3843,7 +3848,7 @@ class IMDatabasePointCollecter:
             qm_energy = qm_driver.compute_energy(molecule, qm_driver.basis_set_label)
             print('qm_energy', qm_energy)
         
-        elif isinstance(qm_driver, LinearResponseEigenSolver):
+        elif isinstance(qm_driver, LinearResponseEigenSolver) or isinstance(qm_driver, TdaEigenSolver):
             self.drivers['es'][0].ostream.mute()
             scf_results = self.drivers['es'][3].compute(molecule, basis)
             scf_energy = self.drivers['es'][3].scf_energy
@@ -3897,6 +3902,7 @@ class IMDatabasePointCollecter:
 
         elif isinstance(grad_driver, TddftGradientDriver):
             grad_driver.ostream.mute()
+            grad_driver._rsp_results = None
             grad_driver.compute(molecule, basis, self.drivers['es'][3], self.drivers['es'][0], rsp_results)
             qm_gradient = grad_driver.gradient
 

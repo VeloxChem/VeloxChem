@@ -31,16 +31,29 @@
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import numpy as np
-import time
+import time as tm
+import math
 
 from .veloxchemlib import mpi_master
 from .veloxchemlib import XCIntegrator
 from .profiler import Profiler
 from .cphfsolver import CphfSolver
-from .firstorderprop import FirstOrderProperties
 from .distributedarray import DistributedArray
 from .dftutils import get_default_grid_level
 from .inputparser import parse_input
+from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
+                           dft_sanity_check, pe_sanity_check,
+                           solvation_model_sanity_check,
+                           rsp_results_solvation_sanity_check)
+from .errorhandler import assert_msg_critical
+
+# Temporary for comp_lr_fock
+from .veloxchemlib import make_matrix, mat_t
+from .matrix import Matrix
+from .distributedarray import DistributedArray
+from .subcommunicators import SubCommunicators
+from .rifockdriver import RIFockDriver
+from .fockdriver import FockDriver
 
 
 class TddftOrbitalResponse(CphfSolver):
@@ -66,12 +79,10 @@ class TddftOrbitalResponse(CphfSolver):
 
         self.tamm_dancoff = False
         self.state_deriv_index = None
-        self.do_first_order_prop = False
 
         self._input_keywords['orbitalresponse'].update({
             'tamm_dancoff': ('bool', 'whether RPA or TDA is calculated'),
             'state_deriv_index': ('seq_fixed_int', 'excited state of interest'),
-            'do_first_order_prop': ('bool', 'do first-order property'),
         })
 
     def update_settings(self, orbrsp_dict, method_dict=None):
@@ -110,68 +121,6 @@ class TddftOrbitalResponse(CphfSolver):
         """
 
         super().compute(molecule, basis, scf_tensors, rsp_results)
-
-        if self.do_first_order_prop:
-            first_order_prop = FirstOrderProperties(self.comm, self.ostream)
-
-            orbrsp_results = self.cphf_results
-
-            dist_cphf_ov = orbrsp_results['dist_cphf_ov']
-            lambda_ov = [
-                dist_cphf_ov[s].get_full_vector(0)
-                for s in range(len(dist_cphf_ov))
-            ]
-
-            # unrelaxed density and dipole moment
-            if self.rank == mpi_master():
-                if self.tamm_dancoff:
-                    method = 'TDA'
-                else:
-                    method = 'RPA'
-                nocc = molecule.number_of_alpha_electrons()
-                mo = scf_tensors['C_alpha']
-                mo_occ = mo[:, :nocc]
-                mo_vir = mo[:, nocc:]
-                nvir = mo_vir.shape[1]
-
-                unrel_dm_ao = orbrsp_results['unrelaxed_density_ao']
-                lambda_ao = np.array([
-                    np.linalg.multi_dot(
-                        [mo_occ, lambda_ov[s].reshape(nocc, nvir), mo_vir.T])
-                    for s in range(len(lambda_ov))
-                ])
-
-                rel_dm_ao = (unrel_dm_ao + 2.0 * lambda_ao +
-                             2.0 * lambda_ao.transpose(0, 2, 1))
-
-                unrel_density = (scf_tensors['D_alpha'] +
-                                 scf_tensors['D_beta'] + unrel_dm_ao)
-            else:
-                unrel_density = None
-            first_order_prop.compute(molecule, basis, unrel_density)
-
-            if self.rank == mpi_master():
-                title = method + ' Unrelaxed Dipole Moment(s) '
-                first_order_prop.print_properties(molecule, title,
-                                                  self.state_deriv_index)
-
-            # relaxed density and dipole moment
-            if self.rank == mpi_master():
-                rel_density = (scf_tensors['D_alpha'] + scf_tensors['D_beta'] +
-                               rel_dm_ao)
-            else:
-                rel_density = None
-            first_order_prop.compute(molecule, basis, rel_density)
-
-            if self.rank == mpi_master():
-                self.relaxed_dipole_moment = first_order_prop.get_property(
-                    'dipole moment')
-
-                title = method + ' Relaxed Dipole Moment(s) '
-                first_order_prop.print_properties(molecule, title,
-                                                  self.state_deriv_index)
-
-                self.ostream.print_blank()
 
     @staticmethod
     def get_full_solution_vector(solution):
@@ -215,6 +164,41 @@ class TddftOrbitalResponse(CphfSolver):
             unrelaxed one-particle density.
         """
 
+
+        # check molecule
+        molecule_sanity_check(molecule)
+
+        # check SCF results
+        scf_results_sanity_check(self, scf_tensors)
+
+        # check dft setup
+        dft_sanity_check(self, 'compute_rhs')
+
+        # check pe setup
+        pe_sanity_check(self, molecule=molecule)
+
+        # check solvation setup
+        solvation_model_sanity_check(self)
+        rsp_results_solvation_sanity_check(self, rsp_results)
+
+        # TODO: replace with a sanity check?
+        if 'eigenvectors' in rsp_results:
+            self.tamm_dancoff = True
+        # TODO: in the original implementation eri_dict, dft_dict, pe_dict
+        # are passed as arguments, but I am not sure why. Better to initialize
+        # here instead and remove from function arguments.
+        # ERI information
+        eri_dict = self._init_eri(molecule, basis)
+
+        # DFT information
+        dft_dict = self._init_dft(molecule, scf_tensors)
+
+        # PE information
+        pe_dict = self._init_pe(molecule, basis)
+
+        # CPCM_information
+        self._init_cpcm(molecule)
+
         profiler = Profiler({
             'timing': self.timing,
             'profiling': self.profiling,
@@ -224,7 +208,7 @@ class TddftOrbitalResponse(CphfSolver):
 
         profiler.set_timing_key('RHS')
 
-        rhs_t0 = time.time()
+        rhs_t0 = tm.time()
 
         self.ostream.print_info(
             "Computing the right-hand side (RHS) of CPHF/CPKS equations...")
@@ -461,7 +445,7 @@ class TddftOrbitalResponse(CphfSolver):
         profiler.print_profiling_summary(self.ostream)
 
         self.ostream.print_info("RHS of CPHF/CPKS equations computed in " +
-                                f"{time.time() - rhs_t0:.2f} sec.")
+                                f"{tm.time() - rhs_t0:.2f} sec.")
         self.ostream.print_blank()
         self.ostream.flush()
 
@@ -505,7 +489,7 @@ class TddftOrbitalResponse(CphfSolver):
 
         profiler.set_timing_key('Omega')
 
-        omega_t0 = time.time()
+        omega_t0 = tm.time()
 
         self.ostream.print_info("Computing the omega Lagrange multipliers...")
         self.ostream.print_blank()
@@ -519,10 +503,15 @@ class TddftOrbitalResponse(CphfSolver):
 
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
+
         # DFT information
-        dft_dict = self._init_dft(molecule, scf_tensors, silent=True)
+        dft_dict = self._init_dft(molecule, scf_tensors)
+
         # PE information
         pe_dict = self._init_pe(molecule, basis)
+
+        # CPCM_information
+        self._init_cpcm(molecule)
 
         self.ostream.unmute()
 
@@ -689,7 +678,7 @@ class TddftOrbitalResponse(CphfSolver):
         profiler.print_profiling_summary(self.ostream)
 
         self.ostream.print_info("The omega Lagrange multipliers computed in " +
-                                f"{time.time() - omega_t0:.2f} sec.")
+                                f"{tm.time() - omega_t0:.2f} sec.")
         self.ostream.print_blank()
         self.ostream.flush()
 
@@ -730,6 +719,27 @@ class TddftOrbitalResponse(CphfSolver):
                           if self.grid_level is None else self.grid_level)
             cur_str = 'Molecular Grid Level            : ' + str(grid_level)
             self.ostream.print_header(cur_str.ljust(str_width))
+
+        if self._cpcm:
+            cur_str = 'Solvation Model                 : '
+            cur_str += 'C-PCM'
+            self.ostream.print_header(cur_str.ljust(str_width))
+            cur_str = 'C-PCM Points per Hydrogen Sphere: '
+            cur_str += f'{self.cpcm_grid_per_sphere[1]}'
+            self.ostream.print_header(cur_str.ljust(str_width))
+            cur_str = 'C-PCM Points per non-H Sphere   : '
+            cur_str += f'{self.cpcm_grid_per_sphere[0]}'
+            self.ostream.print_header(cur_str.ljust(str_width))
+            cur_str = 'Non-Equilibrium solvation       : '
+            cur_str += f'{self.non_equilibrium_solv}'
+            self.ostream.print_header(cur_str.ljust(str_width))
+            cur_str = 'C-PCM Dielectric Constant       : '
+            cur_str += f'{self.cpcm_epsilon}'
+            self.ostream.print_header(cur_str.ljust(str_width))
+            if self.non_equilibrium_solv:
+                cur_str = 'C-PCM Optical Dielectric Const. : '
+                cur_str += f'{self.cpcm_optical_epsilon}'
+                self.ostream.print_header(cur_str.ljust(str_width))
 
         self.ostream.print_blank()
         self.ostream.flush()

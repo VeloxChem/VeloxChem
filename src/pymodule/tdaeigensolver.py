@@ -110,6 +110,7 @@ class TdaEigenSolver(LinearSolver):
 
         self.core_excitation = False
         self.num_core_orbitals = 0
+        self.spin_flip = False
 
         # solver setup
         self.solver = None

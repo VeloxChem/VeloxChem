@@ -630,26 +630,26 @@ class InterpolationDriver():
   
         
         #TODO: Grimme QF correction implementation comparison later
-        # self.grimme_qf_params = {'k': {'H': 1.755, 'C': 2.463, 'N':2.559, 'O':2.579}, 'ken':-0.164,
-        #                          'EN':{'H': 2.1, 'C': 2.5, 'N':3.0, 'O':3.5}}
+        self.grimme_qf_params = {'k': {'H': 1.755, 'C': 2.463, 'N':2.559, 'O':2.579}, 'ken':-0.164,
+                                 'EN':{'H': 2.1, 'C': 2.5, 'N':3.0, 'O':3.5}}
             
-        # def grimme_function(r, re, kstr, a):
-        #     grimme_func = kstr + kstr * (re / r)**a - 2.0 * kstr * (re / r)**(a/2)
-        #     grimme_func_deriv = ((-a * kstr * (re/r)**a) / (r)) + ((a * kstr * (re / r)**(a/2)) / r)
-        #     grimme_func_sec_deriv = ((a**2 * kstr * (re / r)**a) / (r**2) + (a * kstr * (re / r)**a) / (r**2) 
-        #                                    - (a**2 * kstr * (re / r)**(a/2)) / (2.0 * r**2) - (a * kstr * (re / r)**(a/2.0)) / r**2)
-        #     return grimme_func, grimme_func_deriv, grimme_func_sec_deriv
+        def grimme_function(r, re, kstr, a):
+            grimme_func = kstr + kstr * (re / r)**a - 2.0 * kstr * (re / r)**(a/2)
+            grimme_func_deriv = ((-a * kstr * (re/r)**a) / (r)) + ((a * kstr * (re / r)**(a/2)) / r)
+            grimme_func_sec_deriv = ((a**2 * kstr * (re / r)**a) / (r**2) + (a * kstr * (re / r)**a) / (r**2) 
+                                           - (a**2 * kstr * (re / r)**(a/2)) / (2.0 * r**2) - (a * kstr * (re / r)**(a/2.0)) / r**2)
+            return grimme_func, grimme_func_deriv, grimme_func_sec_deriv
         
-        # def grimme_func_correction(r, re, kstr, a):
-        #     V, dV, ddV = grimme_function(r, re, kstr, a)
-        #     V0, dV0, ddV0 = grimme_function(re, re, kstr, a)
+        def grimme_func_correction(r, re, kstr, a):
+            V, dV, ddV = grimme_function(r, re, kstr, a)
+            V0, dV0, ddV0 = grimme_function(re, re, kstr, a)
             
-        #     dr = r - re
-        #     dE = V - (V0 + dV0 * dr + 0.5 * ddV0 * dr**2)
-        #     dg = dV - (dV0 + ddV0 * dr)
-        #     dE_deriv_bmat = dg
-        #     print('grimme corr', dr, dE, dE_deriv_bmat)
-        #     return dE, dE_deriv_bmat   
+            dr = r - re
+            dE = V - (V0 + dV0 * dr + 0.5 * ddV0 * dr**2)
+            dg = dV - (dV0 + ddV0 * dr)
+            dE_deriv_bmat = dg
+            print('grimme corr', dr, dE, dE_deriv_bmat)
+            return dE, dE_deriv_bmat   
 
         
         
@@ -658,15 +658,16 @@ class InterpolationDriver():
         self.impes_coordinate.gradient  = np.zeros((natms, 3))
         self.impes_coordinate.NAC       = np.zeros((natms, 3))       # if you need it
 
-        # for bond_idx, element_bond in enumerate(self.impes_coordinate.z_matrix[:]):
-        #     if len(element_bond) !=2:
-        #         break
-            
-        #     a = (self.grimme_qf_params['k'][self.molecule.get_labels()[element_bond[0]]] * self.grimme_qf_params['k'][self.molecule.get_labels()[element_bond[1]]]
-        #          + self.grimme_qf_params['ken'] * (self.grimme_qf_params['EN'][self.molecule.get_labels()[element_bond[0]]] - self.grimme_qf_params['EN'][self.molecule.get_labels()[element_bond[1]]])**2)
-        #     dE, dg = grimme_func_correction(self.impes_coordinate.internal_coordinates_values[bond_idx], self.eq_bond_force_constants[tuple(element_bond)]['r_eq'], self.eq_bond_force_constants[tuple(element_bond)]['k_st'], a)
-        #     self.impes_coordinate.energy += dE
-        #     self.impes_coordinate.gradient += (dg * self.impes_coordinate.b_matrix[bond_idx, :]).reshape(natms,3)
+        # if self.eq_bond_force_constants is not None:
+        #     for bond_idx, element_bond in enumerate(self.impes_coordinate.z_matrix[:]):
+        #         if len(element_bond) !=2:
+        #             break
+                
+        #         a = (self.grimme_qf_params['k'][self.molecule.get_labels()[element_bond[0]]] * self.grimme_qf_params['k'][self.molecule.get_labels()[element_bond[1]]]
+        #             + self.grimme_qf_params['ken'] * (self.grimme_qf_params['EN'][self.molecule.get_labels()[element_bond[0]]] - self.grimme_qf_params['EN'][self.molecule.get_labels()[element_bond[1]]])**2)
+        #         dE, dg = grimme_func_correction(self.impes_coordinate.internal_coordinates_values[bond_idx], self.eq_bond_force_constants[tuple(element_bond)]['r_eq'], self.eq_bond_force_constants[tuple(element_bond)]['k_st'], a)
+        #         self.impes_coordinate.energy += dE
+        #         self.impes_coordinate.gradient += (dg * self.impes_coordinate.b_matrix[bond_idx, :]).reshape(natms,3)
 
         # --- 1.  raw (unnormalised) weights and their gradients ----------------------
         w_i          = np.array(weights_cart, dtype=np.float64)        # ← rename
@@ -1108,9 +1109,7 @@ class InterpolationDriver():
             hessian = data_point.internal_hessian.copy()
             dist_org = (org_int_coords.copy() - data_point.internal_coordinates_values)
             dist_check = (org_int_coords.copy() - data_point.internal_coordinates_values)
-        
-            # for bond_idx, element_bond in enumerate(self.impes_coordinate.z_matrix[:self.symmetry_information[-1][0]]):
-            #     dist_check[bond_idx] = (1.0 / org_int_coords[bond_idx]) - (1.0 / data_point.internal_coordinates_values[bond_idx])
+            
             if not self.use_cosine_dihedral:
                 for i, element in enumerate(self.impes_coordinate.z_matrix[self.symmetry_information[-1][1]:], start=self.symmetry_information[-1][1]): 
 
@@ -1124,6 +1123,7 @@ class InterpolationDriver():
                         0.5 * np.linalg.multi_dot([dist_check.T, hessian, dist_check]))
 
             dist_hessian_eff = np.matmul(dist_check.T, hessian)
+
 
             if not self.use_cosine_dihedral:
                 for i, element in enumerate(self.impes_coordinate.z_matrix[self.symmetry_information[-1][1]:], start=self.symmetry_information[-1][1]):
@@ -1617,8 +1617,12 @@ class InterpolationDriver():
         coverage_mass=0.8
         topk=None
         
-        
 
+        masses = molecule.get_masses().copy()
+        masses_cart = np.repeat(masses, 3)
+        sqrt_masses = 1.0 / np.sqrt(masses_cart)
+        
+        qm_gradient_mw = qm_gradient.reshape(-1) * sqrt_masses    # mass-weighted gradient
         constraints = []
         print(len(datapoints), self.z_matrix, self.symmetry_information)
         for datapoint in datapoints:
@@ -1684,33 +1688,34 @@ class InterpolationDriver():
             # The sum of partial_energies should match the total second-order approx:
             # total_energy_diff = sum(partial_energies)
 
-            masses = molecule.get_masses().copy()
-            masses_cart = np.repeat(masses, 3)
-            sqrt_masses = np.sqrt(masses_cart)
 
             variable_part = sum(partial_energies)        # Hartree
             E_pred_check  = datapoint.energy + variable_part
 
             pred_E, pred_G_mw, _ = self.compute_potential(datapoint, self.impes_coordinate.internal_coordinates_values)
-            pred_G = sqrt_masses * pred_G_mw.reshape(-1)
-            pred_G = pred_G.reshape(pred_G_mw.shape)
-            pred_im_G_int = self.transform_gradient_to_internal_coordinates(molecule, pred_G, self.impes_coordinate.b_matrix)
-            pred_qm_G_int = self.transform_gradient_to_internal_coordinates(molecule, qm_gradient, self.impes_coordinate.b_matrix)
+            pred_im_G_int = self.transform_gradient_to_internal_coordinates(molecule, pred_G_mw, self.impes_coordinate.b_matrix)
+            pred_qm_G_int = self.transform_gradient_to_internal_coordinates(molecule, qm_gradient_mw.reshape(qm_gradient.shape), self.impes_coordinate.b_matrix)
 
             print("max energy diff",
                 abs((E_pred_check - pred_E)))
             
-            g_pred_check = partial_gradient              # already Hartree/bohr
+
+            
+            
+            g_pred_check = partial_gradient           # already Hartree/bohr
             max_grad_diff = np.max(np.abs(g_pred_check - pred_im_G_int))
             print("max grad diff", max_grad_diff)
+            print(g_pred_check, pred_im_G_int)
 
+         
 
             delta_E = abs(qm_energy - pred_E)
             delta_G = np.linalg.norm(pred_qm_G_int - pred_im_G_int)
 
             print(' \n\n Energy error with QM ', delta_E * hartree_in_kcalpermol(), delta_G)
+   
             delta_g = pred_qm_G_int - pred_im_G_int
-
+            print('delta g', delta_g)
             single_energy_error = []
             weights = []
             single_gradient_error = []
@@ -1743,7 +1748,7 @@ class InterpolationDriver():
 
             L_ref         = 0.1                                  # bohr, choose sensibly
             G_as_energy   = g_i * L_ref                          # Hartree
-            G_kcal        = G_as_energy * hartree_in_kcalpermol()
+            G_kcal        = G_as_energy * hartree_in_kcalpermol() * bohr_in_angstrom()
             print('Gradient in kcal', G_kcal)
             lambda_grad   = 0.5                                  # 0…1, how much you care about gradient
             score_i_kcal  = (1.0 - lambda_grad) * E_kcal + lambda_grad * G_kcal
@@ -1752,8 +1757,8 @@ class InterpolationDriver():
             w_tot = score_i_kcal / (score_i_kcal.sum() + eps)
 
             # for bookkeeping: check sums
-            # assert np.allclose(e_i.sum(), delta_E, atol=1e-12)
-            # assert np.allclose(g_i.sum(), delta_G, atol=1e-12)
+            assert np.allclose(e_i.sum(), delta_E, atol=1e-12)
+            assert np.allclose(g_i.sum(), delta_G, atol=1e-12)
 
             # --- final per-coordinate entry ---
             contributions = list(
@@ -1818,11 +1823,10 @@ class InterpolationDriver():
                     f" E_share={e_kcal:.3f} kcal/mol,"
                     f" G_share={g_kcal:.3f} kcal/mol,"
                     f" w_tot={w_i:.3f} {picked}")
-                print(f" {i:2d} {tuple(int(x) for x in coord)}: |pE|={abs(pE):.3e} Ha, share={e_kcal:.3f} kcal/mol, w={w_i:.3f} {picked}")
-                print('Sum of energy-weights:', float(sorted_weights.sum()))
-                print('Selected constraints so far:', constraints)
+            print('Sum of energy-weights:', float(sorted_weights.sum()))
+            print('Selected constraints so far:', constraints)
 
-            return constraints
+        return constraints
 
             # if error_source == 'gradient':
             #     print('Delta G:', delta_G * hartree_in_kcalpermol() * bohr_in_angstrom(), constraints)
