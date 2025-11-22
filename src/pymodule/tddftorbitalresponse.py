@@ -181,8 +181,11 @@ class TddftOrbitalResponse(CphfSolver):
         rsp_results_solvation_sanity_check(self, rsp_results)
 
         # TODO: replace with a sanity check?
-        if 'eigenvectors' in rsp_results:
-            self.tamm_dancoff = True
+        if self.rank == mpi_master():
+            if 'eigenvectors' in rsp_results:
+                self.tamm_dancoff = True
+        self.tamm_dancoff = self.comm.bcast(self.tamm_dancoff,
+                                            root=mpi_master())
 
         # TODO: in the original implementation eri_dict, dft_dict, pe_dict
         # are passed as arguments, but I am not sure why. Better to initialize
