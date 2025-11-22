@@ -62,7 +62,6 @@ from .rsptpatransition import TpaTransition
 from .rspdoublerestrans import DoubleResTransition
 from .rspthreepatransition import ThreePATransition
 from .rsptpa import TPA
-from .tdhfhessiandriver import TdhfHessianDriver
 from .polarizabilitygradient import PolarizabilityGradient
 from .vibrationalanalysis import VibrationalAnalysis
 #from .rspcustomproperty import CustomProperty
@@ -544,6 +543,12 @@ def main():
                     if 'response' in task.input_dict else {})
         rsp_dict['filename'] = task.input_dict['filename']
 
+        grad_dict = (task.input_dict['gradient']
+                         if 'gradient' in task.input_dict else {})
+
+        run_excited_state_vibanalysis = ('state_deriv_index' in grad_dict)
+        run_ground_state_vibanalysis = (not run_excited_state_vibanalysis)
+
         if use_xtb:
             vibrational_drv = VibrationalAnalysis(xtb_drv)
             # set print level for input file based calculation
@@ -556,15 +561,36 @@ def main():
                                             polgrad_dict=polgrad_dict)
 
         else:
-            vibrational_drv = VibrationalAnalysis(scf_drv)
-            # set print level for input file based calculation
-            vibrational_drv.print_level = 2
-            vibrational_drv.update_settings(method_dict,
-                                            vib_dict,
-                                            hessian_dict=hessian_dict,
-                                            cphf_dict=orbrsp_dict,
-                                            rsp_dict=rsp_dict,
-                                            polgrad_dict=polgrad_dict)
+            if run_ground_state_vibanalysis: 
+                vibrational_drv = VibrationalAnalysis(scf_drv)
+                # set print level for input file based calculation
+                vibrational_drv.print_level = 2
+                vibrational_drv.update_settings(method_dict,
+                                                vib_dict,
+                                                hessian_dict=hessian_dict,
+                                                cphf_dict=orbrsp_dict,
+                                                rsp_dict=rsp_dict,
+                                                polgrad_dict=polgrad_dict)
+            elif run_excited_state_vibanalysis:
+                assert_msg_critical(
+                    rsp_dict['property'].lower() in ['absorption', 'uv-vis', 'ecd'],
+                    'Invalid response property for vibrational analysis')
+
+                rsp_prop = select_rsp_property(task, mol_orbs, rsp_dict,
+                                               method_dict)
+                rsp_prop.init_driver(task.mpi_comm, task.ostream)
+                rsp_prop.compute(task.molecule, task.ao_basis, scf_results)
+
+                vibrational_drv = VibrationalAnalysis(scf_drv,
+                                                      rsp_prop._rsp_driver)
+                # set print level for input file based calculation
+                vibrational_drv.print_level = 2
+                vibrational_drv.update_settings(method_dict,
+                                                vib_dict,
+                                                hessian_dict=hessian_dict,
+                                                cphf_dict=orbrsp_dict,
+                                                rsp_dict=rsp_dict,
+                                                polgrad_dict=polgrad_dict)
 
         vib_results = vibrational_drv.compute(task.molecule, task.ao_basis)
 
@@ -654,14 +680,38 @@ def main():
 
             # Excited state Hessian and vibrational analysis
             if 'vibrational' in task.input_dict:
-                freq_dict = task.input_dict['vibrational']
-                tdhfhessian_drv = TdhfHessianDriver(scf_drv)
-                tdhfhessian_drv.update_settings(method_dict, rsp_dict,
-                                                freq_dict, orbrsp_dict)
-                tdhfhessian_drv.compute(task.molecule, task.ao_basis,
-                                        rsp_prop._rsp_driver)
-                if task.mpi_rank == mpi_master():
-                    tdhfhessian_drv.vibrational_analysis(task.molecule)
+                vib_dict = task.input_dict['vibrational']
+                vib_dict['filename'] = task.input_dict['filename']
+
+                hessian_dict = (task.input_dict['hessian']
+                                if 'hessian' in task.input_dict else {})
+
+                polgrad_dict = (task.input_dict['polarizability_gradient']
+                                if 'polarizability_gradient' in task.input_dict else {})
+
+                orbrsp_dict = (task.input_dict['orbital_response']
+                               if 'orbital_response' in task.input_dict else {})
+                orbrsp_dict['program_end_time'] = program_end_time
+                orbrsp_dict['filename'] = task.input_dict['filename']
+
+                rsp_dict = (task.input_dict['response']
+                            if 'response' in task.input_dict else {})
+                rsp_dict['filename'] = task.input_dict['filename']
+
+                grad_dict = (task.input_dict['gradient']
+                                 if 'gradient' in task.input_dict else {})
+                vibrational_drv = VibrationalAnalysis(scf_drv,
+                                                      rsp_prop._rsp_driver)
+                # set print level for input file based calculation
+                vibrational_drv.print_level = 2
+                vibrational_drv.update_settings(method_dict,
+                                                vib_dict,
+                                                hessian_dict=hessian_dict,
+                                                cphf_dict=orbrsp_dict,
+                                                rsp_dict=rsp_dict,
+                                                polgrad_dict=polgrad_dict)
+
+                vib_results = vibrational_drv.compute(task.molecule, task.ao_basis)
 
             # Excited state optimization
             if 'optimize_excited_state' in task.input_dict:

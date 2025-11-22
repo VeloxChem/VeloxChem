@@ -109,7 +109,6 @@ class ScfGradientDriver(GradientDriver):
         self.print_header()
 
         if self.numerical:
-
             self.ostream.mute()
             self.compute_numerical(molecule, basis, scf_results)
             self.ostream.unmute()
@@ -267,21 +266,21 @@ class ScfGradientDriver(GradientDriver):
             grad_timing['Point_charges_grad'] += time.time() - t0
 
         # orbital contribution to gradient
-
+    
         t0 = time.time()
-
+    
         ovl_grad_drv = OverlapGeom100Driver()
-
+    
         for iatom in local_atoms:
             gmats = ovl_grad_drv.compute(molecule, basis, iatom)
-
+    
             for i, label in enumerate(['X', 'Y', 'Z']):
                 gmat = gmats.matrix_to_numpy(label)
                 # Note: minus sign for energy weighted density
                 self.gradient[iatom, i] -= 2.0 * np.sum((gmat + gmat.T) * W)
-
+    
             gmats = Matrices()
-
+    
         grad_timing['Overlap_grad'] += time.time() - t0
 
         # ERI contribution to gradient
