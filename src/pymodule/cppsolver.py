@@ -1453,56 +1453,26 @@ class ComplexResponse(LinearSolver):
                 vec /= (3.0 * w)
                 vec *= w**2 * extinction_coefficient_from_beta()
 
-            # excitation (positive and negative parts)
-            vec_ov = vec[:n_ov].reshape(nocc, nvir)
-            vec_ov_p = (vec_ov + np.abs(vec_ov)) / 2.0
-            vec_ov_m = (vec_ov - np.abs(vec_ov)) / 2.0
+            # excitation and de-excitation
+            z_mat_ov = vec[:n_ov].reshape(nocc, nvir)
+            y_mat_ov = vec[n_ov:].reshape(nocc, nvir)
 
-            # de-excitation (positive and negative parts)
-            vec_vo = vec[n_ov:].reshape(nocc, nvir).T
-            vec_vo_p = (vec_vo + np.abs(vec_vo)) / 2.0
-            vec_vo_m = (vec_vo - np.abs(vec_vo)) / 2.0
+            prop_diag_D = np.sum(z_mat_ov, axis=1) + np.sum(y_mat_ov, axis=1)
+            prop_diag_A = np.sum(z_mat_ov, axis=0) + np.sum(y_mat_ov, axis=0)
 
-            # take square root to get "orbital pair" contributions
-            sqrt_vec_ov_p = np.sqrt(vec_ov_p)
-            sqrt_vec_ov_m = np.sqrt(np.abs(vec_ov_m))
-            sqrt_vec_vo_p = np.sqrt(vec_vo_p)
-            sqrt_vec_vo_m = np.sqrt(np.abs(vec_vo_m))
+            prop_dens_D = -np.linalg.multi_dot(
+                [mo_occ, np.diag(prop_diag_D), mo_occ.T])
+            prop_dens_A = np.linalg.multi_dot(
+                [mo_vir, np.diag(prop_diag_A), mo_vir.T])
 
             if normalize_densities:
-                prop_detach_mo = -(np.matmul(sqrt_vec_ov_p, sqrt_vec_ov_p.T) -
-                                   np.matmul(sqrt_vec_ov_m, sqrt_vec_ov_m.T) +
-                                   np.matmul(sqrt_vec_vo_p.T, sqrt_vec_vo_p) -
-                                   np.matmul(sqrt_vec_vo_m.T, sqrt_vec_vo_m))
-
-                prop_detach_ao = np.linalg.multi_dot(
-                    [mo_occ, prop_detach_mo, mo_occ.T])
-
-                sum_val = -np.sum(prop_detach_ao * scf_results['S'])
-
-                sqrt_vec_ov_p /= np.sqrt(np.abs(sum_val))
-                sqrt_vec_ov_m /= np.sqrt(np.abs(sum_val))
-                sqrt_vec_vo_p /= np.sqrt(np.abs(sum_val))
-                sqrt_vec_vo_m /= np.sqrt(np.abs(sum_val))
-
-            prop_detach_mo = -(np.matmul(sqrt_vec_ov_p, sqrt_vec_ov_p.T) -
-                               np.matmul(sqrt_vec_ov_m, sqrt_vec_ov_m.T) +
-                               np.matmul(sqrt_vec_vo_p.T, sqrt_vec_vo_p) -
-                               np.matmul(sqrt_vec_vo_m.T, sqrt_vec_vo_m))
-
-            prop_attach_mo = (np.matmul(sqrt_vec_vo_p, sqrt_vec_vo_p.T) -
-                              np.matmul(sqrt_vec_vo_m, sqrt_vec_vo_m.T) +
-                              np.matmul(sqrt_vec_ov_p.T, sqrt_vec_ov_p) -
-                              np.matmul(sqrt_vec_ov_m.T, sqrt_vec_ov_m))
-
-            prop_detach_ao = np.linalg.multi_dot(
-                [mo_occ, prop_detach_mo, mo_occ.T])
-            prop_attach_ao = np.linalg.multi_dot(
-                [mo_vir, prop_attach_mo, mo_vir.T])
+                abs_sum_val = abs(np.sum(prop_dens_D * scf_results['S']))
+                prop_dens_D /= abs_sum_val
+                prop_dens_A /= abs_sum_val
 
             return {
-                'property_density_detachment': prop_detach_ao,
-                'property_density_attachment': prop_attach_ao,
+                'property_density_detachment': prop_dens_D,
+                'property_density_attachment': prop_dens_A,
             }
         else:
             return None
