@@ -2893,6 +2893,7 @@ class IMForceFieldGenerator:
             qm_energy = np.array([qm_driver.scf_energy])
             qm_driver.ostream.unmute()
             qm_driver.filename = None
+            qm_driver.checkpoint_file = None
 
             print('qm_energy in SCF driver', qm_energy)
 
@@ -2906,6 +2907,8 @@ class IMForceFieldGenerator:
         elif isinstance(qm_driver, LinearResponseEigenSolver) or isinstance(qm_driver, TdaEigenSolver):
             self.drivers['es'][0].ostream.mute()
             scf_results = self.drivers['es'][3].compute(molecule, basis)
+            self.drivers['es'][3].filename = None
+            self.drivers['es'][3].checkpoint_file = None
             scf_energy = self.drivers['es'][3].scf_energy
             qm_driver.ostream.unmute()
             rsp_results = qm_driver.compute(molecule, basis, scf_results)

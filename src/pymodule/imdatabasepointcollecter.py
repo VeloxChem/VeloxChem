@@ -3839,6 +3839,7 @@ class IMDatabasePointCollecter:
             qm_energy = np.array([qm_energy])
             qm_driver.ostream.unmute()
             qm_driver.filename = None
+            qm_driver.checkpoint_file = None
         
         elif isinstance(qm_driver, ExternalScfDriver):
             qm_energy = qm_driver.compute_energy(molecule, qm_driver.basis_set_label)
@@ -3851,6 +3852,8 @@ class IMDatabasePointCollecter:
         elif isinstance(qm_driver, LinearResponseEigenSolver) or isinstance(qm_driver, TdaEigenSolver):
             self.drivers['es'][0].ostream.mute()
             scf_results = self.drivers['es'][3].compute(molecule, basis)
+            self.drivers['es'][3].filename = None
+            self.drivers['es'][3].checkpoint_file = None
             scf_energy = self.drivers['es'][3].scf_energy
             qm_driver.ostream.mute()
             rsp_results = qm_driver.compute(molecule, basis, scf_results)
@@ -4179,7 +4182,6 @@ class IMDatabasePointCollecter:
         with open(self.reference_struc_energies_file, mode) as file:
             
             for i, dyn_mol in enumerate(molecules):
-                print('i', i)
                 current_xyz_string = dyn_mol.get_xyz_string()
                 xyz_lines = current_xyz_string.splitlines()
 
