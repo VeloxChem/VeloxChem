@@ -2684,7 +2684,7 @@ class IMDatabasePointCollecter:
                     interpolation_driver.symmetry_information = self.impes_drivers[root].symmetry_information
                     interpolation_driver.qm_symmetry_data_points = self.impes_drivers[root].qm_symmetry_data_points
                     interpolation_driver.distance_thrsh = 1000
-                    interpolation_driver.eq_bond_force_constants = self.impes_drivers.eq_bond_force_constants
+                    interpolation_driver.eq_bond_force_constants = self.eq_bond_force_constants
                     interpolation_driver.impes_coordinate.eq_bond_force_constants = self.eq_bond_force_constants
                     interpolation_driver.exponent_p = self.impes_drivers[root].exponent_p
                     interpolation_driver.print = False

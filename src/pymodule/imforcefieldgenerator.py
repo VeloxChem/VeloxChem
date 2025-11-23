@@ -786,7 +786,7 @@ class IMForceFieldGenerator:
                         key = key_old
                         for opt_root in self.roots_to_follow:
                             if self.use_minimized_structures[0]:
-                                if op_roots not in files_to_add_conf or opt_root not in self.use_minimized_structures[2]:
+                                if opt_roots not in files_to_add_conf or opt_root not in self.use_minimized_structures[2]:
                                     if opt_root == 0:
                                         current_basis = MolecularBasis.read(molecule, states_basis['gs'])
                                         molecules_to_add_info.append((molecule, current_basis, [opt_root]))
