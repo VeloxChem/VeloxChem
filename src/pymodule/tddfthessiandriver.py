@@ -243,10 +243,9 @@ class TddftHessianDriver(HessianDriver):
 
         tddft_gradient_driver.state_deriv_index = self.state_deriv_index
 
-        if self.rank == mpi_master():
-            # Calculate excited-state relaxed dipole moment
-            if self.do_dipole_gradient:
-                tddft_gradient_driver.do_first_order_prop = True
+        # Calculate excited-state relaxed dipole moment
+        if self.do_dipole_gradient:
+            tddft_gradient_driver.do_first_order_prop = True
 
         tddft_gradient_driver.ostream.mute()
         tddft_gradient_driver.compute(
@@ -254,8 +253,8 @@ class TddftHessianDriver(HessianDriver):
         )
         tddft_gradient_driver.ostream.unmute()
 
-        if self.rank == mpi_master():
-            if self.do_dipole_gradient:
+        if self.do_dipole_gradient:
+            if self.rank == mpi_master():
                 self.relaxed_dipole_moment = (
                     tddft_gradient_driver.relaxed_dipole_moment[0].copy()
                 )

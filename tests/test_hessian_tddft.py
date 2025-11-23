@@ -35,6 +35,7 @@ class TestTddftHessianDriver:
         scf_drv.xcfun = xcfun_label
         scf_drv.grid_level = 6
         scf_drv.conv_thresh = 1e-10
+        scf_drv.ostream.mute()
         scf_results = scf_drv.compute(molecule, basis)
 
         if tamm_dancoff:
@@ -43,6 +44,7 @@ class TestTddftHessianDriver:
             rsp_drv = LinearResponseEigenSolver()
         rsp_drv.conv_thresh = 1e-8
         rsp_drv.nstates = 5
+        rsp_drv.ostream.mute()
         rsp_results = rsp_drv.compute(molecule, basis, scf_results)
 
         grad_dict = {}
@@ -53,6 +55,7 @@ class TestTddftHessianDriver:
         hessian_drv.update_settings(method_dict={}, grad_dict=grad_dict,
                                      cphf_dict=cphf_dict) 
         hessian_drv.do_dipole_gradient = True
+        hessian_drv.ostream.mute()
         hessian_drv.compute(molecule, basis)
 
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
@@ -70,6 +73,7 @@ class TestTddftHessianDriver:
             assert diff_hessian < 1.0e-5
             assert diff_dipole_grad < 1.0e-5
 
+    @pytest.mark.solvers
     def test_tda(self):
         xcfun_label = "hf"
         tamm_dancoff = True
@@ -97,6 +101,7 @@ class TestTddftHessianDriver:
         ref_label = "tda_camb3lyp"
         self.run_tddft_hessian(xcfun_label, tamm_dancoff, ref_label)
 
+    @pytest.mark.solvers
     def test_rpa(self):
         xcfun_label = "hf"
         tamm_dancoff = False
