@@ -16,11 +16,11 @@ class TestCTNumbers:
         particle_participation_ratio = 1.9982298906088756
         avg_participation_ratio = 1.9910796194833504
         
-        avg_hole_position = np.array([ 1.39951260e-01,  1.33518801e-01, -7.95624567e-05])
-        avg_particle_position = np.array([-1.46077909e-01,  1.08171427e-01, -8.18080571e-05])
-        avg_difference_vec = np.array([-2.86029169e-01, -2.53473739e-02, -2.24560031e-06])
+        avg_hole_position = np.array([ 9.48439790e-02,  4.63701220e-02, -9.30375228e-05])
+        avg_particle_position = np.array([-1.05663691e-02,  1.95196319e-02, -2.61361122e-05])
+        avg_difference_vec = np.array([-1.05410348e-01, -2.68504901e-02,  6.69014106e-05])
         
-        ct_length = 0.2871500913516519
+        ct_length = 0.10877635215676436
 
         thienyl_thiazole_str = """S   1.5860   -1.4206    0.0001  
         C   0.6775    0.0310   -0.0004  
@@ -50,7 +50,6 @@ class TestCTNumbers:
         # SCF settings and calculation
         scf_drv = ScfRestrictedDriver()
         scf_drv.ostream.mute()
-        scf_drv.grid_level = 3
         scf_results = scf_drv.compute(molecule, basis)
 
         # Solve the TDDFT linear response equation for the first 2 excited states
@@ -84,11 +83,11 @@ class TestCTNumbers:
         particle_participation_ratio = 1.999849478491969
         avg_participation_ratio = 1.9910526729613571
         
-        avg_hole_position = np.array([ 1.50961023e-01,  1.34494466e-01, -7.94760197e-05])
-        avg_particle_position = np.array([-9.57159520e-02,  1.12634410e-01, -8.14126679e-05])
-        avg_difference_vec = np.array([-2.46676975e-01, -2.18600555e-02, -1.93664826e-06])
+        avg_hole_position = np.array([ 1.08215773e-01,  3.95031475e-02, -9.74729973e-05])
+        avg_particle_position = np.array([ 2.29569961e-02,  1.46525443e-02, -2.70624949e-05])
+        avg_difference_vec = np.array([-8.52587765e-02, -2.48506032e-02,  7.04105023e-05])
         
-        ct_length =  0.2476436794645711
+        ct_length =  0.08880662362780768
 
         thienyl_thiazole_str = """S   1.5860   -1.4206    0.0001  
         C   0.6775    0.0310   -0.0004  
@@ -118,7 +117,6 @@ class TestCTNumbers:
         # SCF settings and calculation
         scf_drv = ScfRestrictedDriver()
         scf_drv.ostream.mute()
-        scf_drv.grid_level = 3
         scf_results = scf_drv.compute(molecule, basis)
 
         # Solve the TDDFT linear response equation for the first 2 excited states
