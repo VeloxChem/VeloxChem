@@ -73,6 +73,7 @@ class LocalizationDriver:
         self.threshold = 1e-12
 
         # choose localization routine: "boys" (only boys for now)
+        # TODO: implement "pm" and _compute_pipek_mezey
         self.method = 'boys'
 
     def localize(self, molecule, basis, scf_tensors, mo_list):
@@ -128,32 +129,31 @@ class LocalizationDriver:
 
         return C_loc
 
-    def compute(self, molecule, basis, scf_res, mo_list):
+    def compute(self, molecule, basis, mo_coefs, mo_list):
         """
         Send to the selected localization routine.
         """
-        link = {
-            "boys": self._compute_foster_boys,
-            #TODO "pm": self._compute_pipek_mezey,
-        }
 
-        assert_msg_critical(self.method.lower() in link, 
-                            'Only Foster-Boys localization available!')
-        func = link[self.method.lower()]
-        return func(molecule, basis, scf_res, mo_list)
+        assert_msg_critical(self.method.lower() in ['boys'],
+            'LocalizationDriver: Invalid localization method')
 
-    def _compute_foster_boys(self, molecule, basis, scf_res, mo_list):
+        if self.method.lower() == 'boys':
+            return self._compute_foster_boys(molecule, basis, mo_coefs, mo_list)
+
+    def _compute_foster_boys(self, molecule, basis, mo_coefs, mo_list):
         """
         Foster-Boys localization.
         """
 
         if self.rank == mpi_master():
             dip_mats = np.array(compute_electric_dipole_integrals(molecule, basis))
-            C = scf_res['C_alpha']
+            C = mo_coefs.copy()
             C_local = C[:, mo_list].copy()
             m = C_local.shape[1]
 
-            r = np.array([C_local.T @ x @ C_local for x in dip_mats])
+            r = np.array([
+                np.linalg.multi_dot([C_local.T, x, C_local]) for x in dip_mats
+            ])
 
             for _ in range(self.max_iter):
                 max_theta = 0.0
@@ -175,13 +175,13 @@ class LocalizationDriver:
                         R = np.array([[cos, -sin], 
                                     [sin,  cos]])
 
-                        C_local[:,[i,j]] = C_local[:,[i,j]].copy() @ R
+                        C_local[:,[i,j]] = np.matmul(C_local[:,[i,j]].copy(), R)
 
                         for x in range(3):
-                            r[x, [i, j], :] = R.T @ r[x, [i, j], :].copy()
+                            r[x, [i, j], :] = np.matmul(R.T, r[x, [i, j], :].copy())
                             #r[x, :, [i, j]] = r[x, :, [i, j]].copy() @ R
                             rx = r[x].copy()
-                            rx[:, [i, j]] = rx[:, [i, j]] @ R
+                            rx[:, [i, j]] = np.matmul(rx[:, [i, j]], R)
                             r[x] = rx
 
                         max_theta = max(max_theta, abs(theta_opt))

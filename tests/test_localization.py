@@ -9,9 +9,9 @@ from veloxchem.localizationdriver import LocalizationDriver
 
 
 @pytest.mark.solvers
-class TestBoys:
+class TestLocalization:
 
-    def test_run_boys(self, tol=1e-6):
+    def test_run_localization(self, tol=1e-6):
 
         xyz_string = """12
         D6h
@@ -35,10 +35,16 @@ class TestBoys:
         scf_drv.ostream.mute()
         scf_res = scf_drv.compute(mol, bas)
 
-        local_scf_res = scf_res.copy()
-        localization_drv = LocalizationDriver()
-        C_loc = localization_drv.compute(mol, bas, local_scf_res, list(range(6)))
+        if scf_drv.rank == mpi_master():
+            mo_coefs = scf_res['C_alpha']
+        else:
+            mo_coefs = None
+
+        loc_drv = LocalizationDriver()
+        C_loc = loc_drv.compute(mol, bas, mo_coefs, list(range(6)))
 
         if scf_drv.rank == mpi_master():
-            assert np.max(np.abs(C_loc.T @ scf_res['S'] @ C_loc - np.eye(C_loc.shape[1]))) < tol
+            assert np.max(np.abs(
+                np.linalg.multi_dot([C_loc.T, scf_res['S'], C_loc]) - np.eye(C_loc.shape[1])
+            )) < tol
             assert np.max(np.abs(C_loc[:, :6])) > 0.98
