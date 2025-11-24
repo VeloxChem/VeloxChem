@@ -228,12 +228,8 @@ class TddftGradientDriver(GradientDriver):
 
         # NOTE: the numerical gradient is calculated for the first state only.
         if self.numerical:
-            scf_drv.ostream.mute()
-            rsp_drv.ostream.mute()
             self.compute_numerical(molecule, basis, scf_drv, rsp_drv,
                                    rsp_results)
-            rsp_drv.ostream.unmute()
-            scf_drv.ostream.unmute()
         else:
             self.compute_analytical(molecule, basis, rsp_results)
 
@@ -855,14 +851,22 @@ class TddftGradientDriver(GradientDriver):
         else:
             # always try restarting scf for analytical gradient
             scf_drv.restart = True
+
+        scf_drv.ostream.mute()
         scf_results = scf_drv.compute(molecule, basis)
+        scf_drv.ostream.unmute()
+
         assert_msg_critical(scf_drv.is_converged,
                             'TddftGradientDriver: SCF did not converge')
         self._scf_drv = scf_drv
 
         # response should not be restarted
         rsp_drv.restart = False
+
+        rsp_drv.ostream.mute()
         rsp_results = rsp_drv.compute(molecule, basis, scf_results)
+        rsp_drv.ostream.unmute()
+
         assert_msg_critical(rsp_drv.is_converged,
                             'TddftGradientDriver: response did not converge')
         self._rsp_results = rsp_results
@@ -900,9 +904,6 @@ class TddftGradientDriver(GradientDriver):
             The electric dipole moment vector.
         """
 
-        scf_drv.ostream.mute()
-        rsp_drv.ostream.mute()
-
         # numerical dipole moment of the excited states
         n_states = len(self.state_deriv_index)
         dipole_moment = np.zeros((n_states, 3))
@@ -910,11 +911,14 @@ class TddftGradientDriver(GradientDriver):
 
         for s in range(n_states):
 
-            self.ostream.unmute()
             self.ostream.print_info(
                 f'Processing excited state {s + 1}/{n_states}...')
+            if s == n_states - 1:
+                self.ostream.print_blank()
             self.ostream.flush()
-            self.ostream.mute()
+
+            scf_drv.ostream.mute()
+            rsp_drv.ostream.mute()
 
             for i in range(3):
                 field[i] = field_strength
@@ -938,8 +942,8 @@ class TddftGradientDriver(GradientDriver):
                 dipole_moment[s, i] = (-(e_plus - e_minus) /
                                        (2.0 * field_strength))
 
-        scf_drv.ostream.unmute()
-        rsp_drv.ostream.unmute()
+            scf_drv.ostream.unmute()
+            rsp_drv.ostream.unmute()
 
         return dipole_moment
 

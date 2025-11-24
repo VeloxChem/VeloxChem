@@ -316,9 +316,11 @@ class HessianDriver:
 
         str_width = 70
 
+        title = f'{self.flag} Setup'
+
         self.ostream.print_blank()
-        self.ostream.print_header(self.flag)
-        self.ostream.print_header((len(self.flag) + 2) * '=')
+        self.ostream.print_header(title)
+        self.ostream.print_header((len(title) + 2) * '=')
         self.ostream.flush()
 
         cur_str = 'Hessian Type                    : '
@@ -390,6 +392,8 @@ class HessianDriver:
         for i in range(natoms):
 
             self.ostream.print_info(f'Processing atom {i + 1}/{natoms}...')
+            if i == natoms - 1:
+                self.ostream.print_blank()
             self.ostream.flush()
 
             for d in range(3):
