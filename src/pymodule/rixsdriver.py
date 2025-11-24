@@ -193,8 +193,12 @@ class RixsDriver:
 
         self.twoshot = cvs_rsp_tensors
         init_photon_set = True
-        
-        num_vir_orbitals = rsp_tensors['num_vir']
+
+        if self.rank == mpi_master():
+            num_vir_orbitals = rsp_tensors['num_vir']
+        else:
+            num_vir_orbitals = None
+        num_vir_orbitals = self.comm.bcast(num_vir_orbitals, root=mpi_master())
 
         if self.twoshot is not None:
             self._approach_string = (f'Running RIXS calculation in the two‑shot approach')

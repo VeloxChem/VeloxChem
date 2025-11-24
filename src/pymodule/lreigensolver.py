@@ -649,9 +649,9 @@ class LinearResponseEigenSolver(LinearSolver):
                         y_mat = eigvec[eigvec.size // 2:].reshape(
                             self.num_core_orbitals, -1)
                     elif self.restricted_subspace:
-                        mo_occ = np.hstack((scf_tensors['C_alpha'][:, :self.num_core_orbitals].copy(),
-                                scf_tensors['C_alpha'][:, nocc - self.num_valence_orbitals:nocc].copy()))
-                        mo_vir = scf_tensors['C_alpha'][:, nocc:nocc+self.num_vir_orbitals].copy()
+                        mo_occ = np.hstack((scf_results['C_alpha'][:, :self.num_core_orbitals].copy(),
+                                scf_results['C_alpha'][:, nocc - self.num_valence_orbitals:nocc].copy()))
+                        mo_vir = scf_results['C_alpha'][:, nocc:nocc+self.num_vir_orbitals].copy()
                         z_mat = eigvec[:eigvec.size // 2].reshape(
                             self.num_core_orbitals + self.num_valence_orbitals, -1)
                         y_mat = eigvec[eigvec.size // 2:].reshape(
