@@ -389,10 +389,8 @@ class HessianDriver:
 
         for i in range(natoms):
 
-            self.ostream.unmute()
             self.ostream.print_info(f'Processing atom {i + 1}/{natoms}...')
             self.ostream.flush()
-            self.ostream.mute()
 
             for d in range(3):
                 coords[i, d] += self.delta_h
@@ -470,10 +468,6 @@ class HessianDriver:
             # save the dipole moment gradient in the expected shape
             self.dipole_gradient = dipole_gradient.transpose(2, 0, 1).reshape(
                 3, natm * 3)
-
-        # unmute ostream
-        # TODO: how should the ostream be handled properly?
-        self.ostream.unmute()
 
     def compute_energy(self, molecule, *args):
         """

@@ -185,10 +185,8 @@ class GradientDriver:
 
         for i in range(natoms):
 
-            self.ostream.unmute()
             self.ostream.print_info(f'Processing atom {i + 1}/{natoms}...')
             self.ostream.flush()
-            self.ostream.mute()
 
             for d in range(3):
                 coords[i, d] += self.delta_h
