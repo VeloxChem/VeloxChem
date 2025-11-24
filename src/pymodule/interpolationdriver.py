@@ -1607,7 +1607,7 @@ class InterpolationDriver():
         return distance, dihedral_dist, denominator, weight_gradient, distance_vector, grad_s
 
 
-    def determine_important_internal_coordinates(self, qm_energy, qm_gradient, molecule, z_matrix, datapoints):
+    def determine_important_internal_coordinates(self, qm_energy, qm_gradient, molecule, z_matrix, datapoints, dihedral_diff_const=True):
         """Determines the most important internal coordinates
            leading to the large deviation.
         """
@@ -1644,7 +1644,7 @@ class InterpolationDriver():
                     internal_coord_elem_distance.append(np.sin(self.impes_coordinate.internal_coordinates_values[elem_idx] - datapoint.internal_coordinates_values[elem_idx]))
                     org_interal_coord_elem_distance.append(np.cos(self.impes_coordinate.internal_coordinates_values[elem_idx] - datapoint.internal_coordinates_values[elem_idx]))
                     print(z_matrix[elem_idx], self.impes_coordinate.internal_coordinates_values[elem_idx], datapoint.internal_coordinates_values[elem_idx])
-                    if abs(internal_coord_elem_distance[-1]) > 0.3:
+                    if abs(internal_coord_elem_distance[-1]) > 0.3 and dihedral_diff_const:
                         dihedral_difference.append(element)
                     
                 else:
@@ -1828,42 +1828,6 @@ class InterpolationDriver():
 
         return constraints
 
-            # if error_source == 'gradient':
-            #     print('Delta G:', delta_G * hartree_in_kcalpermol() * bohr_in_angstrom(), constraints)
-            #     sorted_contributions = sorted(contributions_gradient, key=lambda x: x[1], reverse=True)
-
-                # # Print the sorted contributions with internal coordinates
-                # print('Delta E:', delta_G * hartree_in_kcalpermol() * bohr_in_angstrom(), constraints)
-                # for contrib, error, ind_weight, coord in sorted_contributions_gradient[:]:        
-                #     print('additional coord', abs(ind_weight - max(weights)) < 1e-8)
-                #     if tuple(int(x) for x in coord) in constraints:
-                #         continue
-                #     if len(coord) == 2 and ind_weight > max(weights) * 0.7:
-                #         constraints.append(tuple(int(x) for x in coord))
-                #     elif len(coord) == 3 and ind_weight > max(weights) * 0.7:
-                #         constraints.append(tuple(int(x) for x in coord))
-                #     elif len(coord) == 4 and ind_weight > max(weights) * 0.7 and tuple(sorted(coord)) not in self.symmetry_information[7][3] and tuple(sorted(coord)) not in self.symmetry_information[7][2]:
-                #         constraints.append(tuple(int(x) for x in coord))
-                #     print(f'Internal Coordinate: {tuple(int(x) for x in coord)}, Error: {error * hartree_in_kcalpermol() * bohr_in_angstrom()} kcal/mol Å^-1')#, distance {internal_coord_elem_distance[z_matrix.index(coord)]}, Contribution: {contrib}, weight {ind_weight}, Error: {error * hartree_in_kcalpermol()} kcal/mol')
-                # print('Sum of Weights', sum(weights), sum(single_gradient_error) * hartree_in_kcalpermol() * bohr_in_angstrom())
-
-
-            # Print the sorted contributions with internal coordinates
-            
-        #     for contrib, error, ind_weight, coord in sorted_contributions[:]:        
-        #         print('additional coord', abs(ind_weight - max(weights)) < 1e-8)
-        #         if tuple(int(x) for x in coord) in constraints:
-        #             continue
-        #         if len(coord) == 2 and ind_weight > max(weights) * 0.7:
-        #             constraints.append(tuple(int(x) for x in coord))
-        #         elif len(coord) == 3 and ind_weight > max(weights) * 0.7:
-        #             constraints.append(tuple(int(x) for x in coord))
-        #         elif len(coord) == 4 and ind_weight > max(weights) * 0.7: #and tuple(sorted(coord)) not in self.symmetry_information[7][3] and tuple(sorted(coord)) not in self.symmetry_information[7][2]:
-        #             constraints.append(tuple(int(x) for x in coord))
-        #         print(f'Internal Coordinate: {tuple(int(x) for x in coord)}, Error: {error} kcal/mol')#, distance {internal_coord_elem_distance[z_matrix.index(coord)]}, Contribution: {contrib}, weight {ind_weight}, Error: {error * hartree_in_kcalpermol()} kcal/mol')
-        #     print('Sum of Weights', sum(weights), sum(single_energy_error))
-
-        # return constraints
     
     def transform_gradient_to_internal_coordinates(self, molecule, gradient, b_matrix, tol=1e-6):
         """

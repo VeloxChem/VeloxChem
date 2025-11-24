@@ -2290,8 +2290,8 @@ class IMDatabasePointCollecter:
                 if self.skipping_value < 0:
                     self.skipping_value = 0
             
-            if self.step % 1 == 0:
-                self.add_a_point = True
+            # if self.step % 1 == 0:
+            #     self.add_a_point = True
             
             if self.current_state != self.prev_state:
                 self.add_a_point = True
@@ -2554,8 +2554,7 @@ class IMDatabasePointCollecter:
                     addition_of_state_specific_points.append(comb[0])
                 if comb[1] not in addition_of_state_specific_points:
                     addition_of_state_specific_points.append(comb[1])
-                
-        
+
         if len(addition_of_state_specific_points) > 0:
 
             for state in self.roots_to_follow:
@@ -2817,6 +2816,12 @@ class IMDatabasePointCollecter:
 
                 
                 self.add_a_point = False
+        
+
+            # New normal mode adjusted hessian
+
+            # self.auxilary_datapoint(molecule, self.impes_drivers[self.current_state], self.qm_data_point_dict[self.current_state], state_specific_energies[self.current_state], state_specific_gradients[self.current_state], self.z_matrix)
+
 
         # calcualte energy gradient
         if self.add_a_point is False:
@@ -3437,7 +3442,32 @@ class IMDatabasePointCollecter:
                     drivers[1].state_deriv_index = org_roots
     
         
+    def auxilary_datapoint(self, molecule, impes_driver, qm_datapoint_dict, state_specific_energies, state_specific_gradients, z_matrix):
+        
+        impes_driver.compute(molecule)
+        current_weights = impes_driver.weights
+        weights = [value for _, value in current_weights.items()]
+        used_labels = [label_idx for label_idx, _ in current_weights.items()]
+        # Sort labels and weights by descending weight
+        sorted_items = sorted(zip(used_labels, weights), key=lambda x: x[1], reverse=True)
+        total_weight = sum(weights)
+        cumulative_weight = 0.0
+        internal_coordinate_datapoints = []
+        for label, weight in sorted_items:
+            cumulative_weight += weight
+            internal_coordinate_datapoints.append(qm_data_point_dict[label])
+            if cumulative_weight >= 0.8 * total_weight:
+                break
+        # qm_datapoints_weighted = [qm_datapoint for qm_datapoint in enumerate if ]
+        constraints = impes_driver.determine_important_internal_coordinates(state_specific_energies[0], state_specific_gradients[0], molecule, z_matrix, internal_coordinate_datapoints, dihedral_diff_const=False)
 
+        print(constraints)
+        exit()
+
+
+        return 0
+    
+    
     def determine_beysian_trust_radius(self, molecules, qm_energies, current_datapoints, interpolation_setting, sym_datapoints, sym_dict):
     
         trust_radii = []
