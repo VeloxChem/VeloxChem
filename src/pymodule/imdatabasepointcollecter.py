@@ -2290,8 +2290,8 @@ class IMDatabasePointCollecter:
                 if self.skipping_value < 0:
                     self.skipping_value = 0
             
-            # if self.step % 400 == 0:
-            #     self.add_a_point = True
+            if self.step % 1 == 0:
+                self.add_a_point = True
             
             if self.current_state != self.prev_state:
                 self.add_a_point = True
@@ -2490,7 +2490,7 @@ class IMDatabasePointCollecter:
             qm_energy, scf_results, rsp_results = self.compute_energy(drivers[0], molecule, current_basis)
             print(qm_energy)
             if isinstance(drivers[0], LinearResponseEigenSolver) or isinstance(drivers[0], TdaEigenSolver):
-                qm_energy = [qm_energy[identification_state]]
+                qm_energy = [qm_energy[identification_state + state]]
 
 
             gradients = self.compute_gradient(drivers[1], molecule, current_basis, scf_results, rsp_results)
