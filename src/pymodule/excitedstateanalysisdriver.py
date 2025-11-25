@@ -313,7 +313,8 @@ class ExcitedStateAnalysisDriver:
         # of expected excitations
         eigvec_shape = eigvec.shape[0]
         error_text = "eigenvectors not consistent with the expected number "
-        error_text += "of occupied and virtual orbitals"
+        error_text += "of occupied and virtual orbitals. For calculations which use "
+        error_text += "the CVS approximation, please set num_core_orbitals."
         assert_msg_critical(
             nexc == eigvec_shape or 2 * nexc == eigvec_shape, error_text
         )
@@ -321,17 +322,25 @@ class ExcitedStateAnalysisDriver:
         z_mat = eigvec[:nexc]
         if eigvec.shape[0] == nexc:
             tdens_mo = np.reshape(z_mat, (nocc, nvirt))
+            tdens_ao = np.linalg.multi_dot([mo_occ, tdens_mo, mo_vir.T])
+            hole_dens_mo = -np.matmul(tdens_mo, tdens_mo.T)
+            hole_dens_ao = np.linalg.multi_dot([mo_occ, hole_dens_mo, mo_occ.T])
+
+            part_dens_mo = np.matmul(tdens_mo.T, tdens_mo)
+            part_dens_ao = np.linalg.multi_dot([mo_vir, part_dens_mo, mo_vir.T])
         else:
+            # Eqs. 2.130 - 2.133 of "Computational Spectroscopy of D18 Photodegradation"
+            # Carl Svennerstedt, master thesis 2025
             y_mat = eigvec[nexc:]
-            tdens_mo = np.reshape(z_mat - y_mat, (nocc, nvirt))
+            tdens_mo = np.zeros((norb, norb))
+            tdens_mo[:nocc, nocc:] = np.reshape(z_mat, (nocc, nvirt))
+            tdens_mo[nocc:, :nocc] = -np.reshape(y_mat, (nocc, nvirt)).transpose()
+            tdens_ao = np.linalg.multi_dot([mo, tdens_mo, mo.T])
+            hole_dens_mo = -np.matmul(tdens_mo, tdens_mo.T)
+            hole_dens_ao = np.linalg.multi_dot([mo, hole_dens_mo, mo.T])
 
-        tdens_ao = np.linalg.multi_dot([mo_occ, tdens_mo, mo_vir.T])
-
-        hole_dens_mo = -np.matmul(tdens_mo, tdens_mo.T)
-        hole_dens_ao = np.linalg.multi_dot([mo_occ, hole_dens_mo, mo_occ.T])
-
-        part_dens_mo = np.matmul(tdens_mo.T, tdens_mo)
-        part_dens_ao = np.linalg.multi_dot([mo_vir, part_dens_mo, mo_vir.T])
+            part_dens_mo = np.matmul(tdens_mo.T, tdens_mo)
+            part_dens_ao = np.linalg.multi_dot([mo, part_dens_mo, mo.T])
 
         return {
             "transition_density_matrix_MO": tdens_mo,
@@ -503,6 +512,7 @@ class ExcitedStateAnalysisDriver:
             "avg_particle_position": avg_particle_position,
             "avg_difference_vector": avg_diff_vec,
             "ct_length": ct_length,
+            "atom_wise_ct_matrix": ct_matrix,
         }
 
     def compute_avg_position_based_on_fragments(
