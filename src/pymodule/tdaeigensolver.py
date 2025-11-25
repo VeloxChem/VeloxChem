@@ -31,7 +31,6 @@
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from mpi4py import MPI
-from pathlib import Path
 from copy import deepcopy
 import numpy as np
 import time as tm
@@ -400,7 +399,7 @@ class TdaEigenSolver(LinearSolver):
                 mo_vir = scf_tensors['C_alpha'][:, nocc:].copy()
             elif self.restricted_subspace:
                 mo_occ = np.hstack((scf_tensors['C_alpha'][:, :self.num_core_orbitals].copy(),
-                                scf_tensors['C_alpha'][:, nocc - self.num_valence_orbitals:nocc].copy()))
+                                    scf_tensors['C_alpha'][:, nocc - self.num_valence_orbitals:nocc].copy()))
                 mo_vir = scf_tensors['C_alpha'][:, nocc:nocc+self.num_vir_orbitals].copy()
             else:
                 mo_occ = scf_tensors['C_alpha'][:, :nocc].copy()
@@ -685,7 +684,7 @@ class TdaEigenSolver(LinearSolver):
                     mat = trial_mat[:, k].reshape(self.num_core_orbitals, nvir)
                     mat = np.matmul(mo_occ, np.matmul(mat, mo_vir.T))
                 elif self.restricted_subspace:
-                    mat = trial_mat[:, k].reshape(self.num_core_orbitals + self.num_valence_orbitals, 
+                    mat = trial_mat[:, k].reshape(self.num_core_orbitals + self.num_valence_orbitals,
                                                   self.num_vir_orbitals)
                     mat = np.matmul(mo_occ, np.matmul(mat, mo_vir.T))
                 else:

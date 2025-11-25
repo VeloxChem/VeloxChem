@@ -280,9 +280,10 @@ class LinearResponseEigenSolver(LinearSolver):
                 'LinearResponseEigenSolver: too many excited states')
             if getattr(self, 'restricted_subspace', False) and not self.core_excitation:
                 assert_msg_critical(
-                self.nstates <= (self.num_core_orbitals + self.num_valence_orbitals) 
-                                * (self.num_vir_orbitals),
-                'LinearResponseEigenSolver: too many excited states')
+                    self.nstates <= (
+                        (self.num_core_orbitals + self.num_valence_orbitals) *
+                        (self.num_vir_orbitals)),
+                    'LinearResponseEigenSolver: too many excited states')
 
             if self.core_excitation:
                 assert_msg_critical(
@@ -650,7 +651,7 @@ class LinearResponseEigenSolver(LinearSolver):
                             self.num_core_orbitals, -1)
                     elif self.restricted_subspace:
                         mo_occ = np.hstack((scf_results['C_alpha'][:, :self.num_core_orbitals].copy(),
-                                scf_results['C_alpha'][:, nocc - self.num_valence_orbitals:nocc].copy()))
+                                            scf_results['C_alpha'][:, nocc - self.num_valence_orbitals:nocc].copy()))
                         mo_vir = scf_results['C_alpha'][:, nocc:nocc+self.num_vir_orbitals].copy()
                         z_mat = eigvec[:eigvec.size // 2].reshape(
                             self.num_core_orbitals + self.num_valence_orbitals, -1)
@@ -1065,10 +1066,11 @@ class LinearResponseEigenSolver(LinearSolver):
                            for i in range(self.num_core_orbitals)
                            for a in range(nocc, norb)]
         elif self.restricted_subspace:
-            core_and_val_indices = list(range(self.num_core_orbitals)) + list(range(nocc - self.num_valence_orbitals, nocc)) 
+            core_and_val_indices = (list(range(self.num_core_orbitals)) +
+                                    list(range(nocc - self.num_valence_orbitals, nocc)))
             excitations = [(i, a)
-                            for i in core_and_val_indices
-                            for a in range(nocc, nocc+self.num_vir_orbitals)]
+                           for i in core_and_val_indices
+                           for a in range(nocc, nocc+self.num_vir_orbitals)]
         else:
             excitations = [
                 (i, a) for i in range(nocc) for a in range(nocc, norb)

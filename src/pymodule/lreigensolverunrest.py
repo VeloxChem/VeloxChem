@@ -341,8 +341,10 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
                     f'{self.nstates - checkpoint_nstates} more states...')
                 self.ostream.print_blank()
 
-                igs = self._initial_excitations(self.nstates, orb_ene, nocc,
-                                                norb, checkpoint_nstates)
+                igs = self._initial_excitations(self.nstates,
+                                                (orb_ene_a, orb_ene_b),
+                                                (nocc_a, nocc_b), norb,
+                                                checkpoint_nstates)
                 bger, bung = self._setup_trials(igs, None, self._dist_bger,
                                                 self._dist_bung)
 
@@ -366,7 +368,7 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
         profiler.check_memory_usage('Initial guess')
 
         exc_energies = {}
-        exc_focks = {}
+        # exc_focks = {}
         exc_solutions = {}
         exc_residuals = {}
         relative_residual_norm = {}
@@ -591,18 +593,18 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
         # calculate properties
         if self.is_converged:
             edip_grad_a = self.get_prop_grad('electric dipole', 'xyz', molecule,
-                                           basis, scf_tensors, spin='alpha')
+                                             basis, scf_tensors, spin='alpha')
             lmom_grad_a = self.get_prop_grad('linear momentum', 'xyz', molecule,
-                                           basis, scf_tensors, spin='alpha')
+                                             basis, scf_tensors, spin='alpha')
             mdip_grad_a = self.get_prop_grad('magnetic dipole', 'xyz', molecule,
-                                           basis, scf_tensors, spin='alpha')
+                                             basis, scf_tensors, spin='alpha')
 
             edip_grad_b = self.get_prop_grad('electric dipole', 'xyz', molecule,
-                                           basis, scf_tensors, spin='beta')
+                                             basis, scf_tensors, spin='beta')
             lmom_grad_b = self.get_prop_grad('linear momentum', 'xyz', molecule,
-                                           basis, scf_tensors, spin='beta')
+                                             basis, scf_tensors, spin='beta')
             mdip_grad_b = self.get_prop_grad('magnetic dipole', 'xyz', molecule,
-                                           basis, scf_tensors, spin='beta')
+                                             basis, scf_tensors, spin='beta')
 
             # for unrestricted
             edip_grad_a /= sqrt_2
@@ -647,11 +649,11 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
                     eigvec_a = np.hstack((
                         eigvec_full[:n_ov_a],
                         eigvec_full[n_ov_a + n_ov_b:n_ov_a + n_ov_b + n_ov_a],
-                        ))
+                    ))
                     eigvec_b = np.hstack((
                         eigvec_full[n_ov_a:n_ov_a + n_ov_b],
                         eigvec_full[n_ov_a + n_ov_b + n_ov_a:],
-                        ))
+                    ))
 
                     if self.core_excitation:
                         mo_occ_a = scf_tensors['C_alpha'][:, :self.num_core_orbitals]

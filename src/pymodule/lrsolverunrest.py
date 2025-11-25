@@ -417,11 +417,11 @@ class LinearResponseUnrestrictedSolver(LinearSolver):
                     x_full_a = np.hstack((
                         x_full[:n_ov_a],
                         x_full[n_ov_a + n_ov_b:n_ov_a + n_ov_b + n_ov_a],
-                        ))
+                    ))
                     x_full_b = np.hstack((
                         x_full[n_ov_a:n_ov_a + n_ov_b],
                         x_full[n_ov_a + n_ov_b + n_ov_a:],
-                        ))
+                    ))
 
                     xv = (np.dot(x_full_a, v_grad[(op, freq)][0]) +
                           np.dot(x_full_b, v_grad[(op, freq)][1]))
@@ -569,11 +569,11 @@ class LinearResponseUnrestrictedSolver(LinearSolver):
                         x_alpha = np.hstack((
                             x[:n_ov_a],
                             x[n_ov_a + n_ov_b:n_ov_a + n_ov_b + n_ov_a],
-                            ))
+                        ))
                         x_beta = np.hstack((
                             x[n_ov_a:n_ov_a + n_ov_b],
                             x[n_ov_a + n_ov_b + n_ov_a:],
-                            ))
+                        ))
 
                         for aop in self.a_components:
                             rsp_funcs[(aop, bop, w)] = (-1.0) * (

@@ -32,18 +32,14 @@
 
 from mpi4py import MPI
 import numpy as np
-import math
-import h5py
 import sys
 
 from .veloxchemlib import mpi_master
 from .oneeints import compute_electric_dipole_integrals
-from .subcommunicators import SubCommunicators
 from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
 from .checkpoint import create_hdf5, write_scf_results_to_hdf5
-from .inputparser import (parse_input, print_keywords, print_attributes,
-                          get_random_string_parallel)
+
 
 class LocalizationDriver:
 
@@ -134,7 +130,8 @@ class LocalizationDriver:
         Send to the selected localization routine.
         """
 
-        assert_msg_critical(self.method.lower() in ['boys'],
+        assert_msg_critical(
+            self.method.lower() in ['boys'],
             'LocalizationDriver: Invalid localization method')
 
         if self.method.lower() == 'boys':
@@ -162,15 +159,15 @@ class LocalizationDriver:
                         r_i  = r[:,i,i]
                         r_j  = r[:,j,j]
                         d_ij = r[:,i,j]
-                        
+
                         r_ij = r_i - r_j
                         g = 2.0 * np.dot(r_ij, d_ij)
                         h = np.linalg.norm(r_ij)**2 - 4.0 * np.linalg.norm(d_ij)**2
-                        
+
                         theta_opt = 0.25 * np.arctan2(g,h)
                         if abs(theta_opt) < self.threshold:
                             continue
-                            
+
                         cos, sin = np.cos(theta_opt), np.sin(theta_opt)
                         R = np.array([[cos, -sin], 
                                     [sin,  cos]])
@@ -191,14 +188,14 @@ class LocalizationDriver:
                     break
             else:
                 self.ostream.print_info(f"Foster–Boys did not converge after {self.max_iter} iterations.")
-                    
+
             C_loc = C.copy()
             C_loc[:, mo_list] = C_local
 
             return C_loc
         else:
             return None
-        
+
     def _clean_mo_list(self, mo_list):
         """
         Returns a clean list.
@@ -214,4 +211,3 @@ class LocalizationDriver:
         assert_msg_critical(len(out) > 0, "mo_list must not be empty.")
 
         return out
-

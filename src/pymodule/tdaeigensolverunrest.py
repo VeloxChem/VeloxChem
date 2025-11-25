@@ -31,11 +31,9 @@
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from mpi4py import MPI
-from pathlib import Path
 from copy import deepcopy
 import numpy as np
 import time as tm
-import math
 import sys
 
 from .veloxchemlib import XCFunctional, MolecularGrid
@@ -1024,7 +1022,7 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
             A deepcopy of self.
         """
 
-        new_rsp_drv = TdaEigenSolver(self.comm, self.ostream)
+        new_rsp_drv = TdaUnrestrictedEigenSolver(self.comm, self.ostream)
 
         for key, val in vars(self).items():
             if isinstance(val, (MPI.Intracomm, OutputStream)):

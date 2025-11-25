@@ -35,18 +35,16 @@ import numpy as np
 import h5py
 import sys
 
-from .veloxchemlib import hartree_in_ev, bohr_in_angstrom, mpi_master
+from .veloxchemlib import hartree_in_ev, mpi_master
 from .oneeints import compute_electric_dipole_integrals
-from .subcommunicators import SubCommunicators
 from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
+from .inputparser import parse_input
 
-from .inputparser import (parse_input, print_keywords, print_attributes,
-                          get_random_string_parallel)
 
 class RixsDriver:
     """
-    Implements the RIXS driver in a linear-response framework with two 
+    Implements the RIXS driver in a linear-response framework with two
     approaches: the two-shot and restricted-subspace approximation.
 
     # vlxtag: RHF, RIXS
@@ -91,7 +89,8 @@ class RixsDriver:
         self.photon_energy = None
         self.theta = 0
         # a.u., FWHM
-        self.gamma = .124/hartree_in_ev() 
+        # 1000.0 / hartree_in_wavenumber()
+        self.gamma = 0.124 / hartree_in_ev()
 
         self.tda = False
         self.orb_and_state_dict = None
@@ -155,19 +154,19 @@ class RixsDriver:
             print(f'\nNumber of states: (intermediate, final): ({intermed_states}, {final_states})')
             print(f'\nMO indices (core, valence, virtual): ({mo_c_ind}, {mo_val_ind}, {mo_vir_ind})')
             print(f'\nState indices (intermediate, final): ({ce_states}, {ve_states})')
-    
-    def compute(self, molecule, basis, scf_tensors, 
+
+    def compute(self, molecule, basis, scf_tensors,
                 rsp_tensors, cvs_rsp_tensors=None,
                 cvs_scf_tensors=None):
         """
         Computes RIXS properties.
-        
+
         :param molecule:
             The molecule object.
         :param basis:
             The AO basis set.
         :scf_tensors:
-            The dictionary of tensors from converged SCF 
+            The dictionary of tensors from converged SCF
             wavefunction.
         :rsp_tensors:
             The linear-response results dictionary.
@@ -201,7 +200,7 @@ class RixsDriver:
         num_vir_orbitals = self.comm.bcast(num_vir_orbitals, root=mpi_master())
 
         if self.twoshot:
-            self._approach_string = (f'Running RIXS calculation in the two‑shot approach')
+            self._approach_string = 'Running RIXS calculation in the two‑shot approach'
 
             if self.rank == mpi_master():
                 num_core_orbitals = cvs_rsp_tensors['num_core']
@@ -225,13 +224,13 @@ class RixsDriver:
             val_states              = list(range(num_final_states))
 
         else:
-            self._approach_string = (f'Running RIXS calculation in the restricted‑subspace approach')
+            self._approach_string = 'Running RIXS calculation in the restricted‑subspace approach'
 
             if self.rank == mpi_master():
                 num_valence_orbitals = rsp_tensors['num_val']
                 num_core_orbitals    = rsp_tensors['num_core']
                 assert_msg_critical(num_core_orbitals > 0,
-                                     'No core orbitals indicated in the response tensor.')
+                                    'No core orbitals indicated in the response tensor.')
 
                 # identify the energy of the lowest core-excited state
                 first_core_ene = self._first_core_energy(rsp_tensors)
@@ -307,10 +306,10 @@ class RixsDriver:
         U_occ, U_vir = None, None
         if need_transformation_mats:
             U_occ, U_vir = self.get_transformation_mats(scf_tensors, cvs_scf_tensors, 
-                                                    mo_core_indices + mo_val_indices, mo_vir_indices)
+                                                        mo_core_indices + mo_val_indices, mo_vir_indices)
         # TODO parallelise, and broadcast?
         core_mats = self._preprocess_core_eigvecs(core_eigvecs, occupied_core,
-                                                 num_valence_orbitals, num_vir_orbitals, U_occ, U_vir)
+                                                  num_valence_orbitals, num_vir_orbitals, U_occ, U_vir)
         
         # TODO parallelise, and broadcast?
         if self.rank == mpi_master():
@@ -357,7 +356,7 @@ class RixsDriver:
         self.cross_sections         = np.zeros((num_final_states, len(self.photon_energy)))
         self.elastic_cross_sections = np.zeros((len(self.photon_energy)))
         self.scattering_amplitudes  = np.zeros((num_final_states, len(self.photon_energy),
-                                           3, 3), dtype=complex)
+                                               3, 3), dtype=complex)
 
         if self.rank == mpi_master():
             self._print_header(molecule)
@@ -378,8 +377,8 @@ class RixsDriver:
             for local_i, f in enumerate(range(f_start, f_end)):
                 F_inelastic = np.zeros((3, 3), dtype=complex)
                 z_val, y_val = self.split_eigvec(valence_eigvecs[f],
-                                                num_core_orbitals + num_valence_orbitals,
-                                                num_vir_orbitals, self.tda)
+                                                 num_core_orbitals + num_valence_orbitals,
+                                                 num_vir_orbitals, self.tda)
                 for n in range(num_intermediate_states):
                     z_core, y_core = core_mats[n]
                     gs2core, core2val = self.get_tdms(mo_occ, mo_vir, z_val, y_val, z_core, y_core)
@@ -404,13 +403,14 @@ class RixsDriver:
 
             # Reduce per omega
             F_elastic = self.comm.allreduce(F_elastic_local, op=MPI.SUM)
-            parts = self.comm.allgather(
-                (f_start, f_end,
+            parts = self.comm.allgather((
+                f_start,
+                f_end,
                 local_emission_energies,
                 local_energy_losses,
                 local_cross_sections,
-                local_amplitude_tensors)
-            )
+                local_amplitude_tensors,
+            ))
 
             if self.rank == mpi_master():
                 self.elastic_cross_sections[w_ind] = self.cross_section(F_elastic).real
@@ -552,21 +552,18 @@ class RixsDriver:
             # Elastic line, note that the term prop. to A^2 is not included
             # Phys. Rep. 324, 1–105 (2000), DOI: 10.1016/S0370-1573(99)00003-4
             core_eigvals2 = core_eigenvalue**2
-            gs_exc_tdipole = np.array([
-                                np.sum(intermediate_tdens * dipole_integrals[i])
-                                for i in range(3)])
+            gs_exc_tdipole = np.array([np.sum(intermediate_tdens * dipole_integrals[i])
+                                       for i in range(3)])
             outer_product = np.matmul(gs_exc_tdipole[:, np.newaxis], gs_exc_tdipole[np.newaxis, :])
             scatt_amp = e_n * core_eigvals2 * outer_product
 
         else:
             # Inelastic line
             omega_product = (core_eigenvalue - val_eigenvalue) * core_eigenvalue
-            gs_exc_tdipole = np.array([
-                                np.sum(intermediate_tdens * dipole_integrals[i])
-                                for i in range(3)])
-            exc_exc_tdipole = np.array([
-                                np.sum(final_tdens * dipole_integrals[i])
-                                for i in range(3)])
+            gs_exc_tdipole = np.array([np.sum(intermediate_tdens * dipole_integrals[i])
+                                       for i in range(3)])
+            exc_exc_tdipole = np.array([np.sum(final_tdens * dipole_integrals[i])
+                                        for i in range(3)])
             outer_product = np.matmul(exc_exc_tdipole[:, np.newaxis], gs_exc_tdipole[np.newaxis, :])
             scatt_amp = e_n * omega_product * outer_product
 
@@ -599,8 +596,8 @@ class RixsDriver:
         tr_F2 = np.abs(np.trace(F))**2
 
         sigma_f = omegaprime_omega * (1.0/15.0) * (
-                    (2.0 - 0.5*np.sin(self.theta)**2) * F2 +
-                    (0.75*np.sin(self.theta)**2 - 0.5) * (FF_T_conj + tr_F2))
+            (2.0 - 0.5*np.sin(self.theta)**2) * F2 +
+            (0.75*np.sin(self.theta)**2 - 0.5) * (FF_T_conj + tr_F2))
         
         return sigma_f
     
@@ -706,8 +703,8 @@ class RixsDriver:
         return np.pad(z_mat, padding), np.pad(y_mat, padding)
     
     def _preprocess_core_eigvecs(self, core_eigvecs, occ_core,
-                                num_val_orbs, num_vir_orbs,
-                                U_occ=None, U_vir=None):
+                                 num_val_orbs, num_vir_orbs,
+                                 U_occ=None, U_vir=None):
         """
         Split, pad with zeros (if twoshot) and 
         possibly transform core eigenvectors if needed.
@@ -716,7 +713,7 @@ class RixsDriver:
 
         for vec in core_eigvecs:
             z, y = self.split_eigvec(vec, occ_core,
-                                    num_vir_orbs, self.tda)
+                                     num_vir_orbs, self.tda)
             
             if self.twoshot:
                 z, y = self.pad_matrices(z, y, num_val_orbs)
@@ -865,7 +862,6 @@ class RixsDriver:
                 return f"[{items[0]} ... {items[-1]}]"
             return "[" + ", ".join(items) + "]"
 
-        
         def _join_indices(parts, n):
             sep = ", " if n <= 3 else " "
             return sep.join(parts)
@@ -945,7 +941,7 @@ class RixsDriver:
             
             if self.final_state_cutoff is not None:
                 self.ostream.print_header(
-                f'Final state energy cutoff [eV]   : {hartree_in_ev() * self.final_state_cutoff:.2f}'.ljust(str_width))
+                    f'Final state energy cutoff [eV]   : {hartree_in_ev() * self.final_state_cutoff:.2f}'.ljust(str_width))
 
             self.ostream.print_blank()
 
@@ -953,12 +949,12 @@ class RixsDriver:
             state_list = _format_indices(od["core_states"])
             self.ostream.print_header(
                 f'Intermediate/core states         : {state_list}'.ljust(str_width)
-                )
+            )
 
             state_list = _format_indices(od["val_states"])
             self.ostream.print_header(
                 f'Final/valence states             : {state_list}'.ljust(str_width)
-                )
+            )
             self.ostream.print_blank()
 
             self.ostream.print_header('Orbital sets'.center(str_width))
@@ -966,19 +962,19 @@ class RixsDriver:
             orbital_str    = _format_indices(orbital_labels)
             self.ostream.print_header(
                 f'Core orbitals                    : {orbital_str}'.ljust(str_width)
-                )
+            )
 
             orbital_labels = _format_orbital_names(od["mo_val_indices"], "valence", nocc)
             orbital_str    = _format_indices(orbital_labels)
             self.ostream.print_header(
                 f'Valence orbitals                 : {orbital_str}'.ljust(str_width)
-                )
+            )
             
             orbital_labels = _format_orbital_names(od["mo_vir_indices"], "virtual", nocc)
             orbital_str    = _format_indices(orbital_labels)
             self.ostream.print_header(
                 f'Virtual orbitals                 : {orbital_str}'.ljust(str_width)
-                )
+            )
             self.ostream.print_blank()
 
         if getattr(self, "_approach_string", None):
