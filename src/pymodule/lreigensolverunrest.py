@@ -910,17 +910,20 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
 
                     return ret_dict
                 else:
+                    # non-master rank
                     return {
                         'eigenvalues': eigvals,
                         'eigenvectors_distributed': exc_solutions,
                     }
 
             else:
-
+                # nonlinear
                 # TODO: unrestricted for nonlinear
-                pass
+                return {}
 
-        return None
+        else:
+            # not converged
+            return {}
 
     def _add_nstates_to_checkpoint(self):
         """

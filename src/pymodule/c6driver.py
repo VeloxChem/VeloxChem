@@ -668,9 +668,12 @@ class C6Driver(LinearSolver):
                     'solutions': solutions
                 }
             else:
+                # non-master rank
                 return {'solutions': solutions}
 
-        return None
+        else:
+            # not converged
+            return {}
 
     def _integrate_c6(self, w0, points, weights, imagfreqs, rsp_funcs):
         """

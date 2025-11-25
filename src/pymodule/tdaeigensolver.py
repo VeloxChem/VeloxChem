@@ -562,13 +562,18 @@ class TdaEigenSolver(LinearSolver):
 
             return ret_dict
 
-        else:
+        elif self.rank != mpi_master() and self._is_converged:
+            # non-master rank
             # TODO: return eigenvalues on non-master ranks
             # TODO: return distributed eigenvectors
             return {
                 'eigenvalues': None,
                 'eigenvectors': None,
             }
+
+        else:
+            # not converged
+            return {}
 
     def _gen_trial_vectors(self, molecule, orb_ene, nocc):
         """

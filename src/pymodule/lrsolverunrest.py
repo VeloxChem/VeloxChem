@@ -612,13 +612,18 @@ class LinearResponseUnrestrictedSolver(LinearSolver):
                         'solutions': solutions,
                     }
                 else:
+                    # non-master rank
                     return {'solutions': solutions}
+            else:
+                # not converged
+                return {}
 
         else:
+            # has_external_rhs
             if self.is_converged:
                 return {'solutions': solutions}
-
-        return None
+            else:
+                return {}
 
     @staticmethod
     def get_full_solution_vector(solution):

@@ -772,13 +772,18 @@ class ComplexResponseTDA(LinearSolver):
 
                     return ret_dict
                 else:
+                    # non-master rank
                     return {'solutions': solutions}
+            else:
+                # not converged
+                return {}
 
         else:
+            # nonlinear
             if self.is_converged:
                 return {'focks': focks, 'solutions': solutions}
-
-        return None
+            else:
+                return {}
 
     @staticmethod
     def get_full_solution_vector(solution):

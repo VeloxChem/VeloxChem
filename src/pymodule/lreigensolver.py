@@ -908,12 +908,14 @@ class LinearResponseEigenSolver(LinearSolver):
 
                     return ret_dict
                 else:
+                    # non-master rank
                     return {
                         'eigenvalues': eigvals,
                         'eigenvectors_distributed': exc_solutions,
                     }
 
             else:
+                # nonlinear
                 if self.rank != mpi_master():
                     elec_trans_dipoles = None
                     excitation_details = None
@@ -937,7 +939,9 @@ class LinearResponseEigenSolver(LinearSolver):
 
                 return ret_dict
 
-        return None
+        else:
+            # not converged
+            return {}
 
     def _add_nstates_to_checkpoint(self):
         """
