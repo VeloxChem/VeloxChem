@@ -191,7 +191,7 @@ class RixsDriver:
 
         nocc = molecule.number_of_alpha_electrons()
 
-        self.twoshot = cvs_rsp_tensors
+        self.twoshot = (cvs_rsp_tensors is not None)
         init_photon_set = True
 
         if self.rank == mpi_master():
@@ -200,7 +200,7 @@ class RixsDriver:
             num_vir_orbitals = None
         num_vir_orbitals = self.comm.bcast(num_vir_orbitals, root=mpi_master())
 
-        if self.twoshot is not None:
+        if self.twoshot:
             self._approach_string = (f'Running RIXS calculation in the two‑shot approach')
 
             num_core_orbitals       = cvs_rsp_tensors['num_core']
@@ -486,8 +486,8 @@ class RixsDriver:
             The scattering amplitude tensor: shape = (3,3)
 
         """
-        gamma_hwhm = self.gamma / 2
-        e_n = 1 / (omega - (core_eigenvalue + 1j * gamma_hwhm))
+        gamma_hwhm = self.gamma / 2.0
+        e_n = 1.0 / (omega - (core_eigenvalue + 1j * gamma_hwhm))
 
         if val_eigenvalue is None or intermediate_tdens is None:
             # Elastic line, note that the term prop. to A^2 is not included
@@ -647,8 +647,8 @@ class RixsDriver:
                 z, y = self.pad_matrices(z, y, num_val_orbs)
 
             if U_occ is not None and U_vir is not None:
-                z = U_occ.T @ z @ U_vir
-                y = U_occ.T @ y @ U_vir
+                z = np.linalg.multi_dot([U_occ.T, z, U_vir])
+                y = np.linalg.multi_dot([U_occ.T, y, U_vir])
 
             pp_core_eigvecs.append((z, y))
 
@@ -674,8 +674,9 @@ class RixsDriver:
         :y_core:
             The dexcitation matrix (core-excited state).
         """
-        gs_to_core = mo_occ @ (z_core - y_core) @ mo_vir.T
-        gs_to_core *= np.sqrt(2)
+
+        gs_to_core = np.linalg.multi_dot([mo_occ, z_core - y_core, mo_vir.T])
+        gs_to_core *= np.sqrt(2.0)
 
         core_to_val = (
             np.linalg.multi_dot([mo_vir, z_val.T, z_core, mo_vir.T]) -
@@ -712,13 +713,13 @@ class RixsDriver:
         C_val  = target_scf_tensors['C_alpha']
         C_core = initial_scf_tensors['C_alpha']
 
-        C_occ_val  = C_val[:, nocc]
-        C_vir_val  = C_val[:, nvir]
-        C_occ_core = C_core[:, nocc]
-        C_vir_core = C_core[:, nvir]
+        C_occ_val  = C_val[:, nocc].copy()
+        C_vir_val  = C_val[:, nvir].copy()
+        C_occ_core = C_core[:, nocc].copy()
+        C_vir_core = C_core[:, nvir].copy()
 
-        U_occ = C_occ_val.T @ S @ C_occ_core
-        U_vir = C_vir_val.T @ S @ C_vir_core
+        U_occ = np.linalg.multi_dot([C_occ_val.T, S, C_occ_core])
+        U_vir = np.linalg.multi_dot([C_vir_val.T, S, C_vir_core])
 
         return U_occ, U_vir
     
