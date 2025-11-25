@@ -203,10 +203,23 @@ class RixsDriver:
         if self.twoshot:
             self._approach_string = (f'Running RIXS calculation in the two‑shot approach')
 
-            num_core_orbitals       = cvs_rsp_tensors['num_core']
-            num_valence_orbitals    = nocc - num_core_orbitals 
-            num_intermediate_states = len(cvs_rsp_tensors['eigenvalues'])
-            num_final_states        = len(rsp_tensors['eigenvalues'])
+            if self.rank == mpi_master():
+                num_core_orbitals = cvs_rsp_tensors['num_core']
+                num_valence_orbitals = nocc - num_core_orbitals
+                num_intermediate_states = len(cvs_rsp_tensors['eigenvalues'])
+                num_final_states = len(rsp_tensors['eigenvalues'])
+            else:
+                num_core_orbitals = None
+                num_valence_orbitals = None
+                num_intermediate_states = None
+                num_final_states = None
+
+            num_valence_orbitals, num_core_orbitals = self.comm.bcast(
+                (num_valence_orbitals, num_core_orbitals), root=mpi_master())
+
+            num_intermediate_states, num_final_states = self.comm.bcast(
+                (num_intermediate_states, num_final_states), root=mpi_master())
+
             occupied_core           = num_core_orbitals
             core_states             = list(range(num_intermediate_states))
             val_states              = list(range(num_final_states))
@@ -214,23 +227,40 @@ class RixsDriver:
         else:
             self._approach_string = (f'Running RIXS calculation in the restricted‑subspace approach')
 
-            num_valence_orbitals = rsp_tensors['num_val']
-            num_core_orbitals    = rsp_tensors['num_core']
-            assert_msg_critical(num_core_orbitals > 0,
-                                 'No core orbitals indicated in the response tensor.')
+            if self.rank == mpi_master():
+                num_valence_orbitals = rsp_tensors['num_val']
+                num_core_orbitals    = rsp_tensors['num_core']
+                assert_msg_critical(num_core_orbitals > 0,
+                                     'No core orbitals indicated in the response tensor.')
 
-            # identify the energy of the lowest core-excited state
-            first_core_ene = self._first_core_energy(rsp_tensors)
-            detuning = rsp_tensors['eigenvalues'] - first_core_ene
+                # identify the energy of the lowest core-excited state
+                first_core_ene = self._first_core_energy(rsp_tensors)
+                detuning = rsp_tensors['eigenvalues'] - first_core_ene
 
-            # identify (and possibly remove unphysical valence-excited states) the core-excited states
-            core_states = self._core_state_indices(rsp_tensors, detuning)
-            num_intermediate_states = len(core_states)
-            assert_msg_critical(num_intermediate_states > 0,
-                                'Too few excited states included in response calculation.')
-            # identify the valence-excited states
-            val_states = self._valence_state_indices(detuning, rsp_tensors['eigenvalues'])
-            num_final_states = len(val_states)
+                # identify (and possibly remove unphysical valence-excited states) the core-excited states
+                core_states = self._core_state_indices(rsp_tensors, detuning)
+                num_intermediate_states = len(core_states)
+                assert_msg_critical(num_intermediate_states > 0,
+                                    'Too few excited states included in response calculation.')
+                # identify the valence-excited states
+                val_states = self._valence_state_indices(detuning, rsp_tensors['eigenvalues'])
+                num_final_states = len(val_states)
+            else:
+                num_valence_orbitals = None
+                num_core_orbitals    = None
+                num_intermediate_states = None
+                num_final_states = None
+                core_states = None
+                val_states = None
+
+            num_valence_orbitals, num_core_orbitals = self.comm.bcast(
+                (num_valence_orbitals, num_core_orbitals), root=mpi_master())
+
+            num_intermediate_states, num_final_states = self.comm.bcast(
+                (num_intermediate_states, num_final_states), root=mpi_master())
+
+            core_states = self.comm.bcast(core_states, root=mpi_master())
+            val_states = self.comm.bcast(val_states, root=mpi_master())
 
             # for compatibiltiy with the two-shot approach
             cvs_rsp_tensors = rsp_tensors
@@ -240,19 +270,42 @@ class RixsDriver:
         mo_core_indices = list(range(num_core_orbitals))
         mo_val_indices  = list(range(nocc - num_valence_orbitals, nocc))
         mo_vir_indices  = list(range(nocc, nocc + num_vir_orbitals))
-        mo_occ          = scf_tensors['C_alpha'][:, mo_core_indices + mo_val_indices]
-        mo_vir          = scf_tensors['C_alpha'][:, mo_vir_indices]
 
-        core_eigvals    = cvs_rsp_tensors['eigenvalues'][core_states]
-        valence_eigvals = rsp_tensors['eigenvalues'][val_states]
+        if self.rank == mpi_master():
+            mo_occ = scf_tensors['C_alpha'][:, mo_core_indices + mo_val_indices].copy()
+            mo_vir = scf_tensors['C_alpha'][:, mo_vir_indices].copy()
+
+            core_eigvals = cvs_rsp_tensors['eigenvalues'][core_states].copy()
+            valence_eigvals = rsp_tensors['eigenvalues'][val_states].copy()
+        else:
+            mo_occ = None
+            mo_vir = None
+
+            core_eigvals = None
+            valence_eigvals = None
+
+        mo_occ = self.comm.bcast(mo_occ, root=mpi_master())
+        mo_vir = self.comm.bcast(mo_vir, root=mpi_master())
+
+        core_eigvals = self.comm.bcast(core_eigvals, root=mpi_master())
+        valence_eigvals = self.comm.bcast(valence_eigvals, root=mpi_master())
+
         core_eigvecs    = self._get_eigvecs(cvs_rsp_tensors, core_states, "core")
         valence_eigvecs = self._get_eigvecs(rsp_tensors, val_states, "valence")
 
         # get transformation matrices from valence to core basis, if the
         # valence- and core-excited states were obtained from independent SCFs.
         # returns identity if cvs_scf_tensors are not given (None).
+        need_transformation_mats = False
+        if self.rank == mpi_master():
+            # Note: check need_transformation_mats on master rank
+            # since scf_results is None on non-master ranks
+            need_transformation_mats = (cvs_scf_tensors is not None)
+        need_transformation_mats = self.comm.bcast(need_transformation_mats,
+                                                   root=mpi_master())
+
         U_occ, U_vir = None, None
-        if cvs_scf_tensors is not None:
+        if need_transformation_mats:
             U_occ, U_vir = self.get_transformation_mats(scf_tensors, cvs_scf_tensors, 
                                                     mo_core_indices + mo_val_indices, mo_vir_indices)
         # TODO parallelise, and broadcast?
@@ -281,10 +334,16 @@ class RixsDriver:
         # first core-excited state with osc_strength > 1e-3
         if self.photon_energy is None:
             init_photon_set = False
-            if cvs_rsp_tensors is None:
-                osc_arr = rsp_tensors['oscillator_strengths']
+
+            if self.rank == mpi_master():
+                if cvs_rsp_tensors is None:
+                    osc_arr = rsp_tensors['oscillator_strengths']
+                else:
+                    osc_arr = cvs_rsp_tensors['oscillator_strengths']
             else:
-                osc_arr = cvs_rsp_tensors['oscillator_strengths']
+                osc_arr = None
+            osc_arr = self.comm.bcast(osc_arr, root=mpi_master())
+
             for eig, osc in zip(core_eigvals, osc_arr[core_states]):
                 if osc > 1e-3:
                     self.photon_energy = [eig]
@@ -546,13 +605,29 @@ class RixsDriver:
         return sigma_f
     
     def _get_eigvecs(self, tensor, states, label):
+
         if 'eigenvectors_distributed' in tensor:
-            return np.array([
-                self.get_full_solution_vector(tensor['eigenvectors_distributed'][i]) for i in states])
+            vecs = []
+            for i in states:
+                full_v = self.get_full_solution_vector(
+                    tensor['eigenvectors_distributed'][i])
+                full_v = self.comm.bcast(full_v, root=mpi_master())
+                vecs.append(full_v)
+            return np.array(vecs)
+
         elif 'eigenvectors' in tensor:
             self.tda = True
-            return np.array([
-                tensor['eigenvectors'].T[i] for i in states])
+
+            vecs = []
+            for i in states:
+                if self.rank == mpi_master():
+                    full_v = tensor['eigenvectors'][:, i].copy()
+                else:
+                    full_v = None
+                full_v = self.comm.bcast(full_v, root=mpi_master())
+                vecs.append(full_v)
+            return np.array(vecs)
+
         else:
             # h5-file as input
             try:
@@ -686,8 +761,7 @@ class RixsDriver:
         )
         return gs_to_core, core_to_val
 
-    @staticmethod
-    def get_transformation_mats(target_scf_tensors, initial_scf_tensors, nocc, nvir):
+    def get_transformation_mats(self, target_scf_tensors, initial_scf_tensors, nocc, nvir):
         """
         Gets the transformation matrices of the excitation spaces between
         two -- up-to a phase -- equal SCF wavefunctions, i.e.,
@@ -706,20 +780,25 @@ class RixsDriver:
             Transformation matrices for the occupied, U_occ, and
             for the virtual, U_vir.
         """
-        if initial_scf_tensors is None:
-            return np.eye(len(nocc)), np.eye(len(nvir))
 
-        S      = target_scf_tensors['S']
-        C_val  = target_scf_tensors['C_alpha']
-        C_core = initial_scf_tensors['C_alpha']
+        if self.rank == mpi_master():
+            S      = target_scf_tensors['S']
+            C_val  = target_scf_tensors['C_alpha']
+            C_core = initial_scf_tensors['C_alpha']
 
-        C_occ_val  = C_val[:, nocc].copy()
-        C_vir_val  = C_val[:, nvir].copy()
-        C_occ_core = C_core[:, nocc].copy()
-        C_vir_core = C_core[:, nvir].copy()
+            C_occ_val  = C_val[:, nocc].copy()
+            C_vir_val  = C_val[:, nvir].copy()
+            C_occ_core = C_core[:, nocc].copy()
+            C_vir_core = C_core[:, nvir].copy()
 
-        U_occ = np.linalg.multi_dot([C_occ_val.T, S, C_occ_core])
-        U_vir = np.linalg.multi_dot([C_vir_val.T, S, C_vir_core])
+            U_occ = np.linalg.multi_dot([C_occ_val.T, S, C_occ_core])
+            U_vir = np.linalg.multi_dot([C_vir_val.T, S, C_vir_core])
+        else:
+            U_occ = None
+            U_vir = None
+
+        U_occ = self.comm.bcast(U_occ, root=mpi_master())
+        U_vir = self.comm.bcast(U_vir, root=mpi_master())
 
         return U_occ, U_vir
     

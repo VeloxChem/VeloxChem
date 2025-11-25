@@ -561,8 +561,14 @@ class TdaEigenSolver(LinearSolver):
             self._print_results(ret_dict)
 
             return ret_dict
+
         else:
-            return None
+            # TODO: return eigenvalues on non-master ranks
+            # TODO: return distributed eigenvectors
+            return {
+                'eigenvalues': None,
+                'eigenvectors': None,
+            }
 
     def _gen_trial_vectors(self, molecule, orb_ene, nocc):
         """

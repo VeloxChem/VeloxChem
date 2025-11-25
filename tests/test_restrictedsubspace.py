@@ -102,16 +102,23 @@ class TestRestrictedSubspace:
         H   -0.0582782  -0.3702550   0.2638279
         """
         mol = Molecule.read_xyz_string(xyz_string)
-
         bas = MolecularBasis.read(mol, basis_label, ostream=None)
 
         scf_drv = ScfRestrictedDriver()
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label
+
         scf_results = scf_drv.compute(mol, bas)
+
         nocc = mol.number_of_alpha_electrons()
-        norb = scf_results['C_alpha'].shape[0]
-        if nvir == None:
+
+        if scf_drv.rank == mpi_master():
+            norb = scf_results['C_alpha'].shape[0]
+        else:
+            norb = None
+        norb = scf_drv.comm.bcast(norb, root=mpi_master())
+
+        if nvir is None:
             ncore = 1
             nval = nocc - 1
             nvir = norb - nocc
