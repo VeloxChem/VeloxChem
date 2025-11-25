@@ -329,7 +329,7 @@ class ExcitedStateAnalysisDriver:
             part_dens_mo = np.matmul(tdens_mo.T, tdens_mo)
             part_dens_ao = np.linalg.multi_dot([mo_vir, part_dens_mo, mo_vir.T])
         else:
-            # Eqs. 2.130 - 2.133 of "Computational Spectroscopy of D18 Photodegradation"
+            # Eqs. 2.129 - 2.133 of "Computational Spectroscopy of D18 Photodegradation"
             # Carl Svennerstedt, master thesis 2025
             y_mat = eigvec[nexc:]
             tdens_mo = np.zeros((norb, norb))
