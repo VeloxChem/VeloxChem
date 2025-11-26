@@ -112,7 +112,7 @@ class TdaEigenSolver(LinearSolver):
 
         # restricted subspace
         self.restricted_subspace = False
-        self.num_vir_orbitals = 0
+        self.num_virtual_orbitals = 0
         self.num_valence_orbitals = 0
 
         # solver setup
@@ -256,7 +256,7 @@ class TdaEigenSolver(LinearSolver):
                 assert_msg_critical(
                     self.nstates
                     <= ((self.num_core_orbitals + self.num_valence_orbitals) *
-                        self.num_vir_orbitals),
+                        self.num_virtual_orbitals),
                     'TdaEigenSolver: too many excited states')
             else:
                 assert_msg_critical(self.nstates <= nocc * (norb - nocc),
@@ -403,8 +403,9 @@ class TdaEigenSolver(LinearSolver):
                     (scf_tensors['C_alpha'][:, :self.num_core_orbitals].copy(),
                      scf_tensors['C_alpha']
                      [:, nocc - self.num_valence_orbitals:nocc].copy()))
-                mo_vir = scf_tensors['C_alpha'][:, nocc:nocc +
-                                                self.num_vir_orbitals].copy()
+                mo_vir = np.copy(
+                    scf_tensors['C_alpha'][:, nocc:nocc +
+                                           self.num_virtual_orbitals])
             else:
                 mo_occ = scf_tensors['C_alpha'][:, :nocc].copy()
                 mo_vir = scf_tensors['C_alpha'][:, nocc:].copy()
@@ -520,15 +521,15 @@ class TdaEigenSolver(LinearSolver):
                 orbital_details = {
                     'nstates': self.nstates,
                     'num_core': self.num_core_orbitals,
-                    'num_val': self.num_valence_orbitals,
-                    'num_vir': self.num_vir_orbitals
+                    'num_valence': self.num_valence_orbitals,
+                    'num_virtual': self.num_virtual_orbitals
                 }
             else:
                 orbital_details = {
                     'nstates': self.nstates,
                     'num_core': self.num_core_orbitals,
-                    'num_val': nocc,
-                    'num_vir': norb - nocc
+                    'num_valence': nocc,
+                    'num_virtual': norb - nocc
                 }
 
             ret_dict = {
@@ -541,8 +542,8 @@ class TdaEigenSolver(LinearSolver):
                 'rotatory_strengths': rotatory_strengths,
                 'excitation_details': excitation_details,
                 'num_core': orbital_details['num_core'],
-                'num_val': orbital_details['num_val'],
-                'num_vir': orbital_details['num_vir'],
+                'num_valence': orbital_details['num_valence'],
+                'num_virtual': orbital_details['num_virtual'],
             }
 
             if self.nto:
@@ -611,10 +612,10 @@ class TdaEigenSolver(LinearSolver):
                 excitations = [
                     (i, a)
                     for i in core_and_val_indices
-                    for a in range(nocc, nocc + self.num_vir_orbitals)
+                    for a in range(nocc, nocc + self.num_virtual_orbitals)
                 ]
                 n_exc = (self.num_core_orbitals +
-                         self.num_valence_orbitals) * self.num_vir_orbitals
+                         self.num_valence_orbitals) * self.num_virtual_orbitals
             else:
                 excitations = [
                     (i, a) for i in range(nocc) for a in range(nocc, norb)
@@ -685,7 +686,7 @@ class TdaEigenSolver(LinearSolver):
                      tensors['C_alpha'][:, nocc -
                                         self.num_valence_orbitals:nocc].copy()))
                 mo_vir = tensors['C_alpha'][:, nocc:nocc +
-                                            self.num_vir_orbitals].copy()
+                                            self.num_virtual_orbitals].copy()
             else:
                 mo_occ = tensors['C_alpha'][:, :nocc].copy()
                 mo_vir = tensors['C_alpha'][:, nocc:].copy()
@@ -698,7 +699,7 @@ class TdaEigenSolver(LinearSolver):
                 elif self.restricted_subspace:
                     mat = trial_mat[:, k].reshape(
                         self.num_core_orbitals + self.num_valence_orbitals,
-                        self.num_vir_orbitals)
+                        self.num_virtual_orbitals)
                     mat = np.matmul(mo_occ, np.matmul(mat, mo_vir.T))
                 else:
                     mat = trial_mat[:, k].reshape(nocc, nvir)
@@ -739,7 +740,7 @@ class TdaEigenSolver(LinearSolver):
                  tensors['C_alpha'][:, nocc -
                                     self.num_valence_orbitals:nocc].copy()))
             mo_vir = tensors['C_alpha'][:, nocc:nocc +
-                                        self.num_vir_orbitals].copy()
+                                        self.num_virtual_orbitals].copy()
         else:
             mo_occ = tensors['C_alpha'][:, :nocc].copy()
             mo_vir = tensors['C_alpha'][:, nocc:].copy()
@@ -760,10 +761,10 @@ class TdaEigenSolver(LinearSolver):
             elif self.restricted_subspace:
                 cjb = trial_mat[:, fockind].reshape(
                     self.num_core_orbitals + self.num_valence_orbitals,
-                    self.num_vir_orbitals)
+                    self.num_virtual_orbitals)
                 mat += np.matmul(
                     cjb,
-                    np.diag(orb_ene[nocc:nocc + self.num_vir_orbitals]).T)
+                    np.diag(orb_ene[nocc:nocc + self.num_virtual_orbitals]).T)
                 mat -= np.matmul(
                     np.diag(
                         np.concatenate(
@@ -773,7 +774,7 @@ class TdaEigenSolver(LinearSolver):
                 sigma_vecs.append(
                     mat.reshape(
                         (self.num_core_orbitals + self.num_valence_orbitals) *
-                        self.num_vir_orbitals, 1))
+                        self.num_virtual_orbitals, 1))
             else:
                 cjb = trial_mat[:, fockind].reshape(nocc, nvir)
                 mat += np.matmul(cjb, np.diag(orb_ene[nocc:]).T)

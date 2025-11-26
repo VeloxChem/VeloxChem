@@ -783,7 +783,7 @@ class LinearSolver:
                 core_val_exc_inds = (
                     list(range(self.num_core_orbitals)) +
                     list(range(nocc - self.num_valence_orbitals, nocc)) +
-                    list(range(nocc, nocc + self.num_vir_orbitals)))
+                    list(range(nocc, nocc + self.num_virtual_orbitals)))
                 mo_core_val_exc = mo[:, core_val_exc_inds]
                 fa_mo = np.linalg.multi_dot(
                     [mo_core_val_exc.T, fa, mo_core_val_exc])
@@ -991,15 +991,15 @@ class LinearSolver:
                         kn = self.lrvec2mat(vec, nocc, norb,
                                             self.num_core_orbitals,
                                             self.num_valence_orbitals,
-                                            self.num_vir_orbitals)
+                                            self.num_virtual_orbitals)
                         dak = self.commut_mo_density(kn, nocc,
                                                      self.num_core_orbitals,
                                                      self.num_valence_orbitals,
-                                                     self.num_vir_orbitals)
+                                                     self.num_virtual_orbitals)
                         core_val_exc_inds = (
                             list(range(self.num_core_orbitals)) + list(
                                 range(nocc - self.num_valence_orbitals, nocc)) +
-                            list(range(nocc, nocc + self.num_vir_orbitals)))
+                            list(range(nocc, nocc + self.num_virtual_orbitals)))
                         mo_core_val_exc = mo[:, core_val_exc_inds]
                         dak = np.linalg.multi_dot(
                             [mo_core_val_exc, dak, mo_core_val_exc.T])
@@ -1082,7 +1082,9 @@ class LinearSolver:
                                 list(range(self.num_core_orbitals)) + list(
                                     range(nocc - self.num_valence_orbitals,
                                           nocc)) +
-                                list(range(nocc, nocc + self.num_vir_orbitals)))
+                                list(
+                                    range(nocc,
+                                          nocc + self.num_virtual_orbitals)))
                             mo_core_val_exc = mo[:, core_val_exc_inds]
                             fak_mo = np.linalg.multi_dot(
                                 [mo_core_val_exc.T, fak, mo_core_val_exc])
@@ -1103,11 +1105,11 @@ class LinearSolver:
                             gmo = -self.commut_mo_density(
                                 fat_mo, nocc, self.num_core_orbitals,
                                 self.num_valence_orbitals,
-                                self.num_vir_orbitals)
+                                self.num_virtual_orbitals)
                             gmo_vec_halfsize = self.lrmat2vec(
                                 gmo, nocc, norb, self.num_core_orbitals,
                                 self.num_valence_orbitals,
-                                self.num_vir_orbitals)[:half_size]
+                                self.num_virtual_orbitals)[:half_size]
                         else:
                             gmo = -self.commut_mo_density(fat_mo, nocc)
                             gmo_vec_halfsize = self.lrmat2vec(gmo, nocc,
@@ -1284,7 +1286,7 @@ class LinearSolver:
                 core_val_exc_inds = (
                     list(range(self.num_core_orbitals)) +
                     list(range(nocc - self.num_valence_orbitals, nocc)) +
-                    list(range(nocc, nocc + self.num_vir_orbitals)))
+                    list(range(nocc, nocc + self.num_virtual_orbitals)))
                 mo_core_val_exc = mo[:, core_val_exc_inds]
                 fa_mo = np.linalg.multi_dot(
                     [mo_core_val_exc.T, fa, mo_core_val_exc])
@@ -1395,15 +1397,15 @@ class LinearSolver:
                         kn = self.lrvec2mat(vec, nocc, norb,
                                             self.num_core_orbitals,
                                             self.num_valence_orbitals,
-                                            self.num_vir_orbitals)
+                                            self.num_virtual_orbitals)
                         dak = self.commut_mo_density(kn, nocc,
                                                      self.num_core_orbitals,
                                                      self.num_valence_orbitals,
-                                                     self.num_vir_orbitals)
+                                                     self.num_virtual_orbitals)
                         core_val_exc_inds = (
                             list(range(self.num_core_orbitals)) + list(
                                 range(nocc - self.num_valence_orbitals, nocc)) +
-                            list(range(nocc, nocc + self.num_vir_orbitals)))
+                            list(range(nocc, nocc + self.num_virtual_orbitals)))
                         mo_core_val_exc = mo[:, core_val_exc_inds]
                         dak = np.linalg.multi_dot(
                             [mo_core_val_exc, dak, mo_core_val_exc.T])
@@ -1489,7 +1491,7 @@ class LinearSolver:
                         core_val_exc_inds = (
                             list(range(self.num_core_orbitals)) + list(
                                 range(nocc - self.num_valence_orbitals, nocc)) +
-                            list(range(nocc, nocc + self.num_vir_orbitals)))
+                            list(range(nocc, nocc + self.num_virtual_orbitals)))
                         mo_core_val_exc = mo[:, core_val_exc_inds]
                         fak_mo = np.linalg.multi_dot(
                             [mo_core_val_exc.T, fak, mo_core_val_exc])
@@ -1507,13 +1509,14 @@ class LinearSolver:
                         gmo_vec_halfsize = self.lrmat2vec(
                             gmo, nocc, norb, self.num_core_orbitals)[:half_size]
                     elif getattr(self, 'restricted_subspace', False):
-                        gmo = -self.commut_mo_density(
-                            fat_mo, nocc, self.num_core_orbitals,
-                            self.num_valence_orbitals, self.num_vir_orbitals)
+                        gmo = -self.commut_mo_density(fat_mo, nocc,
+                                                      self.num_core_orbitals,
+                                                      self.num_valence_orbitals,
+                                                      self.num_virtual_orbitals)
                         gmo_vec_halfsize = self.lrmat2vec(
                             gmo, nocc, norb, self.num_core_orbitals,
                             self.num_valence_orbitals,
-                            self.num_vir_orbitals)[:half_size]
+                            self.num_virtual_orbitals)[:half_size]
                     else:
                         gmo = -self.commut_mo_density(fat_mo, nocc)
                         gmo_vec_halfsize = self.lrmat2vec(gmo, nocc,
@@ -2897,20 +2900,20 @@ class LinearSolver:
                 core_val_exc_inds = (
                     list(range(self.num_core_orbitals)) +
                     list(range(nocc - self.num_valence_orbitals, nocc)) +
-                    list(range(nocc, nocc + self.num_vir_orbitals)))
+                    list(range(nocc, nocc + self.num_virtual_orbitals)))
                 mo_core_val_exc = mo[:, core_val_exc_inds]
                 matrices = [
                     factor * (-1.0) * self.commut_mo_density(
                         np.linalg.multi_dot([
                             mo_core_val_exc.T, P, mo_core_val_exc
                         ]), nocc, self.num_core_orbitals,
-                        self.num_valence_orbitals, self.num_vir_orbitals)
+                        self.num_valence_orbitals, self.num_virtual_orbitals)
                     for P in integral_comps
                 ]
                 gradients = tuple(
-                    self.lrmat2vec(m, nocc, norb, self.num_core_orbitals, self.
-                                   num_valence_orbitals, self.num_vir_orbitals)
-                    for m in matrices)
+                    self.lrmat2vec(m, nocc, norb, self.num_core_orbitals,
+                                   self.num_valence_orbitals,
+                                   self.num_virtual_orbitals) for m in matrices)
             else:
                 matrices = [
                     factor * (-1.0) * self.commut_mo_density(
@@ -3548,7 +3551,7 @@ class LinearSolver:
                 nocc = molecule.number_of_beta_electrons()
         nvir = nto_mo.number_of_mos() - nocc
         if getattr(self, 'restricted_subspace', False):
-            nvir = self.num_vir_orbitals
+            nvir = self.num_virtual_orbitals
 
         if nto_spin == '' or nto_spin == 'alpha':
             lam_diag = nto_mo.occa_to_numpy()[nocc:nocc + min(nocc, nvir)]

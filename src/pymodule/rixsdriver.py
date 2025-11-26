@@ -194,7 +194,7 @@ class RixsDriver:
         init_photon_set = True
 
         if self.rank == mpi_master():
-            num_vir_orbitals = rsp_tensors['num_vir']
+            num_vir_orbitals = rsp_tensors['num_virtual']
         else:
             num_vir_orbitals = None
         num_vir_orbitals = self.comm.bcast(num_vir_orbitals, root=mpi_master())
@@ -227,7 +227,7 @@ class RixsDriver:
             self._approach_string = 'Running RIXS calculation in the restricted‑subspace approach'
 
             if self.rank == mpi_master():
-                num_valence_orbitals = rsp_tensors['num_val']
+                num_valence_orbitals = rsp_tensors['num_valence']
                 num_core_orbitals    = rsp_tensors['num_core']
                 assert_msg_critical(num_core_orbitals > 0,
                                     'No core orbitals indicated in the response tensor.')

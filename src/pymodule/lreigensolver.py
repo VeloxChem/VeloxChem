@@ -116,7 +116,7 @@ class LinearResponseEigenSolver(LinearSolver):
 
         # restricted subspace
         self.restricted_subspace = False
-        self.num_vir_orbitals = 0
+        self.num_virtual_orbitals = 0
         self.num_valence_orbitals = 0
 
         self.nto = False
@@ -285,7 +285,7 @@ class LinearResponseEigenSolver(LinearSolver):
                 assert_msg_critical(
                     self.nstates
                     <= ((self.num_core_orbitals + self.num_valence_orbitals) *
-                        (self.num_vir_orbitals)),
+                        (self.num_virtual_orbitals)),
                     'LinearResponseEigenSolver: too many excited states')
 
             if self.core_excitation:
@@ -616,15 +616,15 @@ class LinearResponseEigenSolver(LinearSolver):
                 orbital_details = {
                     'nstates': self.nstates,
                     'num_core': self.num_core_orbitals,
-                    'num_val': self.num_valence_orbitals,
-                    'num_vir': self.num_vir_orbitals
+                    'num_valence': self.num_valence_orbitals,
+                    'num_virtual': self.num_virtual_orbitals
                 }
             else:
                 orbital_details = {
                     'nstates': self.nstates,
                     'num_core': self.num_core_orbitals,
-                    'num_val': nocc,
-                    'num_vir': norb - nocc
+                    'num_valence': nocc,
+                    'num_virtual': norb - nocc
                 }
 
             if self.rank == mpi_master():
@@ -660,7 +660,7 @@ class LinearResponseEigenSolver(LinearSolver):
                              [:, nocc - self.num_valence_orbitals:nocc].copy()))
                         mo_vir = scf_results[
                             'C_alpha'][:, nocc:nocc +
-                                       self.num_vir_orbitals].copy()
+                                       self.num_virtual_orbitals].copy()
                         z_mat = eigvec[:eigvec.size // 2].reshape(
                             self.num_core_orbitals + self.num_valence_orbitals,
                             -1)
@@ -887,8 +887,8 @@ class LinearResponseEigenSolver(LinearSolver):
                         'rotatory_strengths': rot_vel,
                         'excitation_details': excitation_details,
                         'num_core': orbital_details['num_core'],
-                        'num_val': orbital_details['num_val'],
-                        'num_vir': orbital_details['num_vir']
+                        'num_valence': orbital_details['num_valence'],
+                        'num_virtual': orbital_details['num_virtual']
                     }
 
                     if self.nto:
@@ -1079,9 +1079,11 @@ class LinearResponseEigenSolver(LinearSolver):
             core_and_val_indices = (
                 list(range(self.num_core_orbitals)) +
                 list(range(nocc - self.num_valence_orbitals, nocc)))
-            excitations = [(i, a)
-                           for i in core_and_val_indices
-                           for a in range(nocc, nocc + self.num_vir_orbitals)]
+            excitations = [
+                (i, a)
+                for i in core_and_val_indices
+                for a in range(nocc, nocc + self.num_virtual_orbitals)
+            ]
         else:
             excitations = [
                 (i, a) for i in range(nocc) for a in range(nocc, norb)
@@ -1184,7 +1186,7 @@ class LinearResponseEigenSolver(LinearSolver):
         elif self.restricted_subspace:
             ediag, sdiag = self.construct_ediag_sdiag_half(
                 orb_ene, nocc, norb, self.num_core_orbitals,
-                self.num_valence_orbitals, self.num_vir_orbitals)
+                self.num_valence_orbitals, self.num_virtual_orbitals)
         else:
             ediag, sdiag = self.construct_ediag_sdiag_half(orb_ene, nocc, norb)
 

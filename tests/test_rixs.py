@@ -40,7 +40,7 @@ class TestRIXS:
             lr_drv.restricted_subspace = True
             lr_drv.num_core_orbitals = ncore
             lr_drv.num_valence_orbitals = nvalence
-            lr_drv.num_vir_orbitals = nvir
+            lr_drv.num_virtual_orbitals = nvir
         else:
             cvs_lr_drv = LinearResponseEigenSolver()
             if tda:
