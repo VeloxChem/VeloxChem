@@ -194,10 +194,10 @@ class TddftOrbitalResponse(CphfSolver):
         eri_dict = self._init_eri(molecule, basis)
 
         # DFT information
-        dft_dict = self._init_dft(molecule, scf_tensors)
+        dft_dict = self._init_dft(molecule, scf_tensors, silent=True)
 
         # PE information
-        pe_dict = self._init_pe(molecule, basis)
+        pe_dict = self._init_pe(molecule, basis, silent=True)
 
         # CPCM_information
         self._init_cpcm(molecule)
@@ -500,23 +500,17 @@ class TddftOrbitalResponse(CphfSolver):
 
         profiler.start_timer('Prep')
 
-        # we don't want too much output about ERI/DFT/PE so this part is done
-        # with mute/unmute
-        self.ostream.mute()
-
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
 
         # DFT information
-        dft_dict = self._init_dft(molecule, scf_tensors)
+        dft_dict = self._init_dft(molecule, scf_tensors, silent=True)
 
         # PE information
-        pe_dict = self._init_pe(molecule, basis)
+        pe_dict = self._init_pe(molecule, basis, silent=True)
 
         # CPCM_information
         self._init_cpcm(molecule)
-
-        self.ostream.unmute()
 
         profiler.stop_timer('Prep')
 
@@ -694,7 +688,7 @@ class TddftOrbitalResponse(CphfSolver):
 
         self.ostream.print_blank()
         self.ostream.print_header('{:s} Setup'.format(title))
-        self.ostream.print_header('=' * (len(title) + 8))
+        self.ostream.print_header('-' * (len(title) + 8))
         self.ostream.print_blank()
 
         str_width = 70
