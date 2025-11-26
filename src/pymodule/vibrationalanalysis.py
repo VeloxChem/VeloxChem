@@ -41,6 +41,7 @@ from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .scfrestopendriver import ScfRestrictedOpenDriver
 from .scfhessiandriver import ScfHessianDriver
+from .tddfthessiandriver import TddftHessianDriver
 from .xtbdriver import XtbDriver
 from .xtbhessiandriver import XtbHessianDriver
 from .polarizabilitygradient import PolarizabilityGradient
@@ -81,6 +82,7 @@ class VibrationalAnalysis:
         - int_pol: Parallel Raman (in A**4/amu).
         - int_depol: Perpendicular Raman (in A**4/amu).
         - depol_ratio: Depolarization ratio (in A**4/amu).
+        - state_deriv_index: index of excited state for excited-state vib. analysis.
         - frequencies: the frequency/ies of external electric field (for
           resonance Raman)
         - flag: The name of the driver.
@@ -104,7 +106,7 @@ class VibrationalAnalysis:
         - result_file: The name of the vibrational analysis output file (txt format).
     """
 
-    def __init__(self, drv):
+    def __init__(self, drv, rsp_drv=None):
         """
         Initializes vibrational analysis driver.
         """
@@ -133,14 +135,31 @@ class VibrationalAnalysis:
         self.rsp_dict = {}
         self.polgrad_dict = {}
 
+        self.do_ir = True
+        self.do_raman = False
+        self.do_resonance_raman = False
+        self.rr_damping = None
+        self.frequencies = (0,)
+
+        # Excited-state index in case of
+        # excited-state vibrational analysis.
+        self.state_deriv_index = None
+
         # Hessian driver etc
         self.is_scf = False
         self.is_xtb = False
+        self.is_tddft = False
         if isinstance(drv, (ScfRestrictedDriver, ScfUnrestrictedDriver,
                             ScfRestrictedOpenDriver)):
-            self.is_scf = True
-            self.scf_driver = drv
-            self.hessian_driver = ScfHessianDriver(drv)
+            if rsp_drv is None:
+                self.is_scf = True
+                self.scf_driver = drv
+                self.hessian_driver = ScfHessianDriver(drv)
+            else:
+                self.is_tddft = True
+                self.scf_driver = drv
+                self.rsp_driver = rsp_drv
+                self.hessian_driver = TddftHessianDriver(drv, rsp_drv)
         elif isinstance(drv, XtbDriver):
             self.is_xtb = True
             self.scf_driver = None
@@ -170,12 +189,6 @@ class VibrationalAnalysis:
         # flag for two-point or four-point approximation
         self.do_four_point_hessian = False
         self.do_four_point_raman = False
-
-        self.do_ir = True
-        self.do_raman = False
-        self.do_resonance_raman = False
-        self.rr_damping = None
-        self.frequencies = (0,)
 
         # flag for printing
         self.do_print_hessian = False
@@ -213,6 +226,7 @@ class VibrationalAnalysis:
                     ('bool', 'whether to print Raman depolarization ratio'),
                 'temperature': ('float', 'the temperature'),
                 'pressure': ('float', 'the pressure'),
+                'state_deriv_index': ('int', 'excited state index'),
                 'frequencies':
                     ('seq_range', 'frequencies of external electric field'),
                 'filename': ('str', 'base name of output files'),
@@ -346,6 +360,10 @@ class VibrationalAnalysis:
                     vib_results['depolarization_ratios'] = self.depol_ratio
             elif (self.do_raman or self.do_resonance_raman) and self.is_xtb:
                 self.ostream.print_info('Raman not available for XTB.')
+                self.do_raman = False
+                self.do_resonance_raman = False
+            elif (self.do_raman or self.do_resonance_raman) and self.is_tddft:
+                self.ostream.print_info('Raman not available for TDDFT.')
                 self.do_raman = False
                 self.do_resonance_raman = False
 
@@ -599,7 +617,10 @@ class VibrationalAnalysis:
         if self.is_scf:
             # only pass numerical option to ScfHessianDriver
             # since XtbHessianDriver will always be numerical
-            hessian_drv.numerical = self.numerical_hessian
+            if self.numerical_hessian and not hessian_drv.numerical:
+                hessian_drv.numerical = self.numerical_hessian
+        if self.is_tddft:
+            hessian_drv.state_deriv_index = self.state_deriv_index
         hessian_drv.do_four_point = self.do_four_point_hessian
         hessian_drv.do_dipole_gradient = self.do_ir
         hessian_drv.do_print_hessian = self.do_print_hessian

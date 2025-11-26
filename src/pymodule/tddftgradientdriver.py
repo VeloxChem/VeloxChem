@@ -45,9 +45,11 @@ from .veloxchemlib import mpi_master, mat_t
 from .veloxchemlib import make_matrix
 from .matrices import Matrices
 from .molecularbasis import MolecularBasis
+from .tdaeigensolver import TdaEigenSolver
 from .tddftorbitalresponse import TddftOrbitalResponse
 from .gradientdriver import GradientDriver
 from .scfgradientdriver import ScfGradientDriver
+from .firstorderprop import FirstOrderProperties
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
@@ -105,6 +107,8 @@ class TddftGradientDriver(GradientDriver):
         self.state_deriv_index = None
 
         self.do_first_order_prop = False
+        self.relaxed_dipole_moment = None
+        self.unrelaxed_dipole_moment = None
 
         # option dictionaries from input
         # TODO: cleanup
@@ -120,7 +124,7 @@ class TddftGradientDriver(GradientDriver):
 
     def update_settings(self,
                         grad_dict,
-                        rsp_dict,
+                        rsp_dict=None,
                         orbrsp_dict=None,
                         method_dict=None):
         """
@@ -135,6 +139,9 @@ class TddftGradientDriver(GradientDriver):
         :param method_dict:
             The input dicitonary of method settings group.
         """
+
+        if rsp_dict is None:
+            rsp_dict = {}
 
         if method_dict is None:
             method_dict = {}
@@ -161,9 +168,6 @@ class TddftGradientDriver(GradientDriver):
         if self.tamm_dancoff:
             self.flag = 'TDA Gradient Driver'
 
-        if self.state_deriv_index is not None:
-            orbrsp_dict['state_deriv_index'] = self.state_deriv_index
-
         self.grad_dict = dict(grad_dict)
         self.rsp_dict = dict(rsp_dict)
         self.method_dict = dict(method_dict)
@@ -188,7 +192,14 @@ class TddftGradientDriver(GradientDriver):
         scf_results_sanity_check(self, self._scf_drv.scf_tensors)
         dft_sanity_check(self, 'compute')
 
+        # TODO: replace with a sanity check?
+        if isinstance(rsp_drv, TdaEigenSolver):
+            self.tamm_dancoff = True
+
         if self.rank == mpi_master():
+            if self.tamm_dancoff:
+                self.flag = 'TDA Gradient Driver'
+
             all_states = list(np.arange(1, len(rsp_results['eigenvalues']) + 1))
             if self.state_deriv_index is not None:
 
@@ -217,12 +228,8 @@ class TddftGradientDriver(GradientDriver):
 
         # NOTE: the numerical gradient is calculated for the first state only.
         if self.numerical:
-            scf_drv.ostream.mute()
-            rsp_drv.ostream.mute()
             self.compute_numerical(molecule, basis, scf_drv, rsp_drv,
                                    rsp_results)
-            rsp_drv.ostream.unmute()
-            scf_drv.ostream.unmute()
         else:
             self.compute_analytical(molecule, basis, rsp_results)
 
@@ -241,7 +248,7 @@ class TddftGradientDriver(GradientDriver):
 
     def compute_excited_state_densities(self, molecule, basis, rsp_results):
         """
-        Performs calculation of analytical gradient.
+        Performs calculation of the one-particle density matrices.
 
         :param molecule:
             The molecule.
@@ -461,7 +468,7 @@ class TddftGradientDriver(GradientDriver):
                 for s in range(dof):
                     # Sum of alpha + beta already in relaxed_density_ao
                     self.gradient[s, iatom, i] += np.sum(
-                        (gmat + gmat.T) * relaxed_density_ao[s])
+                            (gmat + gmat.T) * relaxed_density_ao[s])
 
             gmats = Matrices()
 
@@ -487,7 +494,7 @@ class TddftGradientDriver(GradientDriver):
                     # summation of alpha and beta already included
                     # in relaxed_density_ao
                     self.gradient[s, iatom, i] -= np.sum(
-                        (gmat_100 + gmat_100.T) * relaxed_density_ao[s])
+                            (gmat_100 + gmat_100.T) * relaxed_density_ao[s])
                     self.gradient[s, iatom,
                                   i] -= np.sum(gmat_010 * relaxed_density_ao[s])
 
@@ -586,7 +593,7 @@ class TddftGradientDriver(GradientDriver):
             for idx in range(dof):
 
                 sym_den_mat_for_fock_rel.set_values(
-                    self.get_sym_mat(relaxed_density_ao[idx]))
+                        self.get_sym_mat(relaxed_density_ao[idx]))
 
                 sym_den_mat_for_fock_xmy.set_values(
                     self.get_sym_mat(x_minus_y_ao[idx]))
@@ -746,6 +753,29 @@ class TddftGradientDriver(GradientDriver):
             for s in range(dof):
                 self.gradient[s] += gs_grad
 
+        if self.do_first_order_prop:
+            if self.rank == mpi_master():
+                unrelaxed_total_density = (scf_tensors['D_alpha'] +
+                                           scf_tensors['D_beta'] +
+                                           unrelaxed_density_ao)
+                relaxed_total_density = (scf_tensors['D_alpha'] +
+                                         scf_tensors['D_beta'] +
+                                         relaxed_density_ao)
+            else:
+                unrelaxed_total_density = None
+                relaxed_total_density = None
+
+            self.unrelaxed_dipole_moment = self.compute_dipole_moment(
+                molecule,
+                basis,
+                unrelaxed_total_density,
+                dipole_moment_type='Unrelaxed')
+            self.relaxed_dipole_moment = self.compute_dipole_moment(
+                molecule,
+                basis,
+                relaxed_total_density,
+                dipole_moment_type='Relaxed')
+
         self.gradient = self.comm.allreduce(self.gradient, op=MPI.SUM)
 
         if self.timing and self.rank == mpi_master():
@@ -753,6 +783,41 @@ class TddftGradientDriver(GradientDriver):
             for key, val in grad_timing.items():
                 self.ostream.print_info(f'    {key:<25s}:  {val:.2f} sec')
             self.ostream.print_blank()
+
+    def compute_dipole_moment(self,
+                              molecule,
+                              basis,
+                              density,
+                              dipole_moment_type="Relaxed"):
+        """ Computes the dipole moment based on the density.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The basis set.
+        :param density:
+            The total density matrix (alpha + beta).
+        :param dipole_moment_type:
+            The type of dipole moment (Relaxed or Unrelaxed).
+
+        """
+
+        first_order_prop = FirstOrderProperties(self.comm, self.ostream)
+        first_order_prop.compute(molecule, basis, density)
+
+        if self.rank == mpi_master():
+            if self.tamm_dancoff:
+                method = 'TDA'
+            else:
+                method = 'RPA'
+            title = method + ' ' + dipole_moment_type + ' Dipole Moment(s) '
+            first_order_prop.print_properties(molecule, title,
+                                              self.state_deriv_index)
+            self.ostream.print_blank()
+            dipole_moment = first_order_prop.get_property('dipole moment')
+            return dipole_moment
+        else:
+            return None
 
     def compute_energy(self, molecule, basis, scf_drv, rsp_drv, rsp_results):
         """
@@ -786,14 +851,22 @@ class TddftGradientDriver(GradientDriver):
         else:
             # always try restarting scf for analytical gradient
             scf_drv.restart = True
+
+        scf_drv.ostream.mute()
         scf_results = scf_drv.compute(molecule, basis)
+        scf_drv.ostream.unmute()
+
         assert_msg_critical(scf_drv.is_converged,
                             'TddftGradientDriver: SCF did not converge')
         self._scf_drv = scf_drv
 
         # response should not be restarted
         rsp_drv.restart = False
+
+        rsp_drv.ostream.mute()
         rsp_results = rsp_drv.compute(molecule, basis, scf_results)
+        rsp_drv.ostream.unmute()
+
         assert_msg_critical(rsp_drv.is_converged,
                             'TddftGradientDriver: response did not converge')
         self._rsp_results = rsp_results
@@ -831,14 +904,22 @@ class TddftGradientDriver(GradientDriver):
             The electric dipole moment vector.
         """
 
-        scf_drv.ostream.mute()
-
         # numerical dipole moment of the excited states
         n_states = len(self.state_deriv_index)
         dipole_moment = np.zeros((n_states, 3))
         field = [0.0, 0.0, 0.0]
 
         for s in range(n_states):
+
+            self.ostream.print_info(
+                f'Processing excited state {s + 1}/{n_states}...')
+            if s == n_states - 1:
+                self.ostream.print_blank()
+            self.ostream.flush()
+
+            scf_drv.ostream.mute()
+            rsp_drv.ostream.mute()
+
             for i in range(3):
                 field[i] = field_strength
                 scf_drv.electric_field = field
@@ -861,7 +942,8 @@ class TddftGradientDriver(GradientDriver):
                 dipole_moment[s, i] = (-(e_plus - e_minus) /
                                        (2.0 * field_strength))
 
-        scf_drv.ostream.unmute()
+            scf_drv.ostream.unmute()
+            rsp_drv.ostream.unmute()
 
         return dipole_moment
 

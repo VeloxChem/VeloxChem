@@ -1379,3 +1379,100 @@ class ComplexResponse(LinearSolver):
                 hf.create_dataset(ylabel, data=y_data)
 
             hf.close()
+
+    def get_cpp_property_densities(self,
+                                   molecule,
+                                   basis,
+                                   scf_results,
+                                   cpp_results,
+                                   w,
+                                   normalize_densities=True):
+        """
+        Gets CPP property densities.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param scf_results:
+            The SCF results dictionary.
+        :param cpp_results:
+            The CPP results dictionary.
+        :param w:
+            The given frequency.
+        :param normalize_densities:
+            Whether or not to normalize the property densities.
+
+        :return:
+            A dictionary containing property densities at given frequency.
+        """
+
+        assert_msg_critical(self.cpp_flag in ['absorption', 'ecd'],
+                            'get_cpp_property_densities: Invalid cpp_flag')
+
+        assert_msg_critical(
+            ('x', w) in cpp_results['solutions'] and
+            ('y', w) in cpp_results['solutions'] and
+            ('z', w) in cpp_results['solutions'],
+            'get_cpp_property_densities: Could not find frequency ' +
+            f'{w} in CPP results')
+
+        # solution vectors
+        cpp_solution_vector_x = self.get_full_solution_vector(
+            cpp_results['solutions'][('x', w)])
+        cpp_solution_vector_y = self.get_full_solution_vector(
+            cpp_results['solutions'][('y', w)])
+        cpp_solution_vector_z = self.get_full_solution_vector(
+            cpp_results['solutions'][('z', w)])
+
+        # property gradient for a operator
+        a_prop_grad = self.get_complex_prop_grad(self.a_operator,
+                                                 self.a_components, molecule,
+                                                 basis, scf_results)
+
+        if self.rank == mpi_master():
+            nocc = molecule.number_of_alpha_electrons()
+            norb = scf_results['E_alpha'].shape[0]
+            nvir = norb - nocc
+            n_ov = nocc * nvir
+
+            mo_occ = scf_results['C_alpha'][:, :nocc]
+            mo_vir = scf_results['C_alpha'][:, nocc:]
+
+            if self.cpp_flag == 'absorption':
+                # vector representation of absorption cross-section
+                vec = (a_prop_grad[0] * cpp_solution_vector_x +
+                       a_prop_grad[1] * cpp_solution_vector_y +
+                       a_prop_grad[2] * cpp_solution_vector_z).imag / 3.0
+                vec *= 4.0 * np.pi * w * fine_structure_constant()
+            elif self.cpp_flag == 'ecd':
+                # vector representation of Delta epsilon
+                vec = (a_prop_grad[0] * cpp_solution_vector_x / w +
+                       a_prop_grad[1] * cpp_solution_vector_y / w +
+                       a_prop_grad[2] * cpp_solution_vector_z / w).imag
+                vec /= (3.0 * w)
+                vec *= w**2 * extinction_coefficient_from_beta()
+
+            # excitation and de-excitation
+            z_mat_ov = vec[:n_ov].reshape(nocc, nvir)
+            y_mat_ov = vec[n_ov:].reshape(nocc, nvir)
+
+            prop_diag_D = np.sum(z_mat_ov, axis=1) + np.sum(y_mat_ov, axis=1)
+            prop_diag_A = np.sum(z_mat_ov, axis=0) + np.sum(y_mat_ov, axis=0)
+
+            prop_dens_D = -np.linalg.multi_dot(
+                [mo_occ, np.diag(prop_diag_D), mo_occ.T])
+            prop_dens_A = np.linalg.multi_dot(
+                [mo_vir, np.diag(prop_diag_A), mo_vir.T])
+
+            if normalize_densities:
+                abs_sum_val = abs(np.sum(prop_dens_D * scf_results['S']))
+                prop_dens_D /= abs_sum_val
+                prop_dens_A /= abs_sum_val
+
+            return {
+                'property_density_detachment': prop_dens_D,
+                'property_density_attachment': prop_dens_A,
+            }
+        else:
+            return None

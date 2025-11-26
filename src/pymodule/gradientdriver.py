@@ -185,10 +185,10 @@ class GradientDriver:
 
         for i in range(natoms):
 
-            self.ostream.unmute()
             self.ostream.print_info(f'Processing atom {i + 1}/{natoms}...')
+            if i == natoms - 1:
+                self.ostream.print_blank()
             self.ostream.flush()
-            self.ostream.mute()
 
             for d in range(3):
                 coords[i, d] += self.delta_h
@@ -475,7 +475,7 @@ class GradientDriver:
         if self.numerical:
             title = 'Numerical '
         else:
-            title = 'Analytical '
+        	title = 'Analytical '
 
         title += 'Gradient (Hartree/Bohr)'
         self.ostream.print_header(title)
@@ -527,9 +527,11 @@ class GradientDriver:
 
         str_width = 70
 
+        title = f'{self.flag} Setup'
+
         self.ostream.print_blank()
-        self.ostream.print_header(self.flag)
-        self.ostream.print_header((len(self.flag) + 2) * '=')
+        self.ostream.print_header(title)
+        self.ostream.print_header((len(title) + 2) * '=')
         self.ostream.flush()
 
         cur_str = 'Gradient Type                   : '
@@ -544,7 +546,7 @@ class GradientDriver:
             cur_str3 = 'Finite Difference Step Size     : '
             cur_str3 += str(self.delta_h) + ' a.u.'
         else:
-            cur_str += 'Analytical'
+        	cur_str += 'Analytical'
 
         self.ostream.print_blank()
         self.ostream.print_header(cur_str.ljust(str_width))
