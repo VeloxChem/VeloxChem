@@ -155,9 +155,9 @@ class RixsDriver:
             print(f'\nMO indices (core, valence, virtual): ({mo_c_ind}, {mo_val_ind}, {mo_vir_ind})')
             print(f'\nState indices (intermediate, final): ({ce_states}, {ve_states})')
 
-    def compute(self, molecule, basis, scf_tensors,
-                rsp_tensors, cvs_rsp_tensors=None,
-                cvs_scf_tensors=None):
+    def compute(self, molecule, basis, scf_results,
+                rsp_results, cvs_rsp_results=None,
+                cvs_scf_results=None):
         """
         Computes RIXS properties.
 
@@ -165,16 +165,15 @@ class RixsDriver:
             The molecule object.
         :param basis:
             The AO basis set.
-        :scf_tensors:
-            The dictionary of tensors from converged SCF
-            wavefunction.
-        :rsp_tensors:
+        :scf_results:
+            The results dictionary from converged SCF wavefunction.
+        :rsp_results:
             The linear-response results dictionary.
-        :cvs_rsp_tensors:
+        :cvs_rsp_results:
             The core-valence-separated (CVS) linear-response 
             results dictionary.
-        :cvs_scf_tensors:
-            The dictionary of tensors from converged CVS SCF 
+        :cvs_scf_results:
+            The results dictionary from converged CVS SCF
             wavefunction. If given -- assumes that the CVS response
             was obtained from an independent SCF wavefunction.
             
@@ -190,11 +189,11 @@ class RixsDriver:
 
         nocc = molecule.number_of_alpha_electrons()
 
-        self.twoshot = (cvs_rsp_tensors is not None)
+        self.twoshot = (cvs_rsp_results is not None)
         init_photon_set = True
 
         if self.rank == mpi_master():
-            num_vir_orbitals = rsp_tensors['num_virtual']
+            num_vir_orbitals = rsp_results['num_virtual']
         else:
             num_vir_orbitals = None
         num_vir_orbitals = self.comm.bcast(num_vir_orbitals, root=mpi_master())
@@ -203,10 +202,10 @@ class RixsDriver:
             self._approach_string = 'Running RIXS calculation in the two‑shot approach'
 
             if self.rank == mpi_master():
-                num_core_orbitals = cvs_rsp_tensors['num_core']
+                num_core_orbitals = cvs_rsp_results['num_core']
                 num_valence_orbitals = nocc - num_core_orbitals
-                num_intermediate_states = len(cvs_rsp_tensors['eigenvalues'])
-                num_final_states = len(rsp_tensors['eigenvalues'])
+                num_intermediate_states = len(cvs_rsp_results['eigenvalues'])
+                num_final_states = len(rsp_results['eigenvalues'])
             else:
                 num_core_orbitals = None
                 num_valence_orbitals = None
@@ -227,22 +226,22 @@ class RixsDriver:
             self._approach_string = 'Running RIXS calculation in the restricted‑subspace approach'
 
             if self.rank == mpi_master():
-                num_valence_orbitals = rsp_tensors['num_valence']
-                num_core_orbitals    = rsp_tensors['num_core']
+                num_valence_orbitals = rsp_results['num_valence']
+                num_core_orbitals    = rsp_results['num_core']
                 assert_msg_critical(num_core_orbitals > 0,
-                                    'No core orbitals indicated in the response tensor.')
+                                    'No core orbitals indicated in the response results.')
 
                 # identify the energy of the lowest core-excited state
-                first_core_ene = self._first_core_energy(rsp_tensors)
-                detuning = rsp_tensors['eigenvalues'] - first_core_ene
+                first_core_ene = self._first_core_energy(rsp_results)
+                detuning = rsp_results['eigenvalues'] - first_core_ene
 
                 # identify (and possibly remove unphysical valence-excited states) the core-excited states
-                core_states = self._core_state_indices(rsp_tensors, detuning)
+                core_states = self._core_state_indices(rsp_results, detuning)
                 num_intermediate_states = len(core_states)
                 assert_msg_critical(num_intermediate_states > 0,
                                     'Too few excited states included in response calculation.')
                 # identify the valence-excited states
-                val_states = self._valence_state_indices(detuning, rsp_tensors['eigenvalues'])
+                val_states = self._valence_state_indices(detuning, rsp_results['eigenvalues'])
                 num_final_states = len(val_states)
             else:
                 num_valence_orbitals = None
@@ -262,7 +261,7 @@ class RixsDriver:
             val_states = self.comm.bcast(val_states, root=mpi_master())
 
             # for compatibiltiy with the two-shot approach
-            cvs_rsp_tensors = rsp_tensors
+            cvs_rsp_results = rsp_results
             # for compatibiltiy with the two-shot approach
             occupied_core   = num_core_orbitals + num_valence_orbitals
 
@@ -271,11 +270,11 @@ class RixsDriver:
         mo_vir_indices  = list(range(nocc, nocc + num_vir_orbitals))
 
         if self.rank == mpi_master():
-            mo_occ = scf_tensors['C_alpha'][:, mo_core_indices + mo_val_indices].copy()
-            mo_vir = scf_tensors['C_alpha'][:, mo_vir_indices].copy()
+            mo_occ = scf_results['C_alpha'][:, mo_core_indices + mo_val_indices].copy()
+            mo_vir = scf_results['C_alpha'][:, mo_vir_indices].copy()
 
-            core_eigvals = cvs_rsp_tensors['eigenvalues'][core_states].copy()
-            valence_eigvals = rsp_tensors['eigenvalues'][val_states].copy()
+            core_eigvals = cvs_rsp_results['eigenvalues'][core_states].copy()
+            valence_eigvals = rsp_results['eigenvalues'][val_states].copy()
         else:
             mo_occ = None
             mo_vir = None
@@ -289,23 +288,23 @@ class RixsDriver:
         core_eigvals = self.comm.bcast(core_eigvals, root=mpi_master())
         valence_eigvals = self.comm.bcast(valence_eigvals, root=mpi_master())
 
-        core_eigvecs    = self._get_eigvecs(cvs_rsp_tensors, core_states, "core")
-        valence_eigvecs = self._get_eigvecs(rsp_tensors, val_states, "valence")
+        core_eigvecs    = self._get_eigvecs(cvs_rsp_results, core_states, "core")
+        valence_eigvecs = self._get_eigvecs(rsp_results, val_states, "valence")
 
         # get transformation matrices from valence to core basis, if the
         # valence- and core-excited states were obtained from independent SCFs.
-        # returns identity if cvs_scf_tensors are not given (None).
+        # returns identity if cvs_scf_results are not given (None).
         need_transformation_mats = False
         if self.rank == mpi_master():
             # Note: check need_transformation_mats on master rank
             # since scf_results is None on non-master ranks
-            need_transformation_mats = (cvs_scf_tensors is not None)
+            need_transformation_mats = (cvs_scf_results is not None)
         need_transformation_mats = self.comm.bcast(need_transformation_mats,
                                                    root=mpi_master())
 
         U_occ, U_vir = None, None
         if need_transformation_mats:
-            U_occ, U_vir = self.get_transformation_mats(scf_tensors, cvs_scf_tensors, 
+            U_occ, U_vir = self.get_transformation_mats(scf_results, cvs_scf_results, 
                                                         mo_core_indices + mo_val_indices, mo_vir_indices)
         # TODO parallelise, and broadcast?
         core_mats = self._preprocess_core_eigvecs(core_eigvecs, occupied_core,
@@ -335,10 +334,10 @@ class RixsDriver:
             init_photon_set = False
 
             if self.rank == mpi_master():
-                if cvs_rsp_tensors is None:
-                    osc_arr = rsp_tensors['oscillator_strengths']
+                if cvs_rsp_results is None:
+                    osc_arr = rsp_results['oscillator_strengths']
                 else:
-                    osc_arr = cvs_rsp_tensors['oscillator_strengths']
+                    osc_arr = cvs_rsp_results['oscillator_strengths']
             else:
                 osc_arr = None
             osc_arr = self.comm.bcast(osc_arr, root=mpi_master())
@@ -440,6 +439,7 @@ class RixsDriver:
             self.ostream.print_info('Writing to files...')
             self.ostream.print_blank()
             self.ostream.flush()
+            # TODO: append to final h5 (instead of writting new file)
             self._write_hdf5(self.filename + '_rixs')
 
         if not init_photon_set:
@@ -452,28 +452,32 @@ class RixsDriver:
 
         return results_dict
     
-    def _first_core_energy(self, rsp_tensors):
+    def _first_core_energy(self, rsp_results):
         """
         Return energy of the first core-excited state (by label order).
 
-        :param rsp_tensors:
+        :param rsp_results:
             Dictionary containing excitation information.
 
         :return:
             The energy (float) corresponding to the first
             state labeled as 'core' in exciitation_details.
         """
-        for k, entries in enumerate(rsp_tensors['excitation_details']):
+
+        # TODO: implement more robust way of determining core-excited states
+        # (other than relying on the excitation_details text)
+
+        for k, entries in enumerate(rsp_results['excitation_details']):
             if entries[0].split()[0].startswith("core"):
-                return rsp_tensors['eigenvalues'][k]
+                return rsp_results['eigenvalues'][k]
         raise ValueError("No core-labeled state found in excitation_details.")
 
-    def _core_state_indices(self, rsp_tensors, detuning, tol=1e-6):
+    def _core_state_indices(self, rsp_results, detuning, tol=1e-6):
         """
         Filter out (possibly) unphysical non-core states.
         Keep states with detuning >= -tol and labeled 'core'.
 
-        :param rsp_tensors:
+        :param rsp_results:
             Dictionary containing the response data.
         :param detuning:
             Array of detuning values relative to the
@@ -485,12 +489,15 @@ class RixsDriver:
             List of core-excited states and array of detuning.
         """
 
+        # TODO: implement more robust way of determining core-excited states
+        # (other than relying on the excitation_details text)
+
         # -tol to make sure the first_core_ene-state is included
         init_core_states = np.where(detuning >= -tol)[0]
 
         core_states = []
         for state in init_core_states:
-            entry = rsp_tensors['excitation_details'][state][0].split()
+            entry = rsp_results['excitation_details'][state][0].split()
             label = entry[0]
             if label.startswith("core"):
                 core_states.append(int(state))
@@ -601,37 +608,52 @@ class RixsDriver:
         
         return sigma_f
     
-    def _get_eigvecs(self, tensor, states, label):
+    def _get_eigvecs(self, rsp_results, states, label):
+        """
+        Gets eigenvectors.
 
-        if 'eigenvectors_distributed' in tensor:
+        :param rsp_results:
+            The dictionay containint response results.
+        :param states:
+            The excited states.
+        :param label:
+            The label.
+
+        :return:
+            The eigenvectors as a list of 1D numpy arrays.
+        """
+
+        # TODO: implement more robust way of checking whether rsp_results is
+        #       from TDA or RPA
+
+        assert_msg_critical(
+            ('eigenvectors_distributed' in rsp_results or
+             'eigenvectors' in rsp_results),
+            'RixsDriver._get_eigvecs: Expecting eigenvectors_distributed or ' +
+            'eigenvectors in rsp_results')
+
+        if 'eigenvectors_distributed' in rsp_results:
             vecs = []
             for i in states:
                 full_v = self.get_full_solution_vector(
-                    tensor['eigenvectors_distributed'][i])
+                    rsp_results['eigenvectors_distributed'][i])
                 full_v = self.comm.bcast(full_v, root=mpi_master())
                 vecs.append(full_v)
             return np.array(vecs)
 
-        elif 'eigenvectors' in tensor:
+        elif 'eigenvectors' in rsp_results:
             self.tda = True
 
             vecs = []
             for i in states:
                 if self.rank == mpi_master():
-                    full_v = tensor['eigenvectors'][:, i].copy()
+                    full_v = rsp_results['eigenvectors'][:, i].copy()
                 else:
                     full_v = None
                 full_v = self.comm.bcast(full_v, root=mpi_master())
                 vecs.append(full_v)
             return np.array(vecs)
 
-        else:
-            # h5-file as input
-            try:
-                return np.array([tensor[f'S{i + 1}'] for i in states])
-            except KeyError as e:
-                raise RuntimeError(f"Could not extract {label} eigenvectors using the key: {e}")
-            
     @staticmethod
     def get_full_solution_vector(solution):
         """
@@ -758,16 +780,16 @@ class RixsDriver:
         )
         return gs_to_core, core_to_val
 
-    def get_transformation_mats(self, target_scf_tensors, initial_scf_tensors, nocc, nvir):
+    def get_transformation_mats(self, target_scf_results, initial_scf_results, nocc, nvir):
         """
         Gets the transformation matrices of the excitation spaces between
         two -- up-to a phase -- equal SCF wavefunctions, i.e.,
         from "initial" space to "target" space.
 
-        :param target_scf_tensors:
-            SCF tensors of the target space.
-        :param initial_scf_tensors:
-            SCF tensors of the initial space.
+        :param target_scf_results:
+            SCF results of the target space.
+        :param initial_scf_results:
+            SCF results of the initial space.
         :param nocc:
             Number of occupied orbitals.
         :param nvir:
@@ -779,9 +801,9 @@ class RixsDriver:
         """
 
         if self.rank == mpi_master():
-            S      = target_scf_tensors['S']
-            C_val  = target_scf_tensors['C_alpha']
-            C_core = initial_scf_tensors['C_alpha']
+            S      = target_scf_results['S']
+            C_val  = target_scf_results['C_alpha']
+            C_core = initial_scf_results['C_alpha']
 
             C_occ_val  = C_val[:, nocc].copy()
             C_vir_val  = C_val[:, nvir].copy()
@@ -826,23 +848,21 @@ class RixsDriver:
         if not fname:
             raise ValueError('No filename given to _write_hdf5()')
 
+        # TODO: use pathlib for handling file extension
         # Add the .h5 extension if not given
         if not fname[-3:] == '.h5':
             fname += '.h5'
 
-        # Save all the internal data to the h5 datafile named 'fname'
-        try:
-            with h5py.File(fname, 'w') as hf:
-                hf.create_dataset('photon_energies', data=self.photon_energy)
-                hf.create_dataset('cross_sections', data=self.cross_sections)
-                hf.create_dataset('emission_energies', data=self.emission_enes)
-                hf.create_dataset('energy_losses', data=self.ene_losses)
-                hf.create_dataset('elastic_cross_sections', data=self.elastic_cross_sections)
-                hf.create_dataset('scattering_amplitudes', data=self.scattering_amplitudes)
+        # TODO: append to final h5 (instead of writting new file)
 
-        except Exception as e:
-            print('Failed to create h5 data file: {}'.format(e),
-                  file=sys.stdout)
+        # Save all the internal data to the h5 datafile named 'fname'
+        with h5py.File(fname, 'w') as hf:
+            hf.create_dataset('photon_energies', data=self.photon_energy)
+            hf.create_dataset('cross_sections', data=self.cross_sections)
+            hf.create_dataset('emission_energies', data=self.emission_enes)
+            hf.create_dataset('energy_losses', data=self.ene_losses)
+            hf.create_dataset('elastic_cross_sections', data=self.elastic_cross_sections)
+            hf.create_dataset('scattering_amplitudes', data=self.scattering_amplitudes)
 
     def _print_header(self, molecule):
         """
@@ -863,6 +883,10 @@ class RixsDriver:
             return "[" + ", ".join(items) + "]"
 
         def _join_indices(parts, n):
+            """
+            Join indices.
+            """
+            # TODO: double check
             sep = ", " if n <= 3 else " "
             return sep.join(parts)
         

@@ -73,7 +73,7 @@ class TestRIXS:
             rixs_res = rixs_drv.compute(mol, bas, scf_results, valence_rsp)
         elif cvs_scf:
             rixs_res = rixs_drv.compute(mol, bas, scf_results, valence_rsp, cvs_rsp_res, 
-                                        cvs_scf_tensors=cvs_scf_res)
+                                        cvs_scf_results=cvs_scf_res)
         else:
             rixs_res = rixs_drv.compute(mol, bas, scf_results, valence_rsp, cvs_rsp_res)
 
