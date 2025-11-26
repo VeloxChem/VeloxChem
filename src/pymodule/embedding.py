@@ -35,7 +35,6 @@ from io import StringIO
 from contextlib import redirect_stdout
 import numpy as np
 import json
-import time
 
 from .veloxchemlib import bohr_in_angstrom
 from .oneeints import (compute_nuclear_potential_integrals,
