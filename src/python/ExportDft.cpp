@@ -94,7 +94,7 @@ static auto
 check_arrays(const std::string& func_name, const std::vector<py::array_t<double>>& arrays, const int nao) -> void
 {
     std::string errstyle(func_name + std::string(": Expecting contiguous numpy arrays"));
-    std::string errshape(func_name + std::string(": Invalide shape of numpy array"));
+    std::string errshape(func_name + std::string(": Invalid shape of numpy array"));
 
     for (size_t i = 0; i < arrays.size(); i++)
     {
