@@ -44,6 +44,7 @@ from .lreigensolverunrest import LinearResponseUnrestrictedEigenSolver
 from .c6driver import C6Driver
 from .tdaeigensolver import TdaEigenSolver
 from .tdaeigensolverunrest import TdaUnrestrictedEigenSolver
+from .rixsdriver import RixsDriver
 from .shgdriver import ShgDriver
 from .tpatransitiondriver import TpaTransitionDriver
 from .doubleresbeta import DoubleResBetaDriver
@@ -228,6 +229,26 @@ class ResponseProperty:
                 elif method_type == 'unrestricted':
                     self._rsp_driver = LinearResponseUnrestrictedEigenSolver(
                         self.comm, self.ostream)
+
+            self._rsp_driver._input_keywords['response'].update({
+                'tamm_dancoff': ('bool', 'use Tamm-Dancoff approximation'),
+            })
+
+        # Resonant Inelastic X-ray Scattering (RIXS)
+        elif (self._rsp_dict['order'] == 'linear' and
+              self._rsp_dict['residue'] == 'single' and
+              self._rsp_dict['is_complex'] == 'yes'):
+
+            assert_msg_critical(
+                self._rsp_dict['property'] == 'rixs',
+                'This response property is only for RIXS')
+
+            assert_msg_critical(
+                method_type == 'restricted',
+                'ResponseProperty: This response property is ' +
+                'only implemented for restricted case')
+
+            self._rsp_driver = RixsDriver(self.comm, self.ostream)
 
             self._rsp_driver._input_keywords['response'].update({
                 'tamm_dancoff': ('bool', 'use Tamm-Dancoff approximation'),

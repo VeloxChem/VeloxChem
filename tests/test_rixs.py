@@ -13,7 +13,7 @@ from veloxchem.rixsdriver import RixsDriver
 class TestRIXS:
 
     def run_rixs(self, xcfun_label, basis_label, ref_xsection, ncore, nstates,
-                  ncorestates=None, nvir=None, nvalence=None, cvs_scf=False, tda=False, cutoff_ene=None):
+                 ncorestates=None, nvir=None, nvalence=None, tda=False, cutoff_ene=None):
 
         xyz_string = """3
         xyz
@@ -31,51 +31,26 @@ class TestRIXS:
         scf_drv.conv_thresh = 1e-8
         scf_results = scf_drv.compute(mol, bas)
 
-        lr_drv = LinearResponseEigenSolver()
-        if tda:
-            lr_drv = TdaEigenSolver()
-        lr_drv.ostream.mute()
-
-        if nvir is not None:
-            lr_drv.restricted_subspace = True
-            lr_drv.num_core_orbitals = ncore
-            lr_drv.num_valence_orbitals = nvalence
-            lr_drv.num_virtual_orbitals = nvir
-        else:
-            cvs_lr_drv = LinearResponseEigenSolver()
-            if tda:
-                cvs_lr_drv = TdaEigenSolver()
-            cvs_lr_drv.ostream.mute()
-            cvs_lr_drv.core_excitation = True
-            cvs_lr_drv.num_core_orbitals = ncore
-            cvs_lr_drv.nstates = ncorestates
-            cvs_lr_drv.conv_thresh = 1e-6
-            if cvs_scf:
-                cvs_scf_drv = ScfRestrictedDriver()
-                cvs_scf_drv.ostream.mute()
-                cvs_scf_drv.xcfun = xcfun_label
-                cvs_scf_drv.conv_thresh = 1e-8
-                cvs_scf_res = cvs_scf_drv.compute(mol, bas)
-                cvs_rsp_res = cvs_lr_drv.compute(mol, bas, cvs_scf_res)
-            else:
-                cvs_rsp_res = cvs_lr_drv.compute(mol, bas, scf_results)
-
-        lr_drv.nstates = nstates
-        lr_drv.conv_thresh = 1e-6
-        valence_rsp = lr_drv.compute(mol, bas, scf_results)
-
         rixs_drv = RixsDriver()
         rixs_drv.ostream.mute()
         rixs_drv.final_state_cutoff = cutoff_ene
         rixs_drv.gamma = .16 / hartree_in_ev()
 
+        rixs_drv.conv_thresh = 1e-6
+        rixs_drv.tamm_dancoff = tda
+        rixs_drv.nstates = nstates
+
         if nvir is not None:
-            rixs_res = rixs_drv.compute(mol, bas, scf_results, valence_rsp)
-        elif cvs_scf:
-            rixs_res = rixs_drv.compute(mol, bas, scf_results, valence_rsp, cvs_rsp_res, 
-                                        cvs_scf_results=cvs_scf_res)
+            rixs_drv.restricted_subspace = True
+            rixs_drv.num_core_orbitals = ncore
+            rixs_drv.num_valence_orbitals = nvalence
+            rixs_drv.num_virtual_orbitals = nvir
         else:
-            rixs_res = rixs_drv.compute(mol, bas, scf_results, valence_rsp, cvs_rsp_res)
+            rixs_drv.restricted_subspace = False
+            rixs_drv.num_core_orbitals = ncore
+            rixs_drv.num_core_states = ncorestates
+
+        rixs_res = rixs_drv.compute(mol, bas, scf_results)
 
         if scf_drv.rank == mpi_master():
             assert np.allclose(ref_xsection, rixs_res['cross_sections'][:,0], 
@@ -90,7 +65,7 @@ class TestRIXS:
             3.905579709, 4.827752013
         ])
 
-        self.run_rixs('hf', 'def2-svp', ref_xsection, 1, 20, ncorestates=2, nvir=16, nvalence=1, cvs_scf=True, tda=False)
+        self.run_rixs('hf', 'def2-svp', ref_xsection, 1, 20, ncorestates=2, nvir=16, nvalence=1, tda=False)
 
     def test_hf_svp_tda_rsa(self):
 
@@ -147,7 +122,7 @@ class TestRIXS:
             59.501431469, 44.226334207, 62.956362303, 83.197727132
         ])
 
-        self.run_rixs('hf', 'def2-svp', ref_xsection, 1, 20, ncorestates=4, cvs_scf=True, tda=True)
+        self.run_rixs('hf', 'def2-svp', ref_xsection, 1, 20, ncorestates=4, tda=True)
 
     def test_b3lyp_svp_rpa_2s(self):
 

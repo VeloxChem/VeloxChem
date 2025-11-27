@@ -58,6 +58,7 @@ from .rspabsorption import Absorption
 from .rsplinabscross import LinearAbsorptionCrossSection
 from .rspcdspec import CircularDichroismSpectrum
 from .rspc6 import C6
+from .rsprixs import RIXS
 from .rspshg import SHG
 from .rsptpatransition import TpaTransition
 from .rspdoublerestrans import DoubleResTransition
@@ -73,7 +74,6 @@ from .xtbgradientdriver import XtbGradientDriver
 from .xtbhessiandriver import XtbHessianDriver
 from .cli import cli
 from .errorhandler import assert_msg_critical
-from .localizationdriver import LocalizationDriver
 
 
 def select_scf_driver(task, scf_type):
@@ -179,6 +179,9 @@ def select_rsp_property(task, mol_orbs, rsp_dict, method_dict):
 
     elif prop_type == 'c6':
         rsp_prop = C6(rsp_dict, method_dict)
+
+    elif prop_type == 'rixs':
+        rsp_prop = RIXS(rsp_dict, method_dict)
 
     elif prop_type == 'shg':
         rsp_prop = SHG(rsp_dict, method_dict)
@@ -330,7 +333,7 @@ def main():
         'hf', 'rhf', 'uhf', 'rohf', 'scf', 'uscf', 'roscf', 'wavefunction',
         'wave function', 'mp2', 'ump2', 'romp2', 'gradient', 'uscf_gradient',
         'hessian', 'optimize', 'response', 'pulses', 'visualization', 'loprop',
-        'pe force field', 'vibrational', 'polarizability_gradient', 'rixs'
+        'pe force field', 'vibrational', 'polarizability_gradient'
     ]
 
     scf_type = 'restricted'
@@ -631,9 +634,6 @@ def main():
         rsp_dict['program_end_time'] = program_end_time
         rsp_dict['filename'] = task.input_dict['filename']
         rsp_dict = updated_dict_with_eri_settings(rsp_dict, scf_drv)
-        if 'localize_mos' in rsp_dict:
-            loc_drv = LocalizationDriver(task.mpi_comm, task.ostream)
-            loc_drv.localize_and_write(task.molecule, task.ao_basis, scf_drv, rsp_dict['localize_mos'], write_hdf5 = True)
 
         rsp_prop = select_rsp_property(task, mol_orbs, rsp_dict, method_dict)
         rsp_prop.init_driver(task.mpi_comm,
@@ -740,44 +740,6 @@ def main():
         pulsed_response = PulsedResponse(task.mpi_comm, task.ostream)
         pulsed_response.update_settings(prt_dict, cpp_dict, method_dict)
         pulsed_response.compute(task.molecule, task.ao_basis, scf_results)
-
-    # Resonant inelastic X-ray scattering
-    if (task_type == 'rixs') and (scf_drv.scf_type == 'restricted'):
-        rixs_dict = (task.input_dict['rixs']
-                     if 'rixs' in task.input_dict else {})
-        rixs_dict['program_end_time'] = program_end_time
-        rixs_dict['filename'] = task.input_dict['filename']
-        
-        rsp_dict = (dict(task.input_dict['response'])
-                    if 'response' in task.input_dict else {})
-        rsp_dict['program_end_time'] = program_end_time
-        rsp_dict['filename'] = task.input_dict['filename']
-        rsp_dict = updated_dict_with_eri_settings(rsp_dict, scf_drv)
-
-        rsp_prop = select_rsp_property(task, mol_orbs, rsp_dict, method_dict)
-        rsp_prop.init_driver(task.mpi_comm, task.ostream)
-        rsp_prop.compute(task.molecule, task.ao_basis, scf_results)
-
-        cvs_rsp_dict = (dict(task.input_dict['cvs_response'])
-                    if 'cvs_response' in task.input_dict else {})
-        if cvs_rsp_dict == {}:
-            # Restricted subspace approach
-            cvs_rsp_prop = None
-        else:
-            # Two-shot approach
-            cvs_rsp_dict['program_end_time'] = program_end_time
-            cvs_rsp_dict['filename'] = task.input_dict['filename'] + '_cvs'
-            cvs_rsp_dict = updated_dict_with_eri_settings(cvs_rsp_dict, scf_drv)
-            
-            cvs_rsp = select_rsp_property(task, mol_orbs, cvs_rsp_dict, method_dict)
-            cvs_rsp.init_driver(task.mpi_comm, task.ostream)
-            cvs_rsp.compute(task.molecule, task.ao_basis, scf_results)
-            cvs_rsp_prop = cvs_rsp._rsp_property
-
-        rixs_drv = RixsDriver(task.mpi_comm, task.ostream)
-        rixs_drv.update_settings(rixs_dict, method_dict)
-        rixs_drv.compute(task.molecule, task.ao_basis, scf_results, rsp_prop._rsp_property, cvs_rsp_prop)
-    
 
     # MP2 perturbation theory
 

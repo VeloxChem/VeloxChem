@@ -31,6 +31,7 @@
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from mpi4py import MPI
+from pathlib import Path
 import numpy as np
 import h5py
 import sys
@@ -38,11 +39,14 @@ import sys
 from .veloxchemlib import hartree_in_ev, mpi_master
 from .oneeints import compute_electric_dipole_integrals
 from .outputstream import OutputStream
+from .linearsolver import LinearSolver
+from .lreigensolver import LinearResponseEigenSolver
+from .tdaeigensolver import TdaEigenSolver
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input
 
 
-class RixsDriver:
+class RixsDriver(LinearSolver):
     """
     Implements the RIXS driver in a linear-response framework with two
     approaches: the two-shot and restricted-subspace approximation.
@@ -77,13 +81,12 @@ class RixsDriver:
             else:
                 ostream = OutputStream(None)
 
-        # mpi information
-        self.comm  = comm
-        self.rank  = comm.Get_rank()
-        self.nodes = comm.Get_size()
+        super().__init__(comm, ostream)
 
-        # outputstream
-        self.ostream = ostream
+        # for RIXS, the default convergence threshold is tighter
+        self.conv_thresh = 2.0e-5
+
+        self.tamm_dancoff = False
 
         # method settings
         self.photon_energy = None
@@ -92,58 +95,65 @@ class RixsDriver:
         # 1000.0 / hartree_in_wavenumber()
         self.gamma = 0.124 / hartree_in_ev()
 
-        self.tda = False
-        self.orb_and_state_dict = None
+        self.nstates = 5
+        self.num_core_states = 5
 
-        self.rixs_dict = {}
-        self.filename = None
+        # restricted subspace
+        self.restricted_subspace = True
+
+        self.num_core_orbitals = 0
+        self.num_virtual_orbitals = 0
+        self.num_valence_orbitals = 0
+
+        self._orb_and_state_dict = None
 
         # TODO?: should this be in terms of energy or number of states?
         #self.num_final_states = None
         self.final_state_cutoff = None
 
         # input keywords
-        self.input_keywords = {
-            'rixs': {
-                'theta': ('float', 'angle between incident polarization vector and propagation vector of outgoing'),
-                'gamma': ('float', 'broadening term (FWHM)'),
-                'photon_energy': ('list', 'list of incoming photon energies'),
-                'final_state_cutoff': ('float', 'energy window of final states to include'),
-            },
-        }
+        self._input_keywords['response'].update({
+            'theta':
+                ('float', 'angle between incident polarization vector and ' +
+                    'propagation vector of outgoing'),
+            'gamma': ('float', 'broadening term (FWHM)'),
+            'photon_energy': ('list', 'list of incoming photon energies'),
+            'final_state_cutoff':
+                ('float', 'energy window of final states to include'),
+            'nstates': ('int', 'number of excited states'),
+            'num_core_states': ('int', 'number of core-excited states'),
+            'num_core_orbitals': ('int', 'number of involved core-orbitals'),
+            'restricted_subspace':
+                ('bool', 'restricted subspace approximation'),
+            'num_valence_orbitals':
+                ('int', 'number of involved valence orbitals'),
+            'num_virtual_orbitals':
+                ('int', 'number of involved virtual orbitals'),
+        })
 
-    def update_settings(self, rixs_dict=None, method_dict=None):
+    def update_settings(self, rsp_dict, method_dict=None):
         """
         Updates settings in RixsDriver.
 
-        :param rixs_dict:
-            The dictionary of rixs input.
+        :param rsp_dict:
+            The dictionary of response input.
+        :param method_dict:
+            The dictionary of method settings.
         """
 
         if method_dict is None:
             method_dict = {}
-        if rixs_dict is None:
-            rixs_dict = {}
 
-        rixs_keywords = {
-            key: val[0] for key, val in self.input_keywords['rixs'].items()
-        }
-
-        parse_input(self, rixs_keywords, rixs_dict)
-
-        if 'program_end_time' in rixs_dict:
-            self.program_end_time = rixs_dict['program_end_time']
-        if 'filename' in rixs_dict:
-            self.filename = rixs_dict['filename']
+        super().update_settings(rsp_dict, method_dict)
 
     def print_info(self):
         """
         Prints relevant orbital and state information
         """
-        if self.orb_and_state_dict is None:
+        if self._orb_and_state_dict is None:
             self.ostream.print_warning('Compute first!')
         else:
-            info = self.orb_and_state_dict
+            info = self._orb_and_state_dict
             intermed_states = info['num_intermediate_states']
             final_states = info['num_final_states']
             mo_c_ind = info['mo_core_indices']
@@ -156,8 +166,7 @@ class RixsDriver:
             print(f'\nState indices (intermediate, final): ({ce_states}, {ve_states})')
 
     def compute(self, molecule, basis, scf_results,
-                rsp_results, cvs_rsp_results=None,
-                cvs_scf_results=None):
+                rsp_results=None, cvs_rsp_results=None):
         """
         Computes RIXS properties.
 
@@ -172,11 +181,7 @@ class RixsDriver:
         :cvs_rsp_results:
             The core-valence-separated (CVS) linear-response 
             results dictionary.
-        :cvs_scf_results:
-            The results dictionary from converged CVS SCF
-            wavefunction. If given -- assumes that the CVS response
-            was obtained from an independent SCF wavefunction.
-            
+
         NOTE: To run full diagonalization, do a restricted
               subspace calculation with the full space, 
               indicating which orbitals define the core.
@@ -187,9 +192,75 @@ class RixsDriver:
             and the scattering amplitude tensor.
         """
 
+        if rsp_results is None:
+
+            rsp_keys = [
+                'restricted_subspace',
+                'nstates',
+                'num_virtual_orbitals',
+                'num_valence_orbitals',
+                'num_core_orbitals',
+                'conv_thresh',
+                'restart',
+            ]
+
+            if self.tamm_dancoff:
+                rsp_drv = TdaEigenSolver(self.comm, self.ostream)
+            else:
+                rsp_drv = LinearResponseEigenSolver(self.comm, self.ostream)
+
+            for key in rsp_keys:
+                if hasattr(self, key):
+                    setattr(rsp_drv, key, getattr(self, key))
+
+            if rsp_drv.restricted_subspace:
+                assert_msg_critical(
+                    (rsp_drv.num_core_orbitals > 0 and
+                     rsp_drv.num_valence_orbitals > 0 and
+                     rsp_drv.num_virtual_orbitals > 0),
+                    'Invalid number of core/valence/virtual orbitals for ' +
+                    'restricted_subspace')
+
+            if self.checkpoint_file is not None:
+                fpath = Path(self.checkpoint_file)
+                fpath = fpath.with_name(fpath.stem)
+                rsp_drv.checkpoint_file = str(fpath) + '_rixs.h5'
+
+            rsp_results = rsp_drv.compute(molecule, basis, scf_results)
+
+        if cvs_rsp_results is None and (not self.restricted_subspace):
+
+            cvs_rsp_keys = [
+                'num_core_orbitals',
+                'conv_thresh',
+                'restart',
+            ]
+
+            if self.tamm_dancoff:
+                cvs_rsp_drv = TdaEigenSolver(self.comm, self.ostream)
+            else:
+                cvs_rsp_drv = LinearResponseEigenSolver(self.comm, self.ostream)
+
+            for key in cvs_rsp_keys:
+                if hasattr(self, key):
+                    setattr(cvs_rsp_drv, key, getattr(self, key))
+
+            cvs_rsp_drv.core_excitation = True
+            cvs_rsp_drv.nstates = self.num_core_states
+
+            assert_msg_critical(cvs_rsp_drv.num_core_orbitals > 0,
+                                'Invalid number of core orbitals')
+
+            if self.checkpoint_file is not None:
+                fpath = Path(self.checkpoint_file)
+                fpath = fpath.with_name(fpath.stem)
+                cvs_rsp_drv.checkpoint_file = str(fpath) + '_rixs_cvs.h5'
+
+            cvs_rsp_results = cvs_rsp_drv.compute(molecule, basis, scf_results)
+
         nocc = molecule.number_of_alpha_electrons()
 
-        self.twoshot = (cvs_rsp_results is not None)
+        self.twoshot = (not self.restricted_subspace)
         init_photon_set = True
 
         if self.rank == mpi_master():
@@ -291,26 +362,9 @@ class RixsDriver:
         core_eigvecs    = self._get_eigvecs(cvs_rsp_results, core_states, "core")
         valence_eigvecs = self._get_eigvecs(rsp_results, val_states, "valence")
 
-        # get transformation matrices from valence to core basis, if the
-        # valence- and core-excited states were obtained from independent SCFs.
-        # returns identity if cvs_scf_results are not given (None).
-        need_transformation_mats = False
-        if self.rank == mpi_master():
-            # Note: check need_transformation_mats on master rank
-            # since scf_results is None on non-master ranks
-            need_transformation_mats = (cvs_scf_results is not None)
-        need_transformation_mats = self.comm.bcast(need_transformation_mats,
-                                                   root=mpi_master())
-
-        U_occ, U_vir = None, None
-        if need_transformation_mats:
-            U_occ, U_vir = self.get_transformation_mats(scf_results, cvs_scf_results, 
-                                                        mo_core_indices + mo_val_indices, mo_vir_indices)
-        # TODO parallelise, and broadcast?
         core_mats = self._preprocess_core_eigvecs(core_eigvecs, occupied_core,
-                                                  num_valence_orbitals, num_vir_orbitals, U_occ, U_vir)
+                                                  num_valence_orbitals, num_vir_orbitals)
         
-        # TODO parallelise, and broadcast?
         if self.rank == mpi_master():
             dipole_integrals = compute_electric_dipole_integrals(molecule, basis, [0.0,0.0,0.0])
         else:
@@ -318,7 +372,7 @@ class RixsDriver:
         dipole_integrals = self.comm.bcast(dipole_integrals, root=mpi_master())
 
         # store state and orbital information used in computation
-        self.orb_and_state_dict = {
+        self._orb_and_state_dict = {
             'num_intermediate_states': num_intermediate_states,
             'num_final_states': num_final_states,
             'mo_core_indices': mo_core_indices,
@@ -377,7 +431,7 @@ class RixsDriver:
                 F_inelastic = np.zeros((3, 3), dtype=complex)
                 z_val, y_val = self.split_eigvec(valence_eigvecs[f],
                                                  num_core_orbitals + num_valence_orbitals,
-                                                 num_vir_orbitals, self.tda)
+                                                 num_vir_orbitals, self.tamm_dancoff)
                 for n in range(num_intermediate_states):
                     z_core, y_core = core_mats[n]
                     gs2core, core2val = self.get_tdms(mo_occ, mo_vir, z_val, y_val, z_core, y_core)
@@ -623,16 +677,12 @@ class RixsDriver:
             The eigenvectors as a list of 1D numpy arrays.
         """
 
-        # TODO: implement more robust way of checking whether rsp_results is
-        #       from TDA or RPA
+        if not self.tamm_dancoff:
+            # RPA
+            assert_msg_critical(
+                'eigenvectors_distributed' in rsp_results,
+                'RixsDriver._get_eigvecs: Incorrect key in rsp_results')
 
-        assert_msg_critical(
-            ('eigenvectors_distributed' in rsp_results or
-             'eigenvectors' in rsp_results),
-            'RixsDriver._get_eigvecs: Expecting eigenvectors_distributed or ' +
-            'eigenvectors in rsp_results')
-
-        if 'eigenvectors_distributed' in rsp_results:
             vecs = []
             for i in states:
                 full_v = self.get_full_solution_vector(
@@ -641,8 +691,11 @@ class RixsDriver:
                 vecs.append(full_v)
             return np.array(vecs)
 
-        elif 'eigenvectors' in rsp_results:
-            self.tda = True
+        else:
+            # TDA
+            assert_msg_critical(
+                'eigenvectors' in rsp_results,
+                'RixsDriver._get_eigvecs: Incorrect key in rsp_results')
 
             vecs = []
             for i in states:
@@ -725,8 +778,7 @@ class RixsDriver:
         return np.pad(z_mat, padding), np.pad(y_mat, padding)
     
     def _preprocess_core_eigvecs(self, core_eigvecs, occ_core,
-                                 num_val_orbs, num_vir_orbs,
-                                 U_occ=None, U_vir=None):
+                                 num_val_orbs, num_vir_orbs):
         """
         Split, pad with zeros (if twoshot) and 
         possibly transform core eigenvectors if needed.
@@ -735,14 +787,10 @@ class RixsDriver:
 
         for vec in core_eigvecs:
             z, y = self.split_eigvec(vec, occ_core,
-                                     num_vir_orbs, self.tda)
+                                     num_vir_orbs, self.tamm_dancoff)
             
             if self.twoshot:
                 z, y = self.pad_matrices(z, y, num_val_orbs)
-
-            if U_occ is not None and U_vir is not None:
-                z = np.linalg.multi_dot([U_occ.T, z, U_vir])
-                y = np.linalg.multi_dot([U_occ.T, y, U_vir])
 
             pp_core_eigvecs.append((z, y))
 
@@ -780,47 +828,6 @@ class RixsDriver:
         )
         return gs_to_core, core_to_val
 
-    def get_transformation_mats(self, target_scf_results, initial_scf_results, nocc, nvir):
-        """
-        Gets the transformation matrices of the excitation spaces between
-        two -- up-to a phase -- equal SCF wavefunctions, i.e.,
-        from "initial" space to "target" space.
-
-        :param target_scf_results:
-            SCF results of the target space.
-        :param initial_scf_results:
-            SCF results of the initial space.
-        :param nocc:
-            Number of occupied orbitals.
-        :param nvir:
-            Number of virtual orbitals.
-        
-        :return:
-            Transformation matrices for the occupied, U_occ, and
-            for the virtual, U_vir.
-        """
-
-        if self.rank == mpi_master():
-            S      = target_scf_results['S']
-            C_val  = target_scf_results['C_alpha']
-            C_core = initial_scf_results['C_alpha']
-
-            C_occ_val  = C_val[:, nocc].copy()
-            C_vir_val  = C_val[:, nvir].copy()
-            C_occ_core = C_core[:, nocc].copy()
-            C_vir_core = C_core[:, nvir].copy()
-
-            U_occ = np.linalg.multi_dot([C_occ_val.T, S, C_occ_core])
-            U_vir = np.linalg.multi_dot([C_vir_val.T, S, C_vir_core])
-        else:
-            U_occ = None
-            U_vir = None
-
-        U_occ = self.comm.bcast(U_occ, root=mpi_master())
-        U_vir = self.comm.bcast(U_vir, root=mpi_master())
-
-        return U_occ, U_vir
-    
     def _write_hdf5(self, fname):
         """
         Writes the RIXS results to the specified output file in h5
@@ -955,8 +962,8 @@ class RixsDriver:
             self.ostream.print_header(
                 f"Incoming photon energies [eV]    : {ev_str}".ljust(str_width))
 
-        if self.orb_and_state_dict:
-            od = self.orb_and_state_dict
+        if self._orb_and_state_dict:
+            od = self._orb_and_state_dict
 
             self.ostream.print_header(
                 f'Number of intermediate states    : {od["num_intermediate_states"]}'.ljust(str_width))
@@ -1006,25 +1013,3 @@ class RixsDriver:
             self.ostream.print_blank()
         
         self.ostream.flush()
-
-    @staticmethod
-    def lorentzian_broadening(x, y, xmin, xmax, xstep, br):
-        xi = np.arange(xmin, xmax, xstep)
-        yi = np.zeros(len(xi))
-        for i in range(len(xi)):
-            for k in range(len(x)):
-                yi[i] = (yi[i] + y[k] * br / ((xi[i] - x[k])**2 +
-                                              (br / 2.0)**2) / np.pi)
-        return xi, yi
-
-    @staticmethod
-    def gaussian_broadening(x, y, xmin, xmax, xstep, br):
-        br_g = br / np.sqrt(4.0 * 2.0 * np.log(2))
-        xi = np.arange(xmin, xmax, xstep)
-        yi = np.zeros(len(xi))
-        for i in range(len(xi)):
-            for k in range(len(y)):
-                yi[i] = yi[i] + y[k] * np.exp(-((xi[i] - x[k])**2) /
-                                              (2 * br_g**2))
-        return xi, yi
-    
