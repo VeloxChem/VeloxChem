@@ -139,8 +139,9 @@ class LinearResponseEigenSolver(LinearSolver):
             'restricted_subspace':
                 ('bool', 'restricted subspace approximation'),
             'num_valence_orbitals':
-                ('int', 'number of involved valence-orbitals'),
-            'num_vir_orbitals': ('int', 'number of involved virtual-orbitals'),
+                ('int', 'number of involved valence orbitals'),
+            'num_virtual_orbitals':
+                ('int', 'number of involved virtual orbitals'),
             'nto': ('bool', 'analyze natural transition orbitals'),
             'nto_pairs': ('int', 'number of NTO pairs in NTO analysis'),
             'nto_cubes': ('bool', 'write NTO cube files'),
@@ -886,6 +887,7 @@ class LinearResponseEigenSolver(LinearSolver):
                         'oscillator_strengths': osc,
                         'rotatory_strengths': rot_vel,
                         'excitation_details': excitation_details,
+                        'number_of_states': self.nstates,
                         'num_core': orbital_details['num_core'],
                         'num_valence': orbital_details['num_valence'],
                         'num_virtual': orbital_details['num_virtual']

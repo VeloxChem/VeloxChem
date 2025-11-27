@@ -147,10 +147,10 @@ class RixsDriver:
             intermed_states = info['num_intermediate_states']
             final_states = info['num_final_states']
             mo_c_ind = info['mo_core_indices']
-            mo_val_ind = info['mo_val_indices']
-            mo_vir_ind = info['mo_vir_indices']
+            mo_val_ind = info['mo_valence_indices']
+            mo_vir_ind = info['mo_virtual_indices']
             ce_states = info['core_states']
-            ve_states = info['val_states']
+            ve_states = info['valence_states']
             print(f'\nNumber of states: (intermediate, final): ({intermed_states}, {final_states})')
             print(f'\nMO indices (core, valence, virtual): ({mo_c_ind}, {mo_val_ind}, {mo_vir_ind})')
             print(f'\nState indices (intermediate, final): ({ce_states}, {ve_states})')
@@ -322,10 +322,10 @@ class RixsDriver:
             'num_intermediate_states': num_intermediate_states,
             'num_final_states': num_final_states,
             'mo_core_indices': mo_core_indices,
-            'mo_val_indices': mo_val_indices,
-            'mo_vir_indices': mo_vir_indices,
+            'mo_valence_indices': mo_val_indices,
+            'mo_virtual_indices': mo_vir_indices,
             'core_states': core_states,
-            'val_states': val_states,
+            'valence_states': val_states,
         }
         
         # if incoming photon energy is not set, set it to match the
@@ -975,7 +975,7 @@ class RixsDriver:
                 f'Intermediate/core states         : {state_list}'.ljust(str_width)
             )
 
-            state_list = _format_indices(od["val_states"])
+            state_list = _format_indices(od["valence_states"])
             self.ostream.print_header(
                 f'Final/valence states             : {state_list}'.ljust(str_width)
             )
@@ -988,13 +988,13 @@ class RixsDriver:
                 f'Core orbitals                    : {orbital_str}'.ljust(str_width)
             )
 
-            orbital_labels = _format_orbital_names(od["mo_val_indices"], "valence", nocc)
+            orbital_labels = _format_orbital_names(od["mo_valence_indices"], "valence", nocc)
             orbital_str    = _format_indices(orbital_labels)
             self.ostream.print_header(
                 f'Valence orbitals                 : {orbital_str}'.ljust(str_width)
             )
             
-            orbital_labels = _format_orbital_names(od["mo_vir_indices"], "virtual", nocc)
+            orbital_labels = _format_orbital_names(od["mo_virtual_indices"], "virtual", nocc)
             orbital_str    = _format_indices(orbital_labels)
             self.ostream.print_header(
                 f'Virtual orbitals                 : {orbital_str}'.ljust(str_width)
