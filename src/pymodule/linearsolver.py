@@ -4039,7 +4039,8 @@ class LinearSolver:
     def plot_xas(self,
                  rsp_results,
                  broadening_type="lorentzian",
-                 broadening_value=0.1239842,
+                 broadening_value=(1000.0 / hartree_in_wavenumber() *
+                                   hartree_in_ev()),
                  ax=None):
         """
         Plot the X-ray absorption spectrum from the response calculation.
@@ -4182,7 +4183,8 @@ class LinearSolver:
     def plot_xcd(self,
                  rsp_results,
                  broadening_type="lorentzian",
-                 broadening_value=0.1239842,
+                 broadening_value=(1000.0 / hartree_in_wavenumber() *
+                                   hartree_in_ev()),
                  ax=None):
         """
         Plot the X-ray CD spectrum from the response calculation.
@@ -4197,92 +4199,21 @@ class LinearSolver:
             The matplotlib axis to plot on.
         """
 
-        assert_msg_critical('matplotlib' in sys.modules,
-                            'matplotlib is required.')
-
-        au2ev = hartree_in_ev()
-
-        # initialize the plot
-        if ax is None:
-            fig, ax = plt.subplots(figsize=(8, 5))
-
-        ax.set_xlabel("Photon energy [eV]")
-        ax.set_title("ECD Spectrum")
-        ax.set_ylabel(r'$\Delta \epsilon$ [L mol$^{-1}$ cm$^{-1}$]')
-
-        ax2 = ax.twinx()
-        ax2.set_ylabel('Rotatory strength [10$^{-40}$ cgs]')
-
-        for i in np.arange(len(rsp_results["eigenvalues"])):
-            ax2.plot(
-                [
-                    rsp_results["eigenvalues"][i] * au2ev,
-                    rsp_results["eigenvalues"][i] * au2ev,
-                ],
-                [0.0, rsp_results["rotatory_strengths"][i]],
-                alpha=0.7,
-                linewidth=2,
-                color="darkcyan",
-            )
-        ax2.set_ylim(-max(abs(rsp_results["rotatory_strengths"])) * 1.1,
-                     max(abs(rsp_results["rotatory_strengths"])) * 1.1)
-
-        ax.axhline(y=0,
-                   marker=',',
-                   color='k',
-                   linestyle='-.',
-                   markersize=0,
-                   linewidth=0.2)
-
-        x = (rsp_results["eigenvalues"]) * au2ev
-        y = rsp_results["rotatory_strengths"]
-        xmin = max(0.0, min(x) - 0.8)
-        xmax = max(x) + 0.8
-        xstep = 0.003
-
-        if broadening_type.lower() == "lorentzian":
-            xi, yi = self.lorentzian_ecd(x, y, xmin, xmax, xstep,
-                                         broadening_value)
-
-        elif broadening_type.lower() == "gaussian":
-            xi, yi = self.gaussian_ecd(x, y, xmin, xmax, xstep,
-                                       broadening_value)
-
-        # denorm_factor is roughly 22.96 * PI
-        denorm_factor = (rotatory_strength_in_cgs() /
-                         (extinction_coefficient_from_beta() / 3.0))
-        yi = (yi * xi) / denorm_factor
-
-        ax.set_ylim(-max(abs(yi)) * 1.1, max(abs(yi)) * 1.1)
-
-        ax.plot(xi, yi, color="black", alpha=0.9, linewidth=2.5)
-        ax.set_xlim(xmin, xmax)
-
-        # include a legend for the bar and for the broadened spectrum
-        legend_bars = mlines.Line2D([], [],
-                                    color='darkcyan',
-                                    alpha=0.7,
-                                    linewidth=2,
-                                    label='Rotatory strength')
-        label_spectrum = f'{broadening_type.capitalize()} '
-        label_spectrum += f'broadening ({broadening_value:.3f} eV)'
-        legend_spectrum = mlines.Line2D([], [],
-                                        color='black',
-                                        linestyle='-',
-                                        linewidth=2.5,
-                                        label=label_spectrum)
-        ax.legend(handles=[legend_bars, legend_spectrum],
-                  frameon=False,
-                  borderaxespad=0.,
-                  loc='center left',
-                  bbox_to_anchor=(1.15, 0.5))
+        self.plot_ecd(rsp_results,
+                      broadening_type=broadening_type,
+                      broadening_value=broadening_value,
+                      ax=ax,
+                      x_unit="ev",
+                      cd_name="xcd")
 
     def plot_ecd(self,
                  rsp_results,
                  broadening_type="lorentzian",
                  broadening_value=(1000.0 / hartree_in_wavenumber() *
                                    hartree_in_ev()),
-                 ax=None):
+                 ax=None,
+                 x_unit="nm",
+                 cd_name="ecd"):
         """
         Plot the ECD spectrum from the response calculation.
 
@@ -4299,6 +4230,14 @@ class LinearSolver:
         assert_msg_critical('matplotlib' in sys.modules,
                             'matplotlib is required.')
 
+        assert_msg_critical(x_unit.lower() in ['nm', 'ev'],
+                            'plot: Invalid x_unit')
+
+        assert_msg_critical(cd_name.lower() in ['ecd', 'xcd'],
+                            'plot: Invalid cd_name')
+
+        use_ev = (x_unit.lower() == 'ev')
+
         ev_x_nm = hartree_in_ev() / hartree_in_inverse_nm()
         au2ev = hartree_in_ev()
 
@@ -4306,19 +4245,23 @@ class LinearSolver:
         if ax is None:
             fig, ax = plt.subplots(figsize=(8, 5))
 
-        ax.set_xlabel("Wavelength [nm]")
-        ax.set_title("ECD Spectrum")
+        if use_ev:
+            ax.set_xlabel("Photon energy [eV]")
+        else:
+            ax.set_xlabel("Wavelength [nm]")
+        ax.set_title(f"{cd_name.upper()} Spectrum")
         ax.set_ylabel(r'$\Delta \epsilon$ [L mol$^{-1}$ cm$^{-1}$]')
 
         ax2 = ax.twinx()
         ax2.set_ylabel('Rotatory strength [10$^{-40}$ cgs]')
 
         for i in np.arange(len(rsp_results["eigenvalues"])):
+            if use_ev:
+                x_val = rsp_results["eigenvalues"][i] * au2ev
+            else:
+                x_val = ev_x_nm / (rsp_results["eigenvalues"][i] * au2ev)
             ax2.plot(
-                [
-                    ev_x_nm / (rsp_results["eigenvalues"][i] * au2ev),
-                    ev_x_nm / (rsp_results["eigenvalues"][i] * au2ev),
-                ],
+                [x_val, x_val],
                 [0.0, rsp_results["rotatory_strengths"][i]],
                 alpha=0.7,
                 linewidth=2,
@@ -4355,8 +4298,14 @@ class LinearSolver:
 
         ax.set_ylim(-max(abs(yi)) * 1.1, max(abs(yi)) * 1.1)
 
-        ax.plot(ev_x_nm / xi, yi, color="black", alpha=0.9, linewidth=2.5)
-        ax.set_xlim(ev_x_nm / xmax, ev_x_nm / xmin)
+        if use_ev:
+            x_data = xi
+            x_lim = (xmin, xmax)
+        else:
+            x_data = ev_x_nm / xi
+            x_lim = (ev_x_nm / xmax, ev_x_nm / xmin)
+        ax.plot(x_data, yi, color="black", alpha=0.9, linewidth=2.5)
+        ax.set_xlim(x_lim)
 
         # include a legend for the bar and for the broadened spectrum
         legend_bars = mlines.Line2D([], [],
