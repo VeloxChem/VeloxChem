@@ -127,6 +127,9 @@ class DensityViewer:
         self._viewer_width = 600
         self._viewer_height = 450
 
+        # progress bar
+        self.progress = None
+
     def read_hdf5(self, fname):
         """
         Reads the dictionary of densities from a checkpoint file.
@@ -313,7 +316,8 @@ class DensityViewer:
         # Loop over atoms
         for i_atom in range(natms):
             if not self.use_visualization_driver:
-                self.progress.value = i_atom
+                if self.progress is not None:
+                    self.progress.value = i_atom
 
             ao_indices_i = self._atom_to_ao[i_atom]
             atom_id_i = identifiers[i_atom]
@@ -538,11 +542,10 @@ class DensityViewer:
         for bonds in plt_bonds:
             self._this_plot += bonds
 
-        # Add widget
         natm = molecule.number_of_atoms()
 
         if not self.use_visualization_driver:
-            # add progress widget
+            # progress bar
             self.progress = widgets.IntProgress(value=0,
                                                 min=0,
                                                 max=natm - 1,
@@ -831,6 +834,7 @@ class DensityViewer:
         natm = molecule.number_of_atoms()
 
         if not self.use_visualization_driver:
+            # progress bar
             self.progress = widgets.IntProgress(value=0,
                                                 min=0,
                                                 max=natm - 1,
