@@ -312,9 +312,8 @@ class DensityViewer:
 
         # Loop over atoms
         for i_atom in range(natms):
-            if self.use_k3d:
-                if not self.use_visualization_driver:
-                    self.progress.value = i_atom
+            if not self.use_visualization_driver:
+                self.progress.value = i_atom
 
             ao_indices_i = self._atom_to_ao[i_atom]
             atom_id_i = identifiers[i_atom]
@@ -544,9 +543,12 @@ class DensityViewer:
 
         if not self.use_visualization_driver:
             # add progress widget
-            self.progress = widgets.IntProgress(value=0, min=0, max=natm-1,
-                                      description='Loading:', bar_style='info',
-                                      style={'bar_color': '#44aa44'})
+            self.progress = widgets.IntProgress(value=0,
+                                                min=0,
+                                                max=natm - 1,
+                                                description='Loading:',
+                                                bar_style='info',
+                                                style={'bar_color': '#44aa44'})
             display(self.progress)
 
         density = self.compute_density(self._density_list[self._i_den])
@@ -558,7 +560,6 @@ class DensityViewer:
         den_list = []
         for i, label in enumerate(self._density_labels):
             den_list.append((label, i))
-
 
         self.density_selector = widgets.Dropdown(options=den_list,
                                                  value=self._i_den,
@@ -826,6 +827,17 @@ class DensityViewer:
         self.initialize(molecule, basis)
 
         den_key_list = list(self._density_dict.keys())
+
+        natm = molecule.number_of_atoms()
+
+        if not self.use_visualization_driver:
+            self.progress = widgets.IntProgress(value=0,
+                                                min=0,
+                                                max=natm - 1,
+                                                description='Loading:',
+                                                bar_style='info',
+                                                style={'bar_color': '#44aa44'})
+            display(self.progress)
 
         # use a persistent output widget
         out = widgets.Output()

@@ -611,7 +611,7 @@ class ExcitedStateAnalysisDriver:
         viewer.zoomTo()
         viewer.show()
 
-    def show_density(self, molecule, basis, descriptors, use_k3d=False):
+    def show_density(self, molecule, basis, descriptors, use_k3d=False, interpolate=False):
         """Displays the particle and hole densities of molecule.
 
         :param molecule:
@@ -626,6 +626,7 @@ class ExcitedStateAnalysisDriver:
 
         dens_viewer = DensityViewer()
         dens_viewer.use_k3d = use_k3d
+        dens_viewer.interpolate = interpolate
         dens_viewer_dict = {}
         if 'hole_density_matrix_AO' in descriptors:
             dens_viewer_dict['particle'] = descriptors[
