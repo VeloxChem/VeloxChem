@@ -313,7 +313,9 @@ class DensityViewer:
         # Loop over atoms
         for i_atom in range(natms):
             if self.use_k3d:
-                self.progress.value = i_atom
+                if not self.use_visualization_driver:
+                    self.progress.value = i_atom
+
             ao_indices_i = self._atom_to_ao[i_atom]
             atom_id_i = identifiers[i_atom]
             atom_orbs_i = np.array(self._ao_dict[atom_id_i])
@@ -520,8 +522,6 @@ class DensityViewer:
         else:
             assert_msg_critical(False,
                                 'DensityViewer.plot: Invalid density input')
-
-        self.use_k3d = True
 
         self.initialize(molecule, basis)
 
