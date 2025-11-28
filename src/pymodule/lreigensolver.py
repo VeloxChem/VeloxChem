@@ -341,10 +341,20 @@ class LinearResponseEigenSolver(LinearSolver):
 
             checkpoint_nstates = self._read_nstates_from_checkpoint()
 
+            # print warning if nstates is not present in the restart file
+            if checkpoint_nstates is None:
+                self.ostream.print_warning(
+                    'Could not find the nstates key in the checkpoint file.')
+                self.ostream.print_blank()
+                self.ostream.print_info(
+                    'Assuming that nstates is not changed before and after ' +
+                    'the restart.')
+                self.ostream.print_blank()
+                self.ostream.flush()
+
             # generate necessary initial guesses if more states are requested
             # in a restart calculation
-            if (checkpoint_nstates is not None and
-                    self.nstates > checkpoint_nstates):
+            elif checkpoint_nstates < self.nstates:
                 self.ostream.print_info(
                     'Generating initial guesses for ' +
                     f'{self.nstates - checkpoint_nstates} more states...')
@@ -363,7 +373,6 @@ class LinearResponseEigenSolver(LinearSolver):
         # generate initial guess from scratch
         else:
             igs = self._initial_excitations(self.nstates, orb_ene, nocc, norb)
-
             bger, bung = self._setup_trials(igs, None)
 
             profiler.set_timing_key('Preparation')
