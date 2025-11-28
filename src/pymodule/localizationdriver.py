@@ -38,7 +38,6 @@ from .veloxchemlib import mpi_master
 from .oneeints import compute_electric_dipole_integrals
 from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
-from .checkpoint import create_hdf5, write_scf_results_to_hdf5
 
 
 class LocalizationDriver:
@@ -72,59 +71,6 @@ class LocalizationDriver:
         # TODO: implement "pm" and _compute_pipek_mezey
         self.method = 'boys'
 
-    def localize(self, molecule, basis, scf_tensors, mo_list):
-        """
-        Normalize inputs, run the selected localization, and broadcast C_loc.
-        Returns the localized coefficient matrix (all ranks get the same array).
-        """
-        if self.rank == mpi_master():
-            self.ostream.print_info(f'Localizing orbitals ({self.method})')
-            self.ostream.print_blank()
-            self.ostream.flush()
-
-        mo_idx = self._clean_mo_list(mo_list)
-        C_loc = self.compute(molecule, basis, scf_tensors, mo_idx)
-        C_loc = self.comm.bcast(C_loc, root=mpi_master())
-
-        if self.rank == mpi_master():
-            self.ostream.print_info('...done.')
-            self.ostream.print_blank()
-            self.ostream.flush()
-        return C_loc
-
-    def localize_and_write(self, molecule, basis, scf_drv, mo_list,
-                           write_hdf5=False):
-        """
-        Cover the required main functionality 
-        and optionally write an HDF5.
-        """
-        C_loc = self.localize(molecule, basis, scf_drv.scf_tensors, mo_list)
-
-        # Update on master and then broadcast C to be safe
-        if self.rank == mpi_master():
-            scf_drv.scf_tensors['C_alpha'] = C_loc
-        scf_drv.scf_tensors['C_alpha'] = self.comm.bcast(
-            scf_drv.scf_tensors['C_alpha'], root=mpi_master())
-
-        if self.rank == mpi_master():
-            #self.ostream.print_info("\n\nTHE ORBITALS HAVE BEEN LOCALIZED!\n\n")
-            if write_hdf5:
-                loc_h5_fname = f"{scf_drv.filename}_boys_loc.h5"
-                if scf_drv._dft:
-                    xc_label = scf_drv.xcfun.get_func_label()
-                else:
-                    xc_label = 'HF'
-                if scf_drv._pe:
-                    with open(str(scf_drv.pe_options['potfile']), 'r') as f_pot:
-                        potfile_text = f_pot.read()
-                else:
-                    potfile_text = ''
-
-                create_hdf5(loc_h5_fname, molecule, basis, xc_label, potfile_text)
-                write_scf_results_to_hdf5(loc_h5_fname, scf_drv.scf_tensors, scf_drv.history)
-
-        return C_loc
-
     def compute(self, molecule, basis, mo_coefs, mo_list):
         """
         Send to the selected localization routine.
@@ -133,6 +79,8 @@ class LocalizationDriver:
         assert_msg_critical(
             self.method.lower() in ['boys'],
             'LocalizationDriver: Invalid localization method')
+
+        mo_list = self._parse_mo_list(mo_list)
 
         if self.method.lower() == 'boys':
             return self._compute_foster_boys(molecule, basis, mo_coefs, mo_list)
@@ -152,7 +100,9 @@ class LocalizationDriver:
                 np.linalg.multi_dot([C_local.T, x, C_local]) for x in dip_mats
             ])
 
-            for _ in range(self.max_iter):
+            loc_converged = False
+
+            for iter_idx in range(self.max_iter):
                 max_theta = 0.0
                 for i in range(m - 1):
                     for j in range(i+1, m):
@@ -168,41 +118,45 @@ class LocalizationDriver:
                         if abs(theta_opt) < self.threshold:
                             continue
 
-                        cos, sin = np.cos(theta_opt), np.sin(theta_opt)
-                        R = np.array([[cos, -sin], 
-                                    [sin,  cos]])
+                        cos_val, sin_val = np.cos(theta_opt), np.sin(theta_opt)
+                        Rmat = np.array([[cos_val, -sin_val], [sin_val, cos_val]])
 
-                        C_local[:,[i,j]] = np.matmul(C_local[:,[i,j]].copy(), R)
+                        C_local[:,[i,j]] = np.matmul(C_local[:,[i,j]].copy(), Rmat)
 
                         for x in range(3):
-                            r[x, [i, j], :] = np.matmul(R.T, r[x, [i, j], :].copy())
-                            #r[x, :, [i, j]] = r[x, :, [i, j]].copy() @ R
+                            r[x, [i, j], :] = np.matmul(Rmat.T, r[x, [i, j], :].copy())
                             rx = r[x].copy()
-                            rx[:, [i, j]] = np.matmul(rx[:, [i, j]], R)
+                            rx[:, [i, j]] = np.matmul(rx[:, [i, j]].copy(), Rmat)
                             r[x] = rx
 
                         max_theta = max(max_theta, abs(theta_opt))
 
                 if max_theta < self.threshold:
-                    #print(f'Total iterations: {l}')
+                    loc_converged = True
                     break
+
+            if loc_converged:
+                C_new = C.copy()
+                C_new[:, mo_list] = C_local
+                return C_new
             else:
-                self.ostream.print_info(f"Foster–Boys did not converge after {self.max_iter} iterations.")
+                self.ostream.print_warning(
+                    f"Foster–Boys did not converge after {self.max_iter} " +
+                    "iterations.")
+                return None
 
-            C_loc = C.copy()
-            C_loc[:, mo_list] = C_local
-
-            return C_loc
         else:
+            # non-master rank
             return None
 
-    def _clean_mo_list(self, mo_list):
+    def _parse_mo_list(self, mo_list):
         """
         Returns a clean list.
         """
         if isinstance(mo_list, (list, tuple, np.ndarray)):
             out = [int(x) for x in mo_list]
         elif isinstance(mo_list, str):
+            # TODO: use input parser
             s = mo_list.strip()
             if s.startswith('[') and s.endswith(']'):
                 s = s[1:-1]
