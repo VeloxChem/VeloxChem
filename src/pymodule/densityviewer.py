@@ -82,6 +82,9 @@ class DensityViewer:
         self.use_visualization_driver = False
         self.interpolate = False
 
+        # flag to indicate if using k3d
+        self.use_k3d = False
+
         # flag for the type of density
         self.den_type = denmat.rest
 
@@ -309,6 +312,8 @@ class DensityViewer:
 
         # Loop over atoms
         for i_atom in range(natms):
+            if self.use_k3d:
+                self.progress.value = i_atom
             ao_indices_i = self._atom_to_ao[i_atom]
             atom_id_i = identifiers[i_atom]
             atom_orbs_i = np.array(self._ao_dict[atom_id_i])
@@ -478,7 +483,10 @@ class DensityViewer:
             and their labels).
         """
 
-        self._plot_using_py3dmol(molecule, basis, den_inp, width, height)
+        if self.use_k3d:
+            self.plot_using_k3d(molecule, basis, den_inp)
+        else:
+            self._plot_using_py3dmol(molecule, basis, den_inp, width, height)
 
     def plot_using_k3d(self, molecule, basis, den_inp):
         """
@@ -513,6 +521,8 @@ class DensityViewer:
             assert_msg_critical(False,
                                 'DensityViewer.plot: Invalid density input')
 
+        self.use_k3d = True
+
         self.initialize(molecule, basis)
 
         self._density_labels = []
@@ -529,6 +539,16 @@ class DensityViewer:
         for bonds in plt_bonds:
             self._this_plot += bonds
 
+        # Add widget
+        natm = molecule.number_of_atoms()
+
+        if not self.use_visualization_driver:
+            # add progress widget
+            self.progress = widgets.IntProgress(value=0, min=0, max=natm-1,
+                                      description='Loading:', bar_style='info',
+                                      style={'bar_color': '#44aa44'})
+            display(self.progress)
+
         density = self.compute_density(self._density_list[self._i_den])
         self._plt_iso_one, self._plt_iso_two = self.draw_density(density)
         self._this_plot += self._plt_iso_one
@@ -539,7 +559,7 @@ class DensityViewer:
         for i, label in enumerate(self._density_labels):
             den_list.append((label, i))
 
-        # Add widget
+
         self.density_selector = widgets.Dropdown(options=den_list,
                                                  value=self._i_den,
                                                  description='Density:')
