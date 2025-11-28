@@ -9,20 +9,24 @@ from veloxchem.excitedstateanalysisdriver import ExcitedStateAnalysisDriver
 
 
 class TestCTNumbers:
+
     def test_tda(self):
-        ct_matrix = np.array([[0.34837228, 0.19662888], [0.1367462, 0.31825265]])
+
+        ct_matrix = np.array([
+            [0.34837228, 0.19662888],
+            [0.1367462, 0.31825265],
+        ])
 
         hole_participation_ratio = 1.9839293483578253
         particle_participation_ratio = 1.9982298906088756
         avg_participation_ratio = 1.9910796194833504
 
-        avg_hole_position = np.array([9.48439790e-02, 4.63701220e-02, -9.30375228e-05])
+        avg_hole_position = np.array(
+            [9.48439790e-02, 4.63701220e-02, -9.30375228e-05])
         avg_particle_position = np.array(
-            [-1.05663691e-02, 1.95196319e-02, -2.61361122e-05]
-        )
+            [-1.05663691e-02, 1.95196319e-02, -2.61361122e-05])
         avg_difference_vec = np.array(
-            [-1.05410348e-01, -2.68504901e-02, 6.69014106e-05]
-        )
+            [-1.05410348e-01, -2.68504901e-02, 6.69014106e-05])
 
         ct_length = 0.10877635215676436
 
@@ -68,60 +72,35 @@ class TestCTNumbers:
         # add fragment dictionary to ExcitedStateAnalysisDriver
         exc_drv.fragment_dict = fragment_dict
 
-        descriptor_dict_s1 = exc_drv.compute(
-            molecule, basis, scf_results, tda_results, 1
-        )
+        descriptor_dict_s1 = exc_drv.compute(molecule, basis, scf_results,
+                                             tda_results, 1)
 
-        assert np.max(np.abs(descriptor_dict_s1["ct_matrix"] - ct_matrix)) < 1.0e-06
-        assert (
-            np.max(
-                np.abs(
-                    descriptor_dict_s1["hole_participation_ratio"]
-                    - hole_participation_ratio
-                )
-            )
-            < 1.0e-06
-        )
-        assert (
-            np.max(
-                np.abs(
-                    descriptor_dict_s1["particle_participation_ratio"]
-                    - particle_participation_ratio
-                )
-            )
-            < 1.0e-06
-        )
-        assert (
-            np.max(
-                np.abs(
-                    descriptor_dict_s1["avg_participation_ratio"]
-                    - avg_participation_ratio
-                )
-            )
-            < 1.0e-06
-        )
-        assert (
-            np.max(np.abs(descriptor_dict_s1["avg_hole_position"] - avg_hole_position))
-            < 1.0e-06
-        )
-        assert (
-            np.max(
-                np.abs(
-                    descriptor_dict_s1["avg_particle_position"] - avg_particle_position
-                )
-            )
-            < 1.0e-06
-        )
-        assert (
-            np.max(
-                np.abs(descriptor_dict_s1["avg_difference_vector"] - avg_difference_vec)
-            )
-            < 1.0e-06
-        )
-        assert np.max(np.abs(descriptor_dict_s1["ct_length"] - ct_length)) < 1.0e-06
+        assert np.max(np.abs(descriptor_dict_s1["ct_matrix"] -
+                             ct_matrix)) < 1.0e-06
+        assert np.max(
+            np.abs(descriptor_dict_s1["hole_participation_ratio"] -
+                   hole_participation_ratio)) < 1.0e-06
+        assert np.max(
+            np.abs(descriptor_dict_s1["particle_participation_ratio"] -
+                   particle_participation_ratio)) < 1.0e-06
+        assert np.max(
+            np.abs(descriptor_dict_s1["avg_participation_ratio"] -
+                   avg_participation_ratio)) < 1.0e-06
+        assert np.max(
+            np.abs(descriptor_dict_s1["avg_hole_position"] -
+                   avg_hole_position)) < 1.0e-06
+        assert np.max(
+            np.abs(descriptor_dict_s1["avg_particle_position"] -
+                   avg_particle_position)) < 1.0e-06
+        assert np.max(
+            np.abs(descriptor_dict_s1["avg_difference_vector"] -
+                   avg_difference_vec)) < 1.0e-06
+        assert np.max(np.abs(descriptor_dict_s1["ct_length"] -
+                             ct_length)) < 1.0e-06
 
     def test_rpa(self):
-        ct_matrix = np.array([[0.37055813, 0.19016109], [0.13581409, 0.32858347]])
+        ct_matrix = np.array([[0.37055813, 0.19016109],
+                              [0.13581409, 0.32858347]])
 
         hole_participation_ratio = 1.982496948226768
         particle_participation_ratio = 1.9997087109644545
@@ -129,15 +108,14 @@ class TestCTNumbers:
 
         avg_hole_position = np.array([0.10244102, 0.04395257, -0.00010709])
         avg_particle_position = np.array(
-            [1.55512189e-02, 1.76200117e-02, -2.91052404e-05]
-        )
+            [1.55512189e-02, 1.76200117e-02, -2.91052404e-05])
         avg_difference_vec = np.array(
-            [-8.68898023e-02, -2.63325597e-02, 7.79813570e-05]
-        )
+            [-8.68898023e-02, -2.63325597e-02, 7.79813570e-05])
 
         ct_length = 0.09079233183655822
 
-        thienyl_thiazole_str = """S   1.5860   -1.4206    0.0001
+        thienyl_thiazole_str = """
+        S   1.5860   -1.4206    0.0001
         C   0.6775    0.0310   -0.0004
         C   1.4857    1.1466   -0.0004
         C   2.8690    0.8051   -0.0001
@@ -179,54 +157,28 @@ class TestCTNumbers:
         # add fragment dictionary to ExcitedStateAnalysisDriver
         exc_drv.fragment_dict = fragment_dict
 
-        descriptor_dict_s1 = exc_drv.compute(
-            molecule, basis, scf_results, lreig_results, 1
-        )
+        descriptor_dict_s1 = exc_drv.compute(molecule, basis, scf_results,
+                                             lreig_results, 1)
 
-        assert np.max(np.abs(descriptor_dict_s1["ct_matrix"] - ct_matrix)) < 1.0e-06
-        assert (
-            np.max(
-                np.abs(
-                    descriptor_dict_s1["hole_participation_ratio"]
-                    - hole_participation_ratio
-                )
-            )
-            < 1.0e-06
-        )
-        assert (
-            np.max(
-                np.abs(
-                    descriptor_dict_s1["particle_participation_ratio"]
-                    - particle_participation_ratio
-                )
-            )
-            < 1.0e-06
-        )
-        assert (
-            np.max(
-                np.abs(
-                    descriptor_dict_s1["avg_participation_ratio"]
-                    - avg_participation_ratio
-                )
-            )
-            < 1.0e-06
-        )
-        assert (
-            np.max(np.abs(descriptor_dict_s1["avg_hole_position"] - avg_hole_position))
-            < 1.0e-06
-        )
-        assert (
-            np.max(
-                np.abs(
-                    descriptor_dict_s1["avg_particle_position"] - avg_particle_position
-                )
-            )
-            < 1.0e-06
-        )
-        assert (
-            np.max(
-                np.abs(descriptor_dict_s1["avg_difference_vector"] - avg_difference_vec)
-            )
-            < 1.0e-06
-        )
-        assert np.max(np.abs(descriptor_dict_s1["ct_length"] - ct_length)) < 1.0e-06
+        assert np.max(np.abs(descriptor_dict_s1["ct_matrix"] -
+                             ct_matrix)) < 1.0e-06
+        assert np.max(
+            np.abs(descriptor_dict_s1["hole_participation_ratio"] -
+                   hole_participation_ratio)) < 1.0e-06
+        assert np.max(
+            np.abs(descriptor_dict_s1["particle_participation_ratio"] -
+                   particle_participation_ratio)) < 1.0e-06
+        assert np.max(
+            np.abs(descriptor_dict_s1["avg_participation_ratio"] -
+                   avg_participation_ratio)) < 1.0e-06
+        assert np.max(
+            np.abs(descriptor_dict_s1["avg_hole_position"] -
+                   avg_hole_position)) < 1.0e-06
+        assert np.max(
+            np.abs(descriptor_dict_s1["avg_particle_position"] -
+                   avg_particle_position)) < 1.0e-06
+        assert np.max(
+            np.abs(descriptor_dict_s1["avg_difference_vector"] -
+                   avg_difference_vec)) < 1.0e-06
+        assert np.max(np.abs(descriptor_dict_s1["ct_length"] -
+                             ct_length)) < 1.0e-06
