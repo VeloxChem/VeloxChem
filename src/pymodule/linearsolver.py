@@ -4054,93 +4054,19 @@ class LinearSolver:
             The matplotlib axis to plot on.
         """
 
-        assert_msg_critical('matplotlib' in sys.modules,
-                            'matplotlib is required.')
-
-        au2ev = hartree_in_ev()
-        ev2au = 1.0 / au2ev
-
-        # initialize the plot
-        if ax is None:
-            fig, ax = plt.subplots(figsize=(8, 5))
-
-        ax.set_xlabel('Photon energy [eV]')
-        ax.set_ylabel(r'$\epsilon$ [L mol$^{-1}$ cm$^{-1}$]')
-
-        ax.set_title("Absorption Spectrum")
-
-        x = (rsp_results['eigenvalues'])
-        y = rsp_results['oscillator_strengths']
-        xmin = max(0.0, min(x) - 0.03)
-        xmax = max(x) + 0.03
-        xstep = 0.0001
-
-        ax2 = ax.twinx()
-
-        for i in np.arange(len(rsp_results['eigenvalues'])):
-            ax2.plot(
-                [
-                    (rsp_results['eigenvalues'][i] * au2ev),
-                    (rsp_results['eigenvalues'][i] * au2ev),
-                ],
-                [0.0, rsp_results['oscillator_strengths'][i]],
-                alpha=0.7,
-                linewidth=2,
-                color="darkcyan",
-            )
-
-        c = 1.0 / fine_structure_constant()
-        NA = avogadro_constant()
-        a_0 = bohr_in_angstrom() * 1.0e-10
-
-        if broadening_type.lower() == "lorentzian":
-            xi, yi = self.lorentzian_absorption(x, y, xmin, xmax, xstep,
-                                                broadening_value * ev2au)
-
-        elif broadening_type.lower() == "gaussian":
-            xi, yi = self.gaussian_absorption(x, y, xmin, xmax, xstep,
-                                              broadening_value * ev2au)
-
-        sigma = (2 * np.pi * np.pi * xi * yi) / c
-        sigma_m2 = sigma * a_0**2
-        sigma_cm2 = sigma_m2 * 10**4
-        epsilon = sigma_cm2 * NA / (np.log(10) * 10**3)
-        ax.plot(xi * au2ev,
-                epsilon,
-                color="black",
-                alpha=0.9,
-                linewidth=2.5)
-
-        legend_bars = mlines.Line2D([], [],
-                                    color='darkcyan',
-                                    alpha=0.7,
-                                    linewidth=2,
-                                    label='Oscillator strength')
-        label_spectrum = f'{broadening_type.capitalize()} '
-        label_spectrum += f'broadening ({broadening_value:.3f} eV)'
-        legend_spectrum = mlines.Line2D([], [],
-                                        color='black',
-                                        linestyle='-',
-                                        linewidth=2.5,
-                                        label=label_spectrum)
-        ax2.legend(handles=[legend_bars, legend_spectrum],
-                   frameon=False,
-                   borderaxespad=0.,
-                   loc='center left',
-                   bbox_to_anchor=(1.15, 0.5))
-        ax2.set_ylim(0, max(abs(rsp_results['oscillator_strengths'])) * 1.1)
-        ax.set_ylim(0, max(epsilon) * 1.1)
-        ax.set_ylim(bottom=0)
-        ax2.set_ylim(bottom=0)
-        ax2.set_ylabel("Oscillator strength")
-        ax.set_xlim(xmin * au2ev, xmax * au2ev)
+        self.plot_uv_vis(rsp_results,
+                         broadening_type=broadening_type,
+                         broadening_value=broadening_value,
+                         ax=ax,
+                         x_unit="ev")
 
     def plot_uv_vis(self,
                     rsp_results,
                     broadening_type="lorentzian",
                     broadening_value=(1000.0 / hartree_in_wavenumber() *
                                       hartree_in_ev()),
-                    ax=None):
+                    ax=None,
+                    x_unit="nm"):
         """
         Plot the UV spectrum from the response calculation.
 
@@ -4152,10 +4078,17 @@ class LinearSolver:
             The broadening value in eV.
         :param ax:
             The matplotlib axis to plot on.
+        :param x_unit:
+            The unit of x-axis.
         """
 
         assert_msg_critical('matplotlib' in sys.modules,
                             'matplotlib is required.')
+
+        assert_msg_critical(x_unit.lower() in ['nm', 'ev'],
+                            'plot: Invalid x_unit')
+
+        use_ev = (x_unit.lower() == 'ev')
 
         ev_x_nm = hartree_in_ev() / hartree_in_inverse_nm()
         au2ev = hartree_in_ev()
@@ -4165,7 +4098,10 @@ class LinearSolver:
         if ax is None:
             fig, ax = plt.subplots(figsize=(8, 5))
 
-        ax.set_xlabel('Wavelength [nm]')
+        if use_ev:
+            ax.set_xlabel('Photon energy [eV]')
+        else:
+            ax.set_xlabel('Wavelength [nm]')
         ax.set_ylabel(r'$\epsilon$ [L mol$^{-1}$ cm$^{-1}$]')
 
         ax.set_title("Absorption Spectrum")
@@ -4179,11 +4115,12 @@ class LinearSolver:
         ax2 = ax.twinx()
 
         for i in np.arange(len(rsp_results['eigenvalues'])):
+            if use_ev:
+                x_val = rsp_results['eigenvalues'][i] * au2ev,
+            else:
+                x_val = ev_x_nm / (rsp_results['eigenvalues'][i] * au2ev)
             ax2.plot(
-                [
-                    ev_x_nm / (rsp_results['eigenvalues'][i] * au2ev),
-                    ev_x_nm / (rsp_results['eigenvalues'][i] * au2ev),
-                ],
+                [x_val, x_val],
                 [0.0, rsp_results['oscillator_strengths'][i]],
                 alpha=0.7,
                 linewidth=2,
@@ -4206,11 +4143,12 @@ class LinearSolver:
         sigma_m2 = sigma * a_0**2
         sigma_cm2 = sigma_m2 * 10**4
         epsilon = sigma_cm2 * NA / (np.log(10) * 10**3)
-        ax.plot(ev_x_nm / (xi * au2ev),
-                epsilon,
-                color="black",
-                alpha=0.9,
-                linewidth=2.5)
+
+        if use_ev:
+            x_data = xi * au2ev
+        else:
+            x_data = ev_x_nm / (xi * au2ev)
+        ax.plot(x_data, epsilon, color="black", alpha=0.9, linewidth=2.5)
 
         legend_bars = mlines.Line2D([], [],
                                     color='darkcyan',
@@ -4234,7 +4172,12 @@ class LinearSolver:
         ax.set_ylim(bottom=0)
         ax2.set_ylim(bottom=0)
         ax2.set_ylabel("Oscillator strength")
-        ax.set_xlim(ev_x_nm / (xmax * au2ev), ev_x_nm / (xmin * au2ev))
+
+        if use_ev:
+            x_lim = (xmin * au2ev, xmax * au2ev)
+        else:
+            x_lim = (ev_x_nm / (xmax * au2ev), ev_x_nm / (xmin * au2ev))
+        ax.set_xlim(x_lim)
 
     def plot_xcd(self,
                  rsp_results,
