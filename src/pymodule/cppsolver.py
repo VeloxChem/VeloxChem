@@ -39,7 +39,8 @@ import h5py
 
 from .veloxchemlib import (mpi_master, hartree_in_wavenumber, hartree_in_ev,
                            hartree_in_inverse_nm, fine_structure_constant,
-                           extinction_coefficient_from_beta)
+                           extinction_coefficient_from_beta, avogadro_constant,
+                           bohr_in_angstrom)
 from .outputstream import OutputStream
 from .profiler import Profiler
 from .distributedarray import DistributedArray
@@ -1113,6 +1114,13 @@ class ComplexResponse(LinearSolver):
             x_data = np.array(cpp_spec['x_data'])
             y_data = np.array(cpp_spec['y_data'])
 
+        if self.cpp_flag == 'absorption':
+            # Note: use epsilon for absorption
+            NA = avogadro_constant()
+            a_0 = bohr_in_angstrom() * 1.0e-10
+            sigma_to_epsilon = a_0**2 * 10**4 * NA / (np.log(10) * 10**3)
+            y_data *= sigma_to_epsilon
+
         spl = make_interp_spline(x_data, y_data, k=3)
         x_spl = np.linspace(x_data[0], x_data[-1], x_data.size * 10)
         y_spl = spl(x_spl)
@@ -1124,10 +1132,11 @@ class ComplexResponse(LinearSolver):
         else:
             ax.set_xlabel(f'Excitation Energy [{x_unit.lower()}]')
 
-        y_max = np.max(np.abs(np.array(cpp_spec['y_data'])))
+        y_max = np.max(np.abs(y_data))
 
         if self.cpp_flag == 'absorption':
-            ax.set_ylabel(r'$\sigma (\omega)$ [a.u.]')
+            # Note: use epsilon for absorption
+            ax.set_ylabel(r'$\epsilon$ [L mol$^{-1}$ cm$^{-1}$]')
             ax.set_title("Absorption Spectrum")
 
             ax.set_ylim(0.0, y_max * 1.1)
