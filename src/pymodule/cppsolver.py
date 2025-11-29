@@ -1115,6 +1115,9 @@ class ComplexResponse(LinearSolver):
             y_data = np.array(cpp_spec['y_data'])
 
         if self.cpp_flag == 'absorption':
+            assert_msg_critical(
+                '[a.u.]' in cpp_spec['y_label'],
+                'ComplexResponse.plot: In valid unit in y_label')
             # Note: use epsilon for absorption
             NA = avogadro_constant()
             a_0 = bohr_in_angstrom() * 1.0e-10
@@ -1385,6 +1388,10 @@ class ComplexResponse(LinearSolver):
                 y_data = np.array(spectrum['y_data'])
 
                 if self.cpp_flag == 'absorption':
+                    assert_msg_critical(
+                        '[a.u.]' in spectrum['y_label'],
+                        'ComplexResponse.write_cpp_rsp_results_to_hdf5: ' +
+                        'In valid unit in y_label')
                     ylabel = self.group_label + '/sigma'
                 elif self.cpp_flag == 'ecd':
                     ylabel = self.group_label + '/delta-epsilon'
