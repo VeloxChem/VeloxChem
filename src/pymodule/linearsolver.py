@@ -2928,8 +2928,13 @@ class LinearSolver:
         else:
             return tuple()
 
-    def get_complex_prop_grad(self, operator, components, molecule, basis,
-                              scf_tensors):
+    def get_complex_prop_grad(self,
+                              operator,
+                              components,
+                              molecule,
+                              basis,
+                              scf_tensors,
+                              spin='alpha'):
         """
         Computes complex property gradients for linear response equations.
 
@@ -3021,8 +3026,12 @@ class LinearSolver:
         if self.rank == mpi_master():
             integral_comps = [integrals[p] for p in components]
 
-            mo = scf_tensors['C_alpha']
-            nocc = molecule.number_of_alpha_electrons()
+            if spin == 'alpha':
+                mo = scf_tensors['C_alpha']
+                nocc = molecule.number_of_alpha_electrons()
+            elif spin == 'beta':
+                mo = scf_tensors['C_beta']
+                nocc = molecule.number_of_beta_electrons()
             norb = mo.shape[1]
 
             factor = np.sqrt(2.0)
