@@ -698,31 +698,31 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
                     ))
 
                     if self.core_excitation:
-                        mo_occ_a = scf_results['C_alpha'][:, :self.
-                                                          num_core_orbitals]
-                        mo_vir_a = scf_results['C_alpha'][:, nocc_a:]
+                        mo_occ_a = scf_results[
+                            'C_alpha'][:, :self.num_core_orbitals].copy()
+                        mo_vir_a = scf_results['C_alpha'][:, nocc_a:].copy()
                         z_mat_a = eigvec_a[:eigvec_a.size // 2].reshape(
                             self.num_core_orbitals, -1)
                         y_mat_a = eigvec_a[eigvec_a.size // 2:].reshape(
                             self.num_core_orbitals, -1)
 
-                        mo_occ_b = scf_results['C_beta'][:, :self.
-                                                         num_core_orbitals]
-                        mo_vir_b = scf_results['C_beta'][:, nocc_b:]
+                        mo_occ_b = scf_results[
+                            'C_beta'][:, :self.num_core_orbitals].copy()
+                        mo_vir_b = scf_results['C_beta'][:, nocc_b:].copy()
                         z_mat_b = eigvec_b[:eigvec_b.size // 2].reshape(
                             self.num_core_orbitals, -1)
                         y_mat_b = eigvec_b[eigvec_b.size // 2:].reshape(
                             self.num_core_orbitals, -1)
                     else:
-                        mo_occ_a = scf_results['C_alpha'][:, :nocc_a]
-                        mo_vir_a = scf_results['C_alpha'][:, nocc_a:]
+                        mo_occ_a = scf_results['C_alpha'][:, :nocc_a].copy()
+                        mo_vir_a = scf_results['C_alpha'][:, nocc_a:].copy()
                         z_mat_a = eigvec_a[:eigvec_a.size // 2].reshape(
                             nocc_a, -1)
                         y_mat_a = eigvec_a[eigvec_a.size // 2:].reshape(
                             nocc_a, -1)
 
-                        mo_occ_b = scf_results['C_beta'][:, :nocc_b]
-                        mo_vir_b = scf_results['C_beta'][:, nocc_b:]
+                        mo_occ_b = scf_results['C_beta'][:, :nocc_b].copy()
+                        mo_vir_b = scf_results['C_beta'][:, nocc_b:].copy()
                         z_mat_b = eigvec_b[:eigvec_b.size // 2].reshape(
                             nocc_b, -1)
                         y_mat_b = eigvec_b[eigvec_b.size // 2:].reshape(

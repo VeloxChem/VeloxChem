@@ -649,14 +649,17 @@ class LinearResponseEigenSolver(LinearSolver):
 
             excitation_details = []
 
+            detachment_charges = []
+            attachment_charges = []
+
             for s in range(self.nstates):
                 eigvec = self.get_full_solution_vector(exc_solutions[s])
 
                 if self.rank == mpi_master():
                     if self.core_excitation:
-                        mo_occ = scf_results['C_alpha'][:, :self.
-                                                        num_core_orbitals]
-                        mo_vir = scf_results['C_alpha'][:, nocc:]
+                        mo_occ = scf_results[
+                            'C_alpha'][:, :self.num_core_orbitals].copy()
+                        mo_vir = scf_results['C_alpha'][:, nocc:].copy()
                         z_mat = eigvec[:eigvec.size // 2].reshape(
                             self.num_core_orbitals, -1)
                         y_mat = eigvec[eigvec.size // 2:].reshape(
@@ -677,8 +680,8 @@ class LinearResponseEigenSolver(LinearSolver):
                             self.num_core_orbitals + self.num_valence_orbitals,
                             -1)
                     else:
-                        mo_occ = scf_results['C_alpha'][:, :nocc]
-                        mo_vir = scf_results['C_alpha'][:, nocc:]
+                        mo_occ = scf_results['C_alpha'][:, :nocc].copy()
+                        mo_vir = scf_results['C_alpha'][:, nocc:].copy()
                         z_mat = eigvec[:eigvec.size // 2].reshape(nocc, -1)
                         y_mat = eigvec[eigvec.size // 2:].reshape(nocc, -1)
 
@@ -757,6 +760,9 @@ class LinearResponseEigenSolver(LinearSolver):
                             for atomidx, aoinds in enumerate(atom_to_ao):
                                 chg_detach[atomidx] += np.sum(diag_DS[aoinds])
                                 chg_attach[atomidx] += np.sum(diag_AS[aoinds])
+
+                            detachment_charges.append(chg_detach)
+                            attachment_charges.append(chg_attach)
 
                             text = f'{"Atom index":>12s} '
                             text += f'{"Detachment charge":>20s} '
@@ -908,8 +914,10 @@ class LinearResponseEigenSolver(LinearSolver):
 
                     if self.detach_attach:
                         if self.detach_attach_charges:
-                            ret_dict['detachment_charges'] = chg_detach
-                            ret_dict['attachment_charges'] = chg_attach
+                            ret_dict['detachment_charges'] = np.array(
+                                detachment_charges)
+                            ret_dict['attachment_charges'] = np.array(
+                                attachment_charges)
                         if self.detach_attach_cubes:
                             ret_dict['density_cubes'] = dens_cube_files
 
