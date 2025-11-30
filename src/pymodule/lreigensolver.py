@@ -1396,8 +1396,8 @@ class LinearResponseEigenSolver(LinearSolver):
 
         return new_rsp_drv
 
-    @staticmethod
-    def get_absorption_spectrum(rsp_results, x_data, x_unit, b_value, b_unit):
+    def get_absorption_spectrum(self, rsp_results, x_data, x_unit, b_value,
+                                b_unit):
         """
         Gets absorption spectrum.
 
@@ -1418,12 +1418,12 @@ class LinearResponseEigenSolver(LinearSolver):
 
         assert_msg_critical(
             x_unit.lower() in ['au', 'ev', 'nm'],
-            'LinearResponseEigenSolver.get_absorption_spectrum: ' +
+            f'{type(self).__name__}.get_absorption_spectrum: ' +
             'x_data should be au, ev or nm')
 
         assert_msg_critical(
             b_unit.lower() in ['au', 'ev'],
-            'LinearResponseEigenSolver.get_absorption_spectrum: ' +
+            f'{type(self).__name__}.get_absorption_spectrum: ' +
             'broadening parameter should be au or ev')
 
         au2ev = hartree_in_ev()
@@ -1471,8 +1471,7 @@ class LinearResponseEigenSolver(LinearSolver):
 
         return spectrum
 
-    @staticmethod
-    def get_ecd_spectrum(rsp_results, x_data, x_unit, b_value, b_unit):
+    def get_ecd_spectrum(self, rsp_results, x_data, x_unit, b_value, b_unit):
         """
         Gets ECD spectrum.
 
@@ -1493,12 +1492,12 @@ class LinearResponseEigenSolver(LinearSolver):
 
         assert_msg_critical(
             x_unit.lower() in ['au', 'ev', 'nm'],
-            'LinearResponseEigenSolver.get_ecd_spectrum: ' +
+            f'{type(self).__name__}.get_ecd_spectrum: ' +
             'x_data should be au, ev or nm')
 
         assert_msg_critical(
             b_unit.lower() in ['au', 'ev'],
-            'LinearResponseEigenSolver.get_ecd_spectrum: ' +
+            f'{type(self).__name__}.get_ecd_spectrum: ' +
             'broadening parameter should be au or ev')
 
         au2ev = hartree_in_ev()

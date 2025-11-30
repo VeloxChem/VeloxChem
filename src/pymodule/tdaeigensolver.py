@@ -430,7 +430,7 @@ class TdaEigenSolver(LinearSolver):
                 mo_vir = scf_results['C_alpha'][:, nocc:].copy()
 
             eigvals, rnorms = self.solver.get_eigenvalues()
-            eigvecs = self.solver.ritz_vectors
+            eigvecs = self.solver.ritz_vectors.copy()
 
             trans_dipoles = self._comp_trans_dipoles(integrals, eigvals,
                                                      eigvecs, mo_occ, mo_vir)

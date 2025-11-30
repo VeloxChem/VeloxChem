@@ -38,6 +38,7 @@ import sys
 
 from .veloxchemlib import XCFunctional, MolecularGrid
 from .veloxchemlib import mpi_master, rotatory_strength_in_cgs
+from .veloxchemlib import hartree_in_wavenumber, hartree_in_ev
 from .veloxchemlib import denmat
 from .aodensitymatrix import AODensityMatrix
 from .outputstream import OutputStream
@@ -57,6 +58,13 @@ from .errorhandler import assert_msg_critical
 from .checkpoint import (read_rsp_hdf5, write_rsp_hdf5, write_rsp_solution,
                          write_lr_rsp_results_to_hdf5,
                          write_detach_attach_to_hdf5)
+from .spectrumplot import (plot_uv_vis_spectrum, plot_xas_spectrum,
+                           plot_ecd_spectrum, plot_xcd_spectrum)
+
+try:
+    import matplotlib.pyplot as plt
+except ImportError:
+    pass
 
 
 class TdaUnrestrictedEigenSolver(LinearSolver):
@@ -1076,3 +1084,205 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
                 new_rsp_drv.key = deepcopy(val)
 
         return new_rsp_drv
+
+    def plot_xas(self,
+                 rsp_results,
+                 broadening_type="lorentzian",
+                 broadening_value=(1000.0 / hartree_in_wavenumber() *
+                                   hartree_in_ev()),
+                 ax=None):
+        """
+        Plot the X-ray absorption spectrum from the response calculation.
+
+        :param rsp_results:
+            The dictionary containing the linear response results.
+        :param broadening_type:
+            The type of broadening to use. Either 'lorentzian' or 'gaussian'.
+        :param broadening_value:
+            The broadening value in eV.
+        :param ax:
+            The matplotlib axis to plot on.
+        """
+
+        assert_msg_critical(
+            not self.restricted_subspace,
+            'Plotting spectrum for restricted_subspace is not implemented.')
+
+        assert_msg_critical(self.core_excitation,
+                            'Please use plot_uv_vis for valence excitation.')
+
+        plot_xas_spectrum(rsp_results,
+                          broadening_type=broadening_type,
+                          broadening_value=broadening_value,
+                          ax=ax)
+
+    def plot_uv_vis(self,
+                    rsp_results,
+                    broadening_type="lorentzian",
+                    broadening_value=(1000.0 / hartree_in_wavenumber() *
+                                      hartree_in_ev()),
+                    ax=None):
+        """
+        Plot the UV-Vis absorption spectrum from the response calculation.
+
+        :param rsp_results:
+            The dictionary containing the linear response results.
+        :param broadening_type:
+            The type of broadening to use. Either 'lorentzian' or 'gaussian'.
+        :param broadening_value:
+            The broadening value in eV.
+        :param ax:
+            The matplotlib axis to plot on.
+        """
+
+        assert_msg_critical(
+            not self.restricted_subspace,
+            'Plotting spectrum for restricted_subspace is not implemented.')
+
+        assert_msg_critical(not self.core_excitation,
+                            'Please use plot_xas for core excitation.')
+
+        plot_uv_vis_spectrum(rsp_results,
+                             broadening_type=broadening_type,
+                             broadening_value=broadening_value,
+                             ax=ax)
+
+    def plot_xcd(self,
+                 rsp_results,
+                 broadening_type="lorentzian",
+                 broadening_value=(1000.0 / hartree_in_wavenumber() *
+                                   hartree_in_ev()),
+                 ax=None):
+        """
+        Plot the X-ray CD spectrum from the response calculation.
+
+        :param rsp_results:
+            The dictionary containing linear response results.
+        :param broadening_type:
+            The type of broadening to use. Either 'lorentzian' or 'gaussian'.
+        :param broadening_value:
+            The broadening value in eV.
+        :param ax:
+            The matplotlib axis to plot on.
+        """
+
+        assert_msg_critical(
+            not self.restricted_subspace,
+            'Plotting spectrum for restricted_subspace is not implemented.')
+
+        assert_msg_critical(self.core_excitation,
+                            'Please use plot_ecd for valence excitation.')
+
+        plot_xcd_spectrum(rsp_results,
+                          broadening_type=broadening_type,
+                          broadening_value=broadening_value,
+                          ax=ax)
+
+    def plot_ecd(self,
+                 rsp_results,
+                 broadening_type="lorentzian",
+                 broadening_value=(1000.0 / hartree_in_wavenumber() *
+                                   hartree_in_ev()),
+                 ax=None):
+        """
+        Plot the CD spectrum from the response calculation.
+
+        :param rsp_results:
+            The dictionary containing linear response results.
+        :param broadening_type:
+            The type of broadening to use. Either 'lorentzian' or 'gaussian'.
+        :param broadening_value:
+            The broadening value in eV.
+        :param ax:
+            The matplotlib axis to plot on.
+        """
+
+        assert_msg_critical(
+            not self.restricted_subspace,
+            'Plotting spectrum for restricted_subspace is not implemented.')
+
+        assert_msg_critical(not self.core_excitation,
+                            'Please use plot_xcd for core excitation.')
+
+        plot_ecd_spectrum(rsp_results,
+                          broadening_type=broadening_type,
+                          broadening_value=broadening_value,
+                          ax=ax)
+
+    def plot(self,
+             rsp_results,
+             broadening_type="lorentzian",
+             broadening_value=(1000.0 / hartree_in_wavenumber() *
+                               hartree_in_ev()),
+             plot_type="electronic"):
+        """
+        Plot the absorption or ECD spectrum from the response calculation.
+
+        :param rsp_results:
+            The dictionary containing linear response results.
+        :param broadening_type:
+            The type of broadening to use. 'lorentzian' or 'gaussian'.
+        :param broadening_value:
+            The broadening value in eV.
+        :param plot_type:
+            The type of plot to generate. 'uv', 'xas', 'ecd', 'xcd', or 'electronic'.
+        """
+
+        assert_msg_critical('matplotlib' in sys.modules,
+                            'matplotlib is required.')
+
+        assert_msg_critical(
+            not self.restricted_subspace,
+            'Plotting spectrum for restricted_subspace is not implemented.')
+
+        if plot_type.lower() in ["uv", "uv-vis", "uv_vis"]:
+            self.plot_uv_vis(rsp_results,
+                             broadening_type=broadening_type,
+                             broadening_value=broadening_value)
+
+        elif plot_type.lower() == "xas":
+            self.plot_xas(rsp_results,
+                          broadening_type=broadening_type,
+                          broadening_value=broadening_value)
+
+        elif plot_type.lower() == "ecd":
+            self.plot_ecd(rsp_results,
+                          broadening_type=broadening_type,
+                          broadening_value=broadening_value)
+
+        elif plot_type.lower() == "xcd":
+            self.plot_xcd(rsp_results,
+                          broadening_type=broadening_type,
+                          broadening_value=broadening_value)
+
+        elif plot_type.lower() == "electronic":
+            fig, axs = plt.subplots(2, 1, figsize=(8, 10))
+            # Increase the height space between subplots
+            fig.subplots_adjust(hspace=0.3)
+
+            if self.core_excitation:
+                self.plot_xas(rsp_results,
+                              broadening_type=broadening_type,
+                              broadening_value=broadening_value,
+                              ax=axs[0])
+
+                self.plot_xcd(rsp_results,
+                              broadening_type=broadening_type,
+                              broadening_value=broadening_value,
+                              ax=axs[1])
+
+            else:
+                self.plot_uv_vis(rsp_results,
+                                 broadening_type=broadening_type,
+                                 broadening_value=broadening_value,
+                                 ax=axs[0])
+
+                self.plot_ecd(rsp_results,
+                              broadening_type=broadening_type,
+                              broadening_value=broadening_value,
+                              ax=axs[1])
+
+        else:
+            assert_msg_critical(False, 'Invalid plot type')
+
+        plt.show()
