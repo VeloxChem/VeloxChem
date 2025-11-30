@@ -230,7 +230,7 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
         })
 
         if self.rank == mpi_master():
-            self._print_header('TDA Driver', nstates=self.nstates)
+            self._print_header('TDA Eigensolver', nstates=self.nstates)
 
         # set start time
 

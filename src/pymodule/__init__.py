@@ -146,6 +146,7 @@ from .lrsolver import LinearResponseSolver
 from .lrsolverunrest import LinearResponseUnrestrictedSolver
 from .cppsolver import ComplexResponse
 from .cppsolverunrest import ComplexResponseUnrestricted
+from .tdacppsolver import ComplexResponseTDA
 from .c6driver import C6Driver
 from .quadraticresponsedriver import QuadraticResponseDriver
 from .cubicresponsedriver import CubicResponseDriver
