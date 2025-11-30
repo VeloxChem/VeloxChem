@@ -177,17 +177,17 @@ class LinearResponseEigenSolver(LinearSolver):
         if self.cube_origin is not None:
             assert_msg_critical(
                 len(self.cube_origin) == 3,
-                'LinearResponseEigenSolver: cube origin needs 3 numbers')
+                f'{type(self).__name__}: cube origin needs 3 numbers')
 
         if self.cube_stepsize is not None:
             assert_msg_critical(
                 len(self.cube_stepsize) == 3,
-                'LinearResponseEigenSolver: cube stepsize needs 3 numbers')
+                f'{type(self).__name__}: cube stepsize needs 3 numbers')
 
         if self.cube_points is not None:
             assert_msg_critical(
                 len(self.cube_points) == 3,
-                'LinearResponseEigenSolver: cube points needs 3 integers')
+                f'{type(self).__name__}: cube points needs 3 integers')
 
         # If the detachemnt and attachment cube files are requested
         # set the detach_attach flag to True to get the detachment and
@@ -268,7 +268,7 @@ class LinearResponseEigenSolver(LinearSolver):
         nbeta = molecule.number_of_beta_electrons()
         assert_msg_critical(
             nalpha == nbeta,
-            'LinearResponseEigenSolver: not implemented for unrestricted case')
+            f'{type(self).__name__}: not implemented for unrestricted case')
 
         if self.rank == mpi_master():
             orb_ene = scf_results['E_alpha']
@@ -278,26 +278,24 @@ class LinearResponseEigenSolver(LinearSolver):
         norb = orb_ene.shape[0]
         nocc = molecule.number_of_alpha_electrons()
 
-        if self.rank == mpi_master():
-            assert_msg_critical(
-                self.nstates <= nocc * (norb - nocc),
-                'LinearResponseEigenSolver: too many excited states')
-            if getattr(self, 'restricted_subspace',
-                       False) and not self.core_excitation:
-                assert_msg_critical(
-                    self.nstates
-                    <= ((self.num_core_orbitals + self.num_valence_orbitals) *
-                        (self.num_virtual_orbitals)),
-                    'LinearResponseEigenSolver: too many excited states')
+        # check number of excited states, core excitation, restricted subspace
+        assert_msg_critical(self.nstates <= nocc * (norb - nocc),
+                            f'{type(self).__name__}: too many excited states')
 
-            if self.core_excitation:
-                assert_msg_critical(
-                    self.num_core_orbitals > 0,
-                    'LinearResponseEigenSolver: num_core_orbitals not set or invalid'
-                )
-                assert_msg_critical(
-                    self.num_core_orbitals < nocc,
-                    'LinearResponseEigenSolver: num_core_orbitals too large')
+        if self.core_excitation:
+            assert_msg_critical(
+                self.num_core_orbitals > 0,
+                f'{type(self).__name__}: num_core_orbitals not set or invalid')
+            assert_msg_critical(
+                self.num_core_orbitals < nocc,
+                f'{type(self).__name__}: num_core_orbitals too large')
+
+        elif getattr(self, 'restricted_subspace', False):
+            assert_msg_critical(
+                self.nstates
+                <= ((self.num_core_orbitals + self.num_valence_orbitals) *
+                    (self.num_virtual_orbitals)),
+                f'{type(self).__name__}: too many excited states')
 
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
@@ -1277,7 +1275,7 @@ class LinearResponseEigenSolver(LinearSolver):
         nbeta = molecule.number_of_beta_electrons()
         assert_msg_critical(
             nalpha == nbeta,
-            'LinearResponseEigenSolver: not implemented for unrestricted case')
+            f'{type(self).__name__}: not implemented for unrestricted case')
 
         if self.rank == mpi_master():
             orb_ene = scf_results['E_alpha']

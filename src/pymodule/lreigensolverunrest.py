@@ -162,17 +162,17 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
         if self.cube_origin is not None:
             assert_msg_critical(
                 len(self.cube_origin) == 3,
-                'LinearResponseUnrestrictedEigenSolver: cube origin needs 3 numbers')
+                f'{type(self).__name__}: cube origin needs 3 numbers')
 
         if self.cube_stepsize is not None:
             assert_msg_critical(
                 len(self.cube_stepsize) == 3,
-                'LinearResponseUnrestrictedEigenSolver: cube stepsize needs 3 numbers')
+                f'{type(self).__name__}: cube stepsize needs 3 numbers')
 
         if self.cube_points is not None:
             assert_msg_critical(
                 len(self.cube_points) == 3,
-                'LinearResponseUnrestrictedEigenSolver: cube points needs 3 integers')
+                f'{type(self).__name__}: cube points needs 3 integers')
 
         # If the detachemnt and attachment cube files are requested
         # set the detach_attach flag to True to get the detachment and
@@ -180,7 +180,7 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
         if self.detach_attach_cubes:
             self.detach_attach = True
 
-    def compute(self, molecule, basis, scf_tensors):
+    def compute(self, molecule, basis, scf_results):
         """
         Performs linear response calculation for a molecule and a basis set.
 
@@ -188,7 +188,7 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
             The molecule.
         :param basis:
             The AO basis set.
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
 
         :return:
@@ -213,7 +213,7 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
         molecule_sanity_check(molecule)
 
         # check SCF results
-        scf_results_sanity_check(self, scf_tensors)
+        scf_results_sanity_check(self, scf_results)
 
         # update checkpoint_file after scf_results_sanity_check
         if self.filename is not None and self.checkpoint_file is None:
@@ -246,8 +246,8 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
         self.start_time = tm.time()
 
         if self.rank == mpi_master():
-            orb_ene_a = scf_tensors['E_alpha']
-            orb_ene_b = scf_tensors['E_beta']
+            orb_ene_a = scf_results['E_alpha']
+            orb_ene_b = scf_results['E_beta']
         else:
             orb_ene_a = None
             orb_ene_b = None
@@ -258,26 +258,31 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
         nocc_a = molecule.number_of_alpha_electrons()
         nocc_b = molecule.number_of_beta_electrons()
 
-        if self.rank == mpi_master():
-            assert_msg_critical(
-                self.nstates <= (nocc_a * (norb - nocc_a) +
-                                 nocc_b * (norb - nocc_b)),
-                'LinearResponseUnrestrictedEigenSolver: too many excited states')
+        # check number of excited states, core excitation, restricted subspace
+        assert_msg_critical(
+            self.nstates
+            <= (nocc_a * (norb - nocc_a) + nocc_b * (norb - nocc_b)),
+            f'{type(self).__name__}: too many excited states')
 
-            if self.core_excitation:
-                assert_msg_critical(
-                    self.num_core_orbitals > 0,
-                    'LinearResponseUnrestrictedEigenSolver: num_core_orbitals not set or invalid')
-                assert_msg_critical(
-                    (self.num_core_orbitals < nocc_a and
-                     self.num_core_orbitals < nocc_b),
-                    'LinearResponseUnrestrictedEigenSolver: num_core_orbitals too large')
+        if self.core_excitation:
+            assert_msg_critical(
+                self.num_core_orbitals > 0,
+                f'{type(self).__name__}: num_core_orbitals not set or invalid')
+            assert_msg_critical(
+                (self.num_core_orbitals < nocc_a and
+                 self.num_core_orbitals < nocc_b),
+                f'{type(self).__name__}: num_core_orbitals too large')
+
+        elif getattr(self, 'restricted_subspace', False):
+            assert_msg_critical(
+                False,
+                f'{type(self).__name__}: restricted_subspace not implemented')
 
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
 
         # DFT information
-        dft_dict = self._init_dft(molecule, scf_tensors)
+        dft_dict = self._init_dft(molecule, scf_results)
 
         # PE information
         pe_dict = self._init_pe(molecule, basis)
@@ -288,13 +293,11 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
         # For now, 'nonlinear' is not supported for unrestricted case.
         assert_msg_critical(
             not self.nonlinear,
-            'LinearResponseUnrestrictedEigenSolver: ' +
-            'not implemented for nonlinear')
+            f'{type(self).__name__}: ' + 'not implemented for nonlinear')
 
         # TODO: enable PE
         assert_msg_critical(
-            not self._pe,
-            'LinearResponseUnrestrictedEigenSolver: ' +
+            not self._pe, f'{type(self).__name__}: ' +
             'not yet implemented for polarizable embedding')
 
         if self.nonlinear:
@@ -350,19 +353,27 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
 
                 profiler.set_timing_key('Preparation')
 
-                self._e2n_half_size(bger, bung, molecule, basis, scf_tensors,
+                self._e2n_half_size(bger, bung, molecule, basis, scf_results,
                                     eri_dict, dft_dict, pe_dict, profiler)
 
         # generate initial guess from scratch
         else:
-            igs = self._initial_excitations(
-                self.nstates, (orb_ene_a, orb_ene_b), (nocc_a, nocc_b), norb)
+            igs = self._initial_excitations(self.nstates,
+                                            (orb_ene_a, orb_ene_b),
+                                            (nocc_a, nocc_b), norb)
             bger, bung = self._setup_trials(igs, None)
 
             profiler.set_timing_key('Preparation')
 
-            self._e2n_half_size(bger, bung, molecule, basis, scf_tensors,
-                                eri_dict, dft_dict, pe_dict, profiler,
+            self._e2n_half_size(bger,
+                                bung,
+                                molecule,
+                                basis,
+                                scf_results,
+                                eri_dict,
+                                dft_dict,
+                                pe_dict,
+                                profiler,
                                 method_type='unrestricted')
 
         profiler.check_memory_usage('Initial guess')
@@ -524,8 +535,8 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
 
             # update trial vectors
             precond = {
-                k: self._get_precond((orb_ene_a, orb_ene_b), (nocc_a, nocc_b), norb, w)
-                for k, w in enumerate(list(wn))
+                k: self._get_precond((orb_ene_a, orb_ene_b), (nocc_a, nocc_b),
+                                     norb, w) for k, w in enumerate(list(wn))
             }
 
             new_trials_ger, new_trials_ung = self._setup_trials(
@@ -552,9 +563,15 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
                                        rsp_vector_labels)
                 self._add_nstates_to_checkpoint()
 
-            self._e2n_half_size(new_trials_ger, new_trials_ung,
-                                molecule, basis, scf_tensors, eri_dict,
-                                dft_dict, pe_dict, profiler,
+            self._e2n_half_size(new_trials_ger,
+                                new_trials_ung,
+                                molecule,
+                                basis,
+                                scf_results,
+                                eri_dict,
+                                dft_dict,
+                                pe_dict,
+                                profiler,
                                 method_type='unrestricted')
 
             iter_in_hours = (tm.time() - iter_start_time) / 3600
@@ -592,19 +609,43 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
 
         # calculate properties
         if self.is_converged:
-            edip_grad_a = self.get_prop_grad('electric dipole', 'xyz', molecule,
-                                             basis, scf_tensors, spin='alpha')
-            lmom_grad_a = self.get_prop_grad('linear momentum', 'xyz', molecule,
-                                             basis, scf_tensors, spin='alpha')
-            mdip_grad_a = self.get_prop_grad('magnetic dipole', 'xyz', molecule,
-                                             basis, scf_tensors, spin='alpha')
+            edip_grad_a = self.get_prop_grad('electric dipole',
+                                             'xyz',
+                                             molecule,
+                                             basis,
+                                             scf_results,
+                                             spin='alpha')
+            lmom_grad_a = self.get_prop_grad('linear momentum',
+                                             'xyz',
+                                             molecule,
+                                             basis,
+                                             scf_results,
+                                             spin='alpha')
+            mdip_grad_a = self.get_prop_grad('magnetic dipole',
+                                             'xyz',
+                                             molecule,
+                                             basis,
+                                             scf_results,
+                                             spin='alpha')
 
-            edip_grad_b = self.get_prop_grad('electric dipole', 'xyz', molecule,
-                                             basis, scf_tensors, spin='beta')
-            lmom_grad_b = self.get_prop_grad('linear momentum', 'xyz', molecule,
-                                             basis, scf_tensors, spin='beta')
-            mdip_grad_b = self.get_prop_grad('magnetic dipole', 'xyz', molecule,
-                                             basis, scf_tensors, spin='beta')
+            edip_grad_b = self.get_prop_grad('electric dipole',
+                                             'xyz',
+                                             molecule,
+                                             basis,
+                                             scf_results,
+                                             spin='beta')
+            lmom_grad_b = self.get_prop_grad('linear momentum',
+                                             'xyz',
+                                             molecule,
+                                             basis,
+                                             scf_results,
+                                             spin='beta')
+            mdip_grad_b = self.get_prop_grad('magnetic dipole',
+                                             'xyz',
+                                             molecule,
+                                             basis,
+                                             scf_results,
+                                             spin='beta')
 
             # for unrestricted
             edip_grad_a /= sqrt_2
@@ -656,25 +697,35 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
                     ))
 
                     if self.core_excitation:
-                        mo_occ_a = scf_tensors['C_alpha'][:, :self.num_core_orbitals]
-                        mo_vir_a = scf_tensors['C_alpha'][:, nocc_a:]
-                        z_mat_a = eigvec_a[:eigvec_a.size // 2].reshape(self.num_core_orbitals, -1)
-                        y_mat_a = eigvec_a[eigvec_a.size // 2:].reshape(self.num_core_orbitals, -1)
+                        mo_occ_a = scf_results['C_alpha'][:, :self.
+                                                          num_core_orbitals]
+                        mo_vir_a = scf_results['C_alpha'][:, nocc_a:]
+                        z_mat_a = eigvec_a[:eigvec_a.size // 2].reshape(
+                            self.num_core_orbitals, -1)
+                        y_mat_a = eigvec_a[eigvec_a.size // 2:].reshape(
+                            self.num_core_orbitals, -1)
 
-                        mo_occ_b = scf_tensors['C_beta'][:, :self.num_core_orbitals]
-                        mo_vir_b = scf_tensors['C_beta'][:, nocc_b:]
-                        z_mat_b = eigvec_b[:eigvec_b.size // 2].reshape(self.num_core_orbitals, -1)
-                        y_mat_b = eigvec_b[eigvec_b.size // 2:].reshape(self.num_core_orbitals, -1)
+                        mo_occ_b = scf_results['C_beta'][:, :self.
+                                                         num_core_orbitals]
+                        mo_vir_b = scf_results['C_beta'][:, nocc_b:]
+                        z_mat_b = eigvec_b[:eigvec_b.size // 2].reshape(
+                            self.num_core_orbitals, -1)
+                        y_mat_b = eigvec_b[eigvec_b.size // 2:].reshape(
+                            self.num_core_orbitals, -1)
                     else:
-                        mo_occ_a = scf_tensors['C_alpha'][:, :nocc_a]
-                        mo_vir_a = scf_tensors['C_alpha'][:, nocc_a:]
-                        z_mat_a = eigvec_a[:eigvec_a.size // 2].reshape(nocc_a, -1)
-                        y_mat_a = eigvec_a[eigvec_a.size // 2:].reshape(nocc_a, -1)
+                        mo_occ_a = scf_results['C_alpha'][:, :nocc_a]
+                        mo_vir_a = scf_results['C_alpha'][:, nocc_a:]
+                        z_mat_a = eigvec_a[:eigvec_a.size // 2].reshape(
+                            nocc_a, -1)
+                        y_mat_a = eigvec_a[eigvec_a.size // 2:].reshape(
+                            nocc_a, -1)
 
-                        mo_occ_b = scf_tensors['C_beta'][:, :nocc_b]
-                        mo_vir_b = scf_tensors['C_beta'][:, nocc_b:]
-                        z_mat_b = eigvec_b[:eigvec_b.size // 2].reshape(nocc_b, -1)
-                        y_mat_b = eigvec_b[eigvec_b.size // 2:].reshape(nocc_b, -1)
+                        mo_occ_b = scf_results['C_beta'][:, :nocc_b]
+                        mo_vir_b = scf_results['C_beta'][:, nocc_b:]
+                        z_mat_b = eigvec_b[:eigvec_b.size // 2].reshape(
+                            nocc_b, -1)
+                        y_mat_b = eigvec_b[eigvec_b.size // 2:].reshape(
+                            nocc_b, -1)
 
                 if self.nto or self.detach_attach:
                     vis_drv = VisualizationDriver(self.comm)
@@ -719,11 +770,21 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
 
                     if self.nto_cubes:
                         lam_diag_a, nto_cube_fnames_a = self.write_nto_cubes(
-                            cubic_grid, molecule, basis, s, nto_mo,
-                            self.nto_pairs, nto_spin='alpha')
+                            cubic_grid,
+                            molecule,
+                            basis,
+                            s,
+                            nto_mo,
+                            self.nto_pairs,
+                            nto_spin='alpha')
                         lam_diag_b, nto_cube_fnames_b = self.write_nto_cubes(
-                            cubic_grid, molecule, basis, s, nto_mo,
-                            self.nto_pairs, nto_spin='beta')
+                            cubic_grid,
+                            molecule,
+                            basis,
+                            s,
+                            nto_mo,
+                            self.nto_pairs,
+                            nto_spin='beta')
 
                         if self.rank == mpi_master():
                             nto_cube_files_a.append(nto_cube_fnames_a)
@@ -769,8 +830,7 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
 
                 # TODO: enable esa
                 assert_msg_critical(
-                    not self.esa,
-                    'LinearResponseUnrestrictedEigenSolver: ' +
+                    not self.esa, f'{type(self).__name__}: ' +
                     'not yet implemented for excited state absorption')
 
                 if self.esa:
@@ -1023,7 +1083,12 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
 
         self.ostream.flush()
 
-    def _initial_excitations(self, nstates, orb_ene, nocc, norb, n_excl_states=0):
+    def _initial_excitations(self,
+                             nstates,
+                             orb_ene,
+                             nocc,
+                             norb,
+                             n_excl_states=0):
         """
         Gets initial guess for excitations.
 
@@ -1072,7 +1137,8 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
 
         final = {}
 
-        for k, (i, a) in enumerate(sorted(w_a, key=w_a.get)[n_excl_states:nstates]):
+        for k, (i, a) in enumerate(
+                sorted(w_a, key=w_a.get)[n_excl_states:nstates]):
             if self.rank == mpi_master():
                 ia = excitations_a.index((i, a))
 
@@ -1104,7 +1170,8 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
 
         k_offset = len(final)
 
-        for k, (j, b) in enumerate(sorted(w_b, key=w_b.get)[n_excl_states:nstates]):
+        for k, (j, b) in enumerate(
+                sorted(w_b, key=w_b.get)[n_excl_states:nstates]):
             if self.rank == mpi_master():
                 jb = excitations_b.index((j, b))
 
@@ -1205,8 +1272,10 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
             ediag_b, sdiag_b = self.construct_ediag_sdiag_half(
                 orb_ene_b, nocc_b, norb, self.num_core_orbitals)
         else:
-            ediag_a, sdiag_a = self.construct_ediag_sdiag_half(orb_ene_a, nocc_a, norb)
-            ediag_b, sdiag_b = self.construct_ediag_sdiag_half(orb_ene_b, nocc_b, norb)
+            ediag_a, sdiag_a = self.construct_ediag_sdiag_half(
+                orb_ene_a, nocc_a, norb)
+            ediag_b, sdiag_b = self.construct_ediag_sdiag_half(
+                orb_ene_b, nocc_b, norb)
 
         ediag_a_sq = ediag_a**2
         sdiag_a_sq = sdiag_a**2
@@ -1306,7 +1375,8 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
             A deepcopy of self.
         """
 
-        new_rsp_drv = LinearResponseUnrestrictedEigenSolver(self.comm, self.ostream)
+        new_rsp_drv = LinearResponseUnrestrictedEigenSolver(
+            self.comm, self.ostream)
 
         for key, val in vars(self).items():
             if isinstance(val, (MPI.Intracomm, OutputStream)):
