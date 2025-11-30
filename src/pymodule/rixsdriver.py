@@ -115,7 +115,7 @@ class RixsDriver(LinearSolver):
         self._input_keywords['response'].update({
             'theta':
                 ('float', 'angle between incident polarization vector and ' +
-                    'propagation vector of outgoing'),
+                    'outgoing propagation vector'),
             'gamma': ('float', 'broadening term (FWHM)'),
             'photon_energy': ('list', 'list of incoming photon energies'),
             'final_state_cutoff':
@@ -143,6 +143,17 @@ class RixsDriver(LinearSolver):
 
         if method_dict is None:
             method_dict = {}
+        
+        key = 'photon_energy'
+        if key in rsp_dict:
+            val = rsp_dict[key]
+
+            if isinstance(val, list):
+                rsp_dict[key] = [float(str(x).strip()) for x in val]
+
+            elif isinstance(val, str):
+                parts = val.replace(',', ' ').split()
+                rsp_dict[key] = [float(x) for x in parts]
 
         super().update_settings(rsp_dict, method_dict)
 
@@ -331,9 +342,8 @@ class RixsDriver(LinearSolver):
             core_states = self.comm.bcast(core_states, root=mpi_master())
             val_states = self.comm.bcast(val_states, root=mpi_master())
 
-            # for compatibiltiy with the two-shot approach
+            # for compatibility with the two-shot approach
             cvs_rsp_results = rsp_results
-            # for compatibiltiy with the two-shot approach
             occupied_core   = num_core_orbitals + num_valence_orbitals
 
         mo_core_indices = list(range(num_core_orbitals))
@@ -477,6 +487,10 @@ class RixsDriver(LinearSolver):
                     f'Computed RIXS cross-sections for {num_final_states} final states '
                     f'at photon energy: {omega*hartree_in_ev():.2f} eV.'
                 )
+                self.ostream.print_blank()
+                self._print_rixs_data(f'RIXS cross-sections at incident X-ray energy '
+                                      f'{omega*hartree_in_ev():.2f} eV, energy-loss mode',
+                                      self.ene_losses[:,w_ind], self.cross_sections[:,w_ind], self.elastic_cross_sections[w_ind])
                 self.ostream.print_blank()
                 self.ostream.flush()
 
@@ -1012,4 +1026,36 @@ class RixsDriver(LinearSolver):
             self.ostream.print_info(self._approach_string)
             self.ostream.print_blank()
         
+        self.ostream.flush()
+
+    def _print_rixs_data(self, title, ene_losses,
+                         cross_sections, elastic_cross_section):
+        """
+        Prints rixs-data to output stream.
+
+        :param title:
+            The title to be printed to the output stream.
+        :param results:
+            The dictionary containing response results.
+        """
+
+        spin_str = 'S'
+
+        valstr = title
+        self.ostream.print_header(valstr.ljust(92))
+        self.ostream.print_header(('-' * len(valstr)).ljust(92))
+        valstr = 'Ground State  {:>5s}: '.format(spin_str + str(0))
+        valstr += '{:15.8f} a.u. '.format(0)
+        valstr += '{:12.5f} eV'.format(0)
+        valstr += '    Cross-section   {:9.2e}'.format(elastic_cross_section)
+        self.ostream.print_header(valstr.ljust(92))
+    
+        for s, e in enumerate(ene_losses):
+            valstr = 'Excited State {:>5s}: '.format(spin_str + str(s + 1))
+            valstr += '{:15.8f} a.u. '.format(e)
+            valstr += '{:12.5f} eV'.format(e * hartree_in_ev())
+            f = cross_sections[s]
+            valstr += '    Cross-section   {:9.2e}'.format(f)
+            self.ostream.print_header(valstr.ljust(92))
+        self.ostream.print_blank()
         self.ostream.flush()
