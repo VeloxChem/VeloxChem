@@ -141,7 +141,7 @@ class ComplexResponseUnrestricted(LinearSolver):
         """
 
         assert_msg_critical(flag.lower() in ['absorption', 'ecd'],
-                            'ComplexResponse: invalid CPP flag')
+                            f'{type(self).__name__}: invalid CPP flag')
 
         self.cpp_flag = flag.lower()
 
@@ -356,11 +356,11 @@ class ComplexResponseUnrestricted(LinearSolver):
         for comp in self.a_components:
             assert_msg_critical(
                 self.is_valid_component(comp, self.a_operator),
-                'ComplexResponse: Undefined or invalid a_component')
+                f'{type(self).__name__}: Undefined or invalid a_component')
         for comp in self.b_components:
             assert_msg_critical(
                 self.is_valid_component(comp, self.b_operator),
-                'ComplexResponse: Undefined or invalid b_component')
+                f'{type(self).__name__}: Undefined or invalid b_component')
 
         if self.norm_thresh is None:
             self.norm_thresh = self.conv_thresh * 1.0e-6
@@ -1123,7 +1123,8 @@ class ComplexResponseUnrestricted(LinearSolver):
 
         assert_msg_critical(
             x_unit.lower() in ['au', 'ev', 'nm'],
-            'ComplexResponse.get_spectrum: x_unit should be au, ev or nm')
+            f'{type(self).__name__}.get_spectrum: x_unit should be au, ev or nm'
+        )
 
         au2ev = hartree_in_ev()
         auxnm = 1.0 / hartree_in_inverse_nm()
@@ -1179,7 +1180,8 @@ class ComplexResponseUnrestricted(LinearSolver):
 
         assert_msg_critical(
             x_unit.lower() in ['au', 'ev', 'nm'],
-            'ComplexResponse.get_spectrum: x_unit should be au, ev or nm')
+            f'{type(self).__name__}.get_spectrum: x_unit should be au, ev or nm'
+        )
 
         au2ev = hartree_in_ev()
         auxnm = 1.0 / hartree_in_inverse_nm()
@@ -1233,7 +1235,7 @@ class ComplexResponseUnrestricted(LinearSolver):
 
         assert_msg_critical(
             x_unit.lower() in ['au', 'ev', 'nm'],
-            'ComplexResponse.plot: x_unit should be au, ev or nm')
+            f'{type(self).__name__}.plot: x_unit should be au, ev or nm')
 
         assert_msg_critical('matplotlib' in sys.modules,
                             'matplotlib is required.')
@@ -1257,7 +1259,7 @@ class ComplexResponseUnrestricted(LinearSolver):
         if self.cpp_flag == 'absorption':
             assert_msg_critical(
                 '[a.u.]' in cpp_spec['y_label'],
-                'ComplexResponse.plot: In valid unit in y_label')
+                f'{type(self).__name__}.plot: In valid unit in y_label')
             # Note: use epsilon for absorption
             NA = avogadro_constant()
             a_0 = bohr_in_angstrom() * 1.0e-10
@@ -1418,11 +1420,11 @@ class ComplexResponseUnrestricted(LinearSolver):
 
         assert_msg_critical(
             '[a.u.]' in spectrum['x_label'],
-            'ComplexResponse._print_absorption_results: In valid unit in x_label'
+            f'{type(self).__name__}._print_absorption_results: In valid unit in x_label'
         )
         assert_msg_critical(
             '[a.u.]' in spectrum['y_label'],
-            'ComplexResponse._print_absorption_results: In valid unit in y_label'
+            f'{type(self).__name__}._print_absorption_results: In valid unit in y_label'
         )
 
         title = '{:<20s}{:<20s}{:>15s}'.format('Frequency[a.u.]',
@@ -1479,10 +1481,12 @@ class ComplexResponseUnrestricted(LinearSolver):
 
         assert_msg_critical(
             '[a.u.]' in spectrum['x_label'],
-            'ComplexResponse._print_ecd_results: In valid unit in x_label')
+            f'{type(self).__name__}._print_ecd_results: In valid unit in x_label'
+        )
         assert_msg_critical(
             r'[L mol$^{-1}$ cm$^{-1}$]' in spectrum['y_label'],
-            'ComplexResponse._print_ecd_results: In valid unit in y_label')
+            f'{type(self).__name__}._print_ecd_results: In valid unit in y_label'
+        )
 
         title = '{:<20s}{:<20s}{:>28s}'.format('Frequency[a.u.]',
                                                'Frequency[eV]',
@@ -1530,8 +1534,8 @@ class ComplexResponseUnrestricted(LinearSolver):
                 if self.cpp_flag == 'absorption':
                     assert_msg_critical(
                         '[a.u.]' in spectrum['y_label'],
-                        'ComplexResponse.write_cpp_rsp_results_to_hdf5: ' +
-                        'In valid unit in y_label')
+                        f'{type(self).__name__}.write_cpp_rsp_results_to_hdf5: '
+                        + 'In valid unit in y_label')
                     ylabel = self.group_label + '/sigma'
                 elif self.cpp_flag == 'ecd':
                     ylabel = self.group_label + '/delta-epsilon'
