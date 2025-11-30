@@ -1105,7 +1105,7 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
         """
 
         assert_msg_critical(
-            not self.restricted_subspace,
+            not getattr(self, 'restricted_subspace', False),
             'Plotting spectrum for restricted_subspace is not implemented.')
 
         assert_msg_critical(self.core_excitation,
@@ -1136,7 +1136,7 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
         """
 
         assert_msg_critical(
-            not self.restricted_subspace,
+            not getattr(self, 'restricted_subspace', False),
             'Plotting spectrum for restricted_subspace is not implemented.')
 
         assert_msg_critical(not self.core_excitation,
@@ -1167,7 +1167,7 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
         """
 
         assert_msg_critical(
-            not self.restricted_subspace,
+            not getattr(self, 'restricted_subspace', False),
             'Plotting spectrum for restricted_subspace is not implemented.')
 
         assert_msg_critical(self.core_excitation,
@@ -1198,7 +1198,7 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
         """
 
         assert_msg_critical(
-            not self.restricted_subspace,
+            not getattr(self, 'restricted_subspace', False),
             'Plotting spectrum for restricted_subspace is not implemented.')
 
         assert_msg_critical(not self.core_excitation,
@@ -1232,7 +1232,7 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
                             'matplotlib is required.')
 
         assert_msg_critical(
-            not self.restricted_subspace,
+            not getattr(self, 'restricted_subspace', False),
             'Plotting spectrum for restricted_subspace is not implemented.')
 
         if plot_type.lower() in ["uv", "uv-vis", "uv_vis"]:
