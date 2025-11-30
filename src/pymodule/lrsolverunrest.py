@@ -113,7 +113,7 @@ class LinearResponseUnrestrictedSolver(LinearSolver):
 
         super().update_settings(rsp_dict, method_dict)
 
-    def compute(self, molecule, basis, scf_tensors, v_grad=None):
+    def compute(self, molecule, basis, scf_results, v_grad=None):
         """
         Performs linear response calculation for a molecule and a basis set.
 
@@ -121,7 +121,7 @@ class LinearResponseUnrestrictedSolver(LinearSolver):
             The molecule.
         :param basis:
             The AO basis set.
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
         :param v_grad:
             The gradients on the right-hand side. If not provided, v_grad will
@@ -149,7 +149,7 @@ class LinearResponseUnrestrictedSolver(LinearSolver):
         molecule_sanity_check(molecule)
 
         # check SCF results
-        scf_results_sanity_check(self, scf_tensors)
+        scf_results_sanity_check(self, scf_results)
 
         # update checkpoint_file after scf_results_sanity_check
         if self.filename is not None and self.checkpoint_file is None:
@@ -167,7 +167,7 @@ class LinearResponseUnrestrictedSolver(LinearSolver):
         # check solvation model setup
         if self.rank == mpi_master():
             assert_msg_critical(
-                'solvation_model' not in scf_tensors,
+                'solvation_model' not in scf_results,
                 type(self).__name__ + ': Solvation model not implemented')
 
         # check print level (verbosity of output)
@@ -188,8 +188,8 @@ class LinearResponseUnrestrictedSolver(LinearSolver):
         self.start_time = tm.time()
 
         if self.rank == mpi_master():
-            orb_ene_a = scf_tensors['E_alpha']
-            orb_ene_b = scf_tensors['E_beta']
+            orb_ene_a = scf_results['E_alpha']
+            orb_ene_b = scf_results['E_beta']
         else:
             orb_ene_a = None
             orb_ene_b = None
@@ -206,7 +206,7 @@ class LinearResponseUnrestrictedSolver(LinearSolver):
         eri_dict = self._init_eri(molecule, basis)
 
         # DFT information
-        dft_dict = self._init_dft(molecule, scf_tensors)
+        dft_dict = self._init_dft(molecule, scf_results)
 
         # PE information
         pe_dict = self._init_pe(molecule, basis)
@@ -216,8 +216,7 @@ class LinearResponseUnrestrictedSolver(LinearSolver):
 
         # TODO: enable PE
         assert_msg_critical(
-            not self._pe,
-            'LinearResponseUnrestrictedSolver: ' +
+            not self._pe, f'{type(self).__name__}: ' +
             'not yet implemented for polarizable embedding')
 
         # right-hand side (gradient)
@@ -229,17 +228,22 @@ class LinearResponseUnrestrictedSolver(LinearSolver):
         # For now, 'has_external_rhs' is not supported for unrestricted case.
         assert_msg_critical(
             not self.has_external_rhs,
-            'LinearResponseUnrestrictedSolver: ' +
-            'not implemented for external rhs')
+            f'{type(self).__name__}: ' + 'not implemented for external rhs')
 
         sqrt_2 = np.sqrt(2.0)
 
         if not self.has_external_rhs:
-            b_grad_alpha = self.get_prop_grad(self.b_operator, self.b_components,
-                                              molecule, basis, scf_tensors,
+            b_grad_alpha = self.get_prop_grad(self.b_operator,
+                                              self.b_components,
+                                              molecule,
+                                              basis,
+                                              scf_results,
                                               spin='alpha')
-            b_grad_beta = self.get_prop_grad(self.b_operator, self.b_components,
-                                             molecule, basis, scf_tensors,
+            b_grad_beta = self.get_prop_grad(self.b_operator,
+                                             self.b_components,
+                                             molecule,
+                                             basis,
+                                             scf_results,
                                              spin='beta')
 
             # for unrestricted
@@ -248,8 +252,8 @@ class LinearResponseUnrestrictedSolver(LinearSolver):
 
             if self.rank == mpi_master():
                 v_grad = {
-                    (op, w): (va, vb)
-                    for op, va, vb in zip(self.b_components, b_grad_alpha, b_grad_beta)
+                    (op, w): (va, vb) for op, va, vb in zip(
+                        self.b_components, b_grad_alpha, b_grad_beta)
                     for w in self.frequencies
                 }
 
@@ -266,8 +270,8 @@ class LinearResponseUnrestrictedSolver(LinearSolver):
                 self.frequencies.append(w)
 
         precond = {
-            w: self._get_precond((orb_ene_a, orb_ene_b), (nocc_a, nocc_b), norb, w)
-            for w in self.frequencies
+            w: self._get_precond((orb_ene_a, orb_ene_b), (nocc_a, nocc_b), norb,
+                                 w) for w in self.frequencies
         }
 
         # distribute the right-hand side
@@ -321,8 +325,15 @@ class LinearResponseUnrestrictedSolver(LinearSolver):
 
             profiler.set_timing_key('Preparation')
 
-            self._e2n_half_size(bger, bung, molecule, basis, scf_tensors,
-                                eri_dict, dft_dict, pe_dict, profiler,
+            self._e2n_half_size(bger,
+                                bung,
+                                molecule,
+                                basis,
+                                scf_results,
+                                eri_dict,
+                                dft_dict,
+                                pe_dict,
+                                profiler,
                                 method_type='unrestricted')
 
         profiler.check_memory_usage('Initial guess')
@@ -505,9 +516,16 @@ class LinearResponseUnrestrictedSolver(LinearSolver):
                 self._write_checkpoint(molecule, basis, dft_dict, pe_dict,
                                        rsp_vector_labels)
 
-            self._e2n_half_size(new_trials_ger, new_trials_ung, molecule, basis,
-                                scf_tensors, eri_dict, dft_dict, pe_dict,
-                                profiler, method_type='unrestricted')
+            self._e2n_half_size(new_trials_ger,
+                                new_trials_ung,
+                                molecule,
+                                basis,
+                                scf_results,
+                                eri_dict,
+                                dft_dict,
+                                pe_dict,
+                                profiler,
+                                method_type='unrestricted')
 
             iter_in_hours = (tm.time() - iter_start_time) / 3600
             iter_per_trial_in_hours = iter_in_hours / n_new_trials
@@ -535,11 +553,17 @@ class LinearResponseUnrestrictedSolver(LinearSolver):
 
         # calculate response functions
         if not self.has_external_rhs:
-            a_grad_alpha = self.get_prop_grad(self.a_operator, self.a_components,
-                                              molecule, basis, scf_tensors,
+            a_grad_alpha = self.get_prop_grad(self.a_operator,
+                                              self.a_components,
+                                              molecule,
+                                              basis,
+                                              scf_results,
                                               spin='alpha')
-            a_grad_beta = self.get_prop_grad(self.a_operator, self.a_components,
-                                             molecule, basis, scf_tensors,
+            a_grad_beta = self.get_prop_grad(self.a_operator,
+                                             self.a_components,
+                                             molecule,
+                                             basis,
+                                             scf_results,
                                              spin='beta')
 
             # for unrestricted
@@ -548,9 +572,10 @@ class LinearResponseUnrestrictedSolver(LinearSolver):
 
             if self.is_converged:
                 if self.rank == mpi_master():
-                    v_op_a = {op: (va, vb)
-                              for op, va, vb in zip(
-                                  self.a_components, a_grad_alpha, a_grad_beta)}
+                    v_op_a = {
+                        op: (va, vb) for op, va, vb in zip(
+                            self.a_components, a_grad_alpha, a_grad_beta)
+                    }
                     rsp_funcs = {}
 
                     # final h5 file for response solutions
@@ -576,9 +601,9 @@ class LinearResponseUnrestrictedSolver(LinearSolver):
                         ))
 
                         for aop in self.a_components:
-                            rsp_funcs[(aop, bop, w)] = (-1.0) * (
-                                np.dot(v_op_a[aop][0], x_alpha) +
-                                np.dot(v_op_a[aop][1], x_beta))
+                            rsp_funcs[(aop, bop, w)] = (
+                                -1.0) * (np.dot(v_op_a[aop][0], x_alpha) +
+                                         np.dot(v_op_a[aop][1], x_beta))
 
                             # Note: flip sign for imaginary a_operator
                             if self.is_imag(self.a_operator):
@@ -591,7 +616,8 @@ class LinearResponseUnrestrictedSolver(LinearSolver):
                                 for aop in self.a_components
                             ]
                             write_rsp_solution_with_multiple_keys(
-                                final_h5_fname, solution_keys, x, self.group_label)
+                                final_h5_fname, solution_keys, x,
+                                self.group_label)
 
                 if self.rank == mpi_master():
                     # print information about h5 file for response solutions
@@ -700,8 +726,10 @@ class LinearResponseUnrestrictedSolver(LinearSolver):
 
         # spawning needed components
 
-        ediag_a, sdiag_a = self.construct_ediag_sdiag_half(orb_ene_a, nocc_a, norb)
-        ediag_b, sdiag_b = self.construct_ediag_sdiag_half(orb_ene_b, nocc_b, norb)
+        ediag_a, sdiag_a = self.construct_ediag_sdiag_half(
+            orb_ene_a, nocc_a, norb)
+        ediag_b, sdiag_b = self.construct_ediag_sdiag_half(
+            orb_ene_b, nocc_b, norb)
 
         ediag_a_sq = ediag_a**2
         sdiag_a_sq = sdiag_a**2
