@@ -177,17 +177,17 @@ class TdaEigenSolver(LinearSolver):
         if self.cube_origin is not None:
             assert_msg_critical(
                 len(self.cube_origin) == 3,
-                'TdaEigenSolver: cube origin needs 3 numbers')
+                f'{type(self).__name__}: cube origin needs 3 numbers')
 
         if self.cube_stepsize is not None:
             assert_msg_critical(
                 len(self.cube_stepsize) == 3,
-                'TdaEigenSolver: cube stepsize needs 3 numbers')
+                f'{type(self).__name__}: cube stepsize needs 3 numbers')
 
         if self.cube_points is not None:
             assert_msg_critical(
                 len(self.cube_points) == 3,
-                'TdaEigenSolver: cube points needs 3 integers')
+                f'{type(self).__name__}: cube points needs 3 integers')
 
         # If the detachemnt and attachment cube files are requested,
         # set the detach_attach flag to True to get the detachment and
@@ -195,7 +195,7 @@ class TdaEigenSolver(LinearSolver):
         if self.detach_attach_cubes:
             self.detach_attach = True
 
-    def compute(self, molecule, basis, scf_tensors):
+    def compute(self, molecule, basis, scf_results):
         """
         Performs TDA excited states calculation using molecular data.
 
@@ -203,7 +203,7 @@ class TdaEigenSolver(LinearSolver):
             The molecule.
         :param basis:
             The AO basis set.
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
 
         :return:
@@ -215,7 +215,7 @@ class TdaEigenSolver(LinearSolver):
         molecule_sanity_check(molecule)
 
         # check SCF results
-        scf_results_sanity_check(self, scf_tensors)
+        scf_results_sanity_check(self, scf_results)
 
         # update checkpoint_file after scf_results_sanity_check
         if self.filename is not None and self.checkpoint_file is None:
@@ -254,27 +254,32 @@ class TdaEigenSolver(LinearSolver):
         nbeta = molecule.number_of_beta_electrons()
         assert_msg_critical(
             nalpha == nbeta,
-            'TdaEigenSolver: not implemented for unrestricted case')
+            f'{type(self).__name__}: not implemented for unrestricted case')
 
         # prepare molecular orbitals
 
         if self.rank == mpi_master():
-            orb_ene = scf_tensors['E_alpha']
+            orb_ene = scf_results['E_alpha']
             norb = orb_ene.shape[0]
             nocc = molecule.number_of_alpha_electrons()
+
+            # check nstates, core excitation, restricted subspace
+            assert_msg_critical(
+                self.nstates <= nocc * (norb - nocc),
+                f'{type(self).__name__}: too many excited states')
+
             if self.core_excitation:
                 assert_msg_critical(
                     self.nstates <= self.num_core_orbitals * (norb - nocc),
-                    'TdaEigenSolver: too many excited states')
+                    f'{type(self).__name__}: too many excited states')
+
             elif self.restricted_subspace:
                 assert_msg_critical(
                     self.nstates
                     <= ((self.num_core_orbitals + self.num_valence_orbitals) *
                         self.num_virtual_orbitals),
-                    'TdaEigenSolver: too many excited states')
-            else:
-                assert_msg_critical(self.nstates <= nocc * (norb - nocc),
-                                    'TdaEigenSolver: too many excited states')
+                    f'{type(self).__name__}: too many excited states')
+
         else:
             orb_ene = None
             nocc = None
@@ -283,7 +288,7 @@ class TdaEigenSolver(LinearSolver):
         eri_dict = self._init_eri(molecule, basis)
 
         # DFT information
-        dft_dict = self._init_dft(molecule, scf_tensors)
+        dft_dict = self._init_dft(molecule, scf_results)
 
         # PE information
         pe_dict = self._init_pe(molecule, basis)
@@ -331,7 +336,7 @@ class TdaEigenSolver(LinearSolver):
             # perform linear transformation of trial vectors
 
             if i >= n_restart_iterations:
-                tdens = self._get_trans_densities(trial_mat, scf_tensors,
+                tdens = self._get_trans_densities(trial_mat, scf_results,
                                                   molecule)
                 fock = self._comp_lr_fock(tdens, molecule, basis, eri_dict,
                                           dft_dict, pe_dict, profiler)
@@ -343,7 +348,7 @@ class TdaEigenSolver(LinearSolver):
             if self.rank == mpi_master():
 
                 if i >= n_restart_iterations:
-                    sig_mat = self._get_sigmas(fock, scf_tensors, molecule,
+                    sig_mat = self._get_sigmas(fock, scf_results, molecule,
                                                trial_mat)
                 else:
                     istart = i * self.nstates
@@ -409,20 +414,20 @@ class TdaEigenSolver(LinearSolver):
 
         if self.rank == mpi_master() and self._is_converged:
             if self.core_excitation:
-                mo_occ = scf_tensors['C_alpha'][:, :self.
+                mo_occ = scf_results['C_alpha'][:, :self.
                                                 num_core_orbitals].copy()
-                mo_vir = scf_tensors['C_alpha'][:, nocc:].copy()
+                mo_vir = scf_results['C_alpha'][:, nocc:].copy()
             elif self.restricted_subspace:
                 mo_occ = np.hstack(
-                    (scf_tensors['C_alpha'][:, :self.num_core_orbitals].copy(),
-                     scf_tensors['C_alpha']
+                    (scf_results['C_alpha'][:, :self.num_core_orbitals].copy(),
+                     scf_results['C_alpha']
                      [:, nocc - self.num_valence_orbitals:nocc].copy()))
                 mo_vir = np.copy(
-                    scf_tensors['C_alpha'][:, nocc:nocc +
+                    scf_results['C_alpha'][:, nocc:nocc +
                                            self.num_virtual_orbitals])
             else:
-                mo_occ = scf_tensors['C_alpha'][:, :nocc].copy()
-                mo_vir = scf_tensors['C_alpha'][:, nocc:].copy()
+                mo_occ = scf_results['C_alpha'][:, :nocc].copy()
+                mo_vir = scf_results['C_alpha'][:, nocc:].copy()
 
             eigvals, rnorms = self.solver.get_eigenvalues()
             eigvecs = self.solver.ritz_vectors
