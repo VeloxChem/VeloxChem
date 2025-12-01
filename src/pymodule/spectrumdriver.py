@@ -78,17 +78,17 @@ class SpectrumDriver:
 
     @staticmethod
     def trajectory_parser(topology_file, trajectory_file, 
-                          qm_selection, filename_core, 
+                          center_selection, filename_core, 
                           filename_environment, snapshots):
         """"
-        Trajectory parser for extracting snapshots.
+        Trajectory parser for managing snapshots with pyframe.
         """
         
-        traj = pyframe.Trajectory(topology_file, 
-                                  trajectory_file,
-                                  qm_selection,
-                                  snapshots)
-        traj.set_core_region(qm_selection)
+        traj = pyframe.Trajectory(topology_file=topology_file, 
+                                  trajectory_file=trajectory_file,
+                                  center_selection=center_selection,
+                                  snapshots=snapshots)
+        traj.set_core_region(center_selection)
         traj.add_region(
             name='test',
             selection='resname SOL or resname Na+',
