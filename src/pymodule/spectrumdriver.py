@@ -76,7 +76,8 @@ class SpectrumDriver:
         self.rank = self.comm.Get_rank()
         self.size = self.comm.Get_size()
 
-    def trajectory_parser(self, topology_file, trajectory_file, 
+    @staticmethod
+    def trajectory_parser(topology_file, trajectory_file, 
                           qm_selection, filename_core, 
                           filename_environment, snapshots):
         """"
