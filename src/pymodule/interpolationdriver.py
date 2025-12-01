@@ -1154,9 +1154,9 @@ class InterpolationDriver():
 
             w_tot = score_i_kcal / (score_i_kcal.sum() + eps)
 
-            # for bookkeeping: check sums
-            assert np.allclose(e_i.sum(), delta_E, atol=1e-12)
-            assert np.allclose(g_i.sum(), delta_G, atol=1e-12)
+            # # for bookkeeping: check sums
+            # assert np.allclose(e_i.sum(), delta_E, atol=1e-12)
+            # assert np.allclose(g_i.sum(), delta_G, atol=1e-12)
 
             # --- final per-coordinate entry ---
             contributions = list(

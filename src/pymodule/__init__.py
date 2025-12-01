@@ -210,19 +210,6 @@ from .interpolationdatapoint import InterpolationDatapoint
 from .alphaoptimizer import AlphaOptimizer
 from .openmmimdynamics import OpenMMIMDynamics
 
-## external interfaces for Interpolation module
-from .clustermanager import ClusterManager
-from .externalexcitedstatedriver import ExternalExcitedStatesScfDriver
-from .externalexcitedstategradientdriver import ExternalExcitedStatesGradientDriver
-from .externalexcitedstatehessiandriver import ExternalExcitedStatesHessianDriver
-from .externalscfdriver import ExternalScfDriver
-from .externalgradientdriver import ExternalGradientDriver
-from .externalhessiandriver import ExternalHessianDriver
-from .externaloptimdriver import ExternalOptimDriver
-from .localbayesresidual import LocalBayesResidual
-
-
-
 from .mofbuilder import MofBuilder
 from .conformergenerator import ConformerGenerator
 from .tsguesser import TransitionStateGuesser

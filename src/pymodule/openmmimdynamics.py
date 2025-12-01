@@ -51,8 +51,6 @@ from .solvationbuilder import SolvationBuilder
 from .optimizationdriver import OptimizationDriver
 from .interpolationdatapoint import InterpolationDatapoint
 from .scfrestdriver import ScfRestrictedDriver
-from .externalscfdriver import ExternalScfDriver
-from .externalexcitedstatedriver import ExternalExcitedStatesScfDriver
 from .interpolationdriver import InterpolationDriver
 from .atommapper import AtomMapper
 from .errorhandler import assert_msg_critical
@@ -1652,13 +1650,6 @@ class OpenMMIMDynamics:
             qm_energy = np.array([qm_energy])
             qm_driver.ostream.unmute()
         
-        elif isinstance(qm_driver, ExternalScfDriver):
-            qm_energy = qm_driver.compute_energy(molecule, basis.get_main_basis_label())
-            print('qm_energy', qm_energy)
-        
-        elif isinstance(qm_driver, ExternalExcitedStatesScfDriver):
-            qm_energy = qm_driver.compute_energy(molecule, basis.get_main_basis_label())
-
         if qm_energy is None:
             error_txt = "Could not compute the QM energy. "
             error_txt += "Please define a QM driver."

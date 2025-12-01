@@ -64,13 +64,6 @@ from .scfrestdriver import ScfRestrictedDriver
 from .molecularbasis import MolecularBasis
 from .scfgradientdriver import ScfGradientDriver
 from .scfhessiandriver import ScfHessianDriver
-from .externalscfdriver import ExternalScfDriver
-from .externalgradientdriver import ExternalGradientDriver
-from .externalhessiandriver import ExternalHessianDriver
-from .externalexcitedstatedriver import ExternalExcitedStatesScfDriver
-from .externalexcitedstategradientdriver import ExternalExcitedStatesGradientDriver
-from .externalexcitedstatehessiandriver import ExternalExcitedStatesHessianDriver
-from .externaloptimdriver import ExternalOptimDriver
 from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
 from .xtbhessiandriver import XtbHessianDriver

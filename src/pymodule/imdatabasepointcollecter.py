@@ -68,7 +68,6 @@ from .xtbgradientdriver import XtbGradientDriver
 from .xtbhessiandriver import XtbHessianDriver
 from .interpolationdriver import InterpolationDriver
 from .interpolationdatapoint import InterpolationDatapoint
-from .localbayesresidual import LocalBayesResidual
 from .alphaoptimizer import AlphaOptimizer
 from .gprinterpolationdriver import GPRInterpolationDriver
 
@@ -192,7 +191,6 @@ class IMDatabasePointCollecter:
 
         # VeloxChem objects
         self.molecule = None
-        self.ghost_atom = (False, None)
         self.energy_gabs = {}
         self.state_energies = {}
         self.unique_residues = []
