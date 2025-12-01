@@ -473,7 +473,7 @@ class LinearSolver:
             'dft_func_label': dft_func_label,
         }
 
-    def _init_pe(self, molecule, basis):
+    def _init_pe(self, molecule, basis, silent=False):
         """
         Initializes polarizable embedding.
 
@@ -502,10 +502,11 @@ class LinearSolver:
 
             # TODO: print PyFraME info
 
-            pot_info = 'Reading polarizable embedding: {}'.format(
-                self.pe_options['potfile'])
-            self.ostream.print_info(pot_info)
-            self.ostream.print_blank()
+            if not silent:
+                pot_info = 'Reading polarizable embedding: {}'.format(
+                    self.pe_options['potfile'])
+                self.ostream.print_info(pot_info)
+                self.ostream.print_blank()
 
             with open(str(self.pe_options['potfile']), 'r') as f_pot:
                 potfile_text = '\n'.join(f_pot.readlines())
@@ -2521,7 +2522,7 @@ class LinearSolver:
             cur_str += f'{self.cpcm_epsilon}'
             self.ostream.print_header(cur_str.ljust(str_width))
             if self.non_equilibrium_solv:
-                cur_str = 'C-PCM Optical Dielectric Constant: '
+                cur_str = 'C-PCM Optical Dielectric Const. : '
                 cur_str += f'{self.cpcm_optical_epsilon}'
                 self.ostream.print_header(cur_str.ljust(str_width))
 

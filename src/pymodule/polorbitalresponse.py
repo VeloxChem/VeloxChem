@@ -2488,7 +2488,7 @@ class PolOrbitalResponse(CphfSolver):
     def print_cphf_header(self, title):
         self.ostream.print_blank()
         self.ostream.print_header(f'{title:s} Setup')
-        self.ostream.print_header('=' * (len(title) + 8))
+        self.ostream.print_header('-' * (len(title) + 8))
         self.ostream.print_blank()
 
         str_width = 70

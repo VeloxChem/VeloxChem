@@ -109,13 +109,9 @@ class ScfGradientDriver(GradientDriver):
         self.print_header()
 
         if self.numerical:
-
-            self.ostream.mute()
             self.compute_numerical(molecule, basis, scf_results)
-            self.ostream.unmute()
 
         else:
-
             # sanity checks
             molecule_sanity_check(molecule)
             scf_results_sanity_check(self, self.scf_driver.scf_tensors)
@@ -267,21 +263,21 @@ class ScfGradientDriver(GradientDriver):
             grad_timing['Point_charges_grad'] += time.time() - t0
 
         # orbital contribution to gradient
-
+    
         t0 = time.time()
-
+    
         ovl_grad_drv = OverlapGeom100Driver()
-
+    
         for iatom in local_atoms:
             gmats = ovl_grad_drv.compute(molecule, basis, iatom)
-
+    
             for i, label in enumerate(['X', 'Y', 'Z']):
                 gmat = gmats.matrix_to_numpy(label)
                 # Note: minus sign for energy weighted density
                 self.gradient[iatom, i] -= 2.0 * np.sum((gmat + gmat.T) * W)
-
+    
             gmats = Matrices()
-
+    
         grad_timing['Overlap_grad'] += time.time() - t0
 
         # ERI contribution to gradient
@@ -939,21 +935,19 @@ class ScfGradientDriver(GradientDriver):
             The energy.
         """
 
-        # if not self._debug:
-        #     self.ostream.mute()
-
         if self.numerical:
             # disable restarting scf for numerical gradient
             self.scf_driver.restart = False
         else:
             # always try restarting scf for analytical gradient
             self.scf_driver.restart = True
+
+        self.scf_driver.ostream.mute()
         new_scf_results = self.scf_driver.compute(molecule, ao_basis)
+        self.scf_driver.ostream.unmute()
+
         assert_msg_critical(self.scf_driver.is_converged,
                             'ScfGradientDriver: SCF did not converge')
-
-        # if not self._debug:
-        #     self.ostream.unmute()
 
         if (self.rank == mpi_master()) and (scf_results is not None):
             scf_results.update(new_scf_results)

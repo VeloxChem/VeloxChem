@@ -40,6 +40,7 @@ from .outputstream import OutputStream
 from .dftutils import get_default_grid_level
 from .inputparser import parse_input
 from .sanitychecks import dft_sanity_check
+from .molecule import Molecule
 
 
 class HessianDriver:
@@ -116,10 +117,13 @@ class HessianDriver:
         self._input_keywords = {
             'hessian': {
                 'numerical': ('bool', 'do numerical hessian'),
-                'do_four_point': ('bool', 'do four-point numerical integration'),
+                'do_four_point':
+                    ('bool', 'do four-point numerical integration'),
+                'delta_h': ('float', 'step size for numerical integration'),
                 'numerical_grad': ('bool', 'whether the gradient is numerical'),
                 'do_print_hessian': ('bool', 'whether to print the Hessian'),
-                'do_dipole_gradient': ('bool', 'whether to compute the dipole gradient'),
+                'do_dipole_gradient':
+                    ('bool', 'whether to compute the dipole gradient'),
                 'timing': ('bool', 'whether timing is needed'),
                 'profiling': ('bool', 'whether profiling is needed'),
                 'memory_profiling': ('bool', 'whether to profile memory'),
@@ -129,8 +133,8 @@ class HessianDriver:
             'method_settings': {
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
                 'grid_level': ('int', 'accuracy level of DFT grid'),
-                }
             }
+        }
 
     def update_settings(self, method_dict=None, hess_dict=None):
         """
@@ -148,8 +152,7 @@ class HessianDriver:
             hess_dict = {}
 
         hess_keywords = {
-            key: val[0] for key, val in
-            self._input_keywords['hessian'].items()
+            key: val[0] for key, val in self._input_keywords['hessian'].items()
         }
 
         parse_input(self, hess_keywords, hess_dict)
@@ -375,23 +378,26 @@ class HessianDriver:
         self.ostream.print_block(molecule.get_string())
         self.ostream.flush()
 
-    def print_hessian(self, molecule):
+    def print_hessian(self, molecule, title=None):
         """
         Prints the Hessian.
 
         :param molecule:
             The molecule.
+        :param title:
+            The title.
         """
 
         # atom labels
         labels = molecule.get_labels()
 
-        if self.numerical:
-            title = 'Numerical '
-        else:
-            title = 'Analytical '
-
-        title += 'Hessian (Hartree/Bohr**2)'
+        # TODO: move to child classes
+        if title is None:
+            if self.numerical:
+                title = 'Numerical '
+            else:
+                title = 'Analytical '
+            title += 'Hessian (Hartree/Bohr**2)'
         self.ostream.print_header(title)
         self.ostream.print_header('-' * (len(title) + 2))
         self.ostream.print_blank()
@@ -434,9 +440,11 @@ class HessianDriver:
 
         str_width = 70
 
+        title = f'{self.flag} Setup'
+
         self.ostream.print_blank()
-        self.ostream.print_header(self.flag)
-        self.ostream.print_header((len(self.flag) + 2) * '=')
+        self.ostream.print_header(title)
+        self.ostream.print_header((len(title) + 2) * '=')
         self.ostream.flush()
 
         cur_str = 'Hessian Type                    : '
@@ -471,3 +479,165 @@ class HessianDriver:
         self.ostream.print_blank()
         self.ostream.flush()
 
+    def compute_numerical(self, molecule, *args):
+        """
+        Computes the numerical Hessian based on the analytical gradient.
+
+        :param molecule:
+            The molecule.
+        :param args:
+            The same arguments as the compute function.
+        """
+        # atom ids
+        labels = molecule.get_labels()
+
+        # atom coordinates (nx3)
+        coords = molecule.get_coordinates_in_bohr()
+        atom_basis_labels = molecule.get_atom_basis_labels()
+
+        # charge and spin multiplicity
+        charge = molecule.get_charge()
+        multiplicity = molecule.get_multiplicity()
+
+        # number of atoms
+        natm = molecule.number_of_atoms()
+
+        # numerical Hessian
+        hessian = np.zeros((natm, 3, natm, 3))
+
+        # numerical dipole moment gradient
+        if self.do_dipole_gradient:
+            dipole_gradient = np.zeros((natm, 3, 3))
+        else:
+            dipole_gradient = None
+
+        natoms = molecule.number_of_atoms()
+
+        for i in range(natoms):
+
+            self.ostream.print_info(f'Processing atom {i + 1}/{natoms}...')
+            if i == natoms - 1:
+                self.ostream.print_blank()
+            self.ostream.flush()
+
+            for d in range(3):
+                coords[i, d] += self.delta_h
+                new_mol = Molecule(labels, coords, 'au', atom_basis_labels)
+                new_mol.set_charge(charge)
+                new_mol.set_multiplicity(multiplicity)
+
+                grad_plus = self.compute_gradient(new_mol, *args)
+
+                if self.do_dipole_gradient:
+                    dipmom_plus = (self.compute_electric_dipole_moment(
+                        new_mol, *args))
+
+                coords[i, d] -= 2.0 * self.delta_h
+                new_mol = Molecule(labels, coords, 'au', atom_basis_labels)
+                new_mol.set_charge(charge)
+                new_mol.set_multiplicity(multiplicity)
+
+                grad_minus = self.compute_gradient(new_mol, *args)
+
+                if self.do_dipole_gradient:
+                    dipmom_minus = (self.compute_electric_dipole_moment(
+                        new_mol, *args))
+
+                if self.do_four_point:
+                    coords[i, d] -= self.delta_h
+                    new_mol = Molecule(labels, coords, 'au', atom_basis_labels)
+                    new_mol.set_charge(charge)
+                    new_mol.set_multiplicity(multiplicity)
+
+                    grad_minus2 = self.compute_gradient(new_mol, *args)
+
+                    if self.do_dipole_gradient:
+                        dipmom_minus2 = (self.compute_electric_dipole_moment(
+                            new_mol, *args))
+
+                    coords[i, d] += 4.0 * self.delta_h
+                    new_mol = Molecule(labels, coords, 'au', atom_basis_labels)
+                    new_mol.set_charge(charge)
+                    new_mol.set_multiplicity(multiplicity)
+
+                    grad_plus2 = self.compute_gradient(new_mol, *args)
+
+                    if self.do_dipole_gradient:
+                        dipmom_plus2 = (self.compute_electric_dipole_moment(
+                            new_mol, *args))
+
+                    coords[i, d] -= 2.0 * self.delta_h
+                    hessian[i, d] = ((grad_minus2 - 8 * grad_minus +
+                                      8 * grad_plus - grad_plus2) /
+                                     (12.0 * self.delta_h))
+                    if self.do_dipole_gradient:
+                        if self.rank == mpi_master():
+                            dipole_gradient[i, d] = (
+                                (dipmom_minus2 - 8 * dipmom_minus +
+                                 8 * dipmom_plus - dipmom_plus2) /
+                                (12.0 * self.delta_h))
+                else:
+                    coords[i, d] += self.delta_h
+                    hessian[i, d] = ((grad_plus - grad_minus) /
+                                     (2.0 * self.delta_h))
+                    if self.do_dipole_gradient:
+                        if self.rank == mpi_master():
+                            dipole_gradient[i, d] = ((dipmom_plus - dipmom_minus) /
+                                                     (2.0 * self.delta_h))
+
+        # save energy for thermodynamics
+        # and restore scf_tensors to results for the original geometry.
+        self.elec_energy = self.compute_energy(molecule, *args)
+
+        # save Hessian in the usual shape
+        self.hessian = hessian.reshape((natm * 3, natm * 3))
+
+        if self.do_dipole_gradient:
+            # save the dipole moment gradient in the expected shape
+            self.dipole_gradient = dipole_gradient.transpose(2, 0, 1).reshape(
+                3, natm * 3)
+
+    def compute_energy(self, molecule, *args):
+        """
+        Computes the energy at current geometry.
+
+        :param molecule:
+            The molecule.
+        :param args:
+            The same arguments as the "compute" function.
+
+        :return:
+            The energy.
+        """
+
+        return
+
+    def compute_gradient(self, molecule, *args):
+        """
+        Computes the gradient at current geometry.
+
+        :param molecule:
+            The molecule.
+        :param args:
+            The same arguments as the "compute" function.
+
+        :return:
+            The gradient.
+        """
+
+        return
+
+    def compute_electric_dipole_moment(self, molecule, *args):
+        """
+        Computes the electric dipole moment at current geometry.
+
+        :param molecule:
+            The molecule.
+        :param args:
+            The same arguments as the "compute" function.
+
+        :return:
+            The electric dipole moment.
+        """
+
+        return

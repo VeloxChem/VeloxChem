@@ -164,6 +164,44 @@ class TddftOrbitalResponse(CphfSolver):
             unrelaxed one-particle density.
         """
 
+        # check molecule
+        molecule_sanity_check(molecule)
+
+        # check SCF results
+        scf_results_sanity_check(self, scf_tensors)
+
+        # check dft setup
+        dft_sanity_check(self, 'compute_rhs')
+
+        # check pe setup
+        pe_sanity_check(self, molecule=molecule)
+
+        # check solvation setup
+        solvation_model_sanity_check(self)
+        rsp_results_solvation_sanity_check(self, rsp_results)
+
+        # TODO: replace with a sanity check?
+        if self.rank == mpi_master():
+            if 'eigenvectors' in rsp_results:
+                self.tamm_dancoff = True
+        self.tamm_dancoff = self.comm.bcast(self.tamm_dancoff,
+                                            root=mpi_master())
+
+        # TODO: in the original implementation eri_dict, dft_dict, pe_dict
+        # are passed as arguments, but I am not sure why. Better to initialize
+        # here instead and remove from function arguments.
+        # ERI information
+        eri_dict = self._init_eri(molecule, basis)
+
+        # DFT information
+        dft_dict = self._init_dft(molecule, scf_tensors, silent=True)
+
+        # PE information
+        pe_dict = self._init_pe(molecule, basis, silent=True)
+
+        # CPCM_information
+        self._init_cpcm(molecule)
+
 
         # check molecule
         molecule_sanity_check(molecule)
@@ -497,23 +535,17 @@ class TddftOrbitalResponse(CphfSolver):
 
         profiler.start_timer('Prep')
 
-        # we don't want too much output about ERI/DFT/PE so this part is done
-        # with mute/unmute
-        self.ostream.mute()
-
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
 
         # DFT information
-        dft_dict = self._init_dft(molecule, scf_tensors)
+        dft_dict = self._init_dft(molecule, scf_tensors, silent=True)
 
         # PE information
-        pe_dict = self._init_pe(molecule, basis)
+        pe_dict = self._init_pe(molecule, basis, silent=True)
 
         # CPCM_information
         self._init_cpcm(molecule)
-
-        self.ostream.unmute()
 
         profiler.stop_timer('Prep')
 
@@ -691,7 +723,7 @@ class TddftOrbitalResponse(CphfSolver):
 
         self.ostream.print_blank()
         self.ostream.print_header('{:s} Setup'.format(title))
-        self.ostream.print_header('=' * (len(title) + 8))
+        self.ostream.print_header('-' * (len(title) + 8))
         self.ostream.print_blank()
 
         str_width = 70
