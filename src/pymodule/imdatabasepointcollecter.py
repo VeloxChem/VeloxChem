@@ -59,17 +59,10 @@ from .scfrestdriver import ScfRestrictedDriver
 from .molecularbasis import MolecularBasis
 from .scfgradientdriver import ScfGradientDriver
 from .scfhessiandriver import ScfHessianDriver
-from .externalscfdriver import ExternalScfDriver
 from .tdaeigensolver import TdaEigenSolver
 from .lreigensolver import LinearResponseEigenSolver
 from .tddftgradientdriver import TddftGradientDriver
 from .tddfthessiandriver import TddftHessianDriver
-from .externalgradientdriver import ExternalGradientDriver
-from .externalhessiandriver import ExternalHessianDriver
-from .externalexcitedstatedriver import ExternalExcitedStatesScfDriver
-from .externalexcitedstategradientdriver import ExternalExcitedStatesGradientDriver
-from .externalexcitedstatehessiandriver import ExternalExcitedStatesHessianDriver
-from .externaloptimdriver import ExternalOptimDriver
 from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
 from .xtbhessiandriver import XtbHessianDriver
@@ -1022,21 +1015,6 @@ class IMDatabasePointCollecter:
 
                     self.sorted_state_spec_im_labels[root].append(label)
                     self.prev_dens_of_points[root] += 1
-
-                    
-                    # if self.add_gpr_model:
-                    #     bayes_model = LocalBayesResidual(self.z_matrix)
-                    #     bayes_model.compute_internal_coordinates_values(qm_data_point.cartesian_coordinates)
-                    
-                    #     if root == 0:
-                    #         bayes_model.symmetry_information = self.non_core_symmetry_groups['gs']
-                    #     else:
-                    #         bayes_model.symmetry_information = self.non_core_symmetry_groups['es']
-                        
-                    #     bayes_model.init_bayesian()
-
-                    #     self.bayes_models[root].append(bayes_model)
-                    
                     old_label = qm_data_point.point_label
                     driver_object.qm_symmetry_data_points[old_label] = [qm_data_point]
                     self.qm_symmetry_datapoint_dict[root][old_label] = [qm_data_point]
@@ -1048,9 +1026,6 @@ class IMDatabasePointCollecter:
                     
                     driver_object.qm_symmetry_data_points[old_label].append(symmetry_data_point)
                     self.qm_symmetry_datapoint_dict[root][old_label].append(symmetry_data_point)
-                    
-                    # driver_object.qm_symmetry_data_points_1 = {old_label: [self.qm_data_point_dict[root][2], self.qm_data_point_dict[root][4]]}
-                    # driver_object.qm_symmetry_data_points_2 = {old_label: [self.qm_data_point_dict[root][3], self.qm_data_point_dict[root][5]]}
 
             print(driver_object.qm_symmetry_data_points)       
             # Set the object as an attribute of the instance
@@ -2817,12 +2792,6 @@ class IMDatabasePointCollecter:
                 
                 self.add_a_point = False
         
-
-            # New normal mode adjusted hessian
-
-            # self.auxilary_datapoint(molecule, self.impes_drivers[self.current_state], self.qm_data_point_dict[self.current_state], state_specific_energies[self.current_state], state_specific_gradients[self.current_state], self.z_matrix)
-
-
         # calcualte energy gradient
         if self.add_a_point is False:
             self.previous_energy_list.append(current_state_difference[self.current_state][0])
@@ -2921,35 +2890,14 @@ class IMDatabasePointCollecter:
                         # qm_energy, scf_tensors = self.compute_energy(drivers[0], optimized_molecule, opt_current_basis)
                         print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', molecule.get_xyz_string())
                     
-                    elif state_to_optim == 0 and isinstance(self.drivers['gs'][0], ExternalScfDriver):
-                        optim_driver = ExternalOptimDriver(self.drivers['gs'][0])
-                        for constraint in self.identfy_relevant_int_coordinates[1]:
-                            if constraint in constraints:
-                                continue
-                            constraints.append(constraint)
-                        optim_driver.constraints = constraints
-                        opt_mol_string = optim_driver.optimize(molecule)
-                        optimized_molecule = Molecule.from_xyz_string(opt_mol_string)
-                        print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', molecule.get_xyz_string())
-                    elif state_to_optim > 0 and isinstance(self.drivers['es'][0], ExternalExcitedStatesScfDriver) and self.drivers['es'][0].program != 'OpenQP':
+                    elif state_to_optim >= 1 and isinstance(self.drivers['es'][0], LinearResponseEigenSolver) or state_to_optim >= 1 and isinstance(self.drivers['es'][0], TdaEigenSolver):
+                            
+                        self.drivers['es'][1].state_deriv_index = [opt_roots]
+                        opt_drv = OptimizationDriver(self.drivers['es'][1])
+                        current_basis = MolecularBasis.read(molecule, states_basis['es'])
+                        _, _, rsp_results = self.compute_energy(self.drivers['es'][0], molecule, current_basis)
+                        opt_drv.ostream.mute()
                         
-                        optim_driver = ExternalOptimDriver(self.drivers['es'][0])
-                        optim_driver.root_to_optim = state_to_optim
-                        for constraint in self.identfy_relevant_int_coordinates[1]:
-                            if constraint in constraints:
-                                continue
-                            constraints.append(constraint)
-                        optim_driver.constraints = constraints
-                        opt_mol_string = optim_driver.optimize(molecule)
-                        optimized_molecule = Molecule.from_xyz_string(opt_mol_string)
-                        current_basis = MolecularBasis.read(optimized_molecule, current_basis.get_main_basis_label())
-                        print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', molecule.get_xyz_string())
-
-                    elif state_to_optim > 0 and isinstance(self.drivers['es'][0], ExternalExcitedStatesScfDriver) and self.drivers['es'][0].program == 'OpenQP':
-                        
-                        self.drivers['es'][1].root_to_optim = state_to_optim
-                        optim_driver = ExternalOptimDriver(self.drivers['es'][0], self.drivers['es'][1])
-                        # optim_driver.root_to_optim = state_to_optim
                         opt_constraint_list = []
                         for constraint in constraints:
                             if len(constraint) == 2:
@@ -2978,13 +2926,17 @@ class IMDatabasePointCollecter:
                             else:
                                 opt_constraint = f"freeze dihedral {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1} {constraint[3] + 1}"
                                 opt_constraint_list.append(opt_constraint)
-                        
-                        optim_driver.constraints = opt_constraint_list[:]
-                        opt_mol_string = optim_driver.optimize(molecule)
-                        optimized_molecule = Molecule.from_xyz_string(opt_mol_string)
-                        current_basis = MolecularBasis.read(optimized_molecule, current_basis.get_main_basis_label())
+                        opt_drv.constraints = opt_constraint_list
+                        self.drivers['es'][3].ostream.mute()
+                        self.drivers['es'][0].ostream.mute()
+                        opt_results = opt_drv.compute(molecule, current_basis, self.drivers['es'][3], self.drivers['es'][0], rsp_results)
+                        excitated_roots = [root for root in self.roots_to_follow if root != 0]
+                        self.drivers['es'][1].state_deriv_index = excitated_roots
+                        energy = opt_results['opt_energies'][-1]
+                        optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
                         print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', molecule.get_xyz_string())
-                        self.drivers['es'][1].root_to_optim = self.roots_to_follow
+                        molecule = optimized_molecule          
+                    
                     
                     same = False
                     counter = 1
@@ -3100,9 +3052,6 @@ class IMDatabasePointCollecter:
                 self.point_checker = 0
                 # self.point_adding_molecule[self.step] = (molecule, qm_energy, label)
 
-
-
-            
             else:
                     
                 current_basis = None
@@ -3204,31 +3153,24 @@ class IMDatabasePointCollecter:
             drivers = self.drivers[key]
             
             org_roots = self.roots_to_follow[0]
-            if any(root > 0 for root in self.roots_to_follow):
-                if isinstance(drivers[0], ExternalExcitedStatesScfDriver):
-                    org_roots = drivers[0].roots
-                elif isinstance(drivers[0], LinearResponseEigenSolver) or isinstance(drivers[0], TdaEigenSolver):           
+            if any(root > 0 for root in self.roots_to_follow): 
+                if isinstance(drivers[0], LinearResponseEigenSolver) or isinstance(drivers[0], TdaEigenSolver):           
                     org_roots = drivers[1].state_deriv_index  
+
             label_counter = 0
             for mol_basis in entries:
                 if any(root > 0 for root in self.roots_to_follow):
-                    if isinstance(drivers[0], ExternalExcitedStatesScfDriver):
-                        drivers[0].roots = mol_basis[4]           
-                        drivers[1].roots_to_follow = mol_basis[4]
-                        drivers[2].roots_to_follow = mol_basis[4]
-                    elif isinstance(drivers[0], LinearResponseEigenSolver) or isinstance(drivers, TdaEigenSolver):
+                    if isinstance(drivers[0], LinearResponseEigenSolver) or isinstance(drivers, TdaEigenSolver):
                         root_to_follow_calc = mol_basis[4]           
                         drivers[1].state_deriv_index = root_to_follow_calc 
                 
                 energies, scf_results, rsp_results = self.compute_energy(drivers[0], mol_basis[0], mol_basis[1])
-                print(energies)
                 
                 if isinstance(drivers[0], LinearResponseEigenSolver) or isinstance(drivers[0], TdaEigenSolver):
                     energies = energies[mol_basis[4]]
 
                 print(energies)
-                # gradients = [np.zeros((len(mol_basis[0].get_labels()), 3)) for _ in range(len(energies))]
-                # hessians = [np.zeros((3 * len(mol_basis[0].get_labels()), 3 * len(mol_basis[0].get_labels()))) for _ in range(len(energies))]
+
                 gradients = self.compute_gradient(drivers[1], mol_basis[0], mol_basis[1], scf_results, rsp_results)
                 
                 hessians = self.compute_hessian(drivers[2], mol_basis[0], mol_basis[1])
@@ -3431,41 +3373,10 @@ class IMDatabasePointCollecter:
                         self.last_added = len(self.allowed_molecules[root]['molecules'])
                 label_counter += 1
             if any(root > 0 for root in self.roots_to_follow):
-                    
-                if isinstance(drivers[0], ExternalExcitedStatesScfDriver):
-                    drivers[0].roots = org_roots
-                    drivers[1].roots_to_follow = org_roots
-                    drivers[2].roots_to_follow = org_roots
-                
-                elif isinstance(drivers[0], LinearResponseEigenSolver) or isinstance(drivers[0], TdaEigenSolver):           
+                                   
+                if isinstance(drivers[0], LinearResponseEigenSolver) or isinstance(drivers[0], TdaEigenSolver):           
                     
                     drivers[1].state_deriv_index = org_roots
-    
-        
-    def auxilary_datapoint(self, molecule, impes_driver, qm_datapoint_dict, state_specific_energies, state_specific_gradients, z_matrix):
-        
-        impes_driver.compute(molecule)
-        current_weights = impes_driver.weights
-        weights = [value for _, value in current_weights.items()]
-        used_labels = [label_idx for label_idx, _ in current_weights.items()]
-        # Sort labels and weights by descending weight
-        sorted_items = sorted(zip(used_labels, weights), key=lambda x: x[1], reverse=True)
-        total_weight = sum(weights)
-        cumulative_weight = 0.0
-        internal_coordinate_datapoints = []
-        for label, weight in sorted_items:
-            cumulative_weight += weight
-            internal_coordinate_datapoints.append(qm_data_point_dict[label])
-            if cumulative_weight >= 0.8 * total_weight:
-                break
-        # qm_datapoints_weighted = [qm_datapoint for qm_datapoint in enumerate if ]
-        constraints = impes_driver.determine_important_internal_coordinates(state_specific_energies[0], state_specific_gradients[0], molecule, z_matrix, internal_coordinate_datapoints, dihedral_diff_const=False)
-
-        print(constraints)
-        exit()
-
-
-        return 0
     
     
     def determine_beysian_trust_radius(self, molecules, qm_energies, current_datapoints, interpolation_setting, sym_datapoints, sym_dict):
@@ -3474,8 +3385,6 @@ class IMDatabasePointCollecter:
         for dp in current_datapoints:   
             sum_sq_error = 0.0
             combined_datapoints = [dp]
-            
-
 
             for i, mol in enumerate(molecules):
                 _, distance, _ = self.calculate_distance_to_ref(mol.get_coordinates_in_bohr(), dp.cartesian_coordinates)
@@ -3527,207 +3436,6 @@ class IMDatabasePointCollecter:
 
     
     def determine_trust_radius_gradient(self, molecules, qm_energies, qm_gradients, im_energies, datapoints, interpolation_setting, sym_datapoints, sym_dict, exponent_p_q):
-
-
-        CACHE = {"key": None}  # will hold stacked arrays from obj_energy_function
-
-        def _alphas_key(x):
-            # stable key for floats
-            return tuple(np.asarray(x, float).round(14))
-        
-        
-        def obj_energy_function(alphas, structure_list, qm_e, qm_g, im_e, dps, impes_dict, sym_datapoints, sym_dict, exponent_p_q):
-                
-            sum_sq_error = 0.0
-            e_x = self.use_opt_confidence_radius[3]
-            natms = len(sym_dict[3])
-            beta = 0.8
-            conv = hartree_in_kcalpermol()
-
-            # collect per-structure blobs (lists for now; we stack at the end)
-            E_interp_list      = []  # ()        interpolated energies (Hartree)
-            G_interp_list      = []  # (D,)      interpolated gradients (Hartree/Bohr)
-            P_list             = []  # (M,)      datapoint energies (Hartree) in this mol's frame (if transformed)
-            G_list             = []  # (M,D)     datapoint gradients (Hartree/Bohr)
-            wprime_alpha_list  = []  # (M,)      dw/dalpha_j
-            wprime_x_list      = []  # (M,D)     ∂w_j/∂x
-            S_list             = []  # ()        sum of weights
-            Sprime_list        = []  # (D,)      ∂S/∂x = Σ ∂w_j/∂x
-            dE_res_list        = []  # ()        (E_interp - E_QM) in kcal/mol
-            dg_full_list       = []  # (D,)      (G_interp - G_QM) in kcal/mol
-
-            interpolation_driver = InterpolationDriver(self.z_matrix)
-            interpolation_driver.update_settings(impes_dict)
-            interpolation_driver.symmetry_information = sym_dict
-            interpolation_driver.qm_symmetry_data_points = sym_datapoints
-            interpolation_driver.distance_thrsh = 1000
-            interpolation_driver.exponent_p = 2
-            interpolation_driver.print = False
-            interpolation_driver.qm_data_points = dps[:]
-            interpolation_driver.calc_optim_trust_radius = True
-
-            for i, dp in enumerate(dps[:]):
-                dp.confidence_radius = alphas[i]
-
-            for i, mol in enumerate(structure_list):
-                
-                interpolation_driver.compute(mol)
-                new_im_energy = interpolation_driver.get_energy()
-                new_im_gradient = interpolation_driver.get_gradient()
-
-                diff_e_kcal = (new_im_energy - qm_e[i]) * conv
-                
-                flattend_indices = [outer_i * 3 + inner_i for outer_i in sym_dict[3] for inner_i in range(3)]
-                
-                idx = np.asarray(flattend_indices, dtype=int)   # length = 3*N_sub
-                nsub = idx.size
-
-                # # full residuals (flattened)
-                dg_full = (new_im_gradient.reshape(-1) - qm_g[i].reshape(-1)) * conv
-                
-                # vectorized arrays per structure
-                P        = np.asarray(interpolation_driver.potentials, dtype=np.float64)          
-                G        = np.asarray(interpolation_driver.gradients, dtype=np.float64).reshape(len(P), -1) 
-                dw       = np.asarray(interpolation_driver.dw_dalpha_list, dtype=np.float64)            
-                dwprime  = np.asarray(interpolation_driver.dw_dX_dalpha_list, dtype=np.float64).reshape(len(P), -1) 
-                S        = float(interpolation_driver.sum_of_weights)                                     
-                Sprime   = np.asarray(interpolation_driver.sum_of_weights_grad, dtype=np.float64).reshape(-1)  
-
-
-                # subspace projections
-                dg_reshaped = dg_full[idx]
-                h  = qm_g[i].reshape(-1)[idx] * conv
-                norm_h = np.linalg.norm(h)              
-
-                L_iso = (dg_reshaped @ dg_reshaped) / (natms * 3)
-
-                if norm_h > 1e-8:
-                    u = h / norm_h # define the unit vector
-                    tau = 1e-8
-                    gate   = (norm_h**2) / (norm_h**2 + tau**2)
-
-                    dg_parallel   = np.dot(u.T, dg_reshaped) * u
-                    dg_perpendicular = dg_reshaped - dg_parallel
-
-                    L_e = diff_e_kcal**2
-                    L_perp = 1.0 / (natms * 3) * (dg_perpendicular @ dg_perpendicular)
-                    L_para = (u.T @ dg_reshaped)**2
-
-                    L_F = gate * (beta * L_perp + (1.0 - beta) * L_para) + (1.0 - gate) * L_iso
-                else:
-                    L_e = diff_e_kcal**2
-                    L_F = L_iso
-
-                diff = 1.0 * e_x * L_e + 0.5 * (1.0 - e_x) * L_F
-
-                sum_sq_error += (diff)
-
-                E_interp_list.append(new_im_energy)
-                G_interp_list.append(new_im_gradient.reshape(-1))
-                P_list.append(P)
-                G_list.append(G)
-                wprime_alpha_list.append(dw)
-                wprime_x_list.append(dwprime)
-                S_list.append(S)
-                Sprime_list.append(Sprime)
-                dE_res_list.append(diff_e_kcal)
-                dg_full_list.append(dg_full)
-
-            # --- stack everything for the gradient to reuse (S = len(structure_list)) ---
-            E_interp_arr   = np.asarray(E_interp_list, dtype=np.float64)                   # (S,)
-            G_interp_arr   = np.stack(G_interp_list, axis=0)                               # (S,D)
-            P_arr          = np.stack(P_list, axis=0)                                      # (S,M)
-            G_arr          = np.stack(G_list, axis=0)                                      # (S,M,D)
-            dw_arr         = np.stack(wprime_alpha_list, axis=0)                           # (S,M)
-            dwprime_arr    = np.stack(wprime_x_list, axis=0)                               # (S,M,D)
-            S_arr          = np.asarray(S_list, dtype=np.float64)                          # (S,)
-            Sprime_arr     = np.stack(Sprime_list, axis=0)                                  # (S,D)
-            dE_res_arr     = np.asarray(dE_res_list, dtype=np.float64)                     # (S,)
-            dg_full_arr    = np.stack(dg_full_list, axis=0)                                # (S,D)
-
-            # cache for jac
-            CACHE.update(dict(
-                key=_alphas_key(alphas),
-                conv=conv, e_x=e_x, beta=beta, idx=idx, nsub=nsub,
-                E_interp=E_interp_arr, G_interp=G_interp_arr,
-                P=P_arr, G=G_arr, dw=dw_arr, dwprime=dwprime_arr,
-                S=S_arr, Sprime=Sprime_arr, dE_res=dE_res_arr, dg_full=dg_full_arr,
-                qm_g=qm_g,  # needed for h_sub in jac
-            ))
-            print('sum_of_sqaure', sum_sq_error, alphas)
-            return sum_sq_error
-        
-        def obj_gradient_function(alphas, structure_list, qm_e, qm_g, im_e, dps, impes_dict, sym_datapoints, sym_dict):
-            
-            if CACHE.get("key") != _alphas_key(alphas):
-                # we only need the side effects (cache); the return value is discarded
-                _ = obj_energy_function(alphas, structure_list, qm_e, qm_g, im_e, dps, impes_dict, sym_datapoints, sym_dict)
-
-            # unpack
-            conv     = CACHE["conv"]; e_x = CACHE["e_x"]; beta = CACHE["beta"]
-            idx      = CACHE["idx"];  nsub= CACHE["nsub"]
-            E_interp = CACHE["E_interp"]       # (S,)
-            G_interp = CACHE["G_interp"]       # (S,D)
-            P        = CACHE["P"]              # (S,M)
-            G        = CACHE["G"]              # (S,M,D)
-            dw       = CACHE["dw"]             # (S,M)
-            dwprime  = CACHE["dwprime"]        # (S,M,D)
-            S        = CACHE["S"]              # (S,)
-            Sprime   = CACHE["Sprime"]         # (S,D)
-            dE_res   = CACHE["dE_res"]         # (S,)
-            dg_full  = CACHE["dg_full"]        # (S,D)
-            qm_g_all = CACHE["qm_g"]           # list/array of (natms,3)
-
-            S_count, M = dw.shape
-            dF_dalphas = np.zeros(M, dtype=np.float64)
-
-                    # loop over structures only (vectorized across datapoints)
-            for s in range(S_count):
-                # build dL/dg (subspace anisotropic) for this structure
-                v_full = np.zeros_like(dg_full[s])         # (D,)
-                g_sub  = dg_full[s, idx]                   # (nsub,)
-                h_sub  = qm_g_all[s].reshape(-1)[idx] * conv
-                norm_h = np.linalg.norm(h_sub)
-
-                if norm_h > 1e-8:
-                    u    = h_sub / norm_h
-                    tau  = 1e-8
-                    gate = (norm_h**2) / (norm_h**2 + tau**2)
-                    gpar = (u @ g_sub) * u
-                    gper = g_sub - gpar
-                    dL_dg_sub = (2.0 * gate) * ((beta/nsub)*gper + (1.0 - beta)*gpar) + (2.0 * (1.0 - gate) / nsub) * g_sub
-                else:
-                    dL_dg_sub = 2.0 * g_sub / nsub
-
-                v_full[idx] = dL_dg_sub  # (D,)
-
-                # convenient views
-                Ps   = P[s]            # (M,)
-                Gs   = G[s]            # (M,D)
-                dws  = dw[s]           # (M,)
-                dwp  = dwprime[s]      # (M,D)
-                Es   = E_interp[s]     # ()
-                Ghat = G_interp[s]     # (D,)
-                Ss   = S[s]            # ()
-                Sprs = Sprime[s]       # (D,)
-                dE_s = dE_res[s]       # ()
-
-                # dE/dalpha in kcal/mol (vector length M)
-                dE_dalpha = (dws * (Ps - Es)) * (conv / Ss)                      # (M,)
-
-                # dG/dalpha in kcal/mol (matrix M x D)
-                term1 = (dwp * (Ps - Es)[:, None]) * (conv / Ss)                  # (M,D)
-                term2 = (dws[:, None] * (Gs - Ghat[None, :])) * (conv / Ss)       # (M,D)
-                term3 = ((dws * (Ps - Es)) / (Ss**2))[:, None] * (conv * Sprs[None, :])  # (M,D)
-                dG_dalpha = term1 + term2 - term3                                 # (M,D)
-
-                # contractions → (M,)
-                grad_force_part  = dG_dalpha @ v_full
-                grad_energy_part = 2.0 * e_x * dE_s * dE_dalpha
-
-                dF_dalphas += grad_energy_part + 0.5 * (1.0 - e_x) * grad_force_part
-            
-            return dF_dalphas
         
         def optimize_trust_radius(alphas, geom_list, E_ref_list, G_ref_list, E_im_list, dps, impes_dict, sym_datapoints, sym_dict, exponent_p_q):
             """
@@ -3744,10 +3452,9 @@ class IMDatabasePointCollecter:
 
             minimizer_kwargs = {"method": "L-BFGS-B", "jac": opt.jac, "bounds": bounds, "options": {"disp": True, "gtol": 1e-4, "ftol": 1e-9, "maxls": 10}}
             res = basinhopping(opt.fun, x0=alphas, minimizer_kwargs=minimizer_kwargs, niter=10)
-            print(res)
+
             return res
         
-
         inital_alphas = [dp.confidence_radius for dp in datapoints]
 
         print('INPUT Trust radius', inital_alphas)
@@ -3871,14 +3578,6 @@ class IMDatabasePointCollecter:
             qm_driver.filename = None
             qm_driver.checkpoint_file = None
         
-        elif isinstance(qm_driver, ExternalScfDriver):
-            qm_energy = qm_driver.compute_energy(molecule, qm_driver.basis_set_label)
-            print('qm_energy', qm_energy)
-        
-        elif isinstance(qm_driver, ExternalExcitedStatesScfDriver):
-            qm_energy = qm_driver.compute_energy(molecule, qm_driver.basis_set_label)
-            print('qm_energy', qm_energy)
-        
         elif isinstance(qm_driver, LinearResponseEigenSolver) or isinstance(qm_driver, TdaEigenSolver):
             self.drivers['es'][0].ostream.mute()
             scf_results = self.drivers['es'][3].compute(molecule, basis)
@@ -3923,15 +3622,6 @@ class IMDatabasePointCollecter:
             qm_gradient = grad_driver.gradient
             qm_gradient = np.array([qm_gradient])
             grad_driver.ostream.unmute()
-        
-        elif isinstance(grad_driver, ExternalGradientDriver):
-            grad_driver.compute_gradient(molecule)
-            qm_gradient = grad_driver.extract_gradients()
-            qm_gradient = qm_gradient
-        
-        elif isinstance(grad_driver, ExternalExcitedStatesGradientDriver):
-            grad_driver.compute_gradient(molecule)
-            qm_gradient = grad_driver.extract_gradients()
 
         elif isinstance(grad_driver, TddftGradientDriver):
             grad_driver.ostream.mute()
@@ -3974,15 +3664,6 @@ class IMDatabasePointCollecter:
             qm_hessian = hess_driver.hessian
             qm_hessians = np.array([qm_hessian])
             hess_driver.ostream.unmute()
-        
-        elif isinstance(hess_driver, ExternalHessianDriver):
-            hess_driver.compute_analytical_hessian(molecule)
-            qm_hessians = hess_driver.extract_hessians()
-
-            
-        elif isinstance(hess_driver, ExternalExcitedStatesHessianDriver):
-            hess_driver.compute_analytical_hessian(molecule)
-            qm_hessians = hess_driver.extract_hessians()
         
         elif isinstance(hess_driver, TddftHessianDriver):
             roots = self.drivers['es'][1].state_deriv_index
@@ -4266,25 +3947,6 @@ class IMDatabasePointCollecter:
                 current_xyz.append(' ')  # Add an empty line for the comment
 
             elif "Energies" in line:
-                # # extract energies + gradient
-                # content = "\n".join(lines)
-                # pattern = (
-                #             r"QM:\s*([-0-9\.]+)\s*"
-                #             r"QM_G:\s*(\[\[[\s\S]*?\]\](?=\s*IM:))\s*"  # stop right before IM:
-                #             r"IM:\s*([-0-9\.]+)\s*"
-                #             r"Distance:\s*([-0-9\.]+)\s*"
-                #             r"State:\s*([0-9]+)"
-                #         )
-                # match = re.search(pattern, content, re.DOTALL)
-                # print(match, parse_gradient(match.group(2)), match.group(2))
-                # if match:
-                #     qm_energies.append(float(match.group(1)))
-                #     qm_gradients.append(parse_gradient(match.group(2)))
-                #     im_energies.append(float(match.group(3)))
-                #     distances.append(float(match.group(4)))
-                #     states.append(int(match.group(5)))
-
-                # activate gradient skipping
                 skip_gradient = True
 
             elif skip_gradient:
