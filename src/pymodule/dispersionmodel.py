@@ -84,6 +84,8 @@ class DispersionModel:
             The dftd4 functional name.
         """
 
+        # for wb97x-d4 parameters, see J. Chem. Phys. 158, 014103 (2023)
+
         known_aliases = {
             'wb97x-d4': 'wb97x-rev',
             'wb97m-d4': 'wb97m',
