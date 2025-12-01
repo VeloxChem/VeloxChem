@@ -86,8 +86,8 @@ class SpectrumDriver:
         
         traj = pyframe.Trajectory(topology_file, 
                                   trajectory_file,
-                                  qm_selection=qm_selection,
-                                  snapshots=snapshots)
+                                  qm_selection,
+                                  snapshots)
         traj.set_core_region(qm_selection)
         traj.add_region(
             name='test',
