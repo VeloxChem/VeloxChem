@@ -398,6 +398,13 @@ class OrbitalViewer:
 
         if isinstance(mo_inp, str):
             if (label and isinstance(label, str)):
+                # for backward compatibility, check and update label
+                if label.startswith('rsp/') and (
+                        not label.startswith('rsp/nto/')):
+                    new_label = label.replace('rsp/', 'rsp/nto/')
+                    if MolecularOrbitals.check_label_validity(
+                            mo_inp, new_label):
+                        label = new_label
                 mo_object = MolecularOrbitals.read_hdf5(mo_inp, label=label)
             else:
                 mo_object = MolecularOrbitals.read_hdf5(mo_inp)
@@ -770,6 +777,13 @@ class OrbitalViewer:
 
         if isinstance(mo_inp, str):
             if (label and isinstance(label, str)):
+                # for backward compatibility, check and update label
+                if label.startswith('rsp/') and (
+                        not label.startswith('rsp/nto/')):
+                    new_label = label.replace('rsp/', 'rsp/nto/')
+                    if MolecularOrbitals.check_label_validity(
+                            mo_inp, new_label):
+                        label = new_label
                 mo_object = MolecularOrbitals.read_hdf5(mo_inp, label=label)
             else:
                 mo_object = MolecularOrbitals.read_hdf5(mo_inp)

@@ -485,7 +485,7 @@ class TdaEigenSolver(LinearSolver):
                     nto_label = f'NTO_S{s + 1}'
                     if final_h5_fname is not None:
                         nto_mo.write_hdf5(final_h5_fname,
-                                          label=f'rsp/{nto_label}')
+                                          label=f'rsp/nto/{nto_label}')
                 else:
                     nto_mo = MolecularOrbitals()
                 nto_mo = nto_mo.broadcast(self.comm, root=mpi_master())
