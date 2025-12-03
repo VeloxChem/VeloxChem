@@ -38,6 +38,7 @@ import re
 
 from .veloxchemlib import AODensityMatrix
 from .veloxchemlib import denmat
+from .veloxchemlib import chemical_element_identifier
 from .visualizationdriver import VisualizationDriver
 from .cubicgrid import CubicGrid
 from .errorhandler import assert_msg_critical
@@ -212,8 +213,18 @@ class DensityViewer:
         self._molecule = molecule
         self._basis = basis
 
-        # Define box size
         self._atomnr = np.array(molecule.get_identifiers()) - 1
+
+        # Take care of _atomnr for ghost atoms
+        for i_atom, (atom_bas_label, atom_bas_elem) in enumerate(
+                molecule.get_atom_basis_labels()):
+            if self._atomnr[i_atom] == -1:
+                elem_id = chemical_element_identifier(atom_bas_elem)
+                assert_msg_critical(
+                    elem_id > 0, 'DensityViewer: dummy atom is not supported')
+                self._atomnr[i_atom] = elem_id - 1
+
+        # Define box size
         self._coords = molecule.get_coordinates_in_bohr()
         if self.atom_centers is None:
             xmin = self._coords[:, 0].min() - self.grid_margins
@@ -888,14 +899,17 @@ class DensityViewer:
         self._viewer_width = width
         self._viewer_height = height
 
+        has_ghost_atom = (0 in molecule.get_identifiers())
+
         # draw the first density by default
         with out:
             display(HTML(self._draw_density_html(den_key_list[0])))
 
         def update_view(change):
-            out.clear_output(wait=True)
-            with out:
-                display(HTML(self._draw_molecule_html()))
+            if not has_ghost_atom:
+                out.clear_output(wait=True)
+                with out:
+                    display(HTML(self._draw_molecule_html()))
             out.clear_output(wait=True)
             with out:
                 display(HTML(self._draw_density_html(change['new'])))
@@ -1003,7 +1017,7 @@ class DensityViewer:
         z = coords[:, 2]
 
         natoms = self._molecule.number_of_atoms()
-        elem_ids = self._molecule.get_identifiers()
+        elem_ids = self._atomnr + 1
 
         x0, y0, z0 = self.origin
         dx, dy, dz = self.stepsize
