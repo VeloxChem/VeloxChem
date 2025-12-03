@@ -253,6 +253,16 @@ class DensityViewer:
         atom_grid = CubicGrid(self._atom_origin, self.stepsize,
                               self._atom_npoints)
 
+        # Take care of mixed basis set by creating a list of atom basis labels
+        atom_basis_labels = []
+        for atom_bas_label, atom_bas_elem in molecule.get_atom_basis_labels():
+            atom_basis_labels.append(atom_bas_label)
+        for i_atom in range(len(atom_basis_labels)):
+            if not atom_basis_labels[i_atom]:
+                atom_basis_labels[i_atom] = basis.get_label()
+
+        self._atom_basis_labels = atom_basis_labels
+
         # Create atomic map
         vis_drv = VisualizationDriver()
         ao_info = vis_drv.get_atomic_orbital_info(molecule, basis)
@@ -260,21 +270,26 @@ class DensityViewer:
         # Create reverse atomic map
         atom_to_ao = vis_drv.map_atom_to_atomic_orbitals(molecule, basis)
         self._atom_to_ao = atom_to_ao
-        self._ao_to_atom = [[] for i in range(len(ao_info))]
-        for i_atom, atom_orbs in enumerate(atom_to_ao):
-            for i_orb, orb in enumerate(atom_orbs):
-                self._ao_to_atom[orb] = [i_atom, i_orb]
+
+        # self._ao_to_atom = [[] for i in range(len(ao_info))]
+        # for i_atom, atom_orbs in enumerate(atom_to_ao):
+        #     # Note: need atom_bas_label for distinguishing atoms that are same
+        #     # elements but with different basis set
+        #     atom_bas_label = atom_basis_labels[i_atom]
+        #     for i_orb, orb in enumerate(atom_orbs):
+        #         self._ao_to_atom[orb] = (i_atom, atom_bas_label, i_orb)
 
         # Compute each unique AO on the grid
         self._ao_dict = {}
         for i_atom, atom in enumerate(self._atomnr):
-            if atom not in self._ao_dict:
+            atom_bas_label = atom_basis_labels[i_atom]
+            if (atom, atom_bas_label) not in self._ao_dict:
                 atomlist = []
                 for orb in atom_to_ao[i_atom]:
                     vis_drv.compute_atomic_orbital_for_grid(
                         atom_grid, basis, ao_info[orb])
                     atomlist.append(atom_grid.values_to_numpy())
-                self._ao_dict[atom] = atomlist
+                self._ao_dict[(atom, atom_bas_label)] = list(atomlist)
 
         self._atom_grid = atom_grid
 
@@ -331,8 +346,6 @@ class DensityViewer:
         # Initialize the density on the molecular grid
         np_density = np.zeros(self.npoints)
 
-        identifiers = np.array(self._molecule.get_identifiers()) - 1
-
         ijk_inds = [(i, j, k) for i in [0, 1] for j in [0, 1] for k in [0, 1]]
 
         # Loop over atoms
@@ -342,8 +355,9 @@ class DensityViewer:
                     self.progress.value = i_atom
 
             ao_indices_i = self._atom_to_ao[i_atom]
-            atom_id_i = identifiers[i_atom]
-            atom_orbs_i = np.array(self._ao_dict[atom_id_i])
+            atom_id_i = self._atomnr[i_atom]
+            atom_bas_label_i = self._atom_basis_labels[i_atom]
+            atom_orbs_i = np.array(self._ao_dict[(atom_id_i, atom_bas_label_i)])
 
             if self.interpolate:
                 ti = (self._coords[i_atom] - self.origin +
@@ -372,8 +386,10 @@ class DensityViewer:
 
             for j_atom in range(natms):
                 ao_indices_j = self._atom_to_ao[j_atom]
-                atom_id_j = identifiers[j_atom]
-                atom_orbs_j = np.array(self._ao_dict[atom_id_j])
+                atom_id_j = self._atomnr[j_atom]
+                atom_bas_label_j = self._atom_basis_labels[j_atom]
+                atom_orbs_j = np.array(self._ao_dict[(atom_id_j,
+                                                      atom_bas_label_j)])
 
                 if self.interpolate:
                     tj = (self._coords[j_atom] - self.origin +
