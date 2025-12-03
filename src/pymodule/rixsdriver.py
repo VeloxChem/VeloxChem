@@ -49,7 +49,7 @@ from .inputparser import parse_input
 class RixsDriver(LinearSolver):
     """
     Implements the RIXS driver in a linear-response framework with two
-    approaches: the two-shot and restricted-subspace approximation.
+    approximations: the two-shot and restricted-subspace approximation.
 
     # vlxtag: RHF, RIXS
     # vlxtag: RKS, RIXS
@@ -83,7 +83,7 @@ class RixsDriver(LinearSolver):
 
         super().__init__(comm, ostream)
 
-        # for RIXS, the default convergence threshold is tighter
+        # For RIXS, the default convergence threshold is tighter
         self.conv_thresh = 2.0e-5
 
         self.tamm_dancoff = False
@@ -98,7 +98,7 @@ class RixsDriver(LinearSolver):
         self.nstates = 5
         self.num_core_states = 5
 
-        # restricted subspace
+        # Restricted subspace
         self.restricted_subspace = True
 
         self.num_core_orbitals = 0
@@ -106,16 +106,15 @@ class RixsDriver(LinearSolver):
         self.num_valence_orbitals = 0
 
         self._orb_and_state_dict = None
-
-        # TODO?: should this be in terms of energy or number of states?
-        #self.num_final_states = None
+        
+        # Set the energy range of the final states
         self.final_state_cutoff = None
 
-        # input keywords
+        # Input keywords
         self._input_keywords['response'].update({
             'theta':
                 ('float', 'angle between incident polarization vector and ' +
-                    'propagation vector of outgoing'),
+                    'outgoing propagation vector'),
             'gamma': ('float', 'broadening term (FWHM)'),
             'photon_energy': ('list', 'list of incoming photon energies'),
             'final_state_cutoff':
@@ -143,6 +142,17 @@ class RixsDriver(LinearSolver):
 
         if method_dict is None:
             method_dict = {}
+        
+        key = 'photon_energy'
+        if key in rsp_dict:
+            val = rsp_dict[key]
+
+            if isinstance(val, list):
+                rsp_dict[key] = [float(str(x).strip()) for x in val]
+
+            elif isinstance(val, str):
+                parts = val.replace(',', ' ').split()
+                rsp_dict[key] = [float(x) for x in parts]
 
         super().update_settings(rsp_dict, method_dict)
 
@@ -270,7 +280,7 @@ class RixsDriver(LinearSolver):
         num_vir_orbitals = self.comm.bcast(num_vir_orbitals, root=mpi_master())
 
         if self.twoshot:
-            self._approach_string = 'Running RIXS calculation in the two‑shot approach'
+            self._approach_string = 'Running RIXS calculation in the two-shot approach'
 
             if self.rank == mpi_master():
                 num_core_orbitals = cvs_rsp_results['num_core']
@@ -294,7 +304,7 @@ class RixsDriver(LinearSolver):
             val_states              = list(range(num_final_states))
 
         else:
-            self._approach_string = 'Running RIXS calculation in the restricted‑subspace approach'
+            self._approach_string = 'Running RIXS calculation in the restricted-subspace approach'
 
             if self.rank == mpi_master():
                 num_valence_orbitals = rsp_results['num_valence']
@@ -302,16 +312,16 @@ class RixsDriver(LinearSolver):
                 assert_msg_critical(num_core_orbitals > 0,
                                     'No core orbitals indicated in the response results.')
 
-                # identify the energy of the lowest core-excited state
+                # Identify the energy of the lowest core-excited state
                 first_core_ene = self._first_core_energy(rsp_results)
                 detuning = rsp_results['eigenvalues'] - first_core_ene
 
-                # identify (and possibly remove unphysical valence-excited states) the core-excited states
+                # Identify (and remove unphysical valence-excited states) the core-excited states
                 core_states = self._core_state_indices(rsp_results, detuning)
                 num_intermediate_states = len(core_states)
                 assert_msg_critical(num_intermediate_states > 0,
                                     'Too few excited states included in response calculation.')
-                # identify the valence-excited states
+                # Identify the valence-excited states
                 val_states = self._valence_state_indices(detuning, rsp_results['eigenvalues'])
                 num_final_states = len(val_states)
             else:
@@ -331,9 +341,8 @@ class RixsDriver(LinearSolver):
             core_states = self.comm.bcast(core_states, root=mpi_master())
             val_states = self.comm.bcast(val_states, root=mpi_master())
 
-            # for compatibiltiy with the two-shot approach
+            # For compatibility with the two-shot approach
             cvs_rsp_results = rsp_results
-            # for compatibiltiy with the two-shot approach
             occupied_core   = num_core_orbitals + num_valence_orbitals
 
         mo_core_indices = list(range(num_core_orbitals))
@@ -371,7 +380,7 @@ class RixsDriver(LinearSolver):
             dipole_integrals = None
         dipole_integrals = self.comm.bcast(dipole_integrals, root=mpi_master())
 
-        # store state and orbital information used in computation
+        # Store state and orbital information used in computation
         self._orb_and_state_dict = {
             'num_intermediate_states': num_intermediate_states,
             'num_final_states': num_final_states,
@@ -382,7 +391,7 @@ class RixsDriver(LinearSolver):
             'valence_states': val_states,
         }
         
-        # if incoming photon energy is not set, set it to match the
+        # If incoming photon energy is not set, set it to match the
         # first core-excited state with osc_strength > 1e-3
         if self.photon_energy is None:
             init_photon_set = False
@@ -477,6 +486,10 @@ class RixsDriver(LinearSolver):
                     f'Computed RIXS cross-sections for {num_final_states} final states '
                     f'at photon energy: {omega*hartree_in_ev():.2f} eV.'
                 )
+                self.ostream.print_blank()
+                self._print_rixs_data(f'RIXS cross-sections at incident X-ray energy '
+                                      f'{omega*hartree_in_ev():.2f} eV, energy-loss mode',
+                                      self.ene_losses[:,w_ind], self.cross_sections[:,w_ind], self.elastic_cross_sections[w_ind])
                 self.ostream.print_blank()
                 self.ostream.flush()
 
@@ -935,7 +948,7 @@ class RixsDriver(LinearSolver):
         nocc        = molecule.number_of_alpha_electrons()
 
         self.ostream.print_blank()
-        title = 'Resonant Inelastic X‑ray Scattering (RIXS) Setup'
+        title = 'Resonant Inelastic X-ray Scattering (RIXS) Setup'
         self.ostream.print_header(f'{title:^{str_width}}')
         self.ostream.print_header(f'{"=" * len(title):^{str_width}}')
         self.ostream.print_blank()
@@ -1012,4 +1025,36 @@ class RixsDriver(LinearSolver):
             self.ostream.print_info(self._approach_string)
             self.ostream.print_blank()
         
+        self.ostream.flush()
+
+    def _print_rixs_data(self, title, ene_losses,
+                         cross_sections, elastic_cross_section):
+        """
+        Prints rixs-data to output stream.
+
+        :param title:
+            The title to be printed to the output stream.
+        :param results:
+            The dictionary containing response results.
+        """
+
+        spin_str = 'S'
+
+        valstr = title
+        self.ostream.print_header(valstr.ljust(92))
+        self.ostream.print_header(('-' * len(valstr)).ljust(92))
+        valstr = 'Ground State  {:>5s}: '.format(spin_str + str(0))
+        valstr += '{:15.8f} a.u. '.format(0)
+        valstr += '{:12.5f} eV'.format(0)
+        valstr += '    Cross-section   {:9.2e}'.format(elastic_cross_section)
+        self.ostream.print_header(valstr.ljust(92))
+    
+        for s, e in enumerate(ene_losses):
+            valstr = 'Excited State {:>5s}: '.format(spin_str + str(s + 1))
+            valstr += '{:15.8f} a.u. '.format(e)
+            valstr += '{:12.5f} eV'.format(e * hartree_in_ev())
+            f = cross_sections[s]
+            valstr += '    Cross-section   {:9.2e}'.format(f)
+            self.ostream.print_header(valstr.ljust(92))
+        self.ostream.print_blank()
         self.ostream.flush()

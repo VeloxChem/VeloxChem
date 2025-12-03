@@ -141,7 +141,7 @@ class LocalizationDriver:
                 return C_new
             else:
                 self.ostream.print_warning(
-                    f"Foster–Boys did not converge after {self.max_iter} " +
+                    f"Foster-Boys did not converge after {self.max_iter} " +
                     "iterations.")
                 return None
 
