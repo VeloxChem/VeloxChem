@@ -49,7 +49,7 @@ from .inputparser import parse_input
 class RixsDriver(LinearSolver):
     """
     Implements the RIXS driver in a linear-response framework with two
-    approaches: the two-shot and restricted-subspace approximation.
+    approximations: the two-shot and restricted-subspace approximation.
 
     # vlxtag: RHF, RIXS
     # vlxtag: RKS, RIXS
@@ -83,7 +83,7 @@ class RixsDriver(LinearSolver):
 
         super().__init__(comm, ostream)
 
-        # for RIXS, the default convergence threshold is tighter
+        # For RIXS, the default convergence threshold is tighter
         self.conv_thresh = 2.0e-5
 
         self.tamm_dancoff = False
@@ -98,7 +98,7 @@ class RixsDriver(LinearSolver):
         self.nstates = 5
         self.num_core_states = 5
 
-        # restricted subspace
+        # Restricted subspace
         self.restricted_subspace = True
 
         self.num_core_orbitals = 0
@@ -106,12 +106,11 @@ class RixsDriver(LinearSolver):
         self.num_valence_orbitals = 0
 
         self._orb_and_state_dict = None
-
-        # TODO?: should this be in terms of energy or number of states?
-        #self.num_final_states = None
+        
+        # Set the energy range of the final states
         self.final_state_cutoff = None
 
-        # input keywords
+        # Input keywords
         self._input_keywords['response'].update({
             'theta':
                 ('float', 'angle between incident polarization vector and ' +
@@ -281,7 +280,7 @@ class RixsDriver(LinearSolver):
         num_vir_orbitals = self.comm.bcast(num_vir_orbitals, root=mpi_master())
 
         if self.twoshot:
-            self._approach_string = 'Running RIXS calculation in the two‑shot approach'
+            self._approach_string = 'Running RIXS calculation in the two-shot approach'
 
             if self.rank == mpi_master():
                 num_core_orbitals = cvs_rsp_results['num_core']
@@ -305,7 +304,7 @@ class RixsDriver(LinearSolver):
             val_states              = list(range(num_final_states))
 
         else:
-            self._approach_string = 'Running RIXS calculation in the restricted‑subspace approach'
+            self._approach_string = 'Running RIXS calculation in the restricted-subspace approach'
 
             if self.rank == mpi_master():
                 num_valence_orbitals = rsp_results['num_valence']
@@ -313,16 +312,16 @@ class RixsDriver(LinearSolver):
                 assert_msg_critical(num_core_orbitals > 0,
                                     'No core orbitals indicated in the response results.')
 
-                # identify the energy of the lowest core-excited state
+                # Identify the energy of the lowest core-excited state
                 first_core_ene = self._first_core_energy(rsp_results)
                 detuning = rsp_results['eigenvalues'] - first_core_ene
 
-                # identify (and possibly remove unphysical valence-excited states) the core-excited states
+                # Identify (and remove unphysical valence-excited states) the core-excited states
                 core_states = self._core_state_indices(rsp_results, detuning)
                 num_intermediate_states = len(core_states)
                 assert_msg_critical(num_intermediate_states > 0,
                                     'Too few excited states included in response calculation.')
-                # identify the valence-excited states
+                # Identify the valence-excited states
                 val_states = self._valence_state_indices(detuning, rsp_results['eigenvalues'])
                 num_final_states = len(val_states)
             else:
@@ -342,7 +341,7 @@ class RixsDriver(LinearSolver):
             core_states = self.comm.bcast(core_states, root=mpi_master())
             val_states = self.comm.bcast(val_states, root=mpi_master())
 
-            # for compatibility with the two-shot approach
+            # For compatibility with the two-shot approach
             cvs_rsp_results = rsp_results
             occupied_core   = num_core_orbitals + num_valence_orbitals
 
@@ -381,7 +380,7 @@ class RixsDriver(LinearSolver):
             dipole_integrals = None
         dipole_integrals = self.comm.bcast(dipole_integrals, root=mpi_master())
 
-        # store state and orbital information used in computation
+        # Store state and orbital information used in computation
         self._orb_and_state_dict = {
             'num_intermediate_states': num_intermediate_states,
             'num_final_states': num_final_states,
@@ -392,7 +391,7 @@ class RixsDriver(LinearSolver):
             'valence_states': val_states,
         }
         
-        # if incoming photon energy is not set, set it to match the
+        # If incoming photon energy is not set, set it to match the
         # first core-excited state with osc_strength > 1e-3
         if self.photon_energy is None:
             init_photon_set = False
@@ -949,7 +948,7 @@ class RixsDriver(LinearSolver):
         nocc        = molecule.number_of_alpha_electrons()
 
         self.ostream.print_blank()
-        title = 'Resonant Inelastic X‑ray Scattering (RIXS) Setup'
+        title = 'Resonant Inelastic X-ray Scattering (RIXS) Setup'
         self.ostream.print_header(f'{title:^{str_width}}')
         self.ostream.print_header(f'{"=" * len(title):^{str_width}}')
         self.ostream.print_blank()
