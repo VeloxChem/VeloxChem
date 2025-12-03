@@ -34,6 +34,7 @@ from pathlib import Path
 import numpy as np
 import math
 import h5py
+import re
 
 from .veloxchemlib import AODensityMatrix
 from .veloxchemlib import denmat
@@ -130,7 +131,7 @@ class DensityViewer:
         # progress bar
         self.progress = None
 
-    def read_hdf5(self, fname):
+    def read_hdf5(self, fname, label=''):
         """
         Reads the dictionary of densities from a checkpoint file.
 
@@ -150,16 +151,37 @@ class DensityViewer:
         errmsg = f"DensityViewer: Cannot read file {fname}."
         assert_msg_critical(valid_checkpoint, errmsg)
 
-        h5f = h5py.File(fname, "r")
+        hf = h5py.File(fname, "r")
 
-        # TODO: add other density types as they become available
-        for key in h5f.keys():
-            if "detach" in key or "attach" in key:
-                data = np.array(h5f.get(key))
-                den_dict[key] = data
-            if "hole" in key or "particle" in key:
-                data = np.array(h5f.get(key))
-                den_dict[key] = data
+        if label:
+            hfgroup = hf.get(label)
+        else:
+            hfgroup = hf
+
+        # sort the keys if there are numbers in the keys
+        sorted_keys = []
+        for key in hfgroup.keys():
+            num_match = re.search(r'\d+', key)
+            if num_match is not None:
+                sorted_keys.append((int(num_match.group()), key))
+            else:
+                sorted_keys.append((0, key))
+        sorted_keys.sort()
+
+        keys = [key_tuple[1] for key_tuple in sorted_keys]
+
+        for key in keys:
+            # TODO: add other density types as they become available
+            for dens_type in [
+                    "D_alpha", "D_beta", "detach_", "attach_", "hole",
+                    "particle"
+            ]:
+                if dens_type in key:
+                    data = np.array(hfgroup.get(key))
+                    if data.ndim == 2:
+                        den_dict[key] = data
+
+        hf.close()
 
         return den_dict
 
@@ -493,7 +515,7 @@ class DensityViewer:
         else:
             self._plot_using_py3dmol(molecule, basis, den_inp, width, height)
 
-    def plot_using_k3d(self, molecule, basis, den_inp):
+    def plot_using_k3d(self, molecule, basis, den_inp, label=''):
         """
         Plots the densities using k3d, with a widget to choose which.
 
@@ -519,7 +541,7 @@ class DensityViewer:
             raise ImportError(self.help_string_widgets_and_display())
 
         if isinstance(den_inp, str):
-            den_dict = self.read_hdf5(den_inp)
+            den_dict = self.read_hdf5(den_inp, label=label)
         elif isinstance(den_inp, dict):
             den_dict = den_inp
         else:
@@ -796,6 +818,7 @@ class DensityViewer:
                             molecule,
                             basis,
                             den_inp,
+                            label='',
                             width=600,
                             height=450):
         """
@@ -818,7 +841,7 @@ class DensityViewer:
             raise ImportError(self.help_string_widgets_and_display())
 
         if isinstance(den_inp, str):
-            den_dict = self.read_hdf5(den_inp)
+            den_dict = self.read_hdf5(den_inp, label=label)
         elif isinstance(den_inp, dict):
             den_dict = den_inp
         else:
