@@ -39,6 +39,7 @@ import sys
 
 from .veloxchemlib import XCFunctional, MolecularGrid
 from .veloxchemlib import mpi_master, rotatory_strength_in_cgs
+from .veloxchemlib import hartree_in_wavenumber, hartree_in_ev
 from .veloxchemlib import denmat
 from .aodensitymatrix import AODensityMatrix
 from .outputstream import OutputStream
@@ -58,6 +59,13 @@ from .errorhandler import assert_msg_critical
 from .checkpoint import (read_rsp_hdf5, write_rsp_hdf5, write_rsp_solution,
                          write_lr_rsp_results_to_hdf5,
                          write_detach_attach_to_hdf5)
+from .spectrumplot import (plot_uv_vis_spectrum, plot_xas_spectrum,
+                           plot_ecd_spectrum, plot_xcd_spectrum)
+
+try:
+    import matplotlib.pyplot as plt
+except ImportError:
+    pass
 
 
 class TdaEigenSolver(LinearSolver):
@@ -169,17 +177,17 @@ class TdaEigenSolver(LinearSolver):
         if self.cube_origin is not None:
             assert_msg_critical(
                 len(self.cube_origin) == 3,
-                'TdaEigenSolver: cube origin needs 3 numbers')
+                f'{type(self).__name__}: cube origin needs 3 numbers')
 
         if self.cube_stepsize is not None:
             assert_msg_critical(
                 len(self.cube_stepsize) == 3,
-                'TdaEigenSolver: cube stepsize needs 3 numbers')
+                f'{type(self).__name__}: cube stepsize needs 3 numbers')
 
         if self.cube_points is not None:
             assert_msg_critical(
                 len(self.cube_points) == 3,
-                'TdaEigenSolver: cube points needs 3 integers')
+                f'{type(self).__name__}: cube points needs 3 integers')
 
         # If the detachemnt and attachment cube files are requested,
         # set the detach_attach flag to True to get the detachment and
@@ -187,7 +195,7 @@ class TdaEigenSolver(LinearSolver):
         if self.detach_attach_cubes:
             self.detach_attach = True
 
-    def compute(self, molecule, basis, scf_tensors):
+    def compute(self, molecule, basis, scf_results):
         """
         Performs TDA excited states calculation using molecular data.
 
@@ -195,7 +203,7 @@ class TdaEigenSolver(LinearSolver):
             The molecule.
         :param basis:
             The AO basis set.
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
 
         :return:
@@ -207,7 +215,7 @@ class TdaEigenSolver(LinearSolver):
         molecule_sanity_check(molecule)
 
         # check SCF results
-        scf_results_sanity_check(self, scf_tensors)
+        scf_results_sanity_check(self, scf_results)
 
         # update checkpoint_file after scf_results_sanity_check
         if self.filename is not None and self.checkpoint_file is None:
@@ -234,7 +242,7 @@ class TdaEigenSolver(LinearSolver):
         })
 
         if self.rank == mpi_master():
-            self._print_header('TDA Driver', nstates=self.nstates)
+            self._print_header('TDA Eigensolver', nstates=self.nstates)
 
         # set start time
 
@@ -246,27 +254,32 @@ class TdaEigenSolver(LinearSolver):
         nbeta = molecule.number_of_beta_electrons()
         assert_msg_critical(
             nalpha == nbeta,
-            'TdaEigenSolver: not implemented for unrestricted case')
+            f'{type(self).__name__}: not implemented for unrestricted case')
 
         # prepare molecular orbitals
 
         if self.rank == mpi_master():
-            orb_ene = scf_tensors['E_alpha']
+            orb_ene = scf_results['E_alpha']
             norb = orb_ene.shape[0]
             nocc = molecule.number_of_alpha_electrons()
+
+            # check nstates, core excitation, restricted subspace
+            assert_msg_critical(
+                self.nstates <= nocc * (norb - nocc),
+                f'{type(self).__name__}: too many excited states')
+
             if self.core_excitation:
                 assert_msg_critical(
                     self.nstates <= self.num_core_orbitals * (norb - nocc),
-                    'TdaEigenSolver: too many excited states')
+                    f'{type(self).__name__}: too many excited states')
+
             elif self.restricted_subspace:
                 assert_msg_critical(
                     self.nstates
                     <= ((self.num_core_orbitals + self.num_valence_orbitals) *
                         self.num_virtual_orbitals),
-                    'TdaEigenSolver: too many excited states')
-            else:
-                assert_msg_critical(self.nstates <= nocc * (norb - nocc),
-                                    'TdaEigenSolver: too many excited states')
+                    f'{type(self).__name__}: too many excited states')
+
         else:
             orb_ene = None
             nocc = None
@@ -275,7 +288,7 @@ class TdaEigenSolver(LinearSolver):
         eri_dict = self._init_eri(molecule, basis)
 
         # DFT information
-        dft_dict = self._init_dft(molecule, scf_tensors)
+        dft_dict = self._init_dft(molecule, scf_results)
 
         # PE information
         pe_dict = self._init_pe(molecule, basis)
@@ -323,7 +336,7 @@ class TdaEigenSolver(LinearSolver):
             # perform linear transformation of trial vectors
 
             if i >= n_restart_iterations:
-                tdens = self._get_trans_densities(trial_mat, scf_tensors,
+                tdens = self._get_trans_densities(trial_mat, scf_results,
                                                   molecule)
                 fock = self._comp_lr_fock(tdens, molecule, basis, eri_dict,
                                           dft_dict, pe_dict, profiler)
@@ -335,7 +348,7 @@ class TdaEigenSolver(LinearSolver):
             if self.rank == mpi_master():
 
                 if i >= n_restart_iterations:
-                    sig_mat = self._get_sigmas(fock, scf_tensors, molecule,
+                    sig_mat = self._get_sigmas(fock, scf_results, molecule,
                                                trial_mat)
                 else:
                     istart = i * self.nstates
@@ -401,23 +414,23 @@ class TdaEigenSolver(LinearSolver):
 
         if self.rank == mpi_master() and self._is_converged:
             if self.core_excitation:
-                mo_occ = scf_tensors['C_alpha'][:, :self.
+                mo_occ = scf_results['C_alpha'][:, :self.
                                                 num_core_orbitals].copy()
-                mo_vir = scf_tensors['C_alpha'][:, nocc:].copy()
+                mo_vir = scf_results['C_alpha'][:, nocc:].copy()
             elif self.restricted_subspace:
                 mo_occ = np.hstack(
-                    (scf_tensors['C_alpha'][:, :self.num_core_orbitals].copy(),
-                     scf_tensors['C_alpha']
+                    (scf_results['C_alpha'][:, :self.num_core_orbitals].copy(),
+                     scf_results['C_alpha']
                      [:, nocc - self.num_valence_orbitals:nocc].copy()))
                 mo_vir = np.copy(
-                    scf_tensors['C_alpha'][:, nocc:nocc +
+                    scf_results['C_alpha'][:, nocc:nocc +
                                            self.num_virtual_orbitals])
             else:
-                mo_occ = scf_tensors['C_alpha'][:, :nocc].copy()
-                mo_vir = scf_tensors['C_alpha'][:, nocc:].copy()
+                mo_occ = scf_results['C_alpha'][:, :nocc].copy()
+                mo_vir = scf_results['C_alpha'][:, nocc:].copy()
 
             eigvals, rnorms = self.solver.get_eigenvalues()
-            eigvecs = self.solver.ritz_vectors
+            eigvecs = self.solver.ritz_vectors.copy()
 
             trans_dipoles = self._comp_trans_dipoles(integrals, eigvals,
                                                      eigvecs, mo_occ, mo_vir)
@@ -1000,3 +1013,205 @@ class TdaEigenSolver(LinearSolver):
                 new_rsp_drv.key = deepcopy(val)
 
         return new_rsp_drv
+
+    def plot_xas(self,
+                 rsp_results,
+                 broadening_type="lorentzian",
+                 broadening_value=(1000.0 / hartree_in_wavenumber() *
+                                   hartree_in_ev()),
+                 ax=None):
+        """
+        Plot the X-ray absorption spectrum from the response calculation.
+
+        :param rsp_results:
+            The dictionary containing the linear response results.
+        :param broadening_type:
+            The type of broadening to use. Either 'lorentzian' or 'gaussian'.
+        :param broadening_value:
+            The broadening value in eV.
+        :param ax:
+            The matplotlib axis to plot on.
+        """
+
+        assert_msg_critical(
+            not self.restricted_subspace,
+            'Plotting spectrum for restricted_subspace is not implemented.')
+
+        assert_msg_critical(self.core_excitation,
+                            'Please use plot_uv_vis for valence excitation.')
+
+        plot_xas_spectrum(rsp_results,
+                          broadening_type=broadening_type,
+                          broadening_value=broadening_value,
+                          ax=ax)
+
+    def plot_uv_vis(self,
+                    rsp_results,
+                    broadening_type="lorentzian",
+                    broadening_value=(1000.0 / hartree_in_wavenumber() *
+                                      hartree_in_ev()),
+                    ax=None):
+        """
+        Plot the UV-Vis absorption spectrum from the response calculation.
+
+        :param rsp_results:
+            The dictionary containing the linear response results.
+        :param broadening_type:
+            The type of broadening to use. Either 'lorentzian' or 'gaussian'.
+        :param broadening_value:
+            The broadening value in eV.
+        :param ax:
+            The matplotlib axis to plot on.
+        """
+
+        assert_msg_critical(
+            not self.restricted_subspace,
+            'Plotting spectrum for restricted_subspace is not implemented.')
+
+        assert_msg_critical(not self.core_excitation,
+                            'Please use plot_xas for core excitation.')
+
+        plot_uv_vis_spectrum(rsp_results,
+                             broadening_type=broadening_type,
+                             broadening_value=broadening_value,
+                             ax=ax)
+
+    def plot_xcd(self,
+                 rsp_results,
+                 broadening_type="lorentzian",
+                 broadening_value=(1000.0 / hartree_in_wavenumber() *
+                                   hartree_in_ev()),
+                 ax=None):
+        """
+        Plot the X-ray CD spectrum from the response calculation.
+
+        :param rsp_results:
+            The dictionary containing linear response results.
+        :param broadening_type:
+            The type of broadening to use. Either 'lorentzian' or 'gaussian'.
+        :param broadening_value:
+            The broadening value in eV.
+        :param ax:
+            The matplotlib axis to plot on.
+        """
+
+        assert_msg_critical(
+            not self.restricted_subspace,
+            'Plotting spectrum for restricted_subspace is not implemented.')
+
+        assert_msg_critical(self.core_excitation,
+                            'Please use plot_ecd for valence excitation.')
+
+        plot_xcd_spectrum(rsp_results,
+                          broadening_type=broadening_type,
+                          broadening_value=broadening_value,
+                          ax=ax)
+
+    def plot_ecd(self,
+                 rsp_results,
+                 broadening_type="lorentzian",
+                 broadening_value=(1000.0 / hartree_in_wavenumber() *
+                                   hartree_in_ev()),
+                 ax=None):
+        """
+        Plot the CD spectrum from the response calculation.
+
+        :param rsp_results:
+            The dictionary containing linear response results.
+        :param broadening_type:
+            The type of broadening to use. Either 'lorentzian' or 'gaussian'.
+        :param broadening_value:
+            The broadening value in eV.
+        :param ax:
+            The matplotlib axis to plot on.
+        """
+
+        assert_msg_critical(
+            not self.restricted_subspace,
+            'Plotting spectrum for restricted_subspace is not implemented.')
+
+        assert_msg_critical(not self.core_excitation,
+                            'Please use plot_xcd for core excitation.')
+
+        plot_ecd_spectrum(rsp_results,
+                          broadening_type=broadening_type,
+                          broadening_value=broadening_value,
+                          ax=ax)
+
+    def plot(self,
+             rsp_results,
+             broadening_type="lorentzian",
+             broadening_value=(1000.0 / hartree_in_wavenumber() *
+                               hartree_in_ev()),
+             plot_type="electronic"):
+        """
+        Plot the absorption or ECD spectrum from the response calculation.
+
+        :param rsp_results:
+            The dictionary containing linear response results.
+        :param broadening_type:
+            The type of broadening to use. 'lorentzian' or 'gaussian'.
+        :param broadening_value:
+            The broadening value in eV.
+        :param plot_type:
+            The type of plot to generate. 'uv', 'xas', 'ecd', 'xcd', or 'electronic'.
+        """
+
+        assert_msg_critical('matplotlib' in sys.modules,
+                            'matplotlib is required.')
+
+        assert_msg_critical(
+            not self.restricted_subspace,
+            'Plotting spectrum for restricted_subspace is not implemented.')
+
+        if plot_type.lower() in ["uv", "uv-vis", "uv_vis"]:
+            self.plot_uv_vis(rsp_results,
+                             broadening_type=broadening_type,
+                             broadening_value=broadening_value)
+
+        elif plot_type.lower() == "xas":
+            self.plot_xas(rsp_results,
+                          broadening_type=broadening_type,
+                          broadening_value=broadening_value)
+
+        elif plot_type.lower() == "ecd":
+            self.plot_ecd(rsp_results,
+                          broadening_type=broadening_type,
+                          broadening_value=broadening_value)
+
+        elif plot_type.lower() == "xcd":
+            self.plot_xcd(rsp_results,
+                          broadening_type=broadening_type,
+                          broadening_value=broadening_value)
+
+        elif plot_type.lower() == "electronic":
+            fig, axs = plt.subplots(2, 1, figsize=(8, 10))
+            # Increase the height space between subplots
+            fig.subplots_adjust(hspace=0.3)
+
+            if self.core_excitation:
+                self.plot_xas(rsp_results,
+                              broadening_type=broadening_type,
+                              broadening_value=broadening_value,
+                              ax=axs[0])
+
+                self.plot_xcd(rsp_results,
+                              broadening_type=broadening_type,
+                              broadening_value=broadening_value,
+                              ax=axs[1])
+
+            else:
+                self.plot_uv_vis(rsp_results,
+                                 broadening_type=broadening_type,
+                                 broadening_value=broadening_value,
+                                 ax=axs[0])
+
+                self.plot_ecd(rsp_results,
+                              broadening_type=broadening_type,
+                              broadening_value=broadening_value,
+                              ax=axs[1])
+
+        else:
+            assert_msg_critical(False, 'Invalid plot type')
+
+        plt.show()

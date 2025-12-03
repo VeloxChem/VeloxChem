@@ -39,7 +39,8 @@ import h5py
 
 from .veloxchemlib import (mpi_master, hartree_in_wavenumber, hartree_in_ev,
                            hartree_in_inverse_nm, fine_structure_constant,
-                           extinction_coefficient_from_beta)
+                           extinction_coefficient_from_beta, avogadro_constant,
+                           bohr_in_angstrom)
 from .outputstream import OutputStream
 from .profiler import Profiler
 from .distributedarray import DistributedArray
@@ -140,7 +141,7 @@ class ComplexResponse(LinearSolver):
         """
 
         assert_msg_critical(flag.lower() in ['absorption', 'ecd'],
-                            'ComplexResponse: invalid CPP flag')
+                            f'{type(self).__name__}: invalid CPP flag')
 
         self.cpp_flag = flag.lower()
 
@@ -288,7 +289,7 @@ class ComplexResponse(LinearSolver):
 
         return dist_new_ger, dist_new_ung
 
-    def compute(self, molecule, basis, scf_tensors, v_grad=None):
+    def compute(self, molecule, basis, scf_results, v_grad=None):
         """
         Solves for the response vector iteratively while checking the residuals
         for convergence.
@@ -297,7 +298,7 @@ class ComplexResponse(LinearSolver):
             The molecule.
         :param basis:
             The AO basis.
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
         :param v_grad:
             The gradients on the right-hand side. If not provided, v_grad will
@@ -321,11 +322,11 @@ class ComplexResponse(LinearSolver):
         for comp in self.a_components:
             assert_msg_critical(
                 self.is_valid_component(comp, self.a_operator),
-                'ComplexResponse: Undefined or invalid a_component')
+                f'{type(self).__name__}: Undefined or invalid a_component')
         for comp in self.b_components:
             assert_msg_critical(
                 self.is_valid_component(comp, self.b_operator),
-                'ComplexResponse: Undefined or invalid b_component')
+                f'{type(self).__name__}: Undefined or invalid b_component')
 
         if self.norm_thresh is None:
             self.norm_thresh = self.conv_thresh * 1.0e-6
@@ -349,7 +350,7 @@ class ComplexResponse(LinearSolver):
         molecule_sanity_check(molecule)
 
         # check SCF results
-        scf_results_sanity_check(self, scf_tensors)
+        scf_results_sanity_check(self, scf_results)
 
         # update checkpoint_file after scf_results_sanity_check
         if self.filename is not None and self.checkpoint_file is None:
@@ -386,10 +387,10 @@ class ComplexResponse(LinearSolver):
         nbeta = molecule.number_of_beta_electrons()
         assert_msg_critical(
             nalpha == nbeta,
-            'ComplexResponse: not implemented for unrestricted case')
+            f'{type(self).__name__}: not implemented for unrestricted case')
 
         if self.rank == mpi_master():
-            orb_ene = scf_tensors['E_alpha']
+            orb_ene = scf_results['E_alpha']
         else:
             orb_ene = None
         orb_ene = self.comm.bcast(orb_ene, root=mpi_master())
@@ -400,7 +401,7 @@ class ComplexResponse(LinearSolver):
         eri_dict = self._init_eri(molecule, basis)
 
         # DFT information
-        dft_dict = self._init_dft(molecule, scf_tensors)
+        dft_dict = self._init_dft(molecule, scf_results)
 
         # PE information
         pe_dict = self._init_pe(molecule, basis)
@@ -416,7 +417,7 @@ class ComplexResponse(LinearSolver):
         if not self.nonlinear:
             b_grad = self.get_complex_prop_grad(self.b_operator,
                                                 self.b_components, molecule,
-                                                basis, scf_tensors)
+                                                basis, scf_results)
             if self.rank == mpi_master():
                 v_grad = {
                     (op, w): v for op, v in zip(self.b_components, b_grad)
@@ -499,7 +500,7 @@ class ComplexResponse(LinearSolver):
 
             profiler.set_timing_key('Preparation')
 
-            self._e2n_half_size(bger, bung, molecule, basis, scf_tensors,
+            self._e2n_half_size(bger, bung, molecule, basis, scf_results,
                                 eri_dict, dft_dict, pe_dict, profiler)
 
         profiler.check_memory_usage('Initial guess')
@@ -774,7 +775,7 @@ class ComplexResponse(LinearSolver):
             # creating new sigma and rho linear transformations
 
             self._e2n_half_size(new_trials_ger, new_trials_ung, molecule, basis,
-                                scf_tensors, eri_dict, dft_dict, pe_dict,
+                                scf_results, eri_dict, dft_dict, pe_dict,
                                 profiler)
 
             iter_in_hours = (tm.time() - iter_start_time) / 3600
@@ -808,7 +809,7 @@ class ComplexResponse(LinearSolver):
         if not self.nonlinear:
             a_grad = self.get_complex_prop_grad(self.a_operator,
                                                 self.a_components, molecule,
-                                                basis, scf_tensors)
+                                                basis, scf_results)
 
             if self.is_converged:
                 if self.rank == mpi_master():
@@ -982,7 +983,8 @@ class ComplexResponse(LinearSolver):
 
         assert_msg_critical(
             x_unit.lower() in ['au', 'ev', 'nm'],
-            'ComplexResponse.get_spectrum: x_unit should be au, ev or nm')
+            f'{type(self).__name__}.get_spectrum: x_unit should be au, ev or nm'
+        )
 
         au2ev = hartree_in_ev()
         auxnm = 1.0 / hartree_in_inverse_nm()
@@ -1038,7 +1040,8 @@ class ComplexResponse(LinearSolver):
 
         assert_msg_critical(
             x_unit.lower() in ['au', 'ev', 'nm'],
-            'ComplexResponse.get_spectrum: x_unit should be au, ev or nm')
+            f'{type(self).__name__}.get_spectrum: x_unit should be au, ev or nm'
+        )
 
         au2ev = hartree_in_ev()
         auxnm = 1.0 / hartree_in_inverse_nm()
@@ -1092,7 +1095,7 @@ class ComplexResponse(LinearSolver):
 
         assert_msg_critical(
             x_unit.lower() in ['au', 'ev', 'nm'],
-            'ComplexResponse.plot: x_unit should be au, ev or nm')
+            f'{type(self).__name__}.plot: x_unit should be au, ev or nm')
 
         assert_msg_critical('matplotlib' in sys.modules,
                             'matplotlib is required.')
@@ -1113,6 +1116,16 @@ class ComplexResponse(LinearSolver):
             x_data = np.array(cpp_spec['x_data'])
             y_data = np.array(cpp_spec['y_data'])
 
+        if self.cpp_flag == 'absorption':
+            assert_msg_critical(
+                '[a.u.]' in cpp_spec['y_label'],
+                f'{type(self).__name__}.plot: In valid unit in y_label')
+            # Note: use epsilon for absorption
+            NA = avogadro_constant()
+            a_0 = bohr_in_angstrom() * 1.0e-10
+            sigma_to_epsilon = a_0**2 * 10**4 * NA / (np.log(10) * 10**3)
+            y_data *= sigma_to_epsilon
+
         spl = make_interp_spline(x_data, y_data, k=3)
         x_spl = np.linspace(x_data[0], x_data[-1], x_data.size * 10)
         y_spl = spl(x_spl)
@@ -1124,10 +1137,11 @@ class ComplexResponse(LinearSolver):
         else:
             ax.set_xlabel(f'Excitation Energy [{x_unit.lower()}]')
 
-        y_max = np.max(np.abs(np.array(cpp_spec['y_data'])))
+        y_max = np.max(np.abs(y_data))
 
         if self.cpp_flag == 'absorption':
-            ax.set_ylabel(r'$\sigma (\omega)$ [a.u.]')
+            # Note: use epsilon for absorption
+            ax.set_ylabel(r'$\epsilon$ [L mol$^{-1}$ cm$^{-1}$]')
             ax.set_title("Absorption Spectrum")
 
             ax.set_ylim(0.0, y_max * 1.1)
@@ -1266,11 +1280,11 @@ class ComplexResponse(LinearSolver):
 
         assert_msg_critical(
             '[a.u.]' in spectrum['x_label'],
-            'ComplexResponse._print_absorption_results: In valid unit in x_label'
+            f'{type(self).__name__}._print_absorption_results: In valid unit in x_label'
         )
         assert_msg_critical(
             '[a.u.]' in spectrum['y_label'],
-            'ComplexResponse._print_absorption_results: In valid unit in y_label'
+            f'{type(self).__name__}._print_absorption_results: In valid unit in y_label'
         )
 
         title = '{:<20s}{:<20s}{:>15s}'.format('Frequency[a.u.]',
@@ -1327,10 +1341,12 @@ class ComplexResponse(LinearSolver):
 
         assert_msg_critical(
             '[a.u.]' in spectrum['x_label'],
-            'ComplexResponse._print_ecd_results: In valid unit in x_label')
+            f'{type(self).__name__}._print_ecd_results: In valid unit in x_label'
+        )
         assert_msg_critical(
             r'[L mol$^{-1}$ cm$^{-1}$]' in spectrum['y_label'],
-            'ComplexResponse._print_ecd_results: In valid unit in y_label')
+            f'{type(self).__name__}._print_ecd_results: In valid unit in y_label'
+        )
 
         title = '{:<20s}{:<20s}{:>28s}'.format('Frequency[a.u.]',
                                                'Frequency[eV]',
@@ -1376,6 +1392,10 @@ class ComplexResponse(LinearSolver):
                 y_data = np.array(spectrum['y_data'])
 
                 if self.cpp_flag == 'absorption':
+                    assert_msg_critical(
+                        '[a.u.]' in spectrum['y_label'],
+                        f'{type(self).__name__}.write_cpp_rsp_results_to_hdf5: '
+                        + 'In valid unit in y_label')
                     ylabel = self.group_label + '/sigma'
                 elif self.cpp_flag == 'ecd':
                     ylabel = self.group_label + '/delta-epsilon'
@@ -1441,8 +1461,8 @@ class ComplexResponse(LinearSolver):
             nvir = norb - nocc
             n_ov = nocc * nvir
 
-            mo_occ = scf_results['C_alpha'][:, :nocc]
-            mo_vir = scf_results['C_alpha'][:, nocc:]
+            mo_occ = scf_results['C_alpha'][:, :nocc].copy()
+            mo_vir = scf_results['C_alpha'][:, nocc:].copy()
 
             if self.cpp_flag == 'absorption':
                 # vector representation of absorption cross-section

@@ -38,6 +38,7 @@ import sys
 
 from .veloxchemlib import XCFunctional, MolecularGrid
 from .veloxchemlib import mpi_master, rotatory_strength_in_cgs
+from .veloxchemlib import hartree_in_wavenumber, hartree_in_ev
 from .veloxchemlib import denmat
 from .aodensitymatrix import AODensityMatrix
 from .outputstream import OutputStream
@@ -57,6 +58,13 @@ from .errorhandler import assert_msg_critical
 from .checkpoint import (read_rsp_hdf5, write_rsp_hdf5, write_rsp_solution,
                          write_lr_rsp_results_to_hdf5,
                          write_detach_attach_to_hdf5)
+from .spectrumplot import (plot_uv_vis_spectrum, plot_xas_spectrum,
+                           plot_ecd_spectrum, plot_xcd_spectrum)
+
+try:
+    import matplotlib.pyplot as plt
+except ImportError:
+    pass
 
 
 class TdaUnrestrictedEigenSolver(LinearSolver):
@@ -157,17 +165,17 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
         if self.cube_origin is not None:
             assert_msg_critical(
                 len(self.cube_origin) == 3,
-                'TdaEigenSolver: cube origin needs 3 numbers')
+                f'{type(self).__name__}: cube origin needs 3 numbers')
 
         if self.cube_stepsize is not None:
             assert_msg_critical(
                 len(self.cube_stepsize) == 3,
-                'TdaEigenSolver: cube stepsize needs 3 numbers')
+                f'{type(self).__name__}: cube stepsize needs 3 numbers')
 
         if self.cube_points is not None:
             assert_msg_critical(
                 len(self.cube_points) == 3,
-                'TdaEigenSolver: cube points needs 3 integers')
+                f'{type(self).__name__}: cube points needs 3 integers')
 
         # If the detachemnt and attachment cube files are requested,
         # set the detach_attach flag to True to get the detachment and
@@ -175,7 +183,7 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
         if self.detach_attach_cubes:
             self.detach_attach = True
 
-    def compute(self, molecule, basis, scf_tensors):
+    def compute(self, molecule, basis, scf_results):
         """
         Performs TDA excited states calculation using molecular data.
 
@@ -183,7 +191,7 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
             The molecule.
         :param basis:
             The AO basis set.
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
 
         :return:
@@ -195,7 +203,7 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
         molecule_sanity_check(molecule)
 
         # check SCF results
-        scf_results_sanity_check(self, scf_tensors)
+        scf_results_sanity_check(self, scf_results)
 
         # update checkpoint_file after scf_results_sanity_check
         if self.filename is not None and self.checkpoint_file is None:
@@ -222,7 +230,7 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
         })
 
         if self.rank == mpi_master():
-            self._print_header('TDA Driver', nstates=self.nstates)
+            self._print_header('TDA Eigensolver', nstates=self.nstates)
 
         # set start time
 
@@ -231,27 +239,35 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
         # prepare molecular orbitals
 
         if self.rank == mpi_master():
-            orb_ene_a = scf_tensors['E_alpha']
-            orb_ene_b = scf_tensors['E_beta']
+            orb_ene_a = scf_results['E_alpha']
+            orb_ene_b = scf_results['E_beta']
 
             norb = orb_ene_a.shape[0]
 
             nocc_a = molecule.number_of_alpha_electrons()
             nocc_b = molecule.number_of_beta_electrons()
 
+            # check nstates, core excitation, restricted subspace
             assert_msg_critical(
-                self.nstates <= (nocc_a * (norb - nocc_a) +
-                                 nocc_b * (norb - nocc_b)),
-                'TdaUnrestrictedEigenSolver: too many excited states')
+                self.nstates
+                <= (nocc_a * (norb - nocc_a) + nocc_b * (norb - nocc_b)),
+                f'{type(self).__name__}: too many excited states')
 
             if self.core_excitation:
                 assert_msg_critical(
                     self.num_core_orbitals > 0,
-                    'TdaUnrestrictedEigenSolver: num_core_orbitals not set or invalid')
+                    f'{type(self).__name__}: num_core_orbitals not set or invalid'
+                )
                 assert_msg_critical(
                     (self.num_core_orbitals < nocc_a and
                      self.num_core_orbitals < nocc_b),
-                    'TdaUnrestrictedEigenSolver: num_core_orbitals too large')
+                    f'{type(self).__name__}: num_core_orbitals too large')
+
+            elif getattr(self, 'restricted_subspace', False):
+                assert_msg_critical(
+                    False,
+                    f'{type(self).__name__}: restricted_subspace not implemented'
+                )
 
         else:
             orb_ene_a = None
@@ -263,7 +279,7 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
         eri_dict = self._init_eri(molecule, basis)
 
         # DFT information
-        dft_dict = self._init_dft(molecule, scf_tensors)
+        dft_dict = self._init_dft(molecule, scf_results)
 
         # PE information
         pe_dict = self._init_pe(molecule, basis)
@@ -273,14 +289,14 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
 
         # TODO: enable PE
         assert_msg_critical(
-            not self._pe,
-            'TdaUnrestrictedEigenSolver: ' +
+            not self._pe, f'{type(self).__name__}: ' +
             'not yet implemented for polarizable embedding')
 
         # set up trial excitation vectors on master node
 
-        diag_mat, trial_mat = self._gen_trial_vectors(
-            molecule, (orb_ene_a, orb_ene_b), (nocc_a, nocc_b))
+        diag_mat, trial_mat = self._gen_trial_vectors(molecule,
+                                                      (orb_ene_a, orb_ene_b),
+                                                      (nocc_a, nocc_b))
 
         # block Davidson algorithm setup
 
@@ -321,10 +337,14 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
             # perform linear transformation of trial vectors
 
             if i >= n_restart_iterations:
-                tdens_a = self._get_trans_densities(trial_mat, scf_tensors,
-                                                    molecule, spin='alpha')
-                tdens_b = self._get_trans_densities(trial_mat, scf_tensors,
-                                                    molecule, spin='beta')
+                tdens_a = self._get_trans_densities(trial_mat,
+                                                    scf_results,
+                                                    molecule,
+                                                    spin='alpha')
+                tdens_b = self._get_trans_densities(trial_mat,
+                                                    scf_results,
+                                                    molecule,
+                                                    spin='beta')
                 fock = self._comp_lr_fock_unrestricted(
                     (tdens_a, tdens_b), molecule, basis, eri_dict, dft_dict,
                     pe_dict, profiler)
@@ -336,7 +356,7 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
             if self.rank == mpi_master():
 
                 if i >= n_restart_iterations:
-                    sig_mat = self._get_sigmas(fock, scf_tensors, molecule,
+                    sig_mat = self._get_sigmas(fock, scf_results, molecule,
                                                trial_mat)
                 else:
                     istart = i * self.nstates
@@ -405,14 +425,16 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
 
         if self.rank == mpi_master() and self._is_converged:
             if self.core_excitation:
-                mo_occ_a = scf_tensors['C_alpha'][:, :self.num_core_orbitals].copy()
-                mo_occ_b = scf_tensors['C_beta'][:, :self.num_core_orbitals].copy()
+                mo_occ_a = scf_results['C_alpha'][:, :self.
+                                                  num_core_orbitals].copy()
+                mo_occ_b = scf_results['C_beta'][:, :self.
+                                                 num_core_orbitals].copy()
             else:
-                mo_occ_a = scf_tensors['C_alpha'][:, :nocc_a].copy()
-                mo_occ_b = scf_tensors['C_beta'][:, :nocc_b].copy()
+                mo_occ_a = scf_results['C_alpha'][:, :nocc_a].copy()
+                mo_occ_b = scf_results['C_beta'][:, :nocc_b].copy()
 
-            mo_vir_a = scf_tensors['C_alpha'][:, nocc_a:].copy()
-            mo_vir_b = scf_tensors['C_beta'][:, nocc_b:].copy()
+            mo_vir_a = scf_results['C_alpha'][:, nocc_a:].copy()
+            mo_vir_b = scf_results['C_beta'][:, nocc_b:].copy()
 
             if self.core_excitation:
                 n_ov_a = self.num_core_orbitals * mo_vir_a.shape[1]
@@ -425,8 +447,12 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
             eigvecs_a = eigvecs[:n_ov_a, :]
             eigvecs_b = eigvecs[n_ov_a:, :]
 
-            trans_dipoles_a = self._comp_trans_dipoles(integrals, eigvals, eigvecs_a, mo_occ_a, mo_vir_a)
-            trans_dipoles_b = self._comp_trans_dipoles(integrals, eigvals, eigvecs_b, mo_occ_b, mo_vir_b)
+            trans_dipoles_a = self._comp_trans_dipoles(integrals, eigvals,
+                                                       eigvecs_a, mo_occ_a,
+                                                       mo_vir_a)
+            trans_dipoles_b = self._comp_trans_dipoles(integrals, eigvals,
+                                                       eigvecs_b, mo_occ_b,
+                                                       mo_vir_b)
 
             trans_dipoles = {}
             for trans_dipole_key in trans_dipoles_a:
@@ -453,8 +479,10 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
 
         for s in range(self.nstates):
             if self.rank == mpi_master():
-                t_mat_a = eigvecs[:n_ov_a, s].reshape(mo_occ_a.shape[1], mo_vir_a.shape[1])
-                t_mat_b = eigvecs[n_ov_a:, s].reshape(mo_occ_b.shape[1], mo_vir_b.shape[1])
+                t_mat_a = eigvecs[:n_ov_a, s].reshape(mo_occ_a.shape[1],
+                                                      mo_vir_a.shape[1])
+                t_mat_b = eigvecs[n_ov_a:, s].reshape(mo_occ_b.shape[1],
+                                                      mo_vir_b.shape[1])
 
                 # save excitation details
                 excitation_details.append(
@@ -478,18 +506,20 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
                 self.ostream.flush()
 
                 if self.rank == mpi_master():
-                    nto_mo = self.get_nto_unrestricted(
-                        (t_mat_a, t_mat_b),
-                        (mo_occ_a, mo_occ_b), (mo_vir_a, mo_vir_b))
+                    nto_mo = self.get_nto_unrestricted((t_mat_a, t_mat_b),
+                                                       (mo_occ_a, mo_occ_b),
+                                                       (mo_vir_a, mo_vir_b))
 
                     nto_lam_a = nto_mo.occa_to_numpy()
                     lam_start_a = mo_occ_a.shape[1]
-                    lam_end_a = lam_start_a + min(mo_occ_a.shape[1], mo_vir_a.shape[1])
+                    lam_end_a = lam_start_a + min(mo_occ_a.shape[1],
+                                                  mo_vir_a.shape[1])
                     nto_lambdas_a.append(nto_lam_a[lam_start_a:lam_end_a])
 
                     nto_lam_b = nto_mo.occb_to_numpy()
                     lam_start_b = mo_occ_b.shape[1]
-                    lam_end_b = lam_start_b + min(mo_occ_b.shape[1], mo_vir_b.shape[1])
+                    lam_end_b = lam_start_b + min(mo_occ_b.shape[1],
+                                                  mo_vir_b.shape[1])
                     nto_lambdas_b.append(nto_lam_b[lam_start_b:lam_end_b])
 
                     # Add the NTO to the final hdf5 file.
@@ -503,11 +533,21 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
 
                 if self.nto_cubes:
                     lam_diag_a, nto_cube_fnames_a = self.write_nto_cubes(
-                        cubic_grid, molecule, basis, s, nto_mo,
-                        self.nto_pairs, nto_spin='alpha')
+                        cubic_grid,
+                        molecule,
+                        basis,
+                        s,
+                        nto_mo,
+                        self.nto_pairs,
+                        nto_spin='alpha')
                     lam_diag_b, nto_cube_fnames_b = self.write_nto_cubes(
-                        cubic_grid, molecule, basis, s, nto_mo,
-                        self.nto_pairs, nto_spin='beta')
+                        cubic_grid,
+                        molecule,
+                        basis,
+                        s,
+                        nto_mo,
+                        self.nto_pairs,
+                        nto_spin='beta')
 
                     if self.rank == mpi_master():
                         nto_cube_files_a.append(nto_cube_fnames_a)
@@ -736,9 +776,11 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
             for k in range(trial_mat.shape[1]):
                 if self.core_excitation:
                     if spin == 'alpha':
-                        mat = trial_mat[:n_ov_a, k].reshape(self.num_core_orbitals, nvir)
+                        mat = trial_mat[:n_ov_a,
+                                        k].reshape(self.num_core_orbitals, nvir)
                     elif spin == 'beta':
-                        mat = trial_mat[n_ov_a:, k].reshape(self.num_core_orbitals, nvir)
+                        mat = trial_mat[n_ov_a:,
+                                        k].reshape(self.num_core_orbitals, nvir)
                 else:
                     if spin == 'alpha':
                         mat = trial_mat[:n_ov_a, k].reshape(nocc, nvir)
@@ -800,13 +842,19 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
             if self.core_excitation:
                 n_ov_a = self.num_core_orbitals * nvir_a
 
-                cjb_alpha = trial_mat[:n_ov_a, idx].reshape(self.num_core_orbitals, nvir_a)
+                cjb_alpha = trial_mat[:n_ov_a,
+                                      idx].reshape(self.num_core_orbitals,
+                                                   nvir_a)
                 mat_a += np.matmul(cjb_alpha, np.diag(orb_ene_a[nocc_a:]).T)
-                mat_a -= np.matmul(np.diag(orb_ene_a[:self.num_core_orbitals]), cjb_alpha)
+                mat_a -= np.matmul(np.diag(orb_ene_a[:self.num_core_orbitals]),
+                                   cjb_alpha)
 
-                cjb_beta = trial_mat[n_ov_a:, idx].reshape(self.num_core_orbitals, nvir_b)
+                cjb_beta = trial_mat[n_ov_a:,
+                                     idx].reshape(self.num_core_orbitals,
+                                                  nvir_b)
                 mat_b += np.matmul(cjb_beta, np.diag(orb_ene_b[nocc_b:]).T)
-                mat_b -= np.matmul(np.diag(orb_ene_b[:self.num_core_orbitals]), cjb_beta)
+                mat_b -= np.matmul(np.diag(orb_ene_b[:self.num_core_orbitals]),
+                                   cjb_beta)
 
                 mat = np.vstack((mat_a.reshape(-1, 1), mat_b.reshape(-1, 1)))
                 sigma_vecs.append(mat)
@@ -904,7 +952,8 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
         }
 
         for s in range(self.nstates):
-            exc_vec = eigvecs[:, s].reshape(mo_occ.shape[1], mo_vir.shape[1]).copy()
+            exc_vec = eigvecs[:, s].reshape(mo_occ.shape[1],
+                                            mo_vir.shape[1]).copy()
 
             # for unrestricted
             trans_dens = np.linalg.multi_dot([mo_occ, exc_vec, mo_vir.T])
@@ -1035,3 +1084,205 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
                 new_rsp_drv.key = deepcopy(val)
 
         return new_rsp_drv
+
+    def plot_xas(self,
+                 rsp_results,
+                 broadening_type="lorentzian",
+                 broadening_value=(1000.0 / hartree_in_wavenumber() *
+                                   hartree_in_ev()),
+                 ax=None):
+        """
+        Plot the X-ray absorption spectrum from the response calculation.
+
+        :param rsp_results:
+            The dictionary containing the linear response results.
+        :param broadening_type:
+            The type of broadening to use. Either 'lorentzian' or 'gaussian'.
+        :param broadening_value:
+            The broadening value in eV.
+        :param ax:
+            The matplotlib axis to plot on.
+        """
+
+        assert_msg_critical(
+            not getattr(self, 'restricted_subspace', False),
+            'Plotting spectrum for restricted_subspace is not implemented.')
+
+        assert_msg_critical(self.core_excitation,
+                            'Please use plot_uv_vis for valence excitation.')
+
+        plot_xas_spectrum(rsp_results,
+                          broadening_type=broadening_type,
+                          broadening_value=broadening_value,
+                          ax=ax)
+
+    def plot_uv_vis(self,
+                    rsp_results,
+                    broadening_type="lorentzian",
+                    broadening_value=(1000.0 / hartree_in_wavenumber() *
+                                      hartree_in_ev()),
+                    ax=None):
+        """
+        Plot the UV-Vis absorption spectrum from the response calculation.
+
+        :param rsp_results:
+            The dictionary containing the linear response results.
+        :param broadening_type:
+            The type of broadening to use. Either 'lorentzian' or 'gaussian'.
+        :param broadening_value:
+            The broadening value in eV.
+        :param ax:
+            The matplotlib axis to plot on.
+        """
+
+        assert_msg_critical(
+            not getattr(self, 'restricted_subspace', False),
+            'Plotting spectrum for restricted_subspace is not implemented.')
+
+        assert_msg_critical(not self.core_excitation,
+                            'Please use plot_xas for core excitation.')
+
+        plot_uv_vis_spectrum(rsp_results,
+                             broadening_type=broadening_type,
+                             broadening_value=broadening_value,
+                             ax=ax)
+
+    def plot_xcd(self,
+                 rsp_results,
+                 broadening_type="lorentzian",
+                 broadening_value=(1000.0 / hartree_in_wavenumber() *
+                                   hartree_in_ev()),
+                 ax=None):
+        """
+        Plot the X-ray CD spectrum from the response calculation.
+
+        :param rsp_results:
+            The dictionary containing linear response results.
+        :param broadening_type:
+            The type of broadening to use. Either 'lorentzian' or 'gaussian'.
+        :param broadening_value:
+            The broadening value in eV.
+        :param ax:
+            The matplotlib axis to plot on.
+        """
+
+        assert_msg_critical(
+            not getattr(self, 'restricted_subspace', False),
+            'Plotting spectrum for restricted_subspace is not implemented.')
+
+        assert_msg_critical(self.core_excitation,
+                            'Please use plot_ecd for valence excitation.')
+
+        plot_xcd_spectrum(rsp_results,
+                          broadening_type=broadening_type,
+                          broadening_value=broadening_value,
+                          ax=ax)
+
+    def plot_ecd(self,
+                 rsp_results,
+                 broadening_type="lorentzian",
+                 broadening_value=(1000.0 / hartree_in_wavenumber() *
+                                   hartree_in_ev()),
+                 ax=None):
+        """
+        Plot the CD spectrum from the response calculation.
+
+        :param rsp_results:
+            The dictionary containing linear response results.
+        :param broadening_type:
+            The type of broadening to use. Either 'lorentzian' or 'gaussian'.
+        :param broadening_value:
+            The broadening value in eV.
+        :param ax:
+            The matplotlib axis to plot on.
+        """
+
+        assert_msg_critical(
+            not getattr(self, 'restricted_subspace', False),
+            'Plotting spectrum for restricted_subspace is not implemented.')
+
+        assert_msg_critical(not self.core_excitation,
+                            'Please use plot_xcd for core excitation.')
+
+        plot_ecd_spectrum(rsp_results,
+                          broadening_type=broadening_type,
+                          broadening_value=broadening_value,
+                          ax=ax)
+
+    def plot(self,
+             rsp_results,
+             broadening_type="lorentzian",
+             broadening_value=(1000.0 / hartree_in_wavenumber() *
+                               hartree_in_ev()),
+             plot_type="electronic"):
+        """
+        Plot the absorption or ECD spectrum from the response calculation.
+
+        :param rsp_results:
+            The dictionary containing linear response results.
+        :param broadening_type:
+            The type of broadening to use. 'lorentzian' or 'gaussian'.
+        :param broadening_value:
+            The broadening value in eV.
+        :param plot_type:
+            The type of plot to generate. 'uv', 'xas', 'ecd', 'xcd', or 'electronic'.
+        """
+
+        assert_msg_critical('matplotlib' in sys.modules,
+                            'matplotlib is required.')
+
+        assert_msg_critical(
+            not getattr(self, 'restricted_subspace', False),
+            'Plotting spectrum for restricted_subspace is not implemented.')
+
+        if plot_type.lower() in ["uv", "uv-vis", "uv_vis"]:
+            self.plot_uv_vis(rsp_results,
+                             broadening_type=broadening_type,
+                             broadening_value=broadening_value)
+
+        elif plot_type.lower() == "xas":
+            self.plot_xas(rsp_results,
+                          broadening_type=broadening_type,
+                          broadening_value=broadening_value)
+
+        elif plot_type.lower() == "ecd":
+            self.plot_ecd(rsp_results,
+                          broadening_type=broadening_type,
+                          broadening_value=broadening_value)
+
+        elif plot_type.lower() == "xcd":
+            self.plot_xcd(rsp_results,
+                          broadening_type=broadening_type,
+                          broadening_value=broadening_value)
+
+        elif plot_type.lower() == "electronic":
+            fig, axs = plt.subplots(2, 1, figsize=(8, 10))
+            # Increase the height space between subplots
+            fig.subplots_adjust(hspace=0.3)
+
+            if self.core_excitation:
+                self.plot_xas(rsp_results,
+                              broadening_type=broadening_type,
+                              broadening_value=broadening_value,
+                              ax=axs[0])
+
+                self.plot_xcd(rsp_results,
+                              broadening_type=broadening_type,
+                              broadening_value=broadening_value,
+                              ax=axs[1])
+
+            else:
+                self.plot_uv_vis(rsp_results,
+                                 broadening_type=broadening_type,
+                                 broadening_value=broadening_value,
+                                 ax=axs[0])
+
+                self.plot_ecd(rsp_results,
+                              broadening_type=broadening_type,
+                              broadening_value=broadening_value,
+                              ax=axs[1])
+
+        else:
+            assert_msg_critical(False, 'Invalid plot type')
+
+        plt.show()

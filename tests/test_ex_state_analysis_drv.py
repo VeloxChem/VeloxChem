@@ -9,33 +9,41 @@ from veloxchem.excitedstateanalysisdriver import ExcitedStateAnalysisDriver
 
 
 class TestCTNumbers:
+
     def test_tda(self):
-        ct_matrix = np.array([[0.34837228, 0.19662888], [0.1367462,  0.31825265]])
+
+        ct_matrix = np.array([
+            [0.34837228, 0.19662888],
+            [0.1367462, 0.31825265],
+        ])
 
         hole_participation_ratio = 1.9839293483578253
         particle_participation_ratio = 1.9982298906088756
         avg_participation_ratio = 1.9910796194833504
-        
-        avg_hole_position = np.array([ 1.39951260e-01,  1.33518801e-01, -7.95624567e-05])
-        avg_particle_position = np.array([-1.46077909e-01,  1.08171427e-01, -8.18080571e-05])
-        avg_difference_vec = np.array([-2.86029169e-01, -2.53473739e-02, -2.24560031e-06])
-        
-        ct_length = 0.2871500913516519
 
-        thienyl_thiazole_str = """S   1.5860   -1.4206    0.0001  
-        C   0.6775    0.0310   -0.0004  
-        C   1.4857    1.1466   -0.0004 
-        C   2.8690    0.8051   -0.0001 
-        C   3.0653   -0.5583    0.0002 
+        avg_hole_position = np.array(
+            [9.48439790e-02, 4.63701220e-02, -9.30375228e-05])
+        avg_particle_position = np.array(
+            [-1.05663691e-02, 1.95196319e-02, -2.61361122e-05])
+        avg_difference_vec = np.array(
+            [-1.05410348e-01, -2.68504901e-02, 6.69014106e-05])
+
+        ct_length = 0.10877635215676436
+
+        thienyl_thiazole_str = """S   1.5860   -1.4206    0.0001
+        C   0.6775    0.0310   -0.0004
+        C   1.4857    1.1466   -0.0004
+        C   2.8690    0.8051   -0.0001
+        C   3.0653   -0.5583    0.0002
         H   1.1367    2.1716   -0.0005
-        H   3.6790    1.5228    0.0000 
-        H   4.0068   -1.0893    0.0006  
-        S  -1.6588    1.4476    0.0009 
+        H   3.6790    1.5228    0.0000
+        H   4.0068   -1.0893    0.0006
+        S  -1.6588    1.4476    0.0009
         N  -1.4203   -1.1264    0.0001
         C  -0.7409   -0.0017    0.0002
         C  -2.7697   -0.8319    0.0000
-        C  -3.0939    0.5086   -0.0006  
-        H  -4.0731    0.9658   -0.0010 
+        C  -3.0939    0.5086   -0.0006
+        H  -4.0731    0.9658   -0.0010
         H  -3.4860   -1.6422   -0.0003
         """
 
@@ -46,11 +54,10 @@ class TestCTNumbers:
 
         molecule = Molecule.read_molecule_string(thienyl_thiazole_str)
         basis = MolecularBasis.read(molecule, "STO-3G", ostream=None)
-        
+
         # SCF settings and calculation
         scf_drv = ScfRestrictedDriver()
         scf_drv.ostream.mute()
-        scf_drv.grid_level = 3
         scf_results = scf_drv.compute(molecule, basis)
 
         # Solve the TDDFT linear response equation for the first 2 excited states
@@ -65,45 +72,63 @@ class TestCTNumbers:
         # add fragment dictionary to ExcitedStateAnalysisDriver
         exc_drv.fragment_dict = fragment_dict
 
-        descriptor_dict_s1 = exc_drv.compute(molecule, basis, scf_results, tda_results, 1)
+        descriptor_dict_s1 = exc_drv.compute(molecule, basis, scf_results,
+                                             tda_results, 1)
 
-        assert np.max(np.abs(descriptor_dict_s1['ct_matrix'] - ct_matrix)) <1.0e-06
-        assert np.max(np.abs(descriptor_dict_s1['hole_participation_ratio'] - hole_participation_ratio)) <1.0e-06
-        assert np.max(np.abs(descriptor_dict_s1['particle_participation_ratio'] - particle_participation_ratio)) <1.0e-06
-        assert np.max(np.abs(descriptor_dict_s1['avg_participation_ratio'] - avg_participation_ratio)) <1.0e-06
-        assert np.max(np.abs(descriptor_dict_s1['avg_hole_position'] - avg_hole_position)) <1.0e-06
-        assert np.max(np.abs(descriptor_dict_s1['avg_particle_position'] - avg_particle_position)) <1.0e-06
-        assert np.max(np.abs(descriptor_dict_s1['avg_difference_vector'] - avg_difference_vec)) <1.0e-06
-        assert np.max(np.abs(descriptor_dict_s1['ct_length'] - ct_length)) <1.0e-06
+        assert np.max(np.abs(descriptor_dict_s1["ct_matrix"] -
+                             ct_matrix)) < 1.0e-06
+        assert np.max(
+            np.abs(descriptor_dict_s1["hole_participation_ratio"] -
+                   hole_participation_ratio)) < 1.0e-06
+        assert np.max(
+            np.abs(descriptor_dict_s1["particle_participation_ratio"] -
+                   particle_participation_ratio)) < 1.0e-06
+        assert np.max(
+            np.abs(descriptor_dict_s1["avg_participation_ratio"] -
+                   avg_participation_ratio)) < 1.0e-06
+        assert np.max(
+            np.abs(descriptor_dict_s1["avg_hole_position"] -
+                   avg_hole_position)) < 1.0e-06
+        assert np.max(
+            np.abs(descriptor_dict_s1["avg_particle_position"] -
+                   avg_particle_position)) < 1.0e-06
+        assert np.max(
+            np.abs(descriptor_dict_s1["avg_difference_vector"] -
+                   avg_difference_vec)) < 1.0e-06
+        assert np.max(np.abs(descriptor_dict_s1["ct_length"] -
+                             ct_length)) < 1.0e-06
 
-        
     def test_rpa(self):
-        ct_matrix = np.array([[0.37844034, 0.17007633], [0.11831815, 0.33537697]])
-        
-        hole_participation_ratio = 1.9822558674307456
-        particle_participation_ratio = 1.999849478491969
-        avg_participation_ratio = 1.9910526729613571
-        
-        avg_hole_position = np.array([ 1.50961023e-01,  1.34494466e-01, -7.94760197e-05])
-        avg_particle_position = np.array([-9.57159520e-02,  1.12634410e-01, -8.14126679e-05])
-        avg_difference_vec = np.array([-2.46676975e-01, -2.18600555e-02, -1.93664826e-06])
-        
-        ct_length =  0.2476436794645711
+        ct_matrix = np.array([[0.37055813, 0.19016109],
+                              [0.13581409, 0.32858347]])
 
-        thienyl_thiazole_str = """S   1.5860   -1.4206    0.0001  
-        C   0.6775    0.0310   -0.0004  
-        C   1.4857    1.1466   -0.0004 
-        C   2.8690    0.8051   -0.0001 
-        C   3.0653   -0.5583    0.0002 
+        hole_participation_ratio = 1.982496948226768
+        particle_participation_ratio = 1.9997087109644545
+        avg_participation_ratio = 1.9911028295956112
+
+        avg_hole_position = np.array([0.10244102, 0.04395257, -0.00010709])
+        avg_particle_position = np.array(
+            [1.55512189e-02, 1.76200117e-02, -2.91052404e-05])
+        avg_difference_vec = np.array(
+            [-8.68898023e-02, -2.63325597e-02, 7.79813570e-05])
+
+        ct_length = 0.09079233183655822
+
+        thienyl_thiazole_str = """
+        S   1.5860   -1.4206    0.0001
+        C   0.6775    0.0310   -0.0004
+        C   1.4857    1.1466   -0.0004
+        C   2.8690    0.8051   -0.0001
+        C   3.0653   -0.5583    0.0002
         H   1.1367    2.1716   -0.0005
-        H   3.6790    1.5228    0.0000 
-        H   4.0068   -1.0893    0.0006  
-        S  -1.6588    1.4476    0.0009 
+        H   3.6790    1.5228    0.0000
+        H   4.0068   -1.0893    0.0006
+        S  -1.6588    1.4476    0.0009
         N  -1.4203   -1.1264    0.0001
         C  -0.7409   -0.0017    0.0002
         C  -2.7697   -0.8319    0.0000
-        C  -3.0939    0.5086   -0.0006  
-        H  -4.0731    0.9658   -0.0010 
+        C  -3.0939    0.5086   -0.0006
+        H  -4.0731    0.9658   -0.0010
         H  -3.4860   -1.6422   -0.0003
         """
 
@@ -114,11 +139,10 @@ class TestCTNumbers:
 
         molecule = Molecule.read_molecule_string(thienyl_thiazole_str)
         basis = MolecularBasis.read(molecule, "STO-3G", ostream=None)
-        
+
         # SCF settings and calculation
         scf_drv = ScfRestrictedDriver()
         scf_drv.ostream.mute()
-        scf_drv.grid_level = 3
         scf_results = scf_drv.compute(molecule, basis)
 
         # Solve the TDDFT linear response equation for the first 2 excited states
@@ -133,13 +157,28 @@ class TestCTNumbers:
         # add fragment dictionary to ExcitedStateAnalysisDriver
         exc_drv.fragment_dict = fragment_dict
 
-        descriptor_dict_s1 = exc_drv.compute(molecule, basis, scf_results, lreig_results, 1)
+        descriptor_dict_s1 = exc_drv.compute(molecule, basis, scf_results,
+                                             lreig_results, 1)
 
-        assert np.max(np.abs(descriptor_dict_s1['ct_matrix'] - ct_matrix)) <1.0e-06
-        assert np.max(np.abs(descriptor_dict_s1['hole_participation_ratio'] - hole_participation_ratio)) <1.0e-06
-        assert np.max(np.abs(descriptor_dict_s1['particle_participation_ratio'] - particle_participation_ratio)) <1.0e-06
-        assert np.max(np.abs(descriptor_dict_s1['avg_participation_ratio'] - avg_participation_ratio)) <1.0e-06
-        assert np.max(np.abs(descriptor_dict_s1['avg_hole_position'] - avg_hole_position)) <1.0e-06
-        assert np.max(np.abs(descriptor_dict_s1['avg_particle_position'] - avg_particle_position)) <1.0e-06
-        assert np.max(np.abs(descriptor_dict_s1['avg_difference_vector'] - avg_difference_vec)) <1.0e-06
-        assert np.max(np.abs(descriptor_dict_s1['ct_length'] - ct_length)) <1.0e-06
+        assert np.max(np.abs(descriptor_dict_s1["ct_matrix"] -
+                             ct_matrix)) < 1.0e-06
+        assert np.max(
+            np.abs(descriptor_dict_s1["hole_participation_ratio"] -
+                   hole_participation_ratio)) < 1.0e-06
+        assert np.max(
+            np.abs(descriptor_dict_s1["particle_participation_ratio"] -
+                   particle_participation_ratio)) < 1.0e-06
+        assert np.max(
+            np.abs(descriptor_dict_s1["avg_participation_ratio"] -
+                   avg_participation_ratio)) < 1.0e-06
+        assert np.max(
+            np.abs(descriptor_dict_s1["avg_hole_position"] -
+                   avg_hole_position)) < 1.0e-06
+        assert np.max(
+            np.abs(descriptor_dict_s1["avg_particle_position"] -
+                   avg_particle_position)) < 1.0e-06
+        assert np.max(
+            np.abs(descriptor_dict_s1["avg_difference_vector"] -
+                   avg_difference_vec)) < 1.0e-06
+        assert np.max(np.abs(descriptor_dict_s1["ct_length"] -
+                             ct_length)) < 1.0e-06
