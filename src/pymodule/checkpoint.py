@@ -316,12 +316,12 @@ def write_detach_attach_to_hdf5(fname,
 
         # add detachment/attachment densities to the rsp group
 
-        detach_label = group_label + "/detach_" + state_label
+        detach_label = group_label + "/detach_attach/detach_" + state_label
         if detach_label in hf:
             del hf[detach_label]
         hf.create_dataset(detach_label, data=dens_detach)
 
-        attach_label = group_label + "/attach_" + state_label
+        attach_label = group_label + "/detach_attach/attach_" + state_label
         if attach_label in hf:
             del hf[attach_label]
         hf.create_dataset(attach_label, data=dens_attach)
@@ -329,13 +329,15 @@ def write_detach_attach_to_hdf5(fname,
         # add detachment/attachment charges to the rsp group
 
         if chg_detach is not None:
-            detach_label = group_label + "/detach_charges_" + state_label
+            detach_label = (group_label + "/detach_attach/detach_charges_" +
+                            state_label)
             if detach_label in hf:
                 del hf[detach_label]
             hf.create_dataset(detach_label, data=chg_detach)
 
         if chg_attach is not None:
-            attach_label = group_label + "/attach_charges_" + state_label
+            attach_label = (group_label + "/detach_attach/attach_charges_" +
+                            state_label)
             if attach_label in hf:
                 del hf[attach_label]
             hf.create_dataset(attach_label, data=chg_attach)

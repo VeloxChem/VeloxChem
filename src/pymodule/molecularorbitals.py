@@ -510,6 +510,35 @@ class MolecularOrbitals:
         hf.close()
 
     @staticmethod
+    def check_label_validity(fname, label=''):
+        """
+        Checks label validity for molecular orbitals hdf5 file.
+
+        :param fname:
+            The name of the hdf5 file.
+
+        :return:
+            True if the label is valid, False otherwise.
+        """
+
+        if label and isinstance(label, str):
+            prefix = label + '_'
+        else:
+            prefix = ''
+
+        hf = h5py.File(fname, 'r')
+
+        is_valid = True
+
+        for key in ['alpha_orbitals', 'alpha_energies', 'alpha_occupations']:
+            key_in_hf = ((prefix + key) in hf)
+            is_valid = (is_valid and key_in_hf)
+
+        hf.close()
+
+        return is_valid
+
+    @staticmethod
     def read_hdf5(fname, label=''):
         """
         Reads molecular orbitals from hdf5 file.
@@ -628,10 +657,12 @@ class MolecularOrbitals:
 
         # sanity checks
 
-        for nto_orbitals, nto_lambdas in zip(nto_orbitals_list, nto_lambdas_list):
+        for nto_orbitals, nto_lambdas in zip(nto_orbitals_list,
+                                             nto_lambdas_list):
 
-            assert_msg_critical(nto_orbitals.shape[1] == nto_lambdas.shape[0],
-                                'MolecularOrbitals.create_nto: Inconsistent size')
+            assert_msg_critical(
+                nto_orbitals.shape[1] == nto_lambdas.shape[0],
+                'MolecularOrbitals.create_nto: Inconsistent size')
 
             negative_lambdas = [x for x in nto_lambdas if x < 0.0]
             positive_lambdas = [x for x in nto_lambdas if x > 0.0]
@@ -646,8 +677,10 @@ class MolecularOrbitals:
                     abs(m + p) < 1.0e-6,
                     'MolecularOrbitals.create_nto: Inconsistent lambda values')
 
-        nto_energies_list = [np.zeros(nto_lambdas_list[idx].shape[0])
-                             for idx in range(len(nto_lambdas_list))]
+        nto_energies_list = [
+            np.zeros(nto_lambdas_list[idx].shape[0])
+            for idx in range(len(nto_lambdas_list))
+        ]
 
         return MolecularOrbitals(nto_orbitals_list, nto_energies_list,
                                  nto_lambdas_list, mo_type)
