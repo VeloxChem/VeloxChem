@@ -90,6 +90,7 @@ class RixsDriver(LinearSolver):
 
         # method settings
         self.photon_energy = None
+        self.core_resonances = None
         self.theta = 0
         # a.u., FWHM
         # 1000.0 / hartree_in_wavenumber()
@@ -117,6 +118,7 @@ class RixsDriver(LinearSolver):
                     'outgoing propagation vector'),
             'gamma': ('float', 'broadening term (FWHM)'),
             'photon_energy': ('list', 'list of incoming photon energies'),
+            'core_resonances': ('int', 'number of core-resonances to take as incoming photon energy'),
             'final_state_cutoff':
                 ('float', 'energy window of final states to include'),
             'nstates': ('int', 'number of excited states'),
@@ -144,6 +146,9 @@ class RixsDriver(LinearSolver):
             method_dict = {}
         
         key = 'photon_energy'
+        if key in rsp_dict and 'core_resonances' in rsp_dict:
+            raise ValueError("Give either photon energies or core resonances, not both!")
+        
         if key in rsp_dict:
             val = rsp_dict[key]
 
@@ -391,9 +396,24 @@ class RixsDriver(LinearSolver):
             'valence_states': val_states,
         }
         
+        if self.core_resonances is not None:
+            # Take incoming photon energies as those of the first n core-excited state eigenvalues
+            if self.rank == mpi_master():
+                assert_msg_critical(self.core_resonances < len(core_eigvals),
+                                    f'Requested {self.core_resonances} core resonances, '
+                                    f'but only {len(core_eigvals)} core states are available.')
+                
+                photon_list = core_eigvals[:self.core_resonances].tolist()
+
+            else:
+                photon_list = None
+
+            photon_list = self.comm.bcast(photon_list, root=mpi_master())
+            self.photon_energy = photon_list
+            
         # If incoming photon energy is not set, set it to match the
         # first core-excited state with osc_strength > 1e-3
-        if self.photon_energy is None:
+        elif self.photon_energy is None:
             init_photon_set = False
 
             if self.rank == mpi_master():
