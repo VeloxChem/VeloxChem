@@ -580,7 +580,7 @@ class TdaEigenSolver(LinearSolver):
 
             if (self.save_solutions and final_h5_fname is not None):
                 # Write response results to final checkpoint file.
-                write_lr_rsp_results_to_hdf5(final_h5_fname, ret_dict)
+                write_lr_rsp_results_to_hdf5(final_h5_fname, ret_dict, self.group_label)
 
             self._print_results(ret_dict)
 
@@ -959,7 +959,7 @@ class TdaEigenSolver(LinearSolver):
 
         for s in range(eigvecs.shape[1]):
             write_rsp_solution(final_h5_fname, 'S{:d}'.format(s + 1),
-                               eigvecs[:, s])
+                               eigvecs[:, s], self.group_label)
 
         self.ostream.print_info('Response solution vectors written to file: ' +
                                 final_h5_fname)

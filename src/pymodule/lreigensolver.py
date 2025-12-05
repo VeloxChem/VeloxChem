@@ -873,7 +873,7 @@ class LinearResponseEigenSolver(LinearSolver):
                     # write to h5 file for response solutions
                     if (self.save_solutions and final_h5_fname is not None):
                         write_rsp_solution(final_h5_fname,
-                                           'S{:d}'.format(s + 1), eigvec)
+                                           'S{:d}'.format(s + 1), eigvec, self.group_label)
 
                     # save excitation details
                     excitation_details.append(
@@ -931,7 +931,7 @@ class LinearResponseEigenSolver(LinearSolver):
                         self.ostream.print_blank()
 
                         # Write the response results to the final checkpoint file
-                        write_lr_rsp_results_to_hdf5(final_h5_fname, ret_dict)
+                        write_lr_rsp_results_to_hdf5(final_h5_fname, ret_dict, self.group_label)
 
                     self._print_results(ret_dict)
 

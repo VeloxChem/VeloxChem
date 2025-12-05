@@ -267,6 +267,7 @@ class RixsDriver(LinearSolver):
                                 'Invalid number of core orbitals')
 
             if self.checkpoint_file is not None:
+                cvs_rsp_drv.group_label = 'rsp_cvs'
                 fpath = Path(self.checkpoint_file)
                 fpath = fpath.with_name(fpath.stem)
                 cvs_rsp_drv.checkpoint_file = str(fpath) + '_rixs_cvs.h5'
@@ -370,7 +371,7 @@ class RixsDriver(LinearSolver):
         mo_occ = self.comm.bcast(mo_occ, root=mpi_master())
         mo_vir = self.comm.bcast(mo_vir, root=mpi_master())
 
-        core_eigvals = self.comm.bcast(core_eigvals, root=mpi_master())
+        core_eigvals    = self.comm.bcast(core_eigvals, root=mpi_master())
         valence_eigvals = self.comm.bcast(valence_eigvals, root=mpi_master())
 
         core_eigvecs    = self._get_eigvecs(cvs_rsp_results, core_states, "core")
@@ -399,7 +400,7 @@ class RixsDriver(LinearSolver):
         if self.core_resonances is not None:
             # Take incoming photon energies as those of the first n core-excited state eigenvalues
             if self.rank == mpi_master():
-                assert_msg_critical(self.core_resonances < len(core_eigvals),
+                assert_msg_critical(self.core_resonances <= len(core_eigvals),
                                     f'Requested {self.core_resonances} core resonances, '
                                     f'but only {len(core_eigvals)} core states are available.')
                 
@@ -637,7 +638,6 @@ class RixsDriver(LinearSolver):
 
         :return: 
             The scattering amplitude tensor: shape = (3,3)
-
         """
         gamma_hwhm = self.gamma / 2.0
         e_n = 1.0 / (omega - (core_eigenvalue + 1j * gamma_hwhm))
