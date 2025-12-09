@@ -116,15 +116,15 @@ class TrajectoryDriver:
         qm_atoms = self.universe.select_atoms(qm_region)
         rest = self.universe.select_atoms(f"not ({qm_region})")
         transforms = [
-            transform.unwarp(qm_atoms),
+            transform.unwrap(qm_atoms),
             transform.center_in_box(qm_atoms, wrap=True),
             transform.wrap(rest)
         ]
         self.universe.trajectory.add_transformations(*transforms)
         snapshots = []
         for ts in self.universe.trajectory[self.start:self.stop:self.step]:
-            qm_coords = qm_atoms.positions / bohr_in_angstrom  # Convert to Bohr
-            mm_coords = rest.positions / bohr_in_angstrom  # Convert to Bohr
+            qm_coords = qm_atoms.positions / bohr_in_angstrom()
+            mm_coords = rest.positions / bohr_in_angstrom()
             snapshot = {
                 'frame': ts.frame,
                 'qm_coords': qm_coords,
