@@ -112,7 +112,7 @@ class TrajectoryDriver:
         self.start = start
         self.stop = stop
         self.step = step
-        #import MDAnalysis.transformations as transform
+
         qm_atoms = self.universe.select_atoms(qm_region)
         rest = self.universe.select_atoms(f"not ({qm_region})")
         transforms = [
