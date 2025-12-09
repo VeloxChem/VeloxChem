@@ -94,7 +94,7 @@ class TrajectoryDriver:
         key: MM region coordinates
         """
         if trajectory_file.lower().endswith('.pdb'):
-            self.universe = mda.Universe(trajectory_file)
+            self.universe = mda.Universe(trajectory_file, guess_bonds=True)
         else:
             self.universe = mda.Universe(topology_file, trajectory_file)
 
@@ -120,10 +120,11 @@ class TrajectoryDriver:
         rest = self.universe.select_atoms(f"not ({qm_region})")
 
         transforms = [
-            transform.unwrap(qm_atoms),
-            transform.center_in_box(qm_atoms, wrap=True),
-            transform.wrap(rest)
+        transform.unwrap(qm_atoms),
+        transform.center_in_box(qm_atoms, wrap=True),
+        transform.wrap(rest)
         ]
+        
         self.universe.trajectory.add_transformations(*transforms)
         snapshots = []
         for ts in self.universe.trajectory[self.start:self.stop:self.step]:
