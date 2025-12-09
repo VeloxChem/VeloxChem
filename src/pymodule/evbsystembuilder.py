@@ -127,7 +127,7 @@ class EvbSystemBuilder():
         # self.bonded_integration: bool = True  # If the integration potential should use bonded (harmonic/morse) forces for forming/breaking bonds, instead of replacing them with nonbonded potentials
         self.bonded_integration_bond_fac: float = 0.2  # Scaling factor for the bonded integration forces.
         self.bonded_integration_angle_fac: float = 0.1  # Scaling factor for the bonded integration forces.
-        self.torsion_lambda_switch: float = 0.4  # The minimum (1-maximum) lambda value at which to start turning on (have turned of) the proper torsion for the product (reactant)
+        self.torsion_lambda_switch: float = 0.25  # The minimum (1-maximum) lambda value at which to start turning on (have turned of) the proper torsion for the product (reactant)
 
         self.int_nb_const_exceptions = True  # If the exceptions for the integration nonbonded force should be kept constant over the entire simulation
 
@@ -232,7 +232,7 @@ class EvbSystemBuilder():
         self.ostream.flush()
         self.reactant = reactant
         self.product = product
-        
+
         if constraints is not None:
             self.constraints = constraints
 
@@ -1922,8 +1922,8 @@ class EvbSystemBuilder():
             "CoullinB   = k * ( ( qqB / rqBdiv^3 ) * r^2 - 3 * ( qqB / rqBdiv^2 ) * r + 3 * ( qqB / rqBdiv ) );"
             "rqAdiv     = select(rqA,rqA,1);"
             "rqBdiv     = select(rqB,rqB,1);"
-            "rqA        = alphaq * ( 1 + sigmaq * qqA )  * 1 ^ pow;"
-            "rqB        = alphaq * ( 1 + sigmaq * qqB )  * 1 ^ pow;"
+            "rqA        = alphaq * ( 1 + sigmaq * qqA );"
+            "rqB        = alphaq * ( 1 + sigmaq * qqB );"
             "CoulA      = k*qqA/r; "
             "CoulB      = k*qqB/r; "
             ""
@@ -1954,8 +1954,8 @@ class EvbSystemBuilder():
             # if rljA = 0, returns 1, otherwise returns rljA. Prevents division by 0 while the step factor is already 0
             "rljAdiv    = select(rljA,rljA,1);"
             "rljBdiv    = select(rljB,rljB,1);"
-            "rljA       = alphalj * ( (26/7 ) * A6  * 1 ) ^ pow;"
-            "rljB       = alphalj * ( (26/7 ) * B6  * 1 ) ^ pow;"
+            "rljA       = alphalj * ( (26/7 ) * A6 ) ^ pow;"
+            "rljB       = alphalj * ( (26/7 ) * B6 ) ^ pow;"
             "LjA        = A12 / r^12 - A6 / r^6;"
             "LjB        = B12 / r^12 - B6 / r^6;"
             "A12        = 4 * epsilonA * sigmaA ^ 12; "

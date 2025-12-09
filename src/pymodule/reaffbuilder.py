@@ -394,6 +394,7 @@ class ReactionForceFieldBuilder():
                                            water_model=self.water_model)
 
         # Reparameterize the forcefield if necessary and requested
+        # todo let this be handled by the MMforcefieldgenerator
         unknown_pairs = set()
         unknown_params = set()
         if self.reparameterize_bonds:

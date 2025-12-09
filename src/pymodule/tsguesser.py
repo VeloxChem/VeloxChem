@@ -89,7 +89,6 @@ class TransitionStateGuesser():
         self.molecule = None
         self.results = {}
 
-
         self.lambda_vec = list(np.round(np.linspace(0, 1, 21), 3))
         self.scf_xcfun = "b3lyp"
         self.scf_basis = 'def2-svp'
@@ -108,8 +107,7 @@ class TransitionStateGuesser():
         self.peak_conformer_search_range = 1
         self.mm_scan_backward = False
         self.scf_scan = False
-        self.mm_conformer_equivalence_threshold = 1e-1 # kJ/mol
-        self.calculate_resp = False
+        self.mm_conformer_equivalence_threshold = 1e-1  # kJ/mol
 
         self.results_file = 'ts_results.h5'
 
@@ -130,6 +128,7 @@ class TransitionStateGuesser():
         self,
         reactant: Molecule | list[Molecule],
         product: Molecule | list[Molecule],
+        constraints=None,
         **build_forcefields_kwargs,
     ):
         """Find a guess for the transition state using a force field scan.
@@ -162,6 +161,7 @@ class TransitionStateGuesser():
         # Build forcefields and systems
 
         self.build_forcefields(reactant, product, **build_forcefields_kwargs)
+        self.build_systems(constraints)
 
         # Scan MM
         self.scan_mm()
@@ -174,9 +174,8 @@ class TransitionStateGuesser():
         return self.results
 
     def build_forcefields(self,
-                          product,
                           reactant,
-                          constraints=None,
+                          product,
                           **build_forcefields_kwargs):
         if self.mute_ff_build:
             self.ostream.print_info(
@@ -186,8 +185,8 @@ class TransitionStateGuesser():
             self.ffbuilder.ostream.mute()
 
         self.reactant, self.product, self.forming_bonds, self.breaking_bonds, reactants, products, product_mapping = self.ffbuilder.build_forcefields(
-            reactant=product,
-            product=reactant,
+            reactant=reactant,
+            product=product,
             **build_forcefields_kwargs,
         )
 
@@ -210,14 +209,6 @@ class TransitionStateGuesser():
         self.mol_charge = self.molecule.get_charge()
         self.mol_multiplicity = self.molecule.get_multiplicity()
 
-        sysbuilder = EvbSystemBuilder()
-        if self.mute_ff_build:
-            sysbuilder.ostream.mute()
-            self.ostream.print_info(
-                "Building MM systems for the transition state guess. Disable mute_ff_build to see detailed output."
-            )
-            self.ostream.flush()
-
         self.ostream.print_info(
             f"Saving reactant and product forcefield as json to {self.folder_name}"
         )
@@ -226,8 +217,30 @@ class TransitionStateGuesser():
             self.reactant, f"{self.folder_name}/reactant.json")
         self.product.save_forcefield_as_json(
             self.product, f"{self.folder_name}/product.json")
-
         
+        rea_bonds = set(self.reactant.bonds.keys())
+        pro_bonds = set(self.product.bonds.keys())
+        static_bonds = rea_bonds & pro_bonds
+        self.results.update({
+            'breaking_bonds': self.breaking_bonds,
+            'forming_bonds': self.forming_bonds,
+            'static_bonds': static_bonds,
+            'reactant': self.reactant,
+            'product': self.product,
+        })
+
+        return self.results
+    
+    def build_systems(self,constraints=None):
+        sysbuilder = EvbSystemBuilder()
+        if self.mute_ff_build:
+            sysbuilder.ostream.mute()
+            self.ostream.print_info(
+                "Building MM systems for the transition state guess. Disable mute_ff_build to see detailed output."
+            )
+            self.ostream.flush()
+
+
         self.systems, self.topology, _ = sysbuilder.build_systems(
             self.reactant,
             self.product,
@@ -240,19 +253,7 @@ class TransitionStateGuesser():
         self.ostream.flush()
         sysbuilder.save_systems_as_xml(self.systems,
                                        self.folder_name + "/systems")
-        rea_bonds = set(self.reactant.bonds.keys())
-        pro_bonds = set(self.product.bonds.keys())
-        static_bonds = rea_bonds & pro_bonds
-        self.results.update({
-            'breaking_bonds': self.breaking_bonds,
-            'forming_bonds': self.forming_bonds,
-            'static_bonds': static_bonds,
-            'lambda_vec': self.lambda_vec,
-            'reactant': self.reactant,
-            'product': self.product,
-        })
-
-        return self.results
+        self.results.update({'lambda_vec': self.lambda_vec})
 
     def scan_mm(self):
 
@@ -334,8 +335,10 @@ class TransitionStateGuesser():
 
                     searched_conformers_indices.extend(
                         range(min_index, max_index + 1))
-                    forward_init_pos = scan_dict[self.lambda_vec[min_index]][0]['pos']
-                    backward_init_pos = scan_dict[self.lambda_vec[max_index]][0]['pos']
+                    forward_init_pos = scan_dict[
+                        self.lambda_vec[min_index]][0]['pos']
+                    backward_init_pos = scan_dict[
+                        self.lambda_vec[max_index]][0]['pos']
 
                     scan_dict_peak_conf = self._run_mm_scan(
                         self.lambda_vec[min_index:max_index + 1],
@@ -453,8 +456,14 @@ class TransitionStateGuesser():
         discont_indices = set(sorted(discont_indices))
         return discont_indices
 
-    def _run_mm_scan(self, lambda_vals, rea_sim, pro_sim, conformer_search,
-                     forward_init_pos, backward_init_pos,skip_backward=False):
+    def _run_mm_scan(self,
+                     lambda_vals,
+                     rea_sim,
+                     pro_sim,
+                     conformer_search,
+                     forward_init_pos,
+                     backward_init_pos,
+                     skip_backward=False):
         pos = copy.copy(forward_init_pos)
         results = {}
         self._print_mm_header(lambda_vals=lambda_vals,
@@ -480,13 +489,14 @@ class TransitionStateGuesser():
             n_conf = len(result)
 
             self._print_mm_iter(l, e1, e2, v, e_int, n_conf)
-            
+
         if self.mm_scan_backward and not skip_backward:
-            self.ostream.print_info("mm_scan_backward turned on. Scanning in reverse direction.")
+            self.ostream.print_info(
+                "mm_scan_backward turned on. Scanning in reverse direction.")
             self.ostream.flush()
             lambda_vals_rev = list(reversed(lambda_vals))
             self._print_mm_header(lambda_vals=lambda_vals,
-                              conformer_search=conformer_search)
+                                  conformer_search=conformer_search)
             pos = copy.copy(backward_init_pos)
             for l in lambda_vals_rev:
                 result = self._get_mm_energy(
@@ -508,16 +518,15 @@ class TransitionStateGuesser():
                 n_conf = len(result)
                 self._print_mm_iter(l, e1, e2, v, e_int, n_conf)
                 self.ostream.flush()
-                
+
         self.ostream.print_blank()
-                
-        
+
         for l, result in results.items():
             # remove duplicate conformers with identical MM energy 'v'
             unique_confs = []
             seen_v = set()
             for conf in result:
-                v_val  = conf['v']
+                v_val = conf['v']
                 seen = False
                 for v in seen_v:
                     if abs(v - v_val) < self.mm_conformer_equivalence_threshold:
@@ -528,10 +537,11 @@ class TransitionStateGuesser():
             original_n_conf = len(result)
             new_n_conf = len(unique_confs)
             if original_n_conf != new_n_conf:
-                self.ostream.print_info(f"Lambda {l}: Reduced {original_n_conf} conformers to {new_n_conf} unique conformers using equivalence threshold of {self.mm_conformer_equivalence_threshold} kJ/mol.")
+                self.ostream.print_info(
+                    f"Lambda {l}: Reduced {original_n_conf} conformers to {new_n_conf} unique conformers using equivalence threshold of {self.mm_conformer_equivalence_threshold} kJ/mol."
+                )
                 self.ostream.flush()
             results[l] = unique_confs
-                
 
         return results
 
@@ -628,7 +638,7 @@ class TransitionStateGuesser():
                 min_conf_index = 0
                 for i, conformer in enumerate(scan):
                     scf_E = self._get_scf_energy(conformer['xyz'])
-                    
+
                     results['scan'][l][i]['scf_energy'] = scf_E
                     if math.isnan(scf_E):
                         continue
@@ -696,7 +706,9 @@ class TransitionStateGuesser():
             scf_results = self.scf_drv.compute(self.molecule, basis)
 
             if not self.scf_drv.is_converged:
-                self.ostream.print_warning("SCF still did not converge. Returning NaN for current calculation")
+                self.ostream.print_warning(
+                    "SCF still did not converge. Returning NaN for current calculation"
+                )
                 self.ostream.flush()
                 return math.nan
         return scf_results['scf_energy'] * hartree_in_kjpermol()
@@ -735,16 +747,15 @@ class TransitionStateGuesser():
                 raise ValueError(
                     "No results provided. Provide either ts_results or filename."
                 )
-        lambda_vec = [round(float(l),3) for l in ts_results['lambda_vec']]
+        lambda_vec = [round(float(l), 3) for l in ts_results['lambda_vec']]
 
         # if there are scf energies, get the best scf energies and everything corresponding to that
         # otherwise, get the best mm energies
 
         if ts_results['scan'][0][0].get('scf_energy', None) is not None:
-            final_lambda = round(float(ts_results.get('max_scf_lambda', 0)),3)
+            final_lambda = round(float(ts_results.get('max_scf_lambda', 0)), 3)
         else:
-            final_lambda = round(float(ts_results['max_mm_lambda']),3)
-                
+            final_lambda = round(float(ts_results['max_mm_lambda']), 3)
 
         forming_bonds = set(ts_results.get('forming_bonds', None))
         breaking_bonds = set(ts_results.get('breaking_bonds', None))
@@ -753,35 +764,37 @@ class TransitionStateGuesser():
 
         # lambda_slider = step=
         ipywidgets.interact(
-            TransitionStateGuesser._show_iteration_inter,
-            step = ipywidgets.SelectionSlider(
+            TransitionStateGuesser._show_lambda_iteration,
+            step=ipywidgets.SelectionSlider(
                 options=lambda_vec,
                 description='Lambda',
                 value=final_lambda,
             ),
             lambda_vec=ipywidgets.fixed(lambda_vec),
-            scan = ipywidgets.fixed(ts_results['scan']),
+            scan=ipywidgets.fixed(ts_results['scan']),
             bonds=ipywidgets.fixed(bonds),
             dashed_bonds=ipywidgets.fixed(dashed_bonds),
             **mol_show_kwargs,
         )
 
     @staticmethod
-    def _show_iteration_inter(
+    def _show_lambda_iteration(
         step,
         lambda_vec,
         scan,
         bonds=None,
         dashed_bonds=None,
-        **mol_show_kwargs,):
-        
+        **mol_show_kwargs,
+    ):
+
         try:
             import ipywidgets
         except ImportError:
             raise ImportError('ipywidgets is required for this functionality.')
-        
-        # conformer_dropdown = 
-        options = list(range(len(scan[step])))
+
+        # conformer_dropdown =
+        options = list(range(1, len(scan[step]) + 1))
+        # options = list(range(0,len(scan[step])+0))
         best_index = 0
         min_energy = None
         if scan[0][0].get('scf_energy', None) is not None:
@@ -795,23 +808,22 @@ class TransitionStateGuesser():
                     min_energy = conf['v']
                     best_index = i
         ipywidgets.interact(
-            TransitionStateGuesser._show_iteration,
+            TransitionStateGuesser._show_conformer_iteration,
             step=ipywidgets.fixed(step),
-            conformer_id = ipywidgets.Dropdown(
-                options=options, 
-                description='Conf. ID', 
-                value=best_index,
+            conformer_id=ipywidgets.Dropdown(
+                options=options,
+                description='Conf. ID',
+                value=best_index + 1,
             ),
             lambda_vec=ipywidgets.fixed(lambda_vec),
-            scan = ipywidgets.fixed(scan),
+            scan=ipywidgets.fixed(scan),
             bonds=ipywidgets.fixed(bonds),
             dashed_bonds=ipywidgets.fixed(dashed_bonds),
             **mol_show_kwargs,
         )
 
-
     @staticmethod
-    def _show_iteration(
+    def _show_conformer_iteration(
         step,
         conformer_id,
         lambda_vec,
@@ -830,31 +842,69 @@ class TransitionStateGuesser():
             raise ImportError('matplotlib is required for this functionality.')
 
         # todo add a nicer visualisation to this
-        mm_energies,_,_,_ = TransitionStateGuesser._get_best_mm_E_from_scan_dict(
+        mm_energies, _, _, _ = TransitionStateGuesser._get_best_mm_E_from_scan_dict(
             scan)
         mm_min = np.min(mm_energies)
         rel_mm_energies = np.asarray(mm_energies) - mm_min
-        
+
         lam_index = np.where(lambda_vec == np.array(step))[0][0]
-        xyz_i = scan[step][conformer_id]['xyz']
+        xyz_i = scan[step][conformer_id - 1]['xyz']
         total_steps = len(rel_mm_energies) - 1
         x = np.linspace(0, lambda_vec[-1], 100)
         y = np.interp(x, lambda_vec, rel_mm_energies)
         fig, ax1 = plt.subplots(figsize=(6.5, 4))
-        
-        print(f"Energies for conformers:")
+
         if scan[0][0].get('scf_energy', None) is not None:
-            scf_energies,_ = TransitionStateGuesser._get_best_scf_E_from_scan_dict(
+            scf_energies, _ = TransitionStateGuesser._get_best_scf_E_from_scan_dict(
                 scan)
             scf_min = np.min(scf_energies)
             rel_scf_energies = np.asarray(scf_energies) - scf_min
+            print("  {:>9} {:>18} {:>19}  ".format("conformer",
+                                                   "MM energy [kJ/mol]",
+                                                   "SCF energy [kJ/mol]"))
+
             for i, conf in enumerate(scan[step]):
-                print(f"  Conf. ID {i}: Relative MM energy = {conf['v']-mm_min:.3f} kJ/mol, Relative SCF energy = {conf['scf_energy']-scf_min:.3f} kJ/mol")
+                conf_str = f"{i+1}"
+                mm_e = f"{conf['v'] - mm_min:.3f}"
+                scf_e = f"{conf['scf_energy'] - scf_min:.3f}"
+
+                if i + 1 == conformer_id and len(scan[step]) > 1:
+                    conf_str_formatted = f"{'-' * (9 - (1 + len(str(conf_str))))} {conf_str}"
+                    mm_e_formatted = f"{'-' * (18 - (1 + len(str(mm_e))))} {mm_e}"
+                    scf_e_formatted = f"{'-' * (19 - (1 + len(str(scf_e))))} {scf_e}"
+                    print_str = "{:>1} {:>9} {:>18} {:>19} {:>1}".format(
+                        ">",
+                        conf_str_formatted,
+                        mm_e_formatted,
+                        scf_e_formatted,
+                        "<",
+                    )
+                else:
+                    print_str = "  {:>9} {:>18} {:>19}  ".format(
+                        conf_str,
+                        mm_e,
+                        scf_e,
+                    )
+                print(print_str)
         else:
+            print("  {:>9} {:>19}  ".format("conformer", "MM energy [kJ/mol]"))
             rel_scf_energies = None
             for i, conf in enumerate(scan[step]):
-                print(f"  Conf. ID {i}: Relative MM energy = {conf['v']-mm_min:.3f} kJ/mol")
-            
+                conf_str = f"{i+1}"
+                mm_e = f"{conf['v'] - mm_min:.3f}"
+                if i + 1 == conformer_id and len(scan[step]) > 1:
+                    conf_str_formatted = f"{'-' * (9 - (1 + len(str(conf_str))))} {conf_str}"
+                    mm_e_formatted = f"{'-' * (18 - (1 + len(str(mm_e))))} {mm_e}"
+                    print_str = "{:>1} {:>9} {:>19} {:>1}".format(
+                        ">",
+                        conf_str_formatted,
+                        mm_e_formatted,
+                        "<",
+                    )
+                else:
+                    print_str = "  {:>9} {:>19}  ".format(conf_str, mm_e)
+                print(print_str)
+
         ax1.plot(
             x,
             y,
@@ -927,7 +977,7 @@ class TransitionStateGuesser():
         ax1.set_xticks(lambda_vec[::2])
         fig.tight_layout()
         plt.show()
-
+        fig.savefig('ts.svg', format='svg')
         mol = Molecule.read_xyz_string(xyz_i)
 
         if bonds is not None and dashed_bonds is not None:
@@ -940,6 +990,7 @@ class TransitionStateGuesser():
             )
         else:
             mol.show(width=640, height=360, **mol_show_kwargs)
+
 
     def _mm_to_xyz_str(self, positions, molecule=None):
         if molecule is None:
@@ -1211,7 +1262,7 @@ class TransitionStateGuesser():
     def _print_scf_iter(self, l, scf_E, mm_E, dif, conf_index):
 
         valstr = "{:6.2f}   {:7d}   {:15.3f}   {:14.3f}".format(
-            l, conf_index+1, dif, mm_E)
+            l, conf_index + 1, dif, mm_E)
         self.ostream.print_header(valstr)
         self.ostream.flush()
 
