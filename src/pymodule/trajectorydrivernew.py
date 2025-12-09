@@ -82,10 +82,10 @@ class TrajectoryDriver:
         self.ostream = ostream
 
     def trajectory_parser(self,
-                          topology_file: str,
                           trajectory_file: str,
                           num_snapshots: int,
-                          qm_region: str):
+                          qm_region: str,
+                          topology_file: str = None):
         """
         Trajectory parser for managing snapshots.
         It returns a list of dictionaries: 
@@ -93,7 +93,10 @@ class TrajectoryDriver:
         key: QM region coordinates
         key: MM region coordinates
         """
-        self.universe = mda.Universe(topology_file, trajectory_file)
+        if trajectory_file.lower().endswith('.pdb'):
+            self.universe = mda.Universe(trajectory_file)
+        else:
+            self.universe = mda.Universe(topology_file, trajectory_file)
 
         total_frames = len(self.universe.trajectory)
         print(f"Total frames in trajectory: {total_frames}")
@@ -115,6 +118,7 @@ class TrajectoryDriver:
 
         qm_atoms = self.universe.select_atoms(qm_region)
         rest = self.universe.select_atoms(f"not ({qm_region})")
+
         transforms = [
             transform.unwrap(qm_atoms),
             transform.center_in_box(qm_atoms, wrap=True),
