@@ -141,6 +141,10 @@ class VibrationalAnalysis:
         self.rr_damping = None
         self.frequencies = (0,)
 
+        # List of atomic masses in amu used to allow 
+        # isotope vibrational analysis via geomeTRIC
+        self.masses = None
+
         # Excited-state index in case of
         # excited-state vibrational analysis.
         self.state_deriv_index = None
@@ -226,6 +230,8 @@ class VibrationalAnalysis:
                     ('bool', 'whether to print Raman depolarization ratio'),
                 'temperature': ('float', 'the temperature'),
                 'pressure': ('float', 'the pressure'),
+                'masses':
+                    ('seq_fixed', 'atomic masses in amu for isotope analysis'),
                 'state_deriv_index': ('int', 'excited state index'),
                 'frequencies':
                     ('seq_range', 'frequencies of external electric field'),
@@ -399,6 +405,12 @@ class VibrationalAnalysis:
         elem = molecule.get_labels()
         coords = molecule.get_coordinates_in_bohr().reshape(natm * 3)
 
+        # Check if masses have been provided for all atoms in the molecule
+        if self.masses is not None:
+            err_msg = "VibrationalAnalysis: the number of atoms in the molecule"
+            err_msg += " does not match the number of atomic masses provided."
+            assert_msg_critical(len(elem) == len(self.masses), err_msg)
+
         try:
             temp_dir = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
         except TypeError:
@@ -413,6 +425,7 @@ class VibrationalAnalysis:
                 coords,
                 self.hessian,
                 elem,
+                mass=self.masses,
                 energy=self.elec_energy,
                 temperature=self.temperature,
                 pressure=self.pressure,
