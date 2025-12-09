@@ -33,6 +33,7 @@
 from pathlib import Path
 from mpi4py import MPI
 import sys
+import logging
 
 from .veloxchemlib import mpi_master, bohr_in_angstrom
 from .molecule import Molecule
@@ -43,6 +44,8 @@ import pyframe
 import numpy as np
 from .molecularbasis import MolecularBasis
 from .outputstream import OutputStream
+
+
 
 class SpectrumDriver:
     """
@@ -81,6 +84,8 @@ class SpectrumDriver:
 
         # output stream
         self.ostream = ostream
+        # Completely disable PyFraME INFO printing messages:
+        logging.getLogger('pyframe').setLevel(logging.CRITICAL)
 
     @staticmethod
     def trajectory_parser(topology_file, trajectory_file, 
@@ -280,7 +285,7 @@ class SpectrumDriver:
         Args:
             trajectory: pyframe.Trajectory returned by trajectory_parser().
             basis: e.g. 'def2-svp'.
-            functional: e.g. 'CAM-B3LYP' or 'HF'.
+            functional: e.g. 'CAM-B3LYP'
             filename_pot: base name used when writing .pot (defaults to trajectory.name).
             basis_path: path to basis files (if not in default).
             workdir: directory where .pot files are located.
