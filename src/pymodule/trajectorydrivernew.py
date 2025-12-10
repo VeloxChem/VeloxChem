@@ -49,15 +49,14 @@ class TrajectoryDriver:
     """
     Driver for trajectory-driven calculations.
     
-    This class automates the parsing of trajecoties.
+    This class automates the parsing of molecular dynamics trajectories and
+    extracts QM and MM region coordinates for each snapshot.
 
     : param comm:
         The MPI communicator.
     : param ostream:
         The output stream.
 
-    Instance variables:
-        - qm_molecule: The QM molecule.
     """
 
     def __init__(self, comm=None, ostream=None):
@@ -87,11 +86,36 @@ class TrajectoryDriver:
                           qm_region: str,
                           topology_file: str = None):
         """
-        Trajectory parser for managing snapshots.
-        It returns a list of dictionaries: 
-        1 dictionary per snapshot
-        key: QM region coordinates
-        key: MM region coordinates
+        Parse a molecular dynamics trajectory and extract QM and MM region coordinates.
+
+        Args:
+            trajectory_file (str): Path to the trajectory file (e.g., .dcd, .xtc, .trr, etc.)
+            num_snapshots (int): Number of snapshots to extract from the trajectory.
+                Must be <= total number of frames in trajectory.
+            qm_region (str): MDAnalysis selection string defining the QM region atoms.
+                Example: 'resname MOL'
+            topology_file (str, optional): Path to the topology file (.tpr, etc)
+        
+        Returns:
+            List[Dict]: A list of snapshots, each represented as a dictionary with keys:
+                'frame' (int): Frame number from trajectory
+                'qm_coords' (np.ndarray): Coordinates of QM region atoms in Bohr
+                'mm_coords' (np.ndarray): Coordinates of MM region atoms in Bohr
+
+        Raises:
+            ValueError: If num_snapshots exceeds total frames in trajectory.
+            FileNotFoundError: If trajectory or topology files are not found.
+            
+        Example:
+            >>> trj_drv = TrajectoryDriver()
+            >>> snapshots = trj_drv.trajectory_parser(
+                trajectory_file='traj.xtc',
+                num_snapshots=4,
+                qm_region='resname MOL',
+                topology_file='topology.tpr'
+            )
+            >>> print(snapshots[0].keys())
+            dict_keys(['frame', 'qm_coords', 'mm_coords'])
         """
         if trajectory_file.lower().endswith('.pdb'):
             self.universe = mda.Universe(trajectory_file, guess_bonds=True)
