@@ -47,7 +47,7 @@ from .outputstream import OutputStream
 
 
 
-class SpectrumDriver:
+class TrajectoryDriver:
     """
     Driver for the sppectra in polarizable embedding (PE) calculations.
     
