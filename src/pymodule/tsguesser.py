@@ -760,9 +760,7 @@ class TransitionStateGuesser():
         forming_bonds = set(ts_results.get('forming_bonds', None))
         breaking_bonds = set(ts_results.get('breaking_bonds', None))
         bonds = set(ts_results.get('static_bonds', None))
-        dashed_bonds = forming_bonds | breaking_bonds
-
-        # lambda_slider = step=
+        
         ipywidgets.interact(
             TransitionStateGuesser._show_lambda_iteration,
             step=ipywidgets.SelectionSlider(
@@ -773,7 +771,8 @@ class TransitionStateGuesser():
             lambda_vec=ipywidgets.fixed(lambda_vec),
             scan=ipywidgets.fixed(ts_results['scan']),
             bonds=ipywidgets.fixed(bonds),
-            dashed_bonds=ipywidgets.fixed(dashed_bonds),
+            forming_bonds=ipywidgets.fixed(forming_bonds),
+            breaking_bonds=ipywidgets.fixed(breaking_bonds),
             **mol_show_kwargs,
         )
 
@@ -783,7 +782,8 @@ class TransitionStateGuesser():
         lambda_vec,
         scan,
         bonds=None,
-        dashed_bonds=None,
+        forming_bonds=None,
+        breaking_bonds=None,
         **mol_show_kwargs,
     ):
 
@@ -818,7 +818,8 @@ class TransitionStateGuesser():
             lambda_vec=ipywidgets.fixed(lambda_vec),
             scan=ipywidgets.fixed(scan),
             bonds=ipywidgets.fixed(bonds),
-            dashed_bonds=ipywidgets.fixed(dashed_bonds),
+            forming_bonds=ipywidgets.fixed(forming_bonds),
+            breaking_bonds=ipywidgets.fixed(breaking_bonds),
             **mol_show_kwargs,
         )
 
@@ -829,7 +830,8 @@ class TransitionStateGuesser():
         lambda_vec,
         scan,
         bonds=None,
-        dashed_bonds=None,
+        forming_bonds=None,
+        breaking_bonds=None,
         **mol_show_kwargs,
     ):
         """
@@ -979,11 +981,17 @@ class TransitionStateGuesser():
         plt.show()
         fig.savefig('ts.svg', format='svg')
         mol = Molecule.read_xyz_string(xyz_i)
-
-        if bonds is not None and dashed_bonds is not None:
+        offset = 0.07
+        add = 0.1
+        breaking_width = offset + add * (1-step)
+        forming_width = offset + add * (step)
+        if bonds is not None and (forming_bonds is not None or breaking_bonds is not None):
             mol.show(
                 bonds=bonds,
-                dashed_bonds=dashed_bonds,
+                forming_bonds=list(forming_bonds),
+                breaking_bonds=list(breaking_bonds),
+                forming_width=forming_width,
+                breaking_width=breaking_width,
                 width=640,
                 height=360,
                 **mol_show_kwargs,
