@@ -115,12 +115,14 @@ class InterpolationDatapoint:
         self.confidence_radius = None
         self.use_inverse_bond_length = True
         self.use_cosine_dihedral = False
+        self.identify_imp_int_coord = True
         self.NAC = False
         self.eq_bond_force_constants = None
         
         # internal_coordinates is a list of geomeTRIC objects which represent
         # different types of internal coordinates (distances, angles, dihedrals)
         self.internal_coordinates = None
+        self.imp_int_coordinates = None
         self.mapping_masks = None
 
         # internal_coordinates_values is a numpy array with the values of the
@@ -229,7 +231,6 @@ class InterpolationDatapoint:
                 self.original_b_matrix[i, :derivative.shape[0]] = derivative
             
             elif len(z) == 2 and self.eq_bond_force_constants is not None:
-                print('Calculating B matrix with eq bond force constants')
                 r = q.value(coords)
                 # r_deriv_2 = ((2.0 / (r + self.eq_bond_force_constants[tuple(z)]['r_eq'])) 
                 #                         - (2.0 * (r - self.eq_bond_force_constants[tuple(z)]['r_eq']) / ((r + self.eq_bond_force_constants[tuple(z)]['r_eq'])**2))) 
@@ -295,6 +296,7 @@ class InterpolationDatapoint:
             second_derivative = q.second_derivative(coords).reshape(-1, n_atoms * 3)
 
             if len(z) == 2 and self.use_inverse_bond_length:
+                
                 r = q.value(coords)
                 r_inv_2 = 1.0 / (r * r)
                 r_inv_3 = r_inv_2 / r
@@ -306,7 +308,7 @@ class InterpolationDatapoint:
                 # self.b2_matrix[i] = 0.5 * (self.b2_matrix[i] + self.b2_matrix[i].T)
 
             elif len(z) == 2 and self.eq_bond_force_constants is not None:
-                
+
                 r = q.value(coords)
                 
                 # r_deriv_2 = ((2.0 / (r + self.eq_bond_force_constants[tuple(z)]['r_eq'])) 
@@ -326,7 +328,7 @@ class InterpolationDatapoint:
                         self.b2_matrix[i, m*3:(m+1)*3, n*3:(n+1)*3] += r_deriv_3 * np.outer(self.original_b_matrix[i, m*3:(m+1)*3], self.original_b_matrix[i, n*3:(n+1)*3])
             
             elif len(z) == 4 and self.use_cosine_dihedral:
-                
+
                 if prev_dihedral != z:
                     prev_dihedral = z
                     phi = q.value(coords)
@@ -673,7 +675,7 @@ class InterpolationDatapoint:
         bonds = []
         angles = []
         dihedrals = []
-
+        
         for z in self.z_matrix:
             if len(z) == 2:
                 bonds.append(z)
@@ -689,6 +691,35 @@ class InterpolationDatapoint:
             'bonds': np.array(bonds),
             'angles': np.array(angles),
             'dihedrals': np.array(dihedrals)
+        }
+    
+    def get_imp_int_coord_as_np_arrays(self):
+        """
+        Returns a dictionary with the numpy arrays corresponding to the bonds,
+        bond angles, and dihedral angles defined by the Z-matrix.
+        """
+        assert_msg_critical(self.imp_int_coordinates is not None,
+                            'InterpolationDatapoint: No Z-matrix is defined.')
+
+        bonds = []
+        angles = []
+        dihedrals = []
+
+        for z in self.imp_int_coordinates:
+            if len(z) == 2:
+                bonds.append(z)
+            elif len(z) == 3:
+                angles.append(z)
+            elif len(z) == 4:
+                dihedrals.append(z)
+            else:
+                assert_msg_critical(
+                    False, 'InterpolationDatapoint: Invalid entry size in Z-matrix.')
+
+        return {
+            'imp_bonds': np.array(bonds),
+            'imp_angles': np.array(angles),
+            'imp_dihedrals': np.array(dihedrals)
         }
 
     def calculate_translation_coordinates(self):
@@ -812,10 +843,25 @@ class InterpolationDatapoint:
             # Angles are saved in an array with three atom indices per row.
             # Dihedrals are saved in an array with four atom indices per row.
             zmat_dict = self.get_z_matrix_as_np_arrays()
+  
             for key in zmat_dict.keys():
                 h5f.create_dataset(label + '_' + key,
                                    data=zmat_dict[key],
                                    compression='gzip')
+            
+            if self.identify_imp_int_coord:
+                assert_msg_critical(
+                    self.imp_int_coordinates is not None,
+                    'InterpolationDatapoint: No important internal coordinates are defined.')
+                # Write the bonds, angles and dihedrals defined in the Z-matrix.
+                # Bonds are saved in an array with two atoms indices per row.
+                # Angles are saved in an array with three atom indices per row.
+                # Dihedrals are saved in an array with four atom indices per row.
+                imp_int_coord_dict = self.get_imp_int_coord_as_np_arrays()
+                for key in imp_int_coord_dict.keys():
+                    h5f.create_dataset(label + '_' + key,
+                                    data=imp_int_coord_dict[key],
+                                    compression='gzip')
                 
             full_label = label + "_masks"
             h5f.create_dataset(full_label,
@@ -823,7 +869,6 @@ class InterpolationDatapoint:
                                compression='gzip')
             
 
-            
             h5f.close()
 
 
@@ -869,6 +914,12 @@ class InterpolationDatapoint:
             z_matrix_dihedral = label + '_dihedrals'
 
             z_matrix_labels = [z_matrix_bonds, z_matrix_angles, z_matrix_dihedral]
+
+            imp_int_coord_bonds = label + '_imp_bonds'
+            imp_int_coord_angles = label + '_imp_angles'
+            imp_int_coord_dihedrals = label + '_imp_dihedrals'
+
+            imp_int_coord_labels = [imp_int_coord_bonds, imp_int_coord_angles, imp_int_coord_dihedrals]
             
             self.point_label = label
             self.energy = np.array(h5f.get(energy_label))
@@ -882,12 +933,16 @@ class InterpolationDatapoint:
             self.mapping_masks = np.array(h5f.get(mapping_masks_label))
 
 
-            z_matrix = []
-            
+            self.z_matrix = []
             for label_obj in z_matrix_labels:
-                current_z_list = [z_list.tolist() for z_list in list(h5f.get(label_obj))]
-                z_matrix.extend(current_z_list)
-                
+                current_z_list = [tuple(z_list.tolist()) for z_list in list(h5f.get(label_obj))]
+                self.z_matrix.extend(current_z_list)
+
+            self.imp_int_coordinates = []
+            for label_obj in imp_int_coord_labels:
+                current_imp_int_coord_list = [tuple(z_list_imp_coord.tolist()) for z_list_imp_coord in list(h5f.get(label_obj))]
+                self.imp_int_coordinates.extend(current_imp_int_coord_list)
+
             h5f.close()
 
     def cartesian_distance_vector(self, data_point):

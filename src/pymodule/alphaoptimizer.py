@@ -138,7 +138,7 @@ def _eval_structure(payload):
     w_x     = np.asarray(drv.dw_dX_dalpha_list, dtype=np.float64).reshape(len(P), -1) # (M,D)
     S       = float(drv.sum_of_weights)                                         # ()
     S_x     = np.asarray(drv.sum_of_weights_grad, dtype=np.float64).reshape(-1) # (D,)
-
+    
     # Residuals in kcal/mol
     dE_res  = (E_interp - E_qm) * conv                                          # ()
     dg_full = (G_interp - G_qm_flat) * conv                                     # (D,)
