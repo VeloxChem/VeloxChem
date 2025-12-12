@@ -144,7 +144,7 @@ class ScfDriver:
         self.ovl_thresh = 1.0e-6
         self.diis_thresh = 1000.0
         self.eri_thresh = 1.0e-12
-        self.eri_thresh_tight = 1.0e-15
+        self.eri_thresh_tight = 1.0e-13
 
         self.pair_thresh = 1.0e-10
         self.density_thresh = 1.0e-10
@@ -249,6 +249,8 @@ class ScfDriver:
                 'max_iter': ('int', 'maximum number of SCF iterations'),
                 'conv_thresh': ('float', 'SCF convergence threshold'),
                 'eri_thresh': ('float', 'ERI screening threshold'),
+                'eri_thresh_tight':
+                    ('float', 'tightened ERI screening threshold'),
                 'pair_thresh': ('float', 'GTO pair screening threshold'),
                 'density_thresh': ('float', 'density screening threshold'),
                 'restart': ('bool', 'restart from checkpoint file'),
