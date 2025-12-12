@@ -37,6 +37,8 @@
 
 #include <iostream>
 
+#include "ChunkedMemcpyGPU.hpp"
+#include "ErrorHandler.hpp"
 #include "GridPartitionFuncGPU.hpp"
 #include "GpuConstants.hpp"
 #include "GpuSafeChecks.hpp"
@@ -155,23 +157,20 @@ applyGridPartitionFunc(CDenseMatrix*                rawGridPoints,
 {
     CGpuDevices gpu_devices;
 
-    const auto total_num_gpus_per_compute_node = gpu_devices.getNumberOfDevices();
-
-    // auto nthreads = omp_get_max_threads();
     auto num_gpus_per_node = numGpusPerNode;
-    // auto num_threads_per_gpu = nthreads / num_gpus_per_node;
+
+    auto nthreads = omp_get_max_threads();
+
+    std::string errnumgpus("gpu::applyGridPartitionFunc: Number of OMP threads does not match number of GPU devices per node.");
+    errors::assertMsgCritical(static_cast<int64_t>(nthreads) == num_gpus_per_node, errnumgpus);
 
 #pragma omp parallel
     {
     auto thread_id = omp_get_thread_num();
 
-    if (thread_id < num_gpus_per_node)
-    {
     auto gpu_id = thread_id;
-    auto gpu_rank = gpu_id + rank * num_gpus_per_node;
-    // auto gpu_count = nnodes * num_gpus_per_node;
 
-    gpuSafe(gpuSetDevice(gpu_rank % total_num_gpus_per_compute_node));
+    gpuSafe(gpuSetDevice(gpu_id));
 
     // grid and atom data
 
@@ -203,39 +202,40 @@ applyGridPartitionFunc(CDenseMatrix*                rawGridPoints,
 
     // grid and atom data on device
 
-    double *d_grid_x, *d_grid_y, *d_grid_z;
+    double* d_data_double;
+    uint32_t* d_data_uint32;
 
-    gpuSafe(gpuMalloc(&d_grid_x, grid_batch_size * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_grid_y, grid_batch_size * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_grid_z, grid_batch_size * sizeof(double)));
+    auto data_double_count = grid_batch_size * 4 + nAtoms * 2 * 3;
+    auto data_uint32_count = grid_batch_size;
 
-    gpuSafe(gpuMemcpy(d_grid_x, gridx, grid_batch_size * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_grid_y, gridy, grid_batch_size * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_grid_z, gridz, grid_batch_size * sizeof(double), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMalloc(&d_data_double, data_double_count * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_data_uint32, data_uint32_count * sizeof(uint32_t)));
 
-    uint32_t *d_atom_ids_of_points;
+    double* d_grid_x = d_data_double;
+    double* d_grid_y = d_grid_x + grid_batch_size;
+    double* d_grid_z = d_grid_y + grid_batch_size;
+    double* d_partial_weights = d_grid_z + grid_batch_size;
+    double* d_atom_x = d_partial_weights + grid_batch_size;
+    double* d_atom_y = d_atom_x + nAtoms * 2;
+    double* d_atom_z = d_atom_y + nAtoms * 2;
 
-    gpuSafe(gpuMalloc(&d_atom_ids_of_points, grid_batch_size * sizeof(uint32_t)));
+    uint32_t* d_atom_ids_of_points = d_data_uint32;
 
-    gpuSafe(gpuMemcpy(d_atom_ids_of_points, atom_ids, grid_batch_size * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpu::chunkedMemcpyHostToDevice<double>(d_grid_x, gridx, grid_batch_size);
+    gpu::chunkedMemcpyHostToDevice<double>(d_grid_y, gridy, grid_batch_size);
+    gpu::chunkedMemcpyHostToDevice<double>(d_grid_z, gridz, grid_batch_size);
 
-    double *d_partial_weights;
+    gpu::chunkedMemcpyHostToDevice<double>(d_atom_x, atom_coords.data() + 0 * nAtoms * 2, nAtoms * 2);
+    gpu::chunkedMemcpyHostToDevice<double>(d_atom_y, atom_coords.data() + 1 * nAtoms * 2, nAtoms * 2);
+    gpu::chunkedMemcpyHostToDevice<double>(d_atom_z, atom_coords.data() + 2 * nAtoms * 2, nAtoms * 2);
 
-    gpuSafe(gpuMalloc(&d_partial_weights, grid_batch_size * sizeof(double)));
-
-    double *d_atom_x, *d_atom_y, *d_atom_z;
-
-    gpuSafe(gpuMalloc(&d_atom_x, nAtoms * 2 * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_atom_y, nAtoms * 2 * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_atom_z, nAtoms * 2 * sizeof(double)));
-
-    gpuSafe(gpuMemcpy(d_atom_x, atom_coords.data() + 0 * nAtoms * 2, nAtoms * 2 * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_atom_y, atom_coords.data() + 1 * nAtoms * 2, nAtoms * 2 * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_atom_z, atom_coords.data() + 2 * nAtoms * 2, nAtoms * 2 * sizeof(double), gpuMemcpyHostToDevice));
-
-    // update weights using GPU
+    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_atom_ids_of_points, atom_ids, grid_batch_size);
 
     gpuSafe(gpuDeviceSynchronize());
+
+#pragma omp barrier
+
+    // update weights using GPU
 
     dim3 threads_per_block(TILE_DIM * TILE_DIM);
 
@@ -248,19 +248,14 @@ applyGridPartitionFunc(CDenseMatrix*                rawGridPoints,
 
     gpuSafe(gpuDeviceSynchronize());
 
-    gpuSafe(gpuMemcpy(partial_weights.data(), d_partial_weights, grid_batch_size * sizeof(double), gpuMemcpyDeviceToHost));
+    gpu::chunkedMemcpyDeviceToHost<double>(partial_weights.data(), d_partial_weights, grid_batch_size);
 
-    gpuSafe(gpuFree(d_grid_x));
-    gpuSafe(gpuFree(d_grid_y));
-    gpuSafe(gpuFree(d_grid_z));
+    gpuSafe(gpuDeviceSynchronize());
 
-    gpuSafe(gpuFree(d_atom_ids_of_points));
+#pragma omp barrier
 
-    gpuSafe(gpuFree(d_partial_weights));
-
-    gpuSafe(gpuFree(d_atom_x));
-    gpuSafe(gpuFree(d_atom_y));
-    gpuSafe(gpuFree(d_atom_z));
+    gpuSafe(gpuFree(d_data_double));
+    gpuSafe(gpuFree(d_data_uint32));
 
     for (int64_t i = 0; i < grid_batch_size; i++)
     {
@@ -280,7 +275,6 @@ applyGridPartitionFunc(CDenseMatrix*                rawGridPoints,
         gridw[i] *= partial_weights[i];
     }
 
-    }
     }
 }
 

@@ -1,6 +1,7 @@
 from pathlib import Path
 import numpy as np
 
+from veloxchem.veloxchemlib import GpuDevices
 from veloxchem.griddriver import GridDriver
 from veloxchem.molecule import Molecule
 
@@ -19,7 +20,8 @@ class TestMolecularGrid:
         grid_drv = GridDriver()
         grid_drv.set_level(1)
 
-        num_gpus_per_node = 1
+        devices = GpuDevices()
+        num_gpus_per_node = devices.get_number_devices()
         mol_grid = grid_drv.generate(mol, num_gpus_per_node)
 
         grid_data = mol_grid.grid_to_numpy()
