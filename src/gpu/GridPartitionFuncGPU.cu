@@ -155,14 +155,20 @@ applyGridPartitionFunc(CDenseMatrix*                rawGridPoints,
                        const int64_t                rank,
                        const int64_t                nnodes) -> void
 {
+    const auto num_gpus_per_node = numGpusPerNode;
+
     CGpuDevices gpu_devices;
+    const auto ndevices = gpu_devices.getNumberOfDevices();
 
-    auto num_gpus_per_node = numGpusPerNode;
+    const auto nthreads = omp_get_max_threads();
 
-    auto nthreads = omp_get_max_threads();
+    errors::assertMsgCritical(
+        static_cast<int64_t>(ndevices) == num_gpus_per_node,
+        std::string(__func__) + std::string(": Number of devices does not match numGpusPerNode."));
 
-    std::string errnumgpus("gpu::applyGridPartitionFunc: Number of OMP threads does not match number of GPU devices per node.");
-    errors::assertMsgCritical(static_cast<int64_t>(nthreads) == num_gpus_per_node, errnumgpus);
+    errors::assertMsgCritical(
+        static_cast<int64_t>(nthreads) == num_gpus_per_node,
+        std::string(__func__) + std::string(": Number of OMP threads does not match numGpusPerNode."));
 
 #pragma omp parallel
     {
@@ -249,8 +255,6 @@ applyGridPartitionFunc(CDenseMatrix*                rawGridPoints,
     gpuSafe(gpuDeviceSynchronize());
 
     gpu::chunkedMemcpyDeviceToHost<double>(partial_weights.data(), d_partial_weights, grid_batch_size);
-
-    gpuSafe(gpuDeviceSynchronize());
 
 #pragma omp barrier
 

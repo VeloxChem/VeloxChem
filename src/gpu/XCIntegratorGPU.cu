@@ -1009,7 +1009,7 @@ getGtoValuesForLda(double*                     d_gto_values,
 
     auto gto_info = gtoinfo::getGtoInfo(gto_block, gtos_mask);
 
-    gpuSafe(gpuMemcpy(d_gto_info, gto_info.data(), gto_info.size() * sizeof(double), gpuMemcpyHostToDevice));
+    gpu::chunkedMemcpyHostToDevice<double>(d_gto_info, gto_info.data(), gto_info.size());
 
     // evaluate GTO values on grid points
 
@@ -1100,7 +1100,7 @@ getGtoValuesForGga(double*                     d_gto_values_0,
 
     auto gto_info = gtoinfo::getGtoInfo(gto_block, gtos_mask);
 
-    gpuSafe(gpuMemcpy(d_gto_info, gto_info.data(), gto_info.size() * sizeof(double), gpuMemcpyHostToDevice));
+    gpu::chunkedMemcpyHostToDevice<double>(d_gto_info, gto_info.data(), gto_info.size());
 
     // evaluate GTO values on grid points
 
@@ -1206,7 +1206,7 @@ getGtoValuesForMgga(double*                     d_gto_values_0,
 
     auto gto_info = gtoinfo::getGtoInfo(gto_block, gtos_mask);
 
-    gpuSafe(gpuMemcpy(d_gto_info, gto_info.data(), gto_info.size() * sizeof(double), gpuMemcpyHostToDevice));
+    gpu::chunkedMemcpyHostToDevice<double>(d_gto_info, gto_info.data(), gto_info.size());
 
     // evaluate GTO values on grid points
 
@@ -1344,9 +1344,9 @@ computeGtoValuesOnGridPoints(const CMolecule& molecule, const CMolecularBasis& b
     gpuSafe(gpuMalloc(&d_grid_y, n_total_grid_points * sizeof(double)));
     gpuSafe(gpuMalloc(&d_grid_z, n_total_grid_points * sizeof(double)));
 
-    gpuSafe(gpuMemcpy(d_grid_x, xcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_grid_y, ycoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_grid_z, zcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
+    gpu::chunkedMemcpyHostToDevice<double>(d_grid_x, xcoords, n_total_grid_points);
+    gpu::chunkedMemcpyHostToDevice<double>(d_grid_y, ycoords, n_total_grid_points);
+    gpu::chunkedMemcpyHostToDevice<double>(d_grid_z, zcoords, n_total_grid_points);
 
     // counts and displacements of grid points in boxes
 
@@ -1421,7 +1421,7 @@ computeGtoValuesOnGridPoints(const CMolecule& molecule, const CMolecularBasis& b
             row_offset += static_cast<int64_t>(pre_ao_inds.size());
         }
 
-        gpuSafe(gpuMemcpy(mat_chi.values(), d_gaos, aocount * npoints * sizeof(double), gpuMemcpyDeviceToHost));
+        gpu::chunkedMemcpyDeviceToHost<double>(mat_chi.values(), d_gaos, aocount * npoints);
 
         for (int64_t nu = 0; nu < aocount; nu++)
         {
@@ -1493,9 +1493,9 @@ computeGtoValuesAndDerivativesOnGridPoints(const CMolecule& molecule, const CMol
     gpuSafe(gpuMalloc(&d_grid_y, n_total_grid_points * sizeof(double)));
     gpuSafe(gpuMalloc(&d_grid_z, n_total_grid_points * sizeof(double)));
 
-    gpuSafe(gpuMemcpy(d_grid_x, xcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_grid_y, ycoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_grid_z, zcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
+    gpu::chunkedMemcpyHostToDevice<double>(d_grid_x, xcoords, n_total_grid_points);
+    gpu::chunkedMemcpyHostToDevice<double>(d_grid_y, ycoords, n_total_grid_points);
+    gpu::chunkedMemcpyHostToDevice<double>(d_grid_z, zcoords, n_total_grid_points);
 
     // counts and displacements of grid points in boxes
 
@@ -1574,10 +1574,10 @@ computeGtoValuesAndDerivativesOnGridPoints(const CMolecule& molecule, const CMol
             row_offset += static_cast<int64_t>(pre_ao_inds.size());
         }
 
-        gpuSafe(gpuMemcpy(mat_chi_0.values(), d_gaos, aocount * npoints * sizeof(double), gpuMemcpyDeviceToHost));
-        gpuSafe(gpuMemcpy(mat_chi_x.values(), d_gaox, aocount * npoints * sizeof(double), gpuMemcpyDeviceToHost));
-        gpuSafe(gpuMemcpy(mat_chi_y.values(), d_gaoy, aocount * npoints * sizeof(double), gpuMemcpyDeviceToHost));
-        gpuSafe(gpuMemcpy(mat_chi_z.values(), d_gaoz, aocount * npoints * sizeof(double), gpuMemcpyDeviceToHost));
+        gpu::chunkedMemcpyDeviceToHost<double>(mat_chi_0.values(), d_gaos, aocount * npoints);
+        gpu::chunkedMemcpyDeviceToHost<double>(mat_chi_x.values(), d_gaox, aocount * npoints);
+        gpu::chunkedMemcpyDeviceToHost<double>(mat_chi_y.values(), d_gaoy, aocount * npoints);
+        gpu::chunkedMemcpyDeviceToHost<double>(mat_chi_z.values(), d_gaoz, aocount * npoints);
 
         for (int64_t nu = 0; nu < aocount; nu++)
         {
@@ -1610,13 +1610,20 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
                        const int64_t           rank,
                        const int64_t           nnodes) -> CAOKohnShamMatrix
 {
+    const auto num_gpus_per_node = numGpusPerNode;
+
     CGpuDevices gpu_devices;
+    const auto ndevices = gpu_devices.getNumberOfDevices();
 
-    const auto total_num_gpus_per_compute_node = gpu_devices.getNumberOfDevices();
+    const auto nthreads = omp_get_max_threads();
 
-    // auto nthreads = omp_get_max_threads();
-    auto num_gpus_per_node = numGpusPerNode;
-    // auto num_threads_per_gpu = nthreads / num_gpus_per_node;
+    errors::assertMsgCritical(
+        static_cast<int64_t>(ndevices) == num_gpus_per_node,
+        std::string(__func__) + std::string(": Number of devices does not match numGpusPerNode."));
+
+    errors::assertMsgCritical(
+        static_cast<int64_t>(nthreads) == num_gpus_per_node,
+        std::string(__func__) + std::string(": Number of OMP threads does not match numGpusPerNode."));
 
     // GTOs blocks and number of AOs
 
@@ -1658,15 +1665,11 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
 
 #pragma omp parallel
     {
-    auto thread_id = omp_get_thread_num();
+    const auto thread_id = omp_get_thread_num();
 
-    if (thread_id < num_gpus_per_node)
-    {
-    auto gpu_id = thread_id;
-    auto gpu_rank = gpu_id + rank * num_gpus_per_node;
-    // auto gpu_count = nnodes * num_gpus_per_node;
+    const auto gpu_id = thread_id;
 
-    gpuSafe(gpuSetDevice(gpu_rank % total_num_gpus_per_compute_node));
+    gpuSafe(gpuSetDevice(gpu_id));
 
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
 
@@ -1692,7 +1695,7 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
     gpuSafe(gpuMalloc(&d_den_mat_full, naos * naos * sizeof(double)));
     gpuSafe(gpuMalloc(&d_mat_Vxc_full, naos * naos * sizeof(double)));
 
-    gpuSafe(gpuMemcpy(d_den_mat_full, densityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice));
+    gpu::chunkedMemcpyHostToDevice<double>(d_den_mat_full, densityMatrix.alphaDensity(0), naos * naos);
 
     dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
@@ -1744,12 +1747,14 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
     gpuSafe(gpuMalloc(&d_grid_z, n_total_grid_points * sizeof(double)));
     gpuSafe(gpuMalloc(&d_grid_w, n_total_grid_points * sizeof(double)));
 
-    gpuSafe(gpuMemcpy(d_grid_x, xcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_grid_y, ycoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_grid_z, zcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_grid_w, weights, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
+    gpu::chunkedMemcpyHostToDevice<double>(d_grid_x, xcoords, n_total_grid_points);
+    gpu::chunkedMemcpyHostToDevice<double>(d_grid_y, ycoords, n_total_grid_points);
+    gpu::chunkedMemcpyHostToDevice<double>(d_grid_z, zcoords, n_total_grid_points);
+    gpu::chunkedMemcpyHostToDevice<double>(d_grid_w, weights, n_total_grid_points);
 
     gpuSafe(gpuDeviceSynchronize());
+
+#pragma omp barrier
 
     // counts and displacements of grid points in boxes
 
@@ -1823,7 +1828,7 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
             ao_inds_int32[ind] = static_cast<uint32_t>(aoinds[ind]);
         }
 
-        gpuSafe(gpuMemcpy(d_ao_inds, ao_inds_int32.data(), aocount * sizeof(uint32_t), gpuMemcpyHostToDevice));
+        gpu::chunkedMemcpyHostToDevice<uint32_t>(d_ao_inds, ao_inds_int32.data(), aocount);
 
         // sub density matrix for ground-state rho
 
@@ -1865,12 +1870,12 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
 
         // functional evaluation
 
-        gpuSafe(gpuMemcpy(rho, d_rho, 2 * npoints * sizeof(double), gpuMemcpyDeviceToHost));
+        gpu::chunkedMemcpyDeviceToHost<double>(rho, d_rho, dim->rho * npoints);
 
         xcfun_copy.compute_exc_vxc_for_lda(npoints, rho, exc, vrho);
 
-        gpuSafe(gpuMemcpy(d_exc, exc, dim->zk * npoints * sizeof(double), gpuMemcpyHostToDevice));
-        gpuSafe(gpuMemcpy(d_vrho, vrho, dim->vrho * npoints * sizeof(double), gpuMemcpyHostToDevice));
+        gpu::chunkedMemcpyHostToDevice<double>(d_exc, exc, dim->zk * npoints);
+        gpu::chunkedMemcpyHostToDevice<double>(d_vrho, vrho, dim->vrho * npoints);
 
         // compute partial contribution to Vxc matrix and distribute partial
         // Vxc to full Kohn-Sham matrix
@@ -1918,7 +1923,9 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
 
     gpuSafe(gpuDeviceSynchronize());
 
-    gpuSafe(gpuMemcpy(mat_Vxc_omp[gpu_id].getPointerToAlphaValues(), d_mat_Vxc_full, naos * naos * sizeof(double), gpuMemcpyDeviceToHost));
+    gpu::chunkedMemcpyDeviceToHost<double>(mat_Vxc_omp[gpu_id].getPointerToAlphaValues(), d_mat_Vxc_full, naos * naos);
+
+#pragma omp barrier
 
     gpuSafe(gpuFree(d_gto_info));
     gpuSafe(gpuFree(d_ao_inds));
@@ -1942,7 +1949,6 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
 
     mat_Vxc_omp[gpu_id].setExchangeCorrelationEnergy(xcene);
 
-    }
     }
 
     auto p_mat_Vxc = mat_Vxc_sum.getPointerToAlphaValues();
@@ -1980,13 +1986,20 @@ integrateVxcFockForGGA(const CMolecule&        molecule,
                        const int64_t           rank,
                        const int64_t           nnodes) -> CAOKohnShamMatrix
 {
+    const auto num_gpus_per_node = numGpusPerNode;
+
     CGpuDevices gpu_devices;
+    const auto ndevices = gpu_devices.getNumberOfDevices();
 
-    const auto total_num_gpus_per_compute_node = gpu_devices.getNumberOfDevices();
+    const auto nthreads = omp_get_max_threads();
 
-    // auto nthreads = omp_get_max_threads();
-    auto num_gpus_per_node = numGpusPerNode;
-    // auto num_threads_per_gpu = nthreads / num_gpus_per_node;
+    errors::assertMsgCritical(
+        static_cast<int64_t>(ndevices) == num_gpus_per_node,
+        std::string(__func__) + std::string(": Number of devices does not match numGpusPerNode."));
+
+    errors::assertMsgCritical(
+        static_cast<int64_t>(nthreads) == num_gpus_per_node,
+        std::string(__func__) + std::string(": Number of OMP threads does not match numGpusPerNode."));
 
     // GTOs blocks and number of AOs
 
@@ -2028,15 +2041,11 @@ integrateVxcFockForGGA(const CMolecule&        molecule,
 
 #pragma omp parallel
     {
-    auto thread_id = omp_get_thread_num();
+    const auto thread_id = omp_get_thread_num();
 
-    if (thread_id < num_gpus_per_node)
-    {
-    auto gpu_id = thread_id;
-    auto gpu_rank = gpu_id + rank * num_gpus_per_node;
-    // auto gpu_count = nnodes * num_gpus_per_node;
+    const auto gpu_id = thread_id;
 
-    gpuSafe(gpuSetDevice(gpu_rank % total_num_gpus_per_compute_node));
+    gpuSafe(gpuSetDevice(gpu_id));
 
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
 
@@ -2066,7 +2075,7 @@ integrateVxcFockForGGA(const CMolecule&        molecule,
     gpuSafe(gpuMalloc(&d_mat_Vxc_full, naos * naos * sizeof(double)));
     gpuSafe(gpuMalloc(&d_mat_Vxc, naos * naos * sizeof(double)));
 
-    gpuSafe(gpuMemcpy(d_den_mat_full, densityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice));
+    gpu::chunkedMemcpyHostToDevice<double>(d_den_mat_full, densityMatrix.alphaDensity(0), naos * naos);
 
     dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
@@ -2128,12 +2137,14 @@ integrateVxcFockForGGA(const CMolecule&        molecule,
     gpuSafe(gpuMalloc(&d_grid_z, n_total_grid_points * sizeof(double)));
     gpuSafe(gpuMalloc(&d_grid_w, n_total_grid_points * sizeof(double)));
 
-    gpuSafe(gpuMemcpy(d_grid_x, xcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_grid_y, ycoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_grid_z, zcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_grid_w, weights, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
+    gpu::chunkedMemcpyHostToDevice<double>(d_grid_x, xcoords, n_total_grid_points);
+    gpu::chunkedMemcpyHostToDevice<double>(d_grid_y, ycoords, n_total_grid_points);
+    gpu::chunkedMemcpyHostToDevice<double>(d_grid_z, zcoords, n_total_grid_points);
+    gpu::chunkedMemcpyHostToDevice<double>(d_grid_w, weights, n_total_grid_points);
 
     gpuSafe(gpuDeviceSynchronize());
+
+#pragma omp barrier
 
     // counts and displacements of grid points in boxes
 
@@ -2219,7 +2230,7 @@ integrateVxcFockForGGA(const CMolecule&        molecule,
             ao_inds_int32[ind] = static_cast<uint32_t>(aoinds[ind]);
         }
 
-        gpuSafe(gpuMemcpy(d_ao_inds, ao_inds_int32.data(), aocount * sizeof(uint32_t), gpuMemcpyHostToDevice));
+        gpu::chunkedMemcpyHostToDevice<uint32_t>(d_ao_inds, ao_inds_int32.data(), aocount);
 
         // sub density matrix for groud-state rho
 
@@ -2266,15 +2277,15 @@ integrateVxcFockForGGA(const CMolecule&        molecule,
 
         // funtional evaluation
 
-        gpuSafe(gpuMemcpy(rho, d_rho, dim->rho * npoints * sizeof(double), gpuMemcpyDeviceToHost));
-        gpuSafe(gpuMemcpy(rhograd, d_rhograd, dim->rho * 3 * npoints * sizeof(double), gpuMemcpyDeviceToHost));
-        gpuSafe(gpuMemcpy(sigma, d_sigma, dim->sigma * npoints * sizeof(double), gpuMemcpyDeviceToHost));
+        gpu::chunkedMemcpyDeviceToHost<double>(rho, d_rho, dim->rho * npoints);
+        gpu::chunkedMemcpyDeviceToHost<double>(rhograd, d_rhograd, dim->rho * 3 * npoints);
+        gpu::chunkedMemcpyDeviceToHost<double>(sigma, d_sigma, dim->sigma * npoints);
 
         xcfun_copy.compute_exc_vxc_for_gga(npoints, rho, sigma, exc, vrho, vsigma);
 
-        gpuSafe(gpuMemcpy(d_exc, exc, dim->zk * npoints * sizeof(double), gpuMemcpyHostToDevice));
-        gpuSafe(gpuMemcpy(d_vrho, vrho, dim->vrho * npoints * sizeof(double), gpuMemcpyHostToDevice));
-        gpuSafe(gpuMemcpy(d_vsigma, vsigma, dim->vsigma * npoints * sizeof(double), gpuMemcpyHostToDevice));
+        gpu::chunkedMemcpyHostToDevice<double>(d_exc, exc, dim->zk * npoints);
+        gpu::chunkedMemcpyHostToDevice<double>(d_vrho, vrho, dim->vrho * npoints);
+        gpu::chunkedMemcpyHostToDevice<double>(d_vsigma, vsigma, dim->vsigma * npoints);
 
         // compute partial contribution to Vxc matrix and distribute partial
         // Vxc to full Kohn-Sham matrix
@@ -2327,11 +2338,13 @@ integrateVxcFockForGGA(const CMolecule&        molecule,
 
     gpuSafe(gpuDeviceSynchronize());
 
-    gpuSafe(gpuMemcpy(mat_Vxc_omp[gpu_id].getPointerToAlphaValues(), d_mat_Vxc_full, naos * naos * sizeof(double), gpuMemcpyDeviceToHost));
+    gpu::chunkedMemcpyDeviceToHost<double>(mat_Vxc_omp[gpu_id].getPointerToAlphaValues(), d_mat_Vxc_full, naos * naos);
 
     // Note: symmetrize mat_Vxc
 
     mat_Vxc_omp[gpu_id].symmetrizeAndScale(0.5);
+
+#pragma omp barrier
 
     gpuSafe(gpuFree(d_gto_info));
     gpuSafe(gpuFree(d_ao_inds));
@@ -2362,7 +2375,6 @@ integrateVxcFockForGGA(const CMolecule&        molecule,
 
     mat_Vxc_omp[gpu_id].setExchangeCorrelationEnergy(xcene);
 
-    }
     }
 
     auto p_mat_Vxc = mat_Vxc_sum.getPointerToAlphaValues();
@@ -2444,13 +2456,20 @@ integrateFxcFockForLDA(CDenseMatrix&           aoFockMatrix,
                        const int64_t           rank,
                        const int64_t           nnodes) -> void
 {
+    const auto num_gpus_per_node = numGpusPerNode;
+
     CGpuDevices gpu_devices;
+    const auto ndevices = gpu_devices.getNumberOfDevices();
 
-    const auto total_num_gpus_per_compute_node = gpu_devices.getNumberOfDevices();
+    const auto nthreads = omp_get_max_threads();
 
-    // auto nthreads = omp_get_max_threads();
-    auto num_gpus_per_node = numGpusPerNode;
-    // auto num_threads_per_gpu = nthreads / num_gpus_per_node;
+    errors::assertMsgCritical(
+        static_cast<int64_t>(ndevices) == num_gpus_per_node,
+        std::string(__func__) + std::string(": Number of devices does not match numGpusPerNode."));
+
+    errors::assertMsgCritical(
+        static_cast<int64_t>(nthreads) == num_gpus_per_node,
+        std::string(__func__) + std::string(": Number of OMP threads does not match numGpusPerNode."));
 
     // GTOs blocks and number of AOs
 
@@ -2487,15 +2506,11 @@ integrateFxcFockForLDA(CDenseMatrix&           aoFockMatrix,
 
 #pragma omp parallel
     {
-    auto thread_id = omp_get_thread_num();
+    const auto thread_id = omp_get_thread_num();
 
-    if (thread_id < num_gpus_per_node)
-    {
-    auto gpu_id = thread_id;
-    auto gpu_rank = gpu_id + rank * num_gpus_per_node;
-    // auto gpu_count = nnodes * num_gpus_per_node;
+    const auto gpu_id = thread_id;
 
-    gpuSafe(gpuSetDevice(gpu_rank % total_num_gpus_per_compute_node));
+    gpuSafe(gpuSetDevice(gpu_id));
 
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
 
@@ -2522,8 +2537,8 @@ integrateFxcFockForLDA(CDenseMatrix&           aoFockMatrix,
     gpuSafe(gpuMalloc(&d_rw_den_mat_full, naos * naos * sizeof(double)));
     gpuSafe(gpuMalloc(&d_mat_Fxc_full, naos * naos * sizeof(double)));
 
-    gpuSafe(gpuMemcpy(d_gs_den_mat_full, gsDensityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_rw_den_mat_full, rwDensityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice));
+    gpu::chunkedMemcpyHostToDevice<double>(d_gs_den_mat_full, gsDensityMatrix.alphaDensity(0), naos * naos);
+    gpu::chunkedMemcpyHostToDevice<double>(d_rw_den_mat_full, rwDensityMatrix.alphaDensity(0), naos * naos);
 
     dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
@@ -2572,12 +2587,14 @@ integrateFxcFockForLDA(CDenseMatrix&           aoFockMatrix,
     gpuSafe(gpuMalloc(&d_grid_z, n_total_grid_points * sizeof(double)));
     gpuSafe(gpuMalloc(&d_grid_w, n_total_grid_points * sizeof(double)));
 
-    gpuSafe(gpuMemcpy(d_grid_x, xcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_grid_y, ycoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_grid_z, zcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_grid_w, weights, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
+    gpu::chunkedMemcpyHostToDevice<double>(d_grid_x, xcoords, n_total_grid_points);
+    gpu::chunkedMemcpyHostToDevice<double>(d_grid_y, ycoords, n_total_grid_points);
+    gpu::chunkedMemcpyHostToDevice<double>(d_grid_z, zcoords, n_total_grid_points);
+    gpu::chunkedMemcpyHostToDevice<double>(d_grid_w, weights, n_total_grid_points);
 
     gpuSafe(gpuDeviceSynchronize());
+
+#pragma omp barrier
 
     // counts and displacements of grid points in boxes
 
@@ -2651,7 +2668,7 @@ integrateFxcFockForLDA(CDenseMatrix&           aoFockMatrix,
             ao_inds_int32[ind] = static_cast<uint32_t>(aoinds[ind]);
         }
 
-        gpuSafe(gpuMemcpy(d_ao_inds, ao_inds_int32.data(), aocount * sizeof(uint32_t), gpuMemcpyHostToDevice));
+        gpu::chunkedMemcpyHostToDevice<uint32_t>(d_ao_inds, ao_inds_int32.data(), aocount);
 
         // sub density matrix for ground-state rho
 
@@ -2693,11 +2710,11 @@ integrateFxcFockForLDA(CDenseMatrix&           aoFockMatrix,
 
         // functional evaluation
 
-        gpuSafe(gpuMemcpy(rho, d_rho, 2 * npoints * sizeof(double), gpuMemcpyDeviceToHost));
+        gpu::chunkedMemcpyDeviceToHost<double>(rho, d_rho, dim->rho * npoints);
 
         xcfun_copy.compute_fxc_for_lda(npoints, rho, v2rho2);
 
-        gpuSafe(gpuMemcpy(d_v2rho2, v2rho2, dim->v2rho2 * npoints * sizeof(double), gpuMemcpyHostToDevice));
+        gpu::chunkedMemcpyHostToDevice<double>(d_v2rho2, v2rho2, dim->v2rho2 * npoints);
 
         // compute partial contribution to Fxc matrix and distribute partial
 
@@ -2778,7 +2795,9 @@ integrateFxcFockForLDA(CDenseMatrix&           aoFockMatrix,
 
     gpuSafe(gpuDeviceSynchronize());
 
-    gpuSafe(gpuMemcpy(mat_Fxc_omp[gpu_id].values(), d_mat_Fxc_full, naos * naos * sizeof(double), gpuMemcpyDeviceToHost));
+    gpu::chunkedMemcpyDeviceToHost<double>(mat_Fxc_omp[gpu_id].values(), d_mat_Fxc_full, naos * naos);
+
+#pragma omp barrier
 
     gpuSafe(gpuFree(d_gto_info));
     gpuSafe(gpuFree(d_ao_inds));
@@ -2799,7 +2818,6 @@ integrateFxcFockForLDA(CDenseMatrix&           aoFockMatrix,
     gpuSafe(gpuFree(d_grid_z));
     gpuSafe(gpuFree(d_grid_w));
 
-    }
     }
 
     auto p_mat_Fxc = aoFockMatrix.values();
@@ -2827,9 +2845,20 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
                        const int64_t           rank,
                        const int64_t           nnodes) -> void
 {
-    CGpuDevices gpu_devices;
+    const auto num_gpus_per_node = numGpusPerNode;
 
-    auto num_gpus_per_node = numGpusPerNode;
+    CGpuDevices gpu_devices;
+    const auto ndevices = gpu_devices.getNumberOfDevices();
+
+    const auto nthreads = omp_get_max_threads();
+
+    errors::assertMsgCritical(
+        static_cast<int64_t>(ndevices) == num_gpus_per_node,
+        std::string(__func__) + std::string(": Number of devices does not match numGpusPerNode."));
+
+    errors::assertMsgCritical(
+        static_cast<int64_t>(nthreads) == num_gpus_per_node,
+        std::string(__func__) + std::string(": Number of OMP threads does not match numGpusPerNode."));
 
     // GTOs blocks and number of AOs
 
@@ -2866,11 +2895,9 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
 
 #pragma omp parallel
     {
-    auto thread_id = omp_get_thread_num();
+    const auto thread_id = omp_get_thread_num();
 
-    if (thread_id < num_gpus_per_node)
-    {
-    auto gpu_id = thread_id;
+    const auto gpu_id = thread_id;
 
     gpuSafe(gpuSetDevice(gpu_id));
 
@@ -3035,6 +3062,8 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
     gpu::zeroMatrix<<<num_blocks, threads_per_block>>>(d_mat_Fxc_full, static_cast<uint32_t>(naos), static_cast<uint32_t>(naos));
 
     gpuSafe(gpuDeviceSynchronize());
+
+#pragma omp barrier
 
     // counts and displacements of grid points in boxes
 
@@ -3294,10 +3323,11 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
 
     gpu::chunkedMemcpyDeviceToHost<double>(mat_Fxc_omp[gpu_id].values(), d_mat_Fxc_full, naos * naos);
 
+#pragma omp barrier
+
     gpuSafe(gpuFree(d_data_double));
     gpuSafe(gpuFree(d_data_uint32));
 
-    }
     }
 
     auto p_mat_Fxc = aoFockMatrix.values();
@@ -3369,13 +3399,20 @@ integrateVxcGradientForLDA(const CMolecule&        molecule,
                            const int64_t           rank,
                            const int64_t           nnodes) -> CDenseMatrix
 {
+    const auto num_gpus_per_node = numGpusPerNode;
+
     CGpuDevices gpu_devices;
+    const auto ndevices = gpu_devices.getNumberOfDevices();
 
-    const auto total_num_gpus_per_compute_node = gpu_devices.getNumberOfDevices();
+    const auto nthreads = omp_get_max_threads();
 
-    // auto nthreads = omp_get_max_threads();
-    auto num_gpus_per_node = numGpusPerNode;
-    // auto num_threads_per_gpu = nthreads / num_gpus_per_node;
+    errors::assertMsgCritical(
+        static_cast<int64_t>(ndevices) == num_gpus_per_node,
+        std::string(__func__) + std::string(": Number of devices does not match numGpusPerNode."));
+
+    errors::assertMsgCritical(
+        static_cast<int64_t>(nthreads) == num_gpus_per_node,
+        std::string(__func__) + std::string(": Number of OMP threads does not match numGpusPerNode."));
 
     // GTOs blocks and number of AOs
 
@@ -3422,15 +3459,11 @@ integrateVxcGradientForLDA(const CMolecule&        molecule,
 
 #pragma omp parallel
     {
-    auto thread_id = omp_get_thread_num();
+    const auto thread_id = omp_get_thread_num();
 
-    if (thread_id < num_gpus_per_node)
-    {
-    auto gpu_id = thread_id;
-    auto gpu_rank = gpu_id + rank * num_gpus_per_node;
-    // auto gpu_count = nnodes * num_gpus_per_node;
+    const auto gpu_id = thread_id;
 
-    gpuSafe(gpuSetDevice(gpu_rank % total_num_gpus_per_compute_node));
+    gpuSafe(gpuSetDevice(gpu_id));
 
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
 
@@ -3467,8 +3500,8 @@ integrateVxcGradientForLDA(const CMolecule&        molecule,
     gpuSafe(gpuMalloc(&d_dengrad_y, natoms * max_npoints_per_box * sizeof(double)));
     gpuSafe(gpuMalloc(&d_dengrad_z, natoms * max_npoints_per_box * sizeof(double)));
 
-    gpuSafe(gpuMemcpy(d_rw_den_mat_full, rwDensityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_gs_den_mat_full, gsDensityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice));
+    gpu::chunkedMemcpyHostToDevice<double>(d_rw_den_mat_full, rwDensityMatrix.alphaDensity(0), naos * naos);
+    gpu::chunkedMemcpyHostToDevice<double>(d_gs_den_mat_full, gsDensityMatrix.alphaDensity(0), naos * naos);
 
     dim3 threads_per_block(1, TILE_DIM);
 
@@ -3517,12 +3550,14 @@ integrateVxcGradientForLDA(const CMolecule&        molecule,
     gpuSafe(gpuMalloc(&d_grid_z, n_total_grid_points * sizeof(double)));
     gpuSafe(gpuMalloc(&d_grid_w, n_total_grid_points * sizeof(double)));
 
-    gpuSafe(gpuMemcpy(d_grid_x, xcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_grid_y, ycoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_grid_z, zcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_grid_w, weights, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
+    gpu::chunkedMemcpyHostToDevice<double>(d_grid_x, xcoords, n_total_grid_points);
+    gpu::chunkedMemcpyHostToDevice<double>(d_grid_y, ycoords, n_total_grid_points);
+    gpu::chunkedMemcpyHostToDevice<double>(d_grid_z, zcoords, n_total_grid_points);
+    gpu::chunkedMemcpyHostToDevice<double>(d_grid_w, weights, n_total_grid_points);
 
     gpuSafe(gpuDeviceSynchronize());
+
+#pragma omp barrier
 
     // counts and displacements of grid points in boxes
 
@@ -3612,9 +3647,9 @@ integrateVxcGradientForLDA(const CMolecule&        molecule,
             ao_to_atom_ids_int32[ind] = static_cast<uint32_t>(ao_to_atom_ids[aoinds[ind]]);
         }
 
-        gpuSafe(gpuMemcpy(d_ao_inds, ao_inds_int32.data(), aocount * sizeof(uint32_t), gpuMemcpyHostToDevice));
+        gpu::chunkedMemcpyHostToDevice<uint32_t>(d_ao_inds, ao_inds_int32.data(), aocount);
 
-        gpuSafe(gpuMemcpy(d_ao_to_atom_ids, ao_to_atom_ids_int32.data(), aocount * sizeof(uint32_t), gpuMemcpyHostToDevice));
+        gpu::chunkedMemcpyHostToDevice<uint32_t>(d_ao_to_atom_ids, ao_to_atom_ids_int32.data(), aocount);
 
         // sub density matrix for ground-state rho
 
@@ -3697,12 +3732,12 @@ integrateVxcGradientForLDA(const CMolecule&        molecule,
 
         // functional evaluation
 
-        gpuSafe(gpuMemcpy(rho, d_rho, 2 * npoints * sizeof(double), gpuMemcpyDeviceToHost));
+        gpu::chunkedMemcpyDeviceToHost<double>(rho, d_rho, dim->rho * npoints);
 
         xcfun_copy.compute_exc_vxc_for_lda(npoints, rho, exc, vrho);
 
-        gpuSafe(gpuMemcpy(d_exc, exc, dim->zk * npoints * sizeof(double), gpuMemcpyHostToDevice));
-        gpuSafe(gpuMemcpy(d_vrho, vrho, dim->vrho * npoints * sizeof(double), gpuMemcpyHostToDevice));
+        gpu::chunkedMemcpyHostToDevice<double>(d_exc, exc, dim->zk * npoints);
+        gpu::chunkedMemcpyHostToDevice<double>(d_vrho, vrho, dim->vrho * npoints);
 
         // accumulate partial contribution to Vxc gradient
 
@@ -3725,7 +3760,9 @@ integrateVxcGradientForLDA(const CMolecule&        molecule,
     gpuSafe(gpuDeviceSynchronize());
 
     // copy final gradient back
-    gpuSafe(gpuMemcpy(molgrad_omp.row(gpu_id), d_mol_grad, natoms * 3 * sizeof(double), gpuMemcpyDeviceToHost));
+    gpu::chunkedMemcpyDeviceToHost<double>(molgrad_omp.row(gpu_id), d_mol_grad, natoms * 3);
+
+#pragma omp barrier
 
     gpuSafe(gpuFree(d_gto_info));
     gpuSafe(gpuFree(d_ao_inds));
@@ -3757,7 +3794,6 @@ integrateVxcGradientForLDA(const CMolecule&        molecule,
     gpuSafe(gpuFree(d_grid_w));
 
     }
-    }
 
     CDenseMatrix molgrad(natoms, 3);
 
@@ -3788,13 +3824,20 @@ integrateVxcGradientForGGA(const CMolecule&        molecule,
                            const int64_t           rank,
                            const int64_t           nnodes) -> CDenseMatrix
 {
+    const auto num_gpus_per_node = numGpusPerNode;
+
     CGpuDevices gpu_devices;
+    const auto ndevices = gpu_devices.getNumberOfDevices();
 
-    const auto total_num_gpus_per_compute_node = gpu_devices.getNumberOfDevices();
+    const auto nthreads = omp_get_max_threads();
 
-    // auto nthreads = omp_get_max_threads();
-    auto num_gpus_per_node = numGpusPerNode;
-    // auto num_threads_per_gpu = nthreads / num_gpus_per_node;
+    errors::assertMsgCritical(
+        static_cast<int64_t>(ndevices) == num_gpus_per_node,
+        std::string(__func__) + std::string(": Number of devices does not match numGpusPerNode."));
+
+    errors::assertMsgCritical(
+        static_cast<int64_t>(nthreads) == num_gpus_per_node,
+        std::string(__func__) + std::string(": Number of OMP threads does not match numGpusPerNode."));
 
     // GTOs blocks and number of AOs
 
@@ -3841,15 +3884,11 @@ integrateVxcGradientForGGA(const CMolecule&        molecule,
 
 #pragma omp parallel
     {
-    auto thread_id = omp_get_thread_num();
+    const auto thread_id = omp_get_thread_num();
 
-    if (thread_id < num_gpus_per_node)
-    {
-    auto gpu_id = thread_id;
-    auto gpu_rank = gpu_id + rank * num_gpus_per_node;
-    // auto gpu_count = nnodes * num_gpus_per_node;
+    const auto gpu_id = thread_id;
 
-    gpuSafe(gpuSetDevice(gpu_rank % total_num_gpus_per_compute_node));
+    gpuSafe(gpuSetDevice(gpu_id));
 
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
 
@@ -3915,8 +3954,8 @@ integrateVxcGradientForGGA(const CMolecule&        molecule,
     gpuSafe(gpuMalloc(&d_dengrad_zy, natoms * max_npoints_per_box * sizeof(double)));
     gpuSafe(gpuMalloc(&d_dengrad_zz, natoms * max_npoints_per_box * sizeof(double)));
 
-    gpuSafe(gpuMemcpy(d_rw_den_mat_full, rwDensityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_gs_den_mat_full, gsDensityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice));
+    gpu::chunkedMemcpyHostToDevice<double>(d_rw_den_mat_full, rwDensityMatrix.alphaDensity(0), naos * naos);
+    gpu::chunkedMemcpyHostToDevice<double>(d_gs_den_mat_full, gsDensityMatrix.alphaDensity(0), naos * naos);
 
     dim3 threads_per_block(1, TILE_DIM);
 
@@ -3972,12 +4011,14 @@ integrateVxcGradientForGGA(const CMolecule&        molecule,
     gpuSafe(gpuMalloc(&d_grid_z, n_total_grid_points * sizeof(double)));
     gpuSafe(gpuMalloc(&d_grid_w, n_total_grid_points * sizeof(double)));
 
-    gpuSafe(gpuMemcpy(d_grid_x, xcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_grid_y, ycoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_grid_z, zcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_grid_w, weights, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
+    gpu::chunkedMemcpyHostToDevice<double>(d_grid_x, xcoords, n_total_grid_points);
+    gpu::chunkedMemcpyHostToDevice<double>(d_grid_y, ycoords, n_total_grid_points);
+    gpu::chunkedMemcpyHostToDevice<double>(d_grid_z, zcoords, n_total_grid_points);
+    gpu::chunkedMemcpyHostToDevice<double>(d_grid_w, weights, n_total_grid_points);
 
     gpuSafe(gpuDeviceSynchronize());
+
+#pragma omp barrier
 
     // counts and displacements of grid points in boxes
 
@@ -4073,9 +4114,9 @@ integrateVxcGradientForGGA(const CMolecule&        molecule,
             ao_to_atom_ids_int32[ind] = static_cast<uint32_t>(ao_to_atom_ids[aoinds[ind]]);
         }
 
-        gpuSafe(gpuMemcpy(d_ao_inds, ao_inds_int32.data(), aocount * sizeof(uint32_t), gpuMemcpyHostToDevice));
+        gpu::chunkedMemcpyHostToDevice<uint32_t>(d_ao_inds, ao_inds_int32.data(), aocount);
 
-        gpuSafe(gpuMemcpy(d_ao_to_atom_ids, ao_to_atom_ids_int32.data(), aocount * sizeof(uint32_t), gpuMemcpyHostToDevice));
+        gpu::chunkedMemcpyHostToDevice<uint32_t>(d_ao_to_atom_ids, ao_to_atom_ids_int32.data(), aocount);
 
         // sub density matrix for groud-state rho
 
@@ -4202,14 +4243,14 @@ integrateVxcGradientForGGA(const CMolecule&        molecule,
 
         // funtional evaluation
 
-        gpuSafe(gpuMemcpy(rho, d_rho, dim->rho * npoints * sizeof(double), gpuMemcpyDeviceToHost));
-        gpuSafe(gpuMemcpy(rhograd, d_rhograd, dim->rho * 3 * npoints * sizeof(double), gpuMemcpyDeviceToHost));
-        gpuSafe(gpuMemcpy(sigma, d_sigma, dim->sigma * npoints * sizeof(double), gpuMemcpyDeviceToHost));
+        gpu::chunkedMemcpyDeviceToHost<double>(rho, d_rho, dim->rho * npoints);
+        gpu::chunkedMemcpyDeviceToHost<double>(rhograd, d_rhograd, dim->rho * 3 * npoints);
+        gpu::chunkedMemcpyDeviceToHost<double>(sigma, d_sigma, dim->sigma * npoints);
 
         xcfun_copy.compute_vxc_for_gga(npoints, rho, sigma, vrho, vsigma);
 
-        gpuSafe(gpuMemcpy(d_vrho, vrho, dim->vrho * npoints * sizeof(double), gpuMemcpyHostToDevice));
-        gpuSafe(gpuMemcpy(d_vsigma, vsigma, dim->vsigma * npoints * sizeof(double), gpuMemcpyHostToDevice));
+        gpu::chunkedMemcpyHostToDevice<double>(d_vrho, vrho, dim->vrho * npoints);
+        gpu::chunkedMemcpyHostToDevice<double>(d_vsigma, vsigma, dim->vsigma * npoints);
 
         // accumulate partial contribution to Vxc gradient
 
@@ -4243,7 +4284,9 @@ integrateVxcGradientForGGA(const CMolecule&        molecule,
     gpuSafe(gpuDeviceSynchronize());
 
     // copy final gradient back
-    gpuSafe(gpuMemcpy(molgrad_omp.row(gpu_id), d_mol_grad, natoms * 3 * sizeof(double), gpuMemcpyDeviceToHost));
+    gpu::chunkedMemcpyDeviceToHost<double>(molgrad_omp.row(gpu_id), d_mol_grad, natoms * 3);
+
+#pragma omp barrier
 
     gpuSafe(gpuFree(d_gto_info));
     gpuSafe(gpuFree(d_ao_inds));
@@ -4299,7 +4342,6 @@ integrateVxcGradientForGGA(const CMolecule&        molecule,
     gpuSafe(gpuFree(d_grid_z));
     gpuSafe(gpuFree(d_grid_w));
 
-    }
     }
 
     CDenseMatrix molgrad(natoms, 3);
