@@ -4655,7 +4655,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     timer.stop("Prep. sortQD");
 
-    timer.start("Prep. Q_prime");
+    timer.start("Prep. Q_prime Q");
 
     // preLinK
     // J. Chem. Phys. 138, 134114 (2013)
@@ -4670,11 +4670,23 @@ computeFockOnGPU(const              CMolecule& molecule,
     double *d_matrix_B = d_matrix_A + mat_full.getNumberOfElements();
     double *d_matrix_C = d_matrix_B + mat_full.getNumberOfElements();
 
+    timer.stop("Prep. Q_prime Q");
+    timer.start("Memcpy Q_prime Q");
+
     gpu::chunkedMemcpyHostToDevice<double>(d_matrix_A, mat_full.values(), mat_full.getNumberOfElements());
+
+    timer.stop("Memcpy Q_prime Q");
+    timer.start("Prep. Q_prime D");
 
     mat_full = screening.get_mat_D_abs_full(cart_naos, cart_dens_ptr);
 
+    timer.stop("Prep. Q_prime D");
+    timer.start("Memcpy Q_prime D");
+
     gpu::chunkedMemcpyHostToDevice<double>(d_matrix_B, mat_full.values(), mat_full.getNumberOfElements());
+
+    timer.stop("Memcpy Q_prime D");
+    timer.start("Dgemm Q_prime 1");
 
     const auto all_prim_count = mat_full.getNumberOfRows();
 
@@ -4692,9 +4704,10 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     cudaSafe(cudaDeviceSynchronize());
 
-    cublasSafe(cublasDgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, n, n, n, &alpha, d_matrix_A, n, d_matrix_C, n, &beta, d_matrix_B, n));
+    timer.stop("Dgemm Q_prime 1");
+    timer.start("Dgemm Q_prime 2");
 
-    gpu::chunkedMemcpyDeviceToHost<double>(mat_full.values(), d_matrix_B, mat_full.getNumberOfElements());
+    cublasSafe(cublasDgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, n, n, n, &alpha, d_matrix_A, n, d_matrix_C, n, &beta, d_matrix_B, n));
 
     cublasSafe(cublasDestroy(handle));
 
@@ -4712,16 +4725,21 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     hipSafe(hipDeviceSynchronize());
 
-    hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, HIPBLAS_OP_N, n, n, n, &alpha, d_matrix_A, n, d_matrix_C, n, &beta, d_matrix_B, n));
+    timer.stop("Dgemm Q_prime 1");
+    timer.start("Dgemm Q_prime 2");
 
-    gpu::chunkedMemcpyDeviceToHost<double>(mat_full.values(), d_matrix_B, mat_full.getNumberOfElements());
+    hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, HIPBLAS_OP_N, n, n, n, &alpha, d_matrix_A, n, d_matrix_C, n, &beta, d_matrix_B, n));
 
     hipblasSafe(hipblasDestroy(handle));
 
 #endif
 
-    timer.stop("Prep. Q_prime");
+    timer.stop("Dgemm Q_prime 2");
+    timer.start("Memcpy Q_prime");
 
+    gpu::chunkedMemcpyDeviceToHost<double>(mat_full.values(), d_matrix_B, mat_full.getNumberOfElements());
+
+    timer.stop("Memcpy Q_prime");
     timer.start("Prep. preLinK 1");
 
     screening.form_pair_inds_for_K(s_prim_count, p_prim_count, d_prim_count, mat_full, prelink_threshold);
