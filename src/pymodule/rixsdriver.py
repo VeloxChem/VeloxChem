@@ -42,6 +42,7 @@ from .outputstream import OutputStream
 from .linearsolver import LinearSolver
 from .lreigensolver import LinearResponseEigenSolver
 from .tdaeigensolver import TdaEigenSolver
+from .cppsolver import ComplexResponse
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input
 
@@ -101,6 +102,8 @@ class RixsDriver(LinearSolver):
 
         # Restricted subspace
         self.restricted_subspace = True
+        # CPP-approach
+        self.complex_polarization_prop = False
 
         self.num_core_orbitals = 0
         self.num_virtual_orbitals = 0
@@ -243,36 +246,54 @@ class RixsDriver(LinearSolver):
 
             rsp_results = rsp_drv.compute(molecule, basis, scf_results)
 
-        if cvs_rsp_results is None and (not self.restricted_subspace):
+        # TODO: rename cvs_rsp_results to something more general?
+        if cvs_rsp_results is None:# and (not self.restricted_subspace):
+            if not self.restricted_subspace:
+                
+                cvs_rsp_keys = [
+                    'num_core_orbitals',
+                    'conv_thresh',
+                    'restart',
+                ]
 
-            cvs_rsp_keys = [
-                'num_core_orbitals',
-                'conv_thresh',
-                'restart',
-            ]
+                if self.tamm_dancoff:
+                    cvs_rsp_drv = TdaEigenSolver(self.comm, self.ostream)
+                else:
+                    cvs_rsp_drv = LinearResponseEigenSolver(self.comm, self.ostream)
 
-            if self.tamm_dancoff:
-                cvs_rsp_drv = TdaEigenSolver(self.comm, self.ostream)
-            else:
-                cvs_rsp_drv = LinearResponseEigenSolver(self.comm, self.ostream)
+                for key in cvs_rsp_keys:
+                    if hasattr(self, key):
+                        setattr(cvs_rsp_drv, key, getattr(self, key))
 
-            for key in cvs_rsp_keys:
-                if hasattr(self, key):
-                    setattr(cvs_rsp_drv, key, getattr(self, key))
+                cvs_rsp_drv.core_excitation = True
+                cvs_rsp_drv.nstates = self.num_core_states
 
-            cvs_rsp_drv.core_excitation = True
-            cvs_rsp_drv.nstates = self.num_core_states
+                assert_msg_critical(cvs_rsp_drv.num_core_orbitals > 0,
+                                    'Invalid number of core orbitals')
 
-            assert_msg_critical(cvs_rsp_drv.num_core_orbitals > 0,
-                                'Invalid number of core orbitals')
+                if self.checkpoint_file is not None:
+                    cvs_rsp_drv.group_label = 'rsp_cvs'
+                    fpath = Path(self.checkpoint_file)
+                    fpath = fpath.with_name(fpath.stem)
+                    cvs_rsp_drv.checkpoint_file = str(fpath) + '_rixs_cvs.h5'
 
-            if self.checkpoint_file is not None:
-                cvs_rsp_drv.group_label = 'rsp_cvs'
-                fpath = Path(self.checkpoint_file)
-                fpath = fpath.with_name(fpath.stem)
-                cvs_rsp_drv.checkpoint_file = str(fpath) + '_rixs_cvs.h5'
+                cvs_rsp_results = cvs_rsp_drv.compute(molecule, basis, scf_results)
 
-            cvs_rsp_results = cvs_rsp_drv.compute(molecule, basis, scf_results)
+            elif self.complex_polarization_prop:
+                assert_msg_critical(self.photon_energy,
+                                        'Must provide incoming photon energies for the CPP approach!')
+                cpp_rsp_drv = ComplexResponse()
+                cpp_rsp_drv.frequencies = self.photon_energy
+                # given broadening is FWHM -> HWHM
+                cpp_rsp_drv.damping = self.gamma / 2
+                
+                if self.checkpoint_file is not None:
+                    cvs_rsp_drv.group_label = 'rsp_cpp'
+                    fpath = Path(self.checkpoint_file)
+                    fpath = fpath.with_name(fpath.stem)
+                    cvs_rsp_drv.checkpoint_file = str(fpath) + '_rixs_cpp.h5'
+
+                cpp_rsp_results = cpp_rsp_drv.compute(molecule, basis, scf_results)
 
         nocc = molecule.number_of_alpha_electrons()
 
@@ -718,8 +739,11 @@ class RixsDriver(LinearSolver):
 
             vecs = []
             for i in states:
-                full_v = self.get_full_solution_vector(
-                    rsp_results['eigenvectors_distributed'][i])
+                if rsp_results['eigenvectors_distributed'] == 'input_file':
+                    full_v = rsp_results['eigenvectors'][i]
+                else:
+                    full_v = self.get_full_solution_vector(
+                        rsp_results['eigenvectors_distributed'][i])
                 full_v = self.comm.bcast(full_v, root=mpi_master())
                 vecs.append(full_v)
             return np.array(vecs)
