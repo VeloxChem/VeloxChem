@@ -34,11 +34,9 @@ from pathlib import Path
 import numpy as np
 import math
 import h5py
-import re
 
 from .veloxchemlib import AODensityMatrix
 from .veloxchemlib import denmat
-from .veloxchemlib import chemical_element_identifier
 from .visualizationdriver import VisualizationDriver
 from .cubicgrid import CubicGrid
 from .errorhandler import assert_msg_critical
@@ -84,9 +82,6 @@ class DensityViewer:
         self.use_visualization_driver = False
         self.interpolate = False
 
-        # flag to indicate if using k3d
-        self.use_k3d = False
-
         # flag for the type of density
         self.den_type = denmat.rest
 
@@ -129,10 +124,7 @@ class DensityViewer:
         self._viewer_width = 600
         self._viewer_height = 450
 
-        # progress bar
-        self.progress = None
-
-    def read_hdf5(self, fname, label=''):
+    def read_hdf5(self, fname):
         """
         Reads the dictionary of densities from a checkpoint file.
 
@@ -152,37 +144,16 @@ class DensityViewer:
         errmsg = f"DensityViewer: Cannot read file {fname}."
         assert_msg_critical(valid_checkpoint, errmsg)
 
-        hf = h5py.File(fname, "r")
+        h5f = h5py.File(fname, "r")
 
-        if label:
-            hfgroup = hf.get(label)
-        else:
-            hfgroup = hf
-
-        # sort the keys if there are numbers in the keys
-        sorted_keys = []
-        for key in hfgroup.keys():
-            num_match = re.search(r'\d+', key)
-            if num_match is not None:
-                sorted_keys.append((int(num_match.group()), key))
-            else:
-                sorted_keys.append((0, key))
-        sorted_keys.sort()
-
-        keys = [key_tuple[1] for key_tuple in sorted_keys]
-
-        for key in keys:
-            # TODO: add other density types as they become available
-            for dens_type in [
-                    "D_alpha", "D_beta", "detach_", "attach_", "hole",
-                    "particle"
-            ]:
-                if dens_type in key:
-                    data = np.array(hfgroup.get(key))
-                    if data.ndim == 2:
-                        den_dict[key] = data
-
-        hf.close()
+        # TODO: add other density types as they become available
+        for key in h5f.keys():
+            if "detach" in key or "attach" in key:
+                data = np.array(h5f.get(key))
+                den_dict[key] = data
+            if "hole" in key or "particle" in key:
+                data = np.array(h5f.get(key))
+                den_dict[key] = data
 
         return den_dict
 
@@ -213,18 +184,8 @@ class DensityViewer:
         self._molecule = molecule
         self._basis = basis
 
-        self._atomnr = np.array(molecule.get_identifiers()) - 1
-
-        # Take care of _atomnr for ghost atoms
-        for i_atom, (atom_bas_label, atom_bas_elem) in enumerate(
-                molecule.get_atom_basis_labels()):
-            if self._atomnr[i_atom] == -1:
-                elem_id = chemical_element_identifier(atom_bas_elem)
-                assert_msg_critical(
-                    elem_id > 0, 'DensityViewer: dummy atom is not supported')
-                self._atomnr[i_atom] = elem_id - 1
-
         # Define box size
+        self._atomnr = np.array(molecule.get_identifiers()) - 1
         self._coords = molecule.get_coordinates_in_bohr()
         if self.atom_centers is None:
             xmin = self._coords[:, 0].min() - self.grid_margins
@@ -264,16 +225,6 @@ class DensityViewer:
         atom_grid = CubicGrid(self._atom_origin, self.stepsize,
                               self._atom_npoints)
 
-        # Take care of mixed basis set by creating a list of atom basis labels
-        atom_basis_labels = []
-        for atom_bas_label, atom_bas_elem in molecule.get_atom_basis_labels():
-            atom_basis_labels.append(atom_bas_label)
-        for i_atom in range(len(atom_basis_labels)):
-            if not atom_basis_labels[i_atom]:
-                atom_basis_labels[i_atom] = basis.get_label()
-
-        self._atom_basis_labels = atom_basis_labels
-
         # Create atomic map
         vis_drv = VisualizationDriver()
         ao_info = vis_drv.get_atomic_orbital_info(molecule, basis)
@@ -281,26 +232,21 @@ class DensityViewer:
         # Create reverse atomic map
         atom_to_ao = vis_drv.map_atom_to_atomic_orbitals(molecule, basis)
         self._atom_to_ao = atom_to_ao
-
-        # self._ao_to_atom = [[] for i in range(len(ao_info))]
-        # for i_atom, atom_orbs in enumerate(atom_to_ao):
-        #     # Note: need atom_bas_label for distinguishing atoms that are same
-        #     # elements but with different basis set
-        #     atom_bas_label = atom_basis_labels[i_atom]
-        #     for i_orb, orb in enumerate(atom_orbs):
-        #         self._ao_to_atom[orb] = (i_atom, atom_bas_label, i_orb)
+        self._ao_to_atom = [[] for i in range(len(ao_info))]
+        for i_atom, atom_orbs in enumerate(atom_to_ao):
+            for i_orb, orb in enumerate(atom_orbs):
+                self._ao_to_atom[orb] = [i_atom, i_orb]
 
         # Compute each unique AO on the grid
         self._ao_dict = {}
         for i_atom, atom in enumerate(self._atomnr):
-            atom_bas_label = atom_basis_labels[i_atom]
-            if (atom, atom_bas_label) not in self._ao_dict:
+            if atom not in self._ao_dict:
                 atomlist = []
                 for orb in atom_to_ao[i_atom]:
                     vis_drv.compute_atomic_orbital_for_grid(
                         atom_grid, basis, ao_info[orb])
                     atomlist.append(atom_grid.values_to_numpy())
-                self._ao_dict[(atom, atom_bas_label)] = list(atomlist)
+                self._ao_dict[atom] = atomlist
 
         self._atom_grid = atom_grid
 
@@ -357,18 +303,15 @@ class DensityViewer:
         # Initialize the density on the molecular grid
         np_density = np.zeros(self.npoints)
 
+        identifiers = np.array(self._molecule.get_identifiers()) - 1
+
         ijk_inds = [(i, j, k) for i in [0, 1] for j in [0, 1] for k in [0, 1]]
 
         # Loop over atoms
         for i_atom in range(natms):
-            if not self.use_visualization_driver:
-                if self.progress is not None:
-                    self.progress.value = i_atom
-
             ao_indices_i = self._atom_to_ao[i_atom]
-            atom_id_i = self._atomnr[i_atom]
-            atom_bas_label_i = self._atom_basis_labels[i_atom]
-            atom_orbs_i = np.array(self._ao_dict[(atom_id_i, atom_bas_label_i)])
+            atom_id_i = identifiers[i_atom]
+            atom_orbs_i = np.array(self._ao_dict[atom_id_i])
 
             if self.interpolate:
                 ti = (self._coords[i_atom] - self.origin +
@@ -397,10 +340,8 @@ class DensityViewer:
 
             for j_atom in range(natms):
                 ao_indices_j = self._atom_to_ao[j_atom]
-                atom_id_j = self._atomnr[j_atom]
-                atom_bas_label_j = self._atom_basis_labels[j_atom]
-                atom_orbs_j = np.array(self._ao_dict[(atom_id_j,
-                                                      atom_bas_label_j)])
+                atom_id_j = identifiers[j_atom]
+                atom_orbs_j = np.array(self._ao_dict[atom_id_j])
 
                 if self.interpolate:
                     tj = (self._coords[j_atom] - self.origin +
@@ -537,12 +478,9 @@ class DensityViewer:
             and their labels).
         """
 
-        if self.use_k3d:
-            self.plot_using_k3d(molecule, basis, den_inp)
-        else:
-            self._plot_using_py3dmol(molecule, basis, den_inp, width, height)
+        self._plot_using_py3dmol(molecule, basis, den_inp, width, height)
 
-    def plot_using_k3d(self, molecule, basis, den_inp, label=''):
+    def plot_using_k3d(self, molecule, basis, den_inp):
         """
         Plots the densities using k3d, with a widget to choose which.
 
@@ -568,7 +506,7 @@ class DensityViewer:
             raise ImportError(self.help_string_widgets_and_display())
 
         if isinstance(den_inp, str):
-            den_dict = self.read_hdf5(den_inp, label=label)
+            den_dict = self.read_hdf5(den_inp)
         elif isinstance(den_inp, dict):
             den_dict = den_inp
         else:
@@ -591,18 +529,6 @@ class DensityViewer:
         for bonds in plt_bonds:
             self._this_plot += bonds
 
-        natm = molecule.number_of_atoms()
-
-        if not self.use_visualization_driver:
-            # progress bar
-            self.progress = widgets.IntProgress(value=0,
-                                                min=0,
-                                                max=natm - 1,
-                                                description='Loading:',
-                                                bar_style='info',
-                                                style={'bar_color': '#44aa44'})
-            display(self.progress)
-
         density = self.compute_density(self._density_list[self._i_den])
         self._plt_iso_one, self._plt_iso_two = self.draw_density(density)
         self._this_plot += self._plt_iso_one
@@ -613,6 +539,7 @@ class DensityViewer:
         for i, label in enumerate(self._density_labels):
             den_list.append((label, i))
 
+        # Add widget
         self.density_selector = widgets.Dropdown(options=den_list,
                                                  value=self._i_den,
                                                  description='Density:')
@@ -845,7 +772,6 @@ class DensityViewer:
                             molecule,
                             basis,
                             den_inp,
-                            label='',
                             width=600,
                             height=450):
         """
@@ -868,7 +794,7 @@ class DensityViewer:
             raise ImportError(self.help_string_widgets_and_display())
 
         if isinstance(den_inp, str):
-            den_dict = self.read_hdf5(den_inp, label=label)
+            den_dict = self.read_hdf5(den_inp)
         elif isinstance(den_inp, dict):
             den_dict = den_inp
         else:
@@ -881,35 +807,20 @@ class DensityViewer:
 
         den_key_list = list(self._density_dict.keys())
 
-        natm = molecule.number_of_atoms()
-
-        if not self.use_visualization_driver:
-            # progress bar
-            self.progress = widgets.IntProgress(value=0,
-                                                min=0,
-                                                max=natm - 1,
-                                                description='Loading:',
-                                                bar_style='info',
-                                                style={'bar_color': '#44aa44'})
-            display(self.progress)
-
         # use a persistent output widget
         out = widgets.Output()
 
         self._viewer_width = width
         self._viewer_height = height
 
-        has_ghost_atom = (0 in molecule.get_identifiers())
-
         # draw the first density by default
         with out:
             display(HTML(self._draw_density_html(den_key_list[0])))
 
         def update_view(change):
-            if not has_ghost_atom:
-                out.clear_output(wait=True)
-                with out:
-                    display(HTML(self._draw_molecule_html()))
+            out.clear_output(wait=True)
+            with out:
+                display(HTML(self._draw_molecule_html()))
             out.clear_output(wait=True)
             with out:
                 display(HTML(self._draw_density_html(change['new'])))
@@ -1017,7 +928,7 @@ class DensityViewer:
         z = coords[:, 2]
 
         natoms = self._molecule.number_of_atoms()
-        elem_ids = self._atomnr + 1
+        elem_ids = self._molecule.get_identifiers()
 
         x0, y0, z0 = self.origin
         dx, dy, dz = self.stepsize

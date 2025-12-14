@@ -2748,7 +2748,7 @@ class IMDatabasePointCollecter:
                 self.last_added = len(self.allowed_molecules[root]['molecules'])
 
 
-            if self.use_opt_confidence_radius[0] and len(self.allowed_molecules[self.current_state]['molecules']) >= 2 and self.density_around_data_point[0][self.current_state] > 1 and self.density_around_data_point[0][self.current_state] % 1 == 0:# and self.prev_dens_of_points[self.current_state] != self.density_around_data_point[0][self.current_state]:
+            if self.use_opt_confidence_radius[0] and len(self.allowed_molecules[self.current_state]['molecules']) >= 2 and self.density_around_data_point[0][self.current_state] > 1 and self.density_around_data_point[0][self.current_state] % 5 == 0 and self.prev_dens_of_points[self.current_state] != self.density_around_data_point[0][self.current_state]:
                 self.prev_dens_of_points[self.current_state] = self.density_around_data_point[0][self.current_state]        
                 trust_radius = None
                 sym_dict = self.non_core_symmetry_groups['gs']
@@ -3061,7 +3061,7 @@ class IMDatabasePointCollecter:
                     current_basis = MolecularBasis.read(molecule, self.basis_set_label['gs'])
                 else:
                     current_basis = MolecularBasis.read(molecule, self.basis_set_label['es'])
-                state_specific_molecules.append((molecule, current_basis, addition_of_state_specific_points, imp_int_coord))
+                state_specific_molecules.append((molecule, current_basis, addition_of_state_specific_points, []))
                     
                 
                 self.add_point(state_specific_molecules, self.non_core_symmetry_groups)

@@ -36,7 +36,6 @@ import sys
 from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
 from .cppsolver import ComplexResponse
-from .cppsolverunrest import ComplexResponseUnrestricted
 from .tdacppsolver import ComplexResponseTDA
 from .lrsolver import LinearResponseSolver
 from .lrsolverunrest import LinearResponseUnrestrictedSolver
@@ -45,7 +44,6 @@ from .lreigensolverunrest import LinearResponseUnrestrictedEigenSolver
 from .c6driver import C6Driver
 from .tdaeigensolver import TdaEigenSolver
 from .tdaeigensolverunrest import TdaUnrestrictedEigenSolver
-from .rixsdriver import RixsDriver
 from .shgdriver import ShgDriver
 from .tpatransitiondriver import TpaTransitionDriver
 from .doubleresbeta import DoubleResBetaDriver
@@ -167,20 +165,15 @@ class ResponseProperty:
               self._rsp_dict['onlystatic'] == 'no' and
               self._rsp_dict['is_complex'] == 'yes'):
 
+            assert_msg_critical(
+                method_type == 'restricted',
+                'ResponseProperty: This response property is ' +
+                'only implemented for restricted case')
+
             if self.tamm_dancoff:
-                if method_type == 'restricted':
-                    self._rsp_driver = ComplexResponseTDA(
-                        self.comm, self.ostream)
-                elif method_type == 'unrestricted':
-                    assert_msg_critical(
-                        False, 'ResponseProperty: This response property is ' +
-                        'only implemented for restricted case')
+                self._rsp_driver = ComplexResponseTDA(self.comm, self.ostream)
             else:
-                if method_type == 'restricted':
-                    self._rsp_driver = ComplexResponse(self.comm, self.ostream)
-                elif method_type == 'unrestricted':
-                    self._rsp_driver = ComplexResponseUnrestricted(
-                        self.comm, self.ostream)
+                self._rsp_driver = ComplexResponse(self.comm, self.ostream)
 
             self._rsp_driver._input_keywords['response'].update({
                 'tamm_dancoff': ('bool', 'use Tamm-Dancoff approximation'),
@@ -235,25 +228,6 @@ class ResponseProperty:
                 elif method_type == 'unrestricted':
                     self._rsp_driver = LinearResponseUnrestrictedEigenSolver(
                         self.comm, self.ostream)
-
-            self._rsp_driver._input_keywords['response'].update({
-                'tamm_dancoff': ('bool', 'use Tamm-Dancoff approximation'),
-            })
-
-        # Resonant Inelastic X-ray Scattering (RIXS)
-        elif (self._rsp_dict['order'] == 'linear' and
-              self._rsp_dict['residue'] == 'single' and
-              self._rsp_dict['is_complex'] == 'yes'):
-
-            assert_msg_critical(self._rsp_dict['property'] == 'rixs',
-                                'This response property is only for RIXS')
-
-            assert_msg_critical(
-                method_type == 'restricted',
-                'ResponseProperty: This response property is ' +
-                'only implemented for restricted case')
-
-            self._rsp_driver = RixsDriver(self.comm, self.ostream)
 
             self._rsp_driver._input_keywords['response'].update({
                 'tamm_dancoff': ('bool', 'use Tamm-Dancoff approximation'),

@@ -760,7 +760,11 @@ class IMForceFieldGenerator:
                 molecules_to_add_info = []
                 if self.use_minimized_structures[0]:       
                     for opt_root in self.roots_to_follow:
-                        if opt_root not in files_to_add_conf or opt_root in self.use_minimized_structures[2]:
+                        root_to_add = opt_root
+                        if opt_root not in files_to_add_conf:
+                            continue
+                        
+                        elif opt_root in self.use_minimized_structures[2]:
                             if opt_root == 0:
                                 current_basis = MolecularBasis.read(molecule, states_basis['gs'])
                                 molecules_to_add_info.append((molecule, current_basis, [opt_root]))
@@ -768,9 +772,8 @@ class IMForceFieldGenerator:
                                 current_basis = MolecularBasis.read(molecule, states_basis['es'])
                                 molecules_to_add_info.append((molecule, current_basis, [opt_root]))
                             continue
-                        root_to_add = opt_root
 
-                        if opt_root == 0 and isinstance(self.drivers['gs'][0], ScfRestrictedDriver):
+                        elif opt_root == 0 and isinstance(self.drivers['gs'][0], ScfRestrictedDriver):
                         
                             opt_drv = OptimizationDriver(self.drivers['gs'][0])
                             current_basis = MolecularBasis.read(molecule, states_basis['gs'])
