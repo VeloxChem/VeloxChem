@@ -145,6 +145,8 @@ from .lreigensolverunrest import LinearResponseUnrestrictedEigenSolver
 from .lrsolver import LinearResponseSolver
 from .lrsolverunrest import LinearResponseUnrestrictedSolver
 from .cppsolver import ComplexResponse
+from .cppsolverunrest import ComplexResponseUnrestricted
+from .tdacppsolver import ComplexResponseTDA
 from .c6driver import C6Driver
 from .quadraticresponsedriver import QuadraticResponseDriver
 from .cubicresponsedriver import CubicResponseDriver
@@ -163,6 +165,8 @@ from .rspabsorption import Absorption
 from .rspc6 import C6
 from .rspshg import SHG
 from .rsptpa import TPA
+from .rixsdriver import RixsDriver
+from .localizationdriver import LocalizationDriver
 #from .rspcustomproperty import CustomProperty
 from .mpitask import MpiTask
 from .subcommunicators import SubCommunicators

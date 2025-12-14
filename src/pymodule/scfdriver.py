@@ -1360,7 +1360,7 @@ class ScfDriver:
             The profiler.
         """
 
-        self._scf_results = None
+        self._scf_results = {}
 
         self._scf_prop = FirstOrderProperties(self.comm, self.ostream)
 
@@ -1784,7 +1784,8 @@ class ScfDriver:
                         self._scf_results[key] = getattr(self, key)
 
             else:
-                self._scf_results = None
+                # non-master rank
+                self._scf_results = {}
                 self._density = AODensityMatrix()
 
             self._scf_prop.compute_scf_prop(molecule, ao_basis,
@@ -1795,6 +1796,10 @@ class ScfDriver:
                     self._scf_prop.get_property('dipole_moment'))
 
                 self._write_final_hdf5(molecule, ao_basis)
+
+        else:
+            # not converged (or end of first step)
+            self._scf_results = {}
 
         if self.rank == mpi_master():
             self._print_scf_finish(diis_start_time)

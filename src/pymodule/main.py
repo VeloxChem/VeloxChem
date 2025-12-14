@@ -43,6 +43,7 @@ from .mmforcefieldgenerator import MMForceFieldGenerator
 from .respchargesdriver import RespChargesDriver
 from .espchargesdriver import EspChargesDriver
 from .excitondriver import ExcitonModelDriver
+from .rixsdriver import RixsDriver
 from .numerovdriver import NumerovDriver
 from .mp2driver import Mp2Driver
 from .peforcefieldgenerator import PEForceFieldGenerator
@@ -57,6 +58,7 @@ from .rspabsorption import Absorption
 from .rsplinabscross import LinearAbsorptionCrossSection
 from .rspcdspec import CircularDichroismSpectrum
 from .rspc6 import C6
+from .rsprixs import RIXS
 from .rspshg import SHG
 from .rsptpatransition import TpaTransition
 from .rspdoublerestrans import DoubleResTransition
@@ -177,6 +179,9 @@ def select_rsp_property(task, mol_orbs, rsp_dict, method_dict):
 
     elif prop_type == 'c6':
         rsp_prop = C6(rsp_dict, method_dict)
+
+    elif prop_type == 'rixs':
+        rsp_prop = RIXS(rsp_dict, method_dict)
 
     elif prop_type == 'shg':
         rsp_prop = SHG(rsp_dict, method_dict)
