@@ -120,6 +120,24 @@ class ReactionForceFieldBuilder():
         forced_forming_bonds: set[tuple[int, int]] | tuple = (),
         product_mapping: dict[int, int] | None = None,
     ):
+        """Create matched forcefields for the reactant and product
+
+        Args:
+            reactant (Molecule | list[Molecule]): The reactant molecule or a list of reactant molecules.
+            product (Molecule | list[Molecule]): The product molecule or a list of product molecules.
+            reactant_partial_charges (list[float], list[list[float]]): Partial charges for the reactant. Will be calculated if not provided. Defaults to None.
+            product_partial_charges (list[float], list[list[float]]): Partial charges for the product. Will be calculated if not provided. Defaults to None.
+            reactant_hessians (np.ndarray, list[np.ndarray]): Hessians for the reactant for the Seminario method. Will be calculated if not provided. Defaults to None.
+            product_hessians (np.ndarray, list[np.ndarray]): Hessians for the product for the Seminario method. Will be calculated if not provided. Defaults to None.
+            reactant_total_multiplicity (int): Total multiplicity for the reactant to override calculated value. Defaults to -1.
+            product_total_multiplicity (int): Total multiplicity for the product to override calculated value. Defaults to -1.
+            forced_breaking_bonds (set[tuple[int, int]] | tuple, optional): A (set of) 1-indexed tuple(s) specifying bonds that are forced to break. Defaults to ().
+            forced_forming_bonds (set[tuple[int, int]] | tuple, optional): A (set of) 1-indexed tuple(s) specifying bonds that are forced to form. Defaults to ().
+            product_mapping (dict[int, int] | None, optional): A dictionary specifying the 1-indexed mapping from reactant to product atoms. If provided, reaction matching is skipped. Defaults to None.
+
+        Returns:
+            tuple: reactant forcefield, product forcefield, forming bonds, breaking bonds, list of reactant forcefields, list of product forcefields, product mapping (0-indexed)
+        """
 
         reactant_ff, reactant_ffs, reactant_total_charge = self._create_combined_forcefield(
             reactant,

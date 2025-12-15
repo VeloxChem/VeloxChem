@@ -88,28 +88,30 @@ class TransitionStateGuesser():
 
         self.molecule = None
         self.results = {}
-
-        self.lambda_vec = list(np.round(np.linspace(0, 1, 21), 3))
-        self.scf_xcfun = "b3lyp"
-        self.scf_basis = 'def2-svp'
-        self.mute_scf = True
+        self.lambda_vector = list(np.round(np.linspace(0, 1, 21), 3))
         self.mute_ff_build = True
+        timing_str = str(int(time.time()))
+        self.folder_name = f'ts_data_{timing_str}' 
+        self.results_file = f'ts_results_{timing_str}.h5'
+        
         self.mm_temperature = 600
         self.mm_steps = 1000
         self.conformer_snapshots = 10
         self.mm_step_size = 0.001
         self.save_mm_traj = False
-        self.scf_drv = None
-        self.folder_name = 'ts_data_' + str(int(time.time()))
         self.force_conformer_search = False
         self.discont_conformer_search = False
         self.peak_conformer_search = False
         self.peak_conformer_search_range = 1
-        self.mm_scan_backward = False
-        self.scf_scan = False
         self.mm_conformer_equivalence_threshold = 1e-1  # kJ/mol
+        self.mm_scan_backward = False
+        
+        self.scf_drv = None
+        self.qm_xcfun = "PBE0"
+        self.qm_basis = 'def2-svp'
+        self.do_qm_scan = False
+        self.mute_scf = True
 
-        self.results_file = 'ts_results.h5'
 
         self.sys_builder_configuration = conf = {
             "name": "vacuum",
@@ -136,26 +138,11 @@ class TransitionStateGuesser():
         Args:
             reactant (Molecule | list[Molecule]): The reactant molecule or a list of reactant molecules.
             product (Molecule | list[Molecule]): The product molecule or a list of product molecules.
-            scf (bool, optional): If True, performs an SCF scan after the MM scan. Defaults to True.
-            reactant_partial_charges (list[float], list[list[float]]): Partial charges for the reactant. Will be calculated if not provided. Defaults to None.
-            product_partial_charges (list[float], list[list[float]]): Partial charges for the product. Will be calculated if not provided. Defaults to None.
-            reparameterize (bool): If True, reparameterizes unknown force constants with the Seminario method. Defaults to True
-            reactant_hessians (np.ndarray, list[np.ndarray]): Hessians for the reactant for the Seminario method. Will be calculated if not provided. Defaults to None.
-            product_hessians (np.ndarray, list[np.ndarray]): Hessians for the product for the Seminario method. Will be calculated if not provided. Defaults to None.
-            mm_opt_constrain_bonds (list[tuple[int, int]]): Bonds to constrain during MM optimization.
-            reactant_total_multiplicity (int): Total multiplicity for the reactant to override calculated value. Defaults to -1.
-            product_total_multiplicity (int): Total multiplicity for the product to override calculated value. Defaults to -1.
-            breaking_bonds (list[tuple[int, int]]): (List of) Bond(s) that is forced to break and is not allowed to recombine over the reaction. Defaults to None.
-            mute_ff_scf (bool): If True, mutes SCF output from RESP calculations. Has no effect if mute_ff_build is True. Defaults to True.
-            optimize_mol (bool): If True, does an xtb optimization of every provided molecule object before reparameterisation. Defaults to False.
-            optimize_ff (bool): If True, does an mm optimization of the combined reactant and product after reparameterisation. Defaults to True.
-            water_model (str): The water model used by the ffbuilder. Only has effect if there is a water molecule involved in the reaction. Defaults to "cspce".
-            
-        Raises:
-            ff_exception: If for whatever reason the force field scan crashes, an exception is raised.
+            constraints: list of constraints to be applied during the scan.
+            **build_forcefields_kwargs: Additional keyword arguments to be passed to the force field builder.
 
         Returns:
-            molecule, dict: molecule object of the guessed transition state and a dictionary with the results of the scan.
+            dict: molecule object of the guessed transition state and a dictionary with the results of the scan.
         """
         self.results = {}
         # Build forcefields and systems
@@ -166,10 +153,10 @@ class TransitionStateGuesser():
         # Scan MM
         self.scan_mm()
 
-        # Scan SCF
-        if self.scf_scan:
+        # Scan QM
+        if self.do_qm_scan:
             # assert False, 'Not implemented yet'
-            self.scan_scf(self.results)
+            self.scan_qm(self.results)
 
         return self.results
 
@@ -244,7 +231,7 @@ class TransitionStateGuesser():
         self.systems, self.topology, _ = sysbuilder.build_systems(
             self.reactant,
             self.product,
-            list(self.lambda_vec),
+            list(self.lambda_vector),
             self.sys_builder_configuration,
             constraints,
         )
@@ -253,7 +240,7 @@ class TransitionStateGuesser():
         self.ostream.flush()
         sysbuilder.save_systems_as_xml(self.systems,
                                        self.folder_name + "/systems")
-        self.results.update({'lambda_vec': self.lambda_vec})
+        self.results.update({'lambda_vec': self.lambda_vector})
 
     def scan_mm(self):
 
@@ -291,7 +278,7 @@ class TransitionStateGuesser():
                 self.ostream.flush()
                 # positions, V, E1, E2, E_int, N_conf = self._run_mm_scan(
                 scan_dict = self._run_mm_scan(
-                    self.lambda_vec,
+                    self.lambda_vector,
                     rea_sim,
                     pro_sim,
                     conformer_search=True,
@@ -300,7 +287,7 @@ class TransitionStateGuesser():
                 )
             else:
                 scan_dict = self._run_mm_scan(
-                    self.lambda_vec,
+                    self.lambda_vector,
                     rea_sim,
                     pro_sim,
                     conformer_search=False,
@@ -314,14 +301,14 @@ class TransitionStateGuesser():
                     scan_dict)
                 if self.peak_conformer_search:
                     peak_index = np.argmax(V)
-                    peak_lambda = self.lambda_vec[peak_index]
+                    peak_lambda = self.lambda_vector[peak_index]
 
                     min_index = max(
                         0,
                         peak_index - self.peak_conformer_search_range,
                     )
                     max_index = min(
-                        len(self.lambda_vec),
+                        len(self.lambda_vector),
                         peak_index + self.peak_conformer_search_range,
                     )
 
@@ -329,19 +316,19 @@ class TransitionStateGuesser():
                         f"Found peak MM E: {V[peak_index]:.3f} at Lambda: {peak_lambda}."
                     )
                     self.ostream.print_info(
-                        f"Doing conformer search from Lambda: {self.lambda_vec[min_index]} to Lambda: {self.lambda_vec[max_index]}."
+                        f"Doing conformer search from Lambda: {self.lambda_vector[min_index]} to Lambda: {self.lambda_vector[max_index]}."
                     )
                     self.ostream.flush()
 
                     searched_conformers_indices.extend(
                         range(min_index, max_index + 1))
                     forward_init_pos = scan_dict[
-                        self.lambda_vec[min_index]][0]['pos']
+                        self.lambda_vector[min_index]][0]['pos']
                     backward_init_pos = scan_dict[
-                        self.lambda_vec[max_index]][0]['pos']
+                        self.lambda_vector[max_index]][0]['pos']
 
                     scan_dict_peak_conf = self._run_mm_scan(
-                        self.lambda_vec[min_index:max_index + 1],
+                        self.lambda_vector[min_index:max_index + 1],
                         rea_sim,
                         pro_sim,
                         conformer_search=True,
@@ -357,7 +344,7 @@ class TransitionStateGuesser():
                     discont_indices = self._check_discontinuities(E1, E2)
 
                     while len(discont_indices) > 0 and len(
-                            searched_conformers_indices) < len(self.lambda_vec):
+                            searched_conformers_indices) < len(self.lambda_vector):
                         self.ostream.flush()
                         self.ostream.print_info(
                             f"Found discontinuities at indices: {discont_indices}."
@@ -370,15 +357,15 @@ class TransitionStateGuesser():
                         searched_conformers_indices = sorted(
                             list(set(searched_conformers_indices)))
                         to_search_lambda = [
-                            self.lambda_vec[i] for i in to_search_indices
+                            self.lambda_vector[i] for i in to_search_indices
                         ]
                         self.ostream.print_info(
                             f"Performing conformer search at lambda values: {to_search_lambda}."
                         )
                         self.ostream.flush()
-                        forward_init_pos = scan_dict[self.lambda_vec[
+                        forward_init_pos = scan_dict[self.lambda_vector[
                             to_search_indices[0]]][0]['pos']
-                        backward_init_pos = scan_dict[self.lambda_vec[
+                        backward_init_pos = scan_dict[self.lambda_vector[
                             to_search_indices[-1]]][0]['pos']
                         scan_dict_discont_conf = self._run_mm_scan(
                             to_search_lambda,
@@ -619,7 +606,7 @@ class TransitionStateGuesser():
 
         return em, e1, e2
 
-    def scan_scf(self, results=None):
+    def scan_qm(self, results=None):
         if results is None:
             results = self.results
         assert_msg_critical(
@@ -627,73 +614,72 @@ class TransitionStateGuesser():
             f'Could not find "scan" in results. Total keys: {results.keys()}',
         )
 
-        self._print_scf_header()
-        scf_energies = []
+        self._print_qm_header()
         ref = None
-        max_scf_energy = None
-        min_scf_conf_index = 0
+        max_qm_energy = None
+        min_qm_conf_index = 0
         try:
             for l, scan in results['scan'].items():
-                min_scf_conf_E = None
+                min_qm_conf_E = None
                 min_conf_index = 0
                 for i, conformer in enumerate(scan):
-                    scf_E = self._get_scf_energy(conformer['xyz'])
+                    qm_E = self._get_qm_energy(conformer['xyz'])
 
-                    results['scan'][l][i]['scf_energy'] = scf_E
-                    if math.isnan(scf_E):
+                    results['scan'][l][i]['qm_energy'] = qm_E
+                    if math.isnan(qm_E):
                         continue
-                    if min_scf_conf_E is None or scf_E < min_scf_conf_E:
-                        min_scf_conf_E = scf_E
+                    if min_qm_conf_E is None or qm_E < min_qm_conf_E:
+                        min_qm_conf_E = qm_E
                         min_conf_index = i
 
                     if ref is None:
-                        ref = scf_E
-                    dif = scf_E - ref
+                        ref = qm_E
+                    dif = qm_E - ref
                     mm_E = results['scan'][l][i]['v']
 
-                    self._print_scf_iter(l, scf_E, mm_E, dif, i)
+                    self._print_qm_iter(l, qm_E, mm_E, dif, i)
 
-                if max_scf_energy is None or min_scf_conf_E > max_scf_energy:
-                    max_scf_energy = min_scf_conf_E
-                    max_scf_lambda = l
-                    min_scf_conf_index = min_conf_index
-                    max_scf_xyz = scan[min_conf_index]['xyz']
+                if max_qm_energy is None or min_qm_conf_E > max_qm_energy:
+                    max_qm_energy = min_qm_conf_E
+                    max_qm_lambda = l
+                    min_qm_conf_index = min_conf_index
+                    max_qm_xyz = scan[min_conf_index]['xyz']
 
             self.ostream.print_blank()
 
             results = {
-                'max_scf_xyz': max_scf_xyz,
-                'max_scf_lambda': max_scf_lambda,
-                'min_scf_conformer_index': min_scf_conf_index,
+                'max_qm_xyz': max_qm_xyz,
+                'max_qm_lambda': max_qm_lambda,
+                'min_qm_conformer_index': min_qm_conf_index,
             }
             self.ostream.print_info(
-                f"Found highest SCF E: {max_scf_energy:.3f} at Lambda: {max_scf_lambda} and conformer index: {min_scf_conf_index}."
+                f"Found highest QM E: {max_qm_energy:.3f} at Lambda: {max_qm_lambda} and conformer index: {min_qm_conf_index}."
             )
             self.ostream.flush()
             self.results.update(results)
 
-            self.molecule = Molecule.read_xyz_string(max_scf_xyz)
+            self.molecule = Molecule.read_xyz_string(max_qm_xyz)
             self.molecule.set_multiplicity(self.mol_multiplicity)
             self.molecule.set_charge(self.mol_charge)
         except Exception as e:
-            self.ostream.print_warning(f"Error in the SCF scan: {e}")
+            self.ostream.print_warning(f"Error in the QM scan: {e}")
             self.ostream.flush()
             self.results.update(results)
         self.save_results(self.results_file, self.results)
         return self.results
 
-    def _get_scf_energy(self, xyz):
+    def _get_qm_energy(self, xyz):
         self.molecule = Molecule.read_xyz_string(xyz)
         self.molecule.set_multiplicity(self.mol_multiplicity)
         self.molecule.set_charge(self.mol_charge)
         if self.scf_drv is None:
             scf_drv = ScfRestrictedDriver()
-            scf_drv.xcfun = self.scf_xcfun
+            scf_drv.xcfun = self.qm_xcfun
             self.scf_drv = scf_drv
 
         if self.mute_scf:
             self.scf_drv.ostream.mute()
-        basis = MolecularBasis.read(self.molecule, self.scf_basis)
+        basis = MolecularBasis.read(self.molecule, self.qm_basis)
         scf_results = self.scf_drv.compute(self.molecule, basis)
 
         if not self.scf_drv.is_converged:
@@ -749,11 +735,11 @@ class TransitionStateGuesser():
                 )
         lambda_vec = [round(float(l), 3) for l in ts_results['lambda_vec']]
 
-        # if there are scf energies, get the best scf energies and everything corresponding to that
+        # if there are qm energies, get the best qm energies and everything corresponding to that
         # otherwise, get the best mm energies
 
-        if ts_results['scan'][0][0].get('scf_energy', None) is not None:
-            final_lambda = round(float(ts_results.get('max_scf_lambda', 0)), 3)
+        if ts_results['scan'][0][0].get('qm_energy', None) is not None:
+            final_lambda = round(float(ts_results.get('max_qm_lambda', 0)), 3)
         else:
             final_lambda = round(float(ts_results['max_mm_lambda']), 3)
 
@@ -797,10 +783,10 @@ class TransitionStateGuesser():
         # options = list(range(0,len(scan[step])+0))
         best_index = 0
         min_energy = None
-        if scan[0][0].get('scf_energy', None) is not None:
+        if scan[0][0].get('qm_energy', None) is not None:
             for i, conf in enumerate(scan[step]):
-                if min_energy is None or conf['scf_energy'] < min_energy:
-                    min_energy = conf['scf_energy']
+                if min_energy is None or conf['qm_energy'] < min_energy:
+                    min_energy = conf['qm_energy']
                     best_index = i
         else:
             for i, conf in enumerate(scan[step]):
@@ -856,41 +842,41 @@ class TransitionStateGuesser():
         y = np.interp(x, lambda_vec, rel_mm_energies)
         fig, ax1 = plt.subplots(figsize=(6.5, 4))
 
-        if scan[0][0].get('scf_energy', None) is not None:
-            scf_energies, _ = TransitionStateGuesser._get_best_scf_E_from_scan_dict(
+        if scan[0][0].get('qm_energy', None) is not None:
+            qm_energies, _ = TransitionStateGuesser._get_best_qm_E_from_scan_dict(
                 scan)
-            scf_min = np.min(scf_energies)
-            rel_scf_energies = np.asarray(scf_energies) - scf_min
+            qm_min = np.min(qm_energies)
+            rel_qm_energies = np.asarray(qm_energies) - qm_min
             print("  {:>9} {:>18} {:>19}  ".format("conformer",
                                                    "MM energy [kJ/mol]",
-                                                   "SCF energy [kJ/mol]"))
+                                                   "QM energy [kJ/mol]"))
 
             for i, conf in enumerate(scan[step]):
                 conf_str = f"{i+1}"
                 mm_e = f"{conf['v'] - mm_min:.3f}"
-                scf_e = f"{conf['scf_energy'] - scf_min:.3f}"
+                qm_e = f"{conf['qm_energy'] - qm_min:.3f}"
 
                 if i + 1 == conformer_id and len(scan[step]) > 1:
                     conf_str_formatted = f"{'-' * (9 - (1 + len(str(conf_str))))} {conf_str}"
                     mm_e_formatted = f"{'-' * (18 - (1 + len(str(mm_e))))} {mm_e}"
-                    scf_e_formatted = f"{'-' * (19 - (1 + len(str(scf_e))))} {scf_e}"
+                    qm_e_formatted = f"{'-' * (19 - (1 + len(str(qm_e))))} {qm_e}"
                     print_str = "{:>1} {:>9} {:>18} {:>19} {:>1}".format(
                         ">",
                         conf_str_formatted,
                         mm_e_formatted,
-                        scf_e_formatted,
+                        qm_e_formatted,
                         "<",
                     )
                 else:
                     print_str = "  {:>9} {:>18} {:>19}  ".format(
                         conf_str,
                         mm_e,
-                        scf_e,
+                        qm_e,
                     )
                 print(print_str)
         else:
             print("  {:>9} {:>19}  ".format("conformer", "MM energy [kJ/mol]"))
-            rel_scf_energies = None
+            rel_qm_energies = None
             for i, conf in enumerate(scan[step]):
                 conf_str = f"{i+1}"
                 mm_e = f"{conf['v'] - mm_min:.3f}"
@@ -939,21 +925,21 @@ class TransitionStateGuesser():
         ax1.set_xlabel(r'$\lambda$')
         ax1.set_ylabel('Relative MM energy [kJ/mol]')
 
-        if rel_scf_energies is not None:
+        if rel_qm_energies is not None:
             ax2 = ax1.twinx()
             ax2.plot(
                 x,
-                np.interp(x, lambda_vec, rel_scf_energies),
+                np.interp(x, lambda_vec, rel_qm_energies),
                 color='darkred',
                 alpha=0.9,
                 linewidth=2.5,
                 linestyle='--',
                 zorder=0,
-                label='SCF energy',
+                label='QM energy',
             )
             ax2.scatter(
                 lambda_vec,
-                rel_scf_energies,
+                rel_qm_energies,
                 alpha=0.7,
                 s=120 / math.log(total_steps, 10),
                 facecolors="none",
@@ -962,14 +948,14 @@ class TransitionStateGuesser():
             )
             ax2.scatter(
                 lambda_vec[lam_index],
-                rel_scf_energies[lam_index],
+                rel_qm_energies[lam_index],
                 marker='o',
                 color='darkorange',
                 alpha=1.0,
                 s=120 / math.log(total_steps, 10),
                 zorder=2,
             )
-            ax2.set_ylabel('Relative SCF energy [kJ/mol]')
+            ax2.set_ylabel('Relative QM energy [kJ/mol]')
 
         fig.legend(loc='upper right',
                    bbox_to_anchor=(1, 1),
@@ -1030,22 +1016,22 @@ class TransitionStateGuesser():
         return V, E1, E2, conf_indices
 
     @staticmethod
-    def _get_best_scf_E_from_scan_dict(scan):
-        scf_energies = []
+    def _get_best_qm_E_from_scan_dict(scan):
+        qm_energies = []
         conf_indices = []
         for conf_scan in scan.values():
-            lowest_scf_e = None
+            lowest_qm_e = None
             index = 0
             for i, conf in enumerate(conf_scan):
-                scf_e = conf.get('scf_energy', None)
-                if scf_e is not None and not math.isnan(scf_e):
-                    if lowest_scf_e is None or scf_e < lowest_scf_e:
-                        lowest_scf_e = scf_e
+                qm_e = conf.get('qm_energy', None)
+                if qm_e is not None and not math.isnan(qm_e):
+                    if lowest_qm_e is None or qm_e < lowest_qm_e:
+                        lowest_qm_e = qm_e
                         index = i
-            scf_energies.append(lowest_scf_e)
+            qm_energies.append(lowest_qm_e)
             conf_indices.append(index)
 
-        return scf_energies, conf_indices
+        return qm_energies, conf_indices
 
     @staticmethod
     def _set_molecule_positions(molecule, positions):
@@ -1094,17 +1080,17 @@ class TransitionStateGuesser():
                               data=min_mm_conformer_index,
                               dtype='i')
 
-            max_scf_xyz = results.get('max_scf_xyz', None)
-            max_scf_lambda = results.get('max_scf_lambda', None)
-            min_scf_conformer_index = results.get('min_scf_conformer_index',
+            max_qm_xyz = results.get('max_qm_xyz', None)
+            max_qm_lambda = results.get('max_qm_lambda', None)
+            min_qm_conformer_index = results.get('min_qm_conformer_index',
                                                   None)
-            if max_scf_xyz is not None:
-                hf.create_dataset('max_scf_xyz', data=[max_scf_xyz])
-                hf.create_dataset('max_scf_lambda',
-                                  data=max_scf_lambda,
+            if max_qm_xyz is not None:
+                hf.create_dataset('max_qm_xyz', data=[max_qm_xyz])
+                hf.create_dataset('max_qm_lambda',
+                                  data=max_qm_lambda,
                                   dtype='f')
-                hf.create_dataset('min_scf_conformer_index',
-                                  data=min_scf_conformer_index,
+                hf.create_dataset('min_qm_conformer_index',
+                                  data=min_qm_conformer_index,
                                   dtype='i')
 
             scan_grp = hf.create_group('scan')
@@ -1112,7 +1098,7 @@ class TransitionStateGuesser():
                 l_grp = scan_grp.create_group(f'{l}')
                 for i, conf in enumerate(conf_scan):
                     conf_grp = l_grp.create_group(str(i))
-                    # v e1 e2 e_int xyz scf
+                    # v e1 e2 e_int xyz qm
                     conf_grp.create_dataset('v', data=conf['v'], dtype='f')
                     conf_grp.create_dataset('e1', data=conf['e1'], dtype='f')
                     conf_grp.create_dataset('e2', data=conf['e2'], dtype='f')
@@ -1120,10 +1106,10 @@ class TransitionStateGuesser():
                                             data=conf['e_int'],
                                             dtype='f')
                     conf_grp.create_dataset('xyz', data=[conf['xyz']])
-                    scf_e = conf.get('scf_energy', None)
-                    if scf_e is not None:
-                        conf_grp.create_dataset('scf_energy',
-                                                data=scf_e,
+                    qm_e = conf.get('qm_energy', None)
+                    if qm_e is not None:
+                        conf_grp.create_dataset('qm_energy',
+                                                data=qm_e,
                                                 dtype='f')
 
     @staticmethod
@@ -1171,13 +1157,13 @@ class TransitionStateGuesser():
             results['max_mm_lambda'] = hf['max_mm_lambda'][()]
             results['min_mm_conformer_index'] = hf['min_mm_conformer_index'][()]
 
-            # Optional SCF results
-            if 'max_scf_xyz' in hf:
-                results['max_scf_xyz'] = hf['max_scf_xyz'][(
+            # Optional QM results
+            if 'max_qm_xyz' in hf:
+                results['max_qm_xyz'] = hf['max_qm_xyz'][(
                 )][0].decode('utf-8')
-                results['max_scf_lambda'] = hf['max_scf_lambda'][()]
-                results['min_scf_conformer_index'] = hf[
-                    'min_scf_conformer_index'][()]
+                results['max_qm_lambda'] = hf['max_qm_lambda'][()]
+                results['min_qm_conformer_index'] = hf[
+                    'min_qm_conformer_index'][()]
 
             # Scan results
             results['scan'] = {}
@@ -1194,8 +1180,8 @@ class TransitionStateGuesser():
                         'e_int': conf_grp['e_int'][()],
                         'xyz': conf_grp['xyz'][()][0].decode('utf-8')
                     }
-                    if 'scf_energy' in conf_grp:
-                        conf['scf_energy'] = conf_grp['scf_energy'][()]
+                    if 'qm_energy' in conf_grp:
+                        conf['qm_energy'] = conf_grp['qm_energy'][()]
                     conf_scan.append(conf)
                 results['scan'][float(l)] = conf_scan
 
@@ -1246,15 +1232,15 @@ class TransitionStateGuesser():
         self.ostream.print_header(valstr)
         self.ostream.flush()
 
-    def _print_scf_header(self):
+    def _print_qm_header(self):
         if self.mute_scf:
             self.ostream.print_info("Disable mute_scf to see detailed output.")
         self.ostream.print_blank()
-        self.ostream.print_header(f"Starting SCF scan")
+        self.ostream.print_header(f"Starting QM scan")
         self.ostream.print_blank()
-        self.ostream.print_header("SCF parameters:")
-        self.ostream.print_header(f"basis:       {self.scf_basis:>10}")
-        self.ostream.print_header(f"DFT xc fun:  {self.scf_xcfun:>10}")
+        self.ostream.print_header("QM parameters:")
+        self.ostream.print_header(f"basis:       {self.qm_basis:>10}")
+        self.ostream.print_header(f"DFT xc fun:  {self.qm_xcfun:>10}")
         self.ostream.print_blank()
         self.ostream.flush()
         valsltr = '{} | {} | {} | {}'.format(
@@ -1267,7 +1253,7 @@ class TransitionStateGuesser():
         self.ostream.print_header(60 * '-')
         self.ostream.flush()
 
-    def _print_scf_iter(self, l, scf_E, mm_E, dif, conf_index):
+    def _print_qm_iter(self, l, qm_E, mm_E, dif, conf_index):
 
         valstr = "{:6.2f}   {:7d}   {:15.3f}   {:14.3f}".format(
             l, conf_index + 1, dif, mm_E)

@@ -30,7 +30,7 @@ class TestTransitionStateGuesser:
         ts_guesser.scf_basis = "STO-3G"
         ts_guesser.mm_steps = 200
         ts_guesser.lambda_vec = [0, 0.2, 0.4, 0.45, 0.5, 0.55, 0.6, 0.8, 1.0]
-        results = ts_guesser.find_TS(rea, pro)
+        results = ts_guesser.find_transition_state(rea, pro)
         folder = Path(__file__).parent / 'data'
 
         reference_results = EvbDriver._load_dict_from_h5(

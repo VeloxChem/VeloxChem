@@ -183,7 +183,7 @@ class TestReactionMatcher:
             pro_smiles=[pro_smiles_alt],
         )
         assert breaking_bonds == set()
-        assert breaking_bonds == {(11, 58), (7, 59)}
+        assert forming_bonds == {(11, 58), (7, 59)}
 
     @pytest.mark.timeconsuming
     def test_copper_complex_2(self):
