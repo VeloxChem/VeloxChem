@@ -549,9 +549,12 @@ def main():
         rsp_dict['filename'] = task.input_dict['filename']
 
         grad_dict = (task.input_dict['gradient']
-                         if 'gradient' in task.input_dict else {})
+                     if 'gradient' in task.input_dict else {})
 
-        run_excited_state_vibanalysis = ('state_deriv_index' in grad_dict)
+        isotopes = (task.input_dict['isotopes']
+                    if 'isotopes' in task.input_dict else None)
+
+        run_excited_state_vibanalysis = ('state_deriv_index' in vib_dict)
         run_ground_state_vibanalysis = (not run_excited_state_vibanalysis)
 
         if use_xtb:
@@ -563,10 +566,11 @@ def main():
                                             hessian_dict=hessian_dict,
                                             cphf_dict=orbrsp_dict,
                                             rsp_dict=rsp_dict,
-                                            polgrad_dict=polgrad_dict)
+                                            polgrad_dict=polgrad_dict,
+                                            isotopes=isotopes)
 
         else:
-            if run_ground_state_vibanalysis: 
+            if run_ground_state_vibanalysis:
                 vibrational_drv = VibrationalAnalysis(scf_drv)
                 # set print level for input file based calculation
                 vibrational_drv.print_level = 2
@@ -575,7 +579,8 @@ def main():
                                                 hessian_dict=hessian_dict,
                                                 cphf_dict=orbrsp_dict,
                                                 rsp_dict=rsp_dict,
-                                                polgrad_dict=polgrad_dict)
+                                                polgrad_dict=polgrad_dict,
+                                                isotopes=isotopes)
             elif run_excited_state_vibanalysis:
                 assert_msg_critical(
                     rsp_dict['property'].lower() in ['absorption', 'uv-vis', 'ecd'],
@@ -595,7 +600,8 @@ def main():
                                                 hessian_dict=hessian_dict,
                                                 cphf_dict=orbrsp_dict,
                                                 rsp_dict=rsp_dict,
-                                                polgrad_dict=polgrad_dict)
+                                                polgrad_dict=polgrad_dict,
+                                                isotopes=isotopes)
 
         vib_results = vibrational_drv.compute(task.molecule, task.ao_basis)
 
@@ -704,7 +710,10 @@ def main():
                 rsp_dict['filename'] = task.input_dict['filename']
 
                 grad_dict = (task.input_dict['gradient']
-                                 if 'gradient' in task.input_dict else {})
+                             if 'gradient' in task.input_dict else {})
+                isotopes = (task.input_dict['isotopes']
+                            if 'isotopes' in task.input_dict else None)
+
                 vibrational_drv = VibrationalAnalysis(scf_drv,
                                                       rsp_prop._rsp_driver)
                 # set print level for input file based calculation
@@ -714,7 +723,8 @@ def main():
                                                 hessian_dict=hessian_dict,
                                                 cphf_dict=orbrsp_dict,
                                                 rsp_dict=rsp_dict,
-                                                polgrad_dict=polgrad_dict)
+                                                polgrad_dict=polgrad_dict,
+                                                isotopes=isotopes)
 
                 vib_results = vibrational_drv.compute(task.molecule, task.ao_basis)
 

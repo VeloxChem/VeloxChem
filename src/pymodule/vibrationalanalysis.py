@@ -141,9 +141,12 @@ class VibrationalAnalysis:
         self.rr_damping = None
         self.frequencies = (0,)
 
-        # List of atomic masses in amu used to allow 
+        # List of atomic masses in amu used to allow
         # isotope vibrational analysis via geomeTRIC
         self.masses = None
+
+        # Dictionary to define the isotopes
+        self.isotopes = None
 
         # Excited-state index in case of
         # excited-state vibrational analysis.
@@ -245,7 +248,8 @@ class VibrationalAnalysis:
                         hessian_dict=None,
                         cphf_dict=None,
                         rsp_dict=None,
-                        polgrad_dict=None):
+                        polgrad_dict=None,
+                        isotopes=None):
         """
         Updates settings in HessianDriver.
 
@@ -261,6 +265,9 @@ class VibrationalAnalysis:
         :param polgrad_dict:
             The input dictionary for the polarizability gradient
             (needed to compute Raman activity).
+        :param isotopes:
+            The dictionary defining the isotope masses for
+            isotope vibrational analysis.
         """
 
         if method_dict is None:
@@ -295,6 +302,9 @@ class VibrationalAnalysis:
         self.cphf_dict = dict(cphf_dict)
         self.rsp_dict = dict(rsp_dict)
         self.polgrad_dict = dict(polgrad_dict)
+
+        if isotopes is not None:
+            self.isotopes = dict(isotopes)
 
     def compute(self, molecule, ao_basis=None, min_basis=None):
         """
@@ -405,8 +415,28 @@ class VibrationalAnalysis:
         elem = molecule.get_labels()
         coords = molecule.get_coordinates_in_bohr().reshape(natm * 3)
 
+        if self.masses is None:
+            self.masses = molecule.get_masses()
+            # modify masses according to the isotopes
+            # dictionary (element, or element and index)
+            if self.isotopes is not None:
+                for index, symbol in enumerate(elem):
+                    symbol_index = "%s%d" % (symbol, index + 1)
+                    lower_symbol = symbol.lower()
+                    lower_index = "%s%d" % (lower_symbol, index + 1)
+                    if symbol in self.isotopes:
+                        self.masses[index] = self.isotopes[symbol]
+                    elif symbol_index in self.isotopes:
+                        self.masses[index] = self.isotopes[symbol_index]
+                    # If isotopes is read from input, the symbol will be lowercase
+                    # and the mass will be a string which has to be converted to float.
+                    elif lower_symbol in self.isotopes:
+                        self.masses[index] = float(self.isotopes[lower_symbol])
+                    elif lower_index in self.isotopes:
+                        self.masses[index] = float(self.isotopes[lower_index])
+
         # Check if masses have been provided for all atoms in the molecule
-        if self.masses is not None:
+        else:
             err_msg = "VibrationalAnalysis: the number of atoms in the molecule"
             err_msg += " does not match the number of atomic masses provided."
             assert_msg_critical(len(elem) == len(self.masses), err_msg)
