@@ -91,9 +91,9 @@ class TransitionStateGuesser():
         self.lambda_vector = list(np.round(np.linspace(0, 1, 21), 3))
         self.mute_ff_build = True
         timing_str = str(int(time.time()))
-        self.folder_name = f'ts_data_{timing_str}' 
+        self.folder_name = f'ts_data_{timing_str}'
         self.results_file = f'ts_results_{timing_str}.h5'
-        
+
         self.mm_temperature = 600
         self.mm_steps = 1000
         self.conformer_snapshots = 10
@@ -105,13 +105,12 @@ class TransitionStateGuesser():
         self.peak_conformer_search_range = 1
         self.mm_conformer_equivalence_threshold = 1e-1  # kJ/mol
         self.mm_scan_backward = False
-        
+
         self.scf_drv = None
         self.qm_xcfun = "PBE0"
         self.qm_basis = 'def2-svp'
         self.do_qm_scan = False
         self.mute_scf = True
-
 
         self.sys_builder_configuration = conf = {
             "name": "vacuum",
@@ -122,8 +121,7 @@ class TransitionStateGuesser():
             "soft_core_lj_int": False,
         }
 
-        self.ffbuilder = ReactionForceFieldBuilder()
-        # override default options in the ffbuilder
+        self.ffbuilder = ReactionForceFieldBuilder(ostream=self.ostream)
         self.ffbuilder.calculate_resp = False
 
     def find_transition_state(
@@ -160,10 +158,7 @@ class TransitionStateGuesser():
 
         return self.results
 
-    def build_forcefields(self,
-                          reactant,
-                          product,
-                          **build_forcefields_kwargs):
+    def build_forcefields(self, reactant, product, **build_forcefields_kwargs):
         if self.mute_ff_build:
             self.ostream.print_info(
                 "Building forcefields. Disable mute_ff_build to see detailed output."
@@ -204,7 +199,7 @@ class TransitionStateGuesser():
             self.reactant, f"{self.folder_name}/reactant.json")
         self.product.save_forcefield_as_json(
             self.product, f"{self.folder_name}/product.json")
-        
+
         rea_bonds = set(self.reactant.bonds.keys())
         pro_bonds = set(self.product.bonds.keys())
         static_bonds = rea_bonds & pro_bonds
@@ -217,8 +212,8 @@ class TransitionStateGuesser():
         })
 
         return self.results
-    
-    def build_systems(self,constraints=None):
+
+    def build_systems(self, constraints=None):
         sysbuilder = EvbSystemBuilder()
         if self.mute_ff_build:
             sysbuilder.ostream.mute()
@@ -226,7 +221,6 @@ class TransitionStateGuesser():
                 "Building MM systems for the transition state guess. Disable mute_ff_build to see detailed output."
             )
             self.ostream.flush()
-
 
         self.systems, self.topology, _ = sysbuilder.build_systems(
             self.reactant,
@@ -344,7 +338,8 @@ class TransitionStateGuesser():
                     discont_indices = self._check_discontinuities(E1, E2)
 
                     while len(discont_indices) > 0 and len(
-                            searched_conformers_indices) < len(self.lambda_vector):
+                            searched_conformers_indices) < len(
+                                self.lambda_vector):
                         self.ostream.flush()
                         self.ostream.print_info(
                             f"Found discontinuities at indices: {discont_indices}."
@@ -746,7 +741,7 @@ class TransitionStateGuesser():
         forming_bonds = set(ts_results.get('forming_bonds', None))
         breaking_bonds = set(ts_results.get('breaking_bonds', None))
         bonds = set(ts_results.get('static_bonds', None))
-        
+
         ipywidgets.interact(
             TransitionStateGuesser._show_lambda_iteration,
             step=ipywidgets.SelectionSlider(
@@ -969,9 +964,10 @@ class TransitionStateGuesser():
         mol = Molecule.read_xyz_string(xyz_i)
         offset = 0.07
         add = 0.1
-        breaking_width = offset + add * (1-step)
+        breaking_width = offset + add * (1 - step)
         forming_width = offset + add * (step)
-        if bonds is not None and (forming_bonds is not None or breaking_bonds is not None):
+        if bonds is not None and (forming_bonds is not None
+                                  or breaking_bonds is not None):
             mol.show(
                 bonds=bonds,
                 forming_bonds=list(forming_bonds),
@@ -984,7 +980,6 @@ class TransitionStateGuesser():
             )
         else:
             mol.show(width=640, height=360, **mol_show_kwargs)
-
 
     def _mm_to_xyz_str(self, positions, molecule=None):
         if molecule is None:
@@ -1082,8 +1077,7 @@ class TransitionStateGuesser():
 
             max_qm_xyz = results.get('max_qm_xyz', None)
             max_qm_lambda = results.get('max_qm_lambda', None)
-            min_qm_conformer_index = results.get('min_qm_conformer_index',
-                                                  None)
+            min_qm_conformer_index = results.get('min_qm_conformer_index', None)
             if max_qm_xyz is not None:
                 hf.create_dataset('max_qm_xyz', data=[max_qm_xyz])
                 hf.create_dataset('max_qm_lambda',
@@ -1159,8 +1153,7 @@ class TransitionStateGuesser():
 
             # Optional QM results
             if 'max_qm_xyz' in hf:
-                results['max_qm_xyz'] = hf['max_qm_xyz'][(
-                )][0].decode('utf-8')
+                results['max_qm_xyz'] = hf['max_qm_xyz'][()][0].decode('utf-8')
                 results['max_qm_lambda'] = hf['max_qm_lambda'][()]
                 results['min_qm_conformer_index'] = hf[
                     'min_qm_conformer_index'][()]

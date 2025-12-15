@@ -256,7 +256,7 @@ class SolvationFepDriver:
             A dictionary containing the free energy calculations and the uncertainty for each stage, and the final free energy.
         """
 
-        if system_pdb == None:
+        if system_pdb is None:
             self.ostream.print_info(f"No system_pdb provided, using SolvationBuilder to solvate the system with {solvent} solvent")
             self.ostream.flush()
             molecule = Molecule.read_pdb_file(solute_pdb)
@@ -710,7 +710,7 @@ class SolvationFepDriver:
     
     def _recalculate_energies(self, forcefields, topology):
         snapshots = self.snapshots
-        u_kn = np.zeros((len(forcefields), sum(self.N_k)), np.float64)
+        u_kn = np.zeros((len(forcefields), sum(self.N_k)), dtype=np.float64)
 
         for k, forcefield in enumerate(forcefields):
             self.ostream.print_info(f"Recalculating energies for Forcefield {k}...")

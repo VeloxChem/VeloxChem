@@ -52,7 +52,7 @@ class TestScfHessianDriver:
                 np.abs(vibanalysis_drv.ir_intensities / ref_ir_intensities -
                        1.0))
             rel_diff_raman = np.max(
-                np.abs(vibanalysis_drv.raman_activities[0.0] /
+                np.abs(vibanalysis_drv.raman_activities[0] /
                        ref_raman_activities - 1.0))
 
             assert diff_hessian < 1.0e-5

@@ -1067,11 +1067,6 @@ integrateExcHessianForGgaOpenShell(const CMolecule&        molecule,
     std::vector<std::vector<double>> omp_v2rhosigma_data(nthreads, std::vector<double>(dim->v2rhosigma * omp_max_npoints));
     std::vector<std::vector<double>> omp_v2sigma2_data(nthreads, std::vector<double>(dim->v2sigma2 * omp_max_npoints));
 
-    std::vector<std::vector<double>> omp_weighted_vrho(nthreads, std::vector<double>(omp_max_npoints));
-    std::vector<std::vector<double>> omp_weighted_vnabla_x(nthreads, std::vector<double>(omp_max_npoints));
-    std::vector<std::vector<double>> omp_weighted_vnabla_y(nthreads, std::vector<double>(omp_max_npoints));
-    std::vector<std::vector<double>> omp_weighted_vnabla_z(nthreads, std::vector<double>(omp_max_npoints));
-
     // coordinates and weights of grid points
 
     auto xcoords = molecularGrid.getCoordinatesX();
@@ -1291,16 +1286,6 @@ integrateExcHessianForGgaOpenShell(const CMolecule&        molecule,
             auto v2rhosigma = omp_v2rhosigma_data[thread_id].data();
             auto v2sigma2   = omp_v2sigma2_data[thread_id].data();
 
-            auto w_a_0 = omp_weighted_vrho[thread_id].data();
-            auto w_a_x = omp_weighted_vnabla_x[thread_id].data();
-            auto w_a_y = omp_weighted_vnabla_y[thread_id].data();
-            auto w_a_z = omp_weighted_vnabla_z[thread_id].data();
-
-            auto w_b_0 = omp_weighted_vrho[thread_id].data();
-            auto w_b_x = omp_weighted_vnabla_x[thread_id].data();
-            auto w_b_y = omp_weighted_vnabla_y[thread_id].data();
-            auto w_b_z = omp_weighted_vnabla_z[thread_id].data();
-
             sdengridgen::serialGenerateDensityForGGA(rho, rhograd, sigma, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, gs_sub_dens_mat_a, gs_sub_dens_mat_b);
 
             // generate density gradient grid
@@ -1443,31 +1428,6 @@ integrateExcHessianForGgaOpenShell(const CMolecule&        molecule,
             auto chi_zzz_val = mat_chi_zzz.values();
 
             auto gatm = molhess_threads.row(thread_id);
-
-            // prepare w0, wx, wy and wz
-
-            #pragma omp simd 
-            for (int g = 0; g < grid_batch_size; g++)
-            {
-                w_a_0[g] = local_weights[g] * vrho[2 * g + 0];
-                w_b_0[g] = local_weights[g] * vrho[2 * g + 1];
-
-                auto vxa = 2.0 * vsigma[3 * g + 0] * rhograd[6 * g + 0] + vsigma[3 * g + 1] * rhograd[6 * g + 3];
-                auto vya = 2.0 * vsigma[3 * g + 0] * rhograd[6 * g + 1] + vsigma[3 * g + 1] * rhograd[6 * g + 4];
-                auto vza = 2.0 * vsigma[3 * g + 0] * rhograd[6 * g + 2] + vsigma[3 * g + 1] * rhograd[6 * g + 5];
-
-                w_a_x[g] = local_weights[g] * vxa;
-                w_a_y[g] = local_weights[g] * vya;
-                w_a_z[g] = local_weights[g] * vza;
-
-                auto vxb = 2.0 * vsigma[3 * g + 2] * rhograd[6 * g + 3] + vsigma[3 * g + 1] * rhograd[6 * g + 0];
-                auto vyb = 2.0 * vsigma[3 * g + 2] * rhograd[6 * g + 4] + vsigma[3 * g + 1] * rhograd[6 * g + 1];
-                auto vzb = 2.0 * vsigma[3 * g + 2] * rhograd[6 * g + 5] + vsigma[3 * g + 1] * rhograd[6 * g + 2];
-
-                w_b_x[g] = local_weights[g] * vxb;
-                w_b_y[g] = local_weights[g] * vyb;
-                w_b_z[g] = local_weights[g] * vzb;
-            }
 
             // prepare gradient grid
 

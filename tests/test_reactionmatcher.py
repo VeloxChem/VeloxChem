@@ -51,6 +51,7 @@ class TestReactionMatcher:
             pro_charges.append(q)
 
         evb = EvbDriver()
+        evb.ostream.mute()
         evb.ffbuilder.reparameterize_bonds = False
         evb.ffbuilder.optimize_ff = False
         evb.build_ff_from_molecules(

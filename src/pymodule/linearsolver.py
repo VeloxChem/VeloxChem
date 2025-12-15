@@ -188,7 +188,7 @@ class LinearSolver:
         self.memory_tracing = False
 
         # verbosity of output (1-3)
-        self.print_level = 2
+        self.print_level = 1
 
         # program end time for graceful exit
         self.program_end_time = None
@@ -442,7 +442,7 @@ class LinearSolver:
             grid_t0 = tm.time()
             molgrid = grid_drv.generate(molecule, self._xcfun_ldstaging)
             n_grid_points = molgrid.number_of_points()
-            if not silent:
+            if (not silent) and (self.print_level > 1):
                 self.ostream.print_info(
                     'Molecular grid with {0:d} points generated in {1:.2f} sec.'
                     .format(n_grid_points,
@@ -473,7 +473,7 @@ class LinearSolver:
             'dft_func_label': dft_func_label,
         }
 
-    def _init_pe(self, molecule, basis):
+    def _init_pe(self, molecule, basis, silent=False):
         """
         Initializes polarizable embedding.
 
@@ -502,10 +502,11 @@ class LinearSolver:
 
             # TODO: print PyFraME info
 
-            pot_info = 'Reading polarizable embedding: {}'.format(
-                self.pe_options['potfile'])
-            self.ostream.print_info(pot_info)
-            self.ostream.print_blank()
+            if not silent:
+                pot_info = 'Reading polarizable embedding: {}'.format(
+                    self.pe_options['potfile'])
+                self.ostream.print_info(pot_info)
+                self.ostream.print_blank()
 
             with open(str(self.pe_options['potfile']), 'r') as f_pot:
                 potfile_text = '\n'.join(f_pot.readlines())
@@ -540,11 +541,12 @@ class LinearSolver:
 
             self.cpcm_drv.init(molecule, do_nuclear=False)
 
-            self.ostream.print_info(
-                f'C-PCM grid with {self.cpcm_drv._cpcm_grid.shape[0]} points generated '
-                + f'in {tm.time() - cpcm_grid_t0:.2f} sec.')
-            self.ostream.print_blank()
-            self.ostream.flush()
+            if self.print_level > 1:
+                self.ostream.print_info(
+                    f'C-PCM grid with {self.cpcm_drv._cpcm_grid.shape[0]} points '
+                    + f'generated in {tm.time() - cpcm_grid_t0:.2f} sec.')
+                self.ostream.print_blank()
+                self.ostream.flush()
 
     def _read_checkpoint(self, rsp_vector_labels):
         """
@@ -693,8 +695,8 @@ class LinearSolver:
                                              dft_dict, pe_dict, profiler)
             else:
                 # TODO: enable subcomms for unrestricted
-                assert_msg_critical(False,
-                    'LinearSolver._e2n_half_size: '
+                assert_msg_critical(
+                    False, 'LinearSolver._e2n_half_size: '
                     'Cannot use subcomms for unrestricted case')
         else:
             if method_type == 'restricted':
@@ -751,6 +753,8 @@ class LinearSolver:
 
         n_total = n_general + n_extra_ger + n_extra_ung
 
+        prep_t0 = tm.time()
+
         # prepare molecular orbitals
 
         if self.rank == mpi_master():
@@ -775,6 +779,14 @@ class LinearSolver:
                     range(nocc, norb))
                 mo_core_exc = mo[:, core_exc_orb_inds]
                 fa_mo = np.linalg.multi_dot([mo_core_exc.T, fa, mo_core_exc])
+            elif getattr(self, 'restricted_subspace', False):
+                core_val_exc_inds = (
+                    list(range(self.num_core_orbitals)) +
+                    list(range(nocc - self.num_valence_orbitals, nocc)) +
+                    list(range(nocc, nocc + self.num_virtual_orbitals)))
+                mo_core_val_exc = mo[:, core_val_exc_inds]
+                fa_mo = np.linalg.multi_dot(
+                    [mo_core_val_exc.T, fa, mo_core_val_exc])
             else:
                 fa_mo = np.linalg.multi_dot([mo.T, fa, mo])
 
@@ -795,6 +807,11 @@ class LinearSolver:
                     continue
 
                 n_subcomms = self.nodes // subcomm_size
+
+                # make sure that number of subcomms does not exceed number
+                # of trial vectors
+                if n_subcomms > n_total:
+                    continue
 
                 ave, res = divmod(n_total, n_subcomms)
                 counts = [
@@ -850,14 +867,23 @@ class LinearSolver:
         if n_total % batch_size != 0:
             num_batches += 1
 
+        if profiler is not None:
+            profiler.add_timing_info('PreProc', tm.time() - prep_t0)
+
+        vecs_e2_ger_data = None
+        vecs_e2_ung_data = None
+
         # go through batches
 
-        if self.rank == mpi_master():
-            batch_str = f'Processing {n_total} Fock builds'
+        if self.rank == mpi_master() and self.print_level > 1:
+            batch_str = f'Processing {n_total} Fock build'
+            if n_total > 1:
+                batch_str += 's'
             if batch_size > 1:
                 batch_str += f' on {batch_size} subcommunicators'
             batch_str += '...'
             self.ostream.print_info(batch_str)
+            self.ostream.print_blank()
             self.ostream.flush()
 
         if self._debug:
@@ -883,6 +909,10 @@ class LinearSolver:
                 kns = []
 
             vec_list = [None for idx in range(len(local_master_ranks))]
+
+            # TODO: use Alltoallv
+
+            prep_t0 = tm.time()
 
             e2_ger, e2_ung = None, None
             fock_ger, fock_ung = None, None
@@ -931,7 +961,12 @@ class LinearSolver:
 
             self.comm.barrier()
 
+            if profiler is not None:
+                profiler.add_timing_info('PreProc', tm.time() - prep_t0)
+
             if subcomm_index + batch_start < batch_end:
+
+                prep_t0 = tm.time()
 
                 local_master_rank = local_master_ranks[subcomm_index]
 
@@ -952,6 +987,22 @@ class LinearSolver:
                         mo_core_exc = mo[:, core_exc_orb_inds]
                         dak = np.linalg.multi_dot(
                             [mo_core_exc, dak, mo_core_exc.T])
+                    elif getattr(self, 'restricted_subspace', False):
+                        kn = self.lrvec2mat(vec, nocc, norb,
+                                            self.num_core_orbitals,
+                                            self.num_valence_orbitals,
+                                            self.num_virtual_orbitals)
+                        dak = self.commut_mo_density(kn, nocc,
+                                                     self.num_core_orbitals,
+                                                     self.num_valence_orbitals,
+                                                     self.num_virtual_orbitals)
+                        core_val_exc_inds = (
+                            list(range(self.num_core_orbitals)) + list(
+                                range(nocc - self.num_valence_orbitals, nocc)) +
+                            list(range(nocc, nocc + self.num_virtual_orbitals)))
+                        mo_core_val_exc = mo[:, core_val_exc_inds]
+                        dak = np.linalg.multi_dot(
+                            [mo_core_val_exc, dak, mo_core_val_exc.T])
                     else:
                         kn = self.lrvec2mat(vec, nocc, norb)
                         dak = self.commut_mo_density(kn, nocc)
@@ -962,11 +1013,21 @@ class LinearSolver:
                 else:
                     dks = None
 
+                if profiler is not None:
+                    profiler.add_timing_info('PreProc', tm.time() - prep_t0)
+
                 # form Fock matrices
 
                 fock = self._comp_lr_fock(dks, molecule, basis, eri_dict,
                                           dft_dict, pe_dict, profiler,
                                           local_comm)
+
+                if profiler is not None:
+                    # only increment FockCount on local master
+                    if is_local_master:
+                        profiler.add_timing_info('_FockCount_', 1)
+
+                prep_t0 = tm.time()
 
                 if is_local_master:
                     raw_fock_ger = []
@@ -1016,6 +1077,17 @@ class LinearSolver:
                             mo_core_exc = mo[:, core_exc_orb_inds]
                             fak_mo = np.linalg.multi_dot(
                                 [mo_core_exc.T, fak, mo_core_exc])
+                        elif getattr(self, 'restricted_subspace', False):
+                            core_val_exc_inds = (
+                                list(range(self.num_core_orbitals)) + list(
+                                    range(nocc - self.num_valence_orbitals,
+                                          nocc)) +
+                                list(
+                                    range(nocc,
+                                          nocc + self.num_virtual_orbitals)))
+                            mo_core_val_exc = mo[:, core_val_exc_inds]
+                            fak_mo = np.linalg.multi_dot(
+                                [mo_core_val_exc.T, fak, mo_core_val_exc])
                         else:
                             fak_mo = np.linalg.multi_dot([mo.T, fak, mo])
 
@@ -1029,6 +1101,15 @@ class LinearSolver:
                             gmo_vec_halfsize = self.lrmat2vec(
                                 gmo, nocc, norb,
                                 self.num_core_orbitals)[:half_size]
+                        elif getattr(self, 'restricted_subspace', False):
+                            gmo = -self.commut_mo_density(
+                                fat_mo, nocc, self.num_core_orbitals,
+                                self.num_valence_orbitals,
+                                self.num_virtual_orbitals)
+                            gmo_vec_halfsize = self.lrmat2vec(
+                                gmo, nocc, norb, self.num_core_orbitals,
+                                self.num_valence_orbitals,
+                                self.num_virtual_orbitals)[:half_size]
                         else:
                             gmo = -self.commut_mo_density(fat_mo, nocc)
                             gmo_vec_halfsize = self.lrmat2vec(gmo, nocc,
@@ -1048,20 +1129,43 @@ class LinearSolver:
                             if self.nonlinear:
                                 fock_ung[:, ifock - batch_ger] = fak_mo_vec
 
+                if profiler is not None:
+                    profiler.add_timing_info('PostProc', tm.time() - prep_t0)
+
             self.comm.barrier()
+
+            prep_t0 = tm.time()
+
+            # TODO: use Alltoallv
+
+            local_e2_ger_data = None
+            local_e2_ung_data = None
 
             for idx, local_master_rank in enumerate(local_master_ranks):
 
                 if idx + batch_start >= batch_end:
                     break
 
-                vecs_e2_ger = DistributedArray(e2_ger,
+                dist_e2_ger = DistributedArray(e2_ger,
                                                self.comm,
                                                root=local_master_rank)
-                vecs_e2_ung = DistributedArray(e2_ung,
+                dist_e2_ung = DistributedArray(e2_ung,
                                                self.comm,
                                                root=local_master_rank)
-                self._append_sigma_vectors(vecs_e2_ger, vecs_e2_ung)
+
+                # Note: accumulate per-rank data to avoid incremental appending
+
+                if local_e2_ger_data is None:
+                    local_e2_ger_data = dist_e2_ger.data.copy()
+                else:
+                    local_e2_ger_data = np.hstack(
+                        (local_e2_ger_data, dist_e2_ger.data))
+
+                if local_e2_ung_data is None:
+                    local_e2_ung_data = dist_e2_ung.data.copy()
+                else:
+                    local_e2_ung_data = np.hstack(
+                        (local_e2_ung_data, dist_e2_ung.data))
 
                 if self.nonlinear:
                     dist_fock_ger = DistributedArray(fock_ger,
@@ -1070,11 +1174,44 @@ class LinearSolver:
                     dist_fock_ung = DistributedArray(fock_ung,
                                                      self.comm,
                                                      root=local_master_rank)
+                    # TODO: avoid incremental append
                     self._append_fock_matrices(dist_fock_ger, dist_fock_ung)
+
+            # Note: accumulate per-batch data to avoid incremental appending
+
+            if vecs_e2_ger_data is None:
+                vecs_e2_ger_data = local_e2_ger_data.copy()
+            else:
+                vecs_e2_ger_data = np.hstack(
+                    (vecs_e2_ger_data, local_e2_ger_data))
+
+            if vecs_e2_ung_data is None:
+                vecs_e2_ung_data = local_e2_ung_data.copy()
+            else:
+                vecs_e2_ung_data = np.hstack(
+                    (vecs_e2_ung_data, local_e2_ung_data))
+
+            if profiler is not None:
+                profiler.add_timing_info('PostProc', tm.time() - prep_t0)
+
+        prep_t0 = tm.time()
+
+        # Note: append sigma and trial vectors only once
+
+        vecs_e2_ger = DistributedArray(vecs_e2_ger_data,
+                                       self.comm,
+                                       distribute=False)
+
+        vecs_e2_ung = DistributedArray(vecs_e2_ung_data,
+                                       self.comm,
+                                       distribute=False)
+
+        self._append_sigma_vectors(vecs_e2_ger, vecs_e2_ung)
 
         self._append_trial_vectors(vecs_ger, vecs_ung)
 
-        self.ostream.print_blank()
+        if profiler is not None:
+            profiler.add_timing_info('AppendVec', tm.time() - prep_t0)
 
     def _e2n_half_size_single_comm(self,
                                    vecs_ger,
@@ -1119,6 +1256,8 @@ class LinearSolver:
         n_extra_ger = n_ger - n_general
         n_extra_ung = n_ung - n_general
 
+        prep_t0 = tm.time()
+
         # prepare molecular orbitals
 
         if self.rank == mpi_master():
@@ -1143,6 +1282,14 @@ class LinearSolver:
                     range(nocc, norb))
                 mo_core_exc = mo[:, core_exc_orb_inds]
                 fa_mo = np.linalg.multi_dot([mo_core_exc.T, fa, mo_core_exc])
+            elif getattr(self, 'restricted_subspace', False):
+                core_val_exc_inds = (
+                    list(range(self.num_core_orbitals)) +
+                    list(range(nocc - self.num_valence_orbitals, nocc)) +
+                    list(range(nocc, nocc + self.num_virtual_orbitals)))
+                mo_core_val_exc = mo[:, core_val_exc_inds]
+                fa_mo = np.linalg.multi_dot(
+                    [mo_core_val_exc.T, fa, mo_core_val_exc])
             else:
                 fa_mo = np.linalg.multi_dot([mo.T, fa, mo])
 
@@ -1155,14 +1302,21 @@ class LinearSolver:
         batch_size = get_batch_size(self.batch_size, n_total, n_ao, self.comm)
         num_batches = get_number_of_batches(n_total, batch_size, self.comm)
 
+        if profiler is not None:
+            profiler.add_timing_info('PreProc', tm.time() - prep_t0)
+
+        vecs_e2_ger_data = None
+        vecs_e2_ung_data = None
+
         # go through batches
 
-        if self.rank == mpi_master():
+        if self.rank == mpi_master() and self.print_level > 1:
             batch_str = f'Processing {n_total} Fock build'
             if n_total > 1:
                 batch_str += 's'
             batch_str += '...'
             self.ostream.print_info(batch_str)
+            self.ostream.print_blank()
             self.ostream.flush()
 
         if self._debug:
@@ -1188,6 +1342,8 @@ class LinearSolver:
                 kns = []
             else:
                 dks = None
+
+            prep_t0 = tm.time()
 
             for col in range(batch_start, batch_end):
 
@@ -1237,6 +1393,22 @@ class LinearSolver:
                         mo_core_exc = mo[:, core_exc_orb_inds]
                         dak = np.linalg.multi_dot(
                             [mo_core_exc, dak, mo_core_exc.T])
+                    elif getattr(self, 'restricted_subspace', False):
+                        kn = self.lrvec2mat(vec, nocc, norb,
+                                            self.num_core_orbitals,
+                                            self.num_valence_orbitals,
+                                            self.num_virtual_orbitals)
+                        dak = self.commut_mo_density(kn, nocc,
+                                                     self.num_core_orbitals,
+                                                     self.num_valence_orbitals,
+                                                     self.num_virtual_orbitals)
+                        core_val_exc_inds = (
+                            list(range(self.num_core_orbitals)) + list(
+                                range(nocc - self.num_valence_orbitals, nocc)) +
+                            list(range(nocc, nocc + self.num_virtual_orbitals)))
+                        mo_core_val_exc = mo[:, core_val_exc_inds]
+                        dak = np.linalg.multi_dot(
+                            [mo_core_val_exc, dak, mo_core_val_exc.T])
                     else:
                         kn = self.lrvec2mat(vec, nocc, norb)
                         dak = self.commut_mo_density(kn, nocc)
@@ -1245,10 +1417,20 @@ class LinearSolver:
                     dks.append(dak)
                     kns.append(kn)
 
+            if profiler is not None:
+                profiler.add_timing_info('PreProc', tm.time() - prep_t0)
+
             # form Fock matrices
 
             fock = self._comp_lr_fock(dks, molecule, basis, eri_dict, dft_dict,
                                       pe_dict, profiler)
+
+            if profiler is not None:
+                # only increment FockCount on master rank
+                if self.rank == mpi_master():
+                    profiler.add_timing_info('_FockCount_', len(dks))
+
+            prep_t0 = tm.time()
 
             if self.rank == mpi_master():
                 raw_fock_ger = []
@@ -1304,6 +1486,16 @@ class LinearSolver:
                         mo_core_exc = mo[:, core_exc_orb_inds]
                         fak_mo = np.linalg.multi_dot(
                             [mo_core_exc.T, fak, mo_core_exc])
+                        self.test_fock = fak_mo
+                    elif getattr(self, 'restricted_subspace', False):
+                        core_val_exc_inds = (
+                            list(range(self.num_core_orbitals)) + list(
+                                range(nocc - self.num_valence_orbitals, nocc)) +
+                            list(range(nocc, nocc + self.num_virtual_orbitals)))
+                        mo_core_val_exc = mo[:, core_val_exc_inds]
+                        fak_mo = np.linalg.multi_dot(
+                            [mo_core_val_exc.T, fak, mo_core_val_exc])
+                        self.test_fock = fak_mo
                     else:
                         fak_mo = np.linalg.multi_dot([mo.T, fak, mo])
 
@@ -1316,6 +1508,15 @@ class LinearSolver:
                                                       self.num_core_orbitals)
                         gmo_vec_halfsize = self.lrmat2vec(
                             gmo, nocc, norb, self.num_core_orbitals)[:half_size]
+                    elif getattr(self, 'restricted_subspace', False):
+                        gmo = -self.commut_mo_density(fat_mo, nocc,
+                                                      self.num_core_orbitals,
+                                                      self.num_valence_orbitals,
+                                                      self.num_virtual_orbitals)
+                        gmo_vec_halfsize = self.lrmat2vec(
+                            gmo, nocc, norb, self.num_core_orbitals,
+                            self.num_valence_orbitals,
+                            self.num_virtual_orbitals)[:half_size]
                     else:
                         gmo = -self.commut_mo_density(fat_mo, nocc)
                         gmo_vec_halfsize = self.lrmat2vec(gmo, nocc,
@@ -1335,18 +1536,48 @@ class LinearSolver:
                         if self.nonlinear:
                             fock_ung[:, ifock - batch_ger] = fak_mo_vec
 
-            vecs_e2_ger = DistributedArray(e2_ger, self.comm)
-            vecs_e2_ung = DistributedArray(e2_ung, self.comm)
-            self._append_sigma_vectors(vecs_e2_ger, vecs_e2_ung)
+            dist_e2_ger = DistributedArray(e2_ger, self.comm)
+            dist_e2_ung = DistributedArray(e2_ung, self.comm)
+
+            if vecs_e2_ger_data is None:
+                vecs_e2_ger_data = dist_e2_ger.data.copy()
+            else:
+                vecs_e2_ger_data = np.hstack(
+                    (vecs_e2_ger_data, dist_e2_ger.data))
+
+            if vecs_e2_ung_data is None:
+                vecs_e2_ung_data = dist_e2_ung.data.copy()
+            else:
+                vecs_e2_ung_data = np.hstack(
+                    (vecs_e2_ung_data, dist_e2_ung.data))
 
             if self.nonlinear:
                 dist_fock_ger = DistributedArray(fock_ger, self.comm)
                 dist_fock_ung = DistributedArray(fock_ung, self.comm)
+                # TODO: avoid incremental append
                 self._append_fock_matrices(dist_fock_ger, dist_fock_ung)
+
+            if profiler is not None:
+                profiler.add_timing_info('PostProc', tm.time() - prep_t0)
+
+        prep_t0 = tm.time()
+
+        # Note: append sigma and trial vectors only once
+
+        vecs_e2_ger = DistributedArray(vecs_e2_ger_data,
+                                       self.comm,
+                                       distribute=False)
+
+        vecs_e2_ung = DistributedArray(vecs_e2_ung_data,
+                                       self.comm,
+                                       distribute=False)
+
+        self._append_sigma_vectors(vecs_e2_ger, vecs_e2_ung)
 
         self._append_trial_vectors(vecs_ger, vecs_ung)
 
-        self.ostream.print_blank()
+        if profiler is not None:
+            profiler.add_timing_info('AppendVec', tm.time() - prep_t0)
 
     def _comp_lr_fock(self,
                       dens,
@@ -1739,10 +1970,10 @@ class LinearSolver:
                 profiler.add_timing_info('FockCPCM', tm.time() - t0)
 
         for idx in range(num_densities):
-            fock_arrays[idx * 2 + 0] = comm.reduce(
-                fock_arrays[idx * 2 + 0], root=mpi_master())
-            fock_arrays[idx * 2 + 1] = comm.reduce(
-                fock_arrays[idx * 2 + 1], root=mpi_master())
+            fock_arrays[idx * 2 + 0] = comm.reduce(fock_arrays[idx * 2 + 0],
+                                                   root=mpi_master())
+            fock_arrays[idx * 2 + 1] = comm.reduce(fock_arrays[idx * 2 + 1],
+                                                   root=mpi_master())
 
         if comm_rank == mpi_master():
             return fock_arrays
@@ -1792,6 +2023,8 @@ class LinearSolver:
         n_extra_ger = n_ger - n_general
         n_extra_ung = n_ung - n_general
 
+        prep_t0 = tm.time()
+
         # prepare molecular orbitals
 
         if self.rank == mpi_master():
@@ -1817,14 +2050,16 @@ class LinearSolver:
             norb = mo_a.shape[1]
 
             if getattr(self, 'core_excitation', False):
-                core_exc_orb_inds_a = list(range(self.num_core_orbitals)) + list(
-                    range(nocc_a, norb))
-                core_exc_orb_inds_b = list(range(self.num_core_orbitals)) + list(
-                    range(nocc_b, norb))
+                core_exc_orb_inds_a = list(range(
+                    self.num_core_orbitals)) + list(range(nocc_a, norb))
+                core_exc_orb_inds_b = list(range(
+                    self.num_core_orbitals)) + list(range(nocc_b, norb))
                 mo_core_exc_a = mo_a[:, core_exc_orb_inds_a]
                 mo_core_exc_b = mo_b[:, core_exc_orb_inds_b]
-                fa_mo = np.linalg.multi_dot([mo_core_exc_a.T, fa, mo_core_exc_a])
-                fb_mo = np.linalg.multi_dot([mo_core_exc_b.T, fb, mo_core_exc_b])
+                fa_mo = np.linalg.multi_dot(
+                    [mo_core_exc_a.T, fa, mo_core_exc_a])
+                fb_mo = np.linalg.multi_dot(
+                    [mo_core_exc_b.T, fb, mo_core_exc_b])
             else:
                 fa_mo = np.linalg.multi_dot([mo_a.T, fa, mo_a])
                 fb_mo = np.linalg.multi_dot([mo_b.T, fb, mo_b])
@@ -1844,14 +2079,21 @@ class LinearSolver:
         batch_size = get_batch_size(self.batch_size, n_total, n_ao, self.comm)
         num_batches = get_number_of_batches(n_total, batch_size, self.comm)
 
+        if profiler is not None:
+            profiler.add_timing_info('PreProc', tm.time() - prep_t0)
+
+        vecs_e2_ger_data = None
+        vecs_e2_ung_data = None
+
         # go through batches
 
-        if self.rank == mpi_master():
+        if self.rank == mpi_master() and self.print_level > 1:
             batch_str = f'Processing {n_total} Fock build'
             if n_total > 1:
                 batch_str += 's'
             batch_str += '...'
             self.ostream.print_info(batch_str)
+            self.ostream.print_blank()
             self.ostream.flush()
 
         if self._debug:
@@ -1882,6 +2124,8 @@ class LinearSolver:
                 kns_a = None
                 dks_b = None
                 kns_b = None
+
+            prep_t0 = tm.time()
 
             for col in range(batch_start, batch_end):
 
@@ -1971,11 +2215,22 @@ class LinearSolver:
                     kns_a.append(kn_a)
                     kns_b.append(kn_b)
 
+            if profiler is not None:
+                profiler.add_timing_info('PreProc', tm.time() - prep_t0)
+
             # form Fock matrices
 
             fock = self._comp_lr_fock_unrestricted(
                 (dks_a, dks_b), molecule, basis, eri_dict, dft_dict, pe_dict,
                 profiler)
+
+            if profiler is not None:
+                # only increment FockCount on master rank
+                if self.rank == mpi_master():
+                    # Note: Jab/Ka/Kb -> 3 Fock builds for openshell
+                    profiler.add_timing_info('_FockCount_', len(dks_a) * 3)
+
+            prep_t0 = tm.time()
 
             if self.rank == mpi_master():
                 raw_fock_ger_a = []
@@ -1996,24 +2251,32 @@ class LinearSolver:
                     if col < n_general:
                         raw_fock_ger_a.append(0.5 * (fock_a_np - fock_a_np.T))
                         raw_fock_ung_a.append(0.5 * (fock_a_np + fock_a_np.T))
-                        raw_kns_ger_a.append(0.5 * (kns_a[ifock] + kns_a[ifock].T))
-                        raw_kns_ung_a.append(0.5 * (kns_a[ifock] - kns_a[ifock].T))
+                        raw_kns_ger_a.append(0.5 *
+                                             (kns_a[ifock] + kns_a[ifock].T))
+                        raw_kns_ung_a.append(0.5 *
+                                             (kns_a[ifock] - kns_a[ifock].T))
                         raw_fock_ger_b.append(0.5 * (fock_b_np - fock_b_np.T))
                         raw_fock_ung_b.append(0.5 * (fock_b_np + fock_b_np.T))
-                        raw_kns_ger_b.append(0.5 * (kns_b[ifock] + kns_b[ifock].T))
-                        raw_kns_ung_b.append(0.5 * (kns_b[ifock] - kns_b[ifock].T))
+                        raw_kns_ger_b.append(0.5 *
+                                             (kns_b[ifock] + kns_b[ifock].T))
+                        raw_kns_ung_b.append(0.5 *
+                                             (kns_b[ifock] - kns_b[ifock].T))
 
                     elif n_extra_ger > 0:
                         raw_fock_ger_a.append(0.5 * (fock_a_np - fock_a_np.T))
-                        raw_kns_ger_a.append(0.5 * (kns_a[ifock] + kns_a[ifock].T))
+                        raw_kns_ger_a.append(0.5 *
+                                             (kns_a[ifock] + kns_a[ifock].T))
                         raw_fock_ger_b.append(0.5 * (fock_b_np - fock_b_np.T))
-                        raw_kns_ger_b.append(0.5 * (kns_b[ifock] + kns_b[ifock].T))
+                        raw_kns_ger_b.append(0.5 *
+                                             (kns_b[ifock] + kns_b[ifock].T))
 
                     elif n_extra_ung > 0:
                         raw_fock_ung_a.append(0.5 * (fock_a_np + fock_a_np.T))
-                        raw_kns_ung_a.append(0.5 * (kns_a[ifock] - kns_a[ifock].T))
+                        raw_kns_ung_a.append(0.5 *
+                                             (kns_a[ifock] - kns_a[ifock].T))
                         raw_fock_ung_b.append(0.5 * (fock_b_np + fock_b_np.T))
-                        raw_kns_ung_b.append(0.5 * (kns_b[ifock] - kns_b[ifock].T))
+                        raw_kns_ung_b.append(0.5 *
+                                             (kns_b[ifock] - kns_b[ifock].T))
 
                 fock_a = raw_fock_ger_a + raw_fock_ung_a
                 kns_a = raw_kns_ger_a + raw_kns_ung_a
@@ -2075,19 +2338,25 @@ class LinearSolver:
                         gmo_b = -self.commut_mo_density(fbt_mo, nocc_b,
                                                         self.num_core_orbitals)
                         gmo_vec_halfsize_a = self.lrmat2vec(
-                            gmo_a, nocc_a, norb, self.num_core_orbitals)[:half_size_a]
+                            gmo_a, nocc_a, norb,
+                            self.num_core_orbitals)[:half_size_a]
                         gmo_vec_halfsize_b = self.lrmat2vec(
-                            gmo_b, nocc_b, norb, self.num_core_orbitals)[:half_size_b]
+                            gmo_b, nocc_b, norb,
+                            self.num_core_orbitals)[:half_size_b]
                     else:
                         gmo_a = -self.commut_mo_density(fat_mo, nocc_a)
                         gmo_b = -self.commut_mo_density(fbt_mo, nocc_b)
-                        gmo_vec_halfsize_a = self.lrmat2vec(gmo_a, nocc_a, norb)[:half_size_a]
-                        gmo_vec_halfsize_b = self.lrmat2vec(gmo_b, nocc_b, norb)[:half_size_b]
+                        gmo_vec_halfsize_a = self.lrmat2vec(
+                            gmo_a, nocc_a, norb)[:half_size_a]
+                        gmo_vec_halfsize_b = self.lrmat2vec(
+                            gmo_b, nocc_b, norb)[:half_size_b]
 
                     # Note: fak_mo_vec uses full MO coefficients matrix since
                     # it is only for fock_ger/fock_ung in nonlinear response
-                    fak_mo_vec = np.linalg.multi_dot([mo_a.T, fak, mo_a]).reshape(norb**2)
-                    fbk_mo_vec = np.linalg.multi_dot([mo_b.T, fbk, mo_b]).reshape(norb**2)
+                    fak_mo_vec = np.linalg.multi_dot([mo_a.T, fak,
+                                                      mo_a]).reshape(norb**2)
+                    fbk_mo_vec = np.linalg.multi_dot([mo_b.T, fbk,
+                                                      mo_b]).reshape(norb**2)
 
                     if ifock < batch_ger:
                         e2_ger_a[:, ifock] = -gmo_vec_halfsize_a
@@ -2110,20 +2379,50 @@ class LinearSolver:
                 e2_ger = None
                 e2_ung = None
 
-            vecs_e2_ger = DistributedArray(e2_ger, self.comm)
-            vecs_e2_ung = DistributedArray(e2_ung, self.comm)
-            self._append_sigma_vectors(vecs_e2_ger, vecs_e2_ung)
+            dist_e2_ger = DistributedArray(e2_ger, self.comm)
+            dist_e2_ung = DistributedArray(e2_ung, self.comm)
+
+            if vecs_e2_ger_data is None:
+                vecs_e2_ger_data = dist_e2_ger.data.copy()
+            else:
+                vecs_e2_ger_data = np.hstack(
+                    (vecs_e2_ger_data, dist_e2_ger.data))
+
+            if vecs_e2_ung_data is None:
+                vecs_e2_ung_data = dist_e2_ung.data.copy()
+            else:
+                vecs_e2_ung_data = np.hstack(
+                    (vecs_e2_ung_data, dist_e2_ung.data))
 
             if self.nonlinear:
                 # TODO: unrestricted for nonlinear
                 # dist_fock_ger = DistributedArray(fock_ger, self.comm)
                 # dist_fock_ung = DistributedArray(fock_ung, self.comm)
+                # TODO: avoid incremental append
                 # self._append_fock_matrices(dist_fock_ger, dist_fock_ung)
                 pass
 
+            if profiler is not None:
+                profiler.add_timing_info('PostProc', tm.time() - prep_t0)
+
+        prep_t0 = tm.time()
+
+        # Note: append sigma and trial vectors only once
+
+        vecs_e2_ger = DistributedArray(vecs_e2_ger_data,
+                                       self.comm,
+                                       distribute=False)
+
+        vecs_e2_ung = DistributedArray(vecs_e2_ung_data,
+                                       self.comm,
+                                       distribute=False)
+
+        self._append_sigma_vectors(vecs_e2_ger, vecs_e2_ung)
+
         self._append_trial_vectors(vecs_ger, vecs_ung)
 
-        self.ostream.print_blank()
+        if profiler is not None:
+            profiler.add_timing_info('AppendVec', tm.time() - prep_t0)
 
     def _write_checkpoint(self, molecule, basis, dft_dict, pe_dict, labels):
         """
@@ -2310,7 +2609,7 @@ class LinearSolver:
             cur_str += f'{self.cpcm_epsilon}'
             self.ostream.print_header(cur_str.ljust(str_width))
             if self.non_equilibrium_solv:
-                cur_str = 'C-PCM Optical Dielectric Constant: '
+                cur_str = 'C-PCM Optical Dielectric Const. : '
                 cur_str += f'{self.cpcm_optical_epsilon}'
                 self.ostream.print_header(cur_str.ljust(str_width))
 
@@ -2479,7 +2778,13 @@ class LinearSolver:
 
         return dist_new_ger, dist_new_ung
 
-    def get_prop_grad(self, operator, components, molecule, basis, scf_tensors, spin='alpha'):
+    def get_prop_grad(self,
+                      operator,
+                      components,
+                      molecule,
+                      basis,
+                      scf_tensors,
+                      spin='alpha'):
         """
         Computes property gradients for linear response equations.
 
@@ -2591,6 +2896,24 @@ class LinearSolver:
                 gradients = tuple(
                     self.lrmat2vec(m, nocc, norb, self.num_core_orbitals)
                     for m in matrices)
+            elif getattr(self, 'restricted_subspace', False):
+                core_val_exc_inds = (
+                    list(range(self.num_core_orbitals)) +
+                    list(range(nocc - self.num_valence_orbitals, nocc)) +
+                    list(range(nocc, nocc + self.num_virtual_orbitals)))
+                mo_core_val_exc = mo[:, core_val_exc_inds]
+                matrices = [
+                    factor * (-1.0) * self.commut_mo_density(
+                        np.linalg.multi_dot([
+                            mo_core_val_exc.T, P, mo_core_val_exc
+                        ]), nocc, self.num_core_orbitals,
+                        self.num_valence_orbitals, self.num_virtual_orbitals)
+                    for P in integral_comps
+                ]
+                gradients = tuple(
+                    self.lrmat2vec(m, nocc, norb, self.num_core_orbitals,
+                                   self.num_valence_orbitals,
+                                   self.num_virtual_orbitals) for m in matrices)
             else:
                 matrices = [
                     factor * (-1.0) * self.commut_mo_density(
@@ -2605,8 +2928,13 @@ class LinearSolver:
         else:
             return tuple()
 
-    def get_complex_prop_grad(self, operator, components, molecule, basis,
-                              scf_tensors):
+    def get_complex_prop_grad(self,
+                              operator,
+                              components,
+                              molecule,
+                              basis,
+                              scf_tensors,
+                              spin='alpha'):
         """
         Computes complex property gradients for linear response equations.
 
@@ -2698,8 +3026,12 @@ class LinearSolver:
         if self.rank == mpi_master():
             integral_comps = [integrals[p] for p in components]
 
-            mo = scf_tensors['C_alpha']
-            nocc = molecule.number_of_alpha_electrons()
+            if spin == 'alpha':
+                mo = scf_tensors['C_alpha']
+                nocc = molecule.number_of_alpha_electrons()
+            elif spin == 'beta':
+                mo = scf_tensors['C_beta']
+                nocc = molecule.number_of_beta_electrons()
             norb = mo.shape[1]
 
             factor = np.sqrt(2.0)
@@ -2716,7 +3048,11 @@ class LinearSolver:
             return tuple()
 
     @staticmethod
-    def commut_mo_density(A, nocc, num_core_orbitals=None):
+    def commut_mo_density(A,
+                          nocc,
+                          num_core_orbitals=None,
+                          num_valence_orbitals=None,
+                          num_vir_orbitals=None):
         """
         Commutes matrix A and MO density
 
@@ -2734,11 +3070,22 @@ class LinearSolver:
 
         mat = np.zeros(A.shape, dtype=A.dtype)
 
-        if num_core_orbitals is not None and num_core_orbitals > 0:
+        if (num_core_orbitals is not None and
+            (None in (num_valence_orbitals, num_vir_orbitals)) and
+                num_core_orbitals > 0):
             mat[:num_core_orbitals,
                 num_core_orbitals:] = -A[:num_core_orbitals, num_core_orbitals:]
             mat[num_core_orbitals:, :num_core_orbitals] = A[
                 num_core_orbitals:, :num_core_orbitals]
+
+        elif ((None not in (num_core_orbitals, num_valence_orbitals,
+                            num_vir_orbitals)) and
+              num_core_orbitals + num_valence_orbitals > 0):
+            num_core_val_orbs = num_core_orbitals + num_valence_orbitals
+            mat[:num_core_val_orbs,
+                num_core_val_orbs:] = -A[:num_core_val_orbs, num_core_val_orbs:]
+            mat[num_core_val_orbs:, :num_core_val_orbs] = A[
+                num_core_val_orbs:, :num_core_val_orbs]
 
         else:
             mat[:nocc, nocc:] = -A[:nocc, nocc:]
@@ -2763,7 +3110,12 @@ class LinearSolver:
         return np.matmul(A, B) - np.matmul(B, A)
 
     @staticmethod
-    def lrvec2mat(vec, nocc, norb, num_core_orbitals=None):
+    def lrvec2mat(vec,
+                  nocc,
+                  norb,
+                  num_core_orbitals=None,
+                  num_valence_orbitals=None,
+                  num_vir_orbitals=None):
         """
         Converts vectors to matrices.
 
@@ -2780,7 +3132,9 @@ class LinearSolver:
 
         nvir = norb - nocc
 
-        if num_core_orbitals is not None and num_core_orbitals > 0:
+        if (num_core_orbitals is not None and
+            (None in (num_valence_orbitals, num_vir_orbitals)) and
+                num_core_orbitals > 0):
             n_ov = num_core_orbitals * nvir
             mat = np.zeros((num_core_orbitals + nvir, num_core_orbitals + nvir),
                            dtype=vec.dtype)
@@ -2789,6 +3143,20 @@ class LinearSolver:
                 num_core_orbitals, nvir)
             mat[num_core_orbitals:, :num_core_orbitals] = vec[n_ov:].reshape(
                 num_core_orbitals, nvir).T
+
+        elif ((None not in (num_core_orbitals, num_valence_orbitals,
+                            num_vir_orbitals)) and
+              num_core_orbitals + num_valence_orbitals > 0):
+            nvir = num_vir_orbitals
+            num_core_val_orbs = num_core_orbitals + num_valence_orbitals
+            n_ov = num_core_val_orbs * nvir
+            mat = np.zeros((num_core_val_orbs + nvir, num_core_val_orbs + nvir),
+                           dtype=vec.dtype)
+            # excitation and de-excitation
+            mat[:num_core_val_orbs, num_core_val_orbs:] = vec[:n_ov].reshape(
+                num_core_val_orbs, nvir)
+            mat[num_core_val_orbs:, :num_core_val_orbs] = vec[n_ov:].reshape(
+                num_core_val_orbs, nvir).T
 
         else:
             n_ov = nocc * nvir
@@ -2800,7 +3168,12 @@ class LinearSolver:
         return mat
 
     @staticmethod
-    def lrmat2vec(mat, nocc, norb, num_core_orbitals=None):
+    def lrmat2vec(mat,
+                  nocc,
+                  norb,
+                  num_core_orbitals=None,
+                  num_valence_orbitals=None,
+                  num_vir_orbitals=None):
         """
         Converts matrices to vectors.
 
@@ -2817,7 +3190,9 @@ class LinearSolver:
 
         nvir = norb - nocc
 
-        if num_core_orbitals is not None and num_core_orbitals > 0:
+        if (num_core_orbitals is not None and
+            (None in (num_valence_orbitals, num_vir_orbitals)) and
+                num_core_orbitals > 0):
             n_ov = num_core_orbitals * nvir
             vec = np.zeros(n_ov * 2, dtype=mat.dtype)
             # excitation and de-excitation
@@ -2825,7 +3200,18 @@ class LinearSolver:
                              num_core_orbitals:].reshape(n_ov)
             vec[n_ov:] = mat[num_core_orbitals:, :num_core_orbitals].T.reshape(
                 n_ov)
-
+        elif ((None not in (num_core_orbitals, num_valence_orbitals,
+                            num_vir_orbitals)) and
+              num_core_orbitals + num_valence_orbitals > 0):
+            nvir = num_vir_orbitals
+            num_core_val_orbs = num_core_orbitals + num_valence_orbitals
+            n_ov = num_core_val_orbs * nvir
+            vec = np.zeros(n_ov * 2, dtype=mat.dtype)
+            # excitation and de-excitation
+            vec[:n_ov] = mat[:num_core_val_orbs,
+                             num_core_val_orbs:].reshape(n_ov)
+            vec[n_ov:] = mat[num_core_val_orbs:, :num_core_val_orbs].T.reshape(
+                n_ov)
         else:
             n_ov = nocc * nvir
             vec = np.zeros(n_ov * 2, dtype=mat.dtype)
@@ -2982,7 +3368,12 @@ class LinearSolver:
         return vecs
 
     @staticmethod
-    def construct_ediag_sdiag_half(orb_ene, nocc, norb, num_core_orbitals=None):
+    def construct_ediag_sdiag_half(orb_ene,
+                                   nocc,
+                                   norb,
+                                   num_core_orbitals=None,
+                                   num_valence_orbitals=None,
+                                   num_vir_orbitals=None):
         """
         Gets the upper half of E0 and S0 diagonal elements as arrays.
 
@@ -2998,15 +3389,25 @@ class LinearSolver:
         """
 
         nvir = norb - nocc
+        evir = orb_ene[nocc:]
 
-        if num_core_orbitals is not None and num_core_orbitals > 0:
+        if (num_core_orbitals is not None and
+            (None in (num_valence_orbitals, num_vir_orbitals)) and
+                num_core_orbitals > 0):
             n_ov = num_core_orbitals * nvir
             eocc = orb_ene[:num_core_orbitals]
+        elif ((None not in (num_core_orbitals, num_valence_orbitals,
+                            num_vir_orbitals)) and
+              num_core_orbitals + num_valence_orbitals > 0):
+            nvir = num_vir_orbitals
+            num_core_val_orbs = num_core_orbitals + num_valence_orbitals
+            n_ov = num_core_val_orbs * nvir
+            eocc = np.hstack((orb_ene[:num_core_orbitals],
+                              orb_ene[nocc - num_valence_orbitals:nocc]))
+            evir = orb_ene[nocc:nocc + num_vir_orbitals]
         else:
             n_ov = nocc * nvir
             eocc = orb_ene[:nocc]
-
-        evir = orb_ene[nocc:]
 
         ediag = (-eocc.reshape(-1, 1) + evir).reshape(n_ov)
         sdiag = np.ones(ediag.shape)
@@ -3101,9 +3502,9 @@ class LinearSolver:
             nto_lam_b[nocc_b - 1 - i_nto] = -lam_diag_b[i_nto]
             nto_lam_b[nocc_b + i_nto] = lam_diag_b[i_nto]
 
-        nto_mo = MolecularOrbitals.create_nto(
-            [nto_orbs_a, nto_orbs_b], [nto_lam_a, nto_lam_b],
-            molorb.unrest)
+        nto_mo = MolecularOrbitals.create_nto([nto_orbs_a, nto_orbs_b],
+                                              [nto_lam_a, nto_lam_b],
+                                              molorb.unrest)
 
         return nto_mo
 
@@ -3150,12 +3551,16 @@ class LinearSolver:
 
         if getattr(self, 'core_excitation', False):
             nocc = self.num_core_orbitals
+        elif getattr(self, 'restricted_subspace', False):
+            nocc = self.num_core_orbitals + self.num_valence_orbitals
         else:
             if nto_spin == '' or nto_spin == 'alpha':
                 nocc = molecule.number_of_alpha_electrons()
             elif nto_spin == 'beta':
                 nocc = molecule.number_of_beta_electrons()
         nvir = nto_mo.number_of_mos() - nocc
+        if getattr(self, 'restricted_subspace', False):
+            nvir = self.num_virtual_orbitals
 
         if nto_spin == '' or nto_spin == 'alpha':
             lam_diag = nto_mo.occa_to_numpy()[nocc:nocc + min(nocc, nvir)]
@@ -3328,6 +3733,11 @@ class LinearSolver:
         for i in range(nocc):
             if getattr(self, 'core_excitation', False):
                 homo_str = f'core_{i + 1}'
+            elif getattr(self, 'restricted_subspace', False):
+                if i < self.num_core_orbitals and self.num_core_orbitals > 0:
+                    homo_str = f'core_{i + 1}'
+                else:
+                    homo_str = 'HOMO' if i == nocc - 1 else f'HOMO-{nocc - 1 - i}'
             else:
                 homo_str = 'HOMO' if i == nocc - 1 else f'HOMO-{nocc - 1 - i}'
 
@@ -3359,7 +3769,11 @@ class LinearSolver:
 
         return excitation_details
 
-    def get_excitation_details_unrestricted(self, eigvec, nocc, nvir, coef_thresh=0.2):
+    def get_excitation_details_unrestricted(self,
+                                            eigvec,
+                                            nocc,
+                                            nvir,
+                                            coef_thresh=0.2):
         """
         Get excitation details.
 
@@ -3398,7 +3812,8 @@ class LinearSolver:
         excitations = []
         de_excitations = []
 
-        for nocc, nvir, eigvec, spin in [(nocc_a, nvir_a, eigvec_a, 'a'), (nocc_b, nvir_b, eigvec_b, 'b')]:
+        for nocc, nvir, eigvec, spin in [(nocc_a, nvir_a, eigvec_a, 'a'),
+                                         (nocc_b, nvir_b, eigvec_b, 'b')]:
             for i in range(nocc):
                 if getattr(self, 'core_excitation', False):
                     homo_str = f'core_{i + 1}'

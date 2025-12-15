@@ -172,6 +172,31 @@ class TestBlockedGtoPairBlock:
         fcoords = t1_pairs.ket_coordinates()
         assert len(fcoords) == 1
         assert fcoords[0] == Point([0.300, 1.400, -2.100])
+        
+    def test_unique_terms(self):
+
+        tol = 1.0e-12
+
+        mol_co, bas_svp = self.get_data()
+
+        # GTO pairs
+        p3_gtos = GtoBlock(bas_svp, mol_co, 1, 3)
+        p3x3_pairs = GtoPairBlock(p3_gtos)
+
+        # GTO norms and exponents
+        p3norms = p3_gtos.normalization_factors()
+
+        # GTO exponents
+        p3exps = p3_gtos.exponents()
+
+        # Blocked GTO pairs
+        bp3x3_pairs = BlockedGtoPairBlock(p3x3_pairs, [1.1, 0.01, 1.2])
+
+        # check unique terms
+        assert bp3x3_pairs.unique_terms(0) == 12
+        assert bp3x3_pairs.unique_terms(1) == 9
+        assert bp3x3_pairs.unique_terms(2) == 0
+        assert bp3x3_pairs.unique_terms(3) == 0
 
     def test_mpi_bcast(self):
 

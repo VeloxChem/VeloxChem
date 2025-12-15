@@ -10,6 +10,7 @@ target_sources(vlxobjs
     T3CGeomX00Distributor.cpp
     T3CLocalDistributor.cpp
     T3CUtils.cpp
+    T3CLocalReducedDistributor.cpp
   )
 
 target_include_directories(vlxobjs

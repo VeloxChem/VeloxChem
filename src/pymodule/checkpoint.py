@@ -40,6 +40,7 @@ from .distributedarray import DistributedArray
 from .errorhandler import assert_msg_critical
 from .molecule import Molecule
 
+
 def create_hdf5(fname, molecule, basis, dft_func_label, potfile_text):
     """
     Creates HDF5 file for a calculation.
@@ -85,6 +86,13 @@ def create_hdf5(fname, molecule, basis, dft_func_label, potfile_text):
                           data=np.array([molecule.get_multiplicity()]))
 
         hf.create_dataset('basis_set', data=np.bytes_([basis.get_label()]))
+
+        atom_basis_labels_flattened = []
+        for atom_bs_name, elem in molecule.get_atom_basis_labels():
+            atom_basis_labels_flattened += [atom_bs_name, elem]
+
+        hf.create_dataset('atom_basis_labels_flattened',
+                          data=np.bytes_(atom_basis_labels_flattened))
 
         hf.create_dataset('dft_func_label', data=np.bytes_([dft_func_label]))
 
@@ -275,7 +283,13 @@ def write_rsp_hdf5(fname, arrays, labels, molecule, basis, dft_dict, pe_dict,
     return True
 
 
-def write_detach_attach_to_hdf5(fname, state_label, dens_detach, dens_attach, group_label='rsp'):
+def write_detach_attach_to_hdf5(fname,
+                                state_label,
+                                dens_detach,
+                                dens_attach,
+                                chg_detach=None,
+                                chg_attach=None,
+                                group_label='rsp'):
     """
     Writes the detachment and attachment density matrices for a specific
     excited state to the checkpoint file.
@@ -288,6 +302,10 @@ def write_detach_attach_to_hdf5(fname, state_label, dens_detach, dens_attach, gr
         The detachment density matrix.
     :param dens_attach:
         The attachment density matrix.
+    :param chg_detach:
+        The detachment charges.
+    :param chg_attach:
+        The attachment charges.
     :param group_label:
         The checkpoint file group label.
     """
@@ -298,15 +316,31 @@ def write_detach_attach_to_hdf5(fname, state_label, dens_detach, dens_attach, gr
 
         # add detachment/attachment densities to the rsp group
 
-        detach_label = group_label + "/detach_" + state_label
+        detach_label = group_label + "/detach_attach/detach_" + state_label
         if detach_label in hf:
             del hf[detach_label]
         hf.create_dataset(detach_label, data=dens_detach)
 
-        attach_label = group_label + "/attach_" + state_label
+        attach_label = group_label + "/detach_attach/attach_" + state_label
         if attach_label in hf:
             del hf[attach_label]
         hf.create_dataset(attach_label, data=dens_attach)
+
+        # add detachment/attachment charges to the rsp group
+
+        if chg_detach is not None:
+            detach_label = (group_label + "/detach_attach/detach_charges_" +
+                            state_label)
+            if detach_label in hf:
+                del hf[detach_label]
+            hf.create_dataset(detach_label, data=chg_detach)
+
+        if chg_attach is not None:
+            attach_label = (group_label + "/detach_attach/attach_charges_" +
+                            state_label)
+            if attach_label in hf:
+                del hf[attach_label]
+            hf.create_dataset(attach_label, data=chg_attach)
 
         hf.close()
 
@@ -592,6 +626,7 @@ def read_cpcm_charges(fname):
 
     return cpcm_q
 
+
 def read_results(fname, label):
     """ Read the results dictionary from a checkpoint file.
 
@@ -607,7 +642,8 @@ def read_results(fname, label):
     valid_checkpoint = (fname and isinstance(fname, str) and
                         Path(fname).is_file())
 
-    assert_msg_critical(valid_checkpoint, fname + " is not a valid checkpoint file.") 
+    assert_msg_critical(valid_checkpoint,
+                        fname + " is not a valid checkpoint file.")
 
     res_dict = {}
     h5f = h5py.File(fname, "r")
@@ -617,7 +653,8 @@ def read_results(fname, label):
     if not label_found:
         h5f.close()
 
-    assert_msg_critical(label_found, label + " section not found in the checkpoint file.")
+    assert_msg_critical(label_found,
+                        label + " section not found in the checkpoint file.")
 
     # Always read general information about the molecule, basis, and settings
     for key in h5f:
@@ -631,36 +668,49 @@ def read_results(fname, label):
 
     h5f_dict = h5f[label]
 
+    known_keys_for_arrays = [
+        'normal_modes',
+        'vib_frequencies',
+        'force_constants',
+        'reduced_masses',
+        'ir_intensities',
+        'external_frequencies',
+        'raman_activities',
+    ]
+
     for key in h5f_dict:
-        # For known lists of arrays (normal modes, raman and resonance raman),
-        # read the sub-group accordingly
-        if "normal_modes" in key or "raman_activities" in key:
-            sub_dict = dict(h5f_dict[key])
-            sub_dict_results = {}
-            for sub_key in sub_dict:
-                sub_dict_results[sub_key] = np.array(sub_dict[sub_key])
-            res_dict[key] = sub_dict_results
+        data = np.array(h5f_dict[key])
+        # Check if data is a number or an array
+        if (len(data.shape) == 1 and data.shape[0] == 1 and
+                key not in known_keys_for_arrays):
+            res_dict[key] = data[0]
         else:
-            data = np.array(h5f_dict[key])
-            # Check if data is a number or an array
-            if len(data.shape) == 1 and data.shape[0] == 1:
-                res_dict[key] = data[0]
-            else:
-                res_dict[key] = data
+            res_dict[key] = data
 
     if "opt" in label:
         # Create the list of xyz geometries
-        nuclear_charges = np.array(res_dict["nuclear_charges"], dtype=int)
+        nuclear_charges = np.array(res_dict["nuclear_charges"]).astype(int)
         xyz_geometries = []
         for coords in res_dict["opt_coordinates_au"]:
             molecule = Molecule(nuclear_charges, coords, units="au")
             xyz_geometries.append(molecule.get_xyz_string())
         res_dict["opt_geometries"] = xyz_geometries
-    
+
     # Create molecule xyz
-    nuclear_charges = np.array(res_dict["nuclear_charges"], dtype=int)
+    nuclear_charges = np.array(res_dict["nuclear_charges"]).astype(int)
     coords = res_dict["atom_coordinates"]
-    molecule = Molecule(nuclear_charges, coords, units="au")
+
+    if "atom_basis_labels_flattened" in res_dict:
+        atom_basis_labels_flattened = [
+            x.decode("utf-8")
+            for x in np.array(res_dict["atom_basis_labels_flattened"])
+        ]
+        atom_basis_names = atom_basis_labels_flattened[0::2]
+        atom_basis_elems = atom_basis_labels_flattened[1::2]
+        atom_basis_labels = list(zip(atom_basis_names, atom_basis_elems))
+        molecule = Molecule(nuclear_charges, coords, "au", atom_basis_labels)
+    else:
+        molecule = Molecule(nuclear_charges, coords, "au")
 
     xyz_lines = molecule.get_xyz_string().splitlines()
 
@@ -675,5 +725,5 @@ def read_results(fname, label):
         res_dict["molecule_xyz_string"] = molecule.get_xyz_string()
 
     h5f.close()
-    
+
     return res_dict

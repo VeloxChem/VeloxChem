@@ -65,7 +65,17 @@ class TestScfUnrestrictedHessian:
                 assert diff_bb < 1e-8
 
     @pytest.mark.solvers
-    def test_hessian_unrest(self):
+    def test_hessian_unrest_pbe(self):
+
+        xcfun_label = 'pbe'
+
+        ref_vib_freqs = np.array(
+            [393.78, 1309.13, 1309.17, 3105.05, 3310.89, 3310.92])
+
+        self.run_hessian_unrest(xcfun_label, ref_vib_freqs)
+
+    @pytest.mark.solvers
+    def test_hessian_unrest_b3lyp(self):
 
         xcfun_label = 'b3lyp'
 

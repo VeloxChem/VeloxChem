@@ -785,7 +785,7 @@ class AtomBdeDriver:
                 f"{scf_err_msg} Skipping radical molecule {run_idx+1}."
             )
             self.ostream.flush()
-            return
+            return None, None
 
         # Optimization step
         opt_skip_flag = None
@@ -809,7 +809,7 @@ class AtomBdeDriver:
                 f"{opt_err_msg} Skipping radical molecule {run_idx+1} of molecule {mol_idx+1} due to failed optimization"
             )
             self.ostream.flush()
-            return
+            return None, None
         
         #Here, should pass the scf and optimization
         #since only master rank has the opt_results_rad and other ranks have None, so create molecule on master rank

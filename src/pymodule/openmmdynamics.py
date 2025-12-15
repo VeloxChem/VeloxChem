@@ -745,7 +745,7 @@ class OpenMMDynamics:
                                 save_pdb = False,
                                 k = 1000,
                                 r0 = 0.5,
-                                water_model = 'ctip3p'
+                                water_model = 'tip3p'
                                 ):
         """
         Runs high-temperature conformational sampling for multiple residues in the system.
@@ -794,10 +794,8 @@ class OpenMMDynamics:
                 ff_gen = MMForceFieldGenerator()
                 ff_gen.ostream.mute()
                 duplicate = False
-                is_water = False
                 
                 if mol.is_water_molecule():
-                    is_water = True
                     water_msg = True
 
                 for j in range(i):

@@ -235,12 +235,12 @@ getBoysFuncTable(const int N) -> std::array<std::array<double, 7>, 121>
 }
 
 auto
-computeBoysFunction(double* values, const double fa, const uint32_t N, const double* bf_table, const double* ft) -> void
+computeBoysFunction(double* values, const double fa, const int N, const double* bf_table, const double* ft) -> void
 {
     // Note: 847 = 121 * 7
     const double* bf_data = bf_table + N * 847;
 
-    uint32_t pnt = (fa > 1.0e5) ? 1000000 : static_cast<uint32_t>(10.0 * fa + 0.5);
+    int pnt = (fa > 1.0e5) ? 1000000 : static_cast<int>(10.0 * fa + 0.5);
 
     if (pnt < 121)
     {
@@ -258,7 +258,7 @@ computeBoysFunction(double* values, const double fa, const uint32_t N, const dou
 
         const double fx = exp(-fa);
 
-        for (uint32_t j = 0; j < N; j++)
+        for (int j = 0; j < N; j++)
         {
             values[N - j - 1] = ft[N - j - 1] * (f2a * values[N - j] + fx);
         }
@@ -283,7 +283,7 @@ computeBoysFunction(double* values, const double fa, const uint32_t N, const dou
 
             const double rterm = pf * fx;
 
-            for (uint32_t j = 1; j <= N; j++)
+            for (int j = 1; j <= N; j++)
             {
                 values[j] = pf * values[j - 1] - rterm;
 
@@ -292,7 +292,7 @@ computeBoysFunction(double* values, const double fa, const uint32_t N, const dou
         }
         else
         {
-            for (uint32_t j = 1; j <= N; j++)
+            for (int j = 1; j <= N; j++)
             {
                 values[j] = pf * values[j - 1];
 

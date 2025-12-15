@@ -700,7 +700,7 @@ class HessianOrbitalResponse(CphfSolver):
 
         self.ostream.print_blank()
         self.ostream.print_header('{:s} Setup'.format(title))
-        self.ostream.print_header('=' * (len(title) + 8))
+        self.ostream.print_header('-' * (len(title) + 8))
         self.ostream.print_blank()
 
         str_width = 70
