@@ -110,6 +110,7 @@ class TransitionStateGuesser():
         self.qm_xcfun = "PBE0"
         self.qm_basis = 'def2-svp'
         self.do_qm_scan = False
+        self.max_qm_conformers = 5
         self.mute_scf = True
 
         self.sys_builder_configuration = conf = {
@@ -614,10 +615,17 @@ class TransitionStateGuesser():
         max_qm_energy = None
         min_qm_conf_index = 0
         try:
-            for l, scan in results['scan'].items():
+            for l in results['scan'].keys():
+                
                 min_qm_conf_E = None
                 min_conf_index = 0
-                for i, conformer in enumerate(scan):
+                scan = sorted(results['scan'][l], key=lambda x: x['v'])
+                results['scan'][l] = scan
+                # Pick out lowest 5 conformers from scan
+                
+                
+                scan_range = min(self.max_qm_conformers,len(scan))
+                for i, conformer in enumerate(scan[:scan_range]):
                     qm_E = self._get_qm_energy(conformer['xyz'])
 
                     results['scan'][l][i]['qm_energy'] = qm_E
@@ -637,16 +645,21 @@ class TransitionStateGuesser():
                 if max_qm_energy is None or min_qm_conf_E > max_qm_energy:
                     max_qm_energy = min_qm_conf_E
                     max_qm_lambda = l
-                    min_qm_conf_index = min_conf_index
-                    max_qm_xyz = scan[min_conf_index]['xyz']
+                    # min_qm_conf_index = min_conf_index
+                    # max_qm_xyz = scan[min_conf_index]['xyz']
+                qm_scan = results['scan'][l][:scan_range]
+                rest = results['scan'][l][scan_range:]
+                sorted_qm_scan = sorted(qm_scan, key=lambda x: x['qm_energy'])
+                results['scan'][l] = sorted_qm_scan + rest
 
             self.ostream.print_blank()
-
-            results = {
+            min_qm_conf_index,_ = min(enumerate(results['scan'][max_qm_lambda]), key=lambda x: x[1].get('qm_energy', math.inf))
+            max_qm_xyz = results['scan'][max_qm_lambda][min_qm_conf_index]['xyz']
+            results.update({
                 'max_qm_xyz': max_qm_xyz,
                 'max_qm_lambda': max_qm_lambda,
                 'min_qm_conformer_index': min_qm_conf_index,
-            }
+            })
             self.ostream.print_info(
                 f"Found highest QM E: {max_qm_energy:.3f} at Lambda: {max_qm_lambda} and conformer index: {min_qm_conf_index}."
             )
@@ -780,8 +793,9 @@ class TransitionStateGuesser():
         min_energy = None
         if scan[0][0].get('qm_energy', None) is not None:
             for i, conf in enumerate(scan[step]):
-                if min_energy is None or conf['qm_energy'] < min_energy:
-                    min_energy = conf['qm_energy']
+                qm_E = conf.get('qm_energy', None)
+                if min_energy is None or (qm_E is not None and qm_E < min_energy):
+                    min_energy = qm_E
                     best_index = i
         else:
             for i, conf in enumerate(scan[step]):
@@ -845,11 +859,25 @@ class TransitionStateGuesser():
             print("  {:>9} {:>18} {:>19}  ".format("conformer",
                                                    "MM energy [kJ/mol]",
                                                    "QM energy [kJ/mol]"))
-
+            
+            # mmqmdif0 = np.array(rel_mm_energies[0] - rel_qm_energies[0])
+            # mmqmdif1 = np.array(rel_mm_energies[-1] - rel_qm_energies[-1])
+            # print(f"MM minimum energy at lambda=0: {rel_mm_energies[0]:.3f} kJ/mol" )
+            # print(f"QM minimum energy at lambda=0: {rel_qm_energies[0]:.3f} kJ/mol" )
+            # print( f"MM-QM energy difference at lambda=0: {mmqmdif0:.3f} kJ/mol" )
+            # print( f"MM-QM energy difference at lambda=1: {mmqmdif1:.3f} kJ/mol" )
+            # interpolation = mmqmdif0*(1-np.array(lambda_vec)) + mmqmdif1*np.array(lambda_vec)
+            # rel_mm_energies = rel_mm_energies - interpolation
+            
+            
             for i, conf in enumerate(scan[step]):
                 conf_str = f"{i+1}"
                 mm_e = f"{conf['v'] - mm_min:.3f}"
-                qm_e = f"{conf['qm_energy'] - qm_min:.3f}"
+                qm_e_raw = conf.get('qm_energy', None)
+                if qm_e_raw is None:
+                    qm_e = ""
+                else:
+                    qm_e = f"{conf['qm_energy'] - qm_min:.3f}"
 
                 if i + 1 == conformer_id and len(scan[step]) > 1:
                     conf_str_formatted = f"{'-' * (9 - (1 + len(str(conf_str))))} {conf_str}"
@@ -869,6 +897,8 @@ class TransitionStateGuesser():
                         qm_e,
                     )
                 print(print_str)
+                
+            
         else:
             print("  {:>9} {:>19}  ".format("conformer", "MM energy [kJ/mol]"))
             rel_qm_energies = None
@@ -921,8 +951,8 @@ class TransitionStateGuesser():
         ax1.set_ylabel('Relative MM energy [kJ/mol]')
 
         if rel_qm_energies is not None:
-            ax2 = ax1.twinx()
-            ax2.plot(
+            # ax2 = ax1.twinx()
+            ax1.plot(
                 x,
                 np.interp(x, lambda_vec, rel_qm_energies),
                 color='darkred',
@@ -932,7 +962,7 @@ class TransitionStateGuesser():
                 zorder=0,
                 label='QM energy',
             )
-            ax2.scatter(
+            ax1.scatter(
                 lambda_vec,
                 rel_qm_energies,
                 alpha=0.7,
@@ -941,7 +971,7 @@ class TransitionStateGuesser():
                 edgecolor="darkorange",
                 zorder=1,
             )
-            ax2.scatter(
+            ax1.scatter(
                 lambda_vec[lam_index],
                 rel_qm_energies[lam_index],
                 marker='o',
@@ -950,7 +980,7 @@ class TransitionStateGuesser():
                 s=120 / math.log(total_steps, 10),
                 zorder=2,
             )
-            ax2.set_ylabel('Relative QM energy [kJ/mol]')
+            ax1.set_ylabel('Relative QM energy [kJ/mol]')
 
         fig.legend(loc='upper right',
                    bbox_to_anchor=(1, 1),
@@ -1045,6 +1075,7 @@ class TransitionStateGuesser():
                                       dtype='i')
             forming_bonds = np.array(list(results['forming_bonds']), dtype='i')
             static_bonds = np.array(list(results['static_bonds']), dtype='i')
+            
             hf.create_dataset('breaking_bonds', data=breaking_bonds)
             hf.create_dataset('forming_bonds', data=forming_bonds)
             hf.create_dataset('static_bonds', data=static_bonds)
@@ -1232,8 +1263,9 @@ class TransitionStateGuesser():
         self.ostream.print_header(f"Starting QM scan")
         self.ostream.print_blank()
         self.ostream.print_header("QM parameters:")
-        self.ostream.print_header(f"basis:       {self.qm_basis:>10}")
+        self.ostream.print_header(f"Basis:       {self.qm_basis:>10}")
         self.ostream.print_header(f"DFT xc fun:  {self.qm_xcfun:>10}")
+        self.ostream.print_header(f"Max conf.:   {self.max_qm_conformers:>10}")
         self.ostream.print_blank()
         self.ostream.flush()
         valsltr = '{} | {} | {} | {}'.format(

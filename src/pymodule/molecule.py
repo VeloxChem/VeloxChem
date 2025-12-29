@@ -1283,6 +1283,7 @@ def _Molecule_show(
     height=300,
     atom_indices=False,
     atom_labels=False,
+    gradient=None,
     starting_index=1,
     bonds=None,
     forming_bonds=None,
@@ -1304,13 +1305,19 @@ def _Molecule_show(
         that list as labels.
     :param gradient:
         The molecular gradient.
-    :starting_index:
+    :param starting_index:
         The starting index for atom indices.
-    :bonds:
+    :param bonds:
         A list of zero-indexed tuples with bonds to draw. If None, connectivity is based on
         proximity.
-    :dashed_bonds:
-        A list of zero-indexed tuples with bonds to draw as dashed lines.
+    :param forming_bonds:
+        A list of zero-indexed tuples with bonds to draw as green dashed lines.
+    :param breaking_bonds:
+        A list of zero-indexed tuples with bonds to draw as orange dashed lines.
+    :param forming_width:
+        The radius of forming bonds.
+    :param breaking_width:
+        The radius of breaking bonds.
     """
 
     try:

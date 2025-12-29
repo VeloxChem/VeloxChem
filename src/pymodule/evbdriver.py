@@ -702,6 +702,8 @@ class EvbDriver():
                         group.create_dataset(k, data=v)
                     elif isinstance(v, set):
                         group.create_dataset(k, data=list(v))
+                    elif isinstance(v, object):
+                        continue
                     else:
                         group[k] = v
 
