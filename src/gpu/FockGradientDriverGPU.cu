@@ -142,13 +142,9 @@ computeOverlapGradientOnGPU(const CMolecule& molecule,
     {
     auto thread_id = omp_get_thread_num();
 
-    if (thread_id < num_gpus_per_node)
-    {
     auto gpu_id = thread_id;
-    auto gpu_rank = gpu_id + rank * num_gpus_per_node;
-    // auto gpu_count = nnodes * num_gpus_per_node;
 
-    gpuSafe(gpuSetDevice(gpu_rank % total_num_gpus_per_compute_node));
+    gpuSafe(gpuSetDevice(gpu_id));
 
     // GTOs blocks and number of AOs
 
@@ -449,6 +445,8 @@ computeOverlapGradientOnGPU(const CMolecule& molecule,
 
     double *d_grad_array[3] = {d_grad_x, d_grad_y, d_grad_z};
 
+#pragma omp barrier
+
     // SS
 
     if (ss_prim_pair_count_local > 0)
@@ -604,6 +602,8 @@ computeOverlapGradientOnGPU(const CMolecule& molecule,
     gpu::chunkedMemcpyDeviceToHost<double>(S_grad_omp[gpu_id].row(1), d_grad_y, natoms);
     gpu::chunkedMemcpyDeviceToHost<double>(S_grad_omp[gpu_id].row(2), d_grad_z, natoms);
 
+#pragma omp barrier
+
     gpuSafe(gpuFree(d_grad_x));
     gpuSafe(gpuFree(d_grad_y));
     gpuSafe(gpuFree(d_grad_z));
@@ -634,7 +634,7 @@ computeOverlapGradientOnGPU(const CMolecule& molecule,
     gpuSafe(gpuFree(d_pd_mat_W_local));
     gpuSafe(gpuFree(d_dd_mat_W_local));
 
-    }}
+    }
 
     CDenseMatrix S_grad_t(natoms, 3);
 
@@ -685,13 +685,9 @@ computeKineticEnergyGradientOnGPU(const CMolecule& molecule,
     {
     auto thread_id = omp_get_thread_num();
 
-    if (thread_id < num_gpus_per_node)
-    {
     auto gpu_id = thread_id;
-    auto gpu_rank = gpu_id + rank * num_gpus_per_node;
-    // auto gpu_count = nnodes * num_gpus_per_node;
 
-    gpuSafe(gpuSetDevice(gpu_rank % total_num_gpus_per_compute_node));
+    gpuSafe(gpuSetDevice(gpu_id));
 
     // GTOs blocks and number of AOs
 
@@ -992,6 +988,8 @@ computeKineticEnergyGradientOnGPU(const CMolecule& molecule,
 
     double *d_grad_array[3] = {d_grad_x, d_grad_y, d_grad_z};
 
+#pragma omp barrier
+
     // SS
 
     if (ss_prim_pair_count_local > 0)
@@ -1147,6 +1145,8 @@ computeKineticEnergyGradientOnGPU(const CMolecule& molecule,
     gpu::chunkedMemcpyDeviceToHost<double>(T_grad_omp[gpu_id].row(1), d_grad_y, natoms);
     gpu::chunkedMemcpyDeviceToHost<double>(T_grad_omp[gpu_id].row(2), d_grad_z, natoms);
 
+#pragma omp barrier
+
     gpuSafe(gpuFree(d_grad_x));
     gpuSafe(gpuFree(d_grad_y));
     gpuSafe(gpuFree(d_grad_z));
@@ -1177,7 +1177,7 @@ computeKineticEnergyGradientOnGPU(const CMolecule& molecule,
     gpuSafe(gpuFree(d_pd_mat_D_local));
     gpuSafe(gpuFree(d_dd_mat_D_local));
 
-    }}
+    }
 
     CDenseMatrix T_grad_t(natoms, 3);
 
@@ -1240,13 +1240,9 @@ computeNuclearPotentialGradientOnGPU(const CMolecule& molecule,
     {
     auto thread_id = omp_get_thread_num();
 
-    if (thread_id < num_gpus_per_node)
-    {
     auto gpu_id = thread_id;
-    auto gpu_rank = gpu_id + rank * num_gpus_per_node;
-    // auto gpu_count = nnodes * num_gpus_per_node;
 
-    gpuSafe(gpuSetDevice(gpu_rank % total_num_gpus_per_compute_node));
+    gpuSafe(gpuSetDevice(gpu_id));
 
     // Boys function (tabulated for order 0-28)
 
@@ -1577,6 +1573,8 @@ computeNuclearPotentialGradientOnGPU(const CMolecule& molecule,
 
     double *d_grad_array[3] = {d_grad_x, d_grad_y, d_grad_z};
 
+#pragma omp barrier
+
     // SS
 
     if (ss_prim_pair_count_local > 0)
@@ -1756,6 +1754,8 @@ computeNuclearPotentialGradientOnGPU(const CMolecule& molecule,
     gpu::chunkedMemcpyDeviceToHost<double>(V_grad_omp[gpu_id].row(1), d_grad_y, natoms);
     gpu::chunkedMemcpyDeviceToHost<double>(V_grad_omp[gpu_id].row(2), d_grad_z, natoms);
 
+#pragma omp barrier
+
     gpuSafe(gpuFree(d_grad_x));
     gpuSafe(gpuFree(d_grad_y));
     gpuSafe(gpuFree(d_grad_z));
@@ -1793,7 +1793,7 @@ computeNuclearPotentialGradientOnGPU(const CMolecule& molecule,
     gpuSafe(gpuFree(d_pd_mat_D_local));
     gpuSafe(gpuFree(d_dd_mat_D_local));
 
-    }}
+    }
 
     CDenseMatrix V_grad_t(natoms, 3);
 
@@ -1846,13 +1846,9 @@ computePointChargesGradientOnGPU(const CMolecule& molecule,
     {
     auto thread_id = omp_get_thread_num();
 
-    if (thread_id < num_gpus_per_node)
-    {
     auto gpu_id = thread_id;
-    auto gpu_rank = gpu_id + rank * num_gpus_per_node;
-    // auto gpu_count = nnodes * num_gpus_per_node;
 
-    gpuSafe(gpuSetDevice(gpu_rank % total_num_gpus_per_compute_node));
+    gpuSafe(gpuSetDevice(gpu_id));
 
     // Boys function (tabulated for order 0-28)
 
@@ -2181,6 +2177,8 @@ computePointChargesGradientOnGPU(const CMolecule& molecule,
 
     double *d_grad_array[3] = {d_grad_x, d_grad_y, d_grad_z};
 
+#pragma omp barrier
+
     // SS
 
     if (ss_prim_pair_count_local > 0)
@@ -2360,6 +2358,8 @@ computePointChargesGradientOnGPU(const CMolecule& molecule,
     gpu::chunkedMemcpyDeviceToHost<double>(V_grad_omp[gpu_id].row(1), d_grad_y, natoms);
     gpu::chunkedMemcpyDeviceToHost<double>(V_grad_omp[gpu_id].row(2), d_grad_z, natoms);
 
+#pragma omp barrier
+
     gpuSafe(gpuFree(d_grad_x));
     gpuSafe(gpuFree(d_grad_y));
     gpuSafe(gpuFree(d_grad_z));
@@ -2397,7 +2397,7 @@ computePointChargesGradientOnGPU(const CMolecule& molecule,
     gpuSafe(gpuFree(d_pd_mat_D_local));
     gpuSafe(gpuFree(d_dd_mat_D_local));
 
-    }}
+    }
 
     CDenseMatrix V_grad_t(natoms, 3);
 
@@ -2433,17 +2433,9 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 {
     // TODO sanity check for flag_K: SYMM or ANTISYMM
 
-    CGpuDevices gpu_devices;
-
-    const auto total_num_gpus_per_compute_node = gpu_devices.getNumberOfDevices();
-
-    // auto nthreads = omp_get_max_threads();
     auto num_gpus_per_node = screening.getNumGpusPerNode();
-    // auto num_threads_per_gpu = nthreads / num_gpus_per_node;
 
-    auto gpu_rank = rank * num_gpus_per_node;
-
-    gpuSafe(gpuSetDevice(gpu_rank % total_num_gpus_per_compute_node));
+    gpuSafe(gpuSetDevice(0));
 
     CMultiTimer timer;
 
@@ -2711,13 +2703,9 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
     {
     auto thread_id = omp_get_thread_num();
 
-    if (thread_id < num_gpus_per_node)
-    {
     auto gpu_id = thread_id;
-    auto gpu_rank = gpu_id + rank * num_gpus_per_node;
-    // auto gpu_count = nnodes * num_gpus_per_node;
 
-    gpuSafe(gpuSetDevice(gpu_rank % total_num_gpus_per_compute_node));
+    gpuSafe(gpuSetDevice(gpu_id));
 
     CMultiTimer timer;
 
@@ -2820,6 +2808,8 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
     gpu::chunkedMemcpyHostToDevice<uint32_t>(d_d_prim_aoinds, d_prim_aoinds.data(), d_prim_aoinds.size());
 
     timer.stop("GTO block prep.");
+
+#pragma omp barrier
 
     // GTO block pairs
 
@@ -3118,6 +3108,8 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
     gpu::chunkedMemcpyHostToDevice<double>(d_grad_z, Fock_grad_omp[gpu_id].row(2), natoms);
 
     double *d_grad_array[3] = {d_grad_x, d_grad_y, d_grad_z};
+
+#pragma omp barrier
 
     CTimer coulomb_timer;
 
@@ -11796,6 +11788,8 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
     screening.setCoulombTime(gpu_id, coulomb_elapsed_time);
 
+#pragma omp barrier
+
     gpuSafe(gpuFree(d_mat_D));
     gpuSafe(gpuFree(d_mat_J));
 
@@ -11859,6 +11853,8 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
     gpuSafe(gpuFree(d_pp_pair_data_local));
     gpuSafe(gpuFree(d_pd_pair_data_local));
     gpuSafe(gpuFree(d_dd_pair_data_local));
+
+#pragma omp barrier
 
     timer.start("Exchange prep.");
 
@@ -12161,6 +12157,8 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
     timer.stop("Exchange prep.");
 
     gpuSafe(gpuDeviceSynchronize());
+
+#pragma omp barrier
 
     CTimer exchange_timer;
 
@@ -24912,6 +24910,14 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
     screening.setExchangeTime(gpu_id, exchange_elapsed_time);
 
+    // copy gradient to host
+
+    gpu::chunkedMemcpyDeviceToHost<double>(Fock_grad_omp[gpu_id].row(0), d_grad_x, natoms);
+    gpu::chunkedMemcpyDeviceToHost<double>(Fock_grad_omp[gpu_id].row(1), d_grad_y, natoms);
+    gpu::chunkedMemcpyDeviceToHost<double>(Fock_grad_omp[gpu_id].row(2), d_grad_z, natoms);
+
+#pragma omp barrier
+
     gpuSafe(gpuFree(d_boys_func_table));
     gpuSafe(gpuFree(d_boys_func_ft));
 
@@ -24998,25 +25004,18 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
     gpuSafe(gpuFree(d_pair_data_K_dp));
     gpuSafe(gpuFree(d_pair_data_K_dd));
 
-    timer.stop("Total timing");
-
-    // std::cout << "\nTiming of ERIs on GPU " << gpu_rank << "\n";
-    // std::cout << "-----------------------\n";
-    // std::cout << timer.getSummary() << std::endl;
-
-    // copy gradient to host
-
-    gpu::chunkedMemcpyDeviceToHost<double>(Fock_grad_omp[gpu_id].row(0), d_grad_x, natoms);
-    gpu::chunkedMemcpyDeviceToHost<double>(Fock_grad_omp[gpu_id].row(1), d_grad_y, natoms);
-    gpu::chunkedMemcpyDeviceToHost<double>(Fock_grad_omp[gpu_id].row(2), d_grad_z, natoms);
-
     gpuSafe(gpuFree(d_grad_x));
     gpuSafe(gpuFree(d_grad_y));
     gpuSafe(gpuFree(d_grad_z));
 
     gpuSafe(gpuFree(d_prim_cart_ao_to_atom_inds));
 
-    }}
+    timer.stop("Total timing");
+
+    // std::cout << "\nTiming of ERIs on GPU " << gpu_id + rank * num_gpus_per_node << "\n";
+    // std::cout << "-----------------------\n";
+    // std::cout << timer.getSummary() << std::endl;
+    }
 
     CDenseMatrix Fock_grad_T (natoms, 3);
 
