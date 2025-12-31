@@ -109,11 +109,8 @@
 #include "EriCoulombGradientPDPP.hpp"
 #include "EriCoulombGradientPDPD.hpp"
 #include "EriCoulombGradientPDDD.hpp"
-#include "EriCoulombGradientDDSS.hpp"
-#include "EriCoulombGradientDDSP.hpp"
-#include "EriCoulombGradientDDSD.hpp"
-#include "EriCoulombGradientDDPP.hpp"
-#include "EriCoulombGradientDDPD.hpp"
+#include "EriCoulombGradientDDSX.hpp"
+#include "EriCoulombGradientDDPX.hpp"
 #include "EriCoulombGradientDDDD.hpp"
 
 #include "EriExchangeGradientSSSS.hpp"

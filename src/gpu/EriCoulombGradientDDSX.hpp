@@ -30,8 +30,8 @@
 //  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 //  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#ifndef EriCoulombGradientDDSD_hpp
-#define EriCoulombGradientDDSD_hpp
+#ifndef EriCoulombGradientDDSX_hpp
+#define EriCoulombGradientDDSX_hpp
 
 #include <cstdint>
 
@@ -39,6 +39,112 @@
 
 namespace gpu {  // gpu namespace
 
+
+__global__ void __launch_bounds__(TILE_SIZE_J)
+computeCoulombGradientDDSS_I_0(double*         grad_x,
+                               const uint32_t  grad_cart_ind,
+                               const double    prefac_coulomb,
+                               const double*   s_prim_info,
+                               const uint32_t  s_prim_count,
+                               const double*   d_prim_info,
+                               const uint32_t  d_prim_count,
+                               const double*   dd_mat_D_local,
+                               const double*   ss_mat_D,
+                               const double*   dd_mat_Q_local,
+                               const double*   ss_mat_Q,
+                               const uint32_t* dd_first_inds_local,
+                               const uint32_t* dd_second_inds_local,
+                               const double*   dd_pair_data_local,
+                               const uint32_t  dd_prim_pair_count_local,
+                               const uint32_t* ss_first_inds,
+                               const uint32_t* ss_second_inds,
+                               const double*   ss_pair_data,
+                               const uint32_t  ss_prim_pair_count,
+                               const uint32_t* prim_cart_ao_to_atom_inds,
+                               const uint32_t  p_prim_count,
+                               const double*   boys_func_table,
+                               const double*   boys_func_ft,
+                               const double    eri_threshold);
+
+__global__ void __launch_bounds__(TILE_SIZE_J)
+computeCoulombGradientDDSS_J_0(double*         grad_x,
+                               const uint32_t  grad_cart_ind,
+                               const double    prefac_coulomb,
+                               const double*   s_prim_info,
+                               const uint32_t  s_prim_count,
+                               const double*   d_prim_info,
+                               const uint32_t  d_prim_count,
+                               const double*   dd_mat_D_local,
+                               const double*   ss_mat_D,
+                               const double*   dd_mat_Q_local,
+                               const double*   ss_mat_Q,
+                               const uint32_t* dd_first_inds_local,
+                               const uint32_t* dd_second_inds_local,
+                               const double*   dd_pair_data_local,
+                               const uint32_t  dd_prim_pair_count_local,
+                               const uint32_t* ss_first_inds,
+                               const uint32_t* ss_second_inds,
+                               const double*   ss_pair_data,
+                               const uint32_t  ss_prim_pair_count,
+                               const uint32_t* prim_cart_ao_to_atom_inds,
+                               const uint32_t  p_prim_count,
+                               const double*   boys_func_table,
+                               const double*   boys_func_ft,
+                               const double    eri_threshold);
+
+__global__ void __launch_bounds__(TILE_SIZE_J)
+computeCoulombGradientDDSP_I_0(double*         grad_x,
+                               const uint32_t  grad_cart_ind,
+                               const double    prefac_coulomb,
+                               const double*   s_prim_info,
+                               const uint32_t  s_prim_count,
+                               const double*   p_prim_info,
+                               const uint32_t  p_prim_count,
+                               const double*   d_prim_info,
+                               const uint32_t  d_prim_count,
+                               const double*   dd_mat_D_local,
+                               const double*   sp_mat_D,
+                               const double*   dd_mat_Q_local,
+                               const double*   sp_mat_Q,
+                               const uint32_t* dd_first_inds_local,
+                               const uint32_t* dd_second_inds_local,
+                               const double*   dd_pair_data_local,
+                               const uint32_t  dd_prim_pair_count_local,
+                               const uint32_t* sp_first_inds,
+                               const uint32_t* sp_second_inds,
+                               const double*   sp_pair_data,
+                               const uint32_t  sp_prim_pair_count,
+                               const uint32_t* prim_cart_ao_to_atom_inds,
+                               const double*   boys_func_table,
+                               const double*   boys_func_ft,
+                               const double    eri_threshold);
+
+__global__ void __launch_bounds__(TILE_SIZE_J)
+computeCoulombGradientDDSP_J_0(double*         grad_x,
+                               const uint32_t  grad_cart_ind,
+                               const double    prefac_coulomb,
+                               const double*   s_prim_info,
+                               const uint32_t  s_prim_count,
+                               const double*   p_prim_info,
+                               const uint32_t  p_prim_count,
+                               const double*   d_prim_info,
+                               const uint32_t  d_prim_count,
+                               const double*   dd_mat_D_local,
+                               const double*   sp_mat_D,
+                               const double*   dd_mat_Q_local,
+                               const double*   sp_mat_Q,
+                               const uint32_t* dd_first_inds_local,
+                               const uint32_t* dd_second_inds_local,
+                               const double*   dd_pair_data_local,
+                               const uint32_t  dd_prim_pair_count_local,
+                               const uint32_t* sp_first_inds,
+                               const uint32_t* sp_second_inds,
+                               const double*   sp_pair_data,
+                               const uint32_t  sp_prim_pair_count,
+                               const uint32_t* prim_cart_ao_to_atom_inds,
+                               const double*   boys_func_table,
+                               const double*   boys_func_ft,
+                               const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombGradientDDSD_I_0(double*         grad_x,
