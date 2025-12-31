@@ -1641,18 +1641,8 @@ CGradientScreeningData::_sortQ(const int64_t                s_prim_count,
         _dd_mat_W_local[gpu_id]       = std::vector<double>(dd_batch_size);
 
         _dd_pair_data_local[gpu_id]   = std::vector<double>(dd_batch_size);
-    }
 
-    // auto nthreads = omp_get_max_threads();
-    // auto num_threads_per_gpu = nthreads / _num_gpus_per_node;
-
-    #pragma omp parallel
-    {
-        auto thread_id = omp_get_thread_num();
-
-        if (thread_id < _num_gpus_per_node)
         {
-            auto gpu_id = thread_id;
             auto gpu_rank = gpu_id + rank * _num_gpus_per_node;
             auto gpu_count = nnodes * _num_gpus_per_node;
 
@@ -3662,13 +3652,6 @@ auto CGradientScreeningData::form_pair_inds_for_K(const int64_t s_prim_count,
         }
     }
 
-    std::sort(sorted_ss_Qp_ik.begin(), sorted_ss_Qp_ik.end());
-    std::sort(sorted_sp_Qp_ik.begin(), sorted_sp_Qp_ik.end());
-    std::sort(sorted_sd_Qp_ik.begin(), sorted_sd_Qp_ik.end());
-    std::sort(sorted_pp_Qp_ik.begin(), sorted_pp_Qp_ik.end());
-    std::sort(sorted_pd_Qp_ik.begin(), sorted_pd_Qp_ik.end());
-    std::sort(sorted_dd_Qp_ik.begin(), sorted_dd_Qp_ik.end());
-
     const auto ss_pair_count_for_K = static_cast<int64_t>(sorted_ss_Qp_ik.size());
     const auto sp_pair_count_for_K = static_cast<int64_t>(sorted_sp_Qp_ik.size());
     const auto sd_pair_count_for_K = static_cast<int64_t>(sorted_sd_Qp_ik.size());
@@ -3762,18 +3745,8 @@ auto CGradientScreeningData::form_pair_inds_for_K(const int64_t s_prim_count,
         _local_pair_inds_k_for_K_dd[gpu_id] = std::vector<uint32_t>(dd_batch_size);
 
         _local_D_ik_for_K_dd[gpu_id] = std::vector<double>(dd_batch_size);
-    }
 
-    // auto nthreads = omp_get_max_threads();
-    // auto num_threads_per_gpu = nthreads / _num_gpus_per_node;
-
-    #pragma omp parallel
-    {
-        auto thread_id = omp_get_thread_num();
-
-        if (thread_id < _num_gpus_per_node)
         {
-            auto gpu_id = thread_id;
             auto gpu_rank = gpu_id + rank * _num_gpus_per_node;
             auto gpu_count = nnodes * _num_gpus_per_node;
 
