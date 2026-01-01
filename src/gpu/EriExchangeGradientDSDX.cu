@@ -84,7 +84,6 @@ computeExchangeGradientDSDS_I_0(double*         grad_x,
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
-
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
@@ -514,7 +513,6 @@ computeExchangeGradientDSDS_I_0(double*         grad_x,
                     );
 
             ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
-
         }
     }
 
@@ -581,7 +579,6 @@ computeExchangeGradientDSDS_K_0(double*         grad_x,
     // we make sure that ik < pair_inds_count_for_K_dd when calling the kernel
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
-
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -1008,7 +1005,6 @@ computeExchangeGradientDSDS_K_0(double*         grad_x,
                     );
 
             ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
-
         }
     }
 
@@ -1082,7 +1078,6 @@ computeExchangeGradientDSDP_I_0(double*         grad_x,
     // we make sure that ik < pair_inds_count_for_K_dd when calling the kernel
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
-
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -1650,7 +1645,6 @@ computeExchangeGradientDSDP_I_0(double*         grad_x,
                     );
 
             ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
-
         }
     }
 
@@ -1724,7 +1718,6 @@ computeExchangeGradientDSDP_K_0(double*         grad_x,
     // we make sure that ik < pair_inds_count_for_K_dd when calling the kernel
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
-
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -2316,7 +2309,6 @@ computeExchangeGradientDSDP_K_0(double*         grad_x,
                     );
 
             ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
-
         }
     }
 
@@ -2388,7 +2380,6 @@ computeExchangeGradientDSDD_I_0(double*         grad_x,
     // we make sure that ik < pair_inds_count_for_K_dd when calling the kernel
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
-
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -2694,7 +2685,6 @@ computeExchangeGradientDSDD_I_0(double*         grad_x,
                     );
 
             ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
-
         }
     }
 
@@ -2766,7 +2756,6 @@ computeExchangeGradientDSDD_I_1(double*         grad_x,
     // we make sure that ik < pair_inds_count_for_K_dd when calling the kernel
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
-
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -3089,7 +3078,6 @@ computeExchangeGradientDSDD_I_1(double*         grad_x,
                     );
 
             ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
-
         }
     }
 
@@ -3161,7 +3149,6 @@ computeExchangeGradientDSDD_I_2(double*         grad_x,
     // we make sure that ik < pair_inds_count_for_K_dd when calling the kernel
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
-
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -3429,7 +3416,6 @@ computeExchangeGradientDSDD_I_2(double*         grad_x,
                     );
 
             ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
-
         }
     }
 
@@ -3501,7 +3487,6 @@ computeExchangeGradientDSDD_I_3(double*         grad_x,
     // we make sure that ik < pair_inds_count_for_K_dd when calling the kernel
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
-
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -3746,7 +3731,6 @@ computeExchangeGradientDSDD_I_3(double*         grad_x,
                     );
 
             ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
-
         }
     }
 
@@ -3818,7 +3802,6 @@ computeExchangeGradientDSDD_I_4(double*         grad_x,
     // we make sure that ik < pair_inds_count_for_K_dd when calling the kernel
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
-
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -4130,7 +4113,6 @@ computeExchangeGradientDSDD_I_4(double*         grad_x,
                     );
 
             ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
-
         }
     }
 
@@ -4202,7 +4184,6 @@ computeExchangeGradientDSDD_K_0(double*         grad_x,
     // we make sure that ik < pair_inds_count_for_K_dd when calling the kernel
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
-
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -4514,7 +4495,6 @@ computeExchangeGradientDSDD_K_0(double*         grad_x,
                     );
 
             ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
-
         }
     }
 
@@ -4586,7 +4566,6 @@ computeExchangeGradientDSDD_K_1(double*         grad_x,
     // we make sure that ik < pair_inds_count_for_K_dd when calling the kernel
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
-
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -4931,7 +4910,6 @@ computeExchangeGradientDSDD_K_1(double*         grad_x,
                     );
 
             ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
-
         }
     }
 
@@ -5003,7 +4981,6 @@ computeExchangeGradientDSDD_K_2(double*         grad_x,
     // we make sure that ik < pair_inds_count_for_K_dd when calling the kernel
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
-
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -5255,7 +5232,6 @@ computeExchangeGradientDSDD_K_2(double*         grad_x,
                     );
 
             ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
-
         }
     }
 
@@ -5327,7 +5303,6 @@ computeExchangeGradientDSDD_K_3(double*         grad_x,
     // we make sure that ik < pair_inds_count_for_K_dd when calling the kernel
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
-
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -5578,7 +5553,6 @@ computeExchangeGradientDSDD_K_3(double*         grad_x,
                     );
 
             ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
-
         }
     }
 
@@ -5650,7 +5624,6 @@ computeExchangeGradientDSDD_K_4(double*         grad_x,
     // we make sure that ik < pair_inds_count_for_K_dd when calling the kernel
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
-
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -5958,7 +5931,6 @@ computeExchangeGradientDSDD_K_4(double*         grad_x,
                     );
 
             ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
-
         }
     }
 
