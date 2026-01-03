@@ -4677,8 +4677,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     const auto data_matrices_ABC_size = static_cast<size_t>(mat_full.getNumberOfElements()) * 3;
 
-    double* d_data_matrices_ABC;
-    gpuSafe(gpuMalloc(&d_data_matrices_ABC, data_matrices_ABC_size * sizeof(double)));
+    screening.resize_devptr_double(0, data_matrices_ABC_size);  // gpu_id 0
+
+    auto d_data_matrices_ABC = screening.get_devptr_double(0);  // gpu_id 0
 
     double *d_matrix_A = d_data_matrices_ABC;
     double *d_matrix_B = d_matrix_A + mat_full.getNumberOfElements();
@@ -4754,11 +4755,6 @@ computeFockOnGPU(const              CMolecule& molecule,
     gpu::chunkedMemcpyDeviceToHost<double>(mat_full.values(), d_matrix_B, mat_full.getNumberOfElements());
 
     timer.stop("Memcpy Q_prime");
-    timer.start("Prep. Q_prime Q");
-
-    gpuSafe(gpuFree(d_data_matrices_ABC));
-
-    timer.stop("Prep. Q_prime Q");
     timer.start("Prep. preLinK 1");
 
     screening.form_pair_inds_for_K(s_prim_count, p_prim_count, d_prim_count, mat_full, prelink_threshold);
@@ -5041,9 +5037,13 @@ computeFockOnGPU(const              CMolecule& molecule,
     data_J_uint32_size += static_cast<size_t>(dd_prim_pair_count_local);    // d_dd_first_inds_local 
     data_J_uint32_size += static_cast<size_t>(dd_prim_pair_count_local);    // d_dd_second_inds_local
 
-    double* d_data_J_double;
+    // J data on device
 
-    gpuSafe(gpuMalloc(&d_data_J_double, data_J_double_size * sizeof(double)));
+    screening.resize_devptr_double(gpu_id, data_J_double_size);
+    screening.resize_devptr_uint32(gpu_id, data_J_uint32_size);
+
+    auto d_data_J_double = screening.get_devptr_double(gpu_id);
+    auto d_data_J_uint32 = screening.get_devptr_uint32(gpu_id);
 
     double* d_mat_D              = d_data_J_double;
     double* d_mat_J              = d_mat_D + max_prim_pair_count;
@@ -5071,10 +5071,6 @@ computeFockOnGPU(const              CMolecule& molecule,
     double* d_pp_pair_data_local = d_sd_pair_data_local + sd_pair_data_local.size();
     double* d_pd_pair_data_local = d_pp_pair_data_local + pp_pair_data_local.size();
     double* d_dd_pair_data_local = d_pd_pair_data_local + pd_pair_data_local.size();
-
-    uint32_t* d_data_J_uint32;
-
-    gpuSafe(gpuMalloc(&d_data_J_uint32, data_J_uint32_size * sizeof(uint32_t)));
 
     uint32_t* d_ss_first_inds        = d_data_J_uint32;
     uint32_t* d_ss_second_inds       = d_ss_first_inds  + ss_prim_pair_count;
@@ -7557,11 +7553,6 @@ computeFockOnGPU(const              CMolecule& molecule,
 
 #pragma omp barrier
 
-    gpuSafe(gpuFree(d_data_J_double));
-    gpuSafe(gpuFree(d_data_J_uint32));
-
-#pragma omp barrier
-
     omptimers[thread_id].start("K prep.");
 
     // K preparation
@@ -7725,9 +7716,13 @@ computeFockOnGPU(const              CMolecule& molecule,
     data_K_uint32_size += pair_counts_K_dp.size();                          // d_pair_counts_K_dp
     data_K_uint32_size += pair_counts_K_dd.size();                          // d_pair_counts_K_dd
 
-    double* d_data_K_double;
+    // K data on device
 
-    gpuSafe(gpuMalloc(&d_data_K_double, data_K_double_size * sizeof(double)));
+    screening.resize_devptr_double(gpu_id, data_K_double_size);
+    screening.resize_devptr_uint32(gpu_id, data_K_uint32_size);
+
+    auto d_data_K_double = screening.get_devptr_double(gpu_id);
+    auto d_data_K_uint32 = screening.get_devptr_uint32(gpu_id);
 
     double* d_mat_K          = d_data_K_double;
     double* d_mat_D_full_AO  = d_mat_K          + max_pair_inds_count;
@@ -7749,10 +7744,6 @@ computeFockOnGPU(const              CMolecule& molecule,
     double* d_pair_data_K_pd = d_pair_data_K_pp + pair_data_K_pp.size();
     double* d_pair_data_K_dp = d_pair_data_K_pd + pair_data_K_pd.size();
     double* d_pair_data_K_dd = d_pair_data_K_dp + pair_data_K_dp.size();
-
-    uint32_t* d_data_K_uint32;
-
-    gpuSafe(gpuMalloc(&d_data_K_uint32, data_K_uint32_size * sizeof(uint32_t)));
 
     uint32_t* d_pair_inds_i_for_K_ss = d_data_K_uint32;
     uint32_t* d_pair_inds_k_for_K_ss = d_pair_inds_i_for_K_ss + pair_inds_count_for_K_ss;
@@ -11091,9 +11082,6 @@ computeFockOnGPU(const              CMolecule& molecule,
     gpuSafe(gpuDeviceSynchronize());
 
 #pragma omp barrier
-
-    gpuSafe(gpuFree(d_data_K_double));
-    gpuSafe(gpuFree(d_data_K_uint32));
 
     gpuSafe(gpuFree(d_data_boys_func));
 

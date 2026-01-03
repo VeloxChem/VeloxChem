@@ -126,250 +126,25 @@ CScreeningData::CScreeningData(const CMolecule& molecule,
 
     form_Q_and_D_inds_for_K();
 
-    const auto cart_naos = _s_prim_count + _p_prim_count * 3 + _d_prim_count * 6;
-
-    // allocate device pointers
-
-    const auto boys_func_table_size = boysfunc::getFullBoysFuncTableSize();
-    const auto boys_func_ft_size    = boysfunc::getBoysFuncFactorsSize();
-
-    const auto s_prim_info_size = 5 * _s_prim_count;
-    const auto p_prim_info_size = 5 * _p_prim_count;
-    const auto d_prim_info_size = 5 * _d_prim_count;
-
-    const auto s_prim_aoinds_size = 1 * _s_prim_count;
-    const auto p_prim_aoinds_size = 3 * _p_prim_count;
-    const auto d_prim_aoinds_size = 6 * _d_prim_count;
-
-    // Note: these counts are larger than those used in J computation
-    const auto ss_prim_pair_count = s_prim_aoinds_size * (s_prim_aoinds_size + 1) / 2;
-    const auto sp_prim_pair_count = s_prim_aoinds_size * p_prim_aoinds_size;
-    const auto sd_prim_pair_count = s_prim_aoinds_size * d_prim_aoinds_size;
-    const auto pp_prim_pair_count = p_prim_aoinds_size * (p_prim_aoinds_size + 1) / 2;
-    const auto pd_prim_pair_count = p_prim_aoinds_size * d_prim_aoinds_size;
-    const auto dd_prim_pair_count = d_prim_aoinds_size * (d_prim_aoinds_size + 1) / 2;
-
-    const auto max_prim_pair_count = std::max({ss_prim_pair_count, sp_prim_pair_count, sd_prim_pair_count,
-                                               pp_prim_pair_count, pd_prim_pair_count, dd_prim_pair_count});
-
-    const auto all_prim_pair_count = (ss_prim_pair_count + sp_prim_pair_count + sd_prim_pair_count +
-                                      pp_prim_pair_count + pd_prim_pair_count + dd_prim_pair_count);
-
-    // Note: these counts are larger than those used in K computation
-    const auto pair_inds_count_for_K_ss = ss_prim_pair_count;
-    const auto pair_inds_count_for_K_sp = sp_prim_pair_count;
-    const auto pair_inds_count_for_K_sd = sd_prim_pair_count;
-    const auto pair_inds_count_for_K_pp = pp_prim_pair_count;
-    const auto pair_inds_count_for_K_pd = pd_prim_pair_count;
-    const auto pair_inds_count_for_K_dd = dd_prim_pair_count;
-
-    const auto max_pair_inds_count = std::max({pair_inds_count_for_K_ss, pair_inds_count_for_K_sp, pair_inds_count_for_K_pp,
-                                               pair_inds_count_for_K_sd, pair_inds_count_for_K_pd, pair_inds_count_for_K_dd});
-
-    const auto all_pair_inds_count = (pair_inds_count_for_K_ss + pair_inds_count_for_K_sp + pair_inds_count_for_K_pp +
-                                      pair_inds_count_for_K_sd + pair_inds_count_for_K_pd + pair_inds_count_for_K_dd);
-
-    const auto all_prim_aoinds_size = (s_prim_aoinds_size + p_prim_aoinds_size + d_prim_aoinds_size);
-
-    _d_data_boys_func       = std::vector<double*>(num_gpus_per_node);
-    _d_data_spd_prim_info   = std::vector<double*>(num_gpus_per_node);
-    _d_data_spd_prim_aoinds = std::vector<uint32_t*>(num_gpus_per_node);
-
-    _d_data_matrices_ABC = std::vector<double*>(num_gpus_per_node);
-
-    _d_data_mat_D_J                 = std::vector<double*>(num_gpus_per_node);
-    _d_data_mat_Q                   = std::vector<double*>(num_gpus_per_node);
-    _d_data_first_second_inds       = std::vector<uint32_t*>(num_gpus_per_node);
-    _d_data_pair_data               = std::vector<double*>(num_gpus_per_node);
-    _d_data_mat_Q_local             = std::vector<double*>(num_gpus_per_node);
-    _d_data_first_second_inds_local = std::vector<uint32_t*>(num_gpus_per_node);
-    _d_data_pair_data_local         = std::vector<double*>(num_gpus_per_node);
-
-    _d_data_mat_K                = std::vector<double*>(num_gpus_per_node);
-    _d_data_pair_inds_for_K      = std::vector<uint32_t*>(num_gpus_per_node);
-    _d_data_mat_D_full_AO        = std::vector<double*>(num_gpus_per_node);
-    _d_data_Q_K                  = std::vector<double*>(num_gpus_per_node);
-    _d_data_D_inds_K             = std::vector<uint32_t*>(num_gpus_per_node);
-    _d_data_pair_counts_displs_K = std::vector<uint32_t*>(num_gpus_per_node);
-    _d_data_pair_data_K          = std::vector<double*>(num_gpus_per_node);
+    // device pointers
 
     _devptr_double = std::vector<double*>(num_gpus_per_node);
     _devptr_uint32 = std::vector<uint32_t*>(num_gpus_per_node);
+
+    _size_devptr_double = std::vector<size_t>(num_gpus_per_node);
+    _size_devptr_uint32 = std::vector<size_t>(num_gpus_per_node);
 
     for (int64_t gpu_id = 0; gpu_id < num_gpus_per_node; gpu_id++)
     {
         gpuSafe(gpuSetDevice(gpu_id));
 
-        const auto ss_prim_pair_count_local = ss_prim_pair_count;
-        const auto sp_prim_pair_count_local = sp_prim_pair_count;
-        const auto sd_prim_pair_count_local = sd_prim_pair_count;
-        const auto pp_prim_pair_count_local = pp_prim_pair_count;
-        const auto pd_prim_pair_count_local = pd_prim_pair_count;
-        const auto dd_prim_pair_count_local = dd_prim_pair_count;
+        // allocate data with initial size of 1
 
-        const auto max_prim_pair_count_local = std::max({ss_prim_pair_count_local, sp_prim_pair_count_local,
-                                                         sd_prim_pair_count_local, pp_prim_pair_count_local,
-                                                         pd_prim_pair_count_local, dd_prim_pair_count_local});
+        _size_devptr_double[gpu_id] = 1;
+        _size_devptr_uint32[gpu_id] = 1;
 
-        const auto all_prim_pair_count_local = (ss_prim_pair_count_local + sp_prim_pair_count_local +
-                                                sd_prim_pair_count_local + pp_prim_pair_count_local +
-                                                pd_prim_pair_count_local + dd_prim_pair_count_local);
-
-        // calculate general size
-
-        const auto size_general_double = ((boys_func_table_size + boys_func_ft_size) +
-                                          (s_prim_info_size + p_prim_info_size + d_prim_info_size));
-        const auto size_general_uint32 = (s_prim_aoinds_size + p_prim_aoinds_size + d_prim_aoinds_size);
-
-        // calculate preLinK size
-
-        const auto size_prelink_double = 3 * cart_naos * cart_naos;
-
-        // calculate J size
-
-        // d_data_mat_D_J, (max_prim_pair_count + max_prim_pair_count_local) * sizeof(double)
-        //
-        // d_data_mat_Q, (ss_prim_pair_count + sp_prim_pair_count + sd_prim_pair_count +
-        //                pp_prim_pair_count + pd_prim_pair_count + dd_prim_pair_count) * sizeof(double)
-        //
-        // d_data_first_second_inds, (ss_prim_pair_count + ss_prim_pair_count +
-        //                            sp_prim_pair_count + sp_prim_pair_count +
-        //                            sd_prim_pair_count + sd_prim_pair_count +
-        //                            pp_prim_pair_count + pp_prim_pair_count +
-        //                            pd_prim_pair_count + pd_prim_pair_count +
-        //                            dd_prim_pair_count + dd_prim_pair_count) * sizeof(uint32_t)
-        //
-        // d_data_pair_data, (ss_pair_data.size() + sp_pair_data.size() + sd_pair_data.size() +
-        //                    pp_pair_data.size() + pd_pair_data.size() + dd_pair_data.size()) * sizeof(double)
-        //
-        // d_data_mat_Q_local, (ss_prim_pair_count_local + sp_prim_pair_count_local + sd_prim_pair_count_local +
-        //                      pp_prim_pair_count_local + pd_prim_pair_count_local + dd_prim_pair_count_local) * sizeof(double)
-        //
-        // d_data_first_second_inds_local, (ss_prim_pair_count_local + ss_prim_pair_count_local +
-        //                                  sp_prim_pair_count_local + sp_prim_pair_count_local +
-        //                                  sd_prim_pair_count_local + sd_prim_pair_count_local +
-        //                                  pp_prim_pair_count_local + pp_prim_pair_count_local +
-        //                                  pd_prim_pair_count_local + pd_prim_pair_count_local +
-        //                                  dd_prim_pair_count_local + dd_prim_pair_count_local) * sizeof(uint32_t)
-        //
-        // d_data_pair_data_local, (ss_pair_data_local.size() + sp_pair_data_local.size() + sd_pair_data_local.size() +
-        //                          pp_pair_data_local.size() + pd_pair_data_local.size() + dd_pair_data_local.size()) * sizeof(double)
-
-        // size for double* pointers
-        // _d_data_mat_D_J
-        // _d_data_mat_Q
-        // _d_data_pair_data
-        // _d_data_mat_Q_local
-        // _d_data_pair_data_local
-        const auto size_J_double = ((max_prim_pair_count + max_prim_pair_count_local) +
-                                    all_prim_pair_count +
-                                    all_prim_pair_count +
-                                    all_prim_pair_count_local +
-                                    all_prim_pair_count_local);
-
-        // size for uint32_t* pointers
-        // _d_data_first_second_inds
-        // _d_data_first_second_inds_local
-        const auto size_J_uint32 = (all_prim_pair_count * 2 +
-                                    all_prim_pair_count_local * 2);
-
-        // calculate K size
-
-        // d_mat_K, max_pair_inds_count * sizeof(double)
-        //
-        // d_data_pair_inds_for_K, (pair_inds_count_for_K_ss + pair_inds_count_for_K_ss +
-        //                          pair_inds_count_for_K_sp + pair_inds_count_for_K_sp +
-        //                          pair_inds_count_for_K_sd + pair_inds_count_for_K_sd +
-        //                          pair_inds_count_for_K_pp + pair_inds_count_for_K_pp +
-        //                          pair_inds_count_for_K_pd + pair_inds_count_for_K_pd +
-        //                          pair_inds_count_for_K_dd + pair_inds_count_for_K_dd) * sizeof(uint32_t)
-        //
-        // d_mat_D_full_AO, cart_naos * cart_naos * sizeof(double)
-        //
-        // d_data_Q_K, (Q_K_ss.size() + Q_K_sp.size() + Q_K_sd.size() +
-        //              Q_K_ps.size() + Q_K_pp.size() + Q_K_pd.size() +
-        //              Q_K_ds.size() + Q_K_dp.size() + Q_K_dd.size()) * sizeof(double)
-        //
-        // d_data_D_inds_K, (D_inds_K_ss.size() + D_inds_K_sp.size() + D_inds_K_sd.size() +
-        //                   D_inds_K_ps.size() + D_inds_K_pp.size() + D_inds_K_pd.size() +
-        //                   D_inds_K_ds.size() + D_inds_K_dp.size() + D_inds_K_dd.size()) * sizeof(uint32_t)
-        //
-        // d_data_pair_counts_displs_K, (pair_counts_K_ss.size() + pair_counts_K_sp.size() + pair_counts_K_sd.size() +
-        //                               pair_counts_K_ps.size() + pair_counts_K_pp.size() + pair_counts_K_pd.size() +
-        //                               pair_counts_K_ds.size() + pair_counts_K_dp.size() + pair_counts_K_dd.size() +
-        //                               pair_displs_K_ss.size() + pair_displs_K_sp.size() + pair_displs_K_sd.size() +
-        //                               pair_displs_K_ps.size() + pair_displs_K_pp.size() + pair_displs_K_pd.size() +
-        //                               pair_displs_K_ds.size() + pair_displs_K_dp.size() + pair_displs_K_dd.size()) * sizeof(uint32_t)
-        //
-        // d_data_pair_data_K, (pair_data_K_ss.size() + pair_data_K_sp.size() + pair_data_K_sd.size() +
-        //                      pair_data_K_ps.size() + pair_data_K_pp.size() + pair_data_K_pd.size() +
-        //                      pair_data_K_ds.size() + pair_data_K_dp.size() + pair_data_K_dd.size()) * sizeof(double)
-
-        // size for double* pointers
-        // _d_data_mat_K
-        // _d_data_mat_D_full_AO
-        // _d_data_Q_K
-        // _d_data_pair_data_K
-        const auto size_K_double = (max_pair_inds_count +
-                                    cart_naos * cart_naos +
-                                    cart_naos * cart_naos +
-                                    cart_naos * cart_naos);
-
-        // size for uint32_t* pointers
-        // _d_data_pair_inds_for_K
-        // _d_data_D_inds_K
-        // _d_data_pair_counts_displs_K
-        const auto size_K_uint32 = (all_pair_inds_count * 2 +
-                                    cart_naos * cart_naos +
-                                    all_prim_aoinds_size * 3 * 2);
-
-        // allocate data
-
-        const auto size_JK_double = std::max({size_prelink_double, size_J_double, size_K_double});
-        const auto size_JK_uint32 = std::max({size_J_uint32, size_K_uint32});
-
-        gpuSafe(gpuMalloc(&_devptr_double[gpu_id], (size_general_double + size_JK_double) * sizeof(double)));
-        gpuSafe(gpuMalloc(&_devptr_uint32[gpu_id], (size_general_uint32 + size_JK_uint32) * sizeof(uint32_t)));
-
-        // prepare genral data (Boys function and primitive AOs)
-
-        // _d_data_boys_func, (boys_func_table_size + boys_func_ft_size) * sizeof(double)
-        // _d_data_spd_prim_info, (s_prim_info_size + p_prim_info_size + d_prim_info_size) * sizeof(double)
-        _d_data_boys_func[gpu_id] = _devptr_double[gpu_id];
-        _d_data_spd_prim_info[gpu_id] = _d_data_boys_func[gpu_id] + (boys_func_table_size + boys_func_ft_size);
-
-        // _d_data_spd_prim_aoinds, (s_prim_aoinds_size + p_prim_aoinds_size + d_prim_aoinds_size) * sizeof(uint32_t)
-        _d_data_spd_prim_aoinds[gpu_id] = _devptr_uint32[gpu_id];
-
-        // prepare preLinK pointers (the same memory is also used by J and K)
-
-        _d_data_matrices_ABC[gpu_id] = _d_data_spd_prim_info[gpu_id] + (s_prim_info_size + p_prim_info_size + d_prim_info_size);
-
-        // prepare J pointers (the same memory is also used by preLinK and K)
-
-        // double* pointers for J
-        _d_data_mat_D_J[gpu_id]         = _d_data_spd_prim_info[gpu_id] + (s_prim_info_size + p_prim_info_size + d_prim_info_size);
-        _d_data_mat_Q[gpu_id]           = _d_data_mat_D_J[gpu_id] + (max_prim_pair_count + max_prim_pair_count_local);
-        _d_data_pair_data[gpu_id]       = _d_data_mat_Q[gpu_id] + all_prim_pair_count;
-        _d_data_mat_Q_local[gpu_id]     = _d_data_pair_data[gpu_id] + all_prim_pair_count;
-        _d_data_pair_data_local[gpu_id] = _d_data_mat_Q_local[gpu_id] + all_prim_pair_count_local;
-
-        // uint32_t* pointers for J
-        _d_data_first_second_inds[gpu_id]       = _d_data_spd_prim_aoinds[gpu_id] + (s_prim_aoinds_size + p_prim_aoinds_size + d_prim_aoinds_size);
-        _d_data_first_second_inds_local[gpu_id] = _d_data_first_second_inds[gpu_id] + all_prim_pair_count * 2;
-
-        // prepare K pointers (the same memory is also used by preLinK and J)
-
-        // double* pointers for K
-        _d_data_mat_K[gpu_id]         = _d_data_spd_prim_info[gpu_id] + (s_prim_info_size + p_prim_info_size + d_prim_info_size);
-        _d_data_mat_D_full_AO[gpu_id] = _d_data_mat_K[gpu_id] + max_pair_inds_count;
-        _d_data_Q_K[gpu_id]           = _d_data_mat_D_full_AO[gpu_id] + cart_naos * cart_naos;
-        _d_data_pair_data_K[gpu_id]   = _d_data_Q_K[gpu_id] + cart_naos * cart_naos;
-
-        // uint32_t* pointers for K
-        _d_data_pair_inds_for_K[gpu_id]      = _d_data_spd_prim_aoinds[gpu_id] + (s_prim_aoinds_size + p_prim_aoinds_size + d_prim_aoinds_size);
-        _d_data_D_inds_K[gpu_id]             = _d_data_pair_inds_for_K[gpu_id] + all_pair_inds_count * 2;
-        _d_data_pair_counts_displs_K[gpu_id] = _d_data_D_inds_K[gpu_id] + cart_naos * cart_naos;
+        gpuSafe(gpuMalloc(&_devptr_double[gpu_id], _size_devptr_double[gpu_id] * sizeof(double)));
+        gpuSafe(gpuMalloc(&_devptr_uint32[gpu_id], _size_devptr_uint32[gpu_id] * sizeof(uint32_t)));
     }
 
     gpuSafe(gpuSetDevice(0));
@@ -404,111 +179,59 @@ CScreeningData::reset_mpi(const int rank, const int nnodes) -> void
 }
 
 auto
-CScreeningData::get_devptr_data_boys_func(const int64_t gpu_id) const -> double*
+CScreeningData::get_size_devptr_double(const int64_t gpu_id) const -> size_t
 {
-    return _d_data_boys_func[gpu_id];
+    return _size_devptr_double[gpu_id];
 }
 
 auto
-CScreeningData::get_devptr_data_spd_prim_info(const int64_t gpu_id) const -> double*
+CScreeningData::get_size_devptr_uint32(const int64_t gpu_id) const -> size_t
 {
-    return _d_data_spd_prim_info[gpu_id];
+    return _size_devptr_uint32[gpu_id];
 }
 
 auto
-CScreeningData::get_devptr_data_spd_prim_aoinds(const int64_t gpu_id) const -> uint32_t*
+CScreeningData::get_devptr_double(const int64_t gpu_id) const -> double*
 {
-    return _d_data_spd_prim_aoinds[gpu_id];
+    return _devptr_double[gpu_id];
 }
 
 auto
-CScreeningData::get_devptr_data_matrices_ABC(const int64_t gpu_id) const -> double*
+CScreeningData::get_devptr_uint32(const int64_t gpu_id) const -> uint32_t*
 {
-    return _d_data_matrices_ABC[gpu_id];
+    return _devptr_uint32[gpu_id];
 }
 
 auto
-CScreeningData::get_devptr_data_mat_D_J(const int64_t gpu_id) const -> double*
+CScreeningData::resize_devptr_double(const int64_t gpu_id, const size_t n) -> void
 {
-    return _d_data_mat_D_J[gpu_id];
+    if (n <= _size_devptr_double[gpu_id]) return;
+
+    gpuSafe(gpuSetDevice(gpu_id));
+
+    gpuSafe(gpuFree(_devptr_double[gpu_id]));
+
+    gpuSafe(gpuDeviceSynchronize());
+
+    _size_devptr_double[gpu_id] = n;
+
+    gpuSafe(gpuMalloc(&_devptr_double[gpu_id], _size_devptr_double[gpu_id] * sizeof(double)));
 }
 
 auto
-CScreeningData::get_devptr_data_mat_Q(const int64_t gpu_id) const -> double*
+CScreeningData::resize_devptr_uint32(const int64_t gpu_id, const size_t n) -> void
 {
-    return _d_data_mat_Q[gpu_id];
-}
+    if (n <= _size_devptr_uint32[gpu_id]) return;
 
-auto
-CScreeningData::get_devptr_data_first_second_inds(const int64_t gpu_id) const -> uint32_t*
-{
-    return _d_data_first_second_inds[gpu_id];
-}
+    gpuSafe(gpuSetDevice(gpu_id));
 
-auto
-CScreeningData::get_devptr_data_pair_data(const int64_t gpu_id) const -> double*
-{
-    return _d_data_pair_data[gpu_id];
-}
+    gpuSafe(gpuFree(_devptr_uint32[gpu_id]));
 
-auto
-CScreeningData::get_devptr_data_mat_Q_local(const int64_t gpu_id) const -> double*
-{
-    return _d_data_mat_Q_local[gpu_id];
-}
+    gpuSafe(gpuDeviceSynchronize());
 
-auto
-CScreeningData::get_devptr_data_first_second_inds_local(const int64_t gpu_id) const -> uint32_t*
-{
-    return _d_data_first_second_inds_local[gpu_id];
-}
+    _size_devptr_uint32[gpu_id] = n;
 
-auto
-CScreeningData::get_devptr_data_pair_data_local(const int64_t gpu_id) const -> double*
-{
-    return _d_data_pair_data_local[gpu_id];
-}
-
-auto
-CScreeningData::get_devptr_data_mat_K(const int64_t gpu_id) const -> double*
-{
-    return _d_data_mat_K[gpu_id];
-}
-
-auto
-CScreeningData::get_devptr_data_pair_inds_for_K(const int64_t gpu_id) const -> uint32_t*
-{
-    return _d_data_pair_inds_for_K[gpu_id];
-}
-
-auto
-CScreeningData::get_devptr_data_mat_D_full_AO(const int64_t gpu_id) const -> double*
-{
-    return _d_data_mat_D_full_AO[gpu_id];
-}
-
-auto
-CScreeningData::get_devptr_data_Q_K(const int64_t gpu_id) const -> double*
-{
-    return _d_data_Q_K[gpu_id];
-}
-
-auto
-CScreeningData::get_devptr_data_D_inds_K(const int64_t gpu_id) const -> uint32_t*
-{
-    return _d_data_D_inds_K[gpu_id];
-}
-
-auto
-CScreeningData::get_devptr_data_pair_counts_displs_K(const int64_t gpu_id) const -> uint32_t*
-{
-    return _d_data_pair_counts_displs_K[gpu_id];
-}
-
-auto
-CScreeningData::get_devptr_data_pair_data_K(const int64_t gpu_id) const -> double*
-{
-    return _d_data_pair_data_K[gpu_id];
+    gpuSafe(gpuMalloc(&_devptr_uint32[gpu_id], _size_devptr_uint32[gpu_id] * sizeof(uint32_t)));
 }
 
 auto

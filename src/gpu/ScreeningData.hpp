@@ -72,30 +72,11 @@ class CScreeningData
     std::vector<uint32_t> _d_prim_aoinds;
 
     // gpu pointers
-    std::vector<double*> _d_data_boys_func;
-    std::vector<double*> _d_data_spd_prim_info;
-    std::vector<uint32_t*> _d_data_spd_prim_aoinds;
-
-    std::vector<double*> _d_data_matrices_ABC;
-
-    std::vector<double*> _d_data_mat_D_J;
-    std::vector<double*> _d_data_mat_Q;
-    std::vector<uint32_t*> _d_data_first_second_inds;
-    std::vector<double*> _d_data_pair_data;
-    std::vector<double*> _d_data_mat_Q_local;
-    std::vector<uint32_t*> _d_data_first_second_inds_local;
-    std::vector<double*> _d_data_pair_data_local;
-
-    std::vector<double*> _d_data_mat_K;
-    std::vector<uint32_t*> _d_data_pair_inds_for_K;
-    std::vector<double*> _d_data_mat_D_full_AO;
-    std::vector<double*> _d_data_Q_K;
-    std::vector<uint32_t*> _d_data_D_inds_K;
-    std::vector<uint32_t*> _d_data_pair_counts_displs_K;
-    std::vector<double*> _d_data_pair_data_K;
-
     std::vector<double*>   _devptr_double;
     std::vector<uint32_t*> _devptr_uint32;
+
+    std::vector<size_t> _size_devptr_double;
+    std::vector<size_t> _size_devptr_uint32;
 
     // cpu data
     CDenseMatrix _Q_matrix_ss;
@@ -254,30 +235,14 @@ class CScreeningData
 
     auto reset_mpi(const int rank, const int nnodes) -> void;
 
-    auto get_devptr_data_boys_func(const int64_t gpu_id) const -> double*;
-    auto get_devptr_data_spd_prim_info(const int64_t gpu_id) const -> double*;
-    auto get_devptr_data_spd_prim_aoinds(const int64_t gpu_id) const -> uint32_t*;
-
-    auto get_devptr_data_matrices_ABC(const int64_t gpu_id) const -> double*;
-
-    auto get_devptr_data_mat_D_J(const int64_t gpu_id) const -> double*;
-    auto get_devptr_data_mat_Q(const int64_t gpu_id) const -> double*;
-    auto get_devptr_data_pair_data(const int64_t gpu_id) const -> double*;
-    auto get_devptr_data_mat_Q_local(const int64_t gpu_id) const -> double*;
-    auto get_devptr_data_pair_data_local(const int64_t gpu_id) const -> double*;
-    auto get_devptr_data_first_second_inds(const int64_t gpu_id) const -> uint32_t*;
-    auto get_devptr_data_first_second_inds_local(const int64_t gpu_id) const -> uint32_t*;
-
-    auto get_devptr_data_mat_K(const int64_t gpu_id) const -> double*;
-    auto get_devptr_data_mat_D_full_AO(const int64_t gpu_id) const -> double*;
-    auto get_devptr_data_Q_K(const int64_t gpu_id) const -> double*;
-    auto get_devptr_data_pair_data_K(const int64_t gpu_id) const -> double*;
-    auto get_devptr_data_pair_inds_for_K(const int64_t gpu_id) const -> uint32_t*;
-    auto get_devptr_data_D_inds_K(const int64_t gpu_id) const -> uint32_t*;
-    auto get_devptr_data_pair_counts_displs_K(const int64_t gpu_id) const -> uint32_t*;
+    auto get_size_devptr_double(const int64_t gpu_id) const -> size_t;
+    auto get_size_devptr_uint32(const int64_t gpu_id) const -> size_t;
 
     auto get_devptr_double(const int64_t gpu_id) const -> double*;
     auto get_devptr_uint32(const int64_t gpu_id) const -> uint32_t*;
+
+    auto resize_devptr_double(const int64_t gpu_id, const size_t n) -> void;
+    auto resize_devptr_uint32(const int64_t gpu_id, const size_t n) -> void;
 
     auto getNumGpusPerNode() const -> const int64_t;
 
