@@ -115,6 +115,7 @@ class InterpolationDriver():
         self.scaling_time = False
         self.exponent_q = None
         self.confidence_radius = 0.5
+        self.alpha = 1.0
         
         self.distance_thrsh = 2.0
         self.z_matrix = z_matrix
@@ -131,6 +132,8 @@ class InterpolationDriver():
         self.potentials = []
         self.gradients = []
         self.distance_molecule = None
+
+        self.external_weights = None
 
         self.calc_hess = True        
         
@@ -525,6 +528,8 @@ class InterpolationDriver():
         if self.weightfunction_type == 'cartesian':
             for i, data_point in enumerate(self.qm_data_points[:]):
                 
+                if self.external_weights is not None:
+                    data_point.confidence_radius = self.external_weights[i]
                 distance, dihedral_dist, denominator, weight_gradient, distance_vec, _, _, dw_da_dx = self.cartesian_distance(data_point)
                 # if i < 2:
                 #     num_grad, num_grad_dw_da = numerical_gradient(self.cartesian_distance, self.molecule.get_coordinates_in_bohr(), data_point)
@@ -563,7 +568,7 @@ class InterpolationDriver():
         for qm_data_point, distance, dihedral_dist, denominator_cart, weight_grad_cart, distance_vector, label_idx in close_distances:
             
             weight_cart = 1.0 / (denominator_cart)
-
+        
             sum_weights_cart += weight_cart
             sum_weight_gradients_cart += weight_grad_cart
 
@@ -613,6 +618,7 @@ class InterpolationDriver():
         # --- 4.  book-keeping (optional) ---------------------------------------------
         for lbl, Wi in zip(used_labels, W_i):
             self.weights[lbl] = Wi
+        print('weights', self.weights)
         # self.sum_of_weights      = W_i.sum()          # if you really need it later
         self.averaged_int_dist   = np.tensordot(W_i, averaged_int_dists, axes=1)
 
@@ -1047,7 +1053,7 @@ class InterpolationDriver():
 
         return trust_radius_weight_gradient_gradient
     
-    def target_customized_shepard_weight_gradient(self, distance_vector, distance, confidence_radius, imp_int_coords_distance, imp_int_coordinate_derivative):
+    def YM_target_customized_shepard_weight_gradient(self, distance_vector, distance, confidence_radius, imp_int_coords_distance, imp_int_coordinate_derivative):
         """ Returns the derivative of an unormalized Shepard interpolation
             weight with respect to the Cartesian coordinates in
             self.impes_coordinate
@@ -1079,6 +1085,37 @@ class InterpolationDriver():
         
    
         return  denominator, weight_gradient.reshape(distance_vector.shape[0], 3)
+    
+    def VL_target_customized_shepard_weight_gradient(self, distance_vector, distance, confidence_radius, dq, dq_dx):
+        """ Returns the derivative of an unormalized Shepard interpolation
+            weight with respect to the Cartesian coordinates in
+            self.impes_coordinate
+
+            :param distance_vector:
+                The Cartesian distance vector between
+                the current data_point and self.impes_coordinate.
+            :param distance:
+                The norm of the distance vector * sqrt(N), N number of atoms.
+        """
+
+        denominator = (
+            (distance / confidence_radius)**(2 * self.exponent_p) +
+            (distance / confidence_radius)**(2 * self.exponent_q))
+        derivative_p = (self.exponent_p * distance_vector *
+                        distance**(2 * self.exponent_p - 2) /
+                        confidence_radius**(2 * self.exponent_p))
+        derivative_q = (self.exponent_q * distance_vector *
+                        distance**(2 * self.exponent_q - 2) /
+                        confidence_radius**(2 * self.exponent_q))
+        
+        weight_gradient = (-1.0 * (2.0 * (derivative_p + derivative_q)) *
+                       (1.0 / (denominator**2)))
+        
+        final_denominator = denominator * np.exp(self.alpha * dq)
+
+        final_weight_gradient = (weight_gradient.reshape(-1) * np.exp(-self.alpha * dq) - 1.0/denominator * self.alpha * np.exp(-self.alpha * dq) * dq_dx).reshape(-1, 3)
+
+        return  final_denominator, final_weight_gradient
     
     def trust_radius_weight_gradient_hessian(self, confidence_radius, distance, imp_int_coords_distance):
 
@@ -1142,10 +1179,18 @@ class InterpolationDriver():
         return  denominator, weight_gradient
     
     
-    def calculate_translation_coordinates(self, given_coordinates):
+    def calculate_translation_coordinates(self, given_coordinates, weights=None):
         """Center the molecule by translating its geometric center to (0, 0, 0)."""
+        
+        if weights is not None:
+            w = np.asarray(w, dtype=float)
+            W = np.sum(w)
+            return given_coordinates - np.sum(given_coordinates * w[:, None], axis=0) / W
+
         center = np.mean(given_coordinates, axis=0)
         translated_coordinates = given_coordinates - center
+
+
 
         return translated_coordinates
 
@@ -1215,24 +1260,40 @@ class InterpolationDriver():
         grad_s = 1.0
         Xc = center_reference_coordinates_core     # variable (current geometry)
         Yc = center_target_coordinates_core        # fixed (datapoint)
-        R  = geometric.rotate.get_rot(Yc, Xc)
+        R_x  = geometric.rotate.get_rot(Yc, Xc)
 
-        rotated_current = (R @ Yc.T).T
+        rotated_current = (R_x @ Yc.T).T
         distance_vector_sub =  Xc - rotated_current
         distance = np.linalg.norm(distance_vector_sub)
 
-        distance_vector = np.zeros_like(reference_coordinates)   # (natms,3)
-        distance_vector[self.symmetry_information[3]] = distance_vector_sub
-  
+        # distance_vector_sub = np.zeros_like(reference_coordinates)   # (natms,3)
+        
+        distance_vector_sub[self.symmetry_information[3]] = distance_vector_sub
 
 
+        # grad_s = distance_vector_sub @ R_x
+        # grad_s -= grad_s.mean(axis=0, keepdims=True)
+
+        # distance_vector_sub = grad_s
+        
         dihedral_dist = 0.0
         if distance < 1e-8:
             distance = 1e-8
             distance_vector_sub[:] = 0
+
+        H_eff = data_point.internal_hessian
+        eigval, V = np.linalg.eigh(H_eff)
+
+        participation = V**2  # shape (n_coord, n_modes)
+
+        # For each internal coordinate, find dominant eigenmode
+        dominant_mode_per_coord = np.argmax(participation, axis=1)
+        coord_curvature = np.sum(eigval * (V**2), axis=1)
+        # print(self.z_matrix)
+        # print('True decomposition', coord_curvature)
             
         # sum of the derivative necessary 
-        imp_int_coord_derivative_contribution = np.zeros_like(distance_vector).reshape(-1)
+        imp_int_coord_derivative_contribution = np.zeros_like(distance_vector_sub).reshape(-1)
         imp_int_coord_distance = 0
 
         if self.use_tc_weights:
@@ -1245,7 +1306,7 @@ class InterpolationDriver():
                     imp_int_coord_distance += np.sin(org_imp_int_coord_distance)**2            
                 
                 else:
-                    imp_int_coord_distance += org_imp_int_coord_distance**2
+                    imp_int_coord_distance += (org_imp_int_coord_distance)**2
                     unmw_b_matrix = self.impes_coordinate.b_matrix[idx, :] / self.impes_coordinate.inv_sqrt_masses
                     imp_int_coord_derivative_contribution += 2.0 * unmw_b_matrix * org_imp_int_coord_distance
                 
@@ -1253,20 +1314,45 @@ class InterpolationDriver():
                 imp_int_coord_distance = 1e-8
                 imp_int_coord_derivative_contribution[:] = 0
 
+        dq = []
+        dq_dx = np.zeros_like(distance_vector_sub).reshape(-1)
+        if self.use_tc_weights:
+            for element in data_point.imp_int_coordinates:
+                idx = self.z_matrix.index(element)
+                org_imp_int_coord_distance = (self.impes_coordinate.internal_coordinates_values[idx] - data_point.internal_coordinates_values[idx])
+                unmw_b_matrix = self.impes_coordinate.b_matrix[idx, :] / self.impes_coordinate.inv_sqrt_masses
+                
+                if len(element) == 4:
+                    dq_dx +=  coord_curvature[idx] * 2.0 * unmw_b_matrix * np.cos(coord_curvature[idx] * org_imp_int_coord_distance) * np.sin(coord_curvature[idx] * org_imp_int_coord_distance) 
+                    dq.append(np.sin(coord_curvature[idx] * org_imp_int_coord_distance))
+                else:
+                    dq_dx += coord_curvature[idx]**2 * 2.0 * unmw_b_matrix * org_imp_int_coord_distance
+                    dq.append(coord_curvature[idx] * org_imp_int_coord_distance)
+
+            
+
+        Dimp_sq = float(np.dot(np.array(dq), np.array(dq)))
+        
+        
         dw_dalhpa_i = 0
         dw_dX_dalpha_i = 0
 
         if self.interpolation_type == 'shepard':
             # denominator, weight_gradient_sub = self.shepard_weight_gradient(
             #     distance_vector_sub, distance, data_point.confidence_radius)
-            denominator_imp_coord, weight_gradient_sub_imp_coord = self.target_customized_shepard_weight_gradient(
+            denominator_imp_coord, weight_gradient_sub_imp_coord = self.YM_target_customized_shepard_weight_gradient(
                 distance_vector_sub, distance, data_point.confidence_radius, imp_int_coord_distance, imp_int_coord_derivative_contribution)
+            
+            if 1 == 2:
+                denominator_imp_coord, weight_gradient_sub_imp_coord = self.VL_target_customized_shepard_weight_gradient(
+                    distance_vector_sub, distance, data_point.confidence_radius, Dimp_sq, dq_dx)
+            
             if self.calc_optim_trust_radius:
                 # dw_dalhpa_i = self.trust_radius_weight_gradient(data_point.confidence_radius, distance)
                 # dw_dX_dalpha_i = self.trust_radius_weight_gradient_gradient(data_point.confidence_radius, distance, distance_vector)
 
                 dw_dalhpa_i = self.trust_radius_tc_weight_gradient(data_point.confidence_radius, distance, imp_int_coord_distance)
-                dw_dX_dalpha_i = self.trust_radius_tc_weight_gradient_gradient(data_point.confidence_radius, distance, distance_vector, imp_int_coord_distance, imp_int_coord_derivative_contribution)
+                dw_dX_dalpha_i = self.trust_radius_tc_weight_gradient_gradient(data_point.confidence_radius, distance, distance_vector_sub, imp_int_coord_distance, imp_int_coord_derivative_contribution)
                 
                 self.dw_dalpha_list.append(dw_dalhpa_i)
                 self.dw_dX_dalpha_list.append(dw_dX_dalpha_i)        
@@ -1282,7 +1368,7 @@ class InterpolationDriver():
         weight_gradient = np.zeros_like(reference_coordinates)   # (natms,3)
         weight_gradient[self.symmetry_information[3]] = weight_gradient_sub_imp_coord
 
-        return distance, dihedral_dist, denominator_imp_coord, weight_gradient, distance_vector, grad_s, dw_dalhpa_i, dw_dX_dalpha_i
+        return distance, dihedral_dist, denominator_imp_coord, weight_gradient, distance_vector_sub, grad_s, dw_dalhpa_i, dw_dX_dalpha_i
 
 
     
@@ -1337,66 +1423,92 @@ class InterpolationDriver():
             
             return w_da
 
+        def rigid_body_projector(X, masses, tol=1e-12):
+            """
+            Projector P (3N,3N) that removes translations + rotations in MASS-WEIGHTED coordinates.
+
+            X:      (N,3) coordinates (use datapoint geometry, already centered is fine)
+            masses: (N,)  atomic masses for these N atoms
+            """
+            X = np.asarray(X, float)
+            m = np.asarray(masses, float)
+            N = X.shape[0]
+            n = 3*N
+
+            # Use COM as origin (if you already centered by centroid, that's still OK:
+            # changing origin only mixes rotation vectors with translations, which remain in the same rigid subspace)
+            com = (m[:, None] * X).sum(axis=0) / m.sum()
+            R = X - com
+
+            # Build rigid basis B in mass-weighted coordinate space
+            B = np.zeros((n, 6), float)
+            mw = np.sqrt(np.repeat(m, 3))
+
+            # translations
+            for a in range(3):
+                v = np.zeros((N, 3), float)
+                v[:, a] = 1.0
+                B[:, a] = (v.reshape(-1) * mw)
+
+            # rotations: omega x r_i
+            for k, omega in enumerate(np.eye(3)):
+                v = np.cross(omega, R).reshape(-1)
+                B[:, 3+k] = v * mw
+
+            # Orthonormalize and detect rank (linear geometries -> rank 5)
+            U, s, _ = np.linalg.svd(B, full_matrices=False)
+            r = int(np.sum(s > tol * s[0])) if s[0] > 0 else 0
+            Q = U[:, :r]
+
+            P = np.eye(n) - Q @ Q.T
+            return 0.5*(P + P.T), Q, s, r
+
+
         def apply_Jc(A):   # A: (Nc,3)
             return A - A.mean(axis=0, keepdims=True)
 
-        def make_spd_hessian(
-            Hc, masses=None, floor_abs=None, floor_rel=1e-6, cap_rel=None,
-            ridge_delta=None, use_mass_weight=False
-        ):
-            """
-            Returns an SPD version of the Cartesian Hessian with the same units as Hc.
-            Hc: (3N,3N) in Eh/bohr^2 (or any consistent units).
-            masses: (N,) in atomic mass units (optional, only if use_mass_weight=True).
-            floor_abs: absolute floor (same units as Hc), e.g. 1e-6 Eh/bohr^2
-            floor_rel: relative floor as tau * median(diag(K or Hs)) if floor_abs is None
-            cap_rel:  optional cap as kappa * percentile95(eigs)
-            ridge_delta: alternative to eigen-flooring: target min eigenvalue (>0)
-            use_mass_weight: if True, regularize K = M^{-1/2} H M^{-1/2} and map back
-            """
-            # 1) Symmetrize
-            Hs = 0.5 * (Hc + Hc.T)
 
-            if use_mass_weight:
-                assert masses is not None
-                N = len(masses)
-                M = np.repeat(masses, 3)
-                Minv_sqrt = 1.0 / np.sqrt(M)
-                # K = M^{-1/2} Hs M^{-1/2}
-                K = (Minv_sqrt[:,None] * Hs) * Minv_sqrt[None,:]
-                A = K
-            else:
-                A = Hs
+        def make_psd_stiffness_metric_from_massweighted_hessian(K, P, r_rigid,
+                                                       floor_rel=1e-6, floor_abs=None,
+                                                       cap_rel=None):
+            """
+            K:       (3N,3N) mass-weighted Hessian block (symmetric)
+            P:       rigid-body projector in mass-weighted space
+            r_rigid: number of rigid DOFs removed (typically 6, sometimes 5)
+            Returns: K_metric (3N,3N) PSD stiffness metric in mass-weighted space
+            """
+            K = 0.5*(K + K.T)
 
-            # 2) SPD via ridge or eigen-floor
-            if ridge_delta is not None:
-                # Ridge shift
-                w = np.linalg.eigvalsh(A)
-                lam_min = w[0]
-                mu = max(ridge_delta - lam_min, 0.0)
-                Aspd = A + mu * np.eye(A.shape[0])
-            else:
-                # Eigen-floor (and optional cap)
-                w, U = np.linalg.eigh(A)
+            # Project out rigid DOFs (keeps a nullspace of dimension r_rigid)
+            Kp = P @ K @ P
+            Kp = 0.5*(Kp + Kp.T)
+
+            w, U = np.linalg.eigh(Kp)
+
+            # Enforce the rigid nullspace explicitly: zero the smallest r_rigid eigenvalues by magnitude
+            idx = np.argsort(np.abs(w))
+            rigid_idx = idx[:r_rigid]
+            vib_idx   = idx[r_rigid:]
+
+            lam = np.abs(w)                 # stiffness magnitude
+            lam[rigid_idx] = 0.0            # keep rigid at exactly zero
+
+            # Floor only the vibrational subspace if desired
+            if vib_idx.size > 0:
                 if floor_abs is None:
-                    # relative floor from median diagonal as a robust scale
-                    base = np.median(np.diag(A))
-                    floor_abs = abs(floor_rel * base)
-                w = np.maximum(np.abs(w), floor_abs)
+                    # robust scale from vibrational magnitudes
+                    base = np.median(lam[vib_idx])
+                    floor_abs = max(floor_rel * base, 0.0)
+
+                lam[vib_idx] = np.maximum(lam[vib_idx], floor_abs)
+
                 if cap_rel is not None:
-                    cap = cap_rel * np.percentile(w, 95)
-                    w = np.minimum(w, cap)
-                Aspd = (U * w) @ U.T   # U @ diag(w) @ U.T
+                    cap = cap_rel * np.percentile(lam[vib_idx], 95)
+                    lam[vib_idx] = np.minimum(lam[vib_idx], cap)
 
-            if use_mass_weight:
-                # Map back: Hspd = M^{1/2} Aspd M^{1/2}
-                Msqrt = np.sqrt(np.repeat(masses, 3))
-                Hspd = (Msqrt[:,None] * Aspd) * Msqrt[None,:]
-            else:
-                Hspd = Aspd
+            K_metric = (U * lam) @ U.T
+            return 0.5*(K_metric + K_metric.T)
 
-            # Final symmetrization to remove numeric dust
-            return 0.5 * (Hspd + Hspd.T)
         
         # First, translate the cartesian coordinates to zero
         target_coordinates = data_point.cartesian_coordinates.copy()
@@ -1423,36 +1535,37 @@ class InterpolationDriver():
         rotated_current = (R_x @ Xc.T).T
         distance_vector =  rotated_current - Yc
         distance = np.linalg.norm(distance_vector) 
-        # print('carteisna distance', distance)
-        H_full = data_point.hessian                          # (3N,3N)
+        grad_s = distance_vector @ R_x
+        grad_s -= grad_s.mean(axis=0, keepdims=True)
 
+        H_eff = data_point.hessian
+    
         idx3 = np.concatenate([3*active_atoms[:,None] + np.array([0,1,2])], axis=1).ravel()
-        H_SS = H_full[np.ix_(idx3, idx3)]
+        H_SS = H_eff[np.ix_(idx3, idx3)] # (Nc,)
+        Msqrt = np.sqrt(np.repeat(self.molecule.get_masses(), 3))               # (3Nc,)
 
-        Nc = Xc.shape[0]
-        J = np.eye(Nc) - np.ones((Nc, Nc))/Nc      # (Nc,Nc)
-        J3 = np.kron(J, np.eye(3))                 # (3Nc,3Nc)
+        # Build rigid-body projector in MASS-WEIGHTED space (removes translations + rotations)
+        Pmw, Q, s, r_rigid = rigid_body_projector(Yc, self.molecule.get_masses())
 
-        Hc = J3.T @ H_SS @ J3 
-        E_ref = 1e-3 / 0.001593 # in hartree to scale the distance making it unitless
         
-        Hc_ul = Hc * E_ref
-        H_spd = make_spd_hessian(Hc_ul, floor_abs=1e-6)
-
+        H_spd = make_psd_stiffness_metric_from_massweighted_hessian(
+            H_SS, Pmw, r_rigid=r_rigid,
+            floor_rel=1e-6, floor_abs=None,
+            cap_rel=None
+        )
+        # H_spd = make_spd_hessian(Hc_ul, floor_abs=1e-6)
+        H_spd_nmw = (Msqrt[:,None] * H_spd) * Msqrt[None,:]
         w, U   = np.linalg.eigh(H_spd)
-        lam_med = np.median(w)
-        lam_lo  = 0.05 * lam_med
-        lam_hi  = 10.0 * lam_med
-        w_clip  = np.clip(w, lam_lo, lam_hi)
-        H_clip  = (U * w_clip) @ U.T
-        # H_clip = Hc
- 
-        distance_2     = (distance_vector.reshape(-1) @ ((1.0 * H_clip) @ distance_vector.reshape(-1)))
+        w_nmw, U   = np.linalg.eigh(H_spd_nmw)
+
+        I = np.eye(distance_vector.reshape(-1).size)
+        distance_2     = (distance_vector.reshape(-1) @ ((I * 1.1 * H_spd_nmw) @ distance_vector.reshape(-1)))
         distance = np.sqrt(distance_2)
-        if distance_2 < 1e-8:
+
+        if distance < 1e-8:
             distance = 1e-8
             distance_vector[:] = 0
-        y = ((1.0 * H_clip) @ distance_vector.reshape(-1)).reshape(-1, 3)      # (Nc,3)
+        y = ((I * 1.1 * H_spd_nmw) @ distance_vector.reshape(-1)).reshape(-1, 3)      # (Nc,3)
 
         rigid = y @ R_x                           # (Nc,3)
         S = y.T @ Xc                                    # (3,3)
@@ -1467,41 +1580,59 @@ class InterpolationDriver():
         grad_s = np.zeros_like(reference_coordinates)   # (natms,3)
         grad_s[self.symmetry_information[3]] = grad_s_sub
 
-        # components in the eigenbasis
-        c = U.T @ distance_vector.reshape(-1)      # projections (u_k · d)
-        contrib = w_clip * (c**2)                   # λ_k * (u_k·d)^2
-        # print("Top contributing modes (λ_k * c_k^2):")
-        # idx = np.argsort(contrib)[::-1]
-        # for j in idx[:5]:
-        #     print(f"k={j:2d}  λ={w_clip[j]:.3e}  (u·d)^2={c[j]**2:.3e}  term={contrib[j]:.3e}")
-
         # sum of the derivative necessary 
         imp_int_coord_derivative_contribution = np.zeros_like(distance_vector).reshape(-1)
         imp_int_coord_distance = 0
         dihedral_dist = 0
+        
+        H_eff = data_point.internal_hessian
+        eigval, V = np.linalg.eigh(H_eff)
 
+        participation = V**2  # shape (n_coord, n_modes)
+
+        # For each internal coordinate, find dominant eigenmode
+        dominant_mode_per_coord = np.argmax(participation, axis=1)
+        coord_curvature = np.sum(eigval * (V**2), axis=1)
+        
+        dq = []
+        dq_dx = np.zeros_like(distance_vector).reshape(-1)
+        # if data_point.point_label == "point_3_rinv_dihedral":
+        #     data_point.imp_int_coordinates = [(1,0,2,3)]
+        
         if self.use_tc_weights:
             for element in data_point.imp_int_coordinates:
                 idx = self.z_matrix.index(element)
-                org_imp_int_coord_distance = self.impes_coordinate.internal_coordinates_values[idx] - data_point.internal_coordinates_values[idx]
+                org_imp_int_coord_distance = (self.impes_coordinate.internal_coordinates_values[idx] - data_point.internal_coordinates_values[idx])
+                unmw_b_matrix = self.impes_coordinate.b_matrix[idx, :] / self.impes_coordinate.inv_sqrt_masses
+                
                 if len(element) == 4:
-                    unmw_b_matrix = self.impes_coordinate.b_matrix[idx, :] / self.impes_coordinate.inv_sqrt_masses
-                    imp_int_coord_derivative_contribution +=  2.0 * unmw_b_matrix * np.cos(org_imp_int_coord_distance) * np.sin(org_imp_int_coord_distance)
-                    imp_int_coord_distance += np.sin(org_imp_int_coord_distance)**2            
-                
+                    dq_dx +=  coord_curvature[idx] * 2.0 * unmw_b_matrix * np.cos(coord_curvature[idx] * org_imp_int_coord_distance) * np.sin(coord_curvature[idx] * org_imp_int_coord_distance)
+                    dq.append(np.sin(coord_curvature[idx] * org_imp_int_coord_distance))
                 else:
-                    imp_int_coord_distance += org_imp_int_coord_distance**2
-                    unmw_b_matrix = self.impes_coordinate.b_matrix[idx, :] / self.impes_coordinate.inv_sqrt_masses
-                    imp_int_coord_derivative_contribution += 2.0 * unmw_b_matrix * org_imp_int_coord_distance
-                
-        if imp_int_coord_distance < 1e-8:
+                    dq_dx += coord_curvature[idx]**2 * 2.0 * unmw_b_matrix * org_imp_int_coord_distance
+                    dq.append(coord_curvature[idx] * org_imp_int_coord_distance)
+
+            
+
+        Dimp_sq = float(np.dot(np.array(dq), np.array(dq)))
+
+        if Dimp_sq < 1e-8:
             imp_int_coord_distance = 1e-8
             imp_int_coord_derivative_contribution[:] = 0
+            Dimp_sq = 1e-8
+            dq_dx[:] = 0
 
         dw_dalpha_i = 0
         dw_dX_dalpha_i = 0
         if self.interpolation_type == 'shepard':
             denominator, weight_gradient = self.shepard_weight_gradient_hessian(distance, data_point.confidence_radius, grad_s, imp_int_coord_distance, imp_int_coord_derivative_contribution)  
+            
+            
+            
+            weight_gradient = (weight_gradient.reshape(-1) * np.exp(-self.alpha * Dimp_sq) - 1.0 / denominator * self.alpha * np.exp(-self.alpha * Dimp_sq) * dq_dx).reshape(-1,3)
+            denominator = denominator * np.exp(self.alpha * Dimp_sq)
+            
+
             if self.calc_optim_trust_radius:
                 dw_dalpha_i = self.trust_radius_weight_gradient_hessian(data_point.confidence_radius, distance, imp_int_coord_distance)
                 dw_dX_dalpha_i = self.trust_radius_weight_gradient_gradient_hessian(data_point.confidence_radius, distance, grad_s, imp_int_coord_distance, imp_int_coord_derivative_contribution)
@@ -1509,7 +1640,7 @@ class InterpolationDriver():
                 self.dw_dalpha_list.append(dw_dalpha_i)
                 self.dw_dX_dalpha_list.append(dw_dX_dalpha_i)
 
-                
+
             
         elif self.interpolation_type == 'simple':
             weight_gradient = self.simple_weight_gradient(distance_vector, distance)
@@ -1518,7 +1649,6 @@ class InterpolationDriver():
             errtxt += self.interpolation_type
             raise ValueError(errtxt)
         
-
         
 
         return distance, dihedral_dist, denominator, weight_gradient, distance_vector, grad_s, dw_dalpha_i, dw_dX_dalpha_i
@@ -1533,7 +1663,8 @@ class InterpolationDriver():
         selection_rule='relative' # 'relative' | 'coverage' | 'topk'
         relative_threshold=0.8
         coverage_mass=0.8
-        topk=None
+        topk = None
+
         
 
         masses = molecule.get_masses().copy()
@@ -1629,9 +1760,9 @@ class InterpolationDriver():
 
             delta_E = abs(qm_energy - pred_E)
             delta_G = np.linalg.norm(pred_qm_G_int - pred_im_G_int)
-
-            print(' \n\n Energy error with QM ', delta_E * hartree_in_kcalpermol(), delta_G)
-   
+            print(' \n\n Energy error with QM ', delta_E * hartree_in_kcalpermol(), delta_G * hartree_in_kcalpermol() * bohr_in_angstrom() / len(pred_im_G_int))
+            if  delta_E * hartree_in_kcalpermol() < 0.6 and delta_G * hartree_in_kcalpermol() * bohr_in_angstrom() / len(pred_im_G_int) < 0.8:
+                continue
             delta_g = pred_qm_G_int - pred_im_G_int
             print('delta g', delta_g)
             single_energy_error = []
@@ -1709,9 +1840,13 @@ class InterpolationDriver():
                 if keep.size > 0:
                     keep[0] = True
                 selected_idx = list(np.where(keep)[0])
+                while np.sum(cum[selected_idx]) < coverage_mass:
+                    selected_idx.append(selected_idx[-1] + 1)
+
             elif selection_rule == 'topk':
                 k = topk if (topk is not None) else max(1, int(0.25 * N))
                 selected_idx = list(range(min(k, N)))
+                print(k, selected_idx)
             else:
                 raise ValueError(f"Unknown selection_rule: {selection_rule}")
 

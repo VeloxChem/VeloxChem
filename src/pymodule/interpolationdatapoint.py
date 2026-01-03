@@ -122,7 +122,7 @@ class InterpolationDatapoint:
         # internal_coordinates is a list of geomeTRIC objects which represent
         # different types of internal coordinates (distances, angles, dihedrals)
         self.internal_coordinates = None
-        self.imp_int_coordinates = None
+        self.imp_int_coordinates = []
         self.mapping_masks = None
 
         # internal_coordinates_values is a numpy array with the values of the
@@ -938,10 +938,11 @@ class InterpolationDatapoint:
                 current_z_list = [tuple(z_list.tolist()) for z_list in list(h5f.get(label_obj))]
                 self.z_matrix.extend(current_z_list)
 
-            self.imp_int_coordinates = []
-            for label_obj in imp_int_coord_labels:
-                current_imp_int_coord_list = [tuple(z_list_imp_coord.tolist()) for z_list_imp_coord in list(h5f.get(label_obj))]
-                self.imp_int_coordinates.extend(current_imp_int_coord_list)
+            if self.identify_imp_int_coord:
+                self.imp_int_coordinates = []
+                for label_obj in imp_int_coord_labels:
+                    current_imp_int_coord_list = [tuple(z_list_imp_coord.tolist()) for z_list_imp_coord in list(h5f.get(label_obj))]
+                    self.imp_int_coordinates.extend(current_imp_int_coord_list)
 
             h5f.close()
 
