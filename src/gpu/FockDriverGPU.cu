@@ -144,7 +144,10 @@ computeQMatrixOnGPU(const CMolecule& molecule,
     const auto boys_func_table = boysfunc::getFullBoysFuncTable();
     const auto boys_func_ft = boysfunc::getBoysFuncFactors();
 
-    auto d_data_boys_func = screening.get_devptr_data_boys_func(gpu_id);
+    const auto data_boys_func_size = boys_func_table.size() + boys_func_ft.size();
+
+    double* d_data_boys_func;
+    gpuSafe(gpuMalloc(&d_data_boys_func, data_boys_func_size * sizeof(double)));
 
     double* d_boys_func_table = d_data_boys_func;
     double* d_boys_func_ft = d_boys_func_table + boys_func_table.size();
@@ -217,14 +220,17 @@ computeQMatrixOnGPU(const CMolecule& molecule,
     gtoinfo::updatePrimitiveInfoForP(p_prim_info.data(), p_prim_aoinds.data(), p_prim_count, gto_blocks);
     gtoinfo::updatePrimitiveInfoForD(d_prim_info.data(), d_prim_aoinds.data(), d_prim_count, gto_blocks);
 
-    auto d_data_spd_prim_info = screening.get_devptr_data_spd_prim_info(gpu_id);
+    const auto data_spd_prim_info_size = s_prim_info.size() + p_prim_info.size() + d_prim_info.size();
+
+    double* d_data_spd_prim_info;
+    gpuSafe(gpuMalloc(&d_data_spd_prim_info, data_spd_prim_info_size * sizeof(double)));
 
     double* d_s_prim_info = d_data_spd_prim_info;
     double* d_p_prim_info = d_s_prim_info + s_prim_info.size();
     double* d_d_prim_info = d_p_prim_info + p_prim_info.size();
 
-    gpu::chunkedMemcpyHostToDevice<double>(d_p_prim_info, p_prim_info.data(), p_prim_info.size());
     gpu::chunkedMemcpyHostToDevice<double>(d_s_prim_info, s_prim_info.data(), s_prim_info.size());
+    gpu::chunkedMemcpyHostToDevice<double>(d_p_prim_info, p_prim_info.data(), p_prim_info.size());
     gpu::chunkedMemcpyHostToDevice<double>(d_d_prim_info, d_prim_info.data(), d_prim_info.size());
 
     // GTO block pairs
@@ -502,6 +508,11 @@ computeQMatrixOnGPU(const CMolecule& molecule,
     }
 
     gpuSafe(gpuDeviceSynchronize());
+
+#pragma omp barrier
+
+    gpuSafe(gpuFree(d_data_boys_func));
+    gpuSafe(gpuFree(d_data_spd_prim_info));
 
     gpuSafe(gpuFree(d_mat_Q));
 
@@ -4664,7 +4675,10 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     auto mat_full = screening.get_mat_Q_full();
 
-    auto d_data_matrices_ABC = screening.get_devptr_data_matrices_ABC(0);
+    const auto data_matrices_ABC_size = static_cast<size_t>(mat_full.getNumberOfElements()) * 3;
+
+    double* d_data_matrices_ABC;
+    gpuSafe(gpuMalloc(&d_data_matrices_ABC, data_matrices_ABC_size * sizeof(double)));
 
     double *d_matrix_A = d_data_matrices_ABC;
     double *d_matrix_B = d_matrix_A + mat_full.getNumberOfElements();
@@ -4740,6 +4754,11 @@ computeFockOnGPU(const              CMolecule& molecule,
     gpu::chunkedMemcpyDeviceToHost<double>(mat_full.values(), d_matrix_B, mat_full.getNumberOfElements());
 
     timer.stop("Memcpy Q_prime");
+    timer.start("Prep. Q_prime Q");
+
+    gpuSafe(gpuFree(d_data_matrices_ABC));
+
+    timer.stop("Prep. Q_prime Q");
     timer.start("Prep. preLinK 1");
 
     screening.form_pair_inds_for_K(s_prim_count, p_prim_count, d_prim_count, mat_full, prelink_threshold);
@@ -4792,7 +4811,10 @@ computeFockOnGPU(const              CMolecule& molecule,
     const auto boys_func_table = boysfunc::getFullBoysFuncTable();
     const auto boys_func_ft    = boysfunc::getBoysFuncFactors();
 
-    auto d_data_boys_func = screening.get_devptr_data_boys_func(gpu_id);
+    const auto data_boys_func_size = boys_func_table.size() + boys_func_ft.size();
+
+    double* d_data_boys_func;
+    gpuSafe(gpuMalloc(&d_data_boys_func, data_boys_func_size * sizeof(double)));
 
     double* d_boys_func_table = d_data_boys_func;
     double* d_boys_func_ft = d_boys_func_table + boys_func_table.size();
@@ -4842,8 +4864,14 @@ computeFockOnGPU(const              CMolecule& molecule,
     gtoinfo::updatePrimitiveInfoForP(p_prim_info.data(), p_prim_aoinds.data(), p_prim_count, gto_blocks);
     gtoinfo::updatePrimitiveInfoForD(d_prim_info.data(), d_prim_aoinds.data(), d_prim_count, gto_blocks);
 
-    auto d_data_spd_prim_info = screening.get_devptr_data_spd_prim_info(gpu_id);
-    auto d_data_spd_prim_aoinds = screening.get_devptr_data_spd_prim_aoinds(gpu_id);
+    const auto data_spd_prim_info_size = s_prim_info.size() + p_prim_info.size() + d_prim_info.size();
+    const auto data_spd_prim_aoinds_size = s_prim_aoinds.size() + p_prim_aoinds.size() + d_prim_aoinds.size();
+
+    double* d_data_spd_prim_info;
+    uint32_t* d_data_spd_prim_aoinds;
+
+    gpuSafe(gpuMalloc(&d_data_spd_prim_info, data_spd_prim_info_size * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_data_spd_prim_aoinds, data_spd_prim_aoinds_size * sizeof(uint32_t)));
 
     double*   d_s_prim_info = d_data_spd_prim_info;
     double*   d_p_prim_info = d_s_prim_info + s_prim_info.size();
@@ -4957,76 +4985,121 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     // sorted Q, D, and indices on device
 
-    auto d_data_mat_D_J = screening.get_devptr_data_mat_D_J(gpu_id);
+    size_t data_J_double_size = 0;
 
-    double *d_mat_D = d_data_mat_D_J;
-    double *d_mat_J = d_mat_D + max_prim_pair_count;
+    data_J_double_size += static_cast<size_t>(max_prim_pair_count);         // d_mat_D
+    data_J_double_size += static_cast<size_t>(max_prim_pair_count_local);   // d_mat_J
+    data_J_double_size += static_cast<size_t>(ss_prim_pair_count);          // d_ss_mat_Q
+    data_J_double_size += static_cast<size_t>(sp_prim_pair_count);          // d_sp_mat_Q
+    data_J_double_size += static_cast<size_t>(sd_prim_pair_count);          // d_sd_mat_Q
+    data_J_double_size += static_cast<size_t>(pp_prim_pair_count);          // d_pp_mat_Q
+    data_J_double_size += static_cast<size_t>(pd_prim_pair_count);          // d_pd_mat_Q
+    data_J_double_size += static_cast<size_t>(dd_prim_pair_count);          // d_dd_mat_Q
+    data_J_double_size += ss_pair_data.size();                              // d_ss_pair_data
+    data_J_double_size += sp_pair_data.size();                              // d_sp_pair_data
+    data_J_double_size += sd_pair_data.size();                              // d_sd_pair_data
+    data_J_double_size += pp_pair_data.size();                              // d_pp_pair_data
+    data_J_double_size += pd_pair_data.size();                              // d_pd_pair_data
+    data_J_double_size += dd_pair_data.size();                              // d_dd_pair_data
+    data_J_double_size += static_cast<size_t>(ss_prim_pair_count_local);    // d_ss_mat_Q_local
+    data_J_double_size += static_cast<size_t>(sp_prim_pair_count_local);    // d_sp_mat_Q_local
+    data_J_double_size += static_cast<size_t>(sd_prim_pair_count_local);    // d_sd_mat_Q_local
+    data_J_double_size += static_cast<size_t>(pp_prim_pair_count_local);    // d_pp_mat_Q_local
+    data_J_double_size += static_cast<size_t>(pd_prim_pair_count_local);    // d_pd_mat_Q_local
+    data_J_double_size += static_cast<size_t>(dd_prim_pair_count_local);    // d_dd_mat_Q_local
+    data_J_double_size += ss_pair_data_local.size();                        // d_ss_pair_data_local
+    data_J_double_size += sp_pair_data_local.size();                        // d_sp_pair_data_local
+    data_J_double_size += sd_pair_data_local.size();                        // d_sd_pair_data_local
+    data_J_double_size += pp_pair_data_local.size();                        // d_pp_pair_data_local
+    data_J_double_size += pd_pair_data_local.size();                        // d_pd_pair_data_local
+    data_J_double_size += dd_pair_data_local.size();                        // d_dd_pair_data_local
 
-    auto d_data_mat_Q = screening.get_devptr_data_mat_Q(gpu_id);
+    size_t data_J_uint32_size = 0;
 
-    double *d_ss_mat_Q = d_data_mat_Q;
-    double *d_sp_mat_Q = d_ss_mat_Q + ss_prim_pair_count;
-    double *d_sd_mat_Q = d_sp_mat_Q + sp_prim_pair_count;
-    double *d_pp_mat_Q = d_sd_mat_Q + sd_prim_pair_count;
-    double *d_pd_mat_Q = d_pp_mat_Q + pp_prim_pair_count;
-    double *d_dd_mat_Q = d_pd_mat_Q + pd_prim_pair_count;
+    data_J_uint32_size += static_cast<size_t>(ss_prim_pair_count);          // d_ss_first_inds
+    data_J_uint32_size += static_cast<size_t>(ss_prim_pair_count);          // d_ss_second_inds
+    data_J_uint32_size += static_cast<size_t>(sp_prim_pair_count);          // d_sp_first_inds 
+    data_J_uint32_size += static_cast<size_t>(sp_prim_pair_count);          // d_sp_second_inds
+    data_J_uint32_size += static_cast<size_t>(sd_prim_pair_count);          // d_sd_first_inds 
+    data_J_uint32_size += static_cast<size_t>(sd_prim_pair_count);          // d_sd_second_inds
+    data_J_uint32_size += static_cast<size_t>(pp_prim_pair_count);          // d_pp_first_inds 
+    data_J_uint32_size += static_cast<size_t>(pp_prim_pair_count);          // d_pp_second_inds
+    data_J_uint32_size += static_cast<size_t>(pd_prim_pair_count);          // d_pd_first_inds 
+    data_J_uint32_size += static_cast<size_t>(pd_prim_pair_count);          // d_pd_second_inds
+    data_J_uint32_size += static_cast<size_t>(dd_prim_pair_count);          // d_dd_first_inds 
+    data_J_uint32_size += static_cast<size_t>(dd_prim_pair_count);          // d_dd_second_inds
+    data_J_uint32_size += static_cast<size_t>(ss_prim_pair_count_local);    // d_ss_first_inds_local 
+    data_J_uint32_size += static_cast<size_t>(ss_prim_pair_count_local);    // d_ss_second_inds_local
+    data_J_uint32_size += static_cast<size_t>(sp_prim_pair_count_local);    // d_sp_first_inds_local 
+    data_J_uint32_size += static_cast<size_t>(sp_prim_pair_count_local);    // d_sp_second_inds_local
+    data_J_uint32_size += static_cast<size_t>(sd_prim_pair_count_local);    // d_sd_first_inds_local 
+    data_J_uint32_size += static_cast<size_t>(sd_prim_pair_count_local);    // d_sd_second_inds_local
+    data_J_uint32_size += static_cast<size_t>(pp_prim_pair_count_local);    // d_pp_first_inds_local 
+    data_J_uint32_size += static_cast<size_t>(pp_prim_pair_count_local);    // d_pp_second_inds_local
+    data_J_uint32_size += static_cast<size_t>(pd_prim_pair_count_local);    // d_pd_first_inds_local 
+    data_J_uint32_size += static_cast<size_t>(pd_prim_pair_count_local);    // d_pd_second_inds_local
+    data_J_uint32_size += static_cast<size_t>(dd_prim_pair_count_local);    // d_dd_first_inds_local 
+    data_J_uint32_size += static_cast<size_t>(dd_prim_pair_count_local);    // d_dd_second_inds_local
 
-    auto d_data_first_second_inds = screening.get_devptr_data_first_second_inds(gpu_id);
+    double* d_data_J_double;
 
-    uint32_t *d_ss_first_inds  = d_data_first_second_inds;
-    uint32_t *d_ss_second_inds = d_ss_first_inds  + ss_prim_pair_count;
-    uint32_t *d_sp_first_inds  = d_ss_second_inds + ss_prim_pair_count;
-    uint32_t *d_sp_second_inds = d_sp_first_inds  + sp_prim_pair_count;
-    uint32_t *d_sd_first_inds  = d_sp_second_inds + sp_prim_pair_count;
-    uint32_t *d_sd_second_inds = d_sd_first_inds  + sd_prim_pair_count;
-    uint32_t *d_pp_first_inds  = d_sd_second_inds + sd_prim_pair_count;
-    uint32_t *d_pp_second_inds = d_pp_first_inds  + pp_prim_pair_count;
-    uint32_t *d_pd_first_inds  = d_pp_second_inds + pp_prim_pair_count;
-    uint32_t *d_pd_second_inds = d_pd_first_inds  + pd_prim_pair_count;
-    uint32_t *d_dd_first_inds  = d_pd_second_inds + pd_prim_pair_count;
-    uint32_t *d_dd_second_inds = d_dd_first_inds  + dd_prim_pair_count;
+    gpuSafe(gpuMalloc(&d_data_J_double, data_J_double_size * sizeof(double)));
 
-    auto d_data_pair_data = screening.get_devptr_data_pair_data(gpu_id);
+    double* d_mat_D              = d_data_J_double;
+    double* d_mat_J              = d_mat_D + max_prim_pair_count;
+    double* d_ss_mat_Q           = d_mat_J + max_prim_pair_count_local;
+    double* d_sp_mat_Q           = d_ss_mat_Q + ss_prim_pair_count;
+    double* d_sd_mat_Q           = d_sp_mat_Q + sp_prim_pair_count;
+    double* d_pp_mat_Q           = d_sd_mat_Q + sd_prim_pair_count;
+    double* d_pd_mat_Q           = d_pp_mat_Q + pp_prim_pair_count;
+    double* d_dd_mat_Q           = d_pd_mat_Q + pd_prim_pair_count;
+    double* d_ss_pair_data       = d_dd_mat_Q + dd_prim_pair_count;
+    double* d_sp_pair_data       = d_ss_pair_data + ss_pair_data.size();
+    double* d_sd_pair_data       = d_sp_pair_data + sp_pair_data.size();
+    double* d_pp_pair_data       = d_sd_pair_data + sd_pair_data.size();
+    double* d_pd_pair_data       = d_pp_pair_data + pp_pair_data.size();
+    double* d_dd_pair_data       = d_pd_pair_data + pd_pair_data.size();
+    double* d_ss_mat_Q_local     = d_dd_pair_data + dd_pair_data.size();
+    double* d_sp_mat_Q_local     = d_ss_mat_Q_local + ss_prim_pair_count_local;
+    double* d_sd_mat_Q_local     = d_sp_mat_Q_local + sp_prim_pair_count_local;
+    double* d_pp_mat_Q_local     = d_sd_mat_Q_local + sd_prim_pair_count_local;
+    double* d_pd_mat_Q_local     = d_pp_mat_Q_local + pp_prim_pair_count_local;
+    double* d_dd_mat_Q_local     = d_pd_mat_Q_local + pd_prim_pair_count_local;
+    double* d_ss_pair_data_local = d_dd_mat_Q_local + dd_prim_pair_count_local;
+    double* d_sp_pair_data_local = d_ss_pair_data_local + ss_pair_data_local.size();
+    double* d_sd_pair_data_local = d_sp_pair_data_local + sp_pair_data_local.size();
+    double* d_pp_pair_data_local = d_sd_pair_data_local + sd_pair_data_local.size();
+    double* d_pd_pair_data_local = d_pp_pair_data_local + pp_pair_data_local.size();
+    double* d_dd_pair_data_local = d_pd_pair_data_local + pd_pair_data_local.size();
 
-    double *d_ss_pair_data = d_data_pair_data;
-    double *d_sp_pair_data = d_ss_pair_data + ss_pair_data.size();
-    double *d_sd_pair_data = d_sp_pair_data + sp_pair_data.size();
-    double *d_pp_pair_data = d_sd_pair_data + sd_pair_data.size();
-    double *d_pd_pair_data = d_pp_pair_data + pp_pair_data.size();
-    double *d_dd_pair_data = d_pd_pair_data + pd_pair_data.size();
+    uint32_t* d_data_J_uint32;
 
-    auto d_data_mat_Q_local = screening.get_devptr_data_mat_Q_local(gpu_id);
+    gpuSafe(gpuMalloc(&d_data_J_uint32, data_J_uint32_size * sizeof(uint32_t)));
 
-    double *d_ss_mat_Q_local = d_data_mat_Q_local;
-    double *d_sp_mat_Q_local = d_ss_mat_Q_local + ss_prim_pair_count_local;
-    double *d_sd_mat_Q_local = d_sp_mat_Q_local + sp_prim_pair_count_local;
-    double *d_pp_mat_Q_local = d_sd_mat_Q_local + sd_prim_pair_count_local;
-    double *d_pd_mat_Q_local = d_pp_mat_Q_local + pp_prim_pair_count_local;
-    double *d_dd_mat_Q_local = d_pd_mat_Q_local + pd_prim_pair_count_local;
-
-    auto d_data_first_second_inds_local = screening.get_devptr_data_first_second_inds_local(gpu_id);
-
-    uint32_t *d_ss_first_inds_local  = d_data_first_second_inds_local;
-    uint32_t *d_ss_second_inds_local = d_ss_first_inds_local  + ss_prim_pair_count_local;
-    uint32_t *d_sp_first_inds_local  = d_ss_second_inds_local + ss_prim_pair_count_local;
-    uint32_t *d_sp_second_inds_local = d_sp_first_inds_local  + sp_prim_pair_count_local;
-    uint32_t *d_sd_first_inds_local  = d_sp_second_inds_local + sp_prim_pair_count_local;
-    uint32_t *d_sd_second_inds_local = d_sd_first_inds_local  + sd_prim_pair_count_local;
-    uint32_t *d_pp_first_inds_local  = d_sd_second_inds_local + sd_prim_pair_count_local;
-    uint32_t *d_pp_second_inds_local = d_pp_first_inds_local  + pp_prim_pair_count_local;
-    uint32_t *d_pd_first_inds_local  = d_pp_second_inds_local + pp_prim_pair_count_local;
-    uint32_t *d_pd_second_inds_local = d_pd_first_inds_local  + pd_prim_pair_count_local;
-    uint32_t *d_dd_first_inds_local  = d_pd_second_inds_local + pd_prim_pair_count_local;
-    uint32_t *d_dd_second_inds_local = d_dd_first_inds_local  + dd_prim_pair_count_local;
-
-    auto d_data_pair_data_local = screening.get_devptr_data_pair_data_local(gpu_id);
-
-    double *d_ss_pair_data_local = d_data_pair_data_local;
-    double *d_sp_pair_data_local = d_ss_pair_data_local + ss_pair_data_local.size();
-    double *d_sd_pair_data_local = d_sp_pair_data_local + sp_pair_data_local.size();
-    double *d_pp_pair_data_local = d_sd_pair_data_local + sd_pair_data_local.size();
-    double *d_pd_pair_data_local = d_pp_pair_data_local + pp_pair_data_local.size();
-    double *d_dd_pair_data_local = d_pd_pair_data_local + pd_pair_data_local.size();
+    uint32_t* d_ss_first_inds        = d_data_J_uint32;
+    uint32_t* d_ss_second_inds       = d_ss_first_inds  + ss_prim_pair_count;
+    uint32_t* d_sp_first_inds        = d_ss_second_inds + ss_prim_pair_count;
+    uint32_t* d_sp_second_inds       = d_sp_first_inds  + sp_prim_pair_count;
+    uint32_t* d_sd_first_inds        = d_sp_second_inds + sp_prim_pair_count;
+    uint32_t* d_sd_second_inds       = d_sd_first_inds  + sd_prim_pair_count;
+    uint32_t* d_pp_first_inds        = d_sd_second_inds + sd_prim_pair_count;
+    uint32_t* d_pp_second_inds       = d_pp_first_inds  + pp_prim_pair_count;
+    uint32_t* d_pd_first_inds        = d_pp_second_inds + pp_prim_pair_count;
+    uint32_t* d_pd_second_inds       = d_pd_first_inds  + pd_prim_pair_count;
+    uint32_t* d_dd_first_inds        = d_pd_second_inds + pd_prim_pair_count;
+    uint32_t* d_dd_second_inds       = d_dd_first_inds  + dd_prim_pair_count;
+    uint32_t* d_ss_first_inds_local  = d_dd_second_inds + dd_prim_pair_count;
+    uint32_t* d_ss_second_inds_local = d_ss_first_inds_local  + ss_prim_pair_count_local;
+    uint32_t* d_sp_first_inds_local  = d_ss_second_inds_local + ss_prim_pair_count_local;
+    uint32_t* d_sp_second_inds_local = d_sp_first_inds_local  + sp_prim_pair_count_local;
+    uint32_t* d_sd_first_inds_local  = d_sp_second_inds_local + sp_prim_pair_count_local;
+    uint32_t* d_sd_second_inds_local = d_sd_first_inds_local  + sd_prim_pair_count_local;
+    uint32_t* d_pp_first_inds_local  = d_sd_second_inds_local + sd_prim_pair_count_local;
+    uint32_t* d_pp_second_inds_local = d_pp_first_inds_local  + pp_prim_pair_count_local;
+    uint32_t* d_pd_first_inds_local  = d_pp_second_inds_local + pp_prim_pair_count_local;
+    uint32_t* d_pd_second_inds_local = d_pd_first_inds_local  + pd_prim_pair_count_local;
+    uint32_t* d_dd_first_inds_local  = d_pd_second_inds_local + pd_prim_pair_count_local;
+    uint32_t* d_dd_second_inds_local = d_dd_first_inds_local  + dd_prim_pair_count_local;
 
     gpu::chunkedMemcpyHostToDevice<double>(d_ss_mat_Q, ss_mat_Q.data(), ss_mat_Q.size());
     gpu::chunkedMemcpyHostToDevice<double>(d_sp_mat_Q, sp_mat_Q.data(), sp_mat_Q.size());
@@ -5128,7 +5201,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             //omptimers[thread_id].start("    J block SSSS");
 
-        gpu::computeCoulombFockSSSS<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockSSSS<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -5159,7 +5232,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, sp_mat_D.data(), sp_prim_pair_count);
 
-        gpu::computeCoulombFockSSSP<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockSSSP<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -5190,7 +5263,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, sd_mat_D.data(), sd_prim_pair_count);
 
-        gpu::computeCoulombFockSSSD<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockSSSD<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -5221,7 +5294,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, pp_mat_D.data(), pp_prim_pair_count);
 
-        gpu::computeCoulombFockSSPP<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockSSPP<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -5252,7 +5325,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, pd_mat_D.data(), pd_prim_pair_count);
 
-        gpu::computeCoulombFockSSPD<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockSSPD<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -5285,7 +5358,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, dd_mat_D.data(), dd_prim_pair_count);
 
-        gpu::computeCoulombFockSSDD<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockSSDD<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -5356,7 +5429,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, ss_mat_D.data(), ss_prim_pair_count);
 
-        gpu::computeCoulombFockSPSS<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockSPSS<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -5387,7 +5460,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, sp_mat_D.data(), sp_prim_pair_count);
 
-        gpu::computeCoulombFockSPSP<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockSPSP<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -5418,7 +5491,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, sd_mat_D.data(), sd_prim_pair_count);
 
-        gpu::computeCoulombFockSPSD<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockSPSD<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -5451,7 +5524,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, pp_mat_D.data(), pp_prim_pair_count);
 
-        gpu::computeCoulombFockSPPP<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockSPPP<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -5482,7 +5555,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, pd_mat_D.data(), pd_prim_pair_count);
 
-        gpu::computeCoulombFockSPPD<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockSPPD<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -5515,7 +5588,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, dd_mat_D.data(), dd_prim_pair_count);
 
-        gpu::computeCoulombFockSPDD<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockSPDD<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -5596,7 +5669,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, ss_mat_D.data(), ss_prim_pair_count);
 
-        gpu::computeCoulombFockPPSS<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockPPSS<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -5627,7 +5700,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, sp_mat_D.data(), sp_prim_pair_count);
 
-        gpu::computeCoulombFockPPSP<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockPPSP<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -5658,7 +5731,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, sd_mat_D.data(), sd_prim_pair_count);
 
-        gpu::computeCoulombFockPPSD<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockPPSD<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -5691,7 +5764,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, pp_mat_D.data(), pp_prim_pair_count);
 
-        gpu::computeCoulombFockPPPP<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockPPPP<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -5720,7 +5793,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, pd_mat_D.data(), pd_prim_pair_count);
 
-        gpu::computeCoulombFockPPPD<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockPPPD<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -5753,7 +5826,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, dd_mat_D.data(), dd_prim_pair_count);
 
-        gpu::computeCoulombFockPPDD<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockPPDD<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -5842,7 +5915,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, ss_mat_D.data(), ss_prim_pair_count);
 
-        gpu::computeCoulombFockSDSS<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockSDSS<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -5873,7 +5946,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, sp_mat_D.data(), sp_prim_pair_count);
 
-        gpu::computeCoulombFockSDSP<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockSDSP<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -5906,7 +5979,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, sd_mat_D.data(), sd_prim_pair_count);
 
-        gpu::computeCoulombFockSDSD<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockSDSD<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -5937,7 +6010,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, pp_mat_D.data(), pp_prim_pair_count);
 
-        gpu::computeCoulombFockSDPP<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockSDPP<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -5970,7 +6043,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, pd_mat_D.data(), pd_prim_pair_count);
 
-        gpu::computeCoulombFockSDPD<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockSDPD<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -6005,7 +6078,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, dd_mat_D.data(), dd_prim_pair_count);
 
-        gpu::computeCoulombFockSDDD<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockSDDD<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -6086,7 +6159,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, ss_mat_D.data(), ss_prim_pair_count);
 
-        gpu::computeCoulombFockPDSS<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockPDSS<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -6119,7 +6192,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, sp_mat_D.data(), sp_prim_pair_count);
 
-        gpu::computeCoulombFockPDSP<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockPDSP<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -6154,7 +6227,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, sd_mat_D.data(), sd_prim_pair_count);
 
-        gpu::computeCoulombFockPDSD<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockPDSD<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -6191,7 +6264,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, pp_mat_D.data(), pp_prim_pair_count);
 
-        gpu::computeCoulombFockPDPP<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockPDPP<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -6226,7 +6299,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, pd_mat_D.data(), pd_prim_pair_count);
 
-        gpu::computeCoulombFockPDPD<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockPDPD<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -6261,7 +6334,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, dd_mat_D.data(), dd_prim_pair_count);
 
-        gpu::computeCoulombFockPDDD0<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockPDDD0<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -6282,7 +6355,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-        gpu::computeCoulombFockPDDD1<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockPDDD1<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -6303,7 +6376,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-        gpu::computeCoulombFockPDDD2<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockPDDD2<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -6324,7 +6397,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-        gpu::computeCoulombFockPDDD3<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockPDDD3<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -6345,7 +6418,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-        gpu::computeCoulombFockPDDD4<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockPDDD4<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -6366,7 +6439,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-        gpu::computeCoulombFockPDDD5<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockPDDD5<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -6387,7 +6460,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-        gpu::computeCoulombFockPDDD6<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockPDDD6<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -6481,7 +6554,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             dim3 dd_num_blocks ((dd_prim_pair_count_local + dd_threads_per_block.x - 1) / dd_threads_per_block.x, 1);
 
-        gpu::computeCoulombFockDDSS<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDSS<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -6520,7 +6593,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             dim3 dd_num_blocks ((dd_prim_pair_count_local + dd_threads_per_block.x - 1) / dd_threads_per_block.x, 1);
 
-        gpu::computeCoulombFockDDSP<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDSP<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -6561,7 +6634,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             dim3 dd_num_blocks ((dd_prim_pair_count_local + dd_threads_per_block.x - 1) / dd_threads_per_block.x, 1);
 
-        gpu::computeCoulombFockDDSD<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDSD<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -6600,7 +6673,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             dim3 dd_num_blocks ((dd_prim_pair_count_local + dd_threads_per_block.x - 1) / dd_threads_per_block.x, 1);
 
-        gpu::computeCoulombFockDDPP<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDPP<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -6639,7 +6712,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             dim3 dd_num_blocks ((dd_prim_pair_count_local + dd_threads_per_block.x - 1) / dd_threads_per_block.x, 1);
 
-        gpu::computeCoulombFockDDPD0<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDPD0<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -6660,7 +6733,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-        gpu::computeCoulombFockDDPD1<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDPD1<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -6681,7 +6754,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-        gpu::computeCoulombFockDDPD2<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDPD2<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -6702,7 +6775,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-        gpu::computeCoulombFockDDPD3<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDPD3<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -6723,7 +6796,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-        gpu::computeCoulombFockDDPD4<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDPD4<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -6744,7 +6817,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-        gpu::computeCoulombFockDDPD5<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDPD5<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -6765,7 +6838,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-        gpu::computeCoulombFockDDPD6<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDPD6<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -6786,7 +6859,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-        gpu::computeCoulombFockDDPD7<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDPD7<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -6807,7 +6880,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-        gpu::computeCoulombFockDDPD8<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDPD8<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -6828,7 +6901,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-        gpu::computeCoulombFockDDPD9<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDPD9<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -6867,7 +6940,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             dim3 dd_num_blocks ((dd_prim_pair_count_local + dd_threads_per_block.x - 1) / dd_threads_per_block.x, 1);
 
-        gpu::computeCoulombFockDDDD0<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD0<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -6886,7 +6959,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-        gpu::computeCoulombFockDDDD1<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD1<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -6905,7 +6978,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-        gpu::computeCoulombFockDDDD2<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD2<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -6924,7 +6997,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-        gpu::computeCoulombFockDDDD3<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD3<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -6943,7 +7016,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-        gpu::computeCoulombFockDDDD4<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD4<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -6962,7 +7035,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-        gpu::computeCoulombFockDDDD5<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD5<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -6981,7 +7054,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-        gpu::computeCoulombFockDDDD6<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD6<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -7000,7 +7073,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-        gpu::computeCoulombFockDDDD7<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD7<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -7019,7 +7092,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-        gpu::computeCoulombFockDDDD8<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD8<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -7038,7 +7111,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-        gpu::computeCoulombFockDDDD9<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD9<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -7057,7 +7130,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-        gpu::computeCoulombFockDDDD10<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD10<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -7076,7 +7149,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-        gpu::computeCoulombFockDDDD11<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD11<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -7095,7 +7168,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-        gpu::computeCoulombFockDDDD12<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD12<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -7114,7 +7187,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-        gpu::computeCoulombFockDDDD13<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD13<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -7133,7 +7206,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-        gpu::computeCoulombFockDDDD14<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD14<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -7152,7 +7225,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-        gpu::computeCoulombFockDDDD15<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD15<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -7171,7 +7244,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-        gpu::computeCoulombFockDDDD16<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD16<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -7190,7 +7263,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-        gpu::computeCoulombFockDDDD17<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD17<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -7209,7 +7282,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-        gpu::computeCoulombFockDDDD18<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD18<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -7228,7 +7301,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-        gpu::computeCoulombFockDDDD19<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD19<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -7247,7 +7320,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-        gpu::computeCoulombFockDDDD20<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD20<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -7266,7 +7339,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-        gpu::computeCoulombFockDDDD21<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD21<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -7285,7 +7358,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-        gpu::computeCoulombFockDDDD22<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD22<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -7304,7 +7377,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-        gpu::computeCoulombFockDDDD23<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD23<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -7323,7 +7396,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-        gpu::computeCoulombFockDDDD24<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD24<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -7342,7 +7415,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-        gpu::computeCoulombFockDDDD25<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD25<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -7361,7 +7434,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-        gpu::computeCoulombFockDDDD26<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD26<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -7380,7 +7453,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-        gpu::computeCoulombFockDDDD27<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD27<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -7399,7 +7472,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-        gpu::computeCoulombFockDDDD28<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD28<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -7418,7 +7491,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-        gpu::computeCoulombFockDDDD29<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD29<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -7481,6 +7554,11 @@ computeFockOnGPU(const              CMolecule& molecule,
     gpuSafe(gpuDeviceSynchronize());
 
     omptimers[thread_id].stop("J compute");
+
+#pragma omp barrier
+
+    gpuSafe(gpuFree(d_data_J_double));
+    gpuSafe(gpuFree(d_data_J_uint32));
 
 #pragma omp barrier
 
@@ -7582,22 +7660,139 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     std::vector<double> mat_K(max_pair_inds_count);
 
-    auto d_mat_K = screening.get_devptr_data_mat_K(gpu_id);
+    size_t data_K_double_size = 0;
 
-    auto d_data_pair_inds_for_K = screening.get_devptr_data_pair_inds_for_K(gpu_id);
+    data_K_double_size += static_cast<size_t>(max_pair_inds_count);         // d_mat_K
+    data_K_double_size += static_cast<size_t>(cart_naos * cart_naos);       // d_mat_D_full_AO
+    data_K_double_size += Q_K_ss.size();                                    // d_Q_K_ss
+    data_K_double_size += Q_K_sp.size();                                    // d_Q_K_sp
+    data_K_double_size += Q_K_ps.size();                                    // d_Q_K_ps
+    data_K_double_size += Q_K_sd.size();                                    // d_Q_K_sd
+    data_K_double_size += Q_K_ds.size();                                    // d_Q_K_ds
+    data_K_double_size += Q_K_pp.size();                                    // d_Q_K_pp
+    data_K_double_size += Q_K_pd.size();                                    // d_Q_K_pd
+    data_K_double_size += Q_K_dp.size();                                    // d_Q_K_dp
+    data_K_double_size += Q_K_dd.size();                                    // d_Q_K_dd
+    data_K_double_size += pair_data_K_ss.size();                            // d_pair_data_K_ss
+    data_K_double_size += pair_data_K_sp.size();                            // d_pair_data_K_sp
+    data_K_double_size += pair_data_K_ps.size();                            // d_pair_data_K_ps
+    data_K_double_size += pair_data_K_sd.size();                            // d_pair_data_K_sd
+    data_K_double_size += pair_data_K_ds.size();                            // d_pair_data_K_ds
+    data_K_double_size += pair_data_K_pp.size();                            // d_pair_data_K_pp
+    data_K_double_size += pair_data_K_pd.size();                            // d_pair_data_K_pd
+    data_K_double_size += pair_data_K_dp.size();                            // d_pair_data_K_dp
+    data_K_double_size += pair_data_K_dd.size();                            // d_pair_data_K_dd
 
-    uint32_t *d_pair_inds_i_for_K_ss = d_data_pair_inds_for_K;
-    uint32_t *d_pair_inds_k_for_K_ss = d_pair_inds_i_for_K_ss + pair_inds_count_for_K_ss;
-    uint32_t *d_pair_inds_i_for_K_sp = d_pair_inds_k_for_K_ss + pair_inds_count_for_K_ss;
-    uint32_t *d_pair_inds_k_for_K_sp = d_pair_inds_i_for_K_sp + pair_inds_count_for_K_sp;
-    uint32_t *d_pair_inds_i_for_K_sd = d_pair_inds_k_for_K_sp + pair_inds_count_for_K_sp;
-    uint32_t *d_pair_inds_k_for_K_sd = d_pair_inds_i_for_K_sd + pair_inds_count_for_K_sd;
-    uint32_t *d_pair_inds_i_for_K_pp = d_pair_inds_k_for_K_sd + pair_inds_count_for_K_sd;
-    uint32_t *d_pair_inds_k_for_K_pp = d_pair_inds_i_for_K_pp + pair_inds_count_for_K_pp;
-    uint32_t *d_pair_inds_i_for_K_pd = d_pair_inds_k_for_K_pp + pair_inds_count_for_K_pp;
-    uint32_t *d_pair_inds_k_for_K_pd = d_pair_inds_i_for_K_pd + pair_inds_count_for_K_pd;
-    uint32_t *d_pair_inds_i_for_K_dd = d_pair_inds_k_for_K_pd + pair_inds_count_for_K_pd;
-    uint32_t *d_pair_inds_k_for_K_dd = d_pair_inds_i_for_K_dd + pair_inds_count_for_K_dd;
+    size_t data_K_uint32_size = 0;
+
+    data_K_uint32_size += static_cast<size_t>(pair_inds_count_for_K_ss);    // d_pair_inds_i_for_K_ss
+    data_K_uint32_size += static_cast<size_t>(pair_inds_count_for_K_ss);    // d_pair_inds_k_for_K_ss
+    data_K_uint32_size += static_cast<size_t>(pair_inds_count_for_K_sp);    // d_pair_inds_i_for_K_sp
+    data_K_uint32_size += static_cast<size_t>(pair_inds_count_for_K_sp);    // d_pair_inds_k_for_K_sp
+    data_K_uint32_size += static_cast<size_t>(pair_inds_count_for_K_sd);    // d_pair_inds_i_for_K_sd
+    data_K_uint32_size += static_cast<size_t>(pair_inds_count_for_K_sd);    // d_pair_inds_k_for_K_sd
+    data_K_uint32_size += static_cast<size_t>(pair_inds_count_for_K_pp);    // d_pair_inds_i_for_K_pp
+    data_K_uint32_size += static_cast<size_t>(pair_inds_count_for_K_pp);    // d_pair_inds_k_for_K_pp
+    data_K_uint32_size += static_cast<size_t>(pair_inds_count_for_K_pd);    // d_pair_inds_i_for_K_pd
+    data_K_uint32_size += static_cast<size_t>(pair_inds_count_for_K_pd);    // d_pair_inds_k_for_K_pd
+    data_K_uint32_size += static_cast<size_t>(pair_inds_count_for_K_dd);    // d_pair_inds_i_for_K_dd
+    data_K_uint32_size += static_cast<size_t>(pair_inds_count_for_K_dd);    // d_pair_inds_k_for_K_dd
+    data_K_uint32_size += D_inds_K_ss.size();                               // d_D_inds_K_ss
+    data_K_uint32_size += D_inds_K_sp.size();                               // d_D_inds_K_sp
+    data_K_uint32_size += D_inds_K_ps.size();                               // d_D_inds_K_ps
+    data_K_uint32_size += D_inds_K_sd.size();                               // d_D_inds_K_sd
+    data_K_uint32_size += D_inds_K_ds.size();                               // d_D_inds_K_ds
+    data_K_uint32_size += D_inds_K_pp.size();                               // d_D_inds_K_pp
+    data_K_uint32_size += D_inds_K_pd.size();                               // d_D_inds_K_pd
+    data_K_uint32_size += D_inds_K_dp.size();                               // d_D_inds_K_dp
+    data_K_uint32_size += D_inds_K_dd.size();                               // d_D_inds_K_dd
+    data_K_uint32_size += pair_displs_K_ss.size();                          // d_pair_displs_K_ss
+    data_K_uint32_size += pair_displs_K_sp.size();                          // d_pair_displs_K_sp
+    data_K_uint32_size += pair_displs_K_ps.size();                          // d_pair_displs_K_ps
+    data_K_uint32_size += pair_displs_K_sd.size();                          // d_pair_displs_K_sd
+    data_K_uint32_size += pair_displs_K_ds.size();                          // d_pair_displs_K_ds
+    data_K_uint32_size += pair_displs_K_pp.size();                          // d_pair_displs_K_pp
+    data_K_uint32_size += pair_displs_K_pd.size();                          // d_pair_displs_K_pd
+    data_K_uint32_size += pair_displs_K_dp.size();                          // d_pair_displs_K_dp
+    data_K_uint32_size += pair_displs_K_dd.size();                          // d_pair_displs_K_dd
+    data_K_uint32_size += pair_counts_K_ss.size();                          // d_pair_counts_K_ss
+    data_K_uint32_size += pair_counts_K_sp.size();                          // d_pair_counts_K_sp
+    data_K_uint32_size += pair_counts_K_ps.size();                          // d_pair_counts_K_ps
+    data_K_uint32_size += pair_counts_K_sd.size();                          // d_pair_counts_K_sd
+    data_K_uint32_size += pair_counts_K_ds.size();                          // d_pair_counts_K_ds
+    data_K_uint32_size += pair_counts_K_pp.size();                          // d_pair_counts_K_pp
+    data_K_uint32_size += pair_counts_K_pd.size();                          // d_pair_counts_K_pd
+    data_K_uint32_size += pair_counts_K_dp.size();                          // d_pair_counts_K_dp
+    data_K_uint32_size += pair_counts_K_dd.size();                          // d_pair_counts_K_dd
+
+    double* d_data_K_double;
+
+    gpuSafe(gpuMalloc(&d_data_K_double, data_K_double_size * sizeof(double)));
+
+    double* d_mat_K          = d_data_K_double;
+    double* d_mat_D_full_AO  = d_mat_K          + max_pair_inds_count;
+    double* d_Q_K_ss         = d_mat_D_full_AO  + cart_naos * cart_naos;
+    double* d_Q_K_sp         = d_Q_K_ss         + Q_K_ss.size();
+    double* d_Q_K_ps         = d_Q_K_sp         + Q_K_sp.size();
+    double* d_Q_K_sd         = d_Q_K_ps         + Q_K_ps.size();
+    double* d_Q_K_ds         = d_Q_K_sd         + Q_K_sd.size();
+    double* d_Q_K_pp         = d_Q_K_ds         + Q_K_ds.size();
+    double* d_Q_K_pd         = d_Q_K_pp         + Q_K_pp.size();
+    double* d_Q_K_dp         = d_Q_K_pd         + Q_K_pd.size();
+    double* d_Q_K_dd         = d_Q_K_dp         + Q_K_dp.size();
+    double* d_pair_data_K_ss = d_Q_K_dd         + Q_K_dd.size();
+    double* d_pair_data_K_sp = d_pair_data_K_ss + pair_data_K_ss.size();
+    double* d_pair_data_K_ps = d_pair_data_K_sp + pair_data_K_sp.size();
+    double* d_pair_data_K_sd = d_pair_data_K_ps + pair_data_K_ps.size();
+    double* d_pair_data_K_ds = d_pair_data_K_sd + pair_data_K_sd.size();
+    double* d_pair_data_K_pp = d_pair_data_K_ds + pair_data_K_ds.size();
+    double* d_pair_data_K_pd = d_pair_data_K_pp + pair_data_K_pp.size();
+    double* d_pair_data_K_dp = d_pair_data_K_pd + pair_data_K_pd.size();
+    double* d_pair_data_K_dd = d_pair_data_K_dp + pair_data_K_dp.size();
+
+    uint32_t* d_data_K_uint32;
+
+    gpuSafe(gpuMalloc(&d_data_K_uint32, data_K_uint32_size * sizeof(uint32_t)));
+
+    uint32_t* d_pair_inds_i_for_K_ss = d_data_K_uint32;
+    uint32_t* d_pair_inds_k_for_K_ss = d_pair_inds_i_for_K_ss + pair_inds_count_for_K_ss;
+    uint32_t* d_pair_inds_i_for_K_sp = d_pair_inds_k_for_K_ss + pair_inds_count_for_K_ss;
+    uint32_t* d_pair_inds_k_for_K_sp = d_pair_inds_i_for_K_sp + pair_inds_count_for_K_sp;
+    uint32_t* d_pair_inds_i_for_K_sd = d_pair_inds_k_for_K_sp + pair_inds_count_for_K_sp;
+    uint32_t* d_pair_inds_k_for_K_sd = d_pair_inds_i_for_K_sd + pair_inds_count_for_K_sd;
+    uint32_t* d_pair_inds_i_for_K_pp = d_pair_inds_k_for_K_sd + pair_inds_count_for_K_sd;
+    uint32_t* d_pair_inds_k_for_K_pp = d_pair_inds_i_for_K_pp + pair_inds_count_for_K_pp;
+    uint32_t* d_pair_inds_i_for_K_pd = d_pair_inds_k_for_K_pp + pair_inds_count_for_K_pp;
+    uint32_t* d_pair_inds_k_for_K_pd = d_pair_inds_i_for_K_pd + pair_inds_count_for_K_pd;
+    uint32_t* d_pair_inds_i_for_K_dd = d_pair_inds_k_for_K_pd + pair_inds_count_for_K_pd;
+    uint32_t* d_pair_inds_k_for_K_dd = d_pair_inds_i_for_K_dd + pair_inds_count_for_K_dd;
+    uint32_t* d_D_inds_K_ss          = d_pair_inds_k_for_K_dd + pair_inds_count_for_K_dd;
+    uint32_t* d_D_inds_K_sp          = d_D_inds_K_ss          + D_inds_K_ss.size();
+    uint32_t* d_D_inds_K_ps          = d_D_inds_K_sp          + D_inds_K_sp.size();
+    uint32_t* d_D_inds_K_sd          = d_D_inds_K_ps          + D_inds_K_ps.size();
+    uint32_t* d_D_inds_K_ds          = d_D_inds_K_sd          + D_inds_K_sd.size();
+    uint32_t* d_D_inds_K_pp          = d_D_inds_K_ds          + D_inds_K_ds.size();
+    uint32_t* d_D_inds_K_pd          = d_D_inds_K_pp          + D_inds_K_pp.size();
+    uint32_t* d_D_inds_K_dp          = d_D_inds_K_pd          + D_inds_K_pd.size();
+    uint32_t* d_D_inds_K_dd          = d_D_inds_K_dp          + D_inds_K_dp.size();
+    uint32_t* d_pair_counts_K_ss     = d_D_inds_K_dd          + D_inds_K_dd.size();
+    uint32_t* d_pair_counts_K_sp     = d_pair_counts_K_ss     + pair_counts_K_ss.size();
+    uint32_t* d_pair_counts_K_ps     = d_pair_counts_K_sp     + pair_counts_K_sp.size();
+    uint32_t* d_pair_counts_K_sd     = d_pair_counts_K_ps     + pair_counts_K_ps.size();
+    uint32_t* d_pair_counts_K_ds     = d_pair_counts_K_sd     + pair_counts_K_sd.size();
+    uint32_t* d_pair_counts_K_pp     = d_pair_counts_K_ds     + pair_counts_K_ds.size();
+    uint32_t* d_pair_counts_K_pd     = d_pair_counts_K_pp     + pair_counts_K_pp.size();
+    uint32_t* d_pair_counts_K_dp     = d_pair_counts_K_pd     + pair_counts_K_pd.size();
+    uint32_t* d_pair_counts_K_dd     = d_pair_counts_K_dp     + pair_counts_K_dp.size();
+    uint32_t* d_pair_displs_K_ss     = d_pair_counts_K_dd     + pair_counts_K_dd.size();
+    uint32_t* d_pair_displs_K_sp     = d_pair_displs_K_ss     + pair_displs_K_ss.size();
+    uint32_t* d_pair_displs_K_ps     = d_pair_displs_K_sp     + pair_displs_K_sp.size();
+    uint32_t* d_pair_displs_K_sd     = d_pair_displs_K_ps     + pair_displs_K_ps.size();
+    uint32_t* d_pair_displs_K_ds     = d_pair_displs_K_sd     + pair_displs_K_sd.size();
+    uint32_t* d_pair_displs_K_pp     = d_pair_displs_K_ds     + pair_displs_K_ds.size();
+    uint32_t* d_pair_displs_K_pd     = d_pair_displs_K_pp     + pair_displs_K_pp.size();
+    uint32_t* d_pair_displs_K_dp     = d_pair_displs_K_pd     + pair_displs_K_pd.size();
+    uint32_t* d_pair_displs_K_dd     = d_pair_displs_K_dp     + pair_displs_K_dp.size();
 
     gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pair_inds_i_for_K_ss, pair_inds_i_for_K_ss.data(), pair_inds_i_for_K_ss.size());
     gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pair_inds_k_for_K_ss, pair_inds_k_for_K_ss.data(), pair_inds_k_for_K_ss.size());
@@ -7611,65 +7806,6 @@ computeFockOnGPU(const              CMolecule& molecule,
     gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pair_inds_k_for_K_pd, pair_inds_k_for_K_pd.data(), pair_inds_k_for_K_pd.size());
     gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pair_inds_i_for_K_dd, pair_inds_i_for_K_dd.data(), pair_inds_i_for_K_dd.size());
     gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pair_inds_k_for_K_dd, pair_inds_k_for_K_dd.data(), pair_inds_k_for_K_dd.size());
-
-    auto d_mat_D_full_AO = screening.get_devptr_data_mat_D_full_AO(gpu_id);
-
-    auto d_data_Q_K = screening.get_devptr_data_Q_K(gpu_id);
-
-    double *d_Q_K_ss = d_data_Q_K;
-    double *d_Q_K_sp = d_Q_K_ss + Q_K_ss.size();
-    double *d_Q_K_ps = d_Q_K_sp + Q_K_sp.size();
-    double *d_Q_K_sd = d_Q_K_ps + Q_K_ps.size();
-    double *d_Q_K_ds = d_Q_K_sd + Q_K_sd.size();
-    double *d_Q_K_pp = d_Q_K_ds + Q_K_ds.size();
-    double *d_Q_K_pd = d_Q_K_pp + Q_K_pp.size();
-    double *d_Q_K_dp = d_Q_K_pd + Q_K_pd.size();
-    double *d_Q_K_dd = d_Q_K_dp + Q_K_dp.size();
-
-    auto d_data_D_inds_K = screening.get_devptr_data_D_inds_K(gpu_id);
-
-    uint32_t *d_D_inds_K_ss = d_data_D_inds_K;
-    uint32_t *d_D_inds_K_sp = d_D_inds_K_ss + D_inds_K_ss.size();
-    uint32_t *d_D_inds_K_ps = d_D_inds_K_sp + D_inds_K_sp.size();
-    uint32_t *d_D_inds_K_sd = d_D_inds_K_ps + D_inds_K_ps.size();
-    uint32_t *d_D_inds_K_ds = d_D_inds_K_sd + D_inds_K_sd.size();
-    uint32_t *d_D_inds_K_pp = d_D_inds_K_ds + D_inds_K_ds.size();
-    uint32_t *d_D_inds_K_pd = d_D_inds_K_pp + D_inds_K_pp.size();
-    uint32_t *d_D_inds_K_dp = d_D_inds_K_pd + D_inds_K_pd.size();
-    uint32_t *d_D_inds_K_dd = d_D_inds_K_dp + D_inds_K_dp.size();
-
-    auto d_data_pair_counts_displs_K = screening.get_devptr_data_pair_counts_displs_K(gpu_id);
-
-    uint32_t *d_pair_counts_K_ss = d_data_pair_counts_displs_K;
-    uint32_t *d_pair_counts_K_sp = d_pair_counts_K_ss + pair_counts_K_ss.size();
-    uint32_t *d_pair_counts_K_ps = d_pair_counts_K_sp + pair_counts_K_sp.size();
-    uint32_t *d_pair_counts_K_sd = d_pair_counts_K_ps + pair_counts_K_ps.size();
-    uint32_t *d_pair_counts_K_ds = d_pair_counts_K_sd + pair_counts_K_sd.size();
-    uint32_t *d_pair_counts_K_pp = d_pair_counts_K_ds + pair_counts_K_ds.size();
-    uint32_t *d_pair_counts_K_pd = d_pair_counts_K_pp + pair_counts_K_pp.size();
-    uint32_t *d_pair_counts_K_dp = d_pair_counts_K_pd + pair_counts_K_pd.size();
-    uint32_t *d_pair_counts_K_dd = d_pair_counts_K_dp + pair_counts_K_dp.size();
-    uint32_t *d_pair_displs_K_ss = d_pair_counts_K_dd + pair_counts_K_dd.size();
-    uint32_t *d_pair_displs_K_sp = d_pair_displs_K_ss + pair_displs_K_ss.size();
-    uint32_t *d_pair_displs_K_ps = d_pair_displs_K_sp + pair_displs_K_sp.size();
-    uint32_t *d_pair_displs_K_sd = d_pair_displs_K_ps + pair_displs_K_ps.size();
-    uint32_t *d_pair_displs_K_ds = d_pair_displs_K_sd + pair_displs_K_sd.size();
-    uint32_t *d_pair_displs_K_pp = d_pair_displs_K_ds + pair_displs_K_ds.size();
-    uint32_t *d_pair_displs_K_pd = d_pair_displs_K_pp + pair_displs_K_pp.size();
-    uint32_t *d_pair_displs_K_dp = d_pair_displs_K_pd + pair_displs_K_pd.size();
-    uint32_t *d_pair_displs_K_dd = d_pair_displs_K_dp + pair_displs_K_dp.size();
-
-    auto d_data_pair_data_K = screening.get_devptr_data_pair_data_K(gpu_id);
-
-    double *d_pair_data_K_ss = d_data_pair_data_K;
-    double *d_pair_data_K_sp = d_pair_data_K_ss + pair_data_K_ss.size();
-    double *d_pair_data_K_ps = d_pair_data_K_sp + pair_data_K_sp.size();
-    double *d_pair_data_K_sd = d_pair_data_K_ps + pair_data_K_ps.size();
-    double *d_pair_data_K_ds = d_pair_data_K_sd + pair_data_K_sd.size();
-    double *d_pair_data_K_pp = d_pair_data_K_ds + pair_data_K_ds.size();
-    double *d_pair_data_K_pd = d_pair_data_K_pp + pair_data_K_pp.size();
-    double *d_pair_data_K_dp = d_pair_data_K_pd + pair_data_K_pd.size();
-    double *d_pair_data_K_dd = d_pair_data_K_dp + pair_data_K_dp.size();
 
     gpu::chunkedMemcpyHostToDevice<double>(d_mat_D_full_AO, cart_dens_ptr, cart_naos * cart_naos);
 
@@ -10953,6 +11089,16 @@ computeFockOnGPU(const              CMolecule& molecule,
     }  // end of compute K
 
     gpuSafe(gpuDeviceSynchronize());
+
+#pragma omp barrier
+
+    gpuSafe(gpuFree(d_data_K_double));
+    gpuSafe(gpuFree(d_data_K_uint32));
+
+    gpuSafe(gpuFree(d_data_boys_func));
+
+    gpuSafe(gpuFree(d_data_spd_prim_info));
+    gpuSafe(gpuFree(d_data_spd_prim_aoinds));
 
     omptimers[thread_id].stop("K compute");
     }
