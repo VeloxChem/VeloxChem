@@ -39,6 +39,8 @@
 
 namespace gpu {
 
+auto getAvailableGpuMemory() -> double;
+
 auto computeDotProduct(const double* A, const double* B, const int64_t size_int64) -> double;
 
 auto computeWeightedSum(double* weighted_data, const std::vector<double>& weights, const std::vector<const double*>& pointers, const int64_t size_int64) -> void;

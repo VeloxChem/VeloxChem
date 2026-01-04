@@ -74,6 +74,23 @@
 namespace gpu {  // gpu namespace
 
 auto
+getAvailableGpuMemory() -> double
+{
+    gpuSafe(gpuSetDevice(0));
+
+    errors::assertMsgCritical(
+        !omp_in_parallel(),
+        std::string(__func__) + std::string(": should not be called in omp parallel reigion"));
+
+    size_t mem_free_bytes = 0;
+    size_t mem_total_bytes = 0;
+
+    gpuSafe(gpuMemGetInfo(&mem_free_bytes, &mem_total_bytes));
+
+    return static_cast<double>(mem_free_bytes);
+}
+
+auto
 computeDotProduct(const double* A, const double* B, const int64_t size_int64) -> double
 {
     gpuSafe(gpuSetDevice(0));

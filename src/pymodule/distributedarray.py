@@ -37,6 +37,7 @@ import h5py
 
 from .veloxchemlib import mpi_master
 from .veloxchemlib import matmul_gpu
+from .veloxchemlib import get_avail_mem_gpu
 
 
 class DistributedArray:
@@ -242,12 +243,18 @@ class DistributedArray:
             A numpy array on the master node, None on other nodes.
         """
 
+        # empirical estimation of maximum number of elements for matmul_gpu
+        # (for double precision, 3 matrices, and 25% extra space)
+        # TODO: more accurate estimation using n_rows and n_cols
+        mem_gpu = get_avail_mem_gpu()
+        num_elems_thresh = (0.75 * mem_gpu / 8.0 / 3.0)
+
         if (self.data.ndim == 2 and dist_array.data.ndim == 2 and
                 self.data.size > 0 and dist_array.data.size > 0 and
                 self.data.dtype == np.float64 and
                 dist_array.data.dtype == np.float64 and
-                float(self.data.size) <= 3e9 and
-                float(dist_array.data.size) <= 3e9):
+                float(self.data.size) <= num_elems_thresh and
+                float(dist_array.data.size) <= num_elems_thresh):
             mat = matmul_gpu(self.data.T, dist_array.data)
         else:
             mat = np.matmul(self.data.T, dist_array.data)
@@ -273,12 +280,18 @@ class DistributedArray:
             A numpy array that is available on all nodes.
         """
 
+        # empirical estimation of maximum number of elements for matmul_gpu
+        # (for double precision, 3 matrices, and 25% extra space)
+        # TODO: more accurate estimation using n_rows and n_cols
+        mem_gpu = get_avail_mem_gpu()
+        num_elems_thresh = (0.75 * mem_gpu / 8.0 / 3.0)
+
         if (self.data.ndim == 2 and dist_array.data.ndim == 2 and
                 self.data.size > 0 and dist_array.data.size > 0 and
                 self.data.dtype == np.float64 and
                 dist_array.data.dtype == np.float64 and
-                float(self.data.size) <= 3e9 and
-                float(dist_array.data.size) <= 3e9):
+                float(self.data.size) <= num_elems_thresh and
+                float(dist_array.data.size) <= num_elems_thresh):
             mat = matmul_gpu(self.data.T, dist_array.data)
         else:
             mat = np.matmul(self.data.T, dist_array.data)
@@ -304,10 +317,17 @@ class DistributedArray:
             A distributed array.
         """
 
+        # empirical estimation of maximum number of elements for matmul_gpu
+        # (for double precision, 3 matrices, and 25% extra space)
+        # TODO: more accurate estimation using n_rows and n_cols
+        mem_gpu = get_avail_mem_gpu()
+        num_elems_thresh = (0.75 * mem_gpu / 8.0 / 3.0)
+
         if (self.data.ndim == 2 and array.ndim == 2 and self.data.size > 0 and
                 array.size > 0 and self.data.dtype == np.float64 and
-                array.dtype == np.float64 and float(self.data.size) <= 3e9 and
-                float(array.size) <= 3e9):
+                array.dtype == np.float64 and
+                float(self.data.size) <= num_elems_thresh and
+                float(array.size) <= num_elems_thresh):
             seg_mat = matmul_gpu(self.data, array)
         else:
             seg_mat = np.matmul(self.data, array)

@@ -110,6 +110,8 @@ export_gpu(py::module& m)
         },
         "Computes GTO values and derivatives on grid points using GPU.");
 
+    m.def("get_avail_mem_gpu", &gpu::getAvailableGpuMemory);
+
     m.def(
         "dot_product_gpu",
         [](const py::array_t<double>& A, const py::array_t<double>& B) -> double {
