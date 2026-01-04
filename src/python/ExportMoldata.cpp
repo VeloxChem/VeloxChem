@@ -132,17 +132,17 @@ export_moldata(py::module& m)
         .def("atom_indexes", &CMolecule::getAtomIndexes, "Gets indexes of atoms with requested atomic label")
         .def(
             "number_of_alpha_electrons",
-            [](const CMolecule& self) -> int32_t {
-                int32_t nelec  = self.getNumberOfElectrons();
-                int32_t mult_1 = self.getMultiplicity() - 1;
+            [](const CMolecule& self) -> int64_t {
+                int64_t nelec  = self.getNumberOfElectrons();
+                int64_t mult_1 = self.getMultiplicity() - 1;
                 return (nelec + mult_1) / 2;
             },
             "Gets number of alpha electrons.")
         .def(
             "number_of_beta_electrons",
-            [](const CMolecule& self) -> int32_t {
-                int32_t nelec  = self.getNumberOfElectrons();
-                int32_t mult_1 = self.getMultiplicity() - 1;
+            [](const CMolecule& self) -> int64_t {
+                int64_t nelec  = self.getNumberOfElectrons();
+                int64_t mult_1 = self.getMultiplicity() - 1;
                 return (nelec - mult_1) / 2;
             },
             "Gets number of beta electrons.")

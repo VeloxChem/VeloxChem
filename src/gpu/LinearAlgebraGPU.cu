@@ -74,7 +74,7 @@
 namespace gpu {  // gpu namespace
 
 auto
-computeDotProduct(const double* A, const double* B, const int64_t size) -> double
+computeDotProduct(const double* A, const double* B, const int64_t size_int64) -> double
 {
     gpuSafe(gpuSetDevice(0));
 
@@ -82,22 +82,24 @@ computeDotProduct(const double* A, const double* B, const int64_t size) -> doubl
         !omp_in_parallel(),
         std::string(__func__) + std::string(": should not be called in omp parallel reigion"));
 
-    auto n = static_cast<int32_t>(size);
+    auto size = static_cast<size_t>(size_int64);
 
     double* d_data;
 
-    gpuSafe(gpuMalloc(&d_data, n * 2 * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_data, size * 2 * sizeof(double)));
 
     double* d_A = d_data;
-    double* d_B = d_A + n;
+    double* d_B = d_A + size;
 
-    gpu::chunkedMemcpyHostToDevice<double>(d_A, A, n);
-    gpu::chunkedMemcpyHostToDevice<double>(d_B, B, n);
+    gpu::chunkedMemcpyHostToDevice<double>(d_A, A, size);
+    gpu::chunkedMemcpyHostToDevice<double>(d_B, B, size);
 
 #if defined(USE_CUDA)
 
     cublasHandle_t handle;
     cublasSafe(cublasCreate(&handle));
+
+    auto n = static_cast<int32_t>(size);
 
     double dot_product;
     cublasSafe(cublasDdot(handle, n, d_A, 1, d_B, 1, &dot_product));
@@ -108,6 +110,8 @@ computeDotProduct(const double* A, const double* B, const int64_t size) -> doubl
 
     hipblasHandle_t handle;
     hipblasSafe(hipblasCreate(&handle));
+
+    auto n = static_cast<int32_t>(size);
 
     double dot_product;
     hipblasSafe(hipblasDdot(handle, n, d_A, 1, d_B, 1, &dot_product));
@@ -122,7 +126,7 @@ computeDotProduct(const double* A, const double* B, const int64_t size) -> doubl
 }
 
 auto
-computeWeightedSum(double* weighted_data, const std::vector<double>& weights, const std::vector<const double*>& data_pointers, const int64_t size) -> void
+computeWeightedSum(double* weighted_data, const std::vector<double>& weights, const std::vector<const double*>& data_pointers, const int64_t size_int64) -> void
 {
     gpuSafe(gpuSetDevice(0));
 
@@ -130,16 +134,16 @@ computeWeightedSum(double* weighted_data, const std::vector<double>& weights, co
         !omp_in_parallel(),
         std::string(__func__) + std::string(": should not be called in omp parallel reigion"));
 
-    auto n = static_cast<int32_t>(size);
+    auto size = static_cast<size_t>(size_int64);
 
     double* d_data;
 
-    gpuSafe(gpuMalloc(&d_data, n * 2 * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_data, size * 2 * sizeof(double)));
 
     double* d_X = d_data;
-    double* d_Y = d_X + n;
+    double* d_Y = d_X + size;
 
-    gpu::chunkedMemcpyHostToDevice<double>(d_Y, weighted_data, n);
+    gpu::chunkedMemcpyHostToDevice<double>(d_Y, weighted_data, size);
 
 #if defined(USE_CUDA)
 
@@ -150,7 +154,9 @@ computeWeightedSum(double* weighted_data, const std::vector<double>& weights, co
     {
         double alpha = weights[i];
 
-        gpu::chunkedMemcpyHostToDevice<double>(d_X, data_pointers[i], n);
+        gpu::chunkedMemcpyHostToDevice<double>(d_X, data_pointers[i], size);
+
+        auto n = static_cast<int32_t>(size);
 
         cublasSafe(cublasDaxpy(handle, n, &alpha, d_X, 1, d_Y, 1));
     }
@@ -166,7 +172,9 @@ computeWeightedSum(double* weighted_data, const std::vector<double>& weights, co
     {
         double alpha = weights[i];
 
-        gpu::chunkedMemcpyHostToDevice<double>(d_X, data_pointers[i], n);
+        gpu::chunkedMemcpyHostToDevice<double>(d_X, data_pointers[i], size);
+
+        auto n = static_cast<int32_t>(size);
 
         hipblasSafe(hipblasDaxpy(handle, n, &alpha, d_X, 1, d_Y, 1));
     }
@@ -175,14 +183,14 @@ computeWeightedSum(double* weighted_data, const std::vector<double>& weights, co
 
 #endif
 
-    gpu::chunkedMemcpyDeviceToHost<double>(weighted_data, d_Y, n);
+    gpu::chunkedMemcpyDeviceToHost<double>(weighted_data, d_Y, size);
 
     gpuSafe(gpuFree(d_data));
 }
 
 auto
 computeErrorVector(double* errvec, const double* X, const double* F, const double* D, const double* S,
-                   const int64_t nmo_inp, const int64_t nao_inp, const std::string& trans_X) -> void
+                   const int64_t nmo_int64, const int64_t nao_int64, const std::string& trans_X) -> void
 {
     gpuSafe(gpuSetDevice(0));
 
@@ -190,19 +198,19 @@ computeErrorVector(double* errvec, const double* X, const double* F, const doubl
         !omp_in_parallel(),
         std::string(__func__) + std::string(": should not be called in omp parallel reigion"));
 
-    auto nmo = static_cast<int32_t>(nmo_inp);
-    auto nao = static_cast<int32_t>(nao_inp);
+    auto nmo_size = static_cast<size_t>(nmo_int64);
+    auto nao_size = static_cast<size_t>(nao_int64);
 
     double* d_data;
 
-    gpuSafe(gpuMalloc(&d_data, nao * nao * 3 * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_data, nao_size * nao_size * 3 * sizeof(double)));
 
     double* d_A = d_data;
-    double* d_B = d_A + nao * nao;
-    double* d_C = d_B + nao * nao;
+    double* d_B = d_A + nao_size * nao_size;
+    double* d_C = d_B + nao_size * nao_size;
 
-    gpu::chunkedMemcpyHostToDevice<double>(d_A, F, nao * nao);
-    gpu::chunkedMemcpyHostToDevice<double>(d_B, D, nao * nao);
+    gpu::chunkedMemcpyHostToDevice<double>(d_A, F, nao_size * nao_size);
+    gpu::chunkedMemcpyHostToDevice<double>(d_B, D, nao_size * nao_size);
 
 #if defined(USE_CUDA)
 
@@ -211,13 +219,16 @@ computeErrorVector(double* errvec, const double* X, const double* F, const doubl
 
     double alpha = 1.0, beta = 0.0;
 
+    auto nmo = static_cast<int32_t>(nmo_int64);
+    auto nao = static_cast<int32_t>(nao_int64);
+
     // Note: we compute C^T = B^T * A^T since cublas is column-major
 
     // D^T F^T (=> FD)
     cublasSafe(cublasDgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, nao, nao, nao, &alpha, d_B, nao, d_A, nao, &beta, d_C, nao));
 
     // S^T(FD)^T (=> FDS)
-    gpu::chunkedMemcpyHostToDevice<double>(d_A, S, nao * nao);
+    gpu::chunkedMemcpyHostToDevice<double>(d_A, S, nao_size * nao_size);
 
     cublasSafe(cublasDgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, nao, nao, nao, &alpha, d_A, nao, d_C, nao, &beta, d_B, nao));
 
@@ -232,7 +243,7 @@ computeErrorVector(double* errvec, const double* X, const double* F, const doubl
     double* d_X = d_A;  // note: nao >= nmo
     double* d_Y = d_B;  // note: nao >= nmo
 
-    gpu::chunkedMemcpyHostToDevice<double>(d_X, X, nmo * nao);
+    gpu::chunkedMemcpyHostToDevice<double>(d_X, X, nmo_size * nao_size);
 
     auto op_X  = (trans_X == std::string("N")) ? CUBLAS_OP_N : CUBLAS_OP_T;
     auto op_XT = (trans_X == std::string("N")) ? CUBLAS_OP_T : CUBLAS_OP_N;
@@ -252,7 +263,7 @@ computeErrorVector(double* errvec, const double* X, const double* F, const doubl
     // (EX)^T X (=> X^T(E)X)
     cublasSafe(cublasDgemm(handle, CUBLAS_OP_N, op_XT, nmo, nmo, nao, &alpha, d_Y, nmo, d_X, lda_X, &beta, d_C, nmo));
 
-    gpu::chunkedMemcpyDeviceToHost<double>(errvec, d_C, nmo * nmo);
+    gpu::chunkedMemcpyDeviceToHost<double>(errvec, d_C, nmo_size * nmo_size);
 
     cublasSafe(cublasDestroy(handle));
 
@@ -263,13 +274,16 @@ computeErrorVector(double* errvec, const double* X, const double* F, const doubl
 
     double alpha = 1.0, beta = 0.0;
 
+    auto nmo = static_cast<int32_t>(nmo_int64);
+    auto nao = static_cast<int32_t>(nao_int64);
+
     // Note: we compute C^T = B^T * A^T since hipblas is column-major
 
     // D^T F^T (=> FD)
     hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, HIPBLAS_OP_N, nao, nao, nao, &alpha, d_B, nao, d_A, nao, &beta, d_C, nao));
 
     // S^T(FD)^T (=> FDS)
-    gpu::chunkedMemcpyHostToDevice<double>(d_A, S, nao * nao);
+    gpu::chunkedMemcpyHostToDevice<double>(d_A, S, nao_size * nao_size);
 
     hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, HIPBLAS_OP_N, nao, nao, nao, &alpha, d_A, nao, d_C, nao, &beta, d_B, nao));
 
@@ -284,7 +298,7 @@ computeErrorVector(double* errvec, const double* X, const double* F, const doubl
     double* d_X = d_A;  // note: nao >= nmo
     double* d_Y = d_B;  // note: nao >= nmo
 
-    gpu::chunkedMemcpyHostToDevice<double>(d_X, X, nmo * nao);
+    gpu::chunkedMemcpyHostToDevice<double>(d_X, X, nmo_size * nao_size);
 
     auto op_X  = (trans_X == std::string("N")) ? HIPBLAS_OP_N : HIPBLAS_OP_T;
     auto op_XT = (trans_X == std::string("N")) ? HIPBLAS_OP_T : HIPBLAS_OP_N;
@@ -304,7 +318,7 @@ computeErrorVector(double* errvec, const double* X, const double* F, const doubl
     // (EX)^T X (=> X^T(E)X)
     hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, op_XT, nmo, nmo, nao, &alpha, d_Y, nmo, d_X, lda_X, &beta, d_C, nmo));
 
-    gpu::chunkedMemcpyDeviceToHost<double>(errvec, d_C, nmo * nmo);
+    gpu::chunkedMemcpyDeviceToHost<double>(errvec, d_C, nmo_size * nmo_size);
 
     hipblasSafe(hipblasDestroy(handle));
 
@@ -315,7 +329,7 @@ computeErrorVector(double* errvec, const double* X, const double* F, const doubl
 
 auto
 transformMatrix(double* transformed_F, const double* X, const double* F,
-                const int64_t nmo_inp, const int64_t nao_inp, const std::string& trans_X) -> void
+                const int64_t nmo_int64, const int64_t nao_int64, const std::string& trans_X) -> void
 {
     gpuSafe(gpuSetDevice(0));
 
@@ -323,19 +337,19 @@ transformMatrix(double* transformed_F, const double* X, const double* F,
         !omp_in_parallel(),
         std::string(__func__) + std::string(": should not be called in omp parallel reigion"));
 
-    auto nmo = static_cast<int32_t>(nmo_inp);
-    auto nao = static_cast<int32_t>(nao_inp);
+    auto nmo_size = static_cast<size_t>(nmo_int64);
+    auto nao_size = static_cast<size_t>(nao_int64);
 
     double* d_data;
 
-    gpuSafe(gpuMalloc(&d_data, (nao * nao + nmo * nao + nmo * nao) * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_data, (nao_size * nao_size + nmo_size * nao_size + nmo_size * nao_size) * sizeof(double)));
 
     double* d_F = d_data;
-    double* d_X = d_F + nao * nao;
-    double* d_Y = d_X + nmo * nao;
+    double* d_X = d_F + nao_size * nao_size;
+    double* d_Y = d_X + nmo_size * nao_size;
 
-    gpu::chunkedMemcpyHostToDevice<double>(d_F, F, nao * nao);
-    gpu::chunkedMemcpyHostToDevice<double>(d_X, X, nmo * nao);
+    gpu::chunkedMemcpyHostToDevice<double>(d_F, F, nao_size * nao_size);
+    gpu::chunkedMemcpyHostToDevice<double>(d_X, X, nmo_size * nao_size);
 
 #if defined(USE_CUDA)
 
@@ -343,6 +357,9 @@ transformMatrix(double* transformed_F, const double* X, const double* F,
     cublasSafe(cublasCreate(&handle));
 
     double alpha = 1.0, beta = 0.0;
+
+    auto nmo = static_cast<int32_t>(nmo_int64);
+    auto nao = static_cast<int32_t>(nao_int64);
 
     auto op_X = (trans_X == std::string("N")) ? CUBLAS_OP_N : CUBLAS_OP_T;
     auto lda_X = (trans_X == std::string("N")) ? nmo : nao;
@@ -360,7 +377,7 @@ transformMatrix(double* transformed_F, const double* X, const double* F,
     // (FX)^T X (=> X^T(F)X)
     cublasSafe(cublasDgemm(handle, CUBLAS_OP_N, op_XT, nmo, nmo, nao, &alpha, d_Y, nmo, d_X, lda_X, &beta, d_F, nmo));
 
-    gpu::chunkedMemcpyDeviceToHost<double>(transformed_F, d_F, nmo * nmo);
+    gpu::chunkedMemcpyDeviceToHost<double>(transformed_F, d_F, nmo_size * nmo_size);
 
     cublasSafe(cublasDestroy(handle));
 
@@ -370,6 +387,9 @@ transformMatrix(double* transformed_F, const double* X, const double* F,
     hipblasSafe(hipblasCreate(&handle));
 
     double alpha = 1.0, beta = 0.0;
+
+    auto nmo = static_cast<int32_t>(nmo_int64);
+    auto nao = static_cast<int32_t>(nao_int64);
 
     auto op_X = (trans_X == std::string("N")) ? HIPBLAS_OP_N : HIPBLAS_OP_T;
     auto lda_X = (trans_X == std::string("N")) ? nmo : nao;
@@ -387,7 +407,7 @@ transformMatrix(double* transformed_F, const double* X, const double* F,
     // (FX)^T X (=> X^T(F)X)
     hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, op_XT, nmo, nmo, nao, &alpha, d_Y, nmo, d_X, lda_X, &beta, d_F, nmo));
 
-    gpu::chunkedMemcpyDeviceToHost<double>(transformed_F, d_F, nmo * nmo);
+    gpu::chunkedMemcpyDeviceToHost<double>(transformed_F, d_F, nmo_size * nmo_size);
 
     hipblasSafe(hipblasDestroy(handle));
 
@@ -398,7 +418,7 @@ transformMatrix(double* transformed_F, const double* X, const double* F,
 
 auto
 computeMatrixMultiplication(double* C, const double* A, const double* B, const std::string& trans_A, const std::string& trans_B,
-                            const int64_t m_inp, const int64_t k_inp, const int64_t n_inp) -> void
+                            const int64_t m_int64, const int64_t k_int64, const int64_t n_int64) -> void
 {
     gpuSafe(gpuSetDevice(0));
 
@@ -406,20 +426,20 @@ computeMatrixMultiplication(double* C, const double* A, const double* B, const s
         !omp_in_parallel(),
         std::string(__func__) + std::string(": should not be called in omp parallel reigion"));
 
-    auto m = static_cast<int32_t>(m_inp);
-    auto k = static_cast<int32_t>(k_inp);
-    auto n = static_cast<int32_t>(n_inp);
+    auto m_size = static_cast<size_t>(m_int64);
+    auto k_size = static_cast<size_t>(k_int64);
+    auto n_size = static_cast<size_t>(n_int64);
 
     double* d_data;
 
-    gpuSafe(gpuMalloc(&d_data, (m * k + k * n + m * n) * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_data, (m_size * k_size + k_size * n_size + m_size * n_size) * sizeof(double)));
 
     double* d_A = d_data;
-    double* d_B = d_A + m * k;
-    double* d_C = d_B + k * n;
+    double* d_B = d_A + m_size * k_size;
+    double* d_C = d_B + k_size * n_size;
 
-    gpu::chunkedMemcpyHostToDevice<double>(d_A, A, m * k);
-    gpu::chunkedMemcpyHostToDevice<double>(d_B, B, k * n);
+    gpu::chunkedMemcpyHostToDevice<double>(d_A, A, m_size * k_size);
+    gpu::chunkedMemcpyHostToDevice<double>(d_B, B, k_size * n_size);
 
 #if defined(USE_CUDA)
 
@@ -427,6 +447,10 @@ computeMatrixMultiplication(double* C, const double* A, const double* B, const s
     cublasSafe(cublasCreate(&handle));
 
     double alpha = 1.0, beta = 0.0;
+
+    auto m = static_cast<int32_t>(m_int64);
+    auto k = static_cast<int32_t>(k_int64);
+    auto n = static_cast<int32_t>(n_int64);
 
     auto op_A = (trans_A == std::string("N")) ? CUBLAS_OP_N : CUBLAS_OP_T;
     auto op_B = (trans_B == std::string("N")) ? CUBLAS_OP_N : CUBLAS_OP_T;
@@ -439,7 +463,7 @@ computeMatrixMultiplication(double* C, const double* A, const double* B, const s
 
     cublasSafe(cublasDgemm(handle, op_B, op_A, n, m, k, &alpha, d_B, lda_B, d_A, lda_A, &beta, d_C, n));
 
-    gpu::chunkedMemcpyDeviceToHost<double>(C, d_C, m * n);
+    gpu::chunkedMemcpyDeviceToHost<double>(C, d_C, m_size * n_size);
 
     cublasSafe(cublasDestroy(handle));
 
@@ -449,6 +473,10 @@ computeMatrixMultiplication(double* C, const double* A, const double* B, const s
     hipblasSafe(hipblasCreate(&handle));
 
     double alpha = 1.0, beta = 0.0;
+
+    auto m = static_cast<int32_t>(m_int64);
+    auto k = static_cast<int32_t>(k_int64);
+    auto n = static_cast<int32_t>(n_int64);
 
     auto op_A = (trans_A == std::string("N")) ? HIPBLAS_OP_N : HIPBLAS_OP_T;
     auto op_B = (trans_B == std::string("N")) ? HIPBLAS_OP_N : HIPBLAS_OP_T;
@@ -461,7 +489,7 @@ computeMatrixMultiplication(double* C, const double* A, const double* B, const s
 
     hipblasSafe(hipblasDgemm(handle, op_B, op_A, n, m, k, &alpha, d_B, lda_B, d_A, lda_A, &beta, d_C, n));
 
-    gpu::chunkedMemcpyDeviceToHost<double>(C, d_C, m * n);
+    gpu::chunkedMemcpyDeviceToHost<double>(C, d_C, m_size * n_size);
 
     hipblasSafe(hipblasDestroy(handle));
 
@@ -471,7 +499,7 @@ computeMatrixMultiplication(double* C, const double* A, const double* B, const s
 }
 
 auto
-diagonalizeMatrix(double* A, double* D, const int64_t nrows_A) -> void
+diagonalizeMatrix(double* A, double* D, const int64_t n_int64) -> void
 {
     gpuSafe(gpuSetDevice(0));
 
@@ -479,33 +507,35 @@ diagonalizeMatrix(double* A, double* D, const int64_t nrows_A) -> void
         !omp_in_parallel(),
         std::string(__func__) + std::string(": should not be called in omp parallel reigion"));
 
-#if defined(USE_CUDA)
+    auto n_size = static_cast<size_t>(n_int64);
 
-    auto n = static_cast<int32_t>(nrows_A);
-    int32_t lwork, info;
+#if defined(USE_CUDA)
 
     double *d_A, *d_D, *d_work;
     int32_t *d_info;
 
-    cudaSafe(cudaMalloc(&d_A, n * n * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_D, n * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_A, n_size * n_size * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_D, n_size * sizeof(double)));
     cudaSafe(cudaMalloc(&d_info, sizeof(int32_t)));
 
-    gpu::chunkedMemcpyHostToDevice<double>(d_A, A, n * n);
+    gpu::chunkedMemcpyHostToDevice<double>(d_A, A, n_size * n_size);
+
+    auto n = static_cast<int32_t>(n_int64);
+    int32_t lwork, info;
 
     cusolverDnHandle_t handle;
     cusolverSafe(cusolverDnCreate(&handle));
 
     cusolverSafe(cusolverDnDsyevd_bufferSize(handle, CUSOLVER_EIG_MODE_VECTOR, CUBLAS_FILL_MODE_UPPER, n, d_A, n, d_D, &lwork));
 
-    cudaSafe(cudaMalloc(&d_work, lwork * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_work, static_cast<size_t>(lwork) * sizeof(double)));
 
     cusolverSafe(cusolverDnDsyevd(handle, CUSOLVER_EIG_MODE_VECTOR, CUBLAS_FILL_MODE_UPPER, n, d_A, n, d_D, d_work, lwork, d_info));
 
     cusolverSafe(cusolverDnDestroy(handle));
 
-    gpu::chunkedMemcpyDeviceToHost<double>(A, d_A, n * n);
-    gpu::chunkedMemcpyDeviceToHost<double>(D, d_D, n);
+    gpu::chunkedMemcpyDeviceToHost<double>(A, d_A, n_size * n_size);
+    gpu::chunkedMemcpyDeviceToHost<double>(D, d_D, n_size);
     gpu::chunkedMemcpyDeviceToHost<int32_t>(&info, d_info, 1);
 
     // TODO: check info
@@ -521,14 +551,14 @@ diagonalizeMatrix(double* A, double* D, const int64_t nrows_A) -> void
 
     magma_setdevice(0);
 
-    magma_int_t n = static_cast<magma_int_t>(nrows_A);
+    magma_int_t n = static_cast<magma_int_t>(n_int64);
     //magma_int_t ldda = magma_roundup(n, 32);
 
     double *d_A;
     //hipSafe(hipMalloc(&d_A, n * ldda * sizeof(double)));
     //hipblasSafe(hipblasSetMatrix(n, n, sizeof(double), A, n, d_A, ldda));
-    hipSafe(hipMalloc(&d_A, n * n * sizeof(double)));
-    gpu::chunkedMemcpyHostToDevice<double>(d_A, A, n * n);
+    hipSafe(hipMalloc(&d_A, n_size * n_size * sizeof(double)));
+    gpu::chunkedMemcpyHostToDevice<double>(d_A, A, n_size * n_size);
 
     auto nb = magma_get_dsytrd_nb(n);
     auto lwork = static_cast<magma_int_t>(std::max(2*n + n*nb, 1 + 6*n + 2*n*n));
@@ -537,9 +567,9 @@ diagonalizeMatrix(double* A, double* D, const int64_t nrows_A) -> void
     double *wA, *work;
     magma_int_t *iwork;
 
-    hipSafe(hipHostMalloc(&wA, n * n * sizeof(double)));
-    hipSafe(hipHostMalloc(&work, lwork * sizeof(double)));
-    hipSafe(hipHostMalloc(&iwork, liwork * sizeof(magma_int_t)));
+    hipSafe(hipHostMalloc(&wA, n_size * n_size * sizeof(double)));
+    hipSafe(hipHostMalloc(&work, static_cast<size_t>(lwork) * sizeof(double)));
+    hipSafe(hipHostMalloc(&iwork, static_cast<size_t>(liwork) * sizeof(magma_int_t)));
 
     magma_int_t info;
     //magma_dsyevd_gpu(MagmaVec, MagmaUpper, n, d_A, ldda, D, wA, n, work, lwork, iwork, liwork, &info);
@@ -553,7 +583,7 @@ diagonalizeMatrix(double* A, double* D, const int64_t nrows_A) -> void
     }
 
     //hipblasSafe(hipblasGetMatrix(n, n, sizeof(double), d_A, ldda, A, n));
-    gpu::chunkedMemcpyDeviceToHost<double>(A, d_A, n * n);
+    gpu::chunkedMemcpyDeviceToHost<double>(A, d_A, n_size * n_size);
 
     hipSafe(hipFree(d_A));
 
@@ -568,15 +598,17 @@ diagonalizeMatrix(double* A, double* D, const int64_t nrows_A) -> void
 
 #if defined(USE_HIP)
 auto
-diagonalizeMatrixMultiGPU(double* A, double* D, const int64_t nrows_A, const int64_t num_gpus_per_node) -> void
+diagonalizeMatrixMultiGPU(double* A, double* D, const int64_t n_int64, const int64_t num_gpus_per_node) -> void
 {
     errors::assertMsgCritical(
         !omp_in_parallel(),
         std::string(__func__) + std::string(": should not be called in omp parallel reigion"));
 
+    auto n_size = static_cast<size_t>(n_int64);
+
     magmaSafe(magma_init());
 
-    magma_int_t n = static_cast<magma_int_t>(nrows_A);
+    magma_int_t n = static_cast<magma_int_t>(n_int64);
 
     magma_int_t ngpu = static_cast<magma_int_t>(num_gpus_per_node);
 
@@ -587,9 +619,9 @@ diagonalizeMatrixMultiGPU(double* A, double* D, const int64_t nrows_A, const int
     double *wA, *work;
     magma_int_t *iwork;
 
-    hipSafe(hipHostMalloc(&wA, n * n * sizeof(double)));
-    hipSafe(hipHostMalloc(&work, lwork * sizeof(double)));
-    hipSafe(hipHostMalloc(&iwork, liwork * sizeof(magma_int_t)));
+    hipSafe(hipHostMalloc(&wA, n_size * n_size * sizeof(double)));
+    hipSafe(hipHostMalloc(&work, static_cast<size_t>(lwork) * sizeof(double)));
+    hipSafe(hipHostMalloc(&iwork, static_cast<size_t>(liwork) * sizeof(magma_int_t)));
 
     magma_int_t info;
     magma_dsyevd_m(ngpu, MagmaVec, MagmaUpper, n, A, n, D, work, lwork, iwork, liwork, &info);

@@ -44,6 +44,7 @@
     #define gpuMalloc(ptr, size)                cudaMalloc(ptr, size)
     #define gpuFree(ptr)                        cudaFree(ptr)
     #define gpuDeviceSynchronize()              cudaDeviceSynchronize()
+    #define gpuMemGetInfo(p_free, p_total)      cudaMemGetInfo(p_free, p_total)
     #define gpuMemcpy(dst, src, size, kind)     cudaMemcpy(dst, src, size, kind)
     #define gpuMemcpyHostToDevice               cudaMemcpyHostToDevice
     #define gpuMemcpyDeviceToHost               cudaMemcpyDeviceToHost
@@ -59,6 +60,7 @@
     #define gpuMalloc(ptr, size)                hipMalloc(ptr, size)
     #define gpuFree(ptr)                        hipFree(ptr)
     #define gpuDeviceSynchronize()              hipDeviceSynchronize()
+    #define gpuMemGetInfo(p_free, p_total)      hipMemGetInfo(p_free, p_total)
     #define gpuMemcpy(dst, src, size, kind)     hipMemcpy(dst, src, size, kind)
     #define gpuMemcpyHostToDevice               hipMemcpyHostToDevice
     #define gpuMemcpyDeviceToHost               hipMemcpyDeviceToHost
