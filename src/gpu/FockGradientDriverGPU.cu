@@ -59,7 +59,6 @@
 #include <utility>
 #include <vector>
 
-#include "ScreeningData.hpp"
 #include "GradientScreeningData.hpp"
 #include "BoysFuncTable.hpp"
 #include "ChunkedMemcpyGPU.hpp"

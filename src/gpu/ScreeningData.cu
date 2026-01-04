@@ -136,15 +136,11 @@ CScreeningData::CScreeningData(const CMolecule& molecule,
 
     for (int64_t gpu_id = 0; gpu_id < num_gpus_per_node; gpu_id++)
     {
-        gpuSafe(gpuSetDevice(gpu_id));
+        _size_devptr_double[gpu_id] = 0;
+        _size_devptr_uint32[gpu_id] = 0;
 
-        // allocate data with initial size of 1
-
-        _size_devptr_double[gpu_id] = 1;
-        _size_devptr_uint32[gpu_id] = 1;
-
-        gpuSafe(gpuMalloc(&_devptr_double[gpu_id], _size_devptr_double[gpu_id] * sizeof(double)));
-        gpuSafe(gpuMalloc(&_devptr_uint32[gpu_id], _size_devptr_uint32[gpu_id] * sizeof(uint32_t)));
+        _devptr_double[gpu_id] = nullptr;
+        _devptr_uint32[gpu_id] = nullptr;
     }
 
     gpuSafe(gpuSetDevice(0));
@@ -156,13 +152,10 @@ CScreeningData::~CScreeningData()
         !omp_in_parallel(),
         std::string("CScreeningData destructor: should never be called in omp parallel reigion"));
 
-    // free device pointers
     for (int64_t gpu_id = 0; gpu_id < _num_gpus_per_node; gpu_id++)
     {
-        gpuSafe(gpuSetDevice(gpu_id));
-
-        gpuSafe(gpuFree(_devptr_double[gpu_id]));
-        gpuSafe(gpuFree(_devptr_uint32[gpu_id]));
+        clear_devptr_double(gpu_id);
+        clear_devptr_uint32(gpu_id);
     }
 
     gpuSafe(gpuSetDevice(0));
@@ -176,18 +169,6 @@ CScreeningData::reset_mpi(const int rank, const int nnodes) -> void
     _nnodes = nnodes;
 
     _sortQ();
-}
-
-auto
-CScreeningData::get_size_devptr_double(const int64_t gpu_id) const -> size_t
-{
-    return _size_devptr_double[gpu_id];
-}
-
-auto
-CScreeningData::get_size_devptr_uint32(const int64_t gpu_id) const -> size_t
-{
-    return _size_devptr_uint32[gpu_id];
 }
 
 auto
@@ -205,13 +186,37 @@ CScreeningData::get_devptr_uint32(const int64_t gpu_id) const -> uint32_t*
 auto
 CScreeningData::resize_devptr_double(const int64_t gpu_id, const size_t n) -> void
 {
+    errors::assertMsgCritical(n > 0, std::string("CScreeningData.resize_devptr_double: n must be positive"));
+
     if (n <= _size_devptr_double[gpu_id]) return;
 
+    clear_devptr_double(gpu_id);
+
+    alloc_devptr_double(gpu_id, n);
+}
+
+auto
+CScreeningData::resize_devptr_uint32(const int64_t gpu_id, const size_t n) -> void
+{
+    errors::assertMsgCritical(n > 0, std::string("CScreeningData.resize_devptr_uint32: n must be positive"));
+
+    if (n <= _size_devptr_uint32[gpu_id]) return;
+
+    clear_devptr_uint32(gpu_id);
+
+    alloc_devptr_uint32(gpu_id, n);
+}
+
+auto
+CScreeningData::alloc_devptr_double(const int64_t gpu_id, const size_t n) -> void
+{
+    errors::assertMsgCritical(n > 0, std::string("CScreeningData.alloc_devptr_double: n must be positive"));
+
+    errors::assertMsgCritical(
+        _devptr_double[gpu_id] == nullptr,
+        std::string("CScreeningData.alloc_devptr_double: devptr is already allocated"));
+
     gpuSafe(gpuSetDevice(gpu_id));
-
-    gpuSafe(gpuFree(_devptr_double[gpu_id]));
-
-    gpuSafe(gpuDeviceSynchronize());
 
     _size_devptr_double[gpu_id] = n;
 
@@ -219,19 +224,47 @@ CScreeningData::resize_devptr_double(const int64_t gpu_id, const size_t n) -> vo
 }
 
 auto
-CScreeningData::resize_devptr_uint32(const int64_t gpu_id, const size_t n) -> void
+CScreeningData::alloc_devptr_uint32(const int64_t gpu_id, const size_t n) -> void
 {
-    if (n <= _size_devptr_uint32[gpu_id]) return;
+    errors::assertMsgCritical(n > 0, std::string("CScreeningData.alloc_devptr_uint32: n must be positive"));
+
+    errors::assertMsgCritical(
+        _devptr_uint32[gpu_id] == nullptr,
+        std::string("CScreeningData.alloc_devptr_uint32: devptr is already allocated"));
 
     gpuSafe(gpuSetDevice(gpu_id));
-
-    gpuSafe(gpuFree(_devptr_uint32[gpu_id]));
-
-    gpuSafe(gpuDeviceSynchronize());
 
     _size_devptr_uint32[gpu_id] = n;
 
     gpuSafe(gpuMalloc(&_devptr_uint32[gpu_id], _size_devptr_uint32[gpu_id] * sizeof(uint32_t)));
+}
+
+auto
+CScreeningData::clear_devptr_double(const int64_t gpu_id) -> void
+{
+    gpuSafe(gpuSetDevice(gpu_id));
+
+    gpuSafe(gpuDeviceSynchronize());
+
+    if (_devptr_double[gpu_id] != nullptr) gpuSafe(gpuFree(_devptr_double[gpu_id]));
+
+    _size_devptr_double[gpu_id] = 0;
+
+    _devptr_double[gpu_id] = nullptr;
+}
+
+auto
+CScreeningData::clear_devptr_uint32(const int64_t gpu_id) -> void
+{
+    gpuSafe(gpuSetDevice(gpu_id));
+
+    gpuSafe(gpuDeviceSynchronize());
+
+    if (_devptr_uint32[gpu_id] != nullptr) gpuSafe(gpuFree(_devptr_uint32[gpu_id]));
+
+    _size_devptr_uint32[gpu_id] = 0;
+
+    _devptr_uint32[gpu_id] = nullptr;
 }
 
 auto

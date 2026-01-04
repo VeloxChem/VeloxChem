@@ -235,14 +235,17 @@ class CScreeningData
 
     auto reset_mpi(const int rank, const int nnodes) -> void;
 
-    auto get_size_devptr_double(const int64_t gpu_id) const -> size_t;
-    auto get_size_devptr_uint32(const int64_t gpu_id) const -> size_t;
-
     auto get_devptr_double(const int64_t gpu_id) const -> double*;
     auto get_devptr_uint32(const int64_t gpu_id) const -> uint32_t*;
 
     auto resize_devptr_double(const int64_t gpu_id, const size_t n) -> void;
     auto resize_devptr_uint32(const int64_t gpu_id, const size_t n) -> void;
+
+    auto alloc_devptr_double(const int64_t gpu_id, const size_t n) -> void;
+    auto alloc_devptr_uint32(const int64_t gpu_id, const size_t n) -> void;
+
+    auto clear_devptr_double(const int64_t gpu_id) -> void;
+    auto clear_devptr_uint32(const int64_t gpu_id) -> void;
 
     auto getNumGpusPerNode() const -> const int64_t;
 

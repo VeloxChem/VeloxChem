@@ -11088,6 +11088,10 @@ computeFockOnGPU(const              CMolecule& molecule,
     gpuSafe(gpuFree(d_data_spd_prim_info));
     gpuSafe(gpuFree(d_data_spd_prim_aoinds));
 
+    // TODO: keep devptr
+    screening.clear_devptr_double(gpu_id);
+    screening.clear_devptr_uint32(gpu_id);
+
     omptimers[thread_id].stop("K compute");
     }
 
