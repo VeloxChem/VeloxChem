@@ -4679,6 +4679,8 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     screening.resize_devptr_double(0, data_matrices_ABC_size);  // gpu_id 0
 
+    gpuSafe(gpuDeviceSynchronize());
+
     auto d_data_matrices_ABC = screening.get_devptr_double(0);  // gpu_id 0
 
     double *d_matrix_A = d_data_matrices_ABC;
@@ -5039,8 +5041,14 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     // J data on device
 
+#pragma omp barrier
+
     screening.resize_devptr_double(gpu_id, data_J_double_size);
     screening.resize_devptr_uint32(gpu_id, data_J_uint32_size);
+
+    gpuSafe(gpuDeviceSynchronize());
+
+#pragma omp barrier
 
     auto d_data_J_double = screening.get_devptr_double(gpu_id);
     auto d_data_J_uint32 = screening.get_devptr_uint32(gpu_id);
@@ -7718,8 +7726,14 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     // K data on device
 
+#pragma omp barrier
+
     screening.resize_devptr_double(gpu_id, data_K_double_size);
     screening.resize_devptr_uint32(gpu_id, data_K_uint32_size);
+
+    gpuSafe(gpuDeviceSynchronize());
+
+#pragma omp barrier
 
     auto d_data_K_double = screening.get_devptr_double(gpu_id);
     auto d_data_K_uint32 = screening.get_devptr_uint32(gpu_id);
@@ -11091,6 +11105,8 @@ computeFockOnGPU(const              CMolecule& molecule,
     // TODO: keep devptr
     screening.clear_devptr_double(gpu_id);
     screening.clear_devptr_uint32(gpu_id);
+
+#pragma omp barrier
 
     omptimers[thread_id].stop("K compute");
     }
