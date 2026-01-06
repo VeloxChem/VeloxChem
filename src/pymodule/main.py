@@ -39,6 +39,7 @@ from .scfrestdriver import ScfRestrictedDriver
 #from .scfunrestdriver import ScfUnrestrictedDriver
 #from .scfrestopendriver import ScfRestrictedOpenDriver
 from .scfgradientdriver import ScfGradientDriver
+from .optimizationdriver import OptimizationDriver
 from .rsppolarizability import Polarizability
 from .rspabsorption import Absorption
 from .rsplinabscross import LinearAbsorptionCrossSection
@@ -270,6 +271,21 @@ def main():
         grad_drv = ScfGradientDriver(scf_drv)
         grad_drv.update_settings(grad_dict, method_dict)
         grad_drv.compute(task.molecule, task.ao_basis, scf_results)
+
+    # Geometry optimization
+
+    if task_type == 'optimize':
+
+        opt_dict = (dict(task.input_dict['optimize'])
+                    if 'optimize' in task.input_dict else {})
+        opt_dict['filename'] = task.input_dict['filename']
+
+        grad_drv = ScfGradientDriver(scf_drv)
+        opt_drv = OptimizationDriver(grad_drv)
+        opt_drv.keep_files = True
+        opt_drv.update_settings(opt_dict)
+        opt_results = opt_drv.compute(task.molecule, task.ao_basis,
+                                      scf_results)
 
     # Response
 
