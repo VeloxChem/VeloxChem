@@ -43,10 +43,10 @@ from .veloxchemlib import XCFunctional, MolecularGrid
 from .veloxchemlib import compute_overlap_gradient_gpu
 from .veloxchemlib import compute_kinetic_energy_gradient_gpu
 from .veloxchemlib import compute_nuclear_potential_gradient_gpu
-from .veloxchemlib import compute_fock_gradient_gpu
+from .veloxchemlib import compute_fock_gradient_gpu, matmul_gpu
 from .veloxchemlib import integrate_vxc_gradient_gpu
-from .veloxchemlib import mpi_master
 from .veloxchemlib import parse_xc_func
+from .veloxchemlib import mpi_master
 from .veloxchemlib import bohr_in_angstrom
 from .molecularbasis import MolecularBasis
 from .outputstream import OutputStream
@@ -167,14 +167,19 @@ class ScfGradientDriver(GradientDriver):
             nocc = molecule.number_of_alpha_electrons()
             ene_occ = scf_results['E_alpha'][:nocc]
             mo_occ = scf_results['C_alpha'][:, :nocc].copy()
-            W = np.linalg.multi_dot([mo_occ, np.diag(ene_occ), mo_occ.T])
+            # multi_dot([mo_occ, np.diag(ene_occ), mo_occ.T])
+            W = matmul_gpu(ene_occ * mo_occ, mo_occ.T)
+            naos = D.shape[0]
         else:
-            D = None
-            W = None
+            naos = None
+        naos = self.comm.bcast(naos, root=mpi_master())
 
-        # TODO: use Bcast
-        D = self.comm.bcast(D, root=mpi_master())
-        W = self.comm.bcast(W, root=mpi_master())
+        if self.rank != mpi_master():
+            D = np.zeros((naos, naos))
+            W = np.zeros((naos, naos))
+
+        self.comm.Bcast(D, root=mpi_master())
+        self.comm.Bcast(W, root=mpi_master())
 
         dmat = AODensityMatrix([D], denmat.rest)
         wmat = DenseMatrix(W)
@@ -191,7 +196,7 @@ class ScfGradientDriver(GradientDriver):
 
         grad_screener = GradientScreeningData(
             molecule, basis, dmat, wmat, num_gpus_per_node, self.pair_thresh,
-            self.density_thresh, self.comm.Get_rank(), self.comm.Get_size())
+            self.density_thresh, self.rank, self.nodes)
 
         grad_timing['Screening'] += time.time() - t0
 
