@@ -38,6 +38,7 @@ from .mpitask import MpiTask
 from .scfrestdriver import ScfRestrictedDriver
 #from .scfunrestdriver import ScfUnrestrictedDriver
 #from .scfrestopendriver import ScfRestrictedOpenDriver
+from .scfgradientdriver import ScfGradientDriver
 from .rsppolarizability import Polarizability
 from .rspabsorption import Absorption
 from .rsplinabscross import LinearAbsorptionCrossSection
@@ -256,6 +257,19 @@ def main():
                 task.molecule.get_charge() != 0):
             task.finish()
             return
+
+    # Gradient
+
+    if task_type in ['gradient']:
+
+        grad_dict = (dict(task.input_dict['gradient'])
+                     if 'gradient' in task.input_dict else {})
+        grad_dict['program_end_time'] = program_end_time
+        grad_dict['filename'] = task.input_dict['filename']
+
+        grad_drv = ScfGradientDriver(scf_drv)
+        grad_drv.update_settings(grad_dict, method_dict)
+        grad_drv.compute(task.molecule, task.ao_basis, scf_results)
 
     # Response
 

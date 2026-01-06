@@ -609,8 +609,6 @@ class ScfDriver:
         self.ostream.print_reference(valstr)
         self.ostream.print_blank()
 
-        # TODO: add DFT-D4 dispersion correction
-
         # generate integration grid
         if self._dft:
             print_libxc_reference(self.xcfun, self.ostream)
@@ -630,6 +628,13 @@ class ScfDriver:
                 format(n_grid_points,
                        tm.time() - grid_t0))
             self.ostream.print_blank()
+
+        # TODO: D4 dispersion correction
+        if self.dispersion or (self._dft and
+                               'D4' in self.xcfun.get_func_label().upper()):
+            assert_msg_critical(
+                False,
+                'Dispersion correction not yet implemented for the GPU version.')
 
         # set up polarizable embedding
         if self._pe:
