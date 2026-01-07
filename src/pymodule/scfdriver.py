@@ -1658,10 +1658,7 @@ class ScfDriver:
         prim_qmat = screener.get_prim_q_matrix()
         prim_cart_dmat = screener.get_prim_cart_density_matrix(molecule, basis, dmat)
 
-        prim_qmat_np = prim_qmat.to_numpy()
-        prim_cart_dmat_np = np.abs(prim_cart_dmat.to_numpy())
-
-        ave, res = divmod(prim_qmat_np.shape[0], self.nodes)
+        ave, res = divmod(prim_qmat.number_of_rows(), self.nodes)
         counts = [ave + 1 if p < res else ave for p in range(self.nodes)]
         displs = [sum(counts[:p]) for p in range(self.nodes)]
 
@@ -1669,7 +1666,7 @@ class ScfDriver:
         row_end = row_start + counts[self.rank]
 
         local_q_prime_np = screener.compute_q_prime_slice(
-            prim_qmat_np, prim_cart_dmat_np, row_start, row_end)
+            prim_qmat, prim_cart_dmat, row_start, row_end).to_numpy()
 
         local_q_prime_row_inds, local_q_prime_col_inds = np.where(
             local_q_prime_np > self.prelink_thresh)

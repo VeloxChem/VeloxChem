@@ -2154,17 +2154,21 @@ auto CScreeningData::get_mat_D_abs_full(const int64_t naos, const double* dens_p
     return mat_D_abs_full;
 }
 
-auto CScreeningData::get_Q_prime_slice(const double* Q_mat,
-                                       const double* cart_D_mat,
-                                       const int64_t row_start,
-                                       const int64_t row_end,
-                                       const int64_t n_int64) -> CDenseMatrix
+auto CScreeningData::get_Q_prime_slice(const CDenseMatrix& Q_mat,
+                                       const CDenseMatrix& cart_D_mat,
+                                       const int64_t       row_start,
+                                       const int64_t       row_end) -> CDenseMatrix
 {
     errors::assertMsgCritical(
         !omp_in_parallel(),
         std::string("CScreeningData::get_Q_prime_slice: should never be called in omp parallel reigion"));
 
-    const auto n_size = static_cast<size_t>(n_int64);
+    std::string errsize("CScreeningData::get_Q_prime_slice: Mismatch in matrix sizes");
+    errors::assertMsgCritical(Q_mat.getNumberOfRows() == cart_D_mat.getNumberOfRows(), errsize);
+    errors::assertMsgCritical(Q_mat.getNumberOfColumns() == cart_D_mat.getNumberOfColumns(), errsize);
+
+    const auto n_int64 = Q_mat.getNumberOfRows();
+    const auto n_size  = static_cast<size_t>(n_int64);
 
     const auto data_matrices_ABC_size = (n_size * n_size * 2) + (static_cast<size_t>(row_end - row_start) * n_size);
 
@@ -2178,9 +2182,9 @@ auto CScreeningData::get_Q_prime_slice(const double* Q_mat,
     double *d_matrix_B = d_matrix_A + n_size * n_size;
     double *d_matrix_C = d_matrix_B + n_size * n_size;
 
-    gpu::chunkedMemcpyHostToDevice<double>(d_matrix_A, Q_mat, n_size * n_size);
+    gpu::chunkedMemcpyHostToDevice<double>(d_matrix_A, Q_mat.values(), n_size * n_size);
 
-    gpu::chunkedMemcpyHostToDevice<double>(d_matrix_B, cart_D_mat, n_size * n_size);
+    gpu::chunkedMemcpyHostToDevice<double>(d_matrix_B, cart_D_mat.values(), n_size * n_size);
 
     CDenseMatrix Q_prime_slice(row_end - row_start, n_int64);
 

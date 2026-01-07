@@ -1123,6 +1123,36 @@ class LinearSolver:
         coulomb_timing = 0.0
         exchange_timing = 0.0
 
+        prim_qmat = eri_dict['screening'].get_prim_q_matrix()
+        prim_cart_dens = eri_dict['screening'].get_prim_cart_density_matrix(
+            molecule, basis, dens)
+
+        ave, res = divmod(prim_qmat.number_of_rows(), local_comm.Get_size())
+        counts = [ave + 1 if p < res else ave for p in range(local_comm.Get_size())]
+        displs = [sum(counts[:p]) for p in range(local_comm.Get_size())]
+
+        row_start = displs[local_comm.Get_rank()]
+        row_end = row_start + counts[local_comm.Get_rank()]
+
+        local_q_prime_np = eri_dict['screening'].compute_q_prime_slice(
+            prim_qmat, prim_cart_dens, row_start, row_end).to_numpy()
+
+        local_q_prime_row_inds, local_q_prime_col_inds = np.where(
+            local_q_prime_np > self.prelink_thresh)
+
+        local_q_prime_row_inds += row_start
+
+        # Allgather
+        counts_2 = local_comm.allgather(len(local_q_prime_row_inds))
+        displs_2 = [sum(counts_2[:p]) for p in range(local_comm.Get_size())]
+        # Note: use int32 for row and col indices
+        q_prime_row_inds = np.zeros(sum(counts_2), dtype=np.int32)
+        q_prime_col_inds = np.zeros(sum(counts_2), dtype=np.int32)
+        local_comm.Allgatherv(local_q_prime_row_inds.astype(np.int32),
+                              [q_prime_row_inds, counts_2, displs_2, MPI.INT32_T])
+        local_comm.Allgatherv(local_q_prime_col_inds.astype(np.int32),
+                              [q_prime_col_inds, counts_2, displs_2, MPI.INT32_T])
+
         fock_mat = None
 
         if self._dft:
@@ -1140,6 +1170,7 @@ class LinearSolver:
                         molecule, basis, dens, prefac_coulomb,
                         [full_k_coef, erf_k_coef], [0.0, omega],
                         flag_exchange, self.eri_thresh, self.prelink_thresh,
+                        q_prime_row_inds, q_prime_col_inds,
                         eri_dict['screening'])
 
                 else:
@@ -1148,6 +1179,7 @@ class LinearSolver:
                         molecule, basis, dens, prefac_coulomb,
                         [self.xcfun.get_frac_exact_exchange()], [0.0],
                         flag_exchange, self.eri_thresh, self.prelink_thresh,
+                        q_prime_row_inds, q_prime_col_inds,
                         eri_dict['screening'])
 
             else:
@@ -1155,6 +1187,7 @@ class LinearSolver:
                 fock_mat = compute_fock_gpu(
                     molecule, basis, dens, prefac_coulomb, [0.0], [0.0],
                     flag_exchange, self.eri_thresh, self.prelink_thresh,
+                    q_prime_row_inds, q_prime_col_inds,
                     eri_dict['screening'])
 
         else:
@@ -1162,6 +1195,7 @@ class LinearSolver:
             fock_mat = compute_fock_gpu(
                 molecule, basis, dens, prefac_coulomb, [1.0], [0.0],
                 flag_exchange, self.eri_thresh, self.prelink_thresh,
+                q_prime_row_inds, q_prime_col_inds,
                 eri_dict['screening'])
 
         if profiler is not None:
