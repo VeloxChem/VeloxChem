@@ -33,10 +33,7 @@
 from pathlib import Path
 from mpi4py import MPI
 import sys
-
 from .veloxchemlib import mpi_master
-from .molecule import Molecule
-from .scfrestdriver import ScfRestrictedDriver
 from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
 import numpy as np
@@ -115,10 +112,10 @@ class EnvironmentDriver:
 
         """
         frame = snapshot['frame']
-        coords = snapshot['mm_coords']
-        elements = snapshot['mm_elements']
-        resids = snapshot['mm_resids']
-        resnames = snapshot['mm_resnames']
+        mm_coords = snapshot['mm_coords']
+        mm_elements = snapshot['mm_elements']
+        mm_resids = snapshot['mm_resids']
+        mm_resnames = snapshot['mm_resnames']
 
         pot_path = outdir / f"frame_{frame:06d}.pot"
         charges = {'O': -0.67444000, 'H': 0.33722000}
@@ -131,7 +128,7 @@ class EnvironmentDriver:
             fh.write("@environment\n")
             fh.write("units: angstrom\n")
             fh.write("xyz:\n")
-            for (x, y, z), elem, resn, resid in zip(coords, elements, resnames, resids):
+            for (x, y, z), elem, resn, resid in zip(mm_coords, mm_elements, mm_resnames, mm_resids):
                 fh.write(f"{elem:<2} {x:12.6f} {y:12.6f} {z:12.6f}  {resn:>3}  {resid}\n")
             fh.write("@end\n\n")
 
