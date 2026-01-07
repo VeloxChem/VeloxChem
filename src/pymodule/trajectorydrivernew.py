@@ -34,7 +34,7 @@ from pathlib import Path
 from mpi4py import MPI
 import sys
 
-from .veloxchemlib import mpi_master, bohr_in_angstrom
+from .veloxchemlib import mpi_master
 from .molecule import Molecule
 from .scfrestdriver import ScfRestrictedDriver
 from .outputstream import OutputStream
@@ -44,6 +44,7 @@ from .molecularbasis import MolecularBasis
 from .outputstream import OutputStream
 import MDAnalysis as mda
 import MDAnalysis.transformations as transform
+from MDAnalysis.topology.guessers import guess_atom_element
 
 class TrajectoryDriver:
     """
@@ -155,10 +156,13 @@ class TrajectoryDriver:
         for ts in self.universe.trajectory[self.start:self.stop:self.step]:
             qm_coords = qm_atoms.positions
             mm_coords = rest.positions
+            mm_elements = np.array([guess_atom_element(n) for n in rest.atoms.names])
+
             snapshot = {
                 'frame': ts.frame,
                 'qm_coords': qm_coords,
                 'mm_coords': mm_coords,
+                'mm_elements': mm_elements,
                 'mm_atom_names': rest.atoms.names,
                 'mm_resids': rest.atoms.resids,
                 'mm_resnames': rest.atoms.resnames
