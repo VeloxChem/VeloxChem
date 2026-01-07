@@ -123,6 +123,7 @@ class TrajectoryDriver:
             self.universe = mda.Universe(topology_file, trajectory_file)
 
         total_frames = len(self.universe.trajectory)
+        print(self.universe.trajectory.units)
         print(f"Total frames in trajectory: {total_frames}")
         if num_snapshots > total_frames:
             raise ValueError(f"Requested number of snapshots ({num_snapshots}) exceeds total frames in trajectory ({total_frames}).")
@@ -152,8 +153,8 @@ class TrajectoryDriver:
         self.universe.trajectory.add_transformations(*transforms)
         snapshots = []
         for ts in self.universe.trajectory[self.start:self.stop:self.step]:
-            qm_coords = qm_atoms.positions / bohr_in_angstrom()
-            mm_coords = rest.positions / bohr_in_angstrom()
+            qm_coords = qm_atoms.positions
+            mm_coords = rest.positions
             snapshot = {
                 'frame': ts.frame,
                 'qm_coords': qm_coords,
