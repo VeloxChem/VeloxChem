@@ -32,20 +32,6 @@
 
 #include "GpuRuntime.hpp"
 
-#if defined(USE_CUDA)
-
-#include <cublas_v2.h>
-#include <cusolverDn.h>
-
-#elif defined(USE_HIP)
-
-#include <hip/hip_runtime.h>
-#include <hipblas/hipblas.h>
-//#include <hipsolver/hipsolver.h>
-#include <magma_v2.h>
-
-#endif
-
 #include <omp.h>
 
 #include <algorithm>

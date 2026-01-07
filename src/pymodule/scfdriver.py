@@ -1668,9 +1668,8 @@ class ScfDriver:
         row_start = displs[self.rank]
         row_end = row_start + counts[self.rank]
 
-        local_q_prime_np = matmul_gpu(
-            matmul_gpu(prim_qmat_np[row_start:row_end], prim_cart_dmat_np),
-            prim_qmat_np)
+        local_q_prime_np = screener.compute_q_prime_slice(
+            prim_qmat_np, prim_cart_dmat_np, row_start, row_end)
 
         local_q_prime_row_inds, local_q_prime_col_inds = np.where(
             local_q_prime_np > self.prelink_thresh)

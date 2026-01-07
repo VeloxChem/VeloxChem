@@ -32,6 +32,20 @@
 
 #include "GpuRuntime.hpp"
 
+#if defined(USE_CUDA)
+
+#include <cublas_v2.h>
+#include <cusolverDn.h>
+
+#elif defined(USE_HIP)
+
+#include <hip/hip_runtime.h>
+#include <hipblas/hipblas.h>
+//#include <hipsolver/hipsolver.h>
+#include <magma_v2.h>
+
+#endif
+
 #include <omp.h>
 
 #include <algorithm>
@@ -40,6 +54,7 @@
 #include <sstream>
 
 #include "BoysFuncTable.hpp"
+#include "ChunkedMemcpyGPU.hpp"
 #include "ErrorHandler.hpp"
 #include "GpuConstants.hpp"
 #include "GpuDevices.hpp"
@@ -2137,6 +2152,89 @@ auto CScreeningData::get_mat_D_abs_full(const int64_t naos, const double* dens_p
     }
 
     return mat_D_abs_full;
+}
+
+auto CScreeningData::get_Q_prime_slice(const double* Q_mat,
+                                       const double* cart_D_mat,
+                                       const int64_t row_start,
+                                       const int64_t row_end,
+                                       const int64_t n_int64) -> CDenseMatrix
+{
+    errors::assertMsgCritical(
+        !omp_in_parallel(),
+        std::string("CScreeningData::get_Q_prime_slice: should never be called in omp parallel reigion"));
+
+    const auto n_size = static_cast<size_t>(n_int64);
+
+    const auto data_matrices_ABC_size = (n_size * n_size * 2) + (static_cast<size_t>(row_end - row_start) * n_size);
+
+    resize_devptr_double(0, data_matrices_ABC_size);  // gpu_id 0
+
+    gpuSafe(gpuDeviceSynchronize());
+
+    auto d_data_matrices_ABC = get_devptr_double(0);  // gpu_id 0
+
+    double *d_matrix_A = d_data_matrices_ABC;
+    double *d_matrix_B = d_matrix_A + n_size * n_size;
+    double *d_matrix_C = d_matrix_B + n_size * n_size;
+
+    gpu::chunkedMemcpyHostToDevice<double>(d_matrix_A, Q_mat, n_size * n_size);
+
+    gpu::chunkedMemcpyHostToDevice<double>(d_matrix_B, cart_D_mat, n_size * n_size);
+
+    CDenseMatrix Q_prime_slice(row_end - row_start, n_int64);
+
+#if defined(USE_CUDA)
+
+    cublasHandle_t handle;
+    cublasSafe(cublasCreate(&handle));
+
+    double alpha = 1.0, beta = 0.0;
+
+    auto n = static_cast<int32_t>(n_int64);
+    auto row_count = static_cast<int32_t>(row_end - row_start);
+
+    // compute A^T * (B^T * A^T) since cublas is column-major
+    cublasSafe(cublasDgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, n, row_count, n, &alpha,
+                           d_matrix_B, n, d_matrix_A + static_cast<size_t>(row_start) * n_size, n, &beta,
+                           d_matrix_C, n));
+
+    cudaSafe(cudaDeviceSynchronize());
+
+    cublasSafe(cublasDgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, n, row_count, n, &alpha,
+                           d_matrix_A, n, d_matrix_C, n, &beta,
+                           d_matrix_B, n));
+
+    cublasSafe(cublasDestroy(handle));
+
+#elif defined(USE_HIP)
+
+    hipblasHandle_t handle;
+    hipblasSafe(hipblasCreate(&handle));
+
+    double alpha = 1.0, beta = 0.0;
+
+    auto n = static_cast<int32_t>(n_int64);
+    auto row_count = static_cast<int32_t>(row_end - row_start);
+
+    // compute A^T * (B^T * A^T) since hipblas is column-major
+    hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, HIPBLAS_OP_N, n, row_count, n, &alpha,
+                             d_matrix_B, n, d_matrix_A + static_cast<size_t>(row_start) * n_size, n, &beta,
+                             d_matrix_C, n));
+
+    hipSafe(hipDeviceSynchronize());
+
+    hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, HIPBLAS_OP_N, n, row_count, n, &alpha,
+                             d_matrix_A, n, d_matrix_C, n, &beta,
+                             d_matrix_B, n));
+
+    hipblasSafe(hipblasDestroy(handle));
+
+#endif
+
+    gpu::chunkedMemcpyDeviceToHost<double>(Q_prime_slice.values(), d_matrix_B, static_cast<size_t>(row_end - row_start) * n_size);
+
+    return Q_prime_slice;
 }
 
 auto CScreeningData::form_Q_and_D_inds_for_K() -> void

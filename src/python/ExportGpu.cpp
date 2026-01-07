@@ -83,7 +83,29 @@ export_gpu(py::module& m)
                 const auto cart_dens_ptr = cart_dmat.values();
                 return self.get_mat_D_abs_full(cart_naos, cart_dens_ptr);
             },
-            "Gets primitive Cartesian density matrix.");
+            "Gets primitive Cartesian density matrix.")
+        .def(
+            "compute_q_prime_slice",
+            [](CScreeningData&            self,
+               const py::array_t<double>& Q_mat,
+               const py::array_t<double>& cart_D_mat,
+               const int64_t              row_start,
+               const int64_t              row_end) -> py::array_t<double> {
+                std::string errsize("compute_q_prime_slice: Mismatch in matrix sizes");
+                errors::assertMsgCritical(Q_mat.shape(0) == cart_D_mat.shape(0), errsize);
+                errors::assertMsgCritical(Q_mat.shape(1) == cart_D_mat.shape(1), errsize);
+                std::string errstyle("compute_q_prime_slice: Expecting contiguous matrices");
+                auto c_style_Q = py::detail::check_flags(Q_mat.ptr(), py::array::c_style);
+                auto c_style_D = py::detail::check_flags(cart_D_mat.ptr(), py::array::c_style);
+                errors::assertMsgCritical(c_style_Q && c_style_D, errstyle);
+                const auto Q_mat_ptr = Q_mat.data();
+                const auto cart_D_mat_ptr = cart_D_mat.data();
+                const auto n_int64 = static_cast<int64_t>(Q_mat.shape(0));
+                auto q_prime_slice = self.get_Q_prime_slice(Q_mat_ptr, cart_D_mat_ptr, row_start, row_end, n_int64);
+                return vlx_general::pointer_to_numpy(q_prime_slice.values(), {q_prime_slice.getNumberOfRows(), q_prime_slice.getNumberOfColumns()});
+            },
+            "Computes slice of Q_prime matrix.");
+
 
     // CGradientScreeningData class
 

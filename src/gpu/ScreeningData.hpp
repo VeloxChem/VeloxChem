@@ -421,6 +421,12 @@ class CScreeningData
 
     auto get_mat_D_abs_full(const int64_t naos, const double* dens_ptr) const -> CDenseMatrix;
 
+    auto get_Q_prime_slice(const double* Q_mat,
+                           const double* cart_D_mat,
+                           const int64_t row_start,
+                           const int64_t row_end,
+                           const int64_t n_int64) -> CDenseMatrix;
+
     auto form_Q_and_D_inds_for_K() -> void;
 
     auto form_pair_inds_for_K(const int64_t  s_prim_count,
