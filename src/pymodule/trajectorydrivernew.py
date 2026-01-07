@@ -158,7 +158,10 @@ class TrajectoryDriver:
             snapshot = {
                 'frame': ts.frame,
                 'qm_coords': qm_coords,
-                'mm_coords': mm_coords
+                'mm_coords': mm_coords,
+                'mm_atom_names': rest.atoms.names,
+                'mm_resids': rest.atoms.resids,
+                'mm_resnames': rest.atoms.resnames
             }
             snapshots.append(snapshot)
         return snapshots
