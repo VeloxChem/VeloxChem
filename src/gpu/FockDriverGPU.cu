@@ -4508,6 +4508,9 @@ computeFockOnGPU(const              CMolecule& molecule,
                  const std::string& flag_K,
                  const double       eri_threshold,
                  const double       prelink_threshold,
+                 const int32_t*     Q_prime_row_ptr,
+                 const int32_t*     Q_prime_col_ptr,
+                 const int32_t      Q_prime_ind_count,
                  CScreeningData&    screening) -> CDenseMatrix
 {
     CMultiTimer timer;
@@ -4666,106 +4669,17 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     timer.stop("Prep. sortQD");
 
-    timer.start("Prep. Q_prime Q");
-
     // preLinK
     // J. Chem. Phys. 138, 134114 (2013)
 
-    // TODO distribute computation of Q_prime
-
-    auto mat_full = screening.get_mat_Q_full();
-
-    const auto data_matrices_ABC_size = static_cast<size_t>(mat_full.getNumberOfElements()) * 3;
-
-    screening.resize_devptr_double(0, data_matrices_ABC_size);  // gpu_id 0
-
-    gpuSafe(gpuDeviceSynchronize());
-
-    auto d_data_matrices_ABC = screening.get_devptr_double(0);  // gpu_id 0
-
-    double *d_matrix_A = d_data_matrices_ABC;
-    double *d_matrix_B = d_matrix_A + mat_full.getNumberOfElements();
-    double *d_matrix_C = d_matrix_B + mat_full.getNumberOfElements();
-
-    timer.stop("Prep. Q_prime Q");
-    timer.start("Memcpy Q_prime Q");
-
-    gpu::chunkedMemcpyHostToDevice<double>(d_matrix_A, mat_full.values(), mat_full.getNumberOfElements());
-
-    timer.stop("Memcpy Q_prime Q");
-    timer.start("Prep. Q_prime D");
-
-    mat_full = screening.get_mat_D_abs_full(cart_naos, cart_dens_ptr);
-
-    timer.stop("Prep. Q_prime D");
-    timer.start("Memcpy Q_prime D");
-
-    gpu::chunkedMemcpyHostToDevice<double>(d_matrix_B, mat_full.values(), mat_full.getNumberOfElements());
-
-    timer.stop("Memcpy Q_prime D");
-    timer.start("Dgemm Q_prime 1");
-
-    const auto all_prim_count = mat_full.getNumberOfRows();
-
-#if defined(USE_CUDA)
-
-    cublasHandle_t handle;
-    cublasSafe(cublasCreate(&handle));
-
-    double alpha = 1.0, beta = 0.0;
-
-    auto n = static_cast<int32_t>(all_prim_count);
-
-    // compute A^T * (B^T * A^T) since cublas is column-major
-    cublasSafe(cublasDgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, n, n, n, &alpha, d_matrix_B, n, d_matrix_A, n, &beta, d_matrix_C, n));
-
-    cudaSafe(cudaDeviceSynchronize());
-
-    timer.stop("Dgemm Q_prime 1");
-    timer.start("Dgemm Q_prime 2");
-
-    cublasSafe(cublasDgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, n, n, n, &alpha, d_matrix_A, n, d_matrix_C, n, &beta, d_matrix_B, n));
-
-    cublasSafe(cublasDestroy(handle));
-
-#elif defined(USE_HIP)
-
-    hipblasHandle_t handle;
-    hipblasSafe(hipblasCreate(&handle));
-
-    double alpha = 1.0, beta = 0.0;
-
-    auto n = static_cast<int32_t>(all_prim_count);
-
-    // compute A^T * (B^T * A^T) since hipblas is column-major
-    hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, HIPBLAS_OP_N, n, n, n, &alpha, d_matrix_B, n, d_matrix_A, n, &beta, d_matrix_C, n));
-
-    hipSafe(hipDeviceSynchronize());
-
-    timer.stop("Dgemm Q_prime 1");
-    timer.start("Dgemm Q_prime 2");
-
-    hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, HIPBLAS_OP_N, n, n, n, &alpha, d_matrix_A, n, d_matrix_C, n, &beta, d_matrix_B, n));
-
-    hipblasSafe(hipblasDestroy(handle));
-
-#endif
-
-    timer.stop("Dgemm Q_prime 2");
-    timer.start("Memcpy Q_prime");
-
-    gpu::chunkedMemcpyDeviceToHost<double>(mat_full.values(), d_matrix_B, mat_full.getNumberOfElements());
-
-    timer.stop("Memcpy Q_prime");
     timer.start("Prep. preLinK 1");
 
-    screening.form_pair_inds_for_K(s_prim_count, p_prim_count, d_prim_count, mat_full, prelink_threshold);
+    screening.form_pair_inds_for_K(s_prim_count, p_prim_count, d_prim_count,
+                                   Q_prime_row_ptr, Q_prime_col_ptr, Q_prime_ind_count);
 
     timer.stop("Prep. preLinK 1");
 
     timer.start("Prep. preLinK 2");
-
-    mat_full = CDenseMatrix();
 
     // max densities are needed by exchange Fock
     screening.findMaxDensities(s_prim_count, p_prim_count, d_prim_count,

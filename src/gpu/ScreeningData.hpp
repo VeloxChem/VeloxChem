@@ -423,7 +423,12 @@ class CScreeningData
 
     auto form_Q_and_D_inds_for_K() -> void;
 
-    auto form_pair_inds_for_K(const int64_t s_prim_count, const int64_t p_prim_count, const int64_t d_prim_count, const CDenseMatrix& Q_prime, const double Q_prime_thresh) -> void;
+    auto form_pair_inds_for_K(const int64_t  s_prim_count,
+                              const int64_t  p_prim_count,
+                              const int64_t  d_prim_count,
+                              const int32_t* Q_prime_row_prt,
+                              const int32_t* Q_prime_col_prt,
+                              const int32_t  Q_prime_ind_count) -> void;
 };
 
 #endif /* ScreeningData_hpp */

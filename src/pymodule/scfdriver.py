@@ -50,6 +50,7 @@ from .veloxchemlib import (compute_fock_gpu, matmul_gpu, eigh_gpu,
                            compute_nuclear_potential_integrals_gpu,
                            compute_point_charges_integrals_gpu,
                            compute_mixed_basis_overlap_integrals_gpu)
+from .veloxchemlib import transform_density
 from .profiler import Profiler
 from .griddriver import GridDriver
 from .molecularbasis import MolecularBasis
@@ -1654,6 +1655,39 @@ class ScfDriver:
         timer_summary = {}
         gpu_timer_summary = [{} for idx in range(screener.get_num_gpus_per_node())]
 
+        prim_qmat = screener.get_prim_q_matrix()
+        prim_cart_dmat = screener.get_prim_cart_density_matrix(molecule, basis, dmat)
+
+        prim_qmat_np = prim_qmat.to_numpy()
+        prim_cart_dmat_np = np.abs(prim_cart_dmat.to_numpy())
+
+        ave, res = divmod(prim_qmat_np.shape[0], self.nodes)
+        counts = [ave + 1 if p < res else ave for p in range(self.nodes)]
+        displs = [sum(counts[:p]) for p in range(self.nodes)]
+
+        row_start = displs[self.rank]
+        row_end = row_start + counts[self.rank]
+
+        local_q_prime_np = matmul_gpu(
+            matmul_gpu(prim_qmat_np[row_start:row_end], prim_cart_dmat_np),
+            prim_qmat_np)
+
+        local_q_prime_row_inds, local_q_prime_col_inds = np.where(
+            local_q_prime_np > self.prelink_thresh)
+
+        local_q_prime_row_inds += row_start
+
+        # Allgather
+        counts_2 = self.comm.allgather(len(local_q_prime_row_inds))
+        displs_2 = [sum(counts_2[:p]) for p in range(self.nodes)]
+        # Note: use int32 for row and col indices
+        q_prime_row_inds = np.zeros(sum(counts_2), dtype=np.int32)
+        q_prime_col_inds = np.zeros(sum(counts_2), dtype=np.int32)
+        self.comm.Allgatherv(local_q_prime_row_inds.astype(np.int32),
+                             [q_prime_row_inds, counts_2, displs_2, MPI.INT32_T])
+        self.comm.Allgatherv(local_q_prime_col_inds.astype(np.int32),
+                             [q_prime_col_inds, counts_2, displs_2, MPI.INT32_T])
+
         if self._dft and not self._first_step:
 
             if self.xcfun.is_hybrid():
@@ -1668,7 +1702,8 @@ class ScfDriver:
                     fock_mat = compute_fock_gpu(
                         molecule, basis, dmat, 2.0, [full_k_coef, erf_k_coef],
                         [0.0, omega], 'symm', self.eri_thresh,
-                        self.prelink_thresh, screener)
+                        self.prelink_thresh,
+                        q_prime_row_inds, q_prime_col_inds, screener)
                     fock_mat_local = fock_mat.to_numpy()
 
                     for line in screener.get_timer_summary().splitlines():
@@ -1693,7 +1728,8 @@ class ScfDriver:
                     fock_mat = compute_fock_gpu(
                         molecule, basis, dmat, 2.0,
                         [self.xcfun.get_frac_exact_exchange()], [0.0], 'symm',
-                        self.eri_thresh, self.prelink_thresh, screener)
+                        self.eri_thresh, self.prelink_thresh,
+                        q_prime_row_inds, q_prime_col_inds, screener)
                     fock_mat_local = fock_mat.to_numpy()
 
                     for line in screener.get_timer_summary().splitlines():
@@ -1717,7 +1753,8 @@ class ScfDriver:
                 # pure DFT
                 fock_mat = compute_fock_gpu(
                     molecule, basis, dmat, 2.0, [0.0], [0.0], 'symm',
-                    self.eri_thresh, self.prelink_thresh, screener)
+                    self.eri_thresh, self.prelink_thresh,
+                    q_prime_row_inds, q_prime_col_inds, screener)
                 fock_mat_local = fock_mat.to_numpy()
 
                 for line in screener.get_timer_summary().splitlines():
@@ -1741,7 +1778,8 @@ class ScfDriver:
             # Hartree-Fock
             fock_mat = compute_fock_gpu(
                 molecule, basis, dmat, 2.0, [1.0], [0.0], 'symm',
-                self.eri_thresh, self.prelink_thresh, screener)
+                self.eri_thresh, self.prelink_thresh,
+                q_prime_row_inds, q_prime_col_inds, screener)
             fock_mat_local = fock_mat.to_numpy()
 
             for line in screener.get_timer_summary().splitlines():

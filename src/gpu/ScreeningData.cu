@@ -2840,76 +2840,78 @@ auto CScreeningData::form_Q_and_D_inds_for_K() -> void
     }
 }
 
-auto CScreeningData::form_pair_inds_for_K(const int64_t s_prim_count,
-                                          const int64_t p_prim_count,
-                                          const int64_t d_prim_count,
-                                          const CDenseMatrix& Q_prime,
-                                          const double Q_prime_thresh) -> void
+auto CScreeningData::form_pair_inds_for_K(const int64_t  s_prim_count,
+                                          const int64_t  p_prim_count,
+                                          const int64_t  d_prim_count,
+                                          const int32_t* Q_prime_row_ptr,
+                                          const int32_t* Q_prime_col_ptr,
+                                          const int32_t  Q_prime_ind_count) -> void
 {
-    // TODO consider determining the maximum density associated
-    // with the ik pair (i.e. max_D_jl for ik)
+    std::vector<std::tuple<int64_t, int64_t>> ss_Qp_ik;
+    std::vector<std::tuple<int64_t, int64_t>> sp_Qp_ik;
+    std::vector<std::tuple<int64_t, int64_t>> sd_Qp_ik;
+    std::vector<std::tuple<int64_t, int64_t>> pp_Qp_ik;
+    std::vector<std::tuple<int64_t, int64_t>> pd_Qp_ik;
+    std::vector<std::tuple<int64_t, int64_t>> dd_Qp_ik;
 
-    std::vector<std::tuple<double, int64_t, int64_t>> ss_Qp_ik;
-    std::vector<std::tuple<double, int64_t, int64_t>> sp_Qp_ik;
-    std::vector<std::tuple<double, int64_t, int64_t>> sd_Qp_ik;
-    std::vector<std::tuple<double, int64_t, int64_t>> pp_Qp_ik;
-    std::vector<std::tuple<double, int64_t, int64_t>> pd_Qp_ik;
-    std::vector<std::tuple<double, int64_t, int64_t>> dd_Qp_ik;
+    const auto n_s = s_prim_count;
+    const auto n_p = p_prim_count * 3;
+    const auto n_d = d_prim_count * 6;
 
-    // ss, sp, sd blocks
+    const auto n_sp = n_s + n_p;
+    const auto n_spd = n_s + n_p + n_d;
 
-    for (int64_t i = 0; i < s_prim_count; i++)
+    for (int64_t idx = 0; idx < static_cast<int64_t>(Q_prime_ind_count); idx++)
     {
-        for (int64_t k = i; k < s_prim_count; k++)
-        {
-            const auto Qp_ik = std::fabs(Q_prime.row(i)[k]);
+        const auto i = static_cast<int64_t>(Q_prime_row_ptr[idx]);
+        const auto k = static_cast<int64_t>(Q_prime_col_ptr[idx]);
 
-            if (Qp_ik > Q_prime_thresh) ss_Qp_ik.push_back(std::make_tuple(Qp_ik, i, k));
+        // ss, sp, sd blocks
+        if (i < s_prim_count)
+        {
+            // ss block (note: only upper triangular)
+            if ((i <= k) && (k < n_s))
+            {
+                ss_Qp_ik.push_back(std::make_tuple(i, k));
+            }
+
+            // sp block
+            else if ((n_s <= k) && (k < n_sp))
+            {
+                sp_Qp_ik.push_back(std::make_tuple(i, k - n_s));
+            }
+
+            // sd block
+            else if ((n_sp <= k) && (k < n_spd))
+            {
+                sd_Qp_ik.push_back(std::make_tuple(i, k - n_sp));
+            }
         }
 
-        for (int64_t k = 0; k < p_prim_count * 3; k++)
+        // pp, pd blocks
+        else if ((n_s <= i) && (i < n_sp))
         {
-            const auto Qp_ik = std::fabs(Q_prime.row(i)[s_prim_count + k]);
+            // pp block (note: only upper triangular)
+            if ((i <= k) && (n_s <= k) && (k < n_sp))
+            {
+                pp_Qp_ik.push_back(std::make_tuple(i - n_s, k - n_s));
+            }
 
-            if (Qp_ik > Q_prime_thresh) sp_Qp_ik.push_back(std::make_tuple(Qp_ik, i, k));
+            // pd block
+            else if ((n_sp <= k) && (k < n_spd))
+            {
+                pd_Qp_ik.push_back(std::make_tuple(i - n_s, k - n_sp));
+            }
         }
 
-        for (int64_t k = 0; k < d_prim_count * 6; k++)
+        // dd block
+        else if ((n_sp <= i) && (i < n_spd))
         {
-            const auto Qp_ik = std::fabs(Q_prime.row(i)[s_prim_count + p_prim_count * 3 + k]);
-
-            if (Qp_ik > Q_prime_thresh) sd_Qp_ik.push_back(std::make_tuple(Qp_ik, i, k));
-        }
-    }
-
-    // pp, pd blocks
-
-    for (int64_t i = 0; i < p_prim_count * 3; i++)
-    {
-        for (int64_t k = i; k < p_prim_count * 3; k++)
-        {
-            const auto Qp_ik = std::fabs(Q_prime.row(s_prim_count + i)[s_prim_count + k]);
-
-            if (Qp_ik > Q_prime_thresh) pp_Qp_ik.push_back(std::make_tuple(Qp_ik, i, k));
-        }
-
-        for (int64_t k = 0; k < d_prim_count * 6; k++)
-        {
-            const auto Qp_ik = std::fabs(Q_prime.row(s_prim_count + i)[s_prim_count + p_prim_count * 3 + k]);
-
-            if (Qp_ik > Q_prime_thresh) pd_Qp_ik.push_back(std::make_tuple(Qp_ik, i, k));
-        }
-    }
-
-    // dd block
-
-    for (int64_t i = 0; i < d_prim_count * 6; i++)
-    {
-        for (int64_t k = i; k < d_prim_count * 6; k++)
-        {
-            const auto Qp_ik = std::fabs(Q_prime.row(s_prim_count + p_prim_count * 3 + i)[s_prim_count + p_prim_count * 3 + k]);
-
-            if (Qp_ik > Q_prime_thresh) dd_Qp_ik.push_back(std::make_tuple(Qp_ik, i, k));
+            // dd block (note: only upper triangular)
+            if ((i <= k) && (n_sp <= k) && (k < n_spd))
+            {
+                dd_Qp_ik.push_back(std::make_tuple(i - n_sp, k - n_sp));
+            }
         }
     }
 
@@ -2996,9 +2998,8 @@ auto CScreeningData::form_pair_inds_for_K(const int64_t s_prim_count,
             {
                 const auto& vals = ss_Qp_ik[ik];
 
-                // auto Qp_ik = std::get<0>(vals);
-                auto i = std::get<1>(vals);
-                auto k = std::get<2>(vals);
+                auto i = std::get<0>(vals);
+                auto k = std::get<1>(vals);
 
                 _local_pair_inds_i_for_K_ss[gpu_id][idx] = i;
                 _local_pair_inds_k_for_K_ss[gpu_id][idx] = k;
@@ -3008,9 +3009,8 @@ auto CScreeningData::form_pair_inds_for_K(const int64_t s_prim_count,
             {
                 const auto& vals = sp_Qp_ik[ik];
 
-                // auto Qp_ik = std::get<0>(vals);
-                auto i = std::get<1>(vals);
-                auto k = std::get<2>(vals);
+                auto i = std::get<0>(vals);
+                auto k = std::get<1>(vals);
 
                 _local_pair_inds_i_for_K_sp[gpu_id][idx] = i;
                 _local_pair_inds_k_for_K_sp[gpu_id][idx] = k;
@@ -3020,9 +3020,8 @@ auto CScreeningData::form_pair_inds_for_K(const int64_t s_prim_count,
             {
                 const auto& vals = sd_Qp_ik[ik];
 
-                // auto Qp_ik = std::get<0>(vals);
-                auto i = std::get<1>(vals);
-                auto k = std::get<2>(vals);
+                auto i = std::get<0>(vals);
+                auto k = std::get<1>(vals);
 
                 _local_pair_inds_i_for_K_sd[gpu_id][idx] = i;
                 _local_pair_inds_k_for_K_sd[gpu_id][idx] = k;
@@ -3032,9 +3031,8 @@ auto CScreeningData::form_pair_inds_for_K(const int64_t s_prim_count,
             {
                 const auto& vals = pp_Qp_ik[ik];
 
-                // auto Qp_ik = std::get<0>(vals);
-                auto i = std::get<1>(vals);
-                auto k = std::get<2>(vals);
+                auto i = std::get<0>(vals);
+                auto k = std::get<1>(vals);
 
                 _local_pair_inds_i_for_K_pp[gpu_id][idx] = i;
                 _local_pair_inds_k_for_K_pp[gpu_id][idx] = k;
@@ -3044,9 +3042,8 @@ auto CScreeningData::form_pair_inds_for_K(const int64_t s_prim_count,
             {
                 const auto& vals = pd_Qp_ik[ik];
 
-                // auto Qp_ik = std::get<0>(vals);
-                auto i = std::get<1>(vals);
-                auto k = std::get<2>(vals);
+                auto i = std::get<0>(vals);
+                auto k = std::get<1>(vals);
 
                 _local_pair_inds_i_for_K_pd[gpu_id][idx] = i;
                 _local_pair_inds_k_for_K_pd[gpu_id][idx] = k;
@@ -3056,9 +3053,8 @@ auto CScreeningData::form_pair_inds_for_K(const int64_t s_prim_count,
             {
                 const auto& vals = dd_Qp_ik[ik];
 
-                // auto Qp_ik = std::get<0>(vals);
-                auto i = std::get<1>(vals);
-                auto k = std::get<2>(vals);
+                auto i = std::get<0>(vals);
+                auto k = std::get<1>(vals);
 
                 _local_pair_inds_i_for_K_dd[gpu_id][idx] = i;
                 _local_pair_inds_k_for_K_dd[gpu_id][idx] = k;

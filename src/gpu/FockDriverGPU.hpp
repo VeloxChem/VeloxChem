@@ -107,6 +107,9 @@ auto computeFockOnGPU(const              CMolecule& molecule,
                       const std::string& flag_K,
                       const double       eri_threshold,
                       const double       prelink_threshold,
+                      const int32_t*     Q_prime_row_ptr,
+                      const int32_t*     Q_prime_col_ptr,
+                      const int32_t      Q_prime_ind_count,
                       CScreeningData&    screening) -> CDenseMatrix;
 
 }  // namespace gpu

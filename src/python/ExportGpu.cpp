@@ -74,13 +74,16 @@ export_gpu(py::module& m)
         .def("reset_mpi", &CScreeningData::reset_mpi)
         .def("get_timer_summary", &CScreeningData::getTimerSummary)
         .def("get_gpu_timer_summary", &CScreeningData::getGpuTimerSummary)
+        .def("get_prim_q_matrix", &CScreeningData::get_mat_Q_full)
         .def(
-            "get_q_matrix",
-            [](CScreeningData& self, const int64_t s_prim_count, const int64_t p_prim_count, const int64_t d_prim_count) -> py::array_t<double> {
-                const auto q_mat = self.get_mat_Q_full();
-                return vlx_general::pointer_to_numpy(q_mat.values(), {q_mat.getNumberOfRows(), q_mat.getNumberOfColumns()});
+            "get_prim_cart_density_matrix",
+            [](CScreeningData& self, const CMolecule& mol, const CMolecularBasis& bas, const CAODensityMatrix& dmat) -> CDenseMatrix {
+                const auto cart_dmat = gpu::transformDensity(mol, bas, dmat);
+                const auto cart_naos = cart_dmat.getNumberOfRows();
+                const auto cart_dens_ptr = cart_dmat.values();
+                return self.get_mat_D_abs_full(cart_naos, cart_dens_ptr);
             },
-            "Gets Q matrix.");
+            "Gets primitive Cartesian density matrix.");
 
     // CGradientScreeningData class
 
@@ -320,7 +323,39 @@ export_gpu(py::module& m)
 
     m.def("integrate_vxc_gradient_gpu", &gpu::integrateVxcGradient, "Integrates Vxc gradient using GPU.");
 
-    m.def("compute_fock_gpu", &gpu::computeFockOnGPU, "Computes Fock matrix using GPU.");
+    m.def(
+        "compute_fock_gpu",
+        [](const CMolecule&            molecule,
+           const CMolecularBasis&      basis,
+           const CAODensityMatrix&     densityMatrix,
+           const double                prefac_coulomb,
+           const std::vector<double>&  frac_exact_exchange_values,
+           const std::vector<double>&  omega_values,
+           const std::string&          flag_K,
+           const double                eri_threshold,
+           const double                prelink_threshold,
+           const py::array_t<int32_t>& Q_prime_row_indices,
+           const py::array_t<int32_t>& Q_prime_col_indices,
+           CScreeningData&             screening) -> CDenseMatrix {
+
+            std::string errsize("compute_fock_gpu: Mismatch in the size of Q_prime indices");
+            errors::assertMsgCritical(Q_prime_row_indices.size() == Q_prime_col_indices.size(), errsize);
+
+            std::string errstyle("compute_fock_gpu: Expecting contiguous Q_prime indices");
+            auto c_style_row = py::detail::check_flags(Q_prime_row_indices.ptr(), py::array::c_style);
+            auto c_style_col = py::detail::check_flags(Q_prime_col_indices.ptr(), py::array::c_style);
+            errors::assertMsgCritical(c_style_row && c_style_col, errstyle);
+
+            const auto Q_prime_ind_count = static_cast<int64_t>(Q_prime_row_indices.size());
+            const auto Q_prime_row_ptr = Q_prime_row_indices.data();
+            const auto Q_prime_col_ptr = Q_prime_col_indices.data();
+
+            return gpu::computeFockOnGPU(molecule, basis, densityMatrix, prefac_coulomb,
+                                         frac_exact_exchange_values, omega_values, flag_K,
+                                         eri_threshold, prelink_threshold, Q_prime_row_ptr,
+                                         Q_prime_col_ptr, Q_prime_ind_count, screening);
+        },
+        "Computes Fock matrix using GPU.");
 
     m.def("compute_fock_gradient_gpu", &gpu::computeFockGradientOnGPU, "Computes Fock gradient using GPU.");
 
