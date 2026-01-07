@@ -72,20 +72,7 @@ class EnvironmentDriver:
         """
         Write environment snapshots to .pot files.
 
-        Generates one .pot file per snapshot with @environment (Angstrom
-        coordinates and residue info), @charges, and @polarizabilities blocks
-        in VeloxChem .pot format.
-
-        Args:
-            snapshots (List[Dict]): List of snapshot dictionaries from TrajectoryDriver.
-                Each snapshot must contain:
-                - 'frame' (int): Frame number
-                - 'mm_coords' (np.ndarray): MM region coordinates in Angstrom
-                - 'mm_elements' (np.ndarray): Element symbols per atom (e.g., 'O', 'H').
-                - 'mm_resids' (np.ndarray): Residue IDs
-                - 'mm_resnames' (np.ndarray): Residue names (e.g., 'SOL')
-            outdir (str | Path): Output directory where .pot files will be written.
-                Directory is created if it does not exist.
+        Generates one .pot file per snapshot.
 
         Returns:
             None
@@ -110,14 +97,14 @@ class EnvironmentDriver:
 
         Generates a .pot file for one snapshot containing the @environment,
         @charges, and @polarizabilities sections formatted for VeloxChem.
-
+        
         Args:
             snapshot (Dict): A single snapshot dictionary containing:
-                - 'frame' (int): Frame number used for output filename
+                - 'frame' (int): Frame number
                 - 'mm_coords' (np.ndarray): MM region coordinates in Angstrom (N, 3)
-                - 'mm_elements' (np.ndarray): Element symbols for each atom
+                - 'mm_elements' (np.ndarray): Element symbols for each atom (e.g., 'O', 'H')
                 - 'mm_resids' (np.ndarray): Residue IDs for each atom
-                - 'mm_resnames' (np.ndarray): Residue names for each atom
+                - 'mm_resnames' (np.ndarray): Residue names (e.g., 'SOL')
             outdir (Path): Output directory path.
 
         Returns:
