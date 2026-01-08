@@ -33,15 +33,13 @@
 import numpy as np
 
 from .spectrumplot import lorentzian_absorption, gaussian_absorption
-
-
-from .veloxchemlib import (hartree_in_ev,
-                           hartree_in_inverse_nm,
-                           fine_structure_constant,
-                            avogadro_constant,
-                           bohr_in_angstrom,
-                           hartree_in_wavenumber,
-                           )
+from .veloxchemlib import (
+    hartree_in_ev,
+    fine_structure_constant,
+    avogadro_constant,
+    bohr_in_angstrom,
+    hartree_in_wavenumber,
+)
 
 try:
     import matplotlib.pyplot as plt
@@ -52,8 +50,11 @@ except ImportError:
 # Unit conversion factors
 au2ev = hartree_in_ev()
 ev2au = 1.0 / au2ev
-ev2nm = 1e7 / hartree_in_wavenumber()
 
+# For wavelength conversion directly from energy in Hartree:
+# E (Hartree) * hartree_in_wavenumber -> wavenumber in cm^-1
+# wavelength (nm) = 1e7 / (wavenumber in cm^-1)
+au2nm = 1.0e7 / hartree_in_wavenumber()  # [nm * Hartree]
 
 
 class SpectrumAveragingDriver:
@@ -69,7 +70,7 @@ class SpectrumAveragingDriver:
         self.broadening_type = "lorentzian"
         self.broadening_value_ev = 0.124
         self.xstep_ev = 0.01
-        self.padding_ev = 1.0
+        self.padding_ev = 0.8
 
     def _unpack(self, rsp_all):
         """Accept [rsp_results, ...] or [(frame, rsp_results), ...]."""
@@ -89,7 +90,6 @@ class SpectrumAveragingDriver:
         self,
         rsp_all,
         *,
-        nstates=None,
         energy_min_ev=None,
         energy_max_ev=None,
     ):
@@ -110,39 +110,34 @@ class SpectrumAveragingDriver:
         for rsp in results:
             e = np.asarray(rsp["eigenvalues"], dtype=float)
             f = np.asarray(rsp["oscillator_strengths"], dtype=float)
-            if nstates is not None:
-                e = e[:nstates]
-                f = f[:nstates]
             all_e_au.append(e)
             all_f.append(f)
 
-        # Build a common energy grid (Hartree) for the ensemble
+        # Build xmin/xmax (Hartree) for the ensemble
         if energy_min_ev is None:
-            emin_au = min(np.min(e) for e in all_e_au) - self.padding_ev * ev2au
+            emin_au = min(np.min(e) for e in all_e_au) - float(self.padding_ev) * ev2au
         else:
             emin_au = float(energy_min_ev) * ev2au
 
         if energy_max_ev is None:
-            emax_au = max(np.max(e) for e in all_e_au) + self.padding_ev * ev2au
+            emax_au = max(np.max(e) for e in all_e_au) + float(self.padding_ev) * ev2au
         else:
             emax_au = float(energy_max_ev) * ev2au
 
         emin_au = max(0.0, float(emin_au))
 
         xstep_au = float(self.xstep_ev) * ev2au
-        xgrid_au = np.arange(emin_au, emax_au, xstep_au)
-
-        # Broadening in a.u.
         broad_au = float(self.broadening_value_ev) * ev2au
 
         # Convert absorption cross section (a.u.) -> molar absorptivity epsilon (L mol^-1 cm^-1)
-        c = 1.0 / fine_structure_constant()
+        c = 1.0 / fine_structure_constant()          # speed of light in a.u.
         NA = avogadro_constant()
-        a0 = bohr_in_angstrom() * 1.0e-10  # meters
+        a0 = bohr_in_angstrom() * 1.0e-10            # meters
 
-        # Compute spectrum for each snapshot on the common grid
         epsilon_all = []
         bt = self.broadening_type.lower()
+
+        xgrid_au = None  # take from the broadening routine (np.arange(xmin, xmax, xstep))
 
         for e, f in zip(all_e_au, all_f):
             if bt == "lorentzian":
@@ -152,8 +147,11 @@ class SpectrumAveragingDriver:
             else:
                 raise ValueError(f"Unknown broadening_type: {self.broadening_type}")
 
-            if xi.shape != xgrid_au.shape or not np.allclose(xi, xgrid_au):
-                raise ValueError("Internal error: snapshot spectrum grid differs from common grid")
+            if xgrid_au is None:
+                xgrid_au = xi
+            else:
+                if xi.shape != xgrid_au.shape or not np.allclose(xi, xgrid_au):
+                    raise ValueError("Internal error: snapshot spectrum grid differs from common grid")
 
             sigma_au = (2.0 * np.pi * np.pi * xi * yi) / c
             sigma_m2 = sigma_au * (a0 ** 2)
@@ -173,9 +171,7 @@ class SpectrumAveragingDriver:
         for eps in epsilon_all:
             eps = np.asarray(eps, dtype=float)
             if eps.shape != eps0.shape:
-                raise ValueError(
-                    f"All snapshots must have the same shape, got {eps.shape} vs {eps0.shape}"
-                )
+                raise ValueError(f"All snapshots must have the same shape, got {eps.shape} vs {eps0.shape}")
             eps_sum += eps
             eps_sq_sum += eps * eps
 
@@ -184,10 +180,12 @@ class SpectrumAveragingDriver:
 
         # Convert grids
         xgrid_ev = xgrid_au * au2ev
-        with np.errstate(divide="ignore", invalid="ignore"):
-            wl_nm = ev2nm / xgrid_ev
 
-        # Drop non-finite wavelength points (e.g. xgrid_ev == 0)
+        # Wavelength directly from Hartree grid: wl_nm = (nm*Hartree) / Hartree
+        with np.errstate(divide="ignore", invalid="ignore"):
+            wl_nm = au2nm / xgrid_au
+
+        # Drop non-finite wavelength points (e.g. xgrid_au == 0)
         mask = np.isfinite(wl_nm)
         wl_nm_f = wl_nm[mask]
         eps_avg_f = epsilon_avg[mask]
@@ -204,7 +202,7 @@ class SpectrumAveragingDriver:
             "xgrid_ev": xgrid_ev,
             "wavelength_nm": wl_nm_f,
             "mask_wavelength_finite": mask,
-            "eps_all": epsilon_all,          # each is eps vs xgrid_au/xgrid_ev (energy axis)
+            "eps_all": epsilon_all,          # each is eps vs xgrid_au (energy axis)
             "eps_mean_ev": epsilon_avg,      # eps vs energy grid
             "eps_std_ev": epsilon_std,
             "eps_mean_wl": eps_mean_wl,      # eps vs wavelength grid (reversed)
@@ -215,8 +213,11 @@ class SpectrumAveragingDriver:
 
     def plot_uv_vis(
         self,
-        spectrum,
+        rsp_all_or_spectrum,
         *,
+        energy_min_ev=None,
+        energy_max_ev=None,
+        # plotting options
         show_individual=False,
         show_sticks=True,
         show_std=False,
@@ -224,10 +225,22 @@ class SpectrumAveragingDriver:
         ax=None,
     ):
         """
-        Plot averaged spectrum in the same "wavelength + oscillator sticks" style.
+        Convenience API:
+          - If rsp_all_or_spectrum is a list of snapshots (rsp_all), compute + plot.
+          - If it is a spectrum dict (from compute()), just plot.
         """
         if plt is None:
             raise ImportError("matplotlib is required for plotting")
+
+        # Accept either precomputed spectrum dict or raw rsp_all
+        if isinstance(rsp_all_or_spectrum, dict) and "eps_mean_wl" in rsp_all_or_spectrum:
+            spectrum = rsp_all_or_spectrum
+        else:
+            spectrum = self.compute(
+                rsp_all_or_spectrum,
+                energy_min_ev=energy_min_ev,
+                energy_max_ev=energy_max_ev,
+            )
 
         if ax is None:
             _, ax = plt.subplots()
@@ -238,9 +251,9 @@ class SpectrumAveragingDriver:
         mask = spectrum.get("mask_wavelength_finite", None)
 
         if show_individual:
-            xgrid_ev = spectrum["xgrid_ev"]
+            xgrid_au = spectrum["xgrid_au"]
             with np.errstate(divide="ignore", invalid="ignore"):
-                wl_forward = ev2nm / xgrid_ev
+                wl_forward = au2nm / xgrid_au  # forward (same ordering as eps arrays)
 
             if mask is None:
                 mask = np.isfinite(wl_forward)
@@ -263,9 +276,9 @@ class SpectrumAveragingDriver:
             ax2.set_ylabel("Oscillator strength")
 
             for e_au, f in zip(spectrum["transitions_au"], spectrum["oscillator_strengths"]):
-                e_ev = np.asarray(e_au, dtype=float) * au2ev
+                e_au = np.asarray(e_au, dtype=float)
                 with np.errstate(divide="ignore", invalid="ignore"):
-                    wl_t = ev2nm / e_ev
+                    wl_t = au2nm / e_au
                 ax2.vlines(wl_t, 0.0, f, alpha=0.35, linewidth=2)
 
             ax2.set_ylim(0.0, max(0.2, ax2.get_ylim()[1]))
