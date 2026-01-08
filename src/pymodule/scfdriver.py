@@ -651,15 +651,21 @@ class ScfDriver:
                 S12, S22 = self._comp_mixed_basis_overlap(
                     molecule, min_basis, ao_basis)
 
-            if self.rank == mpi_master():
-                if self.restart:
-                    den_mat = self.gen_initial_density_restart(molecule)
-                else:
-                    den_mat = self.gen_initial_density_sad(
-                        molecule, min_basis, ao_basis, S12, S22)
+            if self.restart:
+                # Note: gen_initial_density_restart involves a matmul_gpu
+                # and we want to run this on all ranks such that they get
+                # the first exposure to cublas/hipblas kernel, which makes
+                # later measurement of FockERI more accurate
+                den_mat = self.gen_initial_density_restart(molecule)
                 naos = den_mat.shape[0]
             else:
-                naos = None
+                if self.rank == mpi_master():
+                    den_mat = self.gen_initial_density_sad(
+                        molecule, min_basis, val_basis, S12, S22)
+                    naos = den_mat.shape[0]
+                else:
+                    naos = None
+
             naos = self.comm.bcast(naos, root=mpi_master())
 
             if self.rank != mpi_master():
@@ -687,15 +693,21 @@ class ScfDriver:
                 S12, S22 = self._comp_mixed_basis_overlap(
                     molecule, min_basis, val_basis)
 
-            if self.rank == mpi_master():
-                if self.restart:
-                    den_mat = self.gen_initial_density_restart(molecule)
-                else:
-                    den_mat = self.gen_initial_density_sad(
-                        molecule, min_basis, val_basis, S12, S22)
+            if self.restart:
+                # Note: gen_initial_density_restart involves a matmul_gpu
+                # and we want to run this on all ranks such that they get
+                # the first exposure to cublas/hipblas kernel, which makes
+                # later measurement of FockERI more accurate
+                den_mat = self.gen_initial_density_restart(molecule)
                 naos = den_mat.shape[0]
             else:
-                naos = None
+                if self.rank == mpi_master():
+                    den_mat = self.gen_initial_density_sad(
+                        molecule, min_basis, val_basis, S12, S22)
+                    naos = den_mat.shape[0]
+                else:
+                    naos = None
+
             naos = self.comm.bcast(naos, root=mpi_master())
 
             if self.rank != mpi_master():
@@ -1649,14 +1661,17 @@ class ScfDriver:
         #     thresh_int = int(-math.log10(self._get_dyn_threshold(e_grad)))
 
         eri_t0 = tm.time()
-        coulomb_timing = 0.0
-        exchange_timing = 0.0
 
         timer_summary = {}
         gpu_timer_summary = [{} for idx in range(screener.get_num_gpus_per_node())]
 
+        q_d_mat_t0 = tm.time()
+
         prim_qmat = screener.get_prim_q_matrix()
         prim_cart_dmat = screener.get_prim_cart_density_matrix(molecule, basis, dmat)
+
+        q_d_mat_dt = tm.time() - q_d_mat_t0
+        q_prime_calc_t0 = tm.time()
 
         ave, res = divmod(prim_qmat.number_of_rows(), self.nodes)
         counts = [ave + 1 if p < res else ave for p in range(self.nodes)]
@@ -1668,10 +1683,18 @@ class ScfDriver:
         local_q_prime_np = screener.compute_q_prime_slice(
             prim_qmat, prim_cart_dmat, row_start, row_end).to_numpy()
 
+        q_prime_calc_dt = tm.time() - q_prime_calc_t0
+        q_prime_inds_t0 = tm.time()
+
         local_q_prime_row_inds, local_q_prime_col_inds = np.where(
             local_q_prime_np > self.prelink_thresh)
 
         local_q_prime_row_inds += row_start
+
+        # TODO: only store upper triangular indices
+
+        q_prime_inds_dt = tm.time() - q_prime_inds_t0
+        q_prime_comm_t0 = tm.time()
 
         # Allgather
         counts_2 = self.comm.allgather(len(local_q_prime_row_inds))
@@ -1683,6 +1706,16 @@ class ScfDriver:
                              [q_prime_row_inds, counts_2, displs_2, MPI.INT32_T])
         self.comm.Allgatherv(local_q_prime_col_inds.astype(np.int32),
                              [q_prime_col_inds, counts_2, displs_2, MPI.INT32_T])
+
+        q_prime_comm_dt = tm.time() - q_prime_comm_t0
+
+        if self.timing_gpu:
+            self.ostream.print_blank()
+            self.ostream.print_info(f'Time spent in Q and D mat. : {q_d_mat_dt:.6f} sec')
+            self.ostream.print_info(f'Time spent in Q_prime calc.: {q_prime_calc_dt:.6f} sec')
+            self.ostream.print_info(f'Time spent in Q_prime inds.: {q_prime_inds_dt:.6f} sec')
+            self.ostream.print_info(f'Time spent in Q_prime comm.: {q_prime_comm_dt:.6f} sec')
+            self.ostream.print_blank()
 
         if self._dft and not self._first_step:
 
