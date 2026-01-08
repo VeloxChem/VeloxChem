@@ -215,6 +215,7 @@ from .smddriver import SmdDriver
 from .atombdedriver import AtomBdeDriver
 from .trajectorydrivernew import TrajectoryDriver
 from .environmentdriver import EnvironmentDriver
+from .spectrumaveragingdriver import SpectrumAveragingDriver
 # for backward compatibility only
 from .peforcefieldgenerator import PEForceFieldGenerator as LoPropDriver
 
