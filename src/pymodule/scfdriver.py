@@ -1691,9 +1691,18 @@ class ScfDriver:
 
         local_q_prime_row_inds += row_start
 
-        # TODO: only store upper triangular indices
-
         q_prime_inds_dt = tm.time() - q_prime_inds_t0
+        q_prime_triu_t0 = tm.time()
+
+        # only store upper triangular indices
+        triu_mask = (local_q_prime_row_inds <= local_q_prime_col_inds)
+        triu_q_prime_row_inds = local_q_prime_row_inds[triu_mask]
+        triu_q_prime_col_inds = local_q_prime_col_inds[triu_mask]
+        # Note: use int32 for row and col indices
+        local_q_prime_row_inds = triu_q_prime_row_inds.astype(np.int32)
+        local_q_prime_col_inds = triu_q_prime_col_inds.astype(np.int32)
+
+        q_prime_triu_dt = tm.time() - q_prime_triu_t0
         q_prime_comm_t0 = tm.time()
 
         # Allgather
@@ -1702,9 +1711,9 @@ class ScfDriver:
         # Note: use int32 for row and col indices
         q_prime_row_inds = np.zeros(sum(counts_2), dtype=np.int32)
         q_prime_col_inds = np.zeros(sum(counts_2), dtype=np.int32)
-        self.comm.Allgatherv(local_q_prime_row_inds.astype(np.int32),
+        self.comm.Allgatherv(local_q_prime_row_inds,
                              [q_prime_row_inds, counts_2, displs_2, MPI.INT32_T])
-        self.comm.Allgatherv(local_q_prime_col_inds.astype(np.int32),
+        self.comm.Allgatherv(local_q_prime_col_inds,
                              [q_prime_col_inds, counts_2, displs_2, MPI.INT32_T])
 
         q_prime_comm_dt = tm.time() - q_prime_comm_t0
@@ -1714,6 +1723,7 @@ class ScfDriver:
             self.ostream.print_info(f'Time spent in Q and D mat. : {q_d_mat_dt:.6f} sec')
             self.ostream.print_info(f'Time spent in Q_prime calc.: {q_prime_calc_dt:.6f} sec')
             self.ostream.print_info(f'Time spent in Q_prime inds.: {q_prime_inds_dt:.6f} sec')
+            self.ostream.print_info(f'Time spent in Q_prime triu.: {q_prime_triu_dt:.6f} sec')
             self.ostream.print_info(f'Time spent in Q_prime comm.: {q_prime_comm_dt:.6f} sec')
             self.ostream.print_blank()
 

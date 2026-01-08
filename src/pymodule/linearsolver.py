@@ -1142,15 +1142,23 @@ class LinearSolver:
 
         local_q_prime_row_inds += row_start
 
+        # only store upper triangular indices
+        triu_mask = (local_q_prime_row_inds <= local_q_prime_col_inds)
+        triu_q_prime_row_inds = local_q_prime_row_inds[triu_mask]
+        triu_q_prime_col_inds = local_q_prime_col_inds[triu_mask]
+        # Note: use int32 for row and col indices
+        local_q_prime_row_inds = triu_q_prime_row_inds.astype(np.int32)
+        local_q_prime_col_inds = triu_q_prime_col_inds.astype(np.int32)
+
         # Allgather
         counts_2 = local_comm.allgather(len(local_q_prime_row_inds))
         displs_2 = [sum(counts_2[:p]) for p in range(local_comm.Get_size())]
         # Note: use int32 for row and col indices
         q_prime_row_inds = np.zeros(sum(counts_2), dtype=np.int32)
         q_prime_col_inds = np.zeros(sum(counts_2), dtype=np.int32)
-        local_comm.Allgatherv(local_q_prime_row_inds.astype(np.int32),
+        local_comm.Allgatherv(local_q_prime_row_inds,
                               [q_prime_row_inds, counts_2, displs_2, MPI.INT32_T])
-        local_comm.Allgatherv(local_q_prime_col_inds.astype(np.int32),
+        local_comm.Allgatherv(local_q_prime_col_inds,
                               [q_prime_col_inds, counts_2, displs_2, MPI.INT32_T])
 
         fock_mat = None
