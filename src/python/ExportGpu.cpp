@@ -74,14 +74,19 @@ export_gpu(py::module& m)
         .def("reset_mpi", &CScreeningData::reset_mpi)
         .def("get_timer_summary", &CScreeningData::getTimerSummary)
         .def("get_gpu_timer_summary", &CScreeningData::getGpuTimerSummary)
-        .def("get_prim_q_matrix", &CScreeningData::get_mat_Q_full)
+        .def("get_prim_cart_naos", &CScreeningData::get_number_of_prim_cart_aos)
         .def(
-            "get_prim_cart_density_matrix",
-            [](CScreeningData& self, const CMolecule& mol, const CMolecularBasis& bas, const CAODensityMatrix& dmat) -> CDenseMatrix {
+            "fill_prim_q_and_cart_dens",
+            [](CScreeningData&         self,
+               const CMolecule&        mol,
+               const CMolecularBasis&  bas,
+               const CAODensityMatrix& dmat,
+               CDenseMatrix&           prim_q_mat,
+               CDenseMatrix&           prim_cart_d_mat) -> void {
                 const auto cart_dmat = gpu::transformDensity(mol, bas, dmat);
                 const auto cart_naos = cart_dmat.getNumberOfRows();
                 const auto cart_dens_ptr = cart_dmat.values();
-                return self.get_mat_D_abs_full(cart_naos, cart_dens_ptr);
+                return self.fill_mat_Q_and_D(cart_naos, cart_dens_ptr, prim_q_mat, prim_cart_d_mat);
             },
             "Gets primitive Cartesian density matrix.")
         .def("compute_q_prime_slice", &CScreeningData::get_Q_prime_slice);

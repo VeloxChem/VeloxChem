@@ -417,9 +417,9 @@ class CScreeningData
     auto get_local_pair_inds_i_for_K_dd(const int64_t gpu_id) const -> const std::vector<uint32_t>&;
     auto get_local_pair_inds_k_for_K_dd(const int64_t gpu_id) const -> const std::vector<uint32_t>&;
 
-    auto get_mat_Q_full() const -> CDenseMatrix;
+    auto get_number_of_prim_cart_aos() const -> int64_t;
 
-    auto get_mat_D_abs_full(const int64_t naos, const double* dens_ptr) const -> CDenseMatrix;
+    auto fill_mat_Q_and_D(const int64_t naos, const double* dens_ptr, CDenseMatrix& mat_Q_full, CDenseMatrix& mat_D_abs_full) const -> void;
 
     auto get_Q_prime_slice(const CDenseMatrix& Q_mat,
                            const CDenseMatrix& cart_D_mat,

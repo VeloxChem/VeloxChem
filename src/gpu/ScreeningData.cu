@@ -1942,17 +1942,29 @@ auto CScreeningData::get_local_pair_inds_k_for_K_pd(const int64_t gpu_id) const 
 auto CScreeningData::get_local_pair_inds_i_for_K_dd(const int64_t gpu_id) const -> const std::vector<uint32_t>& { return _local_pair_inds_i_for_K_dd[gpu_id]; }
 auto CScreeningData::get_local_pair_inds_k_for_K_dd(const int64_t gpu_id) const -> const std::vector<uint32_t>& { return _local_pair_inds_k_for_K_dd[gpu_id]; }
 
-auto CScreeningData::get_mat_Q_full() const -> CDenseMatrix
+auto CScreeningData::get_number_of_prim_cart_aos() const -> int64_t
+{
+    return _s_prim_count + _p_prim_count * 3 + _d_prim_count * 6;
+}
+
+auto CScreeningData::fill_mat_Q_and_D(const int64_t naos, const double* dens_ptr, CDenseMatrix& mat_Q_full, CDenseMatrix& mat_D_abs_full) const -> void
 {
     const auto s_prim_count = _s_prim_count;
     const auto p_prim_count = _p_prim_count;
     const auto d_prim_count = _d_prim_count;
 
-    const auto cart_naos = s_prim_count + p_prim_count * 3 + d_prim_count * 6;
-
-    CDenseMatrix mat_Q_full(cart_naos, cart_naos);
+    const auto& s_prim_aoinds = _s_prim_aoinds;
+    const auto& p_prim_aoinds = _p_prim_aoinds;
+    const auto& d_prim_aoinds = _d_prim_aoinds;
 
     mat_Q_full.zero();
+
+    mat_D_abs_full.zero();
+
+    #pragma omp parallel sections
+    {
+    #pragma omp section
+    {
 
     for (int64_t i = 0; i < s_prim_count; i++)
     {
@@ -1963,7 +1975,14 @@ auto CScreeningData::get_mat_Q_full() const -> CDenseMatrix
                 mat_Q_full.row(i)[j] = _Q_matrix_ss.row(i)[j];
             }
         }
+    }
 
+    }
+    #pragma omp section
+    {
+
+    for (int64_t i = 0; i < s_prim_count; i++)
+    {
         for (int64_t j = 0; j < p_prim_count * 3; j++)
         {
             auto j_full = s_prim_count + j;
@@ -1974,7 +1993,14 @@ auto CScreeningData::get_mat_Q_full() const -> CDenseMatrix
                 mat_Q_full.row(j_full)[i] = _Q_matrix_sp.row(i)[j];
             }
         }
+    }
 
+    }
+    #pragma omp section
+    {
+
+    for (int64_t i = 0; i < s_prim_count; i++)
+    {
         for (int64_t j = 0; j < d_prim_count * 6; j++)
         {
             auto j_full = s_prim_count + p_prim_count * 3 + j;
@@ -1986,6 +2012,10 @@ auto CScreeningData::get_mat_Q_full() const -> CDenseMatrix
             }
         }
     }
+
+    }
+    #pragma omp section
+    {
 
     for (int64_t i = 0; i < p_prim_count * 3; i++)
     {
@@ -2000,6 +2030,15 @@ auto CScreeningData::get_mat_Q_full() const -> CDenseMatrix
                 mat_Q_full.row(i_full)[j_full] = _Q_matrix_pp.row(i)[j];
             }
         }
+    }
+
+    }
+    #pragma omp section
+    {
+
+    for (int64_t i = 0; i < p_prim_count * 3; i++)
+    {
+        auto i_full = s_prim_count + i;
 
         for (int64_t j = 0; j < d_prim_count * 6; j++)
         {
@@ -2012,6 +2051,10 @@ auto CScreeningData::get_mat_Q_full() const -> CDenseMatrix
             }
         }
     }
+
+    }
+    #pragma omp section
+    {
 
     for (int64_t i = 0; i < d_prim_count * 6; i++)
     {
@@ -2028,24 +2071,9 @@ auto CScreeningData::get_mat_Q_full() const -> CDenseMatrix
         }
     }
 
-    return mat_Q_full;
-}
-
-auto CScreeningData::get_mat_D_abs_full(const int64_t naos, const double* dens_ptr) const -> CDenseMatrix
-{
-    const auto s_prim_count = _s_prim_count;
-    const auto p_prim_count = _p_prim_count;
-    const auto d_prim_count = _d_prim_count;
-
-    const auto& s_prim_aoinds = _s_prim_aoinds;
-    const auto& p_prim_aoinds = _p_prim_aoinds;
-    const auto& d_prim_aoinds = _d_prim_aoinds;
-
-    const auto cart_naos = s_prim_count + p_prim_count * 3 + d_prim_count * 6;
-
-    CDenseMatrix mat_D_abs_full(cart_naos, cart_naos);
-
-    mat_D_abs_full.zero();
+    }
+    #pragma omp section
+    {
 
     for (int64_t i = 0; i < s_prim_count; i++)
     {
@@ -2062,6 +2090,15 @@ auto CScreeningData::get_mat_D_abs_full(const int64_t naos, const double* dens_p
                 mat_D_abs_full.row(i)[j] = D_ij;
             }
         }
+    }
+
+    }
+    #pragma omp section
+    {
+
+    for (int64_t i = 0; i < s_prim_count; i++)
+    {
+        const auto i_cgto = s_prim_aoinds[i];
 
         for (int64_t j = 0; j < p_prim_count * 3; j++)
         {
@@ -2077,6 +2114,15 @@ auto CScreeningData::get_mat_D_abs_full(const int64_t naos, const double* dens_p
                 mat_D_abs_full.row(j_full)[i] = D_ij;
             }
         }
+    }
+
+    }
+    #pragma omp section
+    {
+
+    for (int64_t i = 0; i < s_prim_count; i++)
+    {
+        const auto i_cgto = s_prim_aoinds[i];
 
         for (int64_t j = 0; j < d_prim_count * 6; j++)
         {
@@ -2093,6 +2139,10 @@ auto CScreeningData::get_mat_D_abs_full(const int64_t naos, const double* dens_p
             }
         }
     }
+
+    }
+    #pragma omp section
+    {
 
     for (int64_t i = 0; i < p_prim_count * 3; i++)
     {
@@ -2113,6 +2163,17 @@ auto CScreeningData::get_mat_D_abs_full(const int64_t naos, const double* dens_p
                 mat_D_abs_full.row(i_full)[j_full] = D_ij;
             }
         }
+    }
+
+    }
+    #pragma omp section
+    {
+
+    for (int64_t i = 0; i < p_prim_count * 3; i++)
+    {
+        const auto i_cgto = p_prim_aoinds[(i / 3) + p_prim_count * (i % 3)];
+
+        auto i_full = s_prim_count + i;
 
         for (int64_t j = 0; j < d_prim_count * 6; j++)
         {
@@ -2129,6 +2190,10 @@ auto CScreeningData::get_mat_D_abs_full(const int64_t naos, const double* dens_p
             }
         }
     }
+
+    }
+    #pragma omp section
+    {
 
     for (int64_t i = 0; i < d_prim_count * 6; i++)
     {
@@ -2151,7 +2216,8 @@ auto CScreeningData::get_mat_D_abs_full(const int64_t naos, const double* dens_p
         }
     }
 
-    return mat_D_abs_full;
+    } // omp section
+    } // omp parallel sections
 }
 
 auto CScreeningData::get_Q_prime_slice(const CDenseMatrix& Q_mat,

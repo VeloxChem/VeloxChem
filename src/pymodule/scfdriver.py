@@ -609,6 +609,7 @@ class ScfDriver:
         valstr += 'J. Chem. Phys. 138, 134114 (2013)'
         self.ostream.print_reference(valstr)
         self.ostream.print_blank()
+        self.ostream.flush()
 
         # generate integration grid
         if self._dft:
@@ -1667,8 +1668,13 @@ class ScfDriver:
 
         q_d_mat_t0 = tm.time()
 
-        prim_qmat = screener.get_prim_q_matrix()
-        prim_cart_dmat = screener.get_prim_cart_density_matrix(molecule, basis, dmat)
+        prim_cart_naos = screener.get_prim_cart_naos()
+
+        prim_qmat = DenseMatrix(prim_cart_naos, prim_cart_naos)
+        prim_cart_dmat = DenseMatrix(prim_cart_naos, prim_cart_naos)
+
+        screener.fill_prim_q_and_cart_dens(molecule, basis, dmat, prim_qmat,
+                                           prim_cart_dmat)
 
         q_d_mat_dt = tm.time() - q_d_mat_t0
         q_prime_calc_t0 = tm.time()
@@ -2320,6 +2326,7 @@ class ScfDriver:
             self.ostream.print_header(cur_str.ljust(str_width))
 
         self.ostream.print_blank()
+        self.ostream.flush()
 
     def _print_scf_title(self):
         """
@@ -2342,6 +2349,8 @@ class ScfDriver:
                     'Gradient Norm', 'Max. Gradient', 'Density Change')
                 self.ostream.print_header(valstr)
             self.ostream.print_header(92 * '-')
+
+        self.ostream.flush()
 
     def _print_scf_finish(self, start_time):
         """
@@ -2546,6 +2555,7 @@ class ScfDriver:
             self.ostream.print_header(valstr.ljust(92))
 
         self.ostream.print_blank()
+        self.ostream.flush()
 
     def _print_energy_components(self):
         """
@@ -2603,6 +2613,8 @@ class ScfDriver:
             self.ostream.print_header(valstr.ljust(92))
             valstr = 'and S. Grimme, J. Chem Phys, 2019, 150, 154122.'
             self.ostream.print_header(valstr.ljust(92))
+
+        self.ostream.flush()
 
     def _write_final_hdf5(self, molecule, ao_basis):
         """

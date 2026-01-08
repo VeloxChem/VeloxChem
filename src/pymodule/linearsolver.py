@@ -39,6 +39,7 @@ import sys
 import os
 
 # TODO import VisualizationDriver
+from .veloxchemlib import DenseMatrix
 from .veloxchemlib import MolecularGrid
 from .veloxchemlib import AODensityMatrix, denmat
 from .veloxchemlib import ScreeningData, GpuDevices
@@ -1123,9 +1124,13 @@ class LinearSolver:
         coulomb_timing = 0.0
         exchange_timing = 0.0
 
-        prim_qmat = eri_dict['screening'].get_prim_q_matrix()
-        prim_cart_dens = eri_dict['screening'].get_prim_cart_density_matrix(
-            molecule, basis, dens)
+        prim_cart_naos = eri_dict['screening'].get_prim_cart_naos()
+
+        prim_qmat = DenseMatrix(prim_cart_naos, prim_cart_naos)
+        prim_cart_dens = DenseMatrix(prim_cart_naos, prim_cart_naos)
+
+        eri_dict['screening'].fill_prim_q_and_cart_dens(
+            molecule, basis, dens, prim_qmat, prim_cart_dens)
 
         ave, res = divmod(prim_qmat.number_of_rows(), local_comm.Get_size())
         counts = [ave + 1 if p < res else ave for p in range(local_comm.Get_size())]
