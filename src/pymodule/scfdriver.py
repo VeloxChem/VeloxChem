@@ -662,7 +662,7 @@ class ScfDriver:
             else:
                 if self.rank == mpi_master():
                     den_mat = self.gen_initial_density_sad(
-                        molecule, min_basis, val_basis, S12, S22)
+                        molecule, min_basis, ao_basis, S12, S22)
                     naos = den_mat.shape[0]
                 else:
                     naos = None
