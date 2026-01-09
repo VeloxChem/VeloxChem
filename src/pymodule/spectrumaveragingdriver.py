@@ -61,19 +61,28 @@ class SpectrumAveragingDriver:
     """
     Build and plot an averaged UV/Vis spectrum from multiple LR results.
 
-    Inputs are expected to be VeloxChem rsp results dicts (as returned by
-    LinearResponseEigenSolver.compute), or (frame, rsp_results) tuples.
+    Inputs are expected to be VeloxChem response results dictionaries
+    (as returned by LinearResponseEigenSolver.compute), or (frame, rsp_results)
+    tuples.
     """
 
     def __init__(self):
-        # defaults chosen to match the existing plot_uv_vis style
         self.broadening_type = "lorentzian"
         self.broadening_value_ev = 0.124
         self.xstep_ev = 0.01
         self.padding_ev = 0.8
 
     def _unpack(self, rsp_all):
-        """Accept [rsp_results, ...] or [(frame, rsp_results), ...]."""
+        """
+        Unpack snapshot input.
+
+        :param rsp_all:
+            A list of response results dictionaries, or list of
+            (frame, rsp_results) tuples.
+        :return:
+            Two lists (rames, results) where frames contains the frame indices
+            (or None) and results contains the response results dictionaries.
+       """
         frames = []
         results = []
         for item in rsp_all:
@@ -94,10 +103,34 @@ class SpectrumAveragingDriver:
         energy_max_ev=None,
     ):
         """
-        Returns a dict with:
-            xgrid_au, xgrid_ev, wavelength_nm (reversed for plotting)
-            eps_mean, eps_std, eps_all
-            transitions (energies and osc strengths per snapshot)
+        Compute an averaged UV/Vis spectrum from multiple response results.
+
+        A common energy grid (in a.u.) is constrcuted from the global minimum
+        and maximum excitation energies across snapshots (plus padding). Each
+        snapshpt is broadened and converted to molar absorptivity epsilon on the
+        common grid, and the mean and standard deviation are computed.
+
+        :param rsp_all:
+            A list of response results dictionaries, or a list of
+            (frame, rsp_results) tuples.
+        :param energy_min_ev:
+            Minimum photon energy in eV for the common grid. If None, it is set to
+            (global min excitation energy - padding).
+        :param energy_max_ev:
+            Maximum photon energy in eV for the common grid. If None, it is set to
+            (global max excitation energy + padding).
+        :return:
+            A dictionary containing the averaged spectrum and auxilary data:
+              - frames: frame indices (or None)
+              - xgrid_au: energy grid in a.u.
+              - xgrid_ev: energy grid in eV
+              - wavelength_nm: wavelength axis in nm (reversed for plotting)
+              - mask_wavelength_finite: masl applied to drop a non-finite wavelength points
+              - eps_all: list of epsilon arrays for each snapshot (energy axis)
+              - eps_mean_ev / eps_std_ev: mean/std epsilon vs energy grid
+              - eps_mean_wl / eps_std_wl: mean/std epsilon vs wavelength grid (reversed)
+              - transitions_au: excitation energies per snapshot (a.u.)
+              - oscillator_strengths: oscillator strengths per snapshot
         """
         frames, results = self._unpack(rsp_all)
 
@@ -113,7 +146,7 @@ class SpectrumAveragingDriver:
             all_e_au.append(e)
             all_f.append(f)
 
-        # Build xmin/xmax (Hartree) for the ensemble
+        # Build xmin/xmax (a.u.) for the ensemble
         if energy_min_ev is None:
             emin_au = min(np.min(e) for e in all_e_au) - float(self.padding_ev) * ev2au
         else:
@@ -181,7 +214,7 @@ class SpectrumAveragingDriver:
         # Convert grids
         xgrid_ev = xgrid_au * au2ev
 
-        # Wavelength directly from Hartree grid: wl_nm = (nm*Hartree) / Hartree
+        # Wavelength directly from a.u. grid: wl_nm = (nm * a.u.) / a.u.
         with np.errstate(divide="ignore", invalid="ignore"):
             wl_nm = au2nm / xgrid_au
 
