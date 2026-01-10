@@ -1339,6 +1339,10 @@ class ScfDriver:
                                             npot_mat)
 
             if self.rank == mpi_master() and self.electric_field is not None:
+                # TODO: enable electric_field
+                assert_msg_critical(
+                    False, 'SCF driver: electric_field is not yet supported')
+
                 efpot = sum([
                     ef * mat
                     for ef, mat in zip(self.electric_field, dipole_ints)
@@ -2279,12 +2283,8 @@ class ScfDriver:
         vxc_t0 = tm.time()
 
         if self._dft and not self._first_step:
-            # TODO: enable udft
-            assert_msg_critical(
-                False, 'SCF driver: Open shell DFT not yet implemented')
-
-            # TODO: support xcfun.mgga
-            if self.xcfun.get_func_type() in [xcfun.lda, xcfun.gga]:
+            # TODO: support xcfun.lda and xcfun.mgga
+            if self.xcfun.get_func_type() in [xcfun.gga]:
                 # use unrestricted AODensityMatrix in XC integration
                 dmat = AODensityMatrix(den_mat, denmat.unrest)
                 vxc_mat = integrate_vxc_fock_gpu(
@@ -2347,7 +2347,7 @@ class ScfDriver:
                 hcore_mat = kin_mat - npot_mat
                 if self._pe and not self._first_step:
                     hcore_mat -= self._V_es
-                hcore_plus_full_Fock = 2.0 * hcore_mat + fock_mat
+                hcore_plus_full_Fock = 2.0 * hcore_mat + fock_mat[0]
                 e_sum = dot_product_gpu(den_mat, hcore_plus_full_Fock)
                 if self._dft and not self._first_step:
                     e_sum += vxc_mat.get_energy()
@@ -2395,33 +2395,47 @@ class ScfDriver:
         """
 
         if self._dft and not self._first_step:
-            # TODO: take care of unrestricted/restricted-open-shell case
-            vxc_mat_np_local = vxc_mat.alpha_to_numpy()
+            vxc_mat_np_local_a = vxc_mat.alpha_to_numpy()
+            if self.scf_type != 'restricted':
+                vxc_mat_np_local_b = vxc_mat.beta_to_numpy()
 
             if self.rank == mpi_master():
-                vxc_mat_np_sum = np.zeros(vxc_mat_np_local.shape)
+                vxc_mat_np_sum_a = np.zeros(vxc_mat_np_local_a.shape)
+                if self.scf_type != 'restricted':
+                    vxc_mat_np_sum_b = np.zeros(vxc_mat_np_local_b.shape)
             else:
-                vxc_mat_np_sum = None
+                vxc_mat_np_sum_a = None
+                if self.scf_type != 'restricted':
+                    vxc_mat_np_sum_b = None
 
-            self.comm.Reduce(vxc_mat_np_local,
-                             vxc_mat_np_sum,
+            self.comm.Reduce(vxc_mat_np_local_a,
+                             vxc_mat_np_sum_a,
                              op=MPI.SUM,
                              root=mpi_master())
+            if self.scf_type != 'restricted':
+                self.comm.Reduce(vxc_mat_np_local_b,
+                                 vxc_mat_np_sum_b,
+                                 op=MPI.SUM,
+                                 root=mpi_master())
 
         if self.rank == mpi_master():
-            fock_mat += (kin_mat - npot_mat)
+            fock_mat[0] += (kin_mat - npot_mat)
+            if self.scf_type != 'restricted':
+                fock_mat[1] += (kin_mat - npot_mat)
 
             if self._dft and not self._first_step:
-                fock_mat += vxc_mat_np_sum
-                # TODO: take care of unrestricted/restricted-open-shell case
-                if self.scf_type in ['unrestricted', 'restricted_openshell']:
-                    pass
+                fock_mat[0] += vxc_mat_np_sum_a
+                if self.scf_type != 'restricted':
+                    fock_mat[1] += vxc_mat_np_sum_b
 
+            # TODO: double check _pe
+            """
             if self._pe and not self._first_step:
                 fock_mat -= self._V_es
                 # TODO: take care of unrestricted/restricted-open-shell case
                 if self.scf_type in ['unrestricted', 'restricted_openshell']:
                     pass
+            """
 
         return fock_mat
 

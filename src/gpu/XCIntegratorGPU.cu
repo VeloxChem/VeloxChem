@@ -230,6 +230,101 @@ getDensitySigmaOnGrids(double*        d_rho,
 }
 
 __global__ void
+getDensitySigmaOnGridsOpenShell(double*        d_rho,
+                                double*        d_rhograd,
+                                double*        d_sigma,
+                                const double*  d_mat_F_a,
+                                const double*  d_mat_F_b,
+                                const double*  d_gto_values,
+                                const double*  d_gto_values_x,
+                                const double*  d_gto_values_y,
+                                const double*  d_gto_values_z,
+                                const uint32_t aocount,
+                                const uint32_t npoints)
+{
+    __shared__ double As_a[TILE_DIM][TILE_DIM + 1];
+    __shared__ double As_b[TILE_DIM][TILE_DIM + 1];
+    __shared__ double Bs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double Bs_x[TILE_DIM][TILE_DIM + 1];
+    __shared__ double Bs_y[TILE_DIM][TILE_DIM + 1];
+    __shared__ double Bs_z[TILE_DIM][TILE_DIM + 1];
+
+    const uint32_t g = blockIdx.x * blockDim.x + threadIdx.x;
+
+    double rho_a   = 0.0;
+    double rho_a_x = 0.0;
+    double rho_a_y = 0.0;
+    double rho_a_z = 0.0;
+
+    double rho_b   = 0.0;
+    double rho_b_x = 0.0;
+    double rho_b_y = 0.0;
+    double rho_b_z = 0.0;
+
+    for (uint32_t k = 0; k < (aocount + TILE_DIM - 1) / TILE_DIM; k++)
+    {
+        if ((k * TILE_DIM + threadIdx.y < aocount) && (g < npoints))
+        {
+            As_a[threadIdx.y][threadIdx.x] = d_mat_F_a[(k * TILE_DIM + threadIdx.y) * npoints + g];
+            As_b[threadIdx.y][threadIdx.x] = d_mat_F_b[(k * TILE_DIM + threadIdx.y) * npoints + g];
+            Bs[threadIdx.y][threadIdx.x]   = d_gto_values[(k * TILE_DIM + threadIdx.y) * npoints + g];
+            Bs_x[threadIdx.y][threadIdx.x] = d_gto_values_x[(k * TILE_DIM + threadIdx.y) * npoints + g];
+            Bs_y[threadIdx.y][threadIdx.x] = d_gto_values_y[(k * TILE_DIM + threadIdx.y) * npoints + g];
+            Bs_z[threadIdx.y][threadIdx.x] = d_gto_values_z[(k * TILE_DIM + threadIdx.y) * npoints + g];
+        }
+        else
+        {
+            As_a[threadIdx.y][threadIdx.x] = 0.0;
+            As_b[threadIdx.y][threadIdx.x] = 0.0;
+            Bs[threadIdx.y][threadIdx.x]   = 0.0;
+            Bs_x[threadIdx.y][threadIdx.x] = 0.0;
+            Bs_y[threadIdx.y][threadIdx.x] = 0.0;
+            Bs_z[threadIdx.y][threadIdx.x] = 0.0;
+        }
+
+        __syncthreads();
+
+        if (threadIdx.y == 0)
+        {
+            for (uint32_t m = 0; m < TILE_DIM; m++)
+            {
+                rho_a += As_a[m][threadIdx.x] * Bs[m][threadIdx.x];
+                rho_b += As_b[m][threadIdx.x] * Bs[m][threadIdx.x];
+
+                rho_a_x += 2.0 * (As_a[m][threadIdx.x] * Bs_x[m][threadIdx.x]);
+                rho_a_y += 2.0 * (As_a[m][threadIdx.x] * Bs_y[m][threadIdx.x]);
+                rho_a_z += 2.0 * (As_a[m][threadIdx.x] * Bs_z[m][threadIdx.x]);
+                rho_b_x += 2.0 * (As_b[m][threadIdx.x] * Bs_x[m][threadIdx.x]);
+                rho_b_y += 2.0 * (As_b[m][threadIdx.x] * Bs_y[m][threadIdx.x]);
+                rho_b_z += 2.0 * (As_b[m][threadIdx.x] * Bs_z[m][threadIdx.x]);
+            }
+        }
+
+        __syncthreads();
+    }
+
+    if ((threadIdx.y == 0) && (g < npoints))
+    {
+        d_rho[2 * g + 0] = rho_a;
+        d_rho[2 * g + 1] = rho_b;
+
+        d_rhograd[6 * g + 0] = rho_a_x;
+        d_rhograd[6 * g + 1] = rho_a_y;
+        d_rhograd[6 * g + 2] = rho_a_z;
+        d_rhograd[6 * g + 3] = rho_b_x;
+        d_rhograd[6 * g + 4] = rho_b_y;
+        d_rhograd[6 * g + 5] = rho_b_z;
+
+        if (d_sigma != nullptr)
+        {
+            d_sigma[3 * g + 0] = rho_a_x * rho_a_x + rho_a_y * rho_a_y + rho_a_z * rho_a_z;
+            d_sigma[3 * g + 1] = rho_a_x * rho_b_x + rho_a_y * rho_b_y + rho_a_z * rho_b_z;
+            d_sigma[3 * g + 2] = rho_b_x * rho_b_x + rho_b_y * rho_b_y + rho_b_z * rho_b_z;
+        }
+    }
+}
+
+__global__ void
 getLdaDensityGradientOnGrids(double* d_dengrad_x,
                              double* d_dengrad_y,
                              double* d_dengrad_z,
@@ -496,6 +591,52 @@ getGgaVxcMatrixG(double*        d_mat_G,
         d_mat_G[g + i * npoints] = d_grid_w[g + grid_offset] * d_vrho[2 * g + 0] * d_gto_values[g + i * npoints] +
                                    2.0 * (d_grid_w[g + grid_offset] * (vx * d_gto_values_x[g + i * npoints] + vy * d_gto_values_y[g + i * npoints] +
                                                                        vz * d_gto_values_z[g + i * npoints]));
+    }
+}
+
+__global__ void
+getGgaVxcMatrixGOpenShell(double*        d_mat_G_a,
+                          double*        d_mat_G_b,
+                          const double*  d_grid_w,
+                          const uint32_t grid_offset,
+                          const uint32_t npoints,
+                          const double*  d_gto_values,
+                          const double*  d_gto_values_x,
+                          const double*  d_gto_values_y,
+                          const double*  d_gto_values_z,
+                          const uint32_t aocount,
+                          const double*  d_rhograd,
+                          const double*  d_vrho,
+                          const double*  d_vsigma)
+{
+    const uint32_t i = blockIdx.y * blockDim.y + threadIdx.y;
+    const uint32_t g = blockIdx.x * blockDim.x + threadIdx.x;
+
+    // Note: Assuming symmetric density and KohnSham matrices. Only works for ground state.
+
+    if ((i < aocount) && (g < npoints))
+    {
+        const double vxa = 2.0 * d_vsigma[3 * g + 0] * d_rhograd[6 * g + 0] + d_vsigma[3 * g + 1] * d_rhograd[6 * g + 3];
+        const double vya = 2.0 * d_vsigma[3 * g + 0] * d_rhograd[6 * g + 1] + d_vsigma[3 * g + 1] * d_rhograd[6 * g + 4];
+        const double vza = 2.0 * d_vsigma[3 * g + 0] * d_rhograd[6 * g + 2] + d_vsigma[3 * g + 1] * d_rhograd[6 * g + 5];
+
+        const double vxb = 2.0 * d_vsigma[3 * g + 2] * d_rhograd[6 * g + 3] + d_vsigma[3 * g + 1] * d_rhograd[6 * g + 0];
+        const double vyb = 2.0 * d_vsigma[3 * g + 2] * d_rhograd[6 * g + 4] + d_vsigma[3 * g + 1] * d_rhograd[6 * g + 1];
+        const double vzb = 2.0 * d_vsigma[3 * g + 2] * d_rhograd[6 * g + 5] + d_vsigma[3 * g + 1] * d_rhograd[6 * g + 2];
+
+        // adding G_a_val and 2 * G_a_gga_val together (only works for ground state Vxc)
+        d_mat_G_a[g + i * npoints] = d_grid_w[g + grid_offset] * d_vrho[2 * g + 0] * d_gto_values[g + i * npoints] +
+
+                                     2.0 * (d_grid_w[g + grid_offset] * (vxa * d_gto_values_x[g + i * npoints] +
+                                                                         vya * d_gto_values_y[g + i * npoints] +
+                                                                         vza * d_gto_values_z[g + i * npoints]));
+
+        // adding G_b_val and 2 * G_b_gga_val together (only works for ground state Vxc)
+        d_mat_G_b[g + i * npoints] = d_grid_w[g + grid_offset] * d_vrho[2 * g + 1] * d_gto_values[g + i * npoints] +
+
+                                     2.0 * (d_grid_w[g + grid_offset] * (vxb * d_gto_values_x[g + i * npoints] +
+                                                                         vyb * d_gto_values_y[g + i * npoints] +
+                                                                         vzb * d_gto_values_z[g + i * npoints]));
     }
 }
 
@@ -1601,14 +1742,14 @@ computeGtoValuesAndDerivativesOnGridPoints(const CMolecule& molecule, const CMol
 }
 
 static auto
-integrateVxcFockForLDA(const CMolecule&        molecule,
-                       const CMolecularBasis&  basis,
-                       const CAODensityMatrix& densityMatrix,
-                       const CMolecularGrid&   molecularGrid,
-                       const CXCFunctional&    xcFunctional,
-                       const int64_t           numGpusPerNode,
-                       const int64_t           rank,
-                       const int64_t           nnodes) -> CAOKohnShamMatrix
+integrateVxcFockForLdaClosedShell(const CMolecule&        molecule,
+                                  const CMolecularBasis&  basis,
+                                  const CAODensityMatrix& densityMatrix,
+                                  const CMolecularGrid&   molecularGrid,
+                                  const CXCFunctional&    xcFunctional,
+                                  const int64_t           numGpusPerNode,
+                                  const int64_t           rank,
+                                  const int64_t           nnodes) -> CAOKohnShamMatrix
 {
     const auto num_gpus_per_node = numGpusPerNode;
 
@@ -1631,9 +1772,9 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
 
     const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
 
-    std::string errnaos("gpu::integrateVxcFockForLDA: Inconsistent number of AOs");
-
-    errors::assertMsgCritical((naos == densityMatrix.getNumberOfRows(0)) && (naos == densityMatrix.getNumberOfColumns(0)), errnaos);
+    errors::assertMsgCritical(
+        (naos == densityMatrix.getNumberOfRows(0)) && (naos == densityMatrix.getNumberOfColumns(0)),
+        std::string(__func__) + std::string(": Inconsistent number of AOs"));
 
     int64_t max_ncgtos = 0, max_npgtos = 0;
 
@@ -1650,9 +1791,9 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
 
     // Kohn-Sham matrix
 
-    auto closedshell = densityMatrix.isClosedShell();
+    auto is_closed_shell = densityMatrix.isClosedShell();
 
-    CAOKohnShamMatrix mat_Vxc_sum(naos, naos, closedshell);
+    CAOKohnShamMatrix mat_Vxc_sum(naos, naos, is_closed_shell);
 
     mat_Vxc_sum.zero();
 
@@ -1660,7 +1801,7 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
 
     for (int64_t gpu_id = 0; gpu_id < num_gpus_per_node; gpu_id++)
     {
-        mat_Vxc_omp[gpu_id] = CAOKohnShamMatrix(naos, naos, closedshell);
+        mat_Vxc_omp[gpu_id] = CAOKohnShamMatrix(naos, naos, is_closed_shell);
     }
 
 #pragma omp parallel
@@ -1977,14 +2118,14 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
 }
 
 static auto
-integrateVxcFockForGGA(const CMolecule&        molecule,
-                       const CMolecularBasis&  basis,
-                       const CAODensityMatrix& densityMatrix,
-                       const CMolecularGrid&   molecularGrid,
-                       const CXCFunctional&    xcFunctional,
-                       const int64_t           numGpusPerNode,
-                       const int64_t           rank,
-                       const int64_t           nnodes) -> CAOKohnShamMatrix
+integrateVxcFockForGgaClosedShell(const CMolecule&        molecule,
+                                  const CMolecularBasis&  basis,
+                                  const CAODensityMatrix& densityMatrix,
+                                  const CMolecularGrid&   molecularGrid,
+                                  const CXCFunctional&    xcFunctional,
+                                  const int64_t           numGpusPerNode,
+                                  const int64_t           rank,
+                                  const int64_t           nnodes) -> CAOKohnShamMatrix
 {
     const auto num_gpus_per_node = numGpusPerNode;
 
@@ -2007,9 +2148,9 @@ integrateVxcFockForGGA(const CMolecule&        molecule,
 
     const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
 
-    std::string errnaos("gpu::integrateVxcFockForLDA: Inconsistent number of AOs");
-
-    errors::assertMsgCritical((naos == densityMatrix.getNumberOfRows(0)) && (naos == densityMatrix.getNumberOfColumns(0)), errnaos);
+    errors::assertMsgCritical(
+        (naos == densityMatrix.getNumberOfRows(0)) && (naos == densityMatrix.getNumberOfColumns(0)),
+        std::string(__func__) + std::string(": Inconsistent number of AOs"));
 
     int64_t max_ncgtos = 0, max_npgtos = 0;
 
@@ -2026,9 +2167,9 @@ integrateVxcFockForGGA(const CMolecule&        molecule,
 
     // Kohn-Sham matrix
 
-    auto closedshell = densityMatrix.isClosedShell();
+    auto is_closed_shell = densityMatrix.isClosedShell();
 
-    CAOKohnShamMatrix mat_Vxc_sum(naos, naos, closedshell);
+    CAOKohnShamMatrix mat_Vxc_sum(naos, naos, is_closed_shell);
 
     mat_Vxc_sum.zero();
 
@@ -2036,7 +2177,7 @@ integrateVxcFockForGGA(const CMolecule&        molecule,
 
     for (int64_t gpu_id = 0; gpu_id < num_gpus_per_node; gpu_id++)
     {
-        mat_Vxc_omp[gpu_id] = CAOKohnShamMatrix(naos, naos, closedshell);
+        mat_Vxc_omp[gpu_id] = CAOKohnShamMatrix(naos, naos, is_closed_shell);
     }
 
 #pragma omp parallel
@@ -2402,6 +2543,477 @@ integrateVxcFockForGGA(const CMolecule&        molecule,
     return mat_Vxc_sum;
 }
 
+static auto
+integrateVxcFockForGgaOpenShell(const CMolecule&        molecule,
+                                const CMolecularBasis&  basis,
+                                const CAODensityMatrix& densityMatrix,
+                                const CMolecularGrid&   molecularGrid,
+                                const CXCFunctional&    xcFunctional,
+                                const int64_t           numGpusPerNode,
+                                const int64_t           rank,
+                                const int64_t           nnodes) -> CAOKohnShamMatrix
+{
+    const auto num_gpus_per_node = numGpusPerNode;
+
+    CGpuDevices gpu_devices;
+    const auto ndevices = gpu_devices.getNumberOfDevices();
+
+    const auto nthreads = omp_get_max_threads();
+
+    errors::assertMsgCritical(
+        static_cast<int64_t>(ndevices) == num_gpus_per_node,
+        std::string(__func__) + std::string(": Number of devices does not match numGpusPerNode."));
+
+    errors::assertMsgCritical(
+        static_cast<int64_t>(nthreads) == num_gpus_per_node,
+        std::string(__func__) + std::string(": Number of OMP threads does not match numGpusPerNode."));
+
+    // GTOs blocks and number of AOs
+
+    const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
+
+    const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
+
+    errors::assertMsgCritical(
+        (naos == densityMatrix.getNumberOfRows(0)) && (naos == densityMatrix.getNumberOfColumns(0)),
+        std::string(__func__) + std::string(": Inconsistent number of AOs"));
+
+    int64_t max_ncgtos = 0, max_npgtos = 0;
+
+    for (const auto& gto_block : gto_blocks)
+    {
+        const auto ncgtos = gto_block.getNumberOfBasisFunctions();
+        const auto npgtos = gto_block.getNumberOfPrimitives();
+
+        max_ncgtos = std::max(ncgtos, max_ncgtos);
+        max_npgtos = std::max(npgtos, max_npgtos);
+    }
+
+    auto max_npoints_per_box = molecularGrid.getMaxNumberOfGridPointsPerBox();
+
+    // Kohn-Sham matrix
+
+    auto is_closed_shell = densityMatrix.isClosedShell();
+
+    CAOKohnShamMatrix mat_Vxc_sum(naos, naos, is_closed_shell);
+
+    mat_Vxc_sum.zero();
+
+    std::vector<CAOKohnShamMatrix> mat_Vxc_omp(num_gpus_per_node);
+
+    for (int64_t gpu_id = 0; gpu_id < num_gpus_per_node; gpu_id++)
+    {
+        mat_Vxc_omp[gpu_id] = CAOKohnShamMatrix(naos, naos, is_closed_shell);
+    }
+
+#pragma omp parallel
+    {
+    const auto thread_id = omp_get_thread_num();
+
+    const auto gpu_id = thread_id;
+
+    gpuSafe(gpuSetDevice(gpu_id));
+
+    const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
+
+    double* d_gto_info;
+
+    gpuSafe(gpuMalloc(&d_gto_info, 5 * max_ncgtos * max_npgtos * sizeof(double)));
+
+    uint32_t* d_ao_inds;
+
+    gpuSafe(gpuMalloc(&d_ao_inds, naos * sizeof(uint32_t)));
+
+    // Kohn-Sham matrix
+
+    mat_Vxc_omp[gpu_id].zero();
+
+    // GTOs on grid points
+
+    double *d_mat_Vxc_full, *d_mat_Vxc, *d_den_mat_full, *d_den_mat, *d_gto_values, *d_gto_values_x, *d_gto_values_y, *d_gto_values_z, *d_mat_F;
+
+    gpuSafe(gpuMalloc(&d_gto_values, naos * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_gto_values_x, naos * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_gto_values_y, naos * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_gto_values_z, naos * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_mat_Vxc, naos * naos * sizeof(double)));
+
+    gpuSafe(gpuMalloc(&d_den_mat, naos * naos * 2 * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_den_mat_full, naos * naos * 2 * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_mat_F, naos * max_npoints_per_box * 2 * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_mat_Vxc_full, naos * naos * 2 * sizeof(double)));
+
+    double* d_den_mat_a = d_den_mat;
+    double* d_den_mat_b = d_den_mat_a + naos * naos;
+
+    double* d_den_mat_full_a = d_den_mat_full;
+    double* d_den_mat_full_b = d_den_mat_full_a + naos * naos;
+
+    double* d_mat_F_a = d_mat_F;
+    double* d_mat_F_b = d_mat_F_a + naos * max_npoints_per_box;
+
+    double* d_mat_Vxc_full_a = d_mat_Vxc_full;
+    double* d_mat_Vxc_full_b = d_mat_Vxc_full_a + naos * naos;
+
+    gpu::chunkedMemcpyHostToDevice<double>(d_den_mat_full_a, densityMatrix.alphaDensity(0), naos * naos);
+    gpu::chunkedMemcpyHostToDevice<double>(d_den_mat_full_b, densityMatrix.betaDensity(0), naos * naos);
+
+    dim3 threads_per_block(TILE_DIM, TILE_DIM);
+
+    dim3 num_blocks((naos + threads_per_block.x - 1) / threads_per_block.x, (naos + threads_per_block.y - 1) / threads_per_block.y);
+
+    gpu::zeroMatrix<<<num_blocks, threads_per_block>>>(d_mat_Vxc_full_a, static_cast<uint32_t>(naos), static_cast<uint32_t>(naos));
+    gpu::zeroMatrix<<<num_blocks, threads_per_block>>>(d_mat_Vxc_full_b, static_cast<uint32_t>(naos), static_cast<uint32_t>(naos));
+
+    // density and functional derivatives
+
+    auto xcfun_copy = vxcfuncs::getExchangeCorrelationFunctional(xcFunctional.getFunctionalLabel());
+
+    auto       ggafunc = xcfun_copy.getFunctionalPointerToGgaComponent();
+    const auto dim     = &(ggafunc->dim);
+
+    std::vector<double> rho_data(dim->rho * max_npoints_per_box);
+    std::vector<double> rhograd_data(dim->rho * 3 * max_npoints_per_box);
+    std::vector<double> sigma_data(dim->sigma * max_npoints_per_box);
+
+    std::vector<double> exc_data(dim->zk * max_npoints_per_box);
+    std::vector<double> vrho_data(dim->vrho * max_npoints_per_box);
+    std::vector<double> vsigma_data(dim->vsigma * max_npoints_per_box);
+
+    auto rho     = rho_data.data();
+    auto rhograd = rhograd_data.data();
+    auto sigma   = sigma_data.data();
+
+    auto exc    = exc_data.data();
+    auto vrho   = vrho_data.data();
+    auto vsigma = vsigma_data.data();
+
+    double *d_rho, *d_rhograd, *d_sigma, *d_exc, *d_vrho, *d_vsigma;
+
+    gpuSafe(gpuMalloc(&d_rho, dim->rho * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_rhograd, dim->rho * 3 * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_sigma, dim->sigma * max_npoints_per_box * sizeof(double)));
+
+    gpuSafe(gpuMalloc(&d_exc, dim->zk * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_vrho, dim->vrho * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_vsigma, dim->vsigma * max_npoints_per_box * sizeof(double)));
+
+    // initial values for XC energy and number of electrons
+
+    double nele = 0.0, xcene = 0.0;
+
+    // coordinates and weights of grid points
+
+    auto xcoords = molecularGrid.getCoordinatesX();
+    auto ycoords = molecularGrid.getCoordinatesY();
+    auto zcoords = molecularGrid.getCoordinatesZ();
+
+    auto weights = molecularGrid.getWeights();
+
+    auto n_total_grid_points = molecularGrid.getNumberOfGridPoints();
+
+    double *d_grid_x, *d_grid_y, *d_grid_z, *d_grid_w;
+
+    gpuSafe(gpuMalloc(&d_grid_x, n_total_grid_points * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_grid_y, n_total_grid_points * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_grid_z, n_total_grid_points * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_grid_w, n_total_grid_points * sizeof(double)));
+
+    gpu::chunkedMemcpyHostToDevice<double>(d_grid_x, xcoords, n_total_grid_points);
+    gpu::chunkedMemcpyHostToDevice<double>(d_grid_y, ycoords, n_total_grid_points);
+    gpu::chunkedMemcpyHostToDevice<double>(d_grid_z, zcoords, n_total_grid_points);
+    gpu::chunkedMemcpyHostToDevice<double>(d_grid_w, weights, n_total_grid_points);
+
+    gpuSafe(gpuDeviceSynchronize());
+
+#pragma omp barrier
+
+    // counts and displacements of grid points in boxes
+
+    auto counts = molecularGrid.getGridPointCounts();
+
+    auto displacements = molecularGrid.getGridPointDisplacements();
+
+    for (size_t box_id = gpu_id; box_id < counts.size(); box_id += num_gpus_per_node)
+    {
+        // grid points in box
+
+        auto npoints = counts.data()[box_id];
+
+        auto gridblockpos = displacements.data()[box_id];
+
+        // dimension of grid box
+
+        auto boxdim = prescr::getGridBoxDimension(gridblockpos, npoints, xcoords, ycoords, zcoords);
+
+        // prescreening
+
+        std::vector<std::vector<int64_t>> cgto_mask_blocks, pre_ao_inds_blocks;
+
+        std::vector<int64_t> aoinds;
+
+        for (const auto& gto_block : gto_blocks)
+        {
+            // 1st order GTO derivative
+            auto pre_scr_info = prescr::preScreenGtoBlock(gto_block, 1, 1.0e-12, boxdim);
+
+            auto cgto_mask   = std::get<0>(pre_scr_info);
+            auto pre_ao_inds = std::get<1>(pre_scr_info);
+
+            cgto_mask_blocks.push_back(cgto_mask);
+
+            pre_ao_inds_blocks.push_back(pre_ao_inds);
+
+            for (const auto nu : pre_ao_inds)
+            {
+                aoinds.push_back(nu);
+            }
+        }
+
+        const auto aocount = static_cast<int64_t>(aoinds.size());
+
+        if (aocount == 0) continue;
+
+        // GTO values on grid points
+
+        int64_t row_offset = 0;
+
+        for (size_t i_block = 0; i_block < gto_blocks.size(); i_block++)
+        {
+            const auto& gto_block = gto_blocks[i_block];
+
+            const auto& cgto_mask = cgto_mask_blocks[i_block];
+
+            const auto& pre_ao_inds = pre_ao_inds_blocks[i_block];
+
+            gpu::getGtoValuesForGga(d_gto_values,
+                                    d_gto_values_x,
+                                    d_gto_values_y,
+                                    d_gto_values_z,
+                                    row_offset,
+                                    d_gto_info,
+                                    gto_block,
+                                    d_grid_x,
+                                    d_grid_y,
+                                    d_grid_z,
+                                    gridblockpos,
+                                    npoints,
+                                    cgto_mask);
+
+            row_offset += static_cast<int64_t>(pre_ao_inds.size());
+        }
+
+        // AO indices
+
+        std::vector<uint32_t> ao_inds_int32(aocount);
+
+        for (int64_t ind = 0; ind < aocount; ind++)
+        {
+            ao_inds_int32[ind] = static_cast<uint32_t>(aoinds[ind]);
+        }
+
+        gpu::chunkedMemcpyHostToDevice<uint32_t>(d_ao_inds, ao_inds_int32.data(), aocount);
+
+        // sub density matrix for groud-state rho
+
+        threads_per_block = dim3(TILE_DIM, TILE_DIM);
+
+        num_blocks = dim3((aocount + threads_per_block.x - 1) / threads_per_block.x, (aocount + threads_per_block.y - 1) / threads_per_block.y);
+
+        gpu::getSubDensityMatrix<<<num_blocks, threads_per_block>>>(
+                           d_den_mat_a,
+                           d_den_mat_full_a,
+                           static_cast<uint32_t>(naos),
+                           d_ao_inds,
+                           static_cast<uint32_t>(aocount));
+
+        gpu::getSubDensityMatrix<<<num_blocks, threads_per_block>>>(
+                           d_den_mat_b,
+                           d_den_mat_full_b,
+                           static_cast<uint32_t>(naos),
+                           d_ao_inds,
+                           static_cast<uint32_t>(aocount));
+
+        // GGA density for groud-state rho
+
+        threads_per_block = dim3(TILE_DIM, TILE_DIM);
+
+        num_blocks = dim3((npoints + threads_per_block.x - 1) / threads_per_block.x, (aocount + threads_per_block.y - 1) / threads_per_block.y);
+
+        gpu::matmulAB<<<num_blocks, threads_per_block>>>(
+                           d_mat_F_a,
+                           d_den_mat_a,
+                           d_gto_values,
+                           static_cast<uint32_t>(aocount),
+                           static_cast<uint32_t>(npoints));
+
+        gpu::matmulAB<<<num_blocks, threads_per_block>>>(
+                           d_mat_F_b,
+                           d_den_mat_b,
+                           d_gto_values,
+                           static_cast<uint32_t>(aocount),
+                           static_cast<uint32_t>(npoints));
+
+        threads_per_block = dim3(TILE_DIM, TILE_DIM);
+
+        // Note: one block in y dimension
+        num_blocks = dim3((npoints + threads_per_block.x - 1) / threads_per_block.x, 1);
+
+        gpu::getDensitySigmaOnGridsOpenShell<<<num_blocks, threads_per_block>>>(
+                           d_rho,
+                           d_rhograd,
+                           d_sigma,
+                           d_mat_F_a,
+                           d_mat_F_b,
+                           d_gto_values,
+                           d_gto_values_x,
+                           d_gto_values_y,
+                           d_gto_values_z,
+                           static_cast<uint32_t>(aocount),
+                           static_cast<uint32_t>(npoints));
+
+        // funtional evaluation
+
+        gpu::chunkedMemcpyDeviceToHost<double>(rho, d_rho, dim->rho * npoints);
+        gpu::chunkedMemcpyDeviceToHost<double>(rhograd, d_rhograd, dim->rho * 3 * npoints);
+        gpu::chunkedMemcpyDeviceToHost<double>(sigma, d_sigma, dim->sigma * npoints);
+
+        xcfun_copy.compute_exc_vxc_for_gga(npoints, rho, sigma, exc, vrho, vsigma);
+
+        gpu::chunkedMemcpyHostToDevice<double>(d_exc, exc, dim->zk * npoints);
+        gpu::chunkedMemcpyHostToDevice<double>(d_vrho, vrho, dim->vrho * npoints);
+        gpu::chunkedMemcpyHostToDevice<double>(d_vsigma, vsigma, dim->vsigma * npoints);
+
+        // compute partial contribution to Vxc matrix and distribute partial
+        // Vxc to full Kohn-Sham matrix
+
+        // reusing d_mat_F
+        auto d_mat_G_a = d_mat_F_a;
+        auto d_mat_G_b = d_mat_F_b;
+
+        threads_per_block = dim3(TILE_DIM, TILE_DIM);
+
+        num_blocks = dim3((npoints + threads_per_block.x - 1) / threads_per_block.x, (aocount + threads_per_block.y - 1) / threads_per_block.y);
+
+        gpu::getGgaVxcMatrixGOpenShell<<<num_blocks, threads_per_block>>>(
+                           d_mat_G_a,
+                           d_mat_G_b,
+                           d_grid_w,
+                           static_cast<uint32_t>(gridblockpos),
+                           static_cast<uint32_t>(npoints),
+                           d_gto_values,
+                           d_gto_values_x,
+                           d_gto_values_y,
+                           d_gto_values_z,
+                           static_cast<uint32_t>(aocount),
+                           d_rhograd,
+                           d_vrho,
+                           d_vsigma);
+
+        threads_per_block = dim3(TILE_DIM, TILE_DIM);
+
+        num_blocks = dim3((aocount + threads_per_block.x - 1) / threads_per_block.x, (aocount + threads_per_block.y - 1) / threads_per_block.y);
+
+        gpu::matmulABtKohnShamMatrix<<<num_blocks, threads_per_block>>>(
+                           d_mat_Vxc_full_a,
+                           static_cast<uint32_t>(naos),
+                           d_gto_values,
+                           d_mat_G_a,
+                           d_ao_inds,
+                           static_cast<uint32_t>(aocount),
+                           static_cast<uint32_t>(npoints));
+
+        gpu::matmulABtKohnShamMatrix<<<num_blocks, threads_per_block>>>(
+                           d_mat_Vxc_full_b,
+                           static_cast<uint32_t>(naos),
+                           d_gto_values,
+                           d_mat_G_b,
+                           d_ao_inds,
+                           static_cast<uint32_t>(aocount),
+                           static_cast<uint32_t>(npoints));
+
+        // compute partial contribution to XC energy
+
+        for (int64_t g = 0; g < npoints; g++)
+        {
+            auto rho_total = rho[2 * g + 0] + rho[2 * g + 1];
+
+            nele += weights[g + gridblockpos] * rho_total;
+
+            xcene += weights[g + gridblockpos] * exc[g] * rho_total;
+        }
+    }
+
+    gpuSafe(gpuDeviceSynchronize());
+
+    gpu::chunkedMemcpyDeviceToHost<double>(mat_Vxc_omp[gpu_id].getPointerToAlphaValues(), d_mat_Vxc_full_a, naos * naos);
+    gpu::chunkedMemcpyDeviceToHost<double>(mat_Vxc_omp[gpu_id].getPointerToBetaValues(),  d_mat_Vxc_full_b, naos * naos);
+
+    // Note: symmetrize mat_Vxc
+
+    mat_Vxc_omp[gpu_id].symmetrizeAndScale(0.5);
+
+#pragma omp barrier
+
+    gpuSafe(gpuFree(d_gto_info));
+    gpuSafe(gpuFree(d_ao_inds));
+
+    gpuSafe(gpuFree(d_den_mat));
+    gpuSafe(gpuFree(d_gto_values));
+    gpuSafe(gpuFree(d_gto_values_x));
+    gpuSafe(gpuFree(d_gto_values_y));
+    gpuSafe(gpuFree(d_gto_values_z));
+    gpuSafe(gpuFree(d_mat_F));
+    gpuSafe(gpuFree(d_den_mat_full));
+    gpuSafe(gpuFree(d_mat_Vxc_full));
+    gpuSafe(gpuFree(d_mat_Vxc));
+
+    gpuSafe(gpuFree(d_rho));
+    gpuSafe(gpuFree(d_rhograd));
+    gpuSafe(gpuFree(d_sigma));
+    gpuSafe(gpuFree(d_exc));
+    gpuSafe(gpuFree(d_vrho));
+    gpuSafe(gpuFree(d_vsigma));
+
+    gpuSafe(gpuFree(d_grid_x));
+    gpuSafe(gpuFree(d_grid_y));
+    gpuSafe(gpuFree(d_grid_z));
+    gpuSafe(gpuFree(d_grid_w));
+
+    mat_Vxc_omp[gpu_id].setNumberOfElectrons(nele);
+
+    mat_Vxc_omp[gpu_id].setExchangeCorrelationEnergy(xcene);
+
+    }
+
+    auto p_mat_Vxc_a = mat_Vxc_sum.getPointerToAlphaValues();
+    auto p_mat_Vxc_b = mat_Vxc_sum.getPointerToBetaValues();
+
+    double nele_sum = 0.0, xcene_sum = 0.0;
+
+    for (int64_t gpu_id = 0; gpu_id < num_gpus_per_node; gpu_id++)
+    {
+        auto p_mat_v_a = mat_Vxc_omp[gpu_id].getPointerToAlphaValues();
+        auto p_mat_v_b = mat_Vxc_omp[gpu_id].getPointerToBetaValues();
+
+        for (int64_t ind = 0; ind < naos * naos; ind++)
+        {
+            p_mat_Vxc_a[ind] += p_mat_v_a[ind];
+            p_mat_Vxc_b[ind] += p_mat_v_b[ind];
+        }
+
+        nele_sum += mat_Vxc_omp[gpu_id].getNumberOfElectrons();
+
+        xcene_sum += mat_Vxc_omp[gpu_id].getExchangeCorrelationEnergy();
+    }
+
+    mat_Vxc_sum.setNumberOfElectrons(nele_sum);
+
+    mat_Vxc_sum.setExchangeCorrelationEnergy(xcene_sum);
+
+    return mat_Vxc_sum;
+}
+
 auto
 integrateVxcFock(const CMolecule&        molecule,
                  const CMolecularBasis&  basis,
@@ -2416,31 +3028,41 @@ integrateVxcFock(const CMolecule&        molecule,
 
     auto xcfuntype = fvxc.getFunctionalType();
 
-    std::string erropenshell("gpu::integrateVxcFock: Only implemented for closed-shell");
+    auto flag = densityMatrix.isClosedShell() ? std::string("CLOSEDSHELL") : std::string("OPENSHELL");
 
-    errors::assertMsgCritical(densityMatrix.isClosedShell(), erropenshell);
+    if (flag == std::string("CLOSEDSHELL"))
+    {
+        if (xcfuntype == xcfun::lda)
+        {
+            return gpu::integrateVxcFockForLdaClosedShell(molecule, basis, densityMatrix, molecularGrid, fvxc, numGpusPerNode, rank, nnodes);
+        }
+        else if (xcfuntype == xcfun::gga)
+        {
+            return gpu::integrateVxcFockForGgaClosedShell(molecule, basis, densityMatrix, molecularGrid, fvxc, numGpusPerNode, rank, nnodes);
+        }
+        else
+        {
+            std::string errxcfuntype("gpu::integrateVxcFock: Closed-shell only implemented for LDA/GGA");
 
-    if (xcfuntype == xcfun::lda)
-    {
-        return gpu::integrateVxcFockForLDA(molecule, basis, densityMatrix, molecularGrid, fvxc, numGpusPerNode, rank, nnodes);
+            errors::assertMsgCritical(false, errxcfuntype);
+
+            return CAOKohnShamMatrix();
+        }
     }
-    else if (xcfuntype == xcfun::gga)
-    {
-        return gpu::integrateVxcFockForGGA(molecule, basis, densityMatrix, molecularGrid, fvxc, numGpusPerNode, rank, nnodes);
-    }
-    /*
-    else if (xcfuntype == xcfun::mgga)
-    {
-        return gpu::integrateVxcFockForMGGA(molecule, basis, densityMatrix, molecularGrid, fvxc, numGpusPerNode);
-    }
-    */
     else
     {
-        std::string errxcfuntype("gpu::integrateVxcFock: Only implemented for LDA/GGA");
+        if (xcfuntype == xcfun::gga)
+        {
+            return gpu::integrateVxcFockForGgaOpenShell(molecule, basis, densityMatrix, molecularGrid, fvxc, numGpusPerNode, rank, nnodes);
+        }
+        else
+        {
+            std::string errxcfuntype("gpu::integrateVxcFock: Open-shell only implemented for GGA");
 
-        errors::assertMsgCritical(false, errxcfuntype);
+            errors::assertMsgCritical(false, errxcfuntype);
 
-        return CAOKohnShamMatrix();
+            return CAOKohnShamMatrix();
+        }
     }
 }
 
@@ -3845,7 +4467,7 @@ integrateVxcGradientForGGA(const CMolecule&        molecule,
 
     const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
 
-    std::string errnaos("gpu::integrateVxcFockForGGA: Inconsistent number of AOs");
+    std::string errnaos("gpu::integrateVxcGradientForGGA: Inconsistent number of AOs");
 
     errors::assertMsgCritical((naos == rwDensityMatrix.getNumberOfRows(0)) &&
                               (naos == rwDensityMatrix.getNumberOfColumns(0)) &&
