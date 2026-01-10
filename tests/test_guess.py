@@ -28,7 +28,7 @@ class TestInitialGuess:
         if scf_drv.rank == 0:
 
             saddrv = SadGuessDriver()
-            D = saddrv.compute(mol, min_bas, bas, S12, S22, 'restricted')
+            D = saddrv.compute(mol, min_bas, bas, S12, S22, 'restricted')[0]
 
             assert D.ndim == 2
             assert D.shape[0] == 24
@@ -50,7 +50,7 @@ class TestInitialGuess:
             mol.set_charge(charge + 2)
             mol.set_multiplicity(multiplicity)
 
-            D = saddrv.compute(mol, min_bas, bas, S12, S22, 'restricted')
+            D = saddrv.compute(mol, min_bas, bas, S12, S22, 'restricted')[0]
 
             assert mol.number_of_electrons() == 8
             assert mol.number_of_alpha_electrons() == 4
@@ -63,7 +63,7 @@ class TestInitialGuess:
             mol.set_charge(charge - 2)
             mol.set_multiplicity(multiplicity)
 
-            D = saddrv.compute(mol, min_bas, bas, S12, S22, 'restricted')
+            D = saddrv.compute(mol, min_bas, bas, S12, S22, 'restricted')[0]
 
             assert mol.number_of_electrons() == 12
             assert mol.number_of_alpha_electrons() == 6
