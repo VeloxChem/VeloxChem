@@ -33,6 +33,7 @@
 import numpy as np
 
 from .veloxchemlib import weighted_sum_gpu, dot_product_gpu
+from .errorhandler import assert_msg_critical
 
 
 class Diis:
@@ -43,24 +44,31 @@ class Diis:
         - error_vectors: The list of error vectors.
     """
 
-    def __init__(self, max_err_vecs, diis_thresh):
+    def __init__(self, max_err_vecs, diis_thresh, scf_type):
         """
         Initializes iterative subspace by setting list of error vectors to
         empty list.
         """
 
         self.error_vectors = []
+
         self.fock_matrices = []
+
         self.max_err_vecs = max_err_vecs
         self.diis_thresh = diis_thresh
+        self.scf_type = scf_type
+
         self.b_matrix = np.zeros((max_err_vecs, max_err_vecs))
 
     def clear(self):
 
         self.error_vectors.clear()
+
         self.fock_matrices.clear()
+
         self.max_err_vecs = None
         self.diis_thresh = None
+
         self.b_matrix = None
 
     def store_diis_data(self, fock_mat, e_mat, e_grad):
@@ -74,7 +82,7 @@ class Diis:
                 self.b_matrix[:-1, :-1] = sub_bmat[:, :]
 
             self.error_vectors.append(e_mat.copy())
-            self.fock_matrices.append(fock_mat.copy())
+            self.fock_matrices.append([x.copy() for x in fock_mat])
 
             n_vecs = len(self.error_vectors)
             for i in range(n_vecs):
@@ -83,7 +91,7 @@ class Diis:
                 self.b_matrix[i, n_vecs - 1] = fij
                 self.b_matrix[n_vecs - 1, i] = fij
 
-    def get_effective_fock(self, fock_mat, ostream=None):
+    def get_effective_fock(self, fock_mat):
 
         n_vecs = len(self.error_vectors)
 
@@ -95,91 +103,24 @@ class Diis:
 
         else:
             weights = self.compute_weights()
-            effmat = weighted_sum_gpu(weights, self.fock_matrices)
-            return effmat
 
-    def compute_error_vectors_restricted_openshell(self, fock_matrices,
-                                                   fock_matrices_beta,
-                                                   density_matrices,
-                                                   density_matrices_beta,
-                                                   overlap_matrix, oao_matrix):
-        """
-        Computes error vectors for list of AO Fock matrices using (FDS - SDF)
-        in orthogonal AO basis.
+            if self.scf_type == 'restricted':
+                fock_matrices_a = [m[0] for m in self.fock_matrices]
+                effmat_a = weighted_sum_gpu(weights, fock_matrices_a)
+                # Note: return a tuple
+                return (effmat_a,)
 
-        :param fock_matrices:
-            The list of AO Fock matrices (alpha spin).
-        :param fock_matrices_beta:
-            The list of AO Fock matrices (beta spin).
-        :param density_matrices:
-            The list of AO density matrices (alpha spin).
-        :param density_matrices_beta:
-            The list of AO density matrices (beta spin).
-        :param overlap_matrix:
-            The overlap matrix.
-        :param oao_matrix:
-            The orthogonalization matrix.
-        """
+            elif self.scf_type == 'unrestricted':
+                fock_matrices_a = [m[0] for m in self.fock_matrices]
+                fock_matrices_b = [m[1] for m in self.fock_matrices]
+                effmat_a = weighted_sum_gpu(weights, fock_matrices_a)
+                effmat_b = weighted_sum_gpu(weights, fock_matrices_b)
+                return (effmat_a, effmat_b)
 
-        smat = overlap_matrix
-        tmat = oao_matrix
-
-        self.error_vectors.clear()
-
-        for fmat_a, fmat_b, dmat_a, dmat_b in zip(fock_matrices,
-                                                  fock_matrices_beta,
-                                                  density_matrices,
-                                                  density_matrices_beta):
-
-            fds_a = np.matmul(fmat_a, np.matmul(dmat_a, smat))
-            fds_b = np.matmul(fmat_b, np.matmul(dmat_b, smat))
-
-            err_a = np.matmul(tmat.T, np.matmul(fds_a - fds_a.T, tmat))
-            err_b = np.matmul(tmat.T, np.matmul(fds_b - fds_b.T, tmat))
-
-            err_tot = err_a + err_b
-            self.error_vectors.append(err_tot)
-
-    def compute_error_vectors_unrestricted(self, fock_matrices,
-                                           fock_matrices_beta, density_matrices,
-                                           density_matrices_beta,
-                                           overlap_matrix, oao_matrix):
-        """
-        Computes error vectors for list of AO Fock matrices using (FDS - SDF)
-        in orthogonal AO basis.
-
-        :param fock_matrices:
-            The list of AO Fock matrices (alpha spin).
-        :param fock_matrices_beta:
-            The list of AO Fock matrices (beta spin).
-        :param density_matrices:
-            The list of AO density matrices (alpha spin).
-        :param density_matrices_beta:
-            The list of AO density matrices (beta spin).
-        :param overlap_matrix:
-            The overlap matrix.
-        :param oao_matrix:
-            The orthogonalization matrix.
-        """
-
-        smat = overlap_matrix
-        tmat = oao_matrix
-
-        self.error_vectors.clear()
-
-        for fmat_a, fmat_b, dmat_a, dmat_b in zip(fock_matrices,
-                                                  fock_matrices_beta,
-                                                  density_matrices,
-                                                  density_matrices_beta):
-
-            fds_a = np.matmul(fmat_a, np.matmul(dmat_a, smat))
-            fds_b = np.matmul(fmat_b, np.matmul(dmat_b, smat))
-
-            err_a = np.matmul(tmat.T, np.matmul(fds_a - fds_a.T, tmat))
-            err_b = np.matmul(tmat.T, np.matmul(fds_b - fds_b.T, tmat))
-
-            err_tot = np.vstack((err_a, err_b))
-            self.error_vectors.append(err_tot)
+            else:
+                assert_msg_critical(
+                    False,
+                    'DIIS: restricted open-shell not yet supported')
 
     def compute_weights(self):
         """

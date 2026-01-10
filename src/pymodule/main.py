@@ -36,7 +36,7 @@ from datetime import datetime, timedelta
 from .veloxchemlib import mpi_master
 from .mpitask import MpiTask
 from .scfrestdriver import ScfRestrictedDriver
-#from .scfunrestdriver import ScfUnrestrictedDriver
+from .scfunrestdriver import ScfUnrestrictedDriver
 #from .scfrestopendriver import ScfRestrictedOpenDriver
 from .scfgradientdriver import ScfGradientDriver
 from .optimizationdriver import OptimizationDriver

@@ -95,7 +95,7 @@ class ScfRestrictedDriver(ScfDriver):
         """
 
         if self.rank == mpi_master():
-            e_mat = compute_error_vector_gpu(oao_mat, fock_mat, den_mat,
+            e_mat = compute_error_vector_gpu(oao_mat, fock_mat[0], den_mat[0],
                                              ovl_mat)
             e_mat_shape = e_mat.shape
             e_grad = 2.0 * np.sqrt(dot_product_gpu(e_mat, e_mat))
@@ -130,7 +130,7 @@ class ScfRestrictedDriver(ScfDriver):
         """
 
         if self.rank == mpi_master():
-            ddmat = den_mat - old_den_mat
+            ddmat = den_mat[0] - old_den_mat[0]
 
             # diff_den = np.linalg.norm(ddmat)
             diff_den = np.sqrt(dot_product_gpu(ddmat, ddmat))
@@ -140,49 +140,6 @@ class ScfRestrictedDriver(ScfDriver):
         diff_den = self.comm.bcast(diff_den, root=mpi_master())
 
         return diff_den
-
-    def _store_diis_data(self, fock_mat, den_mat, ovl_mat, e_grad):
-        """
-        Stores spin restricted closed shell Fock/Kohn-Sham and density matrices
-        for current iteration. Overloaded base class method.
-
-        :param fock_mat:
-            The Fock/Kohn-Sham matrix.
-        :param den_mat:
-            The density matrix.
-        :param ovl_mat:
-            The overlap matrix (used in ROSCF).
-        :param e_grad:
-            The electronic gradient.
-        """
-
-        if self.rank == mpi_master() and e_grad < self.diis_thresh:
-
-            if len(self._fock_matrices_alpha) == self.max_err_vecs:
-                self._fock_matrices_alpha.popleft()
-                self._density_matrices_alpha.popleft()
-
-            self._fock_matrices_alpha.append(fock_mat.copy())
-            self._density_matrices_alpha.append(den_mat.copy())
-
-    def _get_scaled_fock(self, weights):
-        """
-        Computes effective spin restricted closed shell Fock/Kohn-Sham matrix
-        by summing Fock/Kohn-Sham matrices scalwd with weigths.
-
-        :param weights:
-            The weights of Fock/Kohn-Sham matrices.
-
-        :return:
-            The scaled Fock/Kohn-Sham matrix.
-        """
-
-        effmat = np.zeros(self._fock_matrices_alpha[0].shape)
-
-        for w, fmat in zip(weights, self._fock_matrices_alpha):
-            effmat += w * fmat
-
-        return effmat
 
     def _gen_molecular_orbitals(self, molecule, fock_mat, oao_mat,
                                 num_gpus_per_node):
@@ -205,7 +162,7 @@ class ScfRestrictedDriver(ScfDriver):
         """
 
         if self.rank == mpi_master():
-            fmo = transform_matrix_gpu(oao_mat, fock_mat)
+            fmo = transform_matrix_gpu(oao_mat, fock_mat[0])
 
             eigs, evecs_T = eigh_gpu(fmo, num_gpus_per_node)
             evecs = evecs_T.T

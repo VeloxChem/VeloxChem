@@ -916,13 +916,12 @@ class SadGuessDriver:
                         csad_b[aoinds_2[j], aoinds_1[i]] = c2_j_sqrt_b_occ[i]
 
         if density_type.lower() == 'restricted':
-            return matmul_gpu(csad, csad.T)
+            # Note: return a tuple
+            return (matmul_gpu(csad, csad.T),)
 
         elif density_type.lower() == 'unrestricted':
-            return (
-                np.matmul(csad_a, csad_a.T),
-                np.matmul(csad_b, csad_b.T),
-            )
+            return (np.matmul(csad_a, csad_a.T),
+                    np.matmul(csad_b, csad_b.T))
 
         else:
             return np.zeros(0)

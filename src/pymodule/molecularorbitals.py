@@ -338,7 +338,8 @@ class MolecularOrbitals:
             occ_mo = occ * mo
             dens = matmul_gpu(occ_mo, occ_mo.T)
 
-            return dens
+            # Note: return a tuple
+            return (dens,)
 
         elif self._orbitals_type == molorb.unrest and (
                 scf_type is None or scf_type == 'unrestricted'):
@@ -449,17 +450,17 @@ class MolecularOrbitals:
         enes = []
         occs = []
 
-        orbs.append(np.array(hf.get('alpha_orbitals')))
-        enes.append(np.array(hf.get('alpha_energies')))
-        occs.append(np.array(hf.get('alpha_occupations')))
+        orbs.append(np.array(hf.get('alpha_orbitals'), dtype=np.float64))
+        enes.append(np.array(hf.get('alpha_energies'), dtype=np.float64))
+        occs.append(np.array(hf.get('alpha_occupations'), dtype=np.float64))
 
         if orbs_type == molorb.unrest:
-            orbs.append(np.array(hf.get('beta_orbitals')))
-            enes.append(np.array(hf.get('beta_energies')))
-            occs.append(np.array(hf.get('beta_occupations')))
+            orbs.append(np.array(hf.get('beta_orbitals'), dtype=np.float64))
+            enes.append(np.array(hf.get('beta_energies'), dtype=np.float64))
+            occs.append(np.array(hf.get('beta_occupations'), dtype=np.float64))
 
         elif orbs_type == molorb.restopen:
-            occs.append(np.array(hf.get('beta_occupations')))
+            occs.append(np.array(hf.get('beta_occupations'), dtype=np.float64))
 
         hf.close()
 

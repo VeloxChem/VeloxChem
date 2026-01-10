@@ -50,7 +50,6 @@ from .veloxchemlib import (compute_fock_gpu, matmul_gpu, eigh_gpu,
                            compute_nuclear_potential_integrals_gpu,
                            compute_point_charges_integrals_gpu,
                            compute_mixed_basis_overlap_integrals_gpu)
-from .veloxchemlib import transform_density
 from .profiler import Profiler
 from .griddriver import GridDriver
 from .molecularbasis import MolecularBasis
@@ -658,21 +657,26 @@ class ScfDriver:
                 # the first exposure to cublas/hipblas kernel, which makes
                 # later measurement of FockERI more accurate
                 den_mat = self.gen_initial_density_restart(molecule)
-                naos = den_mat.shape[0]
+                naos = den_mat[0].shape[0]
             else:
                 if self.rank == mpi_master():
                     den_mat = self.gen_initial_density_sad(
                         molecule, min_basis, ao_basis, S12, S22)
-                    naos = den_mat.shape[0]
+                    naos = den_mat[0].shape[0]
                 else:
                     naos = None
 
             naos = self.comm.bcast(naos, root=mpi_master())
 
             if self.rank != mpi_master():
-                den_mat = np.zeros((naos, naos))
+                if self.scf_type == 'restricted':
+                    den_mat = [np.zeros((naos, naos))]
+                else:
+                    den_mat = [np.zeros((naos, naos)), np.zeros((naos, naos))]
 
-            self.comm.Bcast(den_mat, root=mpi_master())
+            self.comm.Bcast(den_mat[0], root=mpi_master())
+            if self.scf_type != 'restricted':
+                self.comm.Bcast(den_mat[1], root=mpi_master())
 
             self._comp_diis(molecule, ao_basis, den_mat, profiler)
 
@@ -700,21 +704,26 @@ class ScfDriver:
                 # the first exposure to cublas/hipblas kernel, which makes
                 # later measurement of FockERI more accurate
                 den_mat = self.gen_initial_density_restart(molecule)
-                naos = den_mat.shape[0]
+                naos = den_mat[0].shape[0]
             else:
                 if self.rank == mpi_master():
                     den_mat = self.gen_initial_density_sad(
                         molecule, min_basis, val_basis, S12, S22)
-                    naos = den_mat.shape[0]
+                    naos = den_mat[0].shape[0]
                 else:
                     naos = None
 
             naos = self.comm.bcast(naos, root=mpi_master())
 
             if self.rank != mpi_master():
-                den_mat = np.zeros((naos, naos))
+                if self.scf_type == 'restricted':
+                    den_mat = [np.zeros((naos, naos))]
+                else:
+                    den_mat = [np.zeros((naos, naos)), np.zeros((naos, naos))]
 
-            self.comm.Bcast(den_mat, root=mpi_master())
+            self.comm.Bcast(den_mat[0], root=mpi_master())
+            if self.scf_type != 'restricted':
+                self.comm.Bcast(den_mat[1], root=mpi_master())
 
             self._comp_diis(molecule, val_basis, den_mat, profiler)
 
@@ -728,15 +737,20 @@ class ScfDriver:
             if self.rank == mpi_master():
                 den_mat = self.gen_initial_density_proj(
                     molecule, ao_basis, val_basis, self._molecular_orbitals)
-                naos = den_mat.shape[0]
+                naos = den_mat[0].shape[0]
             else:
                 naos = None
             naos = self.comm.bcast(naos, root=mpi_master())
 
             if self.rank != mpi_master():
-                den_mat = np.zeros((naos, naos))
+                if self.scf_type == 'restricted':
+                    den_mat = [np.zeros((naos, naos))]
+                else:
+                    den_mat = [np.zeros((naos, naos)), np.zeros((naos, naos))]
 
-            self.comm.Bcast(den_mat, root=mpi_master())
+            self.comm.Bcast(den_mat[0], root=mpi_master())
+            if self.scf_type != 'restricted':
+                self.comm.Bcast(den_mat[1], root=mpi_master())
 
             self._comp_diis(molecule, ao_basis, den_mat, profiler)
 
@@ -871,10 +885,12 @@ class ScfDriver:
         for ang in range(ao_basis.max_angular_momentum() + 1):
             nao_2 += ao_basis.number_of_basis_functions(ang) * (2 * ang + 1)
 
-        mo_1 = valence_mo.alpha_to_numpy()
-        mo_2 = np.zeros((nao_2, nmo_1))
+        mo_1a = valence_mo.alpha_to_numpy()
+        mo_2a = np.zeros((nao_2, nmo_1))
 
-        # TODO: unrestricted MO
+        if self.scf_type == 'unrestricted':
+            mo_1b = valence_mo.beta_to_numpy()
+            mo_2b = np.zeros((nao_2, nmo_1))
 
         row_1 = 0
         row_2 = 0
@@ -884,15 +900,39 @@ class ScfDriver:
                     nbf_1 = valence_basis.number_of_basis_functions([a], ang)
                     nbf_2 = ao_basis.number_of_basis_functions([a], ang)
                     if nbf_1 > 0:
-                        mo_2[row_2:row_2 + nbf_2, :] = mo_1[row_1:row_1 +
-                                                            nbf_1, :]
+                        mo_2a[row_2:row_2 + nbf_2, :] = mo_1a[row_1:row_1 +
+                                                              nbf_1, :]
+                        if self.scf_type == 'unrestricted':
+                            mo_2b[row_2:row_2 + nbf_2, :] = mo_1b[row_1:row_1 +
+                                                                  nbf_1, :]
                     row_1 += nbf_1
                     row_2 += nbf_2
 
-        proj_mo = MolecularOrbitals(
-            [mo_2], [np.zeros(nmo_1)],
-            [molecule.get_aufbau_alpha_occupation(nmo_1)],
-            valence_mo.get_orbitals_type())
+        if self.scf_type == 'restricted':
+            proj_mo = MolecularOrbitals(
+                [mo_2a], [np.zeros(nmo_1)],
+                [molecule.get_aufbau_alpha_occupation(nmo_1)],
+                valence_mo.get_orbitals_type())
+
+        elif self.scf_type == 'unrestricted':
+            proj_mo = MolecularOrbitals(
+                [mo_2a, mo_2b],
+                [np.zeros(nmo_1), np.zeros(nmo_1)], [
+                    molecule.get_aufbau_alpha_occupation(nmo_1),
+                    molecule.get_aufbau_beta_occupation(nmo_1)
+                ], valence_mo.get_orbitals_type())
+
+        elif self.scf_type == 'restricted_openshell':
+            proj_mo = MolecularOrbitals([mo_2a], [np.zeros(nmo_1)], [
+                molecule.get_aufbau_alpha_occupation(nmo_1),
+                molecule.get_aufbau_beta_occupation(nmo_1)
+            ], valence_mo.get_orbitals_type())
+
+        else:
+            proj_mo = None
+            assert_msg_critical(
+                False, 'ScfDriver.gen_initial_density_proj: ' +
+                'Invalid molecular orbitals type')
 
         return proj_mo.get_density(molecule, self.scf_type)
 
@@ -1172,7 +1212,7 @@ class ScfDriver:
         diis_start_time = tm.time()
 
         if self.rank == mpi_master():
-            acc_diis = Diis(self.max_err_vecs, self.diis_thresh)
+            acc_diis = Diis(self.max_err_vecs, self.diis_thresh, self.scf_type)
 
         t0 = tm.time()
 
@@ -1265,7 +1305,7 @@ class ScfDriver:
                                         ' {:.1e}.'.format(self.eri_thresh))
                 self.ostream.print_blank()
 
-        self._density = den_mat.copy()
+        self._density = tuple([x.copy() for x in den_mat])
 
         profiler.check_memory_usage('Initial guess')
 
@@ -1287,9 +1327,7 @@ class ScfDriver:
 
             iter_start_time = tm.time()
 
-            dmat = AODensityMatrix([den_mat], denmat.rest)
-
-            fock_mat, vxc_mat = self._comp_2e_fock(dmat, molecule, ao_basis,
+            fock_mat, vxc_mat = self._comp_2e_fock(den_mat, molecule, ao_basis,
                                                    screener, e_grad, profiler)
 
             profiler.start_timer('ErrVec')
@@ -1347,7 +1385,7 @@ class ScfDriver:
 
             # update density and energy
 
-            self._density = den_mat.copy()
+            self._density = tuple([x.copy() for x in den_mat])
 
             self._scf_energy = e_scf
 
@@ -1372,8 +1410,7 @@ class ScfDriver:
                 acc_diis.store_diis_data(fock_mat, e_mat, e_grad)
 
             if self.rank == mpi_master():
-                eff_fock_mat = acc_diis.get_effective_fock(
-                    fock_mat, self.ostream)
+                eff_fock_mat = acc_diis.get_effective_fock(fock_mat)
             else:
                 eff_fock_mat = None
 
@@ -1387,20 +1424,22 @@ class ScfDriver:
             self._update_mol_orbs_phase()
 
             if self.rank == mpi_master():
-                # TODO unrestricted and restricted open-shell
-                mo = self.molecular_orbitals.alpha_to_numpy()
-                occ = self.molecular_orbitals.occa_to_numpy()
-                occ_mo = occ * mo
-                den_mat = matmul_gpu(occ_mo, occ_mo.T)
-                naos = den_mat.shape[0]
+                den_mat = self.molecular_orbitals.get_density(
+                    molecule, self.scf_type)
+                naos = den_mat[0].shape[0]
             else:
                 naos = None
             naos = self.comm.bcast(naos, root=mpi_master())
 
             if self.rank != mpi_master():
-                den_mat = np.zeros((naos, naos))
+                if self.scf_type == 'restricted':
+                    den_mat = [np.zeros((naos, naos))]
+                else:
+                    den_mat = [np.zeros((naos, naos)), np.zeros((naos, naos))]
 
-            self.comm.Bcast(den_mat, root=mpi_master())
+            self.comm.Bcast(den_mat[0], root=mpi_master())
+            if self.scf_type != 'restricted':
+                self.comm.Bcast(den_mat[1], root=mpi_master())
 
             profiler.stop_timer('FockDiag')
 
@@ -1435,14 +1474,15 @@ class ScfDriver:
                 occ_beta = self.molecular_orbitals.occb_to_numpy()
 
                 if self.scf_type == 'restricted':
-                    D_alpha = self._density
-                    D_beta = self._density
+                    D_alpha = self._density[0]
+                    D_beta = self._density[0]
+                    F_alpha = fock_mat[0]
+                    F_beta = fock_mat[0]
                 else:
                     D_alpha = self._density[0]
                     D_beta = self._density[1]
-
-                F_alpha = fock_mat
-                # F_beta = fock_mat.beta_to_numpy(0)
+                    F_alpha = fock_mat[0]
+                    F_beta = fock_mat[1]
 
                 # TODO: add F_beta
 
@@ -1464,6 +1504,7 @@ class ScfDriver:
                     'D_alpha': D_alpha,
                     'D_beta': D_beta,
                     'F_alpha': F_alpha,
+                    'F_beta': F_beta,
                 }
 
                 if self._dft:
@@ -1628,7 +1669,7 @@ class ScfDriver:
         return ovl_mat, kin_mat, npot_mat, dipole_mats
 
     def _comp_2e_fock(self,
-                      dmat,
+                      den_mat,
                       molecule,
                       basis,
                       screener,
@@ -1637,8 +1678,8 @@ class ScfDriver:
         """
         Computes Fock/Kohn-Sham matrix (only 2e part).
 
-        :param dmat:
-            The AO density matrix.
+        :param den_mat:
+            The density matrix.
         :param molecule:
             The molecule.
         :param basis:
@@ -1653,6 +1694,42 @@ class ScfDriver:
         :return:
             The AO Kohn-Sham (Vxc) matrix.
         """
+
+        if self.scf_type == 'restricted':
+            return self._comp_2e_fock_closed_shell(
+                den_mat, molecule, basis, screener, e_grad, profiler)
+        else:
+            return self._comp_2e_fock_open_shell(
+                den_mat, molecule, basis, screener, e_grad, profiler)
+
+    def _comp_2e_fock_closed_shell(self,
+                                   den_mat,
+                                   molecule,
+                                   basis,
+                                   screener,
+                                   e_grad=None,
+                                   profiler=None):
+        """
+        Computes closed-shell Fock/Kohn-Sham matrix (only 2e part).
+
+        :param den_mat:
+            The density matrix.
+        :param molecule:
+            The molecule.
+        :param basis:
+            The basis set.
+        :param screener:
+            The screening container object.
+        :param e_grad:
+            The electronic gradient.
+        :param profiler:
+            The profiler.
+
+        :return:
+            The AO Kohn-Sham (Vxc) matrix.
+        """
+
+        dmat = AODensityMatrix([den_mat[0]], denmat.rest)
 
         # TODO: use dynamic threshold
 
@@ -1854,8 +1931,6 @@ class ScfDriver:
                          op=MPI.SUM,
                          root=mpi_master())
 
-        # TODO: add beta density
-
         if self.timing:
             all_timer_summary = self.comm.gather(timer_summary)
             all_gpu_timer_summary = self.comm.gather(gpu_timer_summary)
@@ -1906,7 +1981,345 @@ class ScfDriver:
         if self.timing and self._dft:
             profiler.add_timing_info('FockXC', tm.time() - vxc_t0)
 
-        return fock_mat, vxc_mat
+        # Note: return fock_mat in a list
+        return [fock_mat], vxc_mat
+
+    def _comp_2e_fock_open_shell(self,
+                                 den_mat,
+                                 molecule,
+                                 basis,
+                                 screener,
+                                 e_grad=None,
+                                 profiler=None):
+        """
+        Computes open-shell Fock/Kohn-Sham matrices (only 2e part).
+
+        :param dmat:
+            The AO density matrix.
+        :param molecule:
+            The molecule.
+        :param basis:
+            The basis set.
+        :param screener:
+            The screening container object.
+        :param e_grad:
+            The electronic gradient.
+        :param profiler:
+            The profiler.
+
+        :return:
+            The AO Kohn-Sham (Vxc) matrix.
+        """
+
+        # compute_fock_gpu accepts single matrix in AODensityMatrix object
+        # so we use denmat.rest here
+        dmat_total = AODensityMatrix([den_mat[0] + den_mat[1]], denmat.rest)
+        dmat_Ka = AODensityMatrix([den_mat[0]], denmat.rest)
+        dmat_Kb = AODensityMatrix([den_mat[1]], denmat.rest)
+
+        # TODO: use dynamic threshold
+
+        # if e_grad is None:
+        #     thresh_int = 12
+        # else:
+        #     thresh_int = int(-math.log10(self._get_dyn_threshold(e_grad)))
+
+        eri_t0 = tm.time()
+
+        timer_summary = {}
+        gpu_timer_summary = [{} for idx in range(screener.get_num_gpus_per_node())]
+
+        q_d_mat_t0 = tm.time()
+
+        prim_cart_naos = screener.get_prim_cart_naos()
+
+        prim_qmat = DenseMatrix(prim_cart_naos, prim_cart_naos)
+        prim_cart_dmat_a = DenseMatrix(prim_cart_naos, prim_cart_naos)
+        prim_cart_dmat_b = DenseMatrix(prim_cart_naos, prim_cart_naos)
+
+        screener.fill_prim_q_and_cart_dens(molecule, basis, dmat_Ka, prim_qmat,
+                                           prim_cart_dmat_a)
+        screener.fill_prim_q_and_cart_dens(molecule, basis, dmat_Kb, prim_qmat,
+                                           prim_cart_dmat_b)
+
+        q_d_mat_dt = tm.time() - q_d_mat_t0
+        q_prime_calc_t0 = tm.time()
+
+        ave, res = divmod(prim_qmat.number_of_rows(), self.nodes)
+        counts = [ave + 1 if p < res else ave for p in range(self.nodes)]
+        displs = [sum(counts[:p]) for p in range(self.nodes)]
+
+        row_start = displs[self.rank]
+        row_end = row_start + counts[self.rank]
+
+        local_q_prime_np_a = screener.compute_q_prime_slice(
+            prim_qmat, prim_cart_dmat_a, row_start, row_end).to_numpy()
+        local_q_prime_np_b = screener.compute_q_prime_slice(
+            prim_qmat, prim_cart_dmat_b, row_start, row_end).to_numpy()
+
+        q_prime_calc_dt = tm.time() - q_prime_calc_t0
+        q_prime_inds_t0 = tm.time()
+
+        local_q_prime_row_inds_a, local_q_prime_col_inds_a = np.where(
+            local_q_prime_np_a > self.prelink_thresh)
+        local_q_prime_row_inds_b, local_q_prime_col_inds_b = np.where(
+            local_q_prime_np_b > self.prelink_thresh)
+
+        local_q_prime_row_inds_a += row_start
+        local_q_prime_row_inds_b += row_start
+
+        q_prime_inds_dt = tm.time() - q_prime_inds_t0
+        q_prime_triu_t0 = tm.time()
+
+        # only store upper triangular indices
+        triu_mask_a = (local_q_prime_row_inds_a <= local_q_prime_col_inds_a)
+        triu_mask_b = (local_q_prime_row_inds_b <= local_q_prime_col_inds_b)
+        triu_q_prime_row_inds_a = local_q_prime_row_inds_a[triu_mask_a]
+        triu_q_prime_col_inds_a = local_q_prime_col_inds_a[triu_mask_a]
+        triu_q_prime_row_inds_b = local_q_prime_row_inds_b[triu_mask_b]
+        triu_q_prime_col_inds_b = local_q_prime_col_inds_b[triu_mask_b]
+        # Note: use int32 for row and col indices
+        local_q_prime_row_inds_a = triu_q_prime_row_inds_a.astype(np.int32)
+        local_q_prime_col_inds_a = triu_q_prime_col_inds_a.astype(np.int32)
+        local_q_prime_row_inds_b = triu_q_prime_row_inds_b.astype(np.int32)
+        local_q_prime_col_inds_b = triu_q_prime_col_inds_b.astype(np.int32)
+
+        q_prime_triu_dt = tm.time() - q_prime_triu_t0
+        q_prime_comm_t0 = tm.time()
+
+        # Allgather
+        counts_2_a = self.comm.allgather(len(local_q_prime_row_inds_a))
+        displs_2_a = [sum(counts_2_a[:p]) for p in range(self.nodes)]
+        counts_2_b = self.comm.allgather(len(local_q_prime_row_inds_b))
+        displs_2_b = [sum(counts_2_b[:p]) for p in range(self.nodes)]
+        # Note: use int32 for row and col indices
+        q_prime_row_inds_a = np.zeros(sum(counts_2_a), dtype=np.int32)
+        q_prime_col_inds_a = np.zeros(sum(counts_2_a), dtype=np.int32)
+        q_prime_row_inds_b = np.zeros(sum(counts_2_b), dtype=np.int32)
+        q_prime_col_inds_b = np.zeros(sum(counts_2_b), dtype=np.int32)
+        self.comm.Allgatherv(local_q_prime_row_inds_a,
+                             [q_prime_row_inds_a, counts_2_a, displs_2_a, MPI.INT32_T])
+        self.comm.Allgatherv(local_q_prime_col_inds_a,
+                             [q_prime_col_inds_a, counts_2_a, displs_2_a, MPI.INT32_T])
+        self.comm.Allgatherv(local_q_prime_row_inds_b,
+                             [q_prime_row_inds_b, counts_2_b, displs_2_b, MPI.INT32_T])
+        self.comm.Allgatherv(local_q_prime_col_inds_b,
+                             [q_prime_col_inds_b, counts_2_b, displs_2_b, MPI.INT32_T])
+
+        q_prime_comm_dt = tm.time() - q_prime_comm_t0
+
+        if self.timing_gpu:
+            self.ostream.print_blank()
+            self.ostream.print_info(f'Time spent in Q and D mat. : {q_d_mat_dt:.6f} sec')
+            self.ostream.print_info(f'Time spent in Q_prime calc.: {q_prime_calc_dt:.6f} sec')
+            self.ostream.print_info(f'Time spent in Q_prime inds.: {q_prime_inds_dt:.6f} sec')
+            self.ostream.print_info(f'Time spent in Q_prime triu.: {q_prime_triu_dt:.6f} sec')
+            self.ostream.print_info(f'Time spent in Q_prime comm.: {q_prime_comm_dt:.6f} sec')
+            self.ostream.print_blank()
+
+        if self._dft and not self._first_step:
+
+            if self.xcfun.is_hybrid():
+
+                if self.xcfun.is_range_separated():
+                    # range-separated hybrid
+                    full_k_coef = (self.xcfun.get_rs_alpha() +
+                                   self.xcfun.get_rs_beta())
+                    erf_k_coef = -self.xcfun.get_rs_beta()
+                    omega = self.xcfun.get_rs_omega()
+
+                    # J_ab
+                    fock_mat = compute_fock_gpu(
+                        molecule, basis, dmat_total, 1.0, [0.0],
+                        [0.0], 'symm', self.eri_thresh,
+                        self.prelink_thresh,
+                        q_prime_row_inds_a, q_prime_col_inds_a, screener)
+                    fock_mat_local_a = fock_mat.to_numpy()
+                    fock_mat_local_b = fock_mat.to_numpy()
+                    self._update_timer_summary(screener, timer_summary, gpu_timer_summary)
+
+                    # K_a
+                    fock_mat = compute_fock_gpu(
+                        molecule, basis, dmat_Ka, 0.0, [full_k_coef, erf_k_coef],
+                        [0.0, omega], 'symm', self.eri_thresh,
+                        self.prelink_thresh,
+                        q_prime_row_inds_a, q_prime_col_inds_a, screener)
+                    fock_mat_local_a += fock_mat.to_numpy()
+                    self._update_timer_summary(screener, timer_summary, gpu_timer_summary)
+
+                    # K_b
+                    fock_mat = compute_fock_gpu(
+                        molecule, basis, dmat_Kb, 0.0, [full_k_coef, erf_k_coef],
+                        [0.0, omega], 'symm', self.eri_thresh,
+                        self.prelink_thresh,
+                        q_prime_row_inds_b, q_prime_col_inds_b, screener)
+                    fock_mat_local_b += fock_mat.to_numpy()
+                    self._update_timer_summary(screener, timer_summary, gpu_timer_summary)
+
+                else:
+                    # global hybrid
+
+                    # J_ab
+                    fock_mat = compute_fock_gpu(
+                        molecule, basis, dmat_total, 1.0,
+                        [0.0], [0.0], 'symm',
+                        self.eri_thresh, self.prelink_thresh,
+                        q_prime_row_inds_a, q_prime_col_inds_a, screener)
+                    fock_mat_local_a = fock_mat.to_numpy()
+                    fock_mat_local_b = fock_mat.to_numpy()
+                    self._update_timer_summary(screener, timer_summary, gpu_timer_summary)
+
+                    # K_a
+                    fock_mat = compute_fock_gpu(
+                        molecule, basis, dmat_Ka, 0.0,
+                        [self.xcfun.get_frac_exact_exchange()], [0.0], 'symm',
+                        self.eri_thresh, self.prelink_thresh,
+                        q_prime_row_inds_a, q_prime_col_inds_a, screener)
+                    fock_mat_local_a += fock_mat.to_numpy()
+                    self._update_timer_summary(screener, timer_summary, gpu_timer_summary)
+
+                    # K_b
+                    fock_mat = compute_fock_gpu(
+                        molecule, basis, dmat_Kb, 0.0,
+                        [self.xcfun.get_frac_exact_exchange()], [0.0], 'symm',
+                        self.eri_thresh, self.prelink_thresh,
+                        q_prime_row_inds_b, q_prime_col_inds_b, screener)
+                    fock_mat_local_b += fock_mat.to_numpy()
+                    self._update_timer_summary(screener, timer_summary, gpu_timer_summary)
+
+            else:
+                # pure DFT
+
+                # J_ab
+                fock_mat = compute_fock_gpu(
+                    molecule, basis, dmat_total, 1.0, [0.0], [0.0], 'symm',
+                    self.eri_thresh, self.prelink_thresh,
+                    q_prime_row_inds_a, q_prime_col_inds_a, screener)
+                fock_mat_local_a = fock_mat.to_numpy()
+                fock_mat_local_b = fock_mat.to_numpy()
+                self._update_timer_summary(screener, timer_summary, gpu_timer_summary)
+
+        else:
+            # Hartree-Fock
+
+            # J_ab
+            fock_mat = compute_fock_gpu(
+                molecule, basis, dmat_total, 1.0, [0.0], [0.0], 'symm',
+                self.eri_thresh, self.prelink_thresh,
+                q_prime_row_inds_a, q_prime_col_inds_a, screener)
+            fock_mat_local_a = fock_mat.to_numpy()
+            fock_mat_local_b = fock_mat.to_numpy()
+            self._update_timer_summary(screener, timer_summary, gpu_timer_summary)
+
+            # K_a
+            fock_mat = compute_fock_gpu(
+                molecule, basis, dmat_Ka, 0.0, [1.0], [0.0], 'symm',
+                self.eri_thresh, self.prelink_thresh,
+                q_prime_row_inds_a, q_prime_col_inds_a, screener)
+            fock_mat_local_a += fock_mat.to_numpy()
+            self._update_timer_summary(screener, timer_summary, gpu_timer_summary)
+
+            # K_b
+            fock_mat = compute_fock_gpu(
+                molecule, basis, dmat_Kb, 0.0, [1.0], [0.0], 'symm',
+                self.eri_thresh, self.prelink_thresh,
+                q_prime_row_inds_b, q_prime_col_inds_b, screener)
+            fock_mat_local_b += fock_mat.to_numpy()
+            self._update_timer_summary(screener, timer_summary, gpu_timer_summary)
+
+        if self.rank == mpi_master():
+            fock_mat_a = np.zeros(fock_mat_local_a.shape)
+            fock_mat_b = np.zeros(fock_mat_local_b.shape)
+        else:
+            fock_mat_a = None
+            fock_mat_b = None
+
+        self.comm.Reduce(fock_mat_local_a,
+                         fock_mat_a,
+                         op=MPI.SUM,
+                         root=mpi_master())
+
+        self.comm.Reduce(fock_mat_local_b,
+                         fock_mat_b,
+                         op=MPI.SUM,
+                         root=mpi_master())
+
+        if self.timing:
+            all_timer_summary = self.comm.gather(timer_summary)
+            all_gpu_timer_summary = self.comm.gather(gpu_timer_summary)
+
+            if self.rank == mpi_master():
+                fock_time_list = [s['Total timing'] for s in all_timer_summary]
+
+                fock_time_max = max(fock_time_list)
+                fock_time_ave = sum(fock_time_list) / len(fock_time_list)
+                fock_load_imb = 1.0 - fock_time_ave / fock_time_max
+
+                profiler.add_timing_info('FockERI', tm.time() - eri_t0)
+                profiler.add_timing_info('(loadimb)', fock_load_imb)
+
+                if self.timing_gpu:
+                    self.ostream.print_blank()
+
+                    for idx in range(len(all_timer_summary)):
+                        for key, val in all_timer_summary[idx].items():
+                            valstr = f'rank {idx:<5d} {key:<22s} : {val:.3f} sec'
+                            self.ostream.print_info('Timer : ' + valstr)
+                        self.ostream.print_blank()
+
+                    for idx in range(len(all_gpu_timer_summary)):
+                        for gpu_idx in range(len(all_gpu_timer_summary[idx])):
+                            for key, val in all_gpu_timer_summary[idx][gpu_idx].items():
+                                valstr = f'rank {idx:<5d} gpu {gpu_idx:<5d} {key:<22s} : {val:.3f} sec'
+                                self.ostream.print_info('GPU Timer : ' + valstr)
+                            self.ostream.print_blank()
+
+                    self.ostream.flush()
+
+        vxc_t0 = tm.time()
+
+        if self._dft and not self._first_step:
+            # TODO: enable udft
+            assert_msg_critical(
+                False, 'SCF driver: Open shell DFT not yet implemented')
+
+            # TODO: support xcfun.mgga
+            if self.xcfun.get_func_type() in [xcfun.lda, xcfun.gga]:
+                # use unrestricted AODensityMatrix in XC integration
+                dmat = AODensityMatrix(den_mat, denmat.unrest)
+                vxc_mat = integrate_vxc_fock_gpu(
+                    molecule, basis, dmat, self._mol_grid,
+                    self.xcfun.get_func_label(),
+                    screener.get_num_gpus_per_node(), self.rank, self.nodes)
+            else:
+                assert_msg_critical(
+                    False, 'SCF driver: Unsupported XC functional type')
+        else:
+            vxc_mat = None
+
+        if self.timing and self._dft:
+            profiler.add_timing_info('FockXC', tm.time() - vxc_t0)
+
+        return [fock_mat_a, fock_mat_b], vxc_mat
+
+    def _update_timer_summary(self, screener, timer_summary, gpu_timer_summary):
+
+        for line in screener.get_timer_summary().splitlines():
+            key, val = line.split(':')
+            key = key.strip()
+            val = float(val.replace('sec', '').strip())
+            if key not in timer_summary:
+                timer_summary[key] = 0.0
+            timer_summary[key] += val
+
+        for idx, gpu_timer_lines in enumerate(screener.get_gpu_timer_summary()):
+            for line in gpu_timer_lines.splitlines():
+                key, val = line.split(':')
+                key = key.strip()
+                val = float(val.replace('sec', '').strip())
+                if key not in gpu_timer_summary[idx]:
+                    gpu_timer_summary[idx][key] = 0.0
+                gpu_timer_summary[idx][key] += val
 
     def _comp_energy(self, fock_mat, vxc_mat, kin_mat, npot_mat, den_mat):
         """
@@ -1930,13 +2343,31 @@ class ScfDriver:
         """
 
         if self.rank == mpi_master():
-            hcore_mat = kin_mat - npot_mat
-            if self._pe and not self._first_step:
-                hcore_mat -= self._V_es
-            hcore_plus_full_Fock = 2.0 * hcore_mat + fock_mat
-            e_sum = dot_product_gpu(den_mat, hcore_plus_full_Fock)
-            if self._dft and not self._first_step:
-                e_sum += vxc_mat.get_energy()
+            if self.scf_type == 'restricted':
+                hcore_mat = kin_mat - npot_mat
+                if self._pe and not self._first_step:
+                    hcore_mat -= self._V_es
+                hcore_plus_full_Fock = 2.0 * hcore_mat + fock_mat
+                e_sum = dot_product_gpu(den_mat, hcore_plus_full_Fock)
+                if self._dft and not self._first_step:
+                    e_sum += vxc_mat.get_energy()
+
+            elif self.scf_type == 'unrestricted':
+                hcore_mat = kin_mat - npot_mat
+                if self._pe and not self._first_step:
+                    assert_msg_critical(
+                        False,
+                        'SCF driver: unrestricted PE not yet supported')
+                e_sum = 0.5 * (dot_product_gpu(den_mat[0], fock_mat[0]) +
+                               dot_product_gpu(den_mat[1], fock_mat[1]))
+                e_sum += dot_product_gpu(den_mat[0] + den_mat[1], hcore_mat)
+                if self._dft and not self._first_step:
+                    e_sum += vxc_mat.get_energy()
+
+            else:
+                assert_msg_critical(
+                    False,
+                    f'SCF driver: scf_type {self.scf_type} not yet supported')
 
         else:
             e_sum = 0.0
