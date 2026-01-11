@@ -30,7 +30,7 @@
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-from .veloxchemlib import xcfun
+from .veloxchemlib import xcfun_enum
 from .veloxchemlib import parse_xc_func
 from .veloxchemlib import XCFunctional
 from .errorhandler import assert_msg_critical
@@ -57,13 +57,13 @@ def get_default_grid_level(xc_func):
 
     # LDA
 
-    if func_type == xcfun.lda:
+    if func_type == xcfun_enum.lda:
 
         return 4
 
     # GGA
 
-    elif func_type == xcfun.gga:
+    elif func_type == xcfun_enum.gga:
 
         if func_name.upper() in [
                 'B97',
@@ -78,7 +78,7 @@ def get_default_grid_level(xc_func):
 
     # meta-GGA
 
-    elif func_type == xcfun.mgga:
+    elif func_type == xcfun_enum.mgga:
 
         if func_name.upper() in [
                 'SCAN',

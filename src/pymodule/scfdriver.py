@@ -43,7 +43,7 @@ from .veloxchemlib import AODensityMatrix, denmat
 from .veloxchemlib import DenseMatrix
 from .veloxchemlib import ScreeningData, GpuDevices
 from .veloxchemlib import mpi_master, bohr_in_angstrom
-from .veloxchemlib import xcfun
+from .veloxchemlib import xcfun_enum
 from .veloxchemlib import (compute_fock_gpu, matmul_gpu, eigh_gpu,
                            dot_product_gpu, integrate_vxc_fock_gpu,
                            compute_overlap_and_kinetic_energy_integrals_gpu,
@@ -1988,7 +1988,7 @@ class ScfDriver:
 
         if self._dft and not self._first_step:
             # TODO: support xcfun.mgga
-            if self.xcfun.get_func_type() in [xcfun.lda, xcfun.gga]:
+            if self.xcfun.get_func_type() in [xcfun_enum.lda, xcfun_enum.gga]:
                 vxc_mat = integrate_vxc_fock_gpu(
                     molecule, basis, dmat, self._mol_grid,
                     self.xcfun.get_func_label(),
@@ -2300,8 +2300,8 @@ class ScfDriver:
         vxc_t0 = tm.time()
 
         if self._dft and not self._first_step:
-            # TODO: support xcfun.lda and xcfun.mgga
-            if self.xcfun.get_func_type() in [xcfun.gga]:
+            # TODO: support xcfun.mgga
+            if self.xcfun.get_func_type() in [xcfun_enum.lda, xcfun_enum.gga]:
                 # use unrestricted AODensityMatrix in XC integration
                 dmat = AODensityMatrix(den_mat, denmat.unrest)
                 vxc_mat = integrate_vxc_fock_gpu(

@@ -61,7 +61,7 @@ export_dft(py::module& m)
     // xcfun enum class
 
     // clang-format off
-    py::enum_<xcfun>(m, "xcfun")
+    py::enum_<xcfun>(m, "xcfun_enum")
         .value("lda", xcfun::lda)
         .value("gga", xcfun::gga)
         .value("mgga", xcfun::mgga);
