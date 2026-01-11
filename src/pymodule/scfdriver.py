@@ -50,6 +50,7 @@ from .veloxchemlib import (compute_fock_gpu, matmul_gpu, eigh_gpu,
                            compute_nuclear_potential_integrals_gpu,
                            compute_point_charges_integrals_gpu,
                            compute_mixed_basis_overlap_integrals_gpu)
+from .veloxchemlib import compute_electric_dipole_integrals_gpu
 from .profiler import Profiler
 from .griddriver import GridDriver
 from .molecularbasis import MolecularBasis
@@ -59,7 +60,7 @@ from .diis import Diis
 from .firstorderprop import FirstOrderProperties
 from .inputparser import (parse_input, print_keywords, print_attributes,
                           get_random_string_parallel)
-from .dftutils import get_default_grid_level, print_libxc_reference
+from .dftutils import get_default_grid_level, print_xc_reference
 from .sanitychecks import molecule_sanity_check, dft_sanity_check
 from .errorhandler import assert_msg_critical
 from .checkpoint import create_hdf5, write_scf_results_to_hdf5
@@ -139,6 +140,8 @@ class ScfDriver:
         self.max_iter = 50
         self._first_step = False
 
+        # TODO: enable pFON and level-shifting
+
         # thresholds
         self.conv_thresh = 1.0e-6
         self.ovl_thresh = 1.0e-6
@@ -164,7 +167,6 @@ class ScfDriver:
 
         # nuclear repulsion energy
         self._nuc_energy = 0.0
-        self._nuc_mm_energy = 0.0
 
         # mpi information
         self._comm = comm
@@ -203,8 +205,9 @@ class ScfDriver:
         self.potfile = None
         self.pe_options = {}
         self._pe = False
-        self._V_es = None
         self._point_charges = None
+        self._nuc_mm_energy = 0.0
+        self._V_es = None
 
         # static electric field
         self.electric_field = None
@@ -212,9 +215,9 @@ class ScfDriver:
         self._dipole_origin = None
 
         # scf tensors
-        self._scf_tensors = None
+        self._scf_results = None
 
-        # scf property
+        # scf properties
         self._scf_prop = None
 
         # timing and profiling
@@ -233,8 +236,7 @@ class ScfDriver:
         self.program_end_time = None
 
         # filename
-        self._filename = 'veloxchem_scf_' + get_random_string_parallel(
-            self.comm)
+        self.filename = None
 
         # may be used in rare cases when user wants to skip the writing of h5
         # for now we use both _skip_writing_h5 and write_h5 for this purpose
@@ -247,10 +249,12 @@ class ScfDriver:
                 'acc_type':
                     ('str_upper', 'type of SCF convergence accelerator'),
                 'max_iter': ('int', 'maximum number of SCF iterations'),
+                'max_err_vecs': ('int', 'maximum number of DIIS error vectors'),
                 'conv_thresh': ('float', 'SCF convergence threshold'),
                 'eri_thresh': ('float', 'ERI screening threshold'),
                 'eri_thresh_tight':
                     ('float', 'tightened ERI screening threshold'),
+                'ovl_thresh': ('float', 'AO linear dependency threshold'),
                 'pair_thresh': ('float', 'GTO pair screening threshold'),
                 'density_thresh': ('float', 'density screening threshold'),
                 'restart': ('bool', 'restart from checkpoint file'),
@@ -373,12 +377,20 @@ class ScfDriver:
         return self._molecular_orbitals
 
     @property
-    def scf_tensors(self):
+    def scf_results(self):
         """
-        Returns the SCF tensors.
+        Returns the SCF results.
         """
 
-        return self._scf_tensors
+        return self._scf_results
+
+    @property
+    def scf_tensors(self):
+        """
+        Returns the SCF results.
+        """
+
+        return self._scf_results
 
     @property
     def history(self):
@@ -387,22 +399,6 @@ class ScfDriver:
         """
 
         return self._history
-
-    @property
-    def filename(self):
-        """
-        Getter function for protected filename attribute.
-        """
-
-        return self._filename
-
-    @filename.setter
-    def filename(self, value):
-        """
-        Setter function for protected filename attribute.
-        """
-
-        self._filename = value
 
     def print_keywords(self):
         """
@@ -440,9 +436,9 @@ class ScfDriver:
         if 'program_end_time' in scf_dict:
             self.program_end_time = scf_dict['program_end_time']
         if 'filename' in scf_dict:
-            self._filename = scf_dict['filename']
+            self.filename = scf_dict['filename']
             if 'checkpoint_file' not in scf_dict:
-                self.checkpoint_file = f'{self._filename}.scf.h5'
+                self.checkpoint_file = f'{self.filename}.scf.h5'
 
         method_keywords = {
             key: val[0]
@@ -453,6 +449,7 @@ class ScfDriver:
 
         dft_sanity_check(self, 'update_settings')
 
+        # TODO: treat _pe and _point_charges separately
         self._pe_sanity_check(method_dict)
 
         if self.electric_field is not None:
@@ -492,7 +489,7 @@ class ScfDriver:
                 potfile = self.pe_options['potfile']
                 if not Path(potfile).is_file():
                     potfile = str(
-                        Path(self._filename).parent / Path(potfile).name)
+                        Path(self.filename).parent / Path(potfile).name)
                 with Path(potfile).open('r') as fh:
                     lines = fh.read().strip().splitlines()
                     try:
@@ -533,13 +530,13 @@ class ScfDriver:
         profiler = Profiler()
 
         if min_basis is None:
-            if self.rank == mpi_master():
-                min_basis = MolecularBasis.read(molecule,
-                                                'AO-START-GUESS',
-                                                basis_path='.',
-                                                ostream=None)
-            else:
-                min_basis = MolecularBasis()
+            min_basis = MolecularBasis.read(molecule,
+                                            'AO-START-GUESS',
+                                            basis_path='.',
+                                            ostream=None)
+
+        if self.filename is not None and self.checkpoint_file is None:
+            self.checkpoint_file = f'{self.filename}.scf.h5'
 
         # check molecule
         molecule_sanity_check(molecule)
@@ -548,13 +545,11 @@ class ScfDriver:
         dft_sanity_check(self, 'compute')
 
         # check pe setup
+        # TODO: treat _pe and _point_charges separately
         self._pe_sanity_check()
 
         # check print level (verbosity of output)
-        if self.print_level < 2:
-            self.print_level = 1
-        if self.print_level > 2:
-            self.print_level = 3
+        self.print_level = max(1, min(self.print_level, 3))
 
         if self.restart:
             self.restart = self.validate_checkpoint(molecule.get_element_ids(),
@@ -569,22 +564,6 @@ class ScfDriver:
 
         # nuclear repulsion energy
         self._nuc_energy = molecule.nuclear_repulsion_energy()
-
-        # nuclei - point charges interaction
-        self._nuc_mm_energy = 0.0
-        if self._pe:
-            natoms = molecule.number_of_atoms()
-            coords = molecule.get_coordinates_in_bohr()
-            nuclear_charges = molecule.get_element_ids()
-            npoints = self._point_charges.shape[1]
-            for a in range(natoms):
-                xyz_a = coords[a]
-                chg_a = nuclear_charges[a]
-                for p in range(npoints):
-                    xyz_p = self._point_charges[:3, p]
-                    chg_p = self._point_charges[3, p]
-                    r_ap = np.linalg.norm(xyz_a - xyz_p)
-                    self._nuc_mm_energy += chg_a * chg_p / r_ap
 
         if self.rank == mpi_master():
             self._print_header()
@@ -612,7 +591,7 @@ class ScfDriver:
 
         # generate integration grid
         if self._dft:
-            print_libxc_reference(self.xcfun, self.ostream)
+            print_xc_reference(self.xcfun, self.ostream)
 
             grid_drv = GridDriver(self.comm)
             grid_level = (get_default_grid_level(self.xcfun)
@@ -637,6 +616,7 @@ class ScfDriver:
                 False,
                 'Dispersion correction not yet implemented for the GPU version.')
 
+        # TODO: treat _pe and _point_charges separately
         # set up polarizable embedding
         if self._pe:
             pot_info = 'Reading point charges: {}'.format(
@@ -644,28 +624,41 @@ class ScfDriver:
             self.ostream.print_info(pot_info)
             self.ostream.print_blank()
 
+            # nuclei - point charges interaction
+            self._nuc_mm_energy = 0.0
+
+            natoms = molecule.number_of_atoms()
+            coords = molecule.get_coordinates_in_bohr()
+            nuclear_charges = molecule.get_element_ids()
+            npoints = self._point_charges.shape[1]
+
+            for a in range(self.rank, natoms, self.nodes):
+                xyz_a = coords[a]
+                chg_a = nuclear_charges[a]
+
+                for p in range(npoints):
+                    xyz_p = self._point_charges[:3, p]
+                    chg_p = self._point_charges[3, p]
+                    r_ap = np.linalg.norm(xyz_a - xyz_p)
+
+                    self._nuc_mm_energy += chg_a * chg_p / r_ap
+
+            self._nuc_mm_energy = self.comm.allreduce(self._nuc_mm_energy)
+
         # DIIS method
         if self.acc_type.upper() == 'DIIS':
 
-            if not self.restart:
-                S12, S22 = self._comp_mixed_basis_overlap(
-                    molecule, min_basis, ao_basis)
-
+            # Note: gen_initial_density_restart/sad involves a matmul_gpu
+            # and we want to run this on all ranks such that they get
+            # the first exposure to cublas/hipblas kernel, which makes
+            # later measurement of FockERI more accurate
             if self.restart:
-                # Note: gen_initial_density_restart involves a matmul_gpu
-                # and we want to run this on all ranks such that they get
-                # the first exposure to cublas/hipblas kernel, which makes
-                # later measurement of FockERI more accurate
                 den_mat = self.gen_initial_density_restart(molecule)
                 naos = den_mat[0].shape[0]
             else:
-                if self.rank == mpi_master():
-                    den_mat = self.gen_initial_density_sad(
-                        molecule, min_basis, ao_basis, S12, S22)
-                    naos = den_mat[0].shape[0]
-                else:
-                    naos = None
-
+                den_mat = self.gen_initial_density_sad(
+                    molecule, ao_basis, min_basis)
+                naos = den_mat[0].shape[0]
             naos = self.comm.bcast(naos, root=mpi_master())
 
             if self.rank != mpi_master():
@@ -694,25 +687,17 @@ class ScfDriver:
 
             val_basis = ao_basis.reduce_to_valence_basis()
 
-            if not self.restart:
-                S12, S22 = self._comp_mixed_basis_overlap(
-                    molecule, min_basis, val_basis)
-
+            # Note: gen_initial_density_restart/sad involves a matmul_gpu
+            # and we want to run this on all ranks such that they get
+            # the first exposure to cublas/hipblas kernel, which makes
+            # later measurement of FockERI more accurate
             if self.restart:
-                # Note: gen_initial_density_restart involves a matmul_gpu
-                # and we want to run this on all ranks such that they get
-                # the first exposure to cublas/hipblas kernel, which makes
-                # later measurement of FockERI more accurate
                 den_mat = self.gen_initial_density_restart(molecule)
                 naos = den_mat[0].shape[0]
             else:
-                if self.rank == mpi_master():
-                    den_mat = self.gen_initial_density_sad(
-                        molecule, min_basis, val_basis, S12, S22)
-                    naos = den_mat[0].shape[0]
-                else:
-                    naos = None
-
+                den_mat = self.gen_initial_density_sad(
+                    molecule, val_basis, min_basis)
+                naos = den_mat[0].shape[0]
             naos = self.comm.bcast(naos, root=mpi_master())
 
             if self.rank != mpi_master():
@@ -785,7 +770,7 @@ class ScfDriver:
         if self.rank == mpi_master():
             self._print_scf_energy()
 
-            s2 = self.compute_s2(molecule, self.scf_tensors)
+            s2 = self.compute_s2(molecule, self.scf_results)
             self._print_ground_state(molecule, s2)
 
             # TODO: print orbitals
@@ -802,7 +787,7 @@ class ScfDriver:
 
             self.ostream.flush()
 
-        return self.scf_tensors
+        return self.scf_results
 
     def _comp_mixed_basis_overlap(self, molecule, basis_1, basis_2):
         """
@@ -832,22 +817,22 @@ class ScfDriver:
         S12 = np.zeros(S12_partial.shape)
         S22 = np.zeros(S22_partial.shape)
 
-        self.comm.Reduce(S12_partial, S12, op=MPI.SUM, root=mpi_master())
-        self.comm.Reduce(S22_partial, S22, op=MPI.SUM, root=mpi_master())
+        self.comm.Allreduce(S12_partial, S12, op=MPI.SUM)
+        self.comm.Allreduce(S22_partial, S22, op=MPI.SUM)
 
         return S12, S22
 
-    def gen_initial_density_sad(self, molecule, min_basis, ao_basis, S12, S22):
+    def gen_initial_density_sad(self, molecule, ao_basis, min_basis):
         """
         Computes initial AO density using superposition of atomic densities
         scheme.
 
         :param molecule:
             The molecule.
-        :param min_basis:
-            The minimal AO basis for generation of atomic densities.
         :param ao_basis:
             The AO basis.
+        :param min_basis:
+            The minimal AO basis for generation of atomic densities.
 
         :return:
             The AO density matrix.
@@ -855,8 +840,17 @@ class ScfDriver:
 
         sad_drv = SadGuessDriver()
 
+        if self.scf_type == 'restricted':
+            density_type = 'restricted'
+        else:
+            density_type = 'unrestricted'
+
+        S12, S22 = self._comp_mixed_basis_overlap(molecule, min_basis, ao_basis)
+
+        # TODO: enable use of "unpaired_electrons_on_atoms"
+
         return sad_drv.compute(molecule, min_basis, ao_basis, S12, S22,
-                               self.scf_type)
+                               density_type)
 
     def gen_initial_density_proj(self, molecule, ao_basis, valence_basis,
                                  valence_mo):
@@ -1120,7 +1114,15 @@ class ScfDriver:
         # write checkpoint file and sychronize MPI processes
 
         self.restart = True
+        if self.checkpoint_file is None:
+            if self.filename is not None:
+                base_fname = self.filename
+            else:
+                name_string = get_random_string_parallel(self.comm)
+                base_fname = 'vlx_' + name_string
+            self.checkpoint_file = f'{base_fname}.scf.h5'
         self.write_checkpoint(molecule.get_element_ids(), basis.get_label())
+
         self.comm.barrier()
 
     def write_checkpoint(self, nuclear_charges, basis_set):
@@ -1136,20 +1138,13 @@ class ScfDriver:
         if self._skip_writing_h5 or (not self.write_h5):
             return
 
-        if self.checkpoint_file is None and self._filename is None:
-            return
-
-        if self.checkpoint_file is None and self._filename is not None:
-            self.checkpoint_file = f'{self._filename}.scf.h5'
-
-        if self.checkpoint_file and isinstance(self.checkpoint_file, str):
-            if self.rank == mpi_master():
+        if self.rank == mpi_master():
+            if self.checkpoint_file and isinstance(self.checkpoint_file, str):
                 self.molecular_orbitals.write_hdf5(self.checkpoint_file,
                                                    nuclear_charges, basis_set)
                 self.ostream.print_blank()
-                checkpoint_text = 'Checkpoint written to file: '
-                checkpoint_text += self.checkpoint_file
-                self.ostream.print_info(checkpoint_text)
+                self.ostream.print_info('Checkpoint written to file: ' +
+                                        self.checkpoint_file)
 
     def _get_num_gpus_per_node(self):
         """
@@ -1195,7 +1190,7 @@ class ScfDriver:
             The profiler.
         """
 
-        self._scf_tensors = None
+        self._scf_results = None
 
         self._scf_prop = FirstOrderProperties(self.comm, self.ostream)
 
@@ -1234,8 +1229,7 @@ class ScfDriver:
             molecule, ao_basis, screener)
 
         if self.rank == mpi_master() and self.electric_field is not None:
-            dipole_ints = (dipole_mats.x_to_numpy(), dipole_mats.y_to_numpy(),
-                           dipole_mats.z_to_numpy())
+            dipole_ints = dipole_mats
 
         if self._pe and not self._first_step:
             t0_point_charges = tm.time()
@@ -1295,9 +1289,10 @@ class ScfDriver:
         linear_dependency = self.comm.bcast(linear_dependency,
                                             root=mpi_master())
 
-        # TODO: double check self.eri_thresh_tight
-
         if (linear_dependency and self.eri_thresh > self.eri_thresh_tight):
+
+            # TODO: double check if it is necessary to tighten threshold
+
             self.eri_thresh = self.eri_thresh_tight
 
             if self.rank == mpi_master():
@@ -1335,27 +1330,22 @@ class ScfDriver:
             e_el = self._comp_energy(fock_mat, vxc_mat, kin_mat, npot_mat,
                                      den_mat)
 
-            fock_mat = self._comp_full_fock(fock_mat, vxc_mat, kin_mat,
-                                            npot_mat)
+            self._comp_full_fock(fock_mat, vxc_mat, kin_mat, npot_mat)
 
             if self.rank == mpi_master() and self.electric_field is not None:
-                # TODO: enable electric_field
-                assert_msg_critical(
-                    False, 'SCF driver: electric_field is not yet supported')
-
                 efpot = sum([
                     ef * mat
                     for ef, mat in zip(self.electric_field, dipole_ints)
                 ])
 
                 if self.scf_type == 'restricted':
-                    e_el += 2.0 * np.trace(np.matmul(efpot, den_mat))
-                    fock_mat.add_matrix(DenseMatrix(efpot), 0)
+                    e_el += 2.0 * np.trace(np.matmul(efpot, den_mat[0]))
+                    fock_mat[0] += efpot
                 else:
                     e_el += np.trace(np.matmul(efpot,
                                                (den_mat[0] + den_mat[1])))
-                    fock_mat.add_matrix(DenseMatrix(efpot), 0, 'alpha')
-                    fock_mat.add_matrix(DenseMatrix(efpot), 0, 'beta')
+                    fock_mat[0] += efpot
+                    fock_mat[1] += efpot
 
                 self._ef_nuc_energy = 0.0
                 coords = molecule.get_coordinates_in_bohr()
@@ -1374,6 +1364,8 @@ class ScfDriver:
 
             e_scf = (e_el + self._nuc_energy + self._nuc_mm_energy +
                      self._d4_energy + self._ef_nuc_energy)
+
+            e_scf = self.comm.bcast(e_scf, root=mpi_master())
 
             diff_e_scf = e_scf - self.scf_energy
 
@@ -1474,6 +1466,7 @@ class ScfDriver:
                 E_alpha = self.molecular_orbitals.ea_to_numpy()
                 E_beta = self.molecular_orbitals.eb_to_numpy()
 
+                # TODO: use get_aufbau_alpha/beta_occupation
                 occ_alpha = self.molecular_orbitals.occa_to_numpy()
                 occ_beta = self.molecular_orbitals.occb_to_numpy()
 
@@ -1488,15 +1481,18 @@ class ScfDriver:
                     F_alpha = fock_mat[0]
                     F_beta = fock_mat[1]
 
-                # TODO: add F_beta
+                den_type = (denmat.rest
+                            if self.scf_type == 'restricted' else denmat.unrest)
+                self._density = AODensityMatrix(self._density, den_type)
 
-                self._scf_tensors = {
+                self._scf_results = {
                     # eri info
                     'eri_thresh': self.eri_thresh,
                     # scf info
                     'scf_type': self.scf_type,
                     'scf_energy': self.scf_energy,
                     'restart': self.restart,
+                    'filename': self.filename,
                     # scf tensors
                     'S': S,
                     'C_alpha': C_alpha,
@@ -1513,22 +1509,25 @@ class ScfDriver:
 
                 if self._dft:
                     # dft info
-                    self._scf_tensors['xcfun'] = self.xcfun.get_func_label()
+                    self._scf_results['xcfun'] = self.xcfun.get_func_label()
                     if self.grid_level is not None:
-                        self._scf_tensors['grid_level'] = self.grid_level
+                        self._scf_results['grid_level'] = self.grid_level
 
                 if self._pe:
                     # pe info
-                    self._scf_tensors['potfile'] = self.potfile
+                    self._scf_results['potfile'] = self.potfile
 
             else:
-                self._scf_tensors = None
+                # Note: only reset scf_results here
+                # since _density and _molecular_orbitals
+                # may still be useful
+                self._scf_results = None
 
             self._scf_prop.compute_scf_prop(molecule, ao_basis,
-                                            self.scf_tensors, screener)
+                                            self.scf_results, screener)
 
             if self.rank == mpi_master():
-                self._scf_tensors['dipole_moment'] = np.array(
+                self._scf_results['dipole_moment'] = np.array(
                     self._scf_prop.get_property('dipole_moment'))
 
                 self._write_final_hdf5(molecule, ao_basis)
@@ -1549,14 +1548,19 @@ class ScfDriver:
             True if a graceful exit is needed, False otherwise.
         """
 
+        need_exit = False
+
         if self.program_end_time is not None:
             remaining_hours = (self.program_end_time -
                                datetime.now()).total_seconds() / 3600
             # exit gracefully when the remaining time is not sufficient to
             # complete the next iteration (plus 25% to be on the safe side).
             if remaining_hours < iter_in_hours * 1.25:
-                return True
-        return False
+                need_exit = True
+
+        need_exit = self.comm.bcast(need_exit, root=mpi_master())
+
+        return need_exit
 
     def _graceful_exit(self, molecule, basis):
         """
@@ -1646,13 +1650,26 @@ class ScfDriver:
                                              axis=1) / np.sum(nuclear_charges)
             else:
                 self._dipole_origin = np.zeros(3)
-            # TODO: compute dipole integrals
-            # dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
-            # dipole_drv.origin = tuple(self._dipole_origin)
-            # dipole_mats = dipole_drv.compute(molecule, basis)
-            dipole_mats = None
+
+            dipole_mats = compute_electric_dipole_integrals_gpu(
+                molecule, basis, self._dipole_origin, screener,
+                self.rank, self.nodes)
+
+            local_mu_np = [m.to_numpy() for m in dipole_mats]
+            if self.rank == mpi_master():
+                mu_np = [np.zeros((naos, naos)),
+                         np.zeros((naos, naos)),
+                         np.zeros((naos, naos))]
+            else:
+                mu_np = [None, None, None]
+            for d in range(3):
+                self.comm.Reduce(local_mu_np[d],
+                                 mu_np[d],
+                                 op=MPI.SUM,
+                                 root=mpi_master())
+            dipole_mats = mu_np
         else:
-            dipole_mats = None
+            dipole_mats = [None, None, None]
 
         t2 = tm.time()
 
@@ -1696,7 +1713,7 @@ class ScfDriver:
             The profiler.
 
         :return:
-            The AO Kohn-Sham (Vxc) matrix.
+            The Fock matrix and AO Kohn-Sham (Vxc) matrix.
         """
 
         if self.scf_type == 'restricted':
@@ -2342,39 +2359,36 @@ class ScfDriver:
             energy.
         """
 
+        xc_ene = 0.0
+        if self._dft and not self._first_step:
+            xc_ene = self.comm.reduce(vxc_mat.get_energy(), root=mpi_master())
+
         if self.rank == mpi_master():
+            # electronic, kinetic, nuclear energy
+            D = den_mat
+            F = fock_mat
+            T = kin_mat
+            V = npot_mat
+
+            H_core = T - V
+            if self._pe and not self._first_step:
+                H_core -= self._V_es
+
             if self.scf_type == 'restricted':
-                hcore_mat = kin_mat - npot_mat
-                if self._pe and not self._first_step:
-                    hcore_mat -= self._V_es
-                hcore_plus_full_Fock = 2.0 * hcore_mat + fock_mat[0]
-                e_sum = dot_product_gpu(den_mat, hcore_plus_full_Fock)
-                if self._dft and not self._first_step:
-                    e_sum += vxc_mat.get_energy()
-
-            elif self.scf_type == 'unrestricted':
-                hcore_mat = kin_mat - npot_mat
-                if self._pe and not self._first_step:
-                    assert_msg_critical(
-                        False,
-                        'SCF driver: unrestricted PE not yet supported')
-                e_sum = 0.5 * (dot_product_gpu(den_mat[0], fock_mat[0]) +
-                               dot_product_gpu(den_mat[1], fock_mat[1]))
-                e_sum += dot_product_gpu(den_mat[0] + den_mat[1], hcore_mat)
-                if self._dft and not self._first_step:
-                    e_sum += vxc_mat.get_energy()
-
+                e_sum = dot_product_gpu(D[0], F[0])
+                e_sum += 2.0 * dot_product_gpu(D[0], H_core)
             else:
-                assert_msg_critical(
-                    False,
-                    f'SCF driver: scf_type {self.scf_type} not yet supported')
+                e_sum = 0.5 * (dot_product_gpu(D[0], F[0]) +
+                               dot_product_gpu(D[1], F[1]))
+                e_sum += dot_product_gpu(D[0] + D[1], H_core)
+
+            if self._dft and not self._first_step:
+                e_sum += xc_ene
 
         else:
             e_sum = 0.0
-            if self._dft and not self._first_step:
-                e_sum += vxc_mat.get_energy()
 
-        e_sum = self.comm.allreduce(e_sum, op=MPI.SUM)
+        e_sum = self.comm.bcast(e_sum, root=mpi_master())
 
         return e_sum
 
@@ -2395,47 +2409,46 @@ class ScfDriver:
         """
 
         if self._dft and not self._first_step:
-            vxc_mat_np_local_a = vxc_mat.alpha_to_numpy()
+            np_local_xcmat_a = vxc_mat.alpha_to_numpy()
             if self.scf_type != 'restricted':
-                vxc_mat_np_local_b = vxc_mat.beta_to_numpy()
+                np_local_xcmat_b = vxc_mat.beta_to_numpy()
 
             if self.rank == mpi_master():
-                vxc_mat_np_sum_a = np.zeros(vxc_mat_np_local_a.shape)
+                np_xcmat_a = np.zeros(np_local_xcmat_a.shape)
                 if self.scf_type != 'restricted':
-                    vxc_mat_np_sum_b = np.zeros(vxc_mat_np_local_b.shape)
+                    np_xcmat_b = np.zeros(np_local_xcmat_b.shape)
             else:
-                vxc_mat_np_sum_a = None
+                np_xcmat_a = None
                 if self.scf_type != 'restricted':
-                    vxc_mat_np_sum_b = None
+                    np_xcmat_b = None
 
-            self.comm.Reduce(vxc_mat_np_local_a,
-                             vxc_mat_np_sum_a,
+            self.comm.Reduce(np_local_xcmat_a,
+                             np_xcmat_a,
                              op=MPI.SUM,
                              root=mpi_master())
             if self.scf_type != 'restricted':
-                self.comm.Reduce(vxc_mat_np_local_b,
-                                 vxc_mat_np_sum_b,
+                self.comm.Reduce(np_local_xcmat_b,
+                                 np_xcmat_b,
                                  op=MPI.SUM,
                                  root=mpi_master())
 
         if self.rank == mpi_master():
-            fock_mat[0] += (kin_mat - npot_mat)
+            T = kin_mat
+            V = npot_mat
+            fock_mat[0] += (T - V)
             if self.scf_type != 'restricted':
-                fock_mat[1] += (kin_mat - npot_mat)
+                fock_mat[1] += (T - V)
 
             if self._dft and not self._first_step:
-                fock_mat[0] += vxc_mat_np_sum_a
+                fock_mat[0] += np_xcmat_a
                 if self.scf_type != 'restricted':
-                    fock_mat[1] += vxc_mat_np_sum_b
+                    fock_mat[1] += np_xcmat_b
 
-            # TODO: double check _pe
-            """
+            # TODO: treat _pe and _point_charges separately
             if self._pe and not self._first_step:
-                fock_mat -= self._V_es
-                # TODO: take care of unrestricted/restricted-open-shell case
-                if self.scf_type in ['unrestricted', 'restricted_openshell']:
-                    pass
-            """
+                fock_mat[0] -= self._V_es
+                if self.scf_type != 'restricted':
+                    fock_mat[1] -= self._V_es
 
         return fock_mat
 
@@ -2584,7 +2597,9 @@ class ScfDriver:
             e_a = self.molecular_orbitals.ea_to_numpy()
             occ_a = self.molecular_orbitals.occa_to_numpy()
 
-            for col in range(mo_a.shape[1]):
+            # Note: in case of linear dependency, mo_a and ref_mo_a may have
+            # different number of MOs
+            for col in range(min(mo_a.shape[1], ref_mo_a.shape[1])):
                 if np.dot(mo_a[:, col], ref_mo_a[:, col]) < 0.0:
                     mo_a[:, col] *= -1.0
 
@@ -2685,8 +2700,8 @@ class ScfDriver:
 
         if self.rank == mpi_master():
             if self.scf_type == 'restricted':
-                D_alpha = self._density
-                D_beta = self._density
+                D_alpha = self._density[0]
+                D_beta = self._density[0]
             else:
                 D_alpha = self._density[0]
                 D_beta = self._density[1]
@@ -2939,13 +2954,13 @@ class ScfDriver:
 
         return (mol_orbs[:, molist], mol_eigs[molist])
 
-    def compute_s2(self, molecule, scf_tensors):
+    def compute_s2(self, molecule, scf_results):
         """
         Computes expectation value of the S**2 operator.
 
         :param molecule:
             The molecule.
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
 
         :return:
@@ -2955,9 +2970,9 @@ class ScfDriver:
         nalpha = molecule.number_of_alpha_electrons()
         nbeta = molecule.number_of_beta_electrons()
 
-        smat = scf_tensors['S']
-        Cocc_a = scf_tensors['C_alpha'][:, :nalpha].copy()
-        Cocc_b = scf_tensors['C_beta'][:, :nbeta].copy()
+        smat = scf_results['S']
+        Cocc_a = scf_results['C_alpha'][:, :nalpha].copy()
+        Cocc_b = scf_results['C_beta'][:, :nbeta].copy()
 
         a_b = float(nalpha - nbeta) / 2.0
         s2_exact = a_b * (a_b + 1.0)
@@ -2987,9 +3002,8 @@ class ScfDriver:
         self.ostream.print_header(valstr.ljust(92))
 
         mult = molecule.get_multiplicity()
-        if self.scf_type == 'restricted':
-            valstr = 'Multiplicity (2S+1)           :{:5.1f}'.format(mult)
-            self.ostream.print_header(valstr.ljust(92))
+        valstr = 'Multiplicity (2S+1)           :{:3.0f}'.format(mult)
+        self.ostream.print_header(valstr.ljust(92))
 
         sz = 0.5 * (mult - 1.0)
         valstr = 'Magnetic Quantum Number (M_S) :{:5.1f}'.format(sz)
@@ -3028,11 +3042,13 @@ class ScfDriver:
         valstr = f'Nuclear Repulsion Energy           :{enuc:20.10f} a.u.'
         self.ostream.print_header(valstr.ljust(92))
 
+        # TODO: treat _pe and _point_charges separately
         if self._pe:
             valstr = f'Nuclei-Point Charges Energy        :{enuc_mm:20.10f} a.u.'
             self.ostream.print_header(valstr.ljust(92))
 
-        if self.dispersion:
+        if self.dispersion or (self._dft and
+                               'D4' in self.xcfun.get_func_label().upper()):
             valstr = f'D4 Dispersion Correction           :{e_d4:20.10f} a.u.'
             self.ostream.print_header(valstr.ljust(92))
 
@@ -3050,7 +3066,8 @@ class ScfDriver:
 
         self.ostream.print_blank()
 
-        if self.dispersion:
+        if self.dispersion or (self._dft and
+                               'D4' in self.xcfun.get_func_label().upper()):
             valstr = '*** Reference for D4 dispersion correction: '
             self.ostream.print_header(valstr.ljust(92))
             valstr = 'E. Caldeweyher, S. Ehlert, A. Hansen, H. Neugebauer, '
@@ -3074,9 +3091,10 @@ class ScfDriver:
         if self._skip_writing_h5 or (not self.write_h5):
             return
 
-        if self.checkpoint_file is None:
+        if self.filename is None:
             return
 
+        # TODO: use final h5 file f'{self.filename}.h5'
         final_h5_fname = str(
             Path(self.checkpoint_file).with_suffix('.results.h5'))
 
@@ -3092,10 +3110,9 @@ class ScfDriver:
             potfile_text = ''
 
         create_hdf5(final_h5_fname, molecule, ao_basis, xc_label, potfile_text)
-        write_scf_results_to_hdf5(final_h5_fname, self.scf_tensors,
+        write_scf_results_to_hdf5(final_h5_fname, self.scf_results,
                                   self.history)
 
         self.ostream.print_blank()
-        checkpoint_text = 'SCF results written to file: '
-        checkpoint_text += final_h5_fname
-        self.ostream.print_info(checkpoint_text)
+        self.ostream.print_info('SCF results written to file: ' +
+                                final_h5_fname)

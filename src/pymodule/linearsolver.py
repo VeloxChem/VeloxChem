@@ -374,13 +374,13 @@ class LinearSolver:
             'screening': screening,
         }
 
-    def _init_dft(self, molecule, scf_tensors):
+    def _init_dft(self, molecule, scf_results):
         """
         Initializes DFT.
 
         :param molecule:
             The molecule.
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
 
         :return:
@@ -407,7 +407,7 @@ class LinearSolver:
             # TODO: create method for broadcasting large numpy array
 
             if self.rank == mpi_master():
-                gs_density_np = scf_tensors['D_alpha']
+                gs_density_np = scf_results['D_alpha']
                 naos = gs_density_np.shape[0]
             else:
                 naos = None
@@ -449,7 +449,7 @@ class LinearSolver:
                 potfile = self.pe_options['potfile']
                 if not Path(potfile).is_file():
                     potfile = str(
-                        Path(self._filename).parent / Path(potfile).name)
+                        Path(self.filename).parent / Path(potfile).name)
                 with Path(potfile).open('r') as fh:
                     potfile_text = '\n'.join(fh.readlines())
             else:
@@ -561,7 +561,7 @@ class LinearSolver:
         else:
             self._dist_fock_ung.append(fock_ung, axis=1)
 
-    def compute(self, molecule, basis, scf_tensors, v_grad=None):
+    def compute(self, molecule, basis, scf_results, v_grad=None):
         """
         Solves for the linear equations.
 
@@ -569,7 +569,7 @@ class LinearSolver:
             The molecule.
         :param basis:
             The AO basis.
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
         :param v_grad:
             The gradients on the right-hand side. If not provided, v_grad will
@@ -586,7 +586,7 @@ class LinearSolver:
                        vecs_ung,
                        molecule,
                        basis,
-                       scf_tensors,
+                       scf_results,
                        eri_dict,
                        dft_dict,
                        pe_dict,
@@ -602,7 +602,7 @@ class LinearSolver:
             The molecule.
         :param basis:
             The AO basis set.
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
         :param eri_dict:
             The dictionary containing ERI information.
@@ -636,8 +636,8 @@ class LinearSolver:
                 'LinearSolver._e2n_half_size: '
                 'inconsistent shape of trial vectors')
 
-            mo = scf_tensors['C_alpha']
-            fa = scf_tensors['F_alpha']
+            mo = scf_results['C_alpha']
+            fa = scf_results['F_alpha']
 
             nocc = molecule.number_of_alpha_electrons()
             norb = mo.shape[1]
@@ -1579,7 +1579,7 @@ class LinearSolver:
 
         return dist_new_ger, dist_new_ung
 
-    def get_prop_grad(self, operator, components, molecule, basis, scf_tensors,
+    def get_prop_grad(self, operator, components, molecule, basis, scf_results,
                       screening):
         """
         Computes property gradients for linear response equations.
@@ -1592,7 +1592,7 @@ class LinearSolver:
             The molecule.
         :param basis:
             The AO basis set.
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
 
         :return:
@@ -1765,7 +1765,7 @@ class LinearSolver:
             indices = {'x': 0, 'y': 1, 'z': 2}
             integral_comps = [integrals[indices[p]] for p in components]
 
-            mo = scf_tensors['C_alpha']
+            mo = scf_results['C_alpha']
             nocc = molecule.number_of_alpha_electrons()
             norb = mo.shape[1]
 
@@ -1798,7 +1798,7 @@ class LinearSolver:
             return tuple()
 
     def get_complex_prop_grad(self, operator, components, molecule, basis,
-                              scf_tensors, screening):
+                              scf_results, screening):
         """
         Computes complex property gradients for linear response equations.
 
@@ -1810,7 +1810,7 @@ class LinearSolver:
             The molecule.
         :param basis:
             The AO basis set.
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
 
         :return:
@@ -1985,7 +1985,7 @@ class LinearSolver:
             indices = {'x': 0, 'y': 1, 'z': 2}
             integral_comps = [integrals[indices[p]] for p in components]
 
-            mo = scf_tensors['C_alpha']
+            mo = scf_results['C_alpha']
             nocc = molecule.number_of_alpha_electrons()
             norb = mo.shape[1]
 
