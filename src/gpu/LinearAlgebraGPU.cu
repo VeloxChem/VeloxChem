@@ -131,7 +131,7 @@ computeDotProduct(const double* A, const double* B, const int64_t size_int64) ->
     gpublasSafe(gpublasCreate(&handle));
     gpublasSafe(gpublasSetStream(handle, stream));
 
-    auto n = static_cast<int32_t>(size);
+    auto n = static_cast<size_t>(size);
 
     double dot_product;
 
