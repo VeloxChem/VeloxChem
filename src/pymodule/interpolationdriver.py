@@ -161,6 +161,7 @@ class InterpolationDriver():
         # Name lables for the QM data points
         self.labels = None
         self.use_inverse_bond_length = True
+        self.use_eq_bond_length = False
         self.use_cosine_dihedral = False
         self.use_tc_weights = True
 
@@ -177,6 +178,7 @@ class InterpolationDriver():
                 'imforcefield_file':
                     ('str', 'the name of the chk file with QM data'),
                     'use_inverse_bond_length': ('bool', 'whether to use inverse bond lengths in the Z-matrix'),
+                    'use_eq_bond_length': ('bool', 'whether to use eq bond lengths in the Z-matrix'),
                     'use_cosine_dihedral':('bool', 'wether to use cosine and sin for the diehdral in the Z-matrix'),
                     'use_tc_weights':('bool', 'weither to use target coustomized weights'),
                 'labels': ('seq_fixed_str', 'the list of QM data point labels'),
@@ -231,6 +233,10 @@ class InterpolationDriver():
         if self.impes_coordinate.use_inverse_bond_length:
             remove_from_label += "_rinv"
             z_matrix_label += '_rinv'
+        
+        elif self.impes_coordinate.use_eq_bond_length:
+            remove_from_label += "_eq"
+            z_matrix_label += '_eq'
         
         else:
             remove_from_label += "_r"
@@ -618,7 +624,7 @@ class InterpolationDriver():
         # --- 4.  book-keeping (optional) ---------------------------------------------
         for lbl, Wi in zip(used_labels, W_i):
             self.weights[lbl] = Wi
-        print('weights', self.weights)
+        # print('weights', self.weights)
         # self.sum_of_weights      = W_i.sum()          # if you really need it later
         self.averaged_int_dist   = np.tensordot(W_i, averaged_int_dists, axes=1)
 
@@ -879,6 +885,12 @@ class InterpolationDriver():
                     # print('calculating the dihedral')
                     # dist_check[i] = np.tan(dist_org[i])
                     dist_check[i] = np.sin(dist_org[i])
+            
+            # for i, element in enumerate(self.impes_coordinate.z_matrix[:self.symmetry_information[-1][1]]): 
+            #     if len(element) == 2:
+            #         # print('calculating the dihedral')
+            #         # dist_check[i] = np.tan(dist_org[i])
+            #         dist_check[i] = 1.0/org_int_coords[i] - 1.0/data_point.internal_coordinates_values[i]
 
       
             self.bond_rmsd.append(np.sqrt(np.mean(np.sum((dist_org[:self.symmetry_information[-1][0]])**2))))
@@ -898,6 +910,12 @@ class InterpolationDriver():
                     # dist_hessian_eff *= derivative_vals
                     grad[i] *= np.cos(dist_org[i])
                     dist_hessian_eff[i] *= np.cos(dist_org[i])
+            # for i, element in enumerate(self.impes_coordinate.z_matrix[:self.symmetry_information[-1][1]]): 
+            #     if len(element) == 2:
+            #         # print('calculating the dihedral')
+            #         # dist_check[i] = np.tan(dist_org[i])
+            #         grad[i] *= -1.0/org_int_coords[i]**2
+            #         dist_hessian_eff[i] *= -1.0/org_int_coords[i]**2
             
             
             pes_prime = (np.matmul(self.impes_coordinate.b_matrix.T, (grad + dist_hessian_eff))).reshape(natm, 3)
@@ -1111,7 +1129,7 @@ class InterpolationDriver():
         weight_gradient = (-1.0 * (2.0 * (derivative_p + derivative_q)) *
                        (1.0 / (denominator**2)))
         
-        final_denominator = denominator * np.exp(self.alpha * dq)
+        final_denominator = denominator * np.exp(self.alpha * dq) 
 
         final_weight_gradient = (weight_gradient.reshape(-1) * np.exp(-self.alpha * dq) - 1.0/denominator * self.alpha * np.exp(-self.alpha * dq) * dq_dx).reshape(-1, 3)
 
@@ -1343,7 +1361,7 @@ class InterpolationDriver():
             denominator_imp_coord, weight_gradient_sub_imp_coord = self.YM_target_customized_shepard_weight_gradient(
                 distance_vector_sub, distance, data_point.confidence_radius, imp_int_coord_distance, imp_int_coord_derivative_contribution)
             
-            if 1 == 2:
+            if 1 == 1:
                 denominator_imp_coord, weight_gradient_sub_imp_coord = self.VL_target_customized_shepard_weight_gradient(
                     distance_vector_sub, distance, data_point.confidence_radius, Dimp_sq, dq_dx)
             
@@ -1558,14 +1576,18 @@ class InterpolationDriver():
         w, U   = np.linalg.eigh(H_spd)
         w_nmw, U   = np.linalg.eigh(H_spd_nmw)
 
-        I = np.eye(distance_vector.reshape(-1).size)
-        distance_2     = (distance_vector.reshape(-1) @ ((I * 1.1 * H_spd_nmw) @ distance_vector.reshape(-1)))
+        alpha = 1.1       # Your scaling factor for the Hessian importance
+        beta  = 1e-6      # Regularization: ensures non-zero distance for rigid modes/flat regions
+        d_vec = distance_vector.reshape(-1)
+        dim = d_vec.size
+        Metric = (alpha * H_spd_nmw) + (beta * np.eye(dim))
+        distance_2     = (d_vec @ ((Metric) @ d_vec))
         distance = np.sqrt(distance_2)
 
         if distance < 1e-8:
             distance = 1e-8
             distance_vector[:] = 0
-        y = ((I * 1.1 * H_spd_nmw) @ distance_vector.reshape(-1)).reshape(-1, 3)      # (Nc,3)
+        y = (Metric @ d_vec).reshape(-1, 3)      # (Nc,3)
 
         rigid = y @ R_x                           # (Nc,3)
         S = y.T @ Xc                                    # (3,3)
@@ -1661,7 +1683,7 @@ class InterpolationDriver():
         """
 
         selection_rule='relative' # 'relative' | 'coverage' | 'topk'
-        relative_threshold=0.8
+        relative_threshold=0.5
         coverage_mass=0.8
         topk = None
 
@@ -1761,8 +1783,8 @@ class InterpolationDriver():
             delta_E = abs(qm_energy - pred_E)
             delta_G = np.linalg.norm(pred_qm_G_int - pred_im_G_int)
             print(' \n\n Energy error with QM ', delta_E * hartree_in_kcalpermol(), delta_G * hartree_in_kcalpermol() * bohr_in_angstrom() / len(pred_im_G_int))
-            if  delta_E * hartree_in_kcalpermol() < 0.6 and delta_G * hartree_in_kcalpermol() * bohr_in_angstrom() / len(pred_im_G_int) < 0.8:
-                continue
+            # if  delta_E * hartree_in_kcalpermol() < 0.6 and delta_G * hartree_in_kcalpermol() * bohr_in_angstrom() / len(pred_im_G_int) < 0.8:
+            #     continue
             delta_g = pred_qm_G_int - pred_im_G_int
             print('delta g', delta_g)
             single_energy_error = []
@@ -1834,6 +1856,7 @@ class InterpolationDriver():
                     wmax = sorted_weights.max()
                     keep = sorted_weights >= (relative_threshold * wmax)
                     selected_idx = list(np.where(keep)[0])
+                    print(wmax, keep, selected_idx)
             elif selection_rule == 'coverage':
                 cum = np.cumsum(sorted_weights)
                 keep = cum <= coverage_mass

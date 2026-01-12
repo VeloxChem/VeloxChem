@@ -737,9 +737,14 @@ class GPRInterpolationDriver:
         def robust_q(arr, q):
             arr = np.asarray(arr).ravel()
             n = arr.size
+            
+            # --- FIX START ---
+            if n == 0:
+                return 0.0 # or raise a clean error, or return 0.0
+            # --- FIX END ---
+            
             arr.sort()
             if n <= 4:
-                # no trimming; linear interp
                 if n == 1:
                     return float(arr[0])
                 idx = q * (n - 1)
@@ -767,7 +772,7 @@ class GPRInterpolationDriver:
 
         n_good, n_bad = good.size, bad.size
         n_tot = n_good + n_bad
-
+        print(n_good, n_bad)
         if n_good < min_good or n_bad < min_bad:
             # With zero bads, still allow gentle learning from good-only evidence:
             # keep threshold near prior but nudge toward a higher quantile of "good".

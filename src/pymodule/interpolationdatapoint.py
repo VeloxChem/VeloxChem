@@ -114,10 +114,11 @@ class InterpolationDatapoint:
 
         self.confidence_radius = None
         self.use_inverse_bond_length = True
+        self.use_eq_bond_length = False
         self.use_cosine_dihedral = False
         self.identify_imp_int_coord = True
         self.NAC = False
-        self.eq_bond_force_constants = None
+        self.eq_bond_lengths = None
         
         # internal_coordinates is a list of geomeTRIC objects which represent
         # different types of internal coordinates (distances, angles, dihedrals)
@@ -145,6 +146,9 @@ class InterpolationDatapoint:
                 'use_inverse_bond_length':
                     ('bool',
                      'use the inverse bond lengths'),
+                'use_eq_bond_length':
+                    ('bool',
+                     'use the log bond lengths'),
                 'use_cosine_dihedral':
                     ('bool', 'use the cosine of dihedrals'
                      ),
@@ -175,6 +179,7 @@ class InterpolationDatapoint:
 
         if impes_dict is None:
             impes_dict = {}
+
 
         im_keywords = {
             key: val[0]
@@ -214,7 +219,7 @@ class InterpolationDatapoint:
 
         self.b_matrix = np.zeros((len(self.z_matrix), n_atoms * 3))
         # self.b_matrix = np.zeros((len(self.internal_coordinates), n_atoms * 3))
-        if self.use_inverse_bond_length or self.use_cosine_dihedral or self.eq_bond_force_constants is not None:
+        if self.use_inverse_bond_length or self.use_cosine_dihedral or self.use_eq_bond_length:
             self.original_b_matrix = np.zeros((len(self.z_matrix), n_atoms * 3))
             # self.original_b_matrix = np.zeros((len(self.internal_coordinates), n_atoms * 3))
 
@@ -230,12 +235,12 @@ class InterpolationDatapoint:
                 
                 self.original_b_matrix[i, :derivative.shape[0]] = derivative
             
-            elif len(z) == 2 and self.eq_bond_force_constants is not None:
+            elif len(z) == 2 and self.use_eq_bond_length:
                 r = q.value(coords)
-                # r_deriv_2 = ((2.0 / (r + self.eq_bond_force_constants[tuple(z)]['r_eq'])) 
-                #                         - (2.0 * (r - self.eq_bond_force_constants[tuple(z)]['r_eq']) / ((r + self.eq_bond_force_constants[tuple(z)]['r_eq'])**2))) 
-                
-                r_deriv_2 = ((2.0 / (r)) - (2.0 * (r - self.eq_bond_force_constants[tuple(z)]['r_eq']) / ((r)**2))) 
+                r_e = self.eq_bond_lengths[i]
+                # r_deriv_2 = 4.0 * r_e / (r + r_e)**2
+                # f = np.tanh((r - r_e)/0.4)
+                r_deriv_2 = np.exp(-0.4 * (q.value(coords) - r_e))
 
                 self.b_matrix[i, :derivative.shape[0]] = r_deriv_2 * derivative
                 
@@ -262,12 +267,12 @@ class InterpolationDatapoint:
 
             else:
                 self.b_matrix[i, :derivative.shape[0]] = derivative
-                if self.use_inverse_bond_length:
+                if self.use_inverse_bond_length or self.use_eq_bond_length:
                     self.original_b_matrix[i] = derivative
 
         if self.inv_sqrt_masses is not None:
             self.b_matrix = self.b_matrix * self.inv_sqrt_masses
-            if self.use_inverse_bond_length:
+            if self.use_inverse_bond_length or self.use_eq_bond_length:
                 self.original_b_matrix = self.original_b_matrix * self.inv_sqrt_masses
 
             # self.b_matrix[i] = derivative
@@ -307,20 +312,17 @@ class InterpolationDatapoint:
                         self.b2_matrix[i, m*3:(m+1)*3, n*3:(n+1)*3] += 2 * r_inv_3 * np.outer(self.original_b_matrix[i, m*3:(m+1)*3], self.original_b_matrix[i, n*3:(n+1)*3])
                 # self.b2_matrix[i] = 0.5 * (self.b2_matrix[i] + self.b2_matrix[i].T)
 
-            elif len(z) == 2 and self.eq_bond_force_constants is not None:
+            elif len(z) == 2 and self.use_eq_bond_length:
 
                 r = q.value(coords)
                 
-                # r_deriv_2 = ((2.0 / (r + self.eq_bond_force_constants[tuple(z)]['r_eq'])) 
-                #                         - (2.0 * (r - self.eq_bond_force_constants[tuple(z)]['r_eq']) / ((r + self.eq_bond_force_constants[tuple(z)]['r_eq'])**2))) 
+                r_e = self.eq_bond_lengths[i]
+                # r_deriv_2 = 4.0 * r_e / (r + r_e)**2
                 
-                # r_deriv_3 = ((-4.0 / ((r + self.eq_bond_force_constants[tuple(z)]['r_eq'])**2))
-                #              + (4.0 * ((r - self.eq_bond_force_constants[tuple(z)]['r_eq'])) / ((r + self.eq_bond_force_constants[tuple(z)]['r_eq'])**3))) 
+                # r_deriv_3 = - 8.0 * r_e / (r + r_e)**3
                 
-                r_deriv_2 = ((2.0 / (r)) - (2.0 * (r - self.eq_bond_force_constants[tuple(z)]['r_eq']) / ((r)**2))) 
-                
-                r_deriv_3 = ((-4.0 / ((r)**2))
-                             + (4.0 * ((r - self.eq_bond_force_constants[tuple(z)]['r_eq'])) / ((r)**3))) 
+                r_deriv_2 = np.exp(-0.4 * (q.value(coords) - r_e))
+                r_deriv_3 = -0.4 * np.exp(-0.4 * (q.value(coords) - r_e))
                 
                 self.b2_matrix[i] = r_deriv_2 * second_derivative
                 for m in range(n_atoms):
@@ -635,18 +637,19 @@ class InterpolationDatapoint:
 
         int_coords = []
         prev_dihedral = None
+  
         for idx, q in enumerate(self.internal_coordinates):
             
             if (isinstance(q, geometric.internal.Distance) and
                     self.use_inverse_bond_length):
                 int_coords.append(1.0 / q.value(coords))
-            
+    
             elif (isinstance(q, geometric.internal.Distance) and
-                    self.eq_bond_force_constants is not None):
+                    self.use_eq_bond_length):
                 
-                # int_coords.append((2.0 * (q.value(coords) - self.eq_bond_force_constants[tuple(self.z_matrix[idx])]['r_eq'])) / ((q.value(coords) + self.eq_bond_force_constants[tuple(self.z_matrix[idx])]['r_eq'])))
-
-                int_coords.append((2.0 * (q.value(coords) - self.eq_bond_force_constants[tuple(self.z_matrix[idx])]['r_eq'])) / (q.value(coords)))
+                # int_coords.append((2.0 * (q.value(coords) - self.eq_bond_lengths[idx]) / (q.value(coords) + self.eq_bond_lengths[idx])))
+                int_coords.append((1.0 - np.exp(-0.4 * (q.value(coords) - self.eq_bond_lengths[idx]))) / 0.4)
+                
             elif (isinstance(q, geometric.internal.Dihedral) and
                   self.use_cosine_dihedral):
                 
@@ -753,6 +756,8 @@ class InterpolationDatapoint:
 
             if self.use_inverse_bond_length:
                 label += "_rinv"
+            elif self.use_eq_bond_length:
+                label += "_eq"
             else:
                 label += "_r"
 
@@ -817,6 +822,18 @@ class InterpolationDatapoint:
                 self.compute_internal_coordinates_values()
                 h5f.create_dataset(full_label,
                                    data=self.internal_coordinates_values,
+                                   compression='gzip')
+                
+            if not self.use_eq_bond_length and self.eq_bond_lengths is None:
+                assert_msg_critical(
+                    self.eq_bond_lengths is not None,
+                    'InterpolationDatapoint: No eq bond lenths are defined.')
+
+            else:
+                # write internal coordinates
+                full_label = label + "_eq_bond_lengths"
+                h5f.create_dataset(full_label,
+                                   data=self.eq_bond_lengths,
                                    compression='gzip')
 
             assert_msg_critical(
@@ -890,6 +907,8 @@ class InterpolationDatapoint:
 
             if self.use_inverse_bond_length:
                 label += "_rinv"
+            elif self.use_eq_bond_length:
+                label += "_eq"
             else:
                 label += "_r"
 
@@ -904,6 +923,7 @@ class InterpolationDatapoint:
             cart_hess_label = label + "_cartesian_hessian"
             cart_grad_label = label + "_cartesian_gradient"
             coords_label = label + "_internal_coordinates"
+            eq_bond_length_label = label + "_eq_bond_lengths"
             cart_coords_label = label + "_cartesian_coordinates"
             mapping_masks_label = label + "_masks"
             confidence_radius_label = label + "_confidence_radius"
@@ -928,6 +948,7 @@ class InterpolationDatapoint:
             self.internal_hessian = np.array(h5f.get(hessian_label))
             self.hessian = np.array(h5f.get(cart_hess_label))
             self.internal_coordinates_values = np.array(h5f.get(coords_label))
+            self.eq_bond_lengths = np.array(h5f.get(eq_bond_length_label))
             self.cartesian_coordinates = np.array(h5f.get(cart_coords_label))
             self.confidence_radius = np.array(h5f.get(confidence_radius_label))
             self.mapping_masks = np.array(h5f.get(mapping_masks_label))
@@ -1039,7 +1060,7 @@ class InterpolationDatapoint:
                 
         return trust_radius
 
-    def remove_point_from_hdf5(fname, label, use_inverse_bond_length=False, use_cosine_dihedral=False):
+    def remove_point_from_hdf5(self, fname, label, use_inverse_bond_length=False, use_cosine_dihedral=False, use_eq_bond_length=False):
         """
         Removes a point (i.e., corresponding datasets) from an HDF5 file based on label and internal settings.
         
@@ -1050,6 +1071,8 @@ class InterpolationDatapoint:
         """
         if use_inverse_bond_length:
             label += "_rinv"
+        if use_eq_bond_length:
+            label += "_eq"
         else:
             label += "_r"
 
@@ -1058,17 +1081,25 @@ class InterpolationDatapoint:
         else:
             label += "_dihedral"
 
+
         keys_to_remove = [
             label + "_energy",
             label + "_gradient",
             label + "_hessian",
             label + "_internal_coordinates",
             label + "_cartesian_coordinates",
+            label + "_cartesian_gradient",
+            label + "_cartesian_hessian",
             label + "_confidence_radius",
+            label + "_masks",
+            label + "eq_bond_lengths",
             label + "_bonds",
             label + "_angles",
-            label + "_dihedrals"
-        ]
+            label + "_dihedrals",
+            label + "_imp_bonds",
+            label + "_imp_angles",
+            label + "_imp_dihedrals"
+            ]
 
         with h5py.File(fname, 'r+') as h5f:
             for key in keys_to_remove:
@@ -1090,6 +1121,8 @@ class InterpolationDatapoint:
         with h5py.File(fname, 'r+') as h5f:
             if self.use_inverse_bond_length:
                 label += "_rinv"
+            elif self.use_eq_bond_length:
+                label += "_eq"
             else:
                 label += "_r"
 

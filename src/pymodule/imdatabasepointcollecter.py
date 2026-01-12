@@ -56,6 +56,7 @@ from .optimizationdriver import OptimizationDriver
 
 # Drivers
 from .scfrestdriver import ScfRestrictedDriver
+from .scfunrestdriver import ScfUnrestrictedDriver
 from .molecularbasis import MolecularBasis
 from .scfgradientdriver import ScfGradientDriver
 from .scfhessiandriver import ScfHessianDriver
@@ -260,6 +261,8 @@ class IMDatabasePointCollecter:
         self.dynamics_settings_interpolation_run = None
         self.sampled_molecules = None
         self.bayes_models = None
+
+        self.opt_mols_org_mol_swap = {}
 
 
         # output_file variables that will be written into self.general_variable_output
@@ -1006,8 +1009,8 @@ class IMDatabasePointCollecter:
                     qm_data_point = InterpolationDatapoint(self.root_z_matrix[root])
                     qm_data_point.update_settings(self.interpolation_settings[root])
                     qm_data_point.read_hdf5(self.interpolation_settings[root]['imforcefield_file'], label)
+                    print(qm_data_point.eq_bond_lengths)
                     qm_data_point.inv_sqrt_masses = inv_sqrt_masses
-                    qm_data_point.confidence_radius = 0.5
                     self.qm_energies_dict[root].append(qm_data_point.energy)
                     self.qm_data_point_dict[root].append(qm_data_point)
 
@@ -1024,7 +1027,8 @@ class IMDatabasePointCollecter:
                     
                     driver_object.qm_symmetry_data_points[old_label].append(symmetry_data_point)
                     self.qm_symmetry_datapoint_dict[root][old_label].append(symmetry_data_point)
-
+                    
+            driver_object.impes_coordinate.eq_bond_lengths = self.qm_data_point_dict[root][0].eq_bond_lengths
             print(driver_object.qm_symmetry_data_points)       
             # Set the object as an attribute of the instance
             setattr(self, attribute_name, driver_object)
@@ -2461,7 +2465,9 @@ class IMDatabasePointCollecter:
             
    
             qm_energy, scf_results, rsp_results = self.compute_energy(drivers[0], molecule, current_basis)
-            print(qm_energy)
+            
+            print('QM_energy', qm_energy, molecule.get_xyz_string())
+            
             if isinstance(drivers[0], LinearResponseEigenSolver) or isinstance(drivers[0], TdaEigenSolver):
                 qm_energy = qm_energy[mask]
 
@@ -2545,8 +2551,8 @@ class IMDatabasePointCollecter:
                     self.add_a_point = True
                     #TODO: Check if GPR implementation is correctly implemented and updates correctly considering the GPRinterpolationdriver class
                     if self.add_gpr_model:
-
-                       for root in self.roots_to_follow:
+                        print('GPR check is performed')
+                        for root in self.roots_to_follow:
 
                             if len(self.allowed_molecules[state]['molecules']) < 2:
                                 continue
@@ -2748,7 +2754,7 @@ class IMDatabasePointCollecter:
                 self.last_added = len(self.allowed_molecules[root]['molecules'])
 
 
-            if self.use_opt_confidence_radius[0] and len(self.allowed_molecules[self.current_state]['molecules']) >= 2 and self.density_around_data_point[0][self.current_state] > 1 and self.density_around_data_point[0][self.current_state] % 5 == 0 and self.prev_dens_of_points[self.current_state] != self.density_around_data_point[0][self.current_state]:
+            if self.use_opt_confidence_radius[0] and len(self.allowed_molecules[self.current_state]['molecules']) >= 10 and self.density_around_data_point[0][self.current_state] > 1 and self.density_around_data_point[0][self.current_state] % 1 == 0 and self.prev_dens_of_points[self.current_state] != self.density_around_data_point[0][self.current_state]:
                 self.prev_dens_of_points[self.current_state] = self.density_around_data_point[0][self.current_state]        
                 trust_radius = None
                 sym_dict = self.non_core_symmetry_groups['gs']
@@ -2848,179 +2854,227 @@ class IMDatabasePointCollecter:
                     # qm_datapoints_weighted = [qm_datapoint for qm_datapoint in enumerate if ]
                     print('Items', sorted_items, len(internal_coordinate_datapoints), state_specific_energies[state_to_optim][0])
                     constraints = self.impes_drivers[state_to_optim].determine_important_internal_coordinates(state_specific_energies[state_to_optim][0], state_specific_gradients[state_to_optim][0], molecule, self.root_z_matrix[state_to_optim], internal_coordinate_datapoints)
-                    print('CONSTRAINTS', constraints)
-                    if state_to_optim == 0 and isinstance(self.drivers['gs'][0], ScfRestrictedDriver):
-                        _, scf_tensors, rsp_results = self.compute_energy(self.drivers['gs'][0], molecule, current_basis)
-     
-                        opt_drv = OptimizationDriver(self.drivers['gs'][0])
-                        opt_drv.ostream.mute()
+                    corr_new_dp_distrib = False
+                    while not corr_new_dp_distrib:
+                        print('CONSTRAINTS', constraints)
                         
-                        opt_constraint_list = []
-                        for constraint in constraints:
-                            if len(constraint) == 2:
-                                opt_constraint = f"freeze distance {constraint[0] + 1} {constraint[1] + 1}"
-                                opt_constraint_list.append(opt_constraint)
+                        if state_to_optim == 0 and isinstance(self.drivers['gs'][0], ScfRestrictedDriver) or state_to_optim == 0 and isinstance(self.drivers['gs'][0], ScfUnrestrictedDriver):
+                            _, scf_tensors, rsp_results = self.compute_energy(self.drivers['gs'][0], molecule, current_basis)
+        
+                            opt_drv = OptimizationDriver(self.drivers['gs'][0])
+                            opt_drv.ostream.mute()
                             
-                            elif len(constraint) == 3:
-                                opt_constraint = f"freeze angle {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1}"
-                                opt_constraint_list.append(opt_constraint)
-                        
-                            else:
-                                opt_constraint = f"freeze dihedral {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1} {constraint[3] + 1}"
-                                opt_constraint_list.append(opt_constraint)
-                        
-                        for constraint in self.identfy_relevant_int_coordinates[1]:
-                            if constraint in opt_constraint_list:
-                                continue
-                            if len(constraint) == 2:
-                                opt_constraint = f"freeze distance {constraint[0] + 1} {constraint[1] + 1}"
-                                opt_constraint_list.append(opt_constraint)
-                            
-                            elif len(constraint) == 3:
-                                opt_constraint = f"freeze angle {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1}"
-                                opt_constraint_list.append(opt_constraint)
-                        
-                            else:
-                                opt_constraint = f"freeze dihedral {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1} {constraint[3] + 1}"
-                                opt_constraint_list.append(opt_constraint)
-                        
-                        opt_drv.constraints = opt_constraint_list
-                        opt_results = opt_drv.compute(molecule, current_basis, scf_tensors)
-                        optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
-                        optimized_molecule.set_charge(molecule.get_charge())
-                        optimized_molecule.set_multiplicity(molecule.get_multiplicity())
-                        current_basis = MolecularBasis.read(optimized_molecule, current_basis.get_main_basis_label())
-
-                        # qm_energy, scf_tensors = self.compute_energy(drivers[0], optimized_molecule, opt_current_basis)
-                        print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', molecule.get_xyz_string())
-                    
-                    elif state_to_optim >= 1 and isinstance(self.drivers['es'][0], LinearResponseEigenSolver) or state_to_optim >= 1 and isinstance(self.drivers['es'][0], TdaEigenSolver):
-                            
-                        self.drivers['es'][1].state_deriv_index = [state_to_optim]
-                        opt_drv = OptimizationDriver(self.drivers['es'][1])
-                        _, _, rsp_results = self.compute_energy(self.drivers['es'][0], molecule, current_basis)
-                        opt_drv.ostream.mute()
-                        
-                        opt_constraint_list = []
-
-                        for constraint in constraints:
-                            if len(constraint) == 2:
-                                opt_constraint = f"freeze distance {constraint[0] + 1} {constraint[1] + 1}"
-                                opt_constraint_list.append(opt_constraint)
-                            
-                            elif len(constraint) == 3:
-                                opt_constraint = f"freeze angle {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1}"
-                                opt_constraint_list.append(opt_constraint)
-                        
-                            else:
-                                opt_constraint = f"freeze dihedral {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1} {constraint[3] + 1}"
-                                opt_constraint_list.append(opt_constraint)
-                        
-                        for constraint in self.identfy_relevant_int_coordinates[1]:
-                            if constraint in opt_constraint_list:
-                                continue
-                            if len(constraint) == 2:
-                                opt_constraint = f"freeze distance {constraint[0] + 1} {constraint[1] + 1}"
-                                opt_constraint_list.append(opt_constraint)
-                            
-                            elif len(constraint) == 3:
-                                opt_constraint = f"freeze angle {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1}"
-                                opt_constraint_list.append(opt_constraint)
-                        
-                            else:
-                                opt_constraint = f"freeze dihedral {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1} {constraint[3] + 1}"
-                                opt_constraint_list.append(opt_constraint)
-                        opt_drv.constraints = opt_constraint_list
-                        self.drivers['es'][3].ostream.mute()
-                        self.drivers['es'][0].ostream.mute()
-                        opt_results = opt_drv.compute(molecule, current_basis, self.drivers['es'][3], self.drivers['es'][0], rsp_results)
-                        excitated_roots = [root for root in self.roots_to_follow if root != 0]
-                        self.drivers['es'][1].state_deriv_index = excitated_roots
-                        optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
-                        print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', molecule.get_xyz_string())
-                        molecule = optimized_molecule   
-                        current_basis = MolecularBasis.read(optimized_molecule, current_basis.get_main_basis_label())       
-                    
-                    imp_int_coord = constraints
-
-                    same = False
-                    counter = 1
-                    sum_of_values = 0
-                    old_sorted_shorted = []
-                    for item, vlaue in sorted_items:
-                        sum_of_values += vlaue
-                        old_sorted_shorted.append(item)
-                        if sum_of_values > 0.8:       
-                            break
-
-                    old_list_change = []
-                    while not same:
-
-                        interpolation_driver = InterpolationDriver(self.root_z_matrix[state_to_optim])
-                        interpolation_driver.update_settings(self.interpolation_settings[state_to_optim])
-                        interpolation_driver.symmetry_information = self.impes_drivers[state_to_optim].symmetry_information
-                        interpolation_driver.qm_symmetry_data_points = self.impes_drivers[state_to_optim].qm_symmetry_data_points
-                        interpolation_driver.impes_coordinate.inv_sqrt_masses = self.inv_sqrt_masses
-                        interpolation_driver.distance_thrsh = 1000
-                        interpolation_driver.exponent_p = self.impes_drivers[state_to_optim].exponent_p
-                        interpolation_driver.print = False
-                        interpolation_driver.qm_data_points = self.impes_drivers[state_to_optim].qm_data_points
-                        interpolation_driver.calc_optim_trust_radius = True
-
-                        interpolation_driver.compute(optimized_molecule)
-
-                        newly_weights = interpolation_driver.weights
-                        new_weights = [value for _, value in newly_weights.items()]
-                        new_used_labels = [label_idx for label_idx, _ in newly_weights.items()]
-                        # Sort labels and weights by descending weight
-                        new_sorted_items = sorted(zip(new_used_labels, new_weights), key=lambda x: x[1], reverse=True)
-                    
-
-                        new_order = [lbl for lbl, _ in new_sorted_items[:len(old_sorted_shorted)]]
-                        
-                        same = (new_order == old_sorted_shorted)
-
-                        # quick check: exact same ordering?
-            
-                        print(new_sorted_items, sorted_items, same)
-                        int_diff = []
-                        elem_list = []
-                        if not same:
-                            for element_idx, element in enumerate(self.root_z_matrix[self.current_state]):
-
-                                if len(element) == 4 and element not in constraints:
-
-                                    diff = np.sin(interpolation_driver.impes_coordinate.internal_coordinates_values[element_idx] - self.impes_drivers[state_to_optim].impes_coordinate.internal_coordinates_values[element_idx])
-                                    if abs(diff) > 1e-1:
-                                        elem_list.append(element)
-                                        int_diff.append(diff)
+                            opt_constraint_list = []
+                            for constraint in constraints:
+                                if len(constraint) == 2:
+                                    opt_constraint = f"freeze distance {constraint[0] + 1} {constraint[1] + 1}"
+                                    opt_constraint_list.append(opt_constraint)
                                 
-                            ordered_diif = sorted(zip(elem_list, int_diff), key=lambda x:x[1], reverse=True)
+                                elif len(constraint) == 3:
+                                    opt_constraint = f"freeze angle {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1}"
+                                    opt_constraint_list.append(opt_constraint)
                             
-                            print('Len ordered list', ordered_diif)
+                                else:
+                                    opt_constraint = f"freeze dihedral {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1} {constraint[3] + 1}"
+                                    opt_constraint_list.append(opt_constraint)
                             
-                            if len(ordered_diif) > 0:
-                                for spec_elem in range(counter):
-                                    if spec_elem == len(ordered_diif):
+                            for constraint in self.identfy_relevant_int_coordinates[1]:
+                                if constraint in opt_constraint_list:
+                                    continue
+                                if len(constraint) == 2:
+                                    opt_constraint = f"freeze distance {constraint[0] + 1} {constraint[1] + 1}"
+                                    opt_constraint_list.append(opt_constraint)
+                                
+                                elif len(constraint) == 3:
+                                    opt_constraint = f"freeze angle {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1}"
+                                    opt_constraint_list.append(opt_constraint)
+                            
+                                else:
+                                    opt_constraint = f"freeze dihedral {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1} {constraint[3] + 1}"
+                                    opt_constraint_list.append(opt_constraint)
+                            
+                            opt_drv.constraints = opt_constraint_list
+                            opt_results = opt_drv.compute(molecule, current_basis, scf_tensors)
+                            optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
+                            optimized_molecule.set_charge(molecule.get_charge())
+                            optimized_molecule.set_multiplicity(molecule.get_multiplicity())
+                            current_basis = MolecularBasis.read(optimized_molecule, current_basis.get_main_basis_label())
+
+                            # qm_energy, scf_tensors = self.compute_energy(drivers[0], optimized_molecule, opt_current_basis)
+                            print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', molecule.get_xyz_string())
+                        
+                        elif state_to_optim >= 1 and isinstance(self.drivers['es'][0], LinearResponseEigenSolver) or state_to_optim >= 1 and isinstance(self.drivers['es'][0], TdaEigenSolver):
+                                
+                            self.drivers['es'][1].state_deriv_index = [state_to_optim]
+                            opt_drv = OptimizationDriver(self.drivers['es'][1])
+                            _, _, rsp_results = self.compute_energy(self.drivers['es'][0], molecule, current_basis)
+                            opt_drv.ostream.mute()
+                            
+                            opt_constraint_list = []
+
+                            for constraint in constraints:
+                                if len(constraint) == 2:
+                                    opt_constraint = f"freeze distance {constraint[0] + 1} {constraint[1] + 1}"
+                                    opt_constraint_list.append(opt_constraint)
+                                
+                                elif len(constraint) == 3:
+                                    opt_constraint = f"freeze angle {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1}"
+                                    opt_constraint_list.append(opt_constraint)
+                            
+                                else:
+                                    opt_constraint = f"freeze dihedral {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1} {constraint[3] + 1}"
+                                    opt_constraint_list.append(opt_constraint)
+                            
+                            for constraint in self.identfy_relevant_int_coordinates[1]:
+                                if constraint in opt_constraint_list:
+                                    continue
+                                if len(constraint) == 2:
+                                    opt_constraint = f"freeze distance {constraint[0] + 1} {constraint[1] + 1}"
+                                    opt_constraint_list.append(opt_constraint)
+                                
+                                elif len(constraint) == 3:
+                                    opt_constraint = f"freeze angle {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1}"
+                                    opt_constraint_list.append(opt_constraint)
+                            
+                                else:
+                                    opt_constraint = f"freeze dihedral {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1} {constraint[3] + 1}"
+                                    opt_constraint_list.append(opt_constraint)
+                            opt_drv.constraints = opt_constraint_list
+                            self.drivers['es'][3].ostream.mute()
+                            self.drivers['es'][0].ostream.mute()
+                            opt_results = opt_drv.compute(molecule, current_basis, self.drivers['es'][3], self.drivers['es'][0], rsp_results)
+                            excitated_roots = [root for root in self.roots_to_follow if root != 0]
+                            self.drivers['es'][1].state_deriv_index = excitated_roots
+                            optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
+                            optimized_molecule.set_charge(molecule.get_charge())
+                            optimized_molecule.set_multiplicity(molecule.get_multiplicity())
+                            print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', molecule.get_xyz_string()) 
+                            current_basis = MolecularBasis.read(optimized_molecule, current_basis.get_main_basis_label())       
+                        
+                        imp_int_coord = constraints
+
+                        same = False
+                        counter = 1
+                        sum_of_values = 0
+                        old_sorted_shorted = []
+                        for item, vlaue in sorted_items:
+                            sum_of_values += vlaue
+                            old_sorted_shorted.append(item)
+                            if sum_of_values > 0.8:       
+                                break
+                        
+                        old_list_change = []
+                        while not same:
+                            
+                            interpolation_driver = InterpolationDriver(self.root_z_matrix[state_to_optim])
+                            interpolation_driver.update_settings(self.interpolation_settings[state_to_optim])
+                            interpolation_driver.symmetry_information = self.impes_drivers[state_to_optim].symmetry_information
+                            interpolation_driver.qm_symmetry_data_points = self.impes_drivers[state_to_optim].qm_symmetry_data_points
+                            interpolation_driver.impes_coordinate.inv_sqrt_masses = self.inv_sqrt_masses
+                            interpolation_driver.distance_thrsh = 1000
+                            interpolation_driver.exponent_p = self.impes_drivers[state_to_optim].exponent_p
+                            interpolation_driver.print = False
+                            interpolation_driver.qm_data_points = self.impes_drivers[state_to_optim].qm_data_points
+                            interpolation_driver.calc_optim_trust_radius = True
+
+                            interpolation_driver.compute(optimized_molecule)
+
+
+                            _, distance_to_org, _ = self.calculate_distance_to_ref(optimized_molecule.get_coordinates_in_bohr(), molecule.get_coordinates_in_bohr())
+                            distances_dp_to_org = []
+                            distances_dp_to_opt = []
+                            for dp in self.impes_drivers[state_to_optim].qm_data_points:
+                                
+                                _, dist, _ = self.calculate_distance_to_ref(molecule.get_coordinates_in_bohr(), dp.cartesian_coordinates)
+                                _, dist_opt, _ = self.calculate_distance_to_ref(optimized_molecule.get_coordinates_in_bohr(), dp.cartesian_coordinates)
+                                distances_dp_to_org.append(dist)
+                                distances_dp_to_opt.append(dist_opt)
+                            
+
+                            print('Here is the distance to the from the original molecule', distances_dp_to_org, distance_to_org, distances_dp_to_opt)
+                            
+
+                            if any(dist for dist in distances_dp_to_org) < distance_to_org:
+                                min_distance = min(distances_dp_to_org)
+                                min_idx = distances_dp_to_org.index(min_distance)
+
+                                cart_coord = self.impes_drivers[state_to_optim].qm_data_points[min_idx].cartesian_coordinates
+                                int_coords = self.impes_drivers[state_to_optim].qm_data_points[min_idx].internal_coordinates_values
+                                
+                                impt_int_coords_dp = self.impes_drivers[state_to_optim].qm_data_points[min_idx].imp_int_coordinates
+
+                                _, dist, distance_vec = self.calculate_distance_to_ref(optimized_molecule.get_coordinates_in_bohr(), cart_coord)
+                                print(dist, distance_vec, interpolation_driver.impes_coordinate.internal_coordinates_values - int_coords, impt_int_coords_dp)
+
+                                self.opt_mols_org_mol_swap[state_to_optim] = molecule
+                                for imp_coord in impt_int_coords_dp:
+                                    if imp_coord not in constraints:
+                                        constraints.append(imp_coord)
                                         break
-                                    
-                                    dihedral_val_to_reset = molecule.get_dihedral_in_degrees((ordered_diif[spec_elem][0][0] + 1, ordered_diif[spec_elem][0][1] + 1, ordered_diif[spec_elem][0][2] + 1, ordered_diif[spec_elem][0][3] + 1))
-                                    # print(dihedral_val_to_reset, ordered_diif[spec_elem][0])
-                                    optimized_molecule.set_dihedral_in_degrees((ordered_diif[spec_elem][0][0] + 1, ordered_diif[spec_elem][0][1] + 1, ordered_diif[spec_elem][0][2] + 1, ordered_diif[spec_elem][0][3] + 1), dihedral_val_to_reset)
-                                    
-                                    print(optimized_molecule.get_dihedral_in_degrees((ordered_diif[spec_elem][0][0] + 1, ordered_diif[spec_elem][0][1] + 1, ordered_diif[spec_elem][0][2] + 1, ordered_diif[spec_elem][0][3] + 1)))      
-                                    print('Orderd diff element', ordered_diif[spec_elem], old_list_change)
-                                    if ordered_diif[spec_elem][0] in old_list_change:
-                                        same = True
-                            else:
-                                same = True
-                            
-                            counter +=1
-                            if len(old_list_change) == 0:
-                                old_list_change = elem_list.copy()
                                 same = True
 
-                    state_specific_molecules.append((optimized_molecule, current_basis, [state_to_optim], imp_int_coord))
+                            else:
+                                corr_new_dp_distrib = True
+                                same = True
+
+                            # newly_weights = interpolation_driver.weights
+                            # new_weights = [value for _, value in newly_weights.items()]
+                            # new_used_labels = [label_idx for label_idx, _ in newly_weights.items()]
+                            # # Sort labels and weights by descending weight
+                            # new_sorted_items = sorted(zip(new_used_labels, new_weights), key=lambda x: x[1], reverse=True)
+                        
+
+                            # new_order = [lbl for lbl, _ in new_sorted_items[:len(old_sorted_shorted)]]
+                            
+                            # same = (new_order == old_sorted_shorted)
+
+                            # # quick check: exact same ordering?
+                
+                            # print(new_sorted_items, sorted_items, same)
+                            # int_diff = []
+                            # elem_list = []
+                            # if not same:
+                            #     for element_idx, element in enumerate(self.root_z_matrix[self.current_state]):
+                                    
+                            #         target = set(element[1:3])   # positions 2 and 3 → indices 1 and 2
+
+                            #         matches = [p for p in self.all_rot_bonds if set(p).issubset(target)]
+
+                            #         if len(element) == 4 and element not in constraints and len(matches) != 0:
+
+                            #             diff = np.sin(interpolation_driver.impes_coordinate.internal_coordinates_values[element_idx] - self.impes_drivers[state_to_optim].impes_coordinate.internal_coordinates_values[element_idx])
+                            #             if abs(diff) > 1e-1:
+                            #                 elem_list.append(element)
+                            #                 int_diff.append(diff)
+                                    
+                            #     ordered_diif = sorted(zip(elem_list, int_diff), key=lambda x:x[1], reverse=True)
+                                
+                            #     print('Len ordered list', ordered_diif)
+                                
+                            #     if len(ordered_diif) > 0:
+                            #         for spec_elem in range(counter):
+                            #             if spec_elem == len(ordered_diif):
+                            #                 break
+                                        
+                            #             dihedral_val_to_reset = molecule.get_dihedral_in_degrees((ordered_diif[spec_elem][0][0] + 1, ordered_diif[spec_elem][0][1] + 1, ordered_diif[spec_elem][0][2] + 1, ordered_diif[spec_elem][0][3] + 1))
+                                        
+                            #             print(dihedral_val_to_reset)
+                            #             # print(dihedral_val_to_reset, ordered_diif[spec_elem][0])
+                            #             optimized_molecule.set_dihedral_in_degrees((ordered_diif[spec_elem][0][0] + 1, ordered_diif[spec_elem][0][1] + 1, ordered_diif[spec_elem][0][2] + 1, ordered_diif[spec_elem][0][3] + 1), dihedral_val_to_reset)
+                                        
+                            #             print(optimized_molecule.get_dihedral_in_degrees((ordered_diif[spec_elem][0][0] + 1, ordered_diif[spec_elem][0][1] + 1, ordered_diif[spec_elem][0][2] + 1, ordered_diif[spec_elem][0][3] + 1)))      
+                            #             print('Orderd diff element', ordered_diif[spec_elem], old_list_change)
+                            #             if ordered_diif[spec_elem][0] in old_list_change:
+                            #                 same = True
+                            #     else:
+                            #         same = True
+                                
+                            #     counter +=1
+                            #     if len(old_list_change) == 0:
+                            #         old_list_change = elem_list.copy()
+                            #         same = True
+
+                        state_specific_molecules.append((optimized_molecule, current_basis, [state_to_optim], imp_int_coord))
 
                 print('New optimized molecule \n', optimized_molecule.get_xyz_string())
                 self.add_point(state_specific_molecules, self.non_core_symmetry_groups)
@@ -3168,8 +3222,10 @@ class IMDatabasePointCollecter:
                     mw_grad_vec = inv_sqrt_masses * grad_vec
                     mw_hess_mat = (inv_sqrt_masses[:, None] * hess_mat) * inv_sqrt_masses[None, :]
                     
+
                     impes_coordinate = InterpolationDatapoint(self.root_z_matrix[mol_basis[4][number]])
                     impes_coordinate.update_settings(self.interpolation_settings[mol_basis[4][number]])
+                    impes_coordinate.eq_bond_lengths = self.qm_data_point_dict[mol_basis[4][number]][0].eq_bond_lengths
                     impes_coordinate.cartesian_coordinates = mol_basis[0].get_coordinates_in_bohr()
                     impes_coordinate.imp_int_coordinates = mol_basis[6]
                     impes_coordinate.inv_sqrt_masses = inv_sqrt_masses
@@ -3294,7 +3350,7 @@ class IMDatabasePointCollecter:
                     
                     impes_coordinate.write_hdf5(self.interpolation_settings[mol_basis[4][number]]['imforcefield_file'], new_label)
                     if mol_basis[5]:
-                        if self.use_opt_confidence_radius[0] and len(self.allowed_molecules[self.current_state]['molecules']) >= 20:
+                        if self.use_opt_confidence_radius[0] and len(self.allowed_molecules[self.current_state]['molecules']) >= 10:
                             
                             trust_radius = None
                             sym_dict = self.non_core_symmetry_groups['gs']
@@ -3333,11 +3389,23 @@ class IMDatabasePointCollecter:
                                                                                     self.qm_symmetry_datapoint_dict[mol_basis[4][number]],
                                                                                     sym_dict,
                                                                                     self.root_z_matrix[mol_basis[4][number]])
-                            
+
                                 for idx, trust_radius in enumerate(trust_radius):
+
                                     print(self.sorted_state_spec_im_labels[mol_basis[4][number]][idx])
                                     self.qm_data_point_dict[mol_basis[4][number]][idx].update_confidence_radius(self.interpolation_settings[mol_basis[4][number]]['imforcefield_file'], self.sorted_state_spec_im_labels[mol_basis[4][number]][idx], trust_radius)
                                     self.qm_data_point_dict[mol_basis[4][number]][idx].confidence_radius = trust_radius
+
+                                    if idx == len(trust_radius) - 1:
+
+                                        if trust_radius < 0.09:
+
+                                            self.qm_data_point_dict[mol_basis[4][number]][idx].remove_point_from_hdf5(self.interpolation_settings[mol_basis[4][number]]['imforcefield_file'], new_label, 
+                                                                                                                      use_inverse_bond_length=self.qm_data_point_dict[mol_basis[4][number]][idx].use_inverse_bond_length, 
+                                                                                                                      use_cosine_dihedral=self.qm_data_point_dict[mol_basis[4][number]][idx].use_cosine_dihedral, 
+                                                                                                                      use_eq_bond_length=self.qm_data_point_dict[mol_basis[4][number]][idx].use_eq_bond_length)
+
+                                
                                 self.simulation.saveCheckpoint('checkpoint')
                                 
                                 # self.output_file_writer(self.summary_output)
@@ -3361,6 +3429,11 @@ class IMDatabasePointCollecter:
                 if isinstance(drivers[0], LinearResponseEigenSolver) or isinstance(drivers[0], TdaEigenSolver):           
                     
                     drivers[1].state_deriv_index = org_roots
+
+            if self.current_state in self.opt_mols_org_mol_swap:
+                self.impes_drivers[self.current_state].compute(self.opt_mols_org_mol_swap[self.current_state])
+                print(self.impes_drivers[self.current_state].weights, self.impes_drivers[self.current_state].get_energy(), self.opt_mols_org_mol_swap[self.current_state].get_xyz_string())
+
     
     
     def determine_beysian_trust_radius(self, molecules, qm_energies, current_datapoints, interpolation_setting, sym_datapoints, sym_dict, z_matrix):
@@ -3401,7 +3474,7 @@ class IMDatabasePointCollecter:
             that minimizes the sum of squared errors to reference QM energies.
             """
 
-            bounds = [(-1.5, 1.5)] * len(dps)
+            bounds = [(1e-6, 1.5)] * len(dps)
              
             opt = AlphaOptimizer(z_matrix, impes_dict, sym_dict, sym_datapoints, dps,
                  geom_list, E_ref_list, G_ref_list, exponent_p_q,
@@ -3529,6 +3602,15 @@ class IMDatabasePointCollecter:
 
         # restricted SCF
         elif isinstance(qm_driver, ScfRestrictedDriver):
+            qm_driver.ostream.mute()
+            scf_results = qm_driver.compute(molecule, basis)
+            qm_energy = qm_driver.scf_energy
+            qm_energy = np.array([qm_energy])
+            qm_driver.ostream.unmute()
+            qm_driver.filename = None
+            qm_driver.checkpoint_file = None
+        
+        elif isinstance(qm_driver, ScfUnrestrictedDriver):
             qm_driver.ostream.mute()
             scf_results = qm_driver.compute(molecule, basis)
             qm_energy = qm_driver.scf_energy

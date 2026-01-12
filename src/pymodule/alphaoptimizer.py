@@ -245,7 +245,6 @@ class AlphaOptimizer:
         self._cache_key  = key
         self._cache_grad = sum_grad
 
-        print('Current alpha and loss', sum_loss, key)
         return float(sum_loss)
 
     def jac(self, alphas):
