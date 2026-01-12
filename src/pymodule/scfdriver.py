@@ -1403,7 +1403,7 @@ class ScfDriver:
             profiler.start_timer('FockDiag')
 
             if self.rank == mpi_master():
-                acc_diis.store_diis_data(fock_mat, e_mat, e_grad)
+                acc_diis.store_diis_data(fock_mat, den_mat, ovl_mat, e_mat, e_grad)
 
             if self.rank == mpi_master():
                 eff_fock_mat = acc_diis.get_effective_fock(fock_mat)
@@ -2485,22 +2485,6 @@ class ScfDriver:
         """
 
         return 0.0
-
-    def _store_diis_data(self, fock_mat, den_mat, ovl_mat, e_grad):
-        """
-        Stores Fock/Kohn-Sham and density matrices for current iteration.
-
-        :param fock_mat:
-            The Fock/Kohn-Sham matrix.
-        :param den_mat:
-            The density matrix.
-        :param ovl_mat:
-            The overlap matrix (used in ROSCF).
-        :param e_grad:
-            The electronic gradient.
-        """
-
-        return
 
     def _gen_molecular_orbitals(self, molecule, fock_mat, oao_mat,
                                 num_gpus_per_node):

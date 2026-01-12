@@ -53,6 +53,7 @@ class Diis:
         self.error_vectors = []
 
         self.fock_matrices = []
+        self.fock_matrices_proj = []
 
         self.max_err_vecs = max_err_vecs
         self.diis_thresh = diis_thresh
@@ -65,24 +66,32 @@ class Diis:
         self.error_vectors.clear()
 
         self.fock_matrices.clear()
+        self.fock_matrices_proj.clear()
 
         self.max_err_vecs = None
         self.diis_thresh = None
 
         self.b_matrix = None
 
-    def store_diis_data(self, fock_mat, e_mat, e_grad):
+    def store_diis_data(self, fock_mat, den_mat, ovl_mat, e_mat, e_grad):
 
         if e_grad < self.diis_thresh:
 
             if len(self.error_vectors) == self.max_err_vecs:
                 self.error_vectors.pop(0)
                 self.fock_matrices.pop(0)
+                if self.scf_type == 'restricted_openshell':
+                    self.fock_matrices_proj.pop(0)
                 sub_bmat = self.b_matrix[1:, 1:].copy()
                 self.b_matrix[:-1, :-1] = sub_bmat[:, :]
 
             self.error_vectors.append(e_mat.copy())
             self.fock_matrices.append([x.copy() for x in fock_mat])
+            if self.scf_type == 'restricted_openshell':
+                fock_proj = self.get_projected_fock(
+                    fock_mat[0], fock_mat[1], den_mat[0], den_mat[1], ovl_mat)
+                # Note: append a list
+                self.fock_matrices_proj.append([fock_proj])
 
             n_vecs = len(self.error_vectors)
             for i in range(n_vecs):
@@ -95,11 +104,15 @@ class Diis:
 
         n_vecs = len(self.error_vectors)
 
-        if n_vecs == 0:
-            return fock_mat
+        assert_msg_critical(
+            n_vecs > 0,
+            'Diis.get_effective_fock: Need at least one set of error vectors')
 
-        elif n_vecs == 1:
-            return self.fock_matrices[0]
+        if n_vecs == 1:
+            if self.scf_type == 'restricted_openshell':
+                return self.fock_matrices_proj[0]
+            else:
+                return self.fock_matrices[0]
 
         else:
             weights = self.compute_weights()
@@ -118,9 +131,10 @@ class Diis:
                 return (effmat_a, effmat_b)
 
             else:
-                assert_msg_critical(
-                    False,
-                    'DIIS: restricted open-shell not yet supported')
+                eff_fock_matrices = [m[0] for m in self.fock_matrices_proj]
+                effmat = weighted_sum_gpu(weights, eff_fock_matrices)
+                # Note: return a tuple
+                return (effmat,)
 
     def compute_weights(self):
         """
@@ -143,3 +157,44 @@ class Diis:
         bvec[n_vecs] = -1.0
 
         return np.linalg.solve(bmat, bvec)[:n_vecs]
+
+    @staticmethod
+    def get_projected_fock(fa, fb, da, db, s):
+        """
+        Generates projected Fock matrix.
+
+        :param fa:
+            The Fock matrix of alpha spin.
+        :param fb:
+            The Fock matrix of beta spin.
+        :param da:
+            The density matrix of alpha spin.
+        :param db:
+            The density matrix of beta spin.
+        :param s:
+            The overlap matrix.
+
+        :return:
+            The projected Fock matrix.
+        """
+
+        naos = s.shape[0]
+
+        inactive = np.matmul(s, db)
+        active = np.matmul(s, da - db)
+        virtual = np.eye(naos) - np.matmul(s, da)
+
+        #       occ   act   vir
+        #     +----------------+
+        # occ | f0    fb    f0 |
+        # act | fb    f0    fa |
+        # vir | f0    fa    f0 |
+        #     +----------------+
+
+        f0 = 0.5 * (fa + fb)
+
+        fcorr = np.linalg.multi_dot([inactive, fb - f0, active.T])
+        fcorr += np.linalg.multi_dot([active, fa - f0, virtual.T])
+        fcorr += fcorr.T
+
+        return f0 + fcorr
