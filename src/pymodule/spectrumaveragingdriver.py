@@ -101,8 +101,8 @@ class SpectrumAveragingDriver:
             A list of response results dictionaries, or list of
             (frame, rsp_results) tuples.
         :return:
-            Two lists (rames, results) where frames contains the frame indices
-            (or None) and results contains the response results dictionaries.
+            frames: list with frame indices
+            results: list with response results dictionaries
        """
         frames = []
         results = []
@@ -279,9 +279,32 @@ class SpectrumAveragingDriver:
         ax=None,
     ):
         """
-        Convenience API:
-          - If rsp_all_or_spectrum is a list of snapshots (rsp_all), compute + plot.
-          - If it is a spectrum dict (from compute()), just plot.
+        Plot an averaged UV/Vis spectrum from multiple response results.
+
+        :param rsp_all_or_spectrum:
+            Either a list of response results (frame, rsp_results), or a 
+            precomputed spectrum dictionary (as returned by the compute method).
+        :param energy_min_ev:
+            Minimum photon energy in eV for the common grid. If None, it is set to
+            (min excitation energy - padding).
+        :param energy_max_ev:
+            Maximum photon energy in eV for the common grid. If None, it is set to
+            (max excitation energy + padding).
+        :param show_individual:
+            If True, plot individual broadened spectra for each snapshot.
+        :param show_sticks:
+            If True, plots oscillator strength sticks at transition wavelengths.
+        :param show_std:
+            If True, shows a shaded area corresponding to +/- one standard deviation.
+        :param title:
+            Title of the plot.
+        :param ax:
+            Matplotlib Axes object to plot on. If None, a new figure and axes are
+            created.
+        :return:
+            The Matplotlib Axes object containing the plot.
+        :raises ImportError:
+            If matplotlib is not available.
         """
         if plt is None:
             raise ImportError("matplotlib is required for plotting")
