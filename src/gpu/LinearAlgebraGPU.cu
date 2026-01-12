@@ -80,7 +80,7 @@ computeDotProduct(const double* A, const double* B, const int64_t size) -> doubl
 
     gpuSafe(gpuSetDevice(0));
 
-    auto n = static_cast<int32_t>(size);
+    auto n = static_cast<size_t>(size);
 
     double *d_A, *d_B;
 
@@ -125,7 +125,7 @@ computeWeightedSum(double* weighted_data, const std::vector<double>& weights, co
 
     gpuSafe(gpuSetDevice(0));
 
-    auto n = static_cast<int32_t>(size);
+    auto n = static_cast<size_t>(size);
 
     double *d_X, *d_Y;
 
@@ -182,8 +182,8 @@ computeErrorVector(double* errvec, const double* X, const double* F, const doubl
 
     gpuSafe(gpuSetDevice(0));
 
-    auto nmo = static_cast<int32_t>(nmo_inp);
-    auto nao = static_cast<int32_t>(nao_inp);
+    auto nmo = static_cast<size_t>(nmo_inp);
+    auto nao = static_cast<size_t>(nao_inp);
 
     double *d_A, *d_B, *d_C;
 
@@ -313,8 +313,8 @@ transformMatrix(double* transformed_F, const double* X, const double* F,
 
     gpuSafe(gpuSetDevice(0));
 
-    auto nmo = static_cast<int32_t>(nmo_inp);
-    auto nao = static_cast<int32_t>(nao_inp);
+    auto nmo = static_cast<size_t>(nmo_inp);
+    auto nao = static_cast<size_t>(nao_inp);
 
     double *d_F, *d_X, *d_Y;
 
@@ -398,9 +398,9 @@ computeMatrixMultiplication(double* C, const double* A, const double* B, const s
 
     gpuSafe(gpuSetDevice(0));
 
-    auto m = static_cast<int32_t>(m_inp);
-    auto k = static_cast<int32_t>(k_inp);
-    auto n = static_cast<int32_t>(n_inp);
+    auto m = static_cast<size_t>(m_inp);
+    auto k = static_cast<size_t>(k_inp);
+    auto n = static_cast<size_t>(n_inp);
 
     double *d_A, *d_B, *d_C;
 
@@ -471,7 +471,7 @@ diagonalizeMatrix(double* A, double* D, const int64_t nrows_A) -> void
 
     gpuSafe(gpuSetDevice(0));
 
-    auto n = static_cast<int32_t>(nrows_A);
+    auto n = static_cast<size_t>(nrows_A);
     int32_t lwork, info;
 
     double *d_A, *d_D, *d_work;
