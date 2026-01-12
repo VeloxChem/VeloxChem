@@ -146,9 +146,3 @@ class EnvironmentDriver:
                 )
             fh.write("@end\n")
 
-        if self.ostream is not None:
-            if hasattr(self.ostream, "print"):
-                self.ostream.print(f"Wrote {pot_path}")
-            else:
-                print(f"Wrote {pot_path}\n")
-

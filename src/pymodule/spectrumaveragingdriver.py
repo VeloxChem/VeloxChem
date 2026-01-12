@@ -46,16 +46,9 @@ try:
 except ImportError:
     plt = None
 
-
-# Unit conversion factors
 au2ev = hartree_in_ev()
 ev2au = 1.0 / au2ev
-
-# For wavelength conversion directly from energy in Hartree:
-# E (Hartree) * hartree_in_wavenumber -> wavenumber in cm^-1
-# wavelength (nm) = 1e7 / (wavenumber in cm^-1)
-au2nm = 1.0e7 / hartree_in_wavenumber()  # [nm * Hartree]
-
+au2nm = 1.0e7 / hartree_in_wavenumber()
 
 class SpectrumAveragingDriver:
     """
