@@ -35,18 +35,20 @@ from mpi4py import MPI
 import sys
 from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
-from .errorhandler import assert_msg_critical
-import numpy as np
-
 
 class EnvironmentDriver:
     """
     Handles the evironment from the snaphosts of a trajectory.
+
+    :param comm:
+        The MPI communicator.
+    :param ostream:
+        The output stream.
     """
 
     def __init__(self, comm=None, ostream=None):
         """
-        Initialize the EnvironmentDriver.
+        Initialize the environment driver.
         """
         if comm is None:
             comm = MPI.COMM_WORLD
@@ -71,45 +73,44 @@ class EnvironmentDriver:
 
         Generates one .pot file per snapshot.
 
-        Returns:
-            None
-
-        Raises:
-            KeyError: If required keys are missing from snapshot dictionaries.
-            PermissionError: If output directory cannot be created or written to.
-
-        Example:
-            >>> env_drv = EnvironmentDriver()
-            >>> snapshots = trj_drv.trajectory_parser(...)
-            >>> env_drv.write_pot_files(snapshots, outdir='pot_frames')
+        :param snapshots:
+            A list of snapshot dictionaries.
+        :param outdir:
+            Output directory where the .pot files will be written.
+        :return:
+            None.
         """
         outdir = Path(outdir)
         outdir.mkdir(parents=True, exist_ok=True)
         for snap in snapshots:
-            self._write_single_pot(snap, outdir)
+            self.write_single_pot(snap, outdir)
 
-    def _write_single_pot(self, snapshot, outdir: Path):
+    def write_single_pot(self, snapshot, outdir: Path):
         """
         Write a single snapshot to a .pot file.
 
-        Generates a .pot file for one snapshot containing the @environment,
-        @charges, and @polarizabilities sections formatted for VeloxChem.
-        
-        Args:
-            snapshot (Dict): A single snapshot dictionary containing:
-                - 'frame' (int): Frame number
-                - 'mm_coords' (np.ndarray): MM region coordinates in Angstrom (N, 3)
-                - 'mm_elements' (np.ndarray): Element symbols for each atom (e.g., 'O', 'H')
-                - 'mm_resids' (np.ndarray): Residue IDs for each atom
-                - 'mm_resnames' (np.ndarray): Residue names (e.g., 'SOL')
-            outdir (Path): Output directory path.
+        The file contains the @environment,
+        @charges, and @polarizabilities sections.
 
-        Returns:
-            None
+        :param snapshot:
+            A snapshot dictionary containing:
 
-        Raises:
-            IOError: If .pot file cannot be written.
+            - frame (int):
+                Frame number used in the output file name.
+            - mm_coords (numpy.ndarray):
+                MM region Cartesian coordinates, shape (N, 3), in Angstrom.
+            - mm_elements (numpy.ndarray):
+                Element symbols for each MM atom, length N.
+            - mm_resids (numpy.ndarray):
+                Residue id for each MM atom, length N.
+            - mm_resnames (numpy.ndarray):
+                Residue name for each MM atom, length N.
 
+        :param outdir:
+            Directory where the .pot file will be written.
+
+        :return:
+            None.
         """
         frame = snapshot['frame']
         mm_coords = snapshot['mm_coords']

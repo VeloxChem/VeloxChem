@@ -36,7 +36,6 @@ import sys
 
 from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
-from .errorhandler import assert_msg_critical
 import numpy as np
 from .outputstream import OutputStream
 import MDAnalysis as mda
@@ -84,36 +83,32 @@ class TrajectoryDriver:
                           qm_region: str,
                           topology_file: str = None):
         """
-        Parse a molecular dynamics trajectory and extract QM and MM region coordinates.
+        Parse a molecular dynamics trajectory and extract QM and MM region data.
 
-        Args:
-            trajectory_file (str): Path to the trajectory file (e.g., .dcd, .xtc, .trr, etc.)
-            num_snapshots (int): Number of snapshots to extract from the trajectory.
-                Must be <= total number of frames in trajectory.
-            qm_region (str): MDAnalysis selection string defining the QM region atoms.
-                Example: 'resname MOL'
-            topology_file (str, optional): Path to the topology file (.tpr, etc)
-        
-        Returns:
-            List[Dict]: A list of snapshots, each represented as a dictionary with keys:
-                'frame' (int): Frame number from trajectory
-                'qm_coords' (np.ndarray): Coordinates of QM region atoms in Bohr
-                'mm_coords' (np.ndarray): Coordinates of MM region atoms in Bohr
-
-        Raises:
-            ValueError: If num_snapshots exceeds total frames in trajectory.
-            FileNotFoundError: If trajectory or topology files are not found.
-            
-        Example:
-            >>> trj_drv = TrajectoryDriver()
-            >>> snapshots = trj_drv.trajectory_parser(
-                trajectory_file='traj.xtc',
-                num_snapshots=4,
-                qm_region='resname MOL',
-                topology_file='topology.tpr'
-            )
-            >>> print(snapshots[0].keys())
-            dict_keys(['frame', 'qm_coords', 'mm_coords'])
+        :param trajectory_file:
+            Path to the trajectory file (e.g., .dcd, .xtc, .pdb).
+        :param topology_file:
+            Path to the topology file (e.g., .tpr).
+        :param num_snapshots:
+            Number of snapshots to extract from the trajectory.
+        :param qm_region:
+            Selection string defining the QM region (MDAnalysis selection syntax).
+        :return:
+            A list of snapshot dictionaries, each containing:
+            - frame (int):
+                Frame number.
+            - qm_coords (numpy.ndarray):
+                QM region Cartesian coordinates, shape (M, 3), in Angstrom.
+            - qm_elements (numpy.ndarray):
+                Element symbols for each QM atom, length M.
+            - mm_coords (numpy.ndarray):
+                MM region Cartesian coordinates, shape (N, 3), in Angstrom.
+            - mm_elements (numpy.ndarray):
+                Element symbols for each MM atom, length N.
+            - mm_resids (numpy.ndarray):
+                Residue id for each MM atom, length N.
+            - mm_resnames (numpy.ndarray):
+                Residue name for each MM atom, length N.
         """
         if trajectory_file.lower().endswith('.pdb'):
             self.universe = mda.Universe(trajectory_file, guess_bonds=True)

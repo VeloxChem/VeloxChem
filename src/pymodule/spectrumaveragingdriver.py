@@ -30,7 +30,11 @@
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import sys
+from mpi4py import MPI
 import numpy as np
+from .veloxchemlib import mpi_master
+from .outputstream import OutputStream
 
 from .spectrumplot import lorentzian_absorption, gaussian_absorption
 from .veloxchemlib import (
@@ -57,17 +61,41 @@ class SpectrumAveragingDriver:
     Inputs are expected to be VeloxChem response results dictionaries
     (as returned by LinearResponseEigenSolver.compute), or (frame, rsp_results)
     tuples.
+
+    :param comm:
+        The MPI communicator.
+    :param ostream:
+        The output stream.
+
+    Instance variables:
+        - broadening_type: The broadening type, 'lorentzian' or 'gaussian'.
+        - broadening_value_ev: The broadening parameter in eV.
+        - xstep_ev: Photon-energy grid spacing in eV.
+        - padding_ev: Padding added to the global min/max excitation energies (eV)
+          when constructing the common energy grid.
     """
 
-    def __init__(self):
+    def __init__(self, comm=None, ostream=None):
+        """
+        Initializes spectrum averaging driver to default setup.
+        """
+        if comm is None:
+            comm = MPI.COMM_WORLD
+
+        if ostream is None:
+            if comm.Get_rank() == mpi_master():
+                ostream = OutputStream(sys.stdout)
+            else:
+                ostream = OutputStream(None)
+   
         self.broadening_type = "lorentzian"
         self.broadening_value_ev = 0.124
         self.xstep_ev = 0.01
         self.padding_ev = 0.8
 
-    def _unpack(self, rsp_all):
+    def unpack_snapshots(self, rsp_all):
         """
-        Unpack snapshot input.
+        Unpack snapshots input.
 
         :param rsp_all:
             A list of response results dictionaries, or list of
@@ -102,6 +130,8 @@ class SpectrumAveragingDriver:
         and maximum excitation energies across snapshots (plus padding). Each
         snapshpt is broadened and converted to molar absorptivity epsilon on the
         common grid, and the mean and standard deviation are computed.
+        Followed Eqn (1) and procedure here:
+        https://doi.org/10.1021/acs.jctc.5c01719
 
         :param rsp_all:
             A list of response results dictionaries, or a list of
@@ -125,7 +155,7 @@ class SpectrumAveragingDriver:
               - transitions_au: excitation energies per snapshot (a.u.)
               - oscillator_strengths: oscillator strengths per snapshot
         """
-        frames, results = self._unpack(rsp_all)
+        frames, results = self.unpack_snapshots(rsp_all)
 
         if len(results) == 0:
             raise ValueError("No snapshots provided")
@@ -155,15 +185,14 @@ class SpectrumAveragingDriver:
         xstep_au = float(self.xstep_ev) * ev2au
         broad_au = float(self.broadening_value_ev) * ev2au
 
-        # Convert absorption cross section (a.u.) -> molar absorptivity epsilon (L mol^-1 cm^-1)
-        c = 1.0 / fine_structure_constant()          # speed of light in a.u.
+        c = 1.0 / fine_structure_constant()
         NA = avogadro_constant()
-        a0 = bohr_in_angstrom() * 1.0e-10            # meters
+        a0 = bohr_in_angstrom() * 1.0e-10
 
         epsilon_all = []
         bt = self.broadening_type.lower()
 
-        xgrid_au = None  # take from the broadening routine (np.arange(xmin, xmax, xstep))
+        xgrid_au = None
 
         for e, f in zip(all_e_au, all_f):
             if bt == "lorentzian":
@@ -243,7 +272,6 @@ class SpectrumAveragingDriver:
         *,
         energy_min_ev=None,
         energy_max_ev=None,
-        # plotting options
         show_individual=False,
         show_sticks=True,
         show_std=False,
