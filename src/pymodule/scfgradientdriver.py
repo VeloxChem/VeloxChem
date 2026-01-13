@@ -50,6 +50,7 @@ from .veloxchemlib import mpi_master
 from .veloxchemlib import bohr_in_angstrom
 from .molecularbasis import MolecularBasis
 from .outputstream import OutputStream
+from .dispersionmodel import DispersionModel
 from .gradientdriver import GradientDriver
 from .errorhandler import assert_msg_critical
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
@@ -66,6 +67,7 @@ class ScfGradientDriver(GradientDriver):
     Instance variables
         - flag: The driver flag.
         - delta_h: The displacement for finite difference.
+        - dispersion: The flag for calculating D4 dispersion correction.
     """
 
     def __init__(self, scf_drv):
@@ -79,12 +81,13 @@ class ScfGradientDriver(GradientDriver):
         self.flag = 'SCF Gradient Driver'
 
         self.eri_thresh = scf_drv.eri_thresh
+        self.timing = scf_drv.timing
+
         self.pair_thresh = scf_drv.pair_thresh
         self.density_thresh = scf_drv.density_thresh
         self.prelink_thresh = scf_drv.prelink_thresh
 
-        self.timing = scf_drv.timing
-
+        # D4 dispersion correction
         self.dispersion = scf_drv.dispersion
 
     def compute(self, molecule, basis, scf_results=None):
@@ -106,9 +109,13 @@ class ScfGradientDriver(GradientDriver):
         self.print_header()
 
         if self.numerical:
+
+            self.ostream.mute()
             self.compute_numerical(molecule, basis, scf_results)
+            self.ostream.unmute()
 
         else:
+
             # sanity checks
             molecule_sanity_check(molecule)
             scf_results_sanity_check(self, self.scf_driver.scf_tensors)
@@ -119,6 +126,8 @@ class ScfGradientDriver(GradientDriver):
             else:
                 scf_type = None
             scf_type = self.comm.bcast(scf_type, root=mpi_master())
+
+            # TODO: unrestricted gradient
 
             if scf_type == 'restricted':
                 self.compute_analytical_restricted(molecule, basis, scf_results)
@@ -159,6 +168,7 @@ class ScfGradientDriver(GradientDriver):
             'XC_grad': 0.0,
             'PE_grad': 0.0,
             'CPCM_grad': 0.0,
+            'D4_grad': 0.0,
             'Classical': 0.0,
         }
 
@@ -246,7 +256,7 @@ class ScfGradientDriver(GradientDriver):
             grad_timing['Point_charges_grad'] += time.time() - t0
 
         # orbital contribution to gradient
-    
+
         t0 = time.time()
 
         S_grad = compute_overlap_gradient_gpu(molecule, basis, grad_screener, self.rank, self.nodes)
@@ -374,9 +384,11 @@ class ScfGradientDriver(GradientDriver):
             if self.dispersion or (
                     self.scf_driver._dft and
                     'D4' in self.scf_driver.xcfun.get_func_label().upper()):
-                assert_msg_critical(
-                    False,
-                    'Dispersion correction not yet implemented for the GPU version.')
+                disp = DispersionModel()
+                disp.compute(molecule, xcfun_label)
+                self.gradient += disp.get_gradient()
+
+                grad_timing['D4_grad'] += time.time() - t0
 
             t0 = time.time()
 
@@ -476,11 +488,7 @@ class ScfGradientDriver(GradientDriver):
         else:
             # always try restarting scf for analytical gradient
             self.scf_driver.restart = True
-
-        self.scf_driver.ostream.mute()
         new_scf_results = self.scf_driver.compute(molecule, ao_basis)
-        self.scf_driver.ostream.unmute()
-
         assert_msg_critical(self.scf_driver.is_converged,
                             'ScfGradientDriver: SCF did not converge')
 

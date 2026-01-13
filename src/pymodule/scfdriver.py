@@ -58,6 +58,7 @@ from .molecularorbitals import MolecularOrbitals, molorb
 from .sadguessdriver import SadGuessDriver
 from .diis import Diis
 from .firstorderprop import FirstOrderProperties
+from .dispersionmodel import DispersionModel
 from .inputparser import (parse_input, print_keywords, print_attributes,
                           get_random_string_parallel)
 from .dftutils import get_default_grid_level, print_xc_reference
@@ -609,12 +610,30 @@ class ScfDriver:
                        tm.time() - grid_t0))
             self.ostream.print_blank()
 
-        # TODO: D4 dispersion correction
+        # D4 dispersion correction
         if self.dispersion or (self._dft and
                                'D4' in self.xcfun.get_func_label().upper()):
-            assert_msg_critical(
-                False,
-                'Dispersion correction not yet implemented for the GPU version.')
+            if self.rank == mpi_master():
+                disp = DispersionModel()
+                xc_label = self.xcfun.get_func_label() if self._dft else 'HF'
+                disp.compute(molecule, xc_label)
+                self._d4_energy = disp.get_energy()
+
+                dftd4_info = 'Using the D4 dispersion correction.'
+                self.ostream.print_info(dftd4_info)
+                self.ostream.print_blank()
+                for dftd4_ref in disp.get_references():
+                    self.ostream.print_reference(dftd4_ref)
+                self.ostream.print_blank()
+                self.ostream.flush()
+
+            else:
+                self._d4_energy = 0.0
+
+            self._d4_energy = self.comm.bcast(self._d4_energy,
+                                              root=mpi_master())
+        else:
+            self._d4_energy = 0.0
 
         # TODO: treat _pe and _point_charges separately
         # set up polarizable embedding
@@ -2764,6 +2783,11 @@ class ScfDriver:
             cur_str = 'Molecular Grid Level            : ' + str(grid_level)
             self.ostream.print_header(cur_str.ljust(str_width))
 
+        if self.dispersion or (self._dft and
+                               'D4' in self.xcfun.get_func_label().upper()):
+            cur_str = 'Dispersion Correction           : D4'
+            self.ostream.print_header(cur_str.ljust(str_width))
+
         if self.electric_field is not None:
             cur_str = 'Static Electric Field           : '
             cur_str += str(self.electric_field)
@@ -3049,17 +3073,6 @@ class ScfDriver:
         self.ostream.print_header(valstr.ljust(92))
 
         self.ostream.print_blank()
-
-        if self.dispersion or (self._dft and
-                               'D4' in self.xcfun.get_func_label().upper()):
-            valstr = '*** Reference for D4 dispersion correction: '
-            self.ostream.print_header(valstr.ljust(92))
-            valstr = 'E. Caldeweyher, S. Ehlert, A. Hansen, H. Neugebauer, '
-            valstr += 'S. Spicher, C. Bannwarth'
-            self.ostream.print_header(valstr.ljust(92))
-            valstr = 'and S. Grimme, J. Chem Phys, 2019, 150, 154122.'
-            self.ostream.print_header(valstr.ljust(92))
-
         self.ostream.flush()
 
     def _write_final_hdf5(self, molecule, ao_basis):
