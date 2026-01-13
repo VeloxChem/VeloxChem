@@ -148,7 +148,7 @@ class SpectrumAveragingDriver:
               - xgrid_au: energy grid in a.u.
               - xgrid_ev: energy grid in eV
               - wavelength_nm: wavelength axis in nm (reversed for plotting)
-              - mask_wavelength_finite: masl applied to drop a non-finite wavelength points
+              - mask_wavelength_finite: mask applied to drop a non-finite wavelength points
               - eps_all: list of epsilon arrays for each snapshot (energy axis)
               - eps_mean_ev / eps_std_ev: mean/std epsilon vs energy grid
               - eps_mean_wl / eps_std_wl: mean/std epsilon vs wavelength grid (reversed)
@@ -273,10 +273,11 @@ class SpectrumAveragingDriver:
         energy_min_ev=None,
         energy_max_ev=None,
         show_individual=False,
-        show_sticks=True,
+        show_bars=True,
         show_std=False,
         title="Absorption Spectrum (Averaged)",
         ax=None,
+        xlim_nm=None,
     ):
         """
         Plot an averaged UV/Vis spectrum from multiple response results.
@@ -292,8 +293,8 @@ class SpectrumAveragingDriver:
             (max excitation energy + padding).
         :param show_individual:
             If True, plot individual broadened spectra for each snapshot.
-        :param show_sticks:
-            If True, plots oscillator strength sticks at transition wavelengths.
+        :param show_bars:
+            If True, plots oscillator strength bars at transition wavelengths.
         :param show_std:
             If True, shows a shaded area corresponding to +/- one standard deviation.
         :param title:
@@ -301,6 +302,8 @@ class SpectrumAveragingDriver:
         :param ax:
             Matplotlib Axes object to plot on. If None, a new figure and axes are
             created.
+        :param xlim_nm:
+            Tuple (xmin, xmax) to set x-axis limits in nm. If None, automatic limits are used.
         :return:
             The Matplotlib Axes object containing the plot.
         :raises ImportError:
@@ -348,7 +351,12 @@ class SpectrumAveragingDriver:
         if show_std:
             ax.fill_between(wl, ymean - ystd, ymean + ystd, alpha=0.2)
 
-        if show_sticks:
+        if xlim_nm is not None:
+            if len(xlim_nm) != 2:
+                raise ValueError("xlim_nm must be a tuple of (xmin, xmax)")
+            ax.set_xlim(float(xlim_nm[0]), float(xlim_nm[1]))
+
+        if show_bars:
             ax2 = ax.twinx()
             ax2.set_ylabel("Oscillator strength")
 
@@ -359,5 +367,6 @@ class SpectrumAveragingDriver:
                 ax2.vlines(wl_t, 0.0, f, alpha=0.35, linewidth=2)
 
             ax2.set_ylim(0.0, max(0.2, ax2.get_ylim()[1]))
+            ax2.set_xlim(ax.get_xlim())
 
         return ax
