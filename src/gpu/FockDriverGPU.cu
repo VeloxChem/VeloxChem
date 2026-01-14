@@ -549,6 +549,20 @@ computeMixedBasisOverlapIntegralsOnGPU(const CMolecule&       molecule,
     const auto gto_blocks_2 = gtofunc::makeGtoBlocks(basis_2, molecule);
     const auto naos_2 = gtofunc::getNumberOfAtomicOrbitals(gto_blocks_2);
 
+    std::string err_f_orb("F-orbital is not yet supported");
+
+    for (const auto& gto_block : gto_blocks_1)
+    {
+        const auto gto_ang = gto_block.getAngularMomentum();
+        errors::assertMsgCritical(gto_ang <= 2, err_f_orb);
+    }
+
+    for (const auto& gto_block : gto_blocks_2)
+    {
+        const auto gto_ang = gto_block.getAngularMomentum();
+        errors::assertMsgCritical(gto_ang <= 2, err_f_orb);
+    }
+
     std::vector<CDenseMatrix> S_matrices(num_gpus_per_node);
 
     for (int64_t gpu_id = 0; gpu_id < num_gpus_per_node; gpu_id++)

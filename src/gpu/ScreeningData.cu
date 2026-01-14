@@ -95,6 +95,8 @@ CScreeningData::CScreeningData(const CMolecule& molecule,
     _p_prim_count = 0;
     _d_prim_count = 0;
 
+    std::string err_f_orb("F-orbital is not yet supported");
+
     for (const auto& gto_block : gto_blocks)
     {
         const auto ncgtos = gto_block.getNumberOfBasisFunctions();
@@ -113,6 +115,10 @@ CScreeningData::CScreeningData(const CMolecule& molecule,
         else if (gto_ang == 2)
         {
             _d_prim_count += npgtos * ncgtos;
+        }
+        else
+        {
+            errors::assertMsgCritical(false, err_f_orb);
         }
     }
 
