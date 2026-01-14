@@ -749,13 +749,48 @@ class SadGuessDriver:
 
     def get_alpha_beta_occ_for_molecule(self, molecule, net_charge,
                                         num_unpaired_electrons):
+        """
+        Gets alpha and beta occupation numbers for atoms.
+
+        :param molecule:
+            The molecule.
+        :param net_charge:
+            The net charge of the molecule.
+        :param num_unpaired_electrons:
+            The number of unpaired electrons.
+
+        :return:
+            A tuple containing alpha and beta occupation numbers.
+        """
+
+        # generate partial charges
+        # note that the ghost atoms need to be properly excluded
+
+        natoms = molecule.number_of_atoms()
+        identifiers = molecule.get_identifiers()
+
+        list_of_real_atoms = [a for a in range(natoms) if identifiers[a] > 0]
+
+        assert_msg_critical(
+            len(list_of_real_atoms) == natoms,
+            'Initial guess: Ghost atoms are not yet supported')
+
+        # TODO: implement slice method for Molecule
+
+        # sub_molecule = molecule.slice(list_of_real_atoms)
+        # sub_partial_charges = sub_molecule.get_partial_charges(net_charge)
+
+        # partial_charges = np.zeros(natoms)
+        # for i, a in enumerate(list_of_real_atoms):
+        #     partial_charges[a] = sub_partial_charges[i]
 
         partial_charges = molecule.get_partial_charges(net_charge)
+
+        # generate alpha and beta occupation numbers
 
         elem_ids = molecule.get_element_ids()
         sum_elem_ids = sum(elem_ids)
 
-        natoms = molecule.number_of_atoms()
         use_hint_for_unpaired_electrons = (len(
             self._num_unpaired_electrons_on_atoms) == natoms)
 
@@ -791,6 +826,17 @@ class SadGuessDriver:
         return alpha_occ_for_atoms, beta_occ_for_atoms
 
     def get_ao_indices_of_atoms(self, molecule, basis):
+        """
+        Gets AO indices of atoms.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+
+        :return:
+            A list of list containing AO indices of atoms.
+        """
 
         natoms = molecule.number_of_atoms()
         aoinds_atoms = [[] for atomidx in range(natoms)]
@@ -808,23 +854,31 @@ class SadGuessDriver:
 
         return aoinds_atoms
 
-    def compute(self, molecule, basis_1, basis_2, S12, S22, density_type):
+    def compute(self, molecule, basis_1, basis_2, S12, S22, scf_type):
+        """
+        Computes initial density matrix using SAD guess.
 
-        return self._comp_sad_guess(molecule, basis_1, basis_2, S12, S22,
-                                    density_type)
+        :param molecule:
+            The molecule.
+        :param basis_1:
+            The minimal basis set.
+        :param basis_2:
+            The AO basis set.
+        :scf_type:
+            The SCF type.
 
-    def _comp_sad_guess(self, molecule, basis_1, basis_2, S12, S22,
-                        density_type):
+        :return:
+            A tuple containing density matricies as numpy arrays.
+        """
 
         natoms = molecule.number_of_atoms()
 
         nao_1 = S12.shape[0]
         nao_2 = S12.shape[1]
 
-        if density_type.lower() == 'restricted':
+        if scf_type.lower() == 'restricted':
             csad = np.zeros((nao_2, nao_1))
-
-        elif density_type.lower() == 'unrestricted':
+        else:
             csad_a = np.zeros((nao_2, nao_1))
             csad_b = np.zeros((nao_2, nao_1))
 
@@ -867,6 +921,10 @@ class SadGuessDriver:
             naodim_1 = len(aoinds_1)
             naodim_2 = len(aoinds_2)
 
+            # skip ghost atom
+            if (not alpha_occ[atomidx]) and (not beta_occ[atomidx]):
+                continue
+
             err_ao_size = 'SadGuessDriver._comp_sad_guess: '
             err_ao_size += 'Mismatch between basis set and occupation number'
             assert_msg_critical(
@@ -892,7 +950,7 @@ class SadGuessDriver:
 
             mat_c2 = np.linalg.multi_dot([block_22_inv, block_12.T, mat_m])
 
-            if density_type.lower() == 'restricted':
+            if scf_type.lower() == 'restricted':
 
                 sqrt_occ = np.sqrt(alpha_occ[atomidx])
 
@@ -902,7 +960,7 @@ class SadGuessDriver:
                     for i in range(naodim_1):
                         csad[aoinds_2[j], aoinds_1[i]] = c2_j_sqrt_occ[i]
 
-            elif density_type.lower() == 'unrestricted':
+            else:
 
                 sqrt_a_occ = np.sqrt(alpha_occ[atomidx])
                 sqrt_b_occ = np.sqrt(beta_occ[atomidx])
@@ -915,9 +973,8 @@ class SadGuessDriver:
                         csad_a[aoinds_2[j], aoinds_1[i]] = c2_j_sqrt_a_occ[i]
                         csad_b[aoinds_2[j], aoinds_1[i]] = c2_j_sqrt_b_occ[i]
 
-        if density_type.lower() == 'restricted':
+        if scf_type.lower() == 'restricted':
             # Note: return a tuple
             return (matmul_gpu(csad, csad.T),)
         else:
-            return (np.matmul(csad_a, csad_a.T),
-                    np.matmul(csad_b, csad_b.T))
+            return (matmul_gpu(csad_a, csad_a.T), matmul_gpu(csad_b, csad_b.T))
