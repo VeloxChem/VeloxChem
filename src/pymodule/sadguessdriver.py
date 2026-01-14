@@ -918,10 +918,6 @@ class SadGuessDriver:
         if density_type.lower() == 'restricted':
             # Note: return a tuple
             return (matmul_gpu(csad, csad.T),)
-
-        elif density_type.lower() == 'unrestricted':
+        else:
             return (np.matmul(csad_a, csad_a.T),
                     np.matmul(csad_b, csad_b.T))
-
-        else:
-            return np.zeros(0)

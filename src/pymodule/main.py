@@ -82,7 +82,7 @@ def select_scf_driver(task, scf_type):
     elif scf_type == 'restricted_openshell':
         scf_drv = ScfRestrictedOpenDriver(task.mpi_comm, task.ostream)
     else:
-        assert_msg_critical(False, f'SCF: invalide scf_type {scf_type}')
+        assert_msg_critical(False, f'SCF: invalid scf_type {scf_type}')
 
     return scf_drv
 
@@ -155,8 +155,8 @@ def select_rsp_property(task, mol_orbs, rsp_dict, method_dict):
     #     rsp_prop = CustomProperty(rsp_dict, method_dict)
 
     else:
-        assert_msg_critical(
-            False, f'Response: invalide response property {prop_type}')
+        assert_msg_critical(False,
+                            f'Response: invalid response property {prop_type}')
 
     return rsp_prop
 
@@ -225,9 +225,6 @@ def main():
         'wave function', 'mp2', 'ump2', 'romp2', 'gradient', 'hessian',
         'optimize', 'response', 'pulses', 'visualization', 'loprop'
     ]
-
-    if task_type == 'visualization' and 'visualization' in task.input_dict:
-        run_scf = 'read_dalton' not in task.input_dict['visualization']['cubes']
 
     scf_type = 'restricted'
     if task_type in ['uhf', 'uscf', 'ump2']:

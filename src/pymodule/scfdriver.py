@@ -43,7 +43,7 @@ from .veloxchemlib import AODensityMatrix, denmat
 from .veloxchemlib import DenseMatrix
 from .veloxchemlib import ScreeningData, GpuDevices
 from .veloxchemlib import mpi_master, bohr_in_angstrom
-from .veloxchemlib import xcfun_enum
+from .veloxchemlib import xcfun as xcfun_enum
 from .veloxchemlib import (compute_fock_gpu, matmul_gpu, eigh_gpu,
                            dot_product_gpu, integrate_vxc_fock_gpu,
                            compute_overlap_and_kinetic_energy_integrals_gpu,
@@ -1209,7 +1209,7 @@ class ScfDriver:
             The profiler.
         """
 
-        self._scf_results = None
+        self._scf_results = {}
 
         self._scf_prop = FirstOrderProperties(self.comm, self.ostream)
 
@@ -1351,6 +1351,12 @@ class ScfDriver:
 
             self._comp_full_fock(fock_mat, vxc_mat, kin_mat, npot_mat)
 
+            profiler.stop_timer('ErrVec')
+
+            # TODO: CPCM
+
+            profiler.start_timer('ErrVec')
+
             if self.rank == mpi_master() and self.electric_field is not None:
                 efpot = sum([
                     ef * mat
@@ -1419,7 +1425,7 @@ class ScfDriver:
 
             # compute new Fock matrix, molecular orbitals and density
 
-            profiler.start_timer('FockDiag')
+            profiler.start_timer('EffFock')
 
             if self.rank == mpi_master():
                 acc_diis.store_diis_data(fock_mat, den_mat, ovl_mat, e_mat, e_grad)
@@ -1429,6 +1435,10 @@ class ScfDriver:
             else:
                 eff_fock_mat = None
 
+            profiler.stop_timer('EffFock')
+
+            profiler.start_timer('NewMO')
+
             self._molecular_orbitals = self._gen_molecular_orbitals(
                 molecule, eff_fock_mat, oao_mat,
                 screener.get_num_gpus_per_node())
@@ -1437,6 +1447,10 @@ class ScfDriver:
                 self._apply_mom(molecule, ovl_mat)
 
             self._update_mol_orbs_phase()
+
+            profiler.stop_timer('NewMO')
+
+            profiler.start_timer('NewDens')
 
             if self.rank == mpi_master():
                 den_mat = self.molecular_orbitals.get_density(
@@ -1456,7 +1470,7 @@ class ScfDriver:
             if self.scf_type != 'restricted':
                 self.comm.Bcast(den_mat[1], root=mpi_master())
 
-            profiler.stop_timer('FockDiag')
+            profiler.stop_timer('NewDens')
 
             profiler.check_memory_usage('Iteration {:d} Fock diag.'.format(
                 self._num_iter))
@@ -1485,9 +1499,9 @@ class ScfDriver:
                 E_alpha = self.molecular_orbitals.ea_to_numpy()
                 E_beta = self.molecular_orbitals.eb_to_numpy()
 
-                # TODO: use get_aufbau_alpha/beta_occupation
-                occ_alpha = self.molecular_orbitals.occa_to_numpy()
-                occ_beta = self.molecular_orbitals.occb_to_numpy()
+                n_mo = C_alpha.shape[1]
+                occ_alpha = molecule.get_aufbau_alpha_occupation(n_mo)
+                occ_beta = molecule.get_aufbau_beta_occupation(n_mo)
 
                 if self.scf_type == 'restricted':
                     D_alpha = self._density[0]
@@ -1537,10 +1551,11 @@ class ScfDriver:
                     self._scf_results['potfile'] = self.potfile
 
             else:
+                # non-master rank
+                self._scf_results = {}
                 # Note: only reset scf_results here
                 # since _density and _molecular_orbitals
                 # may still be useful
-                self._scf_results = None
 
             self._scf_prop.compute_scf_prop(molecule, ao_basis,
                                             self.scf_results, screener)
@@ -1550,6 +1565,10 @@ class ScfDriver:
                     self._scf_prop.get_property('dipole_moment'))
 
                 self._write_final_hdf5(molecule, ao_basis)
+
+        else:
+            # not converged (or end of first step)
+            self._scf_results = {}
 
         if self.rank == mpi_master():
             self._print_scf_finish(diis_start_time)
@@ -2406,7 +2425,6 @@ class ScfDriver:
 
         else:
             e_sum = 0.0
-
         e_sum = self.comm.bcast(e_sum, root=mpi_master())
 
         return e_sum

@@ -110,36 +110,36 @@ class MolecularOrbitals:
 
     def alpha_to_numpy(self):
 
-        return self._orbitals[0]
+        return self._orbitals[0].copy()
 
     def beta_to_numpy(self):
 
         if self._orbitals_type in [molorb.rest, molorb.restopen]:
-            return self._orbitals[0]
+            return self._orbitals[0].copy()
         else:
-            return self._orbitals[1]
+            return self._orbitals[1].copy()
 
     def ea_to_numpy(self):
 
-        return self._energies[0]
+        return self._energies[0].copy()
 
     def eb_to_numpy(self):
 
         if self._orbitals_type in [molorb.rest, molorb.restopen]:
-            return self._energies[0]
+            return self._energies[0].copy()
         else:
-            return self._energies[1]
+            return self._energies[1].copy()
 
     def occa_to_numpy(self):
 
-        return self._occupations[0]
+        return self._occupations[0].copy()
 
     def occb_to_numpy(self):
 
         if self._orbitals_type == molorb.rest:
-            return self._occupations[0]
+            return self._occupations[0].copy()
         else:
-            return self._occupations[1]
+            return self._occupations[1].copy()
 
     def number_of_aos(self):
 
@@ -198,6 +198,7 @@ class MolecularOrbitals:
                                          ao_map, 0.15, ostream)
 
             ostream.print_blank()
+            ostream.flush()
 
         elif self._orbitals_type == molorb.unrest:
 
@@ -252,6 +253,7 @@ class MolecularOrbitals:
                                          ao_map, 0.15, ostream)
 
             ostream.print_blank()
+            ostream.flush()
 
         else:
 
@@ -259,6 +261,7 @@ class MolecularOrbitals:
             errmsg += " Invalid molecular orbitals type"
             assert_msg_critical(False, errmsg)
 
+    @staticmethod
     def _print_coefficients(eigval, focc, iorb, coeffs, ao_map, thresh,
                             ostream):
         """

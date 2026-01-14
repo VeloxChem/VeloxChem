@@ -124,7 +124,8 @@ class InputParser:
                     continue
 
                 # skip first line if reading basis set
-                if (not self.is_basis_set) and (line[:10] == '@BASIS_SET'):
+                if (not self.is_basis_set) and (line.startswith('@BASIS_SET') or
+                                                line.startswith('@ECP_SET')):
                     self.is_basis_set = True
                     self.basis_set_name = line[10:].strip()
                     continue
@@ -161,7 +162,9 @@ class InputParser:
 
             for line in input_groups[group]:
                 if ':' in line:
-                    key, value = line.split(':')
+                    content = line.split(':')
+                    key = content[0]
+                    value = ':'.join(content[1:])
                     key = '_'.join(key.strip().lower().split())
                     value = value.strip()
                     if value:
@@ -446,15 +449,25 @@ def print_keywords(input_keywords, ostream):
     """
 
     width = 90
+
+    max_key_width = 0
+    for group in input_keywords:
+        for key, val in input_keywords[group].items():
+            if key.startswith('_'):
+                continue
+            max_key_width = max(len(key), max_key_width)
+
     for group in input_keywords:
         group_print = group.replace('_', ' ')
         ostream.print_header('=' * width)
         ostream.print_header(f'  @{group_print}'.ljust(width))
         ostream.print_header('-' * width)
         for key, val in input_keywords[group].items():
-            text = f'  {key}'.ljust(30)
-            text += f'  {get_keyword_type(val[0])}'.ljust(15)
-            text += f'  {val[1]}'.ljust(width - 45)
+            if key.startswith('_'):
+                continue
+            text = f'  {key}'.ljust(max_key_width + 2)
+            text += f'  {get_keyword_type(val[0])}'.ljust(12)
+            text += f'  {val[1]}'.ljust(width - max_key_width - 14)
             ostream.print_header(text)
     ostream.print_header('=' * width)
     ostream.flush()
@@ -466,12 +479,22 @@ def print_attributes(input_keywords, ostream):
     """
 
     width = 90
+
+    max_key_width = 0
+    for group in input_keywords:
+        for key, val in input_keywords[group].items():
+            if key.startswith('_'):
+                continue
+            max_key_width = max(len(key), max_key_width)
+
     ostream.print_header('=' * width)
     for group in input_keywords:
         for key, val in input_keywords[group].items():
-            text = f'  {key}'.ljust(30)
-            text += f'  {get_keyword_type(val[0])}'.ljust(15)
-            text += f'  {val[1]}'.ljust(width - 45)
+            if key.startswith('_'):
+                continue
+            text = f'  {key}'.ljust(max_key_width + 2)
+            text += f'  {get_keyword_type(val[0])}'.ljust(12)
+            text += f'  {val[1]}'.ljust(width - max_key_width - 14)
             ostream.print_header(text)
     ostream.print_header('=' * width)
     ostream.flush()
@@ -516,7 +539,8 @@ def get_random_string_serial():
     """
 
     datetime_string = datetime.now().isoformat(sep='T', timespec='seconds')
-    datetime_string = datetime_string.replace(':', '.')
+    datetime_string = datetime_string.replace('-', '')
+    datetime_string = datetime_string.split('T')[0]
 
     random_string = '{:>08s}'.format(hex(getrandbits(32))[2:])
 

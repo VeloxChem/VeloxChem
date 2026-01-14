@@ -2303,6 +2303,7 @@ class LinearSolver:
         """
 
         nvir = norb - nocc
+        evir = orb_ene[nocc:]
 
         if num_core_orbitals is not None and num_core_orbitals > 0:
             n_ov = num_core_orbitals * nvir
@@ -2310,8 +2311,6 @@ class LinearSolver:
         else:
             n_ov = nocc * nvir
             eocc = orb_ene[:nocc]
-
-        evir = orb_ene[nocc:]
 
         ediag = (-eocc.reshape(-1, 1) + evir).reshape(n_ov)
         sdiag = np.ones(ediag.shape)
@@ -2562,9 +2561,9 @@ class LinearSolver:
 
         for i in range(nocc):
             if getattr(self, 'core_excitation', False):
-                homo_str = f'core_{i+1}'
+                homo_str = f'core_{i + 1}'
             else:
-                homo_str = 'HOMO' if i == nocc - 1 else f'HOMO-{nocc-1-i}'
+                homo_str = 'HOMO' if i == nocc - 1 else f'HOMO-{nocc - 1 - i}'
 
             for a in range(nvir):
                 lumo_str = 'LUMO' if a == 0 else f'LUMO+{a}'
@@ -2617,6 +2616,7 @@ class LinearSolver:
             valstr += '{:13.6f}{:13.6f}{:13.6f}'.format(r[0], r[1], r[2])
             self.ostream.print_header(valstr.ljust(92))
         self.ostream.print_blank()
+        self.ostream.flush()
 
     def _print_absorption(self, title, results):
         """
@@ -2641,6 +2641,7 @@ class LinearSolver:
             valstr += '    Osc.Str. {:9.4f}'.format(f)
             self.ostream.print_header(valstr.ljust(92))
         self.ostream.print_blank()
+        self.ostream.flush()
 
     def _print_ecd(self, title, results):
         """
@@ -2664,6 +2665,7 @@ class LinearSolver:
             valstr += f'{R:11.4f} [10**(-40) cgs]'
             self.ostream.print_header(valstr.ljust(92))
         self.ostream.print_blank()
+        self.ostream.flush()
 
     def _print_excitation_details(self, title, results):
         """

@@ -193,7 +193,7 @@ def write_rsp_hdf5(fname, arrays, labels, molecule, basis, dft_dict, pe_dict,
     :param arrays:
         The response vectors.
     :param labels:
-        The list of labels for trial vecotrs and transformed vectors.
+        The list of labels for trial vectors and transformed vectors.
     :param molecule:
         The molecule.
     :param basis:
@@ -239,7 +239,7 @@ def read_rsp_hdf5(fname, labels, molecule, basis, dft_dict, pe_dict, ostream):
     :param fname:
         Name of the checkpoint file.
     :param labels:
-        The list of labels for trial vecotrs and transformed vectors.
+        The list of labels for trial vectors and transformed vectors.
     :param molecule:
         The molecule.
     :param basis:
@@ -289,7 +289,7 @@ def check_rsp_hdf5(fname, labels, molecule, basis, dft_dict, pe_dict):
     :param fname:
         Name of the checkpoint file.
     :param labels:
-        The list of labels for trial vecotrs and transformed vectors.
+        The list of labels for trial vectors and transformed vectors.
     :param molecule:
         The molecule.
     :param basis:

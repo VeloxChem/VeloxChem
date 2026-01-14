@@ -139,7 +139,7 @@ class ComplexResponse(LinearSolver):
         """
 
         assert_msg_critical(flag.lower() in ['absorption', 'ecd'],
-                            'ComplexResponse: invalide CPP flag')
+                            f'{type(self).__name__}: invalid CPP flag')
 
         self.cpp_flag = flag.lower()
 

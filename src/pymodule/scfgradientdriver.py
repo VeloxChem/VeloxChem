@@ -109,13 +109,9 @@ class ScfGradientDriver(GradientDriver):
         self.print_header()
 
         if self.numerical:
-
-            self.ostream.mute()
             self.compute_numerical(molecule, basis, scf_results)
-            self.ostream.unmute()
 
         else:
-
             # sanity checks
             molecule_sanity_check(molecule)
             scf_results_sanity_check(self, self.scf_driver.scf_tensors)
@@ -264,7 +260,7 @@ class ScfGradientDriver(GradientDriver):
         S_grad *= -2.0
 
         self.gradient += S_grad
-        
+
         grad_timing['Overlap_grad'] += time.time() - t0
 
         # ERI contribution to gradient
@@ -488,7 +484,11 @@ class ScfGradientDriver(GradientDriver):
         else:
             # always try restarting scf for analytical gradient
             self.scf_driver.restart = True
+
+        self.scf_driver.ostream.mute()
         new_scf_results = self.scf_driver.compute(molecule, ao_basis)
+        self.scf_driver.ostream.unmute()
+
         assert_msg_critical(self.scf_driver.is_converged,
                             'ScfGradientDriver: SCF did not converge')
 

@@ -30,7 +30,7 @@
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-from .veloxchemlib import xcfun_enum
+from .veloxchemlib import xcfun as xcfun_enum
 from .veloxchemlib import parse_xc_func
 from .veloxchemlib import XCFunctional
 from .errorhandler import assert_msg_critical
@@ -129,14 +129,6 @@ def print_xc_reference(xcfun, ostream):
         ostream.print_reference(valstr)
         ostream.print_blank()
 
-        valstr = 'Using the Libxc library '
-        valstr += f'(version {xcfun.get_libxc_version()}).'
-        ostream.print_info(valstr)
-        ostream.print_blank()
-        valstr = xcfun.get_libxc_reference()
-        ostream.print_reference(valstr)
-        ostream.print_blank()
-
         valstr = f'Using the {xcfun.get_func_label()} functional.'
         ostream.print_info(valstr)
         ostream.print_blank()
@@ -146,3 +138,12 @@ def print_xc_reference(xcfun, ostream):
                 ostream.print_reference(ref)
                 printed_refs.append(ref)
         ostream.print_blank()
+
+        valstr = 'Using the Libxc library '
+        valstr += f'(v{xcfun.get_libxc_version()}).'
+        ostream.print_info(valstr)
+        ostream.print_blank()
+        ostream.print_reference(xcfun.get_libxc_reference())
+        ostream.print_blank()
+
+        ostream.flush()
