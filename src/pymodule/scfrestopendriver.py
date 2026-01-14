@@ -33,13 +33,14 @@
 from mpi4py import MPI
 from copy import deepcopy
 import numpy as np
+import math
 import sys
 
 from .veloxchemlib import XCFunctional, MolecularGrid
 from .veloxchemlib import matmul_gpu, eigh_gpu, dot_product_gpu
 from .veloxchemlib import compute_error_vector_gpu
 from .veloxchemlib import transform_matrix_gpu
-from .veloxchemlib import mpi_master
+from .veloxchemlib import mpi_master, boltzmann_in_hartreeperkelvin
 from .molecularorbitals import MolecularOrbitals, molorb
 from .outputstream import OutputStream
 from .scfdriver import ScfDriver
@@ -182,7 +183,6 @@ class ScfRestrictedOpenDriver(ScfDriver):
             occa = molecule.get_aufbau_alpha_occupation(eigs.size)
             occb = molecule.get_aufbau_beta_occupation(eigs.size)
 
-            """
             if self.pfon and (self.pfon_temperature > 0):
 
                 self.ostream.print_info(
@@ -226,7 +226,6 @@ class ScfRestrictedOpenDriver(ScfDriver):
                 for idx in range(idx_start_b, idx_end_b):
                     pfon_b[idx] *= pfon_scale_b
                     occb[idx] = pfon_b[idx]
-            """
 
             return MolecularOrbitals([orb_coefs], [eigs], [occa, occb],
                                      molorb.restopen)

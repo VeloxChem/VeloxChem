@@ -39,7 +39,7 @@ import tempfile
 import math
 import h5py
 
-from .veloxchemlib import mpi_master
+from .veloxchemlib import mpi_master, hartree_in_kjpermol
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 from .optimizationengine import OptimizationEngine

@@ -34,11 +34,10 @@ from mpi4py import MPI
 from copy import deepcopy
 import numpy as np
 import time
-import math
 
 from .veloxchemlib import AODensityMatrix, denmat
 from .veloxchemlib import DenseMatrix
-from .veloxchemlib import GradientScreeningData, GpuDevices
+from .veloxchemlib import GradientScreeningData
 from .veloxchemlib import XCFunctional, MolecularGrid
 from .veloxchemlib import compute_overlap_gradient_gpu
 from .veloxchemlib import compute_kinetic_energy_gradient_gpu
@@ -46,9 +45,8 @@ from .veloxchemlib import compute_nuclear_potential_gradient_gpu
 from .veloxchemlib import compute_fock_gradient_gpu, matmul_gpu
 from .veloxchemlib import integrate_vxc_gradient_gpu
 from .veloxchemlib import parse_xc_func
-from .veloxchemlib import mpi_master
+from .veloxchemlib import mpi_master, hartree_in_kjpermol
 from .veloxchemlib import bohr_in_angstrom
-from .molecularbasis import MolecularBasis
 from .outputstream import OutputStream
 from .dispersionmodel import DispersionModel
 from .gradientdriver import GradientDriver
@@ -271,7 +269,7 @@ class ScfGradientDriver(GradientDriver):
             use_dft = False
         use_dft = self.comm.bcast(use_dft, root=mpi_master())
 
-        # determine fock_type and exchange_scaling_factor
+        # parse xc functional
         if use_dft:
             if self.rank == mpi_master():
                 xcfun = scf_results['xcfun']
@@ -280,17 +278,7 @@ class ScfGradientDriver(GradientDriver):
             xcfun = self.comm.bcast(xcfun, root=mpi_master())
             xcfun = parse_xc_func(xcfun)
 
-            if xcfun.is_hybrid():
-                fock_type = '2jkx'
-                exchange_scaling_factor = xcfun.get_frac_exact_exchange()
-            else:
-                fock_type = 'j'
-                exchange_scaling_factor = 0.0
-        else:
-            fock_type = '2jk'
-            exchange_scaling_factor = 1.0
-
-        # further determine exchange_scaling_factor, erf_k_coef and omega
+        # determine full_k_coef, erf_k_coef and omega
         need_omega = (use_dft and xcfun.is_range_separated())
         if need_omega:
             # range-separated hybrid

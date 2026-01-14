@@ -121,7 +121,7 @@ CMolecule::addAtom(const int64_t identifier, const TPoint3D& coordinates, const 
 
         if (_isAngstroms(units))
         {
-            const auto fact = 1.0 / units::getBohrValueInAngstroms();
+            const auto fact = 1.0 / units::bohr_in_angstrom();
 
             _coordinates.push_back({coordinates[0] * fact, coordinates[1] * fact, coordinates[2] * fact});
         }
@@ -251,7 +251,7 @@ CMolecule::getCoordinates(const std::string& units) const -> std::vector<TPoint3
         {
             std::vector<TPoint3D> coords;
 
-            const auto fact = units::getBohrValueInAngstroms();
+            const auto fact = units::bohr_in_angstrom();
 
             for (int64_t i = 0; i < natoms; i++)
             {
@@ -377,7 +377,7 @@ CMolecule::getAtomCoordinates(const int64_t iatom, const std::string& units) con
 {
     if (_isAngstroms(units))
     {
-        const auto fact = units::getBohrValueInAngstroms();
+        const auto fact = units::bohr_in_angstrom();
 
         const auto rxyz = _coordinates[iatom];
 

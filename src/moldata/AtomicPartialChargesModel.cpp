@@ -233,7 +233,7 @@ getCoordinationNumber(const CMolecule& molecule) -> std::vector<double>
 
     for (size_t i = 0; i < covalent_radii.size(); i++)
     {
-        covalent_radii[i] /= units::getBohrValueInAngstroms();
+        covalent_radii[i] /= units::bohr_in_angstrom();
 
         // D3 covalent radii used to construct the coordination number
         covalent_radii[i] *= 4.0 / 3.0;

@@ -40,14 +40,14 @@ namespace units {  // units namespace
 
  @return the conversion factor.
  */
-double getBohrValueInAngstroms();
+double bohr_in_angstrom();
 
 /**
  Gets Hartree value in electronvolts.
 
  @return the conversion factor.
  */
-double getHartreeValueInElectronVolts();
+double hartree_in_ev();
 
 /**
  Gets Hartree value in kcal/mol.
@@ -55,6 +55,13 @@ double getHartreeValueInElectronVolts();
  @return the conversion factor.
  */
 double getHartreeValueInKiloCaloriePerMole();
+
+/**
+ Gets Hartree value in kJ/mol.
+
+ @return the conversion factor.
+ */
+double getHartreeValueInKiloJoulePerMole();
 
 /**
  Gets a Hartree value in inverse nanometer.

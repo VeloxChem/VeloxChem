@@ -35,10 +35,10 @@
 namespace units {  // units namespace
 
 // CODATA 2018
-// https://physics.nist.gov/cuu/Constants/Table/allascii.txt
+// https://physics.nist.gov/cuu/Constants/ArchiveASCII/allascii_2018.txt
 
 double
-getBohrValueInAngstroms()
+bohr_in_angstrom()
 {
     // Bohr radius: 0.5291 772 109 03 e-10 [m]
 
@@ -46,7 +46,7 @@ getBohrValueInAngstroms()
 }
 
 double
-getHartreeValueInElectronVolts()
+hartree_in_ev()
 {
     // hartree-electron volt relationship: 27.211 386 245 988
 
@@ -63,6 +63,18 @@ getHartreeValueInKiloCaloriePerMole()
     // 4.3597447222071e-18 * 1e-3 * 6.02214076e23 / 4.184
 
     return 627.509474063;
+}
+
+double
+getHartreeValueInKiloJoulePerMole()
+{
+    // hartree-joule relationship: 4.359 744 722 2071 e-18
+    // Avogadro constant: 6.022 140 76 e23 [mol^-1]
+
+    // hartree-kcal/mol relationship:
+    // 4.3597447222071e-18 * 1e-3 * 6.02214076e23
+
+    return 2625.4996394798;
 }
 
 double
