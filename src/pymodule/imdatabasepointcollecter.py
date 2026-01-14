@@ -2855,6 +2855,7 @@ class IMDatabasePointCollecter:
                     print('Items', sorted_items, len(internal_coordinate_datapoints), state_specific_energies[state_to_optim][0])
                     constraints = self.impes_drivers[state_to_optim].determine_important_internal_coordinates(state_specific_energies[state_to_optim][0], state_specific_gradients[state_to_optim][0], molecule, self.root_z_matrix[state_to_optim], internal_coordinate_datapoints)
                     corr_new_dp_distrib = False
+                    old_const_len = len(constraints)
                     while not corr_new_dp_distrib:
                         print('CONSTRAINTS', constraints)
                         
@@ -3012,11 +3013,13 @@ class IMDatabasePointCollecter:
                                         constraints.append(imp_coord)
                                         break
                                 same = True
-
+                            
+                            if len(constraints) != old_const_len:
+                                old_const_len = len(constraints)
                             else:
-                                corr_new_dp_distrib = True
                                 same = True
-
+                                corr_new_dp_distrib = True
+                                
                             # newly_weights = interpolation_driver.weights
                             # new_weights = [value for _, value in newly_weights.items()]
                             # new_used_labels = [label_idx for label_idx, _ in newly_weights.items()]
