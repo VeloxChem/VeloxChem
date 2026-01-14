@@ -35,6 +35,7 @@ from pathlib import Path
 import sys
 import time as tm
 
+from .veloxchemlib import mpi_master
 from .errorhandler import assert_msg_critical
 
 
@@ -94,6 +95,27 @@ class OutputStream:
         """
 
         self.close()
+
+    @classmethod
+    def create_mpi_ostream(cls, comm, fname=None):
+        """
+        Creates an MPI output stream that remains active on master rank and
+        silent on other ranks.
+
+        :param comm:
+            The communicator.
+
+        :return:
+            The output stream.
+        """
+
+        if comm.Get_rank() == mpi_master():
+            if fname is not None and isinstance(fname, str):
+                return cls(fname)
+            else:
+                return cls(sys.stdout)
+        else:
+            return cls(None)
 
     def close(self):
         """
@@ -383,8 +405,7 @@ class OutputStream:
         self.print_title('VELOXCHEM')
         self.print_title('AN ELECTRONIC STRUCTURE CODE')
         self.print_title('')
-        self.print_title('Copyright (C) 2018-2024 VeloxChem developers.')
-        self.print_title('All rights reserved.')
+        self.print_title('Copyright 2018-2025 VeloxChem developers')
         self.print_separator()
         exec_str = 'VeloxChem execution started'
         if num_nodes > 1:
