@@ -233,29 +233,3 @@ CAODensityMatrix::betaDensity(const int64_t iDensityMatrix) const
 
     return nullptr;
 }
-
-const CDenseMatrix&
-CAODensityMatrix::getReferenceToAlphaDensity(const int64_t iDensityMatrix) const
-{
-    if (isClosedShell())
-    {
-        return _denMatrices[iDensityMatrix];
-    }
-    else
-    {
-        return _denMatrices[2 * iDensityMatrix];
-    }
-}
-
-const CDenseMatrix&
-CAODensityMatrix::getReferenceToBetaDensity(const int64_t iDensityMatrix) const
-{
-    if (isClosedShell())
-    {
-        return _denMatrices[iDensityMatrix];
-    }
-    else
-    {
-        return _denMatrices[2 * iDensityMatrix + 1];
-    }
-}

@@ -2137,7 +2137,7 @@ integrateVxcFockForLdaClosedShell(const CMolecule&        molecule,
 
     gpuSafe(gpuDeviceSynchronize());
 
-    gpu::chunkedMemcpyDeviceToHost<double>(mat_Vxc_omp[gpu_id].getPointerToAlphaValues(), d_mat_Vxc_full, naos * naos);
+    gpu::chunkedMemcpyDeviceToHost<double>(mat_Vxc_omp[gpu_id].alphaValues(), d_mat_Vxc_full, naos * naos);
 
 #pragma omp barrier
 
@@ -2165,13 +2165,13 @@ integrateVxcFockForLdaClosedShell(const CMolecule&        molecule,
 
     }
 
-    auto p_mat_Vxc = mat_Vxc_sum.getPointerToAlphaValues();
+    auto p_mat_Vxc = mat_Vxc_sum.alphaValues();
 
     double nele_sum = 0.0, xcene_sum = 0.0;
 
     for (int64_t gpu_id = 0; gpu_id < num_gpus_per_node; gpu_id++)
     {
-        auto p_mat_v = mat_Vxc_omp[gpu_id].getPointerToAlphaValues();
+        auto p_mat_v = mat_Vxc_omp[gpu_id].alphaValues();
 
         for (int64_t ind = 0; ind < naos * naos; ind++)
         {
@@ -2553,8 +2553,8 @@ integrateVxcFockForLdaOpenShell(const CMolecule&        molecule,
 
     gpuSafe(gpuDeviceSynchronize());
 
-    gpu::chunkedMemcpyDeviceToHost<double>(mat_Vxc_omp[gpu_id].getPointerToAlphaValues(), d_mat_Vxc_full_a, naos * naos);
-    gpu::chunkedMemcpyDeviceToHost<double>(mat_Vxc_omp[gpu_id].getPointerToBetaValues(), d_mat_Vxc_full_b, naos * naos);
+    gpu::chunkedMemcpyDeviceToHost<double>(mat_Vxc_omp[gpu_id].alphaValues(), d_mat_Vxc_full_a, naos * naos);
+    gpu::chunkedMemcpyDeviceToHost<double>(mat_Vxc_omp[gpu_id].betaValues(), d_mat_Vxc_full_b, naos * naos);
 
 #pragma omp barrier
 
@@ -2582,15 +2582,15 @@ integrateVxcFockForLdaOpenShell(const CMolecule&        molecule,
 
     }
 
-    auto p_mat_Vxc_a = mat_Vxc_sum.getPointerToAlphaValues();
-    auto p_mat_Vxc_b = mat_Vxc_sum.getPointerToBetaValues();
+    auto p_mat_Vxc_a = mat_Vxc_sum.alphaValues();
+    auto p_mat_Vxc_b = mat_Vxc_sum.betaValues();
 
     double nele_sum = 0.0, xcene_sum = 0.0;
 
     for (int64_t gpu_id = 0; gpu_id < num_gpus_per_node; gpu_id++)
     {
-        auto p_mat_v_a = mat_Vxc_omp[gpu_id].getPointerToAlphaValues();
-        auto p_mat_v_b = mat_Vxc_omp[gpu_id].getPointerToBetaValues();
+        auto p_mat_v_a = mat_Vxc_omp[gpu_id].alphaValues();
+        auto p_mat_v_b = mat_Vxc_omp[gpu_id].betaValues();
 
         for (int64_t ind = 0; ind < naos * naos; ind++)
         {
@@ -2972,7 +2972,7 @@ integrateVxcFockForGgaClosedShell(const CMolecule&        molecule,
 
     gpuSafe(gpuDeviceSynchronize());
 
-    gpu::chunkedMemcpyDeviceToHost<double>(mat_Vxc_omp[gpu_id].getPointerToAlphaValues(), d_mat_Vxc_full, naos * naos);
+    gpu::chunkedMemcpyDeviceToHost<double>(mat_Vxc_omp[gpu_id].alphaValues(), d_mat_Vxc_full, naos * naos);
 
     // Note: symmetrize mat_Vxc
 
@@ -3011,13 +3011,13 @@ integrateVxcFockForGgaClosedShell(const CMolecule&        molecule,
 
     }
 
-    auto p_mat_Vxc = mat_Vxc_sum.getPointerToAlphaValues();
+    auto p_mat_Vxc = mat_Vxc_sum.alphaValues();
 
     double nele_sum = 0.0, xcene_sum = 0.0;
 
     for (int64_t gpu_id = 0; gpu_id < num_gpus_per_node; gpu_id++)
     {
-        auto p_mat_v = mat_Vxc_omp[gpu_id].getPointerToAlphaValues();
+        auto p_mat_v = mat_Vxc_omp[gpu_id].alphaValues();
 
         for (int64_t ind = 0; ind < naos * naos; ind++)
         {
@@ -3439,8 +3439,8 @@ integrateVxcFockForGgaOpenShell(const CMolecule&        molecule,
 
     gpuSafe(gpuDeviceSynchronize());
 
-    gpu::chunkedMemcpyDeviceToHost<double>(mat_Vxc_omp[gpu_id].getPointerToAlphaValues(), d_mat_Vxc_full_a, naos * naos);
-    gpu::chunkedMemcpyDeviceToHost<double>(mat_Vxc_omp[gpu_id].getPointerToBetaValues(),  d_mat_Vxc_full_b, naos * naos);
+    gpu::chunkedMemcpyDeviceToHost<double>(mat_Vxc_omp[gpu_id].alphaValues(), d_mat_Vxc_full_a, naos * naos);
+    gpu::chunkedMemcpyDeviceToHost<double>(mat_Vxc_omp[gpu_id].betaValues(),  d_mat_Vxc_full_b, naos * naos);
 
     // Note: symmetrize mat_Vxc
 
@@ -3479,15 +3479,15 @@ integrateVxcFockForGgaOpenShell(const CMolecule&        molecule,
 
     }
 
-    auto p_mat_Vxc_a = mat_Vxc_sum.getPointerToAlphaValues();
-    auto p_mat_Vxc_b = mat_Vxc_sum.getPointerToBetaValues();
+    auto p_mat_Vxc_a = mat_Vxc_sum.alphaValues();
+    auto p_mat_Vxc_b = mat_Vxc_sum.betaValues();
 
     double nele_sum = 0.0, xcene_sum = 0.0;
 
     for (int64_t gpu_id = 0; gpu_id < num_gpus_per_node; gpu_id++)
     {
-        auto p_mat_v_a = mat_Vxc_omp[gpu_id].getPointerToAlphaValues();
-        auto p_mat_v_b = mat_Vxc_omp[gpu_id].getPointerToBetaValues();
+        auto p_mat_v_a = mat_Vxc_omp[gpu_id].alphaValues();
+        auto p_mat_v_b = mat_Vxc_omp[gpu_id].betaValues();
 
         for (int64_t ind = 0; ind < naos * naos; ind++)
         {

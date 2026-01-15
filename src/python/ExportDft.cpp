@@ -30,7 +30,7 @@
 //  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 //  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "ExportDFT.hpp"
+#include "ExportDft.hpp"
 
 #include <pybind11/numpy.h>
 #include <pybind11/operators.h>
@@ -72,18 +72,16 @@ export_dft(py::module& m)
     PyClass<CAOKohnShamMatrix>(m, "AOKohnShamMatrix")
         .def(py::init<>())
         .def(py::init<int64_t, int64_t, bool>(), "nrows"_a, "ncols"_a, "is_rest"_a)
-        .def("get_alpha_matrix", &CAOKohnShamMatrix::getReferenceToAlphaKohnSham, "Gets constant reference to alpha-spin Kohn-Sham matrix.")
-        .def("get_beta_matrix", &CAOKohnShamMatrix::getReferenceToBetaKohnSham, "Gets constant reference to beta-spin Kohn-Sham matrix.")
         .def(
             "alpha_to_numpy",
             [](const CAOKohnShamMatrix& self) -> py::array_t<double> {
-                return vlx_general::pointer_to_numpy(self.getPointerToAlphaValues(), {self.getNumberOfRows(), self.getNumberOfColumns()});
+                return vlx_general::pointer_to_numpy(self.alphaValues(), {self.getNumberOfRows(), self.getNumberOfColumns()});
             },
             "Converts alpha AOKohnShamMatrix to numpy array.")
         .def(
             "beta_to_numpy",
             [](const CAOKohnShamMatrix& self) -> py::array_t<double> {
-                return vlx_general::pointer_to_numpy(self.getPointerToBetaValues(), {self.getNumberOfRows(), self.getNumberOfColumns()});
+                return vlx_general::pointer_to_numpy(self.betaValues(), {self.getNumberOfRows(), self.getNumberOfColumns()});
             },
             "Converts beta AOKohnShamMatrix to numpy array.")
         .def("get_electrons", &CAOKohnShamMatrix::getNumberOfElectrons, "Gets number of electrons obtained by integrating Kohn-Sham matrix.")

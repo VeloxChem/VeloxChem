@@ -57,7 +57,7 @@ CMultiTimer::start(const std::string& label)
     {
         // found label
 
-        int64_t index = label_iter - _labels.begin();
+        auto index = label_iter - _labels.begin();
 
         _timers[index].start();
     }
@@ -82,7 +82,7 @@ CMultiTimer::stop(const std::string& label)
     {
         // found label
 
-        int64_t index = label_iter - _labels.begin();
+        auto index = label_iter - _labels.begin();
 
         _timers[index].stop();
     }

@@ -214,33 +214,19 @@ CAOKohnShamMatrix::getNumberOfElements() const -> int64_t
 }
 
 auto
-CAOKohnShamMatrix::getReferenceToAlphaKohnSham() const -> const CDenseMatrix&
-{
-    return _xcMatrices[0];
-}
-
-auto
-CAOKohnShamMatrix::getReferenceToBetaKohnSham() const -> const CDenseMatrix&
-{
-    if (_xcRestricted) return _xcMatrices[0];
-
-    return _xcMatrices[1];
-}
-
-auto
-CAOKohnShamMatrix::getPointerToAlphaValues() const -> const double*
+CAOKohnShamMatrix::alphaValues() const -> const double*
 {
     return _xcMatrices[0].values();
 }
 
 auto
-CAOKohnShamMatrix::getPointerToAlphaValues() -> double*
+CAOKohnShamMatrix::alphaValues() -> double*
 {
     return _xcMatrices[0].values();
 }
 
 auto
-CAOKohnShamMatrix::getPointerToBetaValues() const -> const double*
+CAOKohnShamMatrix::betaValues() const -> const double*
 {
     if (_xcRestricted) return _xcMatrices[0].values();
 
@@ -248,7 +234,7 @@ CAOKohnShamMatrix::getPointerToBetaValues() const -> const double*
 }
 
 auto
-CAOKohnShamMatrix::getPointerToBetaValues() -> double*
+CAOKohnShamMatrix::betaValues() -> double*
 {
     if (_xcRestricted) return _xcMatrices[0].values();
 

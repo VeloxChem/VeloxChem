@@ -37,7 +37,6 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
-#include "BatchFunc.hpp"
 #include "Codata.hpp"
 #include "GtoBlock.hpp"
 #include "StringFormat.hpp"

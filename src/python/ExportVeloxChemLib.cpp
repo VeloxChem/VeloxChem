@@ -32,7 +32,7 @@
 
 #include <pybind11/pybind11.h>
 
-#include "ExportDFT.hpp"
+#include "ExportDft.hpp"
 #include "ExportGeneral.hpp"
 #include "ExportGpu.hpp"
 #include "ExportMath.hpp"
