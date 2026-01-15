@@ -370,10 +370,7 @@ class OptimizationDriver:
         else:
             coords = m.xyzs[-1] / geometric.nifty.bohr2ang
             labels = molecule.get_labels()
-            atom_basis_labels = [
-                molecule.get_atom_basis_set_label(iatom)
-                for iatom in range(molecule.number_of_atoms())
-            ]
+            atom_basis_labels = molecule.get_atom_basis_labels()
 
             labels = self.comm.bcast(labels, root=mpi_master())
             coords = self.comm.bcast(coords, root=mpi_master())

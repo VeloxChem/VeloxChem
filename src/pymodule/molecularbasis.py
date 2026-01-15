@@ -277,7 +277,7 @@ def _MolecularBasis_read(molecule,
 
     basis_dict = {}
 
-    basis_set_labels = molecule.get_basis_set_labels()
+    basis_set_labels = molecule.get_atom_basis_labels()
 
     # read atom basis sets defined in molecule
     for basis_set_label in set(basis_set_labels):

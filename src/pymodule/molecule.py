@@ -430,8 +430,8 @@ def _Molecule_slice(self, atom_inds):
     coords = self.get_coordinates_in_bohr()
     coords_slice = coords[atom_inds]
 
-    atom_basis_labels_slice = [self.get_atom_basis_set_label(i)
-                               for i in atom_inds]
+    atom_basis_labels = self.get_atom_basis_labels()
+    atom_basis_labels_slice = [atom_basis_labels[i] for i in atom_inds]
 
     # Note: the sliced molecule fragment will have default charge and multiplicity,
     #       which could be wrong, but we will not make any guess here

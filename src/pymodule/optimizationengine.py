@@ -111,10 +111,7 @@ class OptimizationEngine(geometric.engine.Engine):
         start_time = tm.time()
 
         labels = self.molecule.get_labels()
-        atom_basis_labels = [
-            self.molecule.get_atom_basis_set_label(iatom)
-            for iatom in range(self.molecule.number_of_atoms())
-        ]
+        atom_basis_labels = self.molecule.get_atom_basis_labels()
 
         labels = self.comm.bcast(labels, root=mpi_master())
         coords = self.comm.bcast(coords, root=mpi_master())
