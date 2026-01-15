@@ -44,6 +44,8 @@ from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 from .optimizationengine import OptimizationEngine
 from .scfrestdriver import ScfRestrictedDriver
+from .scfunrestdriver import ScfUnrestrictedDriver
+from .scfrestopendriver import ScfRestrictedOpenDriver
 from .scfgradientdriver import ScfGradientDriver
 from .inputparser import parse_input, print_keywords, get_random_string_parallel
 from .errorhandler import assert_msg_critical
@@ -147,7 +149,9 @@ class OptimizationDriver:
         """
 
         if hasattr(self.grad_drv, 'scf_driver'):
-            return isinstance(self.grad_drv.scf_driver, ScfRestrictedDriver)
+            return isinstance(self.grad_drv.scf_driver,
+                              (ScfRestrictedDriver, ScfUnrestrictedDriver,
+                               ScfRestrictedOpenDriver))
         else:
             return False
 
@@ -187,7 +191,8 @@ class OptimizationDriver:
             The energy or gradient driver.
         """
 
-        if isinstance(drv, ScfRestrictedDriver):
+        if isinstance(drv, (ScfRestrictedDriver, ScfUnrestrictedDriver,
+                            ScfRestrictedOpenDriver)):
             grad_drv = ScfGradientDriver(drv)
 
         elif isinstance(drv, ScfGradientDriver):
