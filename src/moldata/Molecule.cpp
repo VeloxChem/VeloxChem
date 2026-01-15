@@ -495,63 +495,6 @@ CMolecule::checkProximity(const double minDistance) const -> bool
 }
 
 auto
-CMolecule::printGeometry() const -> std::string
-{
-    std::stringstream ss;
-
-    ss << "Molecular Geometry (Angstroms)\n";
-
-    ss << std::string(32, '=') << "\n\n";
-
-    ss << "  Atom ";
-
-    ss << fstr::format(std::string("Coordinate X"), 20, fmt_t::right);
-
-    ss << "  ";
-
-    ss << fstr::format(std::string("Coordinate Y"), 20, fmt_t::right);
-
-    ss << "  ";
-
-    ss << fstr::format(std::string("Coordinate Z"), 20, fmt_t::right);
-
-    ss << "  \n\n";
-
-    if (const auto natoms = getNumberOfAtoms(); natoms > 0)
-    {
-        const auto labels = getLabels();
-
-        const auto coords = getCoordinates("angstrom");
-
-        for (int64_t i = 0; i < natoms; i++)
-        {
-            if (_identifiers[i] != 0)
-            {
-                std::string label("  ");
-
-                label.append(labels[i]);
-
-                ss << fstr::format(label, 6, fmt_t::left);
-
-                const auto [rx, ry, rz] = coords[i];
-
-                ss << fstr::to_string(rx, 12, 22, fmt_t::right);
-
-                ss << fstr::to_string(ry, 12, 22, fmt_t::right);
-
-                ss << fstr::to_string(rz, 12, 22, fmt_t::right);
-
-                ss << "\n";
-            }
-        }
-
-        ss << "\n";
-    }
-
-    return ss.str();
-}
-
-auto
 CMolecule::_isAngstroms(const std::string& units) const -> bool
 {
     return (units.length() >= 3) && (fstr::upcase(units) == std::string("ANGSTROM").substr(0, units.length()));

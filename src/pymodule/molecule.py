@@ -286,6 +286,49 @@ def _Molecule_center_of_mass_in_angstrom(self):
     return self.center_of_mass_in_bohr() * bohr_in_angstrom()
 
 
+def _Molecule_get_string(self, title='Molecular Geometry', sep='='):
+    """
+    Returns string representation of molecule.
+
+    :return:
+        A string with representation of molecule.
+    """
+
+    mol_str_title = f'{title} (Angstroms)'
+
+    mol_str = mol_str_title + '\n'
+    mol_str += sep * (len(mol_str_title) + 2) + '\n\n'
+    mol_str += '  Atom'
+    mol_str += '         Coordinate X '
+    mol_str += '         Coordinate Y '
+    mol_str += '         Coordinate Z  \n\n'
+
+    xyz_lines = self.get_xyz_string().splitlines()
+
+    for line in xyz_lines[2:]:
+        content = line.split()
+
+        elem_name = content[0]
+        if elem_name.startswith('Bq_') or elem_name.endswith('_Bq'):
+            elem_name = ' ' + elem_name
+        else:
+            elem_name = '  ' + elem_name
+
+        x_coord = float(content[1])
+        y_coord = float(content[2])
+        z_coord = float(content[3])
+
+        mol_str += f'{elem_name:<6s}'
+        mol_str += f'{x_coord:>22.12f}'
+        mol_str += f'{y_coord:>22.12f}'
+        mol_str += f'{z_coord:>22.12f}'
+        mol_str += '\n'
+
+    mol_str += '\n'
+
+    return mol_str
+
+
 def _Molecule_more_info(self):
     """
     Returns more information about the molecule.
@@ -519,6 +562,7 @@ Molecule.from_dict = _Molecule_from_dict
 Molecule.center_of_mass = _Molecule_center_of_mass
 Molecule.center_of_mass_in_bohr = _Molecule_center_of_mass_in_bohr
 Molecule.center_of_mass_in_angstrom = _Molecule_center_of_mass_in_angstrom
+Molecule.get_string = _Molecule_get_string
 Molecule.more_info = _Molecule_more_info
 Molecule.get_coordinates_in_bohr = _Molecule_get_coordinates_in_bohr
 Molecule.get_coordinates_in_angstrom = _Molecule_get_coordinates_in_angstrom

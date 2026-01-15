@@ -149,8 +149,7 @@ export_moldata(py::module& m)
         .def("nuclear_repulsion_energy",
              &CMolecule::getNuclearRepulsionEnergy,
              "Gets nuclear repulsion energy for molecule assuming point charge model for nucleus.")
-        .def("check_proximity", &CMolecule::checkProximity, "Checks if proximity requirement is satisfied by all pairs of atoms in molecule..")
-        .def("get_string", &CMolecule::printGeometry, "Creates string representation of molecule.");
+        .def("check_proximity", &CMolecule::checkProximity, "Checks if proximity requirement is satisfied by all pairs of atoms in molecule..");
 }
 
 }  // namespace vlx_moldata

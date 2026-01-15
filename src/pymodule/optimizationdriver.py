@@ -394,7 +394,7 @@ class OptimizationDriver:
                 self.ostream.print_blank()
 
                 self.ostream.print_block(
-                    final_mol.get_string())
+                    final_mol.get_string(title='Final Geometry'))
 
                 is_scan_job = False
                 if self.constraints:

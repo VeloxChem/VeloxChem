@@ -295,13 +295,6 @@ class CMolecule
     auto checkProximity(const double distance) const -> bool;
 
     /**
-     Prints geometry of molecule as table to output stream.
-
-     @return the output string.
-     */
-    auto printGeometry() const -> std::string;
-
-    /**
      Computes vector of distances to closest neighbouring atom for each atom.
 
      @return the vector of distances.
