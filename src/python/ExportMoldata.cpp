@@ -129,7 +129,7 @@ export_moldata(py::module& m)
         .def("get_basis_set_labels", &CMolecule::getBasisSetLabels, "Gets a vector of names of atom basis sets in molecule.")
         .def("get_atom_basis_set_label", &CMolecule::getAtomBasisSetLabel, "Gets basis set name of specific atom in molecule.")
         .def("get_atom_coordinates", &CMolecule::getAtomCoordinates, "Gets coordinates [x,y,z] of atom.")
-        .def("atom_indexes", &CMolecule::getAtomIndexes, "Gets indexes of atoms with requested atomic label")
+        .def("atom_indices", &CMolecule::getAtomIndexes, "Gets indexes of atoms with requested atomic label")
         .def(
             "number_of_alpha_electrons",
             [](const CMolecule& self) -> int64_t {

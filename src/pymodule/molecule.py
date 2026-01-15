@@ -413,6 +413,32 @@ def _Molecule_write_xyz_file(self, xyz_filename):
         fh.write(self.get_xyz_string())
 
 
+def _Molecule_slice(self, atom_inds):
+    """
+    Gets a new molecule from a slice of atoms.
+
+    :param atom_inds:
+        The list of atom indices.
+
+    :return:
+        A new molecule from the atom indices.
+    """
+
+    labels = self.get_labels()
+    labels_slice = [labels[i] for i in atom_inds]
+
+    coords = self.get_coordinates_in_bohr()
+    coords_slice = coords[atom_inds]
+
+    atom_basis_labels_slice = [self.get_atom_basis_set_label(i)
+                               for i in atom_inds]
+
+    # Note: the sliced molecule fragment will have default charge and multiplicity,
+    #       which could be wrong, but we will not make any guess here
+
+    return Molecule(labels_slice, coords_slice, 'au', atom_basis_labels_slice)
+
+
 def _Molecule_moments_of_inertia(self):
     """
     Calculates the moment of inertia tensor and principle axes.
@@ -568,6 +594,7 @@ Molecule.get_coordinates_in_bohr = _Molecule_get_coordinates_in_bohr
 Molecule.get_coordinates_in_angstrom = _Molecule_get_coordinates_in_angstrom
 Molecule.get_xyz_string = _Molecule_get_xyz_string
 Molecule.write_xyz_file = _Molecule_write_xyz_file
+Molecule.slice = _Molecule_slice
 Molecule.moments_of_inertia = _Molecule_moments_of_inertia
 Molecule.is_linear = _Molecule_is_linear
 Molecule.get_aufbau_alpha_occupation = _Molecule_get_aufbau_alpha_occupation

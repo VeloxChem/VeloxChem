@@ -771,20 +771,12 @@ class SadGuessDriver:
 
         list_of_real_atoms = [a for a in range(natoms) if identifiers[a] > 0]
 
-        assert_msg_critical(
-            len(list_of_real_atoms) == natoms,
-            'Initial guess: Ghost atoms are not yet supported')
+        sub_molecule = molecule.slice(list_of_real_atoms)
+        sub_partial_charges = sub_molecule.get_partial_charges(net_charge)
 
-        # TODO: implement slice method for Molecule
-
-        # sub_molecule = molecule.slice(list_of_real_atoms)
-        # sub_partial_charges = sub_molecule.get_partial_charges(net_charge)
-
-        # partial_charges = np.zeros(natoms)
-        # for i, a in enumerate(list_of_real_atoms):
-        #     partial_charges[a] = sub_partial_charges[i]
-
-        partial_charges = molecule.get_partial_charges(net_charge)
+        partial_charges = np.zeros(natoms)
+        for i, a in enumerate(list_of_real_atoms):
+            partial_charges[a] = sub_partial_charges[i]
 
         # generate alpha and beta occupation numbers
 

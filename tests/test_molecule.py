@@ -1,11 +1,12 @@
-import tempfile
-import numpy as np
-import math as mt
-
 from mpi4py import MPI
 from pathlib import Path
+import numpy as np
+import tempfile
+import math
+
 from veloxchem.veloxchemlib import bohr_in_angstroms
 from veloxchem.molecule import Molecule
+
 from tester import Tester
 
 
@@ -102,7 +103,7 @@ class TestMolecule:
         # test empty constructor
         mol_b = Molecule()
         assert mol_b.get_multiplicity() == 1
-        assert mt.isclose(mol_b.get_charge(), 0.0, rel_tol=tol, abs_tol=tol)
+        assert math.isclose(mol_b.get_charge(), 0.0, rel_tol=tol, abs_tol=tol)
         assert mol_b.number_of_atoms() == 0
 
         # test composition constructor
@@ -149,13 +150,19 @@ class TestMolecule:
         mol_b.add_atom(1, coords_ang[3], 'angstrom', '')
         Tester.compare_molecules(mol_a, mol_b)
 
-    def test_multiplicity(self):
+    def test_slice(self):
 
-        mol = self.nh3_molecule()
-        assert mol.get_multiplicity() == 1
+        mol_a = Molecule.read_str(self.nh3_h2o_xyzstr(), 'au')
 
-        mol.set_multiplicity(2)
-        assert mol.get_multiplicity() == 2
+        # slice NH3 fragment
+        mol_b = mol_a.slice([0, 1, 2, 3])
+        mol_c = Molecule.read_str(self.nh3_xyzstr(), 'au')
+        Tester.compare_molecules(mol_b, mol_c)
+
+        # slice H2O fragment
+        mol_b = mol_a.slice([4, 5, 6])
+        mol_c = Molecule.read_str(self.h2o_xyzstr(), 'au')
+        Tester.compare_molecules(mol_b, mol_c)
 
     def test_charge(self):
 
@@ -163,21 +170,24 @@ class TestMolecule:
 
         mol = self.nh3_molecule()
         q = mol.get_charge()
-        assert mt.isclose(q, 0.0, rel_tol=tol, abs_tol=tol)
-
+        assert math.isclose(q, 0.0, rel_tol=tol, abs_tol=tol)
         mol.set_charge(1.0)
         q = mol.get_charge()
-        assert mt.isclose(q, 1.0, rel_tol=tol, abs_tol=tol)
+        assert math.isclose(q, 1.0, rel_tol=tol, abs_tol=tol)
+
+    def test_multiplicity(self):
+
+        mol = self.nh3_molecule()
+        assert mol.get_multiplicity() == 1
+        mol.set_multiplicity(2)
+        assert mol.get_multiplicity() == 2
 
     def test_number_of_atoms(self):
 
         mol = self.nh3_molecule()
-
         assert mol.number_of_atoms() == 4
-
         assert mol.number_of_atoms(1) == 3
         assert mol.number_of_atoms(7) == 1
-
         assert mol.number_of_atoms(0, 1, 1) == 0
         assert mol.number_of_atoms(0, 2, 1) == 1
 
@@ -192,7 +202,7 @@ class TestMolecule:
 
         mol = self.nh3_molecule()
         n_e = mol.number_of_electrons()
-        assert mt.isclose(n_e, 10.0, rel_tol=tol, abs_tol=tol)
+        assert math.isclose(n_e, 10.0, rel_tol=tol, abs_tol=tol)
 
     def test_identifiers(self):
 
@@ -220,7 +230,6 @@ class TestMolecule:
 
         tol = 1.0e-12
 
-        # check charges getter
         mol = self.nh3_molecule()
         charges = np.array(mol.get_charges())
         assert np.allclose(charges, np.array([7.0, 1.0, 1.0, 1.0]), tol, tol,
@@ -230,7 +239,6 @@ class TestMolecule:
 
         tol = 1.0e-12
 
-        # check masses getter
         mol = self.nh3_molecule()
         masses = np.array(mol.get_masses())
         assert np.allclose(masses,
@@ -258,51 +266,45 @@ class TestMolecule:
 
         # check nitrogen atom coordinates in au
         coords = mol.get_atom_coordinates(0, 'au')
-        assert mt.isclose(coords[0], -3.710, rel_tol=tol, abs_tol=tol)
-        assert mt.isclose(coords[1], 3.019, rel_tol=tol, abs_tol=tol)
-        assert mt.isclose(coords[2], -0.037, rel_tol=tol, abs_tol=tol)
+        assert math.isclose(coords[0], -3.710, rel_tol=tol, abs_tol=tol)
+        assert math.isclose(coords[1], 3.019, rel_tol=tol, abs_tol=tol)
+        assert math.isclose(coords[2], -0.037, rel_tol=tol, abs_tol=tol)
 
         # check last hydrogen atom coordinates in au
         coords = mol.get_atom_coordinates(3, 'au')
-        assert mt.isclose(coords[0], -4.780, rel_tol=tol, abs_tol=tol)
-        assert mt.isclose(coords[1], 2.569, rel_tol=tol, abs_tol=tol)
-        assert mt.isclose(coords[2], -1.573, rel_tol=tol, abs_tol=tol)
+        assert math.isclose(coords[0], -4.780, rel_tol=tol, abs_tol=tol)
+        assert math.isclose(coords[1], 2.569, rel_tol=tol, abs_tol=tol)
+        assert math.isclose(coords[2], -1.573, rel_tol=tol, abs_tol=tol)
 
         # check nitrogen atom coordinates in angstrom
         f = bohr_in_angstroms()
         coords = mol.get_atom_coordinates(0, 'angstrom')
-        assert mt.isclose(coords[0], -3.710 * f, rel_tol=tol, abs_tol=tol)
-        assert mt.isclose(coords[1], 3.019 * f, rel_tol=tol, abs_tol=tol)
-        assert mt.isclose(coords[2], -0.037 * f, rel_tol=tol, abs_tol=tol)
+        assert math.isclose(coords[0], -3.710 * f, rel_tol=tol, abs_tol=tol)
+        assert math.isclose(coords[1], 3.019 * f, rel_tol=tol, abs_tol=tol)
+        assert math.isclose(coords[2], -0.037 * f, rel_tol=tol, abs_tol=tol)
 
         # check last hydrogen atom coordinates in au
         coords = mol.get_atom_coordinates(3, 'angstrom')
-        assert mt.isclose(coords[0], -4.780 * f, rel_tol=tol, abs_tol=tol)
-        assert mt.isclose(coords[1], 2.569 * f, rel_tol=tol, abs_tol=tol)
-        assert mt.isclose(coords[2], -1.573 * f, rel_tol=tol, abs_tol=tol)
+        assert math.isclose(coords[0], -4.780 * f, rel_tol=tol, abs_tol=tol)
+        assert math.isclose(coords[1], 2.569 * f, rel_tol=tol, abs_tol=tol)
+        assert math.isclose(coords[2], -1.573 * f, rel_tol=tol, abs_tol=tol)
 
-    def test_atom_indexes(self):
+    def test_atom_indices(self):
 
         mol = self.nh3_molecule()
-        assert mol.atom_indexes('B') == []
-        assert mol.atom_indexes('N') == [
-            0,
-        ]
-        assert mol.atom_indexes('H') == [
-            1,
-            2,
-            3,
-        ]
+        assert mol.atom_indices('B') == []
+        assert mol.atom_indices('N') == [0]
+        assert mol.atom_indices('H') == [1, 2, 3]
 
     def test_nuclear_repulsion_energy(self):
 
         tol = 1.0e-12
 
         mol = Molecule.read_molecule_string(self.h2o_xyzstr(), 'au')
-        assert mt.isclose(mol.nuclear_repulsion_energy(),
-                          9.34363815797054450919,
-                          rel_tol=tol,
-                          abs_tol=tol)
+        assert math.isclose(mol.nuclear_repulsion_energy(),
+                            9.34363815797054450919,
+                            rel_tol=tol,
+                            abs_tol=tol)
 
     def test_check_proximity(self):
 
@@ -310,44 +312,26 @@ class TestMolecule:
         assert mol.check_proximity(0.1)
         assert not mol.check_proximity(5.1)
 
-    def test_get_str(self):
+    def test_get_string(self):
 
         mol = self.nh3_molecule()
         molstr = mol.get_string()
         lines = molstr.splitlines()
-
+        # yapf: disable
         assert lines[0] == 'Molecular Geometry (Angstroms)'
         assert lines[1] == '================================'
         assert lines[2] == ''
-        assert lines[3] == ('  Atom         Coordinate X          ' +
-                            'Coordinate Y          Coordinate Z  ')
+        assert lines[3] == '  Atom         Coordinate X          Coordinate Y          Coordinate Z  '
         assert lines[4] == ''
-        assert lines[5] == ('  N          -1.963247452450        ' +
-                            '1.597585999716       -0.019579556803')
-        assert lines[6] == ('  H          -1.959014034763        ' +
-                            '2.615193776283        0.031221455443')
-        assert lines[7] == ('  H          -2.489249600088        ' +
-                            '1.277962964331        0.792178284722')
-        assert lines[8] == ('  H          -2.529467068116        ' +
-                            '1.359456254810       -0.832395752750')
+        assert lines[5] == '  N          -1.963247452450        1.597585999716       -0.019579556803'
+        assert lines[6] == '  H          -1.959014034763        2.615193776283        0.031221455443'
+        assert lines[7] == '  H          -2.489249600088        1.277962964331        0.792178284722'
+        assert lines[8] == '  H          -2.529467068116        1.359456254810       -0.832395752750'
         assert lines[9] == ''
-
-    def test_write_xyz(self):
-
-        comm = MPI.COMM_WORLD
-        rank = comm.Get_rank()
-
-        if rank == 0:
-            with tempfile.TemporaryDirectory() as temp_dir:
-                fname = str(Path(temp_dir, 'mol.xyz'))
-                mol_a = self.nh3_molecule()
-                mol_a.write_xyz(fname)
-                mol_b = Molecule.read_xyz_file(fname)
-                Tester.compare_molecules(mol_a, mol_b)
+        # yapf: enable
 
     def test_read_dict(self):
 
-        # set up molecular data dictionary
         rxyz = [
             'N  -3.710   3.019  -0.037', 'H  -3.702   4.942   0.059',
             'H  -4.704   2.415   1.497', 'H  -4.780   2.569  -1.573'
@@ -360,6 +344,23 @@ class TestMolecule:
         mol_b.set_multiplicity(2)
         Tester.compare_molecules(mol_a, mol_b)
 
+    def test_moments_of_inertia(self):
+
+        tol = 1.0e-12
+
+        mol = Molecule.read_molecule_string(self.ch4_xyzstr(), 'au')
+        imoms = mol.moments_of_inertia()
+        rmoms = np.array(
+            [3.198919866723860, 3.198919866723860, 3.198919866723860])
+        assert np.allclose(rmoms, imoms, tol, tol, False)
+
+    def test_is_linear(self):
+
+        mol = Molecule.read_molecule_string(self.ch4_xyzstr(), 'au')
+        assert not mol.is_linear()
+        mol = Molecule.read_molecule_string(self.co2_xyzstr(), 'au')
+        assert mol.is_linear()
+
     def test_center_of_mass(self):
 
         tol = 1.0e-12
@@ -369,6 +370,18 @@ class TestMolecule:
         ref_com = np.array(
             [-3.831697485497502, 3.0704373126932536, -0.0314360099042971])
         assert np.allclose(ref_com, mol_com, tol, tol, False)
+
+    def test_more_info(self):
+
+        mol = self.nh3_molecule()
+        mol.set_multiplicity(3)
+        molstr = mol.more_info()
+        lines = molstr.splitlines()
+        assert lines[0] == ('Molecular charge            : 0' + 39 * ' ')
+        assert lines[1] == ('Spin multiplicity           : 3' + 39 * ' ')
+        assert lines[2] == ('Number of atoms             : 4' + 39 * ' ')
+        assert lines[3] == ('Number of alpha electrons   : 6' + 39 * ' ')
+        assert lines[4] == ('Number of beta  electrons   : 4' + 39 * ' ')
 
     def test_number_of_alpha_electrons(self):
 
@@ -384,47 +397,11 @@ class TestMolecule:
         mol.set_multiplicity(3)
         assert mol.number_of_beta_electrons() == 4
 
-    def test_more_info(self):
-
-        mol = self.nh3_molecule()
-        mol.set_multiplicity(3)
-        molstr = mol.more_info()
-        lines = molstr.splitlines()
-
-        assert lines[0] == ('Molecular charge            : 0' + 39 * ' ')
-        assert lines[1] == ('Spin multiplicity           : 3' + 39 * ' ')
-        assert lines[2] == ('Number of atoms             : 4' + 39 * ' ')
-        assert lines[3] == ('Number of alpha electrons   : 6' + 39 * ' ')
-        assert lines[4] == ('Number of beta  electrons   : 4' + 39 * ' ')
-
-    def test_moments_of_inertia(self):
-
-        tol = 1.0e-12
-
-        xyzstr = self.ch4_xyzstr()
-        mol = Molecule.read_molecule_string(xyzstr, 'au')
-
-        imoms = mol.moments_of_inertia()
-        rmoms = np.array(
-            [3.198919866723860, 3.198919866723860, 3.198919866723860])
-        assert np.allclose(rmoms, imoms, tol, tol, False)
-
-    def test_is_linear(self):
-
-        xyzstr = self.ch4_xyzstr()
-        mol = Molecule.read_molecule_string(xyzstr, 'au')
-        assert not mol.is_linear()
-
-        xyzstr = self.co2_xyzstr()
-        mol = Molecule.read_molecule_string(xyzstr, 'au')
-        assert mol.is_linear()
-
     def test_get_aufbau_occupation(self):
 
         tol = 1.0e-12
 
-        xyzstr = self.nh3_xyzstr()
-        mol = Molecule.read_molecule_string(xyzstr)
+        mol = Molecule.read_molecule_string(self.nh3_xyzstr())
         mol.set_charge(1.0)
         mol.set_multiplicity(2)
 
@@ -438,3 +415,16 @@ class TestMolecule:
         roccb = np.array([1.0, 1.0, 1.0, 1.0, 0.0, 0.0])
         assert np.allclose(rocca, nocca, tol, tol, False)
         assert np.allclose(roccb, noccb, tol, tol, False)
+
+    def test_write_xyz(self):
+
+        comm = MPI.COMM_WORLD
+        rank = comm.Get_rank()
+
+        if rank == 0:
+            with tempfile.TemporaryDirectory() as temp_dir:
+                fname = str(Path(temp_dir, 'mol.xyz'))
+                mol_a = self.nh3_molecule()
+                mol_a.write_xyz(fname)
+                mol_b = Molecule.read_xyz_file(fname)
+                Tester.compare_molecules(mol_a, mol_b)
