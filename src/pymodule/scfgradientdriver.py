@@ -42,6 +42,7 @@ from .veloxchemlib import XCFunctional, MolecularGrid
 from .veloxchemlib import compute_overlap_gradient_gpu
 from .veloxchemlib import compute_kinetic_energy_gradient_gpu
 from .veloxchemlib import compute_nuclear_potential_gradient_gpu
+from .veloxchemlib import compute_point_charges_gradient_gpu
 from .veloxchemlib import compute_fock_gradient_gpu, matmul_gpu
 from .veloxchemlib import integrate_vxc_gradient_gpu
 from .veloxchemlib import parse_xc_func
@@ -230,24 +231,28 @@ class ScfGradientDriver(GradientDriver):
 
         grad_timing['Nuclear_potential_grad'] += time.time() - t0
 
-        # TODO: point charges contribution
+        # point charges contribution
 
         t0 = time.time()
 
         if self.scf_driver._point_charges is not None:
-            npoints = self.scf_driver._point_charges.shape[1]
+            # npoints = self.scf_driver._point_charges.shape[1]
 
-            mm_coords = []
-            mm_charges = []
-            for p in range(npoints):
-                xyz_p = self.scf_driver._point_charges[:3, p]
-                chg_p = self.scf_driver._point_charges[3, p]
-                mm_coords.append(xyz_p.copy())
-                mm_charges.append(chg_p)
+            # mm_coords = []
+            # mm_charges = []
+            # for p in range(npoints):
+            #     xyz_p = self.scf_driver._point_charges[:3, p]
+            #     chg_p = self.scf_driver._point_charges[3, p]
+            #     mm_coords.append(xyz_p.copy())
+            #     mm_charges.append(chg_p)
 
-            assert_msg_critical(
-                False,
-                'ScfGradientDriver: Point charges not yet implemented')
+            V_es_grad = compute_point_charges_gradient_gpu(
+                molecule, basis, grad_screener, self.scf_driver._point_charges,
+                self.rank, self.nodes)
+            V_es_grad = V_es_grad.to_numpy()
+            V_es_grad *= 2.0
+
+            self.gradient += V_es_grad
 
             grad_timing['Point_charges_grad'] += time.time() - t0
 
@@ -336,6 +341,9 @@ class ScfGradientDriver(GradientDriver):
 
         # Embedding contribution to the gradient
 
+        # TODO: treat _pe and _point_charges separately
+
+        """
         t0 = time.time()
 
         if self.scf_driver._pe:
@@ -355,6 +363,7 @@ class ScfGradientDriver(GradientDriver):
                 self.gradient += pe_grad
 
             grad_timing['PE_grad'] += time.time() - t0
+        """
 
         # nuclear contribution to gradient
         # and D4 dispersion correction if requested
@@ -385,11 +394,6 @@ class ScfGradientDriver(GradientDriver):
         t0 = time.time()
 
         if self.scf_driver._point_charges is not None:
-
-            assert_msg_critical(
-                False,
-                'ScfGradientDriver: Point charges not yet implemented')
-
             coords = molecule.get_coordinates_in_bohr()
             nuclear_charges = molecule.get_element_ids()
             npoints = self.scf_driver._point_charges.shape[1]
@@ -406,6 +410,7 @@ class ScfGradientDriver(GradientDriver):
 
                     self.gradient[a] += f_ij
 
+            """
             if self.scf_driver.qm_vdw_params is not None:
                 vdw_grad = np.zeros((natoms, 3))
 
@@ -441,6 +446,7 @@ class ScfGradientDriver(GradientDriver):
                 vdw_grad /= (hartree_in_kjpermol() * 10.0 / bohr_in_angstrom())
 
                 self.gradient += vdw_grad
+            """
 
         grad_timing['Classical'] += time.time() - t0
 
@@ -555,24 +561,27 @@ class ScfGradientDriver(GradientDriver):
 
         grad_timing['Nuclear_potential_grad'] += time.time() - t0
 
-        # TODO: point charges contribution
+        # point charges contribution
 
         t0 = time.time()
 
         if self.scf_driver._point_charges is not None:
-            npoints = self.scf_driver._point_charges.shape[1]
+            # npoints = self.scf_driver._point_charges.shape[1]
 
-            mm_coords = []
-            mm_charges = []
-            for p in range(npoints):
-                xyz_p = self.scf_driver._point_charges[:3, p]
-                chg_p = self.scf_driver._point_charges[3, p]
-                mm_coords.append(xyz_p.copy())
-                mm_charges.append(chg_p)
+            # mm_coords = []
+            # mm_charges = []
+            # for p in range(npoints):
+            #     xyz_p = self.scf_driver._point_charges[:3, p]
+            #     chg_p = self.scf_driver._point_charges[3, p]
+            #     mm_coords.append(xyz_p.copy())
+            #     mm_charges.append(chg_p)
 
-            assert_msg_critical(
-                False,
-                'ScfGradientDriver: Point charges not yet implemented')
+            V_es_grad = compute_point_charges_gradient_gpu(
+                molecule, basis, grad_screener, self.scf_driver._point_charges,
+                self.rank, self.nodes)
+            V_es_grad = V_es_grad.to_numpy()
+
+            self.gradient += V_es_grad
 
             grad_timing['Point_charges_grad'] += time.time() - t0
 
@@ -704,6 +713,9 @@ class ScfGradientDriver(GradientDriver):
 
         # Embedding contribution to the gradient
 
+        # TODO: treat _pe and _point_charges separately
+
+        """
         t0 = time.time()
 
         if self.scf_driver._pe:
@@ -723,6 +735,7 @@ class ScfGradientDriver(GradientDriver):
                 self.gradient += pe_grad
 
             grad_timing['PE_grad'] += time.time() - t0
+        """
 
         # nuclear contribution to gradient
         # and D4 dispersion correction if requested
@@ -753,11 +766,6 @@ class ScfGradientDriver(GradientDriver):
         t0 = time.time()
 
         if self.scf_driver._point_charges is not None:
-
-            assert_msg_critical(
-                False,
-                'ScfGradientDriver: Point charges not yet implemented')
-
             coords = molecule.get_coordinates_in_bohr()
             nuclear_charges = molecule.get_element_ids()
             npoints = self.scf_driver._point_charges.shape[1]
@@ -774,6 +782,7 @@ class ScfGradientDriver(GradientDriver):
 
                     self.gradient[a] += f_ij
 
+            """
             if self.scf_driver.qm_vdw_params is not None:
                 vdw_grad = np.zeros((natoms, 3))
 
@@ -809,6 +818,7 @@ class ScfGradientDriver(GradientDriver):
                 vdw_grad /= (hartree_in_kjpermol() * 10.0 / bohr_in_angstrom())
 
                 self.gradient += vdw_grad
+            """
 
         grad_timing['Classical'] += time.time() - t0
 
