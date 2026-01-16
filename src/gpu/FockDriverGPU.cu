@@ -80,9 +80,7 @@ zeroData(double* d_data, const uint32_t n)
 auto
 computeQMatrixOnGPU(const CMolecule& molecule,
                     const CMolecularBasis& basis,
-                    const CScreeningData& screening,
-                    const int64_t rank,
-                    const int64_t nnodes) -> CDenseMatrix
+                    const CScreeningData& screening) -> CDenseMatrix
 {
     CGpuDevices gpu_devices;
 
@@ -1421,9 +1419,7 @@ computeMixedBasisOverlapIntegralsOnGPU(const CMolecule&       molecule,
 auto
 computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule,
                                              const CMolecularBasis& basis,
-                                             const CScreeningData& screening,
-                                             const int64_t rank,
-                                             const int64_t nnodes) -> std::vector<CDenseMatrix>
+                                             const CScreeningData& screening) -> std::vector<CDenseMatrix>
 {
     CGpuDevices gpu_devices;
 
@@ -1980,9 +1976,7 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule,
 auto
 computeNuclearPotentialIntegralsOnGPU(const CMolecule& molecule,
                                       const CMolecularBasis& basis,
-                                      const CScreeningData& screening,
-                                      const int64_t rank,
-                                      const int64_t nnodes) -> CDenseMatrix
+                                      const CScreeningData& screening) -> CDenseMatrix
 {
     const auto mol_charges = molecule.getCharges();
     const auto mol_coords = molecule.getCoordinates(std::string("BOHR"));
@@ -1998,7 +1992,7 @@ computeNuclearPotentialIntegralsOnGPU(const CMolecule& molecule,
         points_info[a + natoms * 3] = mol_charges[a];
     }
 
-    return gpu::computePointChargesIntegralsOnGPU(molecule, basis, screening, points_info.data(), natoms, rank, nnodes);
+    return gpu::computePointChargesIntegralsOnGPU(molecule, basis, screening, points_info.data(), natoms);
 }
 
 auto
@@ -2006,9 +2000,7 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule,
                                   const CMolecularBasis& basis,
                                   const CScreeningData& screening,
                                   const double* points_info_ptr,
-                                  const int64_t npoints,
-                                  const int64_t rank,
-                                  const int64_t nnodes) -> CDenseMatrix
+                                  const int64_t npoints) -> CDenseMatrix
 {
     CGpuDevices gpu_devices;
 
@@ -2572,9 +2564,7 @@ auto
 computeElectricDipoleIntegralsOnGPU(const CMolecule& molecule,
                                     const CMolecularBasis& basis,
                                     const std::vector<double>& origin,
-                                    const CScreeningData& screening,
-                                    const int64_t rank,
-                                    const int64_t nnodes) -> std::vector<CDenseMatrix>
+                                    const CScreeningData& screening) -> std::vector<CDenseMatrix>
 {
     CGpuDevices gpu_devices;
 
@@ -3194,9 +3184,7 @@ computeElectricDipoleIntegralsOnGPU(const CMolecule& molecule,
 auto
 computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule,
                                     const CMolecularBasis& basis,
-                                    const CScreeningData& screening,
-                                    const int64_t rank,
-                                    const int64_t nnodes) -> std::vector<CDenseMatrix>
+                                    const CScreeningData& screening) -> std::vector<CDenseMatrix>
 {
     CGpuDevices gpu_devices;
 
@@ -3799,9 +3787,7 @@ auto
 computeAngularMomentumIntegralsOnGPU(const CMolecule& molecule,
                                     const CMolecularBasis& basis,
                                     const std::vector<double>& origin,
-                                    const CScreeningData& screening,
-                                    const int64_t rank,
-                                    const int64_t nnodes) -> std::vector<CDenseMatrix>
+                                    const CScreeningData& screening) -> std::vector<CDenseMatrix>
 {
     CGpuDevices gpu_devices;
 

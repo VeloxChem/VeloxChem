@@ -116,8 +116,7 @@ class FirstOrderProperties:
 
         # dipole integrals
         mu_x, mu_y, mu_z = compute_electric_dipole_integrals_gpu(
-            molecule, basis, origin, screening,
-            self.rank, self.nodes)
+            molecule, basis, origin, screening)
 
         naos = mu_x.number_of_rows()
 

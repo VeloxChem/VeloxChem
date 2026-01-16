@@ -1610,8 +1610,7 @@ class LinearSolver:
 
         if operator in ['dipole', 'electric dipole', 'electric_dipole']:
             mu_x, mu_y, mu_z = compute_electric_dipole_integrals_gpu(
-                molecule, basis, [0.0, 0.0, 0.0], screening,
-                self.rank, self.nodes)
+                molecule, basis, [0.0, 0.0, 0.0], screening)
 
             naos = mu_x.number_of_rows()
 
@@ -1648,7 +1647,7 @@ class LinearSolver:
 
         elif operator in ['linear_momentum', 'linear momentum']:
             mu_x, mu_y, mu_z = compute_linear_momentum_integrals_gpu(
-                molecule, basis, screening, self.rank, self.nodes)
+                molecule, basis, screening)
 
             naos = mu_x.number_of_rows()
 
@@ -1685,8 +1684,7 @@ class LinearSolver:
 
         elif operator in ['angular_momentum', 'angular momentum']:
             mu_x, mu_y, mu_z = compute_angular_momentum_integrals_gpu(
-                molecule, basis, [0.0, 0.0, 0.0], screening,
-                self.rank, self.nodes)
+                molecule, basis, [0.0, 0.0, 0.0], screening)
 
             naos = mu_x.number_of_rows()
 
@@ -1723,8 +1721,7 @@ class LinearSolver:
 
         elif operator in ['magnetic_dipole', 'magnetic dipole']:
             mu_x, mu_y, mu_z = compute_angular_momentum_integrals_gpu(
-                molecule, basis, [0.0, 0.0, 0.0], screening,
-                self.rank, self.nodes)
+                molecule, basis, [0.0, 0.0, 0.0], screening)
 
             naos = mu_x.number_of_rows()
 
@@ -1830,8 +1827,7 @@ class LinearSolver:
 
         if operator in ['dipole', 'electric dipole', 'electric_dipole']:
             mu_x, mu_y, mu_z = compute_electric_dipole_integrals_gpu(
-                molecule, basis, [0.0, 0.0, 0.0], screening,
-                self.rank, self.nodes)
+                molecule, basis, [0.0, 0.0, 0.0], screening)
 
             naos = mu_x.number_of_rows()
 
@@ -1868,7 +1864,7 @@ class LinearSolver:
 
         elif operator in ['linear_momentum', 'linear momentum']:
             mu_x, mu_y, mu_z = compute_linear_momentum_integrals_gpu(
-                molecule, basis, screening, self.rank, self.nodes)
+                molecule, basis, screening)
 
             naos = mu_x.number_of_rows()
 
@@ -1905,8 +1901,7 @@ class LinearSolver:
 
         elif operator in ['angular_momentum', 'angular momentum']:
             mu_x, mu_y, mu_z = compute_angular_momentum_integrals_gpu(
-                molecule, basis, [0.0, 0.0, 0.0], screening,
-                self.rank, self.nodes)
+                molecule, basis, [0.0, 0.0, 0.0], screening)
 
             naos = mu_x.number_of_rows()
 
@@ -1943,8 +1938,7 @@ class LinearSolver:
 
         elif operator in ['magnetic_dipole', 'magnetic dipole']:
             mu_x, mu_y, mu_z = compute_angular_momentum_integrals_gpu(
-                molecule, basis, [0.0, 0.0, 0.0], screening,
-                self.rank, self.nodes)
+                molecule, basis, [0.0, 0.0, 0.0], screening)
 
             naos = mu_x.number_of_rows()
 

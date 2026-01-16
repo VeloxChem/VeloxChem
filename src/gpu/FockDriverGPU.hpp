@@ -45,9 +45,7 @@ namespace gpu {
 
 auto computeQMatrixOnGPU(const CMolecule& molecule,
                          const CMolecularBasis& basis,
-                         const CScreeningData& screening,
-                         const int64_t rank,
-                         const int64_t nnodes) -> CDenseMatrix;
+                         const CScreeningData& screening) -> CDenseMatrix;
 
 auto computeMixedBasisOverlapIntegralsOnGPU(const CMolecule& molecule,
                                             const CMolecularBasis& basis_1,
@@ -58,43 +56,31 @@ auto computeMixedBasisOverlapIntegralsOnGPU(const CMolecule& molecule,
 
 auto computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule,
                                                   const CMolecularBasis& basis,
-                                                  const CScreeningData& screening,
-                                                  const int64_t rank,
-                                                  const int64_t nnodes) -> std::vector<CDenseMatrix>;
+                                                  const CScreeningData& screening) -> std::vector<CDenseMatrix>;
 
 auto computeNuclearPotentialIntegralsOnGPU(const CMolecule& molecule,
                                            const CMolecularBasis& basis,
-                                           const CScreeningData& screening,
-                                           const int64_t rank,
-                                           const int64_t nnodes) -> CDenseMatrix;
+                                           const CScreeningData& screening) -> CDenseMatrix;
 
 auto computePointChargesIntegralsOnGPU(const CMolecule& molecule,
                                        const CMolecularBasis& basis,
                                        const CScreeningData& screening,
                                        const double* points_info_ptr,
-                                       const int64_t npoints,
-                                       const int64_t rank,
-                                       const int64_t nnodes) -> CDenseMatrix;
+                                       const int64_t npoints) -> CDenseMatrix;
 
 auto computeElectricDipoleIntegralsOnGPU(const CMolecule& molecule,
                                          const CMolecularBasis& basis,
                                          const std::vector<double>& origin,
-                                         const CScreeningData& screening,
-                                         const int64_t rank,
-                                         const int64_t nnodes) -> std::vector<CDenseMatrix>;
+                                         const CScreeningData& screening) -> std::vector<CDenseMatrix>;
 
 auto computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule,
                                          const CMolecularBasis& basis,
-                                         const CScreeningData& screening,
-                                         const int64_t rank,
-                                         const int64_t nnodes) -> std::vector<CDenseMatrix>;
+                                         const CScreeningData& screening) -> std::vector<CDenseMatrix>;
 
 auto computeAngularMomentumIntegralsOnGPU(const CMolecule& molecule,
                                           const CMolecularBasis& basis,
                                           const std::vector<double>& origin,
-                                          const CScreeningData& screening,
-                                          const int64_t rank,
-                                          const int64_t nnodes) -> std::vector<CDenseMatrix>;
+                                          const CScreeningData& screening) -> std::vector<CDenseMatrix>;
 
 auto transformDensity(const CMolecule& molecule, const CMolecularBasis& basis, const CAODensityMatrix& densityMatrix) -> CDenseMatrix;
 

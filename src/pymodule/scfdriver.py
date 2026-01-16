@@ -1308,8 +1308,7 @@ class ScfDriver:
             t0_point_charges = tm.time()
             V_es = compute_point_charges_integrals_gpu(molecule, ao_basis,
                                                        screener,
-                                                       self._point_charges,
-                                                       self.rank, self.nodes)
+                                                       self._point_charges)
             naos = V_es.number_of_rows()
             if self.rank == mpi_master():
                 self._V_es = np.zeros((naos, naos))
@@ -1743,10 +1742,10 @@ class ScfDriver:
         t0 = tm.time()
 
         ovl_mat, kin_mat = compute_overlap_and_kinetic_energy_integrals_gpu(
-            molecule, basis, screener, self.rank, self.nodes)
+            molecule, basis, screener)
 
         npot_mat = compute_nuclear_potential_integrals_gpu(
-            molecule, basis, screener, self.rank, self.nodes)
+            molecule, basis, screener)
 
         naos = ovl_mat.number_of_rows()
 
@@ -1788,8 +1787,7 @@ class ScfDriver:
                 self._dipole_origin = np.zeros(3)
 
             dipole_mats = compute_electric_dipole_integrals_gpu(
-                molecule, basis, self._dipole_origin, screener,
-                self.rank, self.nodes)
+                molecule, basis, self._dipole_origin, screener)
 
             local_mu_np = [m.to_numpy() for m in dipole_mats]
             if self.rank == mpi_master():

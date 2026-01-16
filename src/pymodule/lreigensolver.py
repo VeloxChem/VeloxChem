@@ -636,8 +636,7 @@ class LinearResponseEigenSolver(LinearSolver):
 
                 if self.esa:
                     mu_x, mu_y, mu_z = compute_electric_dipole_integrals_gpu(
-                        molecule, basis, [0.0, 0.0, 0.0], eri_dict['screening'],
-                        self.rank, self.nodes)
+                        molecule, basis, [0.0, 0.0, 0.0], eri_dict['screening'])
 
                     naos = mu_x.number_of_rows()
 
