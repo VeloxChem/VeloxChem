@@ -211,7 +211,7 @@ class ScfGradientDriver(GradientDriver):
 
         t0 = time.time()
 
-        T_grad = compute_kinetic_energy_gradient_gpu(molecule, basis, grad_screener, self.rank, self.nodes)
+        T_grad = compute_kinetic_energy_gradient_gpu(molecule, basis, grad_screener)
         T_grad = T_grad.to_numpy()
         T_grad *= 2.0
 
@@ -223,7 +223,7 @@ class ScfGradientDriver(GradientDriver):
 
         t0 = time.time()
 
-        V_grad = compute_nuclear_potential_gradient_gpu(molecule, basis, grad_screener, self.rank, self.nodes)
+        V_grad = compute_nuclear_potential_gradient_gpu(molecule, basis, grad_screener)
         V_grad = V_grad.to_numpy()
         V_grad *= 2.0
 
@@ -247,8 +247,7 @@ class ScfGradientDriver(GradientDriver):
             #     mm_charges.append(chg_p)
 
             V_es_grad = compute_point_charges_gradient_gpu(
-                molecule, basis, grad_screener, self.scf_driver._point_charges,
-                self.rank, self.nodes)
+                molecule, basis, grad_screener, self.scf_driver._point_charges)
             V_es_grad = V_es_grad.to_numpy()
             V_es_grad *= 2.0
 
@@ -260,7 +259,7 @@ class ScfGradientDriver(GradientDriver):
 
         t0 = time.time()
 
-        S_grad = compute_overlap_gradient_gpu(molecule, basis, grad_screener, self.rank, self.nodes)
+        S_grad = compute_overlap_gradient_gpu(molecule, basis, grad_screener)
         S_grad = S_grad.to_numpy()
         S_grad *= -2.0
 
@@ -301,8 +300,7 @@ class ScfGradientDriver(GradientDriver):
 
         fock_grad = compute_fock_gradient_gpu(
             molecule, basis, dmat, 2.0, full_k_coef, 0.0, 'symm',
-            self.eri_thresh, self.prelink_thresh, grad_screener,
-            self.rank, self.nodes)
+            self.eri_thresh, self.prelink_thresh, grad_screener)
 
         self.gradient += fock_grad.to_numpy()
 
@@ -310,8 +308,7 @@ class ScfGradientDriver(GradientDriver):
         if need_omega:
             fock_rs_grad = compute_fock_gradient_gpu(
                 molecule, basis, dmat, 0.0, erf_k_coef, omega, 'symm',
-                self.eri_thresh, self.prelink_thresh, grad_screener,
-                self.rank, self.nodes)
+                self.eri_thresh, self.prelink_thresh, grad_screener)
 
             self.gradient += fock_rs_grad.to_numpy()
 
@@ -543,7 +540,7 @@ class ScfGradientDriver(GradientDriver):
 
         t0 = time.time()
 
-        T_grad = compute_kinetic_energy_gradient_gpu(molecule, basis, grad_screener, self.rank, self.nodes)
+        T_grad = compute_kinetic_energy_gradient_gpu(molecule, basis, grad_screener)
         T_grad = T_grad.to_numpy()
 
         self.gradient += T_grad
@@ -554,7 +551,7 @@ class ScfGradientDriver(GradientDriver):
 
         t0 = time.time()
 
-        V_grad = compute_nuclear_potential_gradient_gpu(molecule, basis, grad_screener, self.rank, self.nodes)
+        V_grad = compute_nuclear_potential_gradient_gpu(molecule, basis, grad_screener)
         V_grad = V_grad.to_numpy()
 
         self.gradient += V_grad
@@ -577,8 +574,7 @@ class ScfGradientDriver(GradientDriver):
             #     mm_charges.append(chg_p)
 
             V_es_grad = compute_point_charges_gradient_gpu(
-                molecule, basis, grad_screener, self.scf_driver._point_charges,
-                self.rank, self.nodes)
+                molecule, basis, grad_screener, self.scf_driver._point_charges)
             V_es_grad = V_es_grad.to_numpy()
 
             self.gradient += V_es_grad
@@ -589,7 +585,7 @@ class ScfGradientDriver(GradientDriver):
 
         t0 = time.time()
 
-        S_grad = compute_overlap_gradient_gpu(molecule, basis, grad_screener, self.rank, self.nodes)
+        S_grad = compute_overlap_gradient_gpu(molecule, basis, grad_screener)
         S_grad = S_grad.to_numpy()
         S_grad *= -1.0
 
@@ -631,8 +627,7 @@ class ScfGradientDriver(GradientDriver):
         # J_ab
         fock_grad = compute_fock_gradient_gpu(
             molecule, basis, d_total, 1.0, 0.0, 0.0, 'symm',
-            self.eri_thresh, self.prelink_thresh, grad_screener,
-            self.rank, self.nodes)
+            self.eri_thresh, self.prelink_thresh, grad_screener)
 
         self.gradient += 0.5 * fock_grad.to_numpy()
 
@@ -646,8 +641,7 @@ class ScfGradientDriver(GradientDriver):
 
         fock_grad = compute_fock_gradient_gpu(
             molecule, basis, d_alpha, 0.0, full_k_coef, 0.0, 'symm',
-            self.eri_thresh, self.prelink_thresh, grad_screener,
-            self.rank, self.nodes)
+            self.eri_thresh, self.prelink_thresh, grad_screener)
 
         self.gradient += 0.5 * fock_grad.to_numpy()
 
@@ -655,8 +649,7 @@ class ScfGradientDriver(GradientDriver):
         if need_omega:
             fock_rs_grad = compute_fock_gradient_gpu(
                 molecule, basis, d_alpha, 0.0, erf_k_coef, omega, 'symm',
-                self.eri_thresh, self.prelink_thresh, grad_screener,
-                self.rank, self.nodes)
+                self.eri_thresh, self.prelink_thresh, grad_screener)
 
             self.gradient += 0.5 * fock_rs_grad.to_numpy()
 
@@ -670,8 +663,7 @@ class ScfGradientDriver(GradientDriver):
 
         fock_grad = compute_fock_gradient_gpu(
             molecule, basis, d_beta, 0.0, full_k_coef, 0.0, 'symm',
-            self.eri_thresh, self.prelink_thresh, grad_screener,
-            self.rank, self.nodes)
+            self.eri_thresh, self.prelink_thresh, grad_screener)
 
         self.gradient += 0.5 * fock_grad.to_numpy()
 
@@ -679,8 +671,7 @@ class ScfGradientDriver(GradientDriver):
         if need_omega:
             fock_rs_grad = compute_fock_gradient_gpu(
                 molecule, basis, d_beta, 0.0, erf_k_coef, omega, 'symm',
-                self.eri_thresh, self.prelink_thresh, grad_screener,
-                self.rank, self.nodes)
+                self.eri_thresh, self.prelink_thresh, grad_screener)
 
             self.gradient += 0.5 * fock_rs_grad.to_numpy()
 

@@ -43,7 +43,7 @@ class TestOverlapGradient:
         grad_screener = GradientScreeningData(mol, bas, dmat, wmat, num_gpus,
                                               1e-10, 1e-10, rank, nnodes)
 
-        S_grad = compute_overlap_gradient_gpu(mol, bas, grad_screener, rank, nnodes)
+        S_grad = compute_overlap_gradient_gpu(mol, bas, grad_screener)
         S_grad = S_grad.to_numpy()
         S_grad *= -2.0
 

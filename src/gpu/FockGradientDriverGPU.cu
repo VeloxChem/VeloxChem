@@ -112,9 +112,7 @@ zeroGradientData(double* d_data, const uint32_t n)
 auto
 computeOverlapGradientOnGPU(const CMolecule& molecule,
                             const CMolecularBasis& basis,
-                            const CGradientScreeningData& screening,
-                            const int64_t rank,
-                            const int64_t nnodes) -> CDenseMatrix
+                            const CGradientScreeningData& screening) -> CDenseMatrix
 
 {
     CGpuDevices gpu_devices;
@@ -656,9 +654,7 @@ computeOverlapGradientOnGPU(const CMolecule& molecule,
 auto
 computeKineticEnergyGradientOnGPU(const CMolecule& molecule,
                                   const CMolecularBasis& basis,
-                                  const CGradientScreeningData& screening,
-                                  const int64_t rank,
-                                  const int64_t nnodes) -> CDenseMatrix
+                                  const CGradientScreeningData& screening) -> CDenseMatrix
 {
     CGpuDevices gpu_devices;
 
@@ -1199,9 +1195,7 @@ computeKineticEnergyGradientOnGPU(const CMolecule& molecule,
 auto
 computeNuclearPotentialGradientOnGPU(const CMolecule& molecule,
                                      const CMolecularBasis& basis,
-                                     const CGradientScreeningData& screening,
-                                     const int64_t rank,
-                                     const int64_t nnodes) -> CDenseMatrix
+                                     const CGradientScreeningData& screening) -> CDenseMatrix
 {
     CGpuDevices gpu_devices;
 
@@ -1817,9 +1811,7 @@ computePointChargesGradientOnGPU(const CMolecule& molecule,
                                  const CMolecularBasis& basis,
                                  const CGradientScreeningData& screening,
                                  const double* points_info_ptr,
-                                 const int64_t npoints,
-                                 const int64_t rank,
-                                 const int64_t nnodes) -> CDenseMatrix
+                                 const int64_t npoints) -> CDenseMatrix
 {
     CGpuDevices gpu_devices;
 
@@ -2426,9 +2418,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                          const std::string& flag_K,
                          const double       eri_threshold,
                          const double       prelink_threshold,
-                         CGradientScreeningData& screening,
-                         const int64_t      rank,
-                         const int64_t      nnodes) -> CDenseMatrix
+                         CGradientScreeningData& screening) -> CDenseMatrix
 {
     // TODO sanity check for flag_K: SYMM or ANTISYMM
 
@@ -2693,10 +2683,6 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
     }
 
     screening.initTimers(num_gpus_per_node);
-
-    // std::cout << "\nTiming of prep. on rank " << rank << "\n";
-    // std::cout << "-------------------------\n";
-    // std::cout << timer.getSummary() << std::endl;
 
 #pragma omp parallel
     {
@@ -25010,10 +24996,6 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
     gpuSafe(gpuFree(d_prim_cart_ao_to_atom_inds));
 
     timer.stop("Total timing");
-
-    // std::cout << "\nTiming of ERIs on GPU " << gpu_id + rank * num_gpus_per_node << "\n";
-    // std::cout << "-----------------------\n";
-    // std::cout << timer.getSummary() << std::endl;
     }
 
     CDenseMatrix Fock_grad_T (natoms, 3);

@@ -43,7 +43,7 @@ class TestNuclearPotentialGradient:
         grad_screener = GradientScreeningData(mol, bas, dmat, wmat, num_gpus,
                                               1e-10, 1e-10, rank, nnodes)
 
-        V_grad = compute_nuclear_potential_gradient_gpu(mol, bas, grad_screener, rank, nnodes)
+        V_grad = compute_nuclear_potential_gradient_gpu(mol, bas, grad_screener)
         V_grad = V_grad.to_numpy()
         V_grad *= 2.0
 

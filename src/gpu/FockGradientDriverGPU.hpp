@@ -46,31 +46,23 @@ namespace gpu {
 auto
 computeOverlapGradientOnGPU(const CMolecule& molecule,
                             const CMolecularBasis& basis,
-                            const CGradientScreeningData& screening,
-                            const int64_t rank,
-                            const int64_t nnodes) -> CDenseMatrix;
+                            const CGradientScreeningData& screening) -> CDenseMatrix;
 
 auto
 computeKineticEnergyGradientOnGPU(const CMolecule& molecule,
                                   const CMolecularBasis& basis,
-                                  const CGradientScreeningData& screening,
-                                  const int64_t rank,
-                                  const int64_t nnodes) -> CDenseMatrix;
+                                  const CGradientScreeningData& screening) -> CDenseMatrix;
 
 auto
 computeNuclearPotentialGradientOnGPU(const CMolecule& molecule,
                                      const CMolecularBasis& basis,
-                                     const CGradientScreeningData& screening,
-                                     const int64_t rank,
-                                     const int64_t nnodes) -> CDenseMatrix;
+                                     const CGradientScreeningData& screening) -> CDenseMatrix;
 
 auto computePointChargesGradientOnGPU(const CMolecule& molecule,
                                       const CMolecularBasis& basis,
                                       const CGradientScreeningData& screening,
                                       const double* points_info_ptr,
-                                      const int64_t npoints,
-                                      const int64_t rank,
-                                      const int64_t nnodes) -> CDenseMatrix;
+                                      const int64_t npoints) -> CDenseMatrix;
 
 auto computeFockGradientOnGPU(const              CMolecule& molecule,
                               const              CMolecularBasis& basis,
@@ -81,9 +73,7 @@ auto computeFockGradientOnGPU(const              CMolecule& molecule,
                               const std::string& flag_K,
                               const double       eri_threshold,
                               const double       prelink_threshold,
-                              CGradientScreeningData& screening,
-                              const int64_t      rank,
-                              const int64_t      nnodes) -> CDenseMatrix;
+                              CGradientScreeningData& screening) -> CDenseMatrix;
 
 }  // namespace gpu
 

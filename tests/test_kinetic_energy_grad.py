@@ -43,7 +43,7 @@ class TestKineticEnergyGradient:
         grad_screener = GradientScreeningData(mol, bas, dmat, wmat, num_gpus,
                                               1e-10, 1e-10, rank, nnodes)
 
-        T_grad = compute_kinetic_energy_gradient_gpu(mol, bas, grad_screener, rank, nnodes)
+        T_grad = compute_kinetic_energy_gradient_gpu(mol, bas, grad_screener)
         T_grad = T_grad.to_numpy()
         T_grad *= 2.0
 
