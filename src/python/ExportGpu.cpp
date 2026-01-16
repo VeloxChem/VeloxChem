@@ -384,9 +384,7 @@ export_gpu(py::module& m)
         [](const CMolecule& molecule,
            const CMolecularBasis& basis,
            const CScreeningData& screener,
-           const py::array_t<double>& point_charges,
-           const int64_t rank,
-           const int64_t nnodes) -> CDenseMatrix {
+           const py::array_t<double>& point_charges) -> CDenseMatrix {
             std::string errshape("compute_point_charges_integrals_gpu: Invalid shape of point_charges");
             std::string errstyle("compute_point_charges_integrals_gpu: Expecting contiguous numpy array");
             const auto  ndim    = static_cast<int64_t>(point_charges.shape(0));
@@ -394,7 +392,7 @@ export_gpu(py::module& m)
             auto        c_style = py::detail::check_flags(point_charges.ptr(), py::array::c_style);
             errors::assertMsgCritical(ndim == 4, errshape);
             errors::assertMsgCritical(c_style, errstyle);
-            return gpu::computePointChargesIntegralsOnGPU(molecule, basis, screener, point_charges.data(), npoints, rank, nnodes);
+            return gpu::computePointChargesIntegralsOnGPU(molecule, basis, screener, point_charges.data(), npoints);
         },
         "Computes point charges integrals using GPU.");
 
@@ -403,9 +401,7 @@ export_gpu(py::module& m)
         [](const CMolecule& molecule,
            const CMolecularBasis& basis,
            const CGradientScreeningData& screener,
-           const py::array_t<double>& point_charges,
-           const int64_t rank,
-           const int64_t nnodes) -> CDenseMatrix {
+           const py::array_t<double>& point_charges) -> CDenseMatrix {
             std::string errshape("compute_point_charges_gradient_gpu: Invalid shape of point_charges");
             std::string errstyle("compute_point_charges_gradient_gpu: Expecting contiguous numpy array");
             const auto  ndim    = static_cast<int64_t>(point_charges.shape(0));
@@ -413,7 +409,7 @@ export_gpu(py::module& m)
             auto        c_style = py::detail::check_flags(point_charges.ptr(), py::array::c_style);
             errors::assertMsgCritical(ndim == 4, errshape);
             errors::assertMsgCritical(c_style, errstyle);
-            return gpu::computePointChargesGradientOnGPU(molecule, basis, screener, point_charges.data(), npoints, rank, nnodes);
+            return gpu::computePointChargesGradientOnGPU(molecule, basis, screener, point_charges.data(), npoints);
         },
         "Computes point charges integrals using GPU.");
 

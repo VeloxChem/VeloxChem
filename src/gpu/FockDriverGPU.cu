@@ -3785,9 +3785,9 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule,
 
 auto
 computeAngularMomentumIntegralsOnGPU(const CMolecule& molecule,
-                                    const CMolecularBasis& basis,
-                                    const std::vector<double>& origin,
-                                    const CScreeningData& screening) -> std::vector<CDenseMatrix>
+                                     const CMolecularBasis& basis,
+                                     const std::vector<double>& origin,
+                                     const CScreeningData& screening) -> std::vector<CDenseMatrix>
 {
     CGpuDevices gpu_devices;
 

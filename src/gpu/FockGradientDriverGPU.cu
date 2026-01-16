@@ -2413,8 +2413,8 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                          const              CMolecularBasis& basis,
                          const              CAODensityMatrix& densityMatrix,
                          const double       prefac_coulomb,
-                         const double       frac_exact_exchange,
-                         const double       omega,
+                         const std::vector<double>& frac_exact_exchange_values,
+                         const std::vector<double>& omega_values,
                          const std::string& flag_K,
                          const double       eri_threshold,
                          const double       prelink_threshold,
@@ -12152,6 +12152,11 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
     timer.start("K computation");
 
     // compute K
+
+    for (int64_t exch_idx = 0; exch_idx < static_cast<int64_t>(frac_exact_exchange_values.size()); exch_idx++)
+    {
+    const auto frac_exact_exchange = frac_exact_exchange_values[exch_idx];
+    const auto omega = omega_values[exch_idx];
 
     if (std::fabs(frac_exact_exchange) > 1.0e-13)
     {
@@ -24883,6 +24888,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
         timer.stop("  K block DD");
     }
 
+    }
     }  // end of compute K
 
     timer.stop("K computation");

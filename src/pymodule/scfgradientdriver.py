@@ -298,19 +298,17 @@ class ScfGradientDriver(GradientDriver):
 
         t0 = time.time()
 
-        fock_grad = compute_fock_gradient_gpu(
-            molecule, basis, dmat, 2.0, full_k_coef, 0.0, 'symm',
-            self.eri_thresh, self.prelink_thresh, grad_screener)
-
-        self.gradient += fock_grad.to_numpy()
-
-        # TODO: compute range-separted fock_grad in one shot
         if need_omega:
-            fock_rs_grad = compute_fock_gradient_gpu(
-                molecule, basis, dmat, 0.0, erf_k_coef, omega, 'symm',
+            fock_grad = compute_fock_gradient_gpu(
+                molecule, basis, dmat, 2.0, [full_k_coef, erf_k_coef],
+                [0.0, omega], 'symm', self.eri_thresh, self.prelink_thresh,
+                grad_screener)
+        else:
+            fock_grad = compute_fock_gradient_gpu(
+                molecule, basis, dmat, 2.0, [full_k_coef], [0.0], 'symm',
                 self.eri_thresh, self.prelink_thresh, grad_screener)
 
-            self.gradient += fock_rs_grad.to_numpy()
+        self.gradient += fock_grad.to_numpy()
 
         grad_timing['Fock_grad'] += time.time() - t0
 
@@ -626,7 +624,7 @@ class ScfGradientDriver(GradientDriver):
 
         # J_ab
         fock_grad = compute_fock_gradient_gpu(
-            molecule, basis, d_total, 1.0, 0.0, 0.0, 'symm',
+            molecule, basis, d_total, 1.0, [0.0], [0.0], 'symm',
             self.eri_thresh, self.prelink_thresh, grad_screener)
 
         self.gradient += 0.5 * fock_grad.to_numpy()
@@ -639,19 +637,17 @@ class ScfGradientDriver(GradientDriver):
             molecule, basis, d_alpha, w_total, num_gpus_per_node, self.pair_thresh,
             self.density_thresh, self.rank, self.nodes)
 
-        fock_grad = compute_fock_gradient_gpu(
-            molecule, basis, d_alpha, 0.0, full_k_coef, 0.0, 'symm',
-            self.eri_thresh, self.prelink_thresh, grad_screener)
-
-        self.gradient += 0.5 * fock_grad.to_numpy()
-
-        # TODO: compute range-separted fock_grad in one shot
         if need_omega:
-            fock_rs_grad = compute_fock_gradient_gpu(
-                molecule, basis, d_alpha, 0.0, erf_k_coef, omega, 'symm',
+            fock_grad = compute_fock_gradient_gpu(
+                molecule, basis, d_alpha, 0.0, [full_k_coef, erf_k_coef],
+                [0.0, omega], 'symm', self.eri_thresh, self.prelink_thresh,
+                grad_screener)
+        else:
+            fock_grad = compute_fock_gradient_gpu(
+                molecule, basis, d_alpha, 0.0, [full_k_coef], [0.0], 'symm',
                 self.eri_thresh, self.prelink_thresh, grad_screener)
 
-            self.gradient += 0.5 * fock_rs_grad.to_numpy()
+        self.gradient += 0.5 * fock_grad.to_numpy()
 
         # K_b
         d_beta = AODensityMatrix([Db], denmat.rest)
@@ -661,19 +657,17 @@ class ScfGradientDriver(GradientDriver):
             molecule, basis, d_beta, w_total, num_gpus_per_node, self.pair_thresh,
             self.density_thresh, self.rank, self.nodes)
 
-        fock_grad = compute_fock_gradient_gpu(
-            molecule, basis, d_beta, 0.0, full_k_coef, 0.0, 'symm',
-            self.eri_thresh, self.prelink_thresh, grad_screener)
-
-        self.gradient += 0.5 * fock_grad.to_numpy()
-
-        # TODO: compute range-separted fock_grad in one shot
         if need_omega:
-            fock_rs_grad = compute_fock_gradient_gpu(
-                molecule, basis, d_beta, 0.0, erf_k_coef, omega, 'symm',
+            fock_grad = compute_fock_gradient_gpu(
+                molecule, basis, d_beta, 0.0, [full_k_coef, erf_k_coef],
+                [0.0, omega], 'symm', self.eri_thresh, self.prelink_thresh,
+                grad_screener)
+        else:
+            fock_grad = compute_fock_gradient_gpu(
+                molecule, basis, d_beta, 0.0, [full_k_coef], [0.0], 'symm',
                 self.eri_thresh, self.prelink_thresh, grad_screener)
 
-            self.gradient += 0.5 * fock_rs_grad.to_numpy()
+        self.gradient += 0.5 * fock_grad.to_numpy()
 
         grad_timing['Fock_grad'] += time.time() - t0
 

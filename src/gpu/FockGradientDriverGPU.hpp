@@ -58,22 +58,24 @@ computeNuclearPotentialGradientOnGPU(const CMolecule& molecule,
                                      const CMolecularBasis& basis,
                                      const CGradientScreeningData& screening) -> CDenseMatrix;
 
-auto computePointChargesGradientOnGPU(const CMolecule& molecule,
-                                      const CMolecularBasis& basis,
-                                      const CGradientScreeningData& screening,
-                                      const double* points_info_ptr,
-                                      const int64_t npoints) -> CDenseMatrix;
+auto
+computePointChargesGradientOnGPU(const CMolecule& molecule,
+                                 const CMolecularBasis& basis,
+                                 const CGradientScreeningData& screening,
+                                 const double* points_info_ptr,
+                                 const int64_t npoints) -> CDenseMatrix;
 
-auto computeFockGradientOnGPU(const              CMolecule& molecule,
-                              const              CMolecularBasis& basis,
-                              const              CAODensityMatrix& densityMatrix,
-                              const double       prefac_coulomb,
-                              const double       frac_exact_exchange,
-                              const double       omega,
-                              const std::string& flag_K,
-                              const double       eri_threshold,
-                              const double       prelink_threshold,
-                              CGradientScreeningData& screening) -> CDenseMatrix;
+auto
+computeFockGradientOnGPU(const              CMolecule& molecule,
+                         const              CMolecularBasis& basis,
+                         const              CAODensityMatrix& densityMatrix,
+                         const double       prefac_coulomb,
+                         const std::vector<double>& frac_exact_exchange_values,
+                         const std::vector<double>& omega_values,
+                         const std::string& flag_K,
+                         const double       eri_threshold,
+                         const double       prelink_threshold,
+                         CGradientScreeningData& screening) -> CDenseMatrix;
 
 }  // namespace gpu
 
