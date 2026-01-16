@@ -47,9 +47,8 @@ class TestFockGradient:
                                               1e-10, 1e-10, rank, nnodes)
 
         fock_grad = compute_fock_gradient_gpu(mol, bas, dmat, coulomb_coef,
-                                              exchange_coef, omega, 'symm',
-                                              1e-12, 5e-6, grad_screener,
-                                              rank, nnodes)
+                                              [exchange_coef], [omega], 'symm',
+                                              1e-12, 5e-6, grad_screener)
 
         fock_grad = fock_grad.to_numpy()
 
