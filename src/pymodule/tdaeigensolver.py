@@ -342,11 +342,12 @@ class TdaEigenSolver(LinearSolver):
                     fock_mat_local = self._comp_lr_fock(tdens_symm, molecule,
                                                         basis, eri_dict,
                                                         dft_dict, pe_dict, 2.0,
-                                                        'symm', profiler)
+                                                        'symm', self.comm,
+                                                        profiler)
 
                     fock_mat_local += self._comp_lr_fock(
                         tdens_antisymm, molecule, basis, eri_dict, dft_dict,
-                        pe_dict, 0.0, 'antisymm', profiler)
+                        pe_dict, 0.0, 'antisymm', self.comm, profiler)
 
                     if self.rank == mpi_master():
                         fock_mat = np.zeros(fock_mat_local.shape)
