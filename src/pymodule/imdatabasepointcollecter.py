@@ -3077,7 +3077,7 @@ class IMDatabasePointCollecter:
                             #         old_list_change = elem_list.copy()
                             #         same = True
 
-                        state_specific_molecules.append((optimized_molecule, current_basis, [state_to_optim], imp_int_coord))
+                    state_specific_molecules.append((optimized_molecule, current_basis, [state_to_optim], imp_int_coord))
 
                 print('New optimized molecule \n', optimized_molecule.get_xyz_string())
                 self.add_point(state_specific_molecules, self.non_core_symmetry_groups)
