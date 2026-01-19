@@ -38,18 +38,41 @@ from .outputstream import OutputStream
 
 class EnvironmentDriver:
     """
-    Handles the evironment from the snaphosts of a trajectory.
+    Handles the environment from the snapshots of a trajectory.
 
     :param comm:
         The MPI communicator.
     :param ostream:
         The output stream.
+
+    Instance variables:
+        - solvent_models: Dictionary containing solvent model parameters.
+        - resname_to_model: Mapping from residue names to solvent models.
     """
 
     def __init__(self, comm=None, ostream=None):
         """
         Initialize the environment driver.
+        See this reference, Figure 4, for different "cp3 approach" parameters:
+        https://doi.org/10.1021/acs.jctc.5c01719
         """
+        self.solvent_models = {
+            "SEP": {
+                    "pattern": ["O", "H", "H"],
+                    "charges": {"O": -0.67444000, "H": 0.33722000},
+                    "polarizabilities": {
+                        "O": [0.0, 0.0, 5.73935000, 0.0, 0.0, 0.0],
+                        "H": [0.0, 0.0, 2.30839000, 0.0, 0.0, 0.0],
+                    },
+            }
+        }
+
+        self.resname_to_model = {
+            "SOL": "SEP",
+            "WAT": "SEP",
+            "HOH": "SEP",
+        }
+
         if comm is None:
             comm = MPI.COMM_WORLD
 
@@ -105,10 +128,9 @@ class EnvironmentDriver:
                 Residue id for each MM atom, length N.
             - mm_resnames (numpy.ndarray):
                 Residue name for each MM atom, length N.
-
+                
         :param outdir:
             Directory where the .pot file will be written.
-
         :return:
             None.
         """
@@ -117,14 +139,16 @@ class EnvironmentDriver:
         mm_elements = snapshot['mm_elements']
         mm_resids = snapshot['mm_resids']
         mm_resnames = snapshot['mm_resnames']
+        present_resnames = sorted(set(str(r) for r in mm_resnames))
+
+        model_to_resnames = {}
+        for resn in present_resnames:
+            model = self.resname_to_model.get(resn)
+            if model is None:
+                raise KeyError(f"No model registered for residue name '{resn}'")
+            model_to_resnames.setdefault(model, set()).add(resn)
 
         pot_path = outdir / f"frame_{frame:06d}.pot"
-        charges = {'O': -0.67444000, 'H': 0.33722000}
-        polar = {
-            'O': [0.0, 0.0, 5.73935000, 0.0, 0.0, 0.0],
-            'H': [0.0, 0.0, 2.30839000, 0.0, 0.0, 0.0],
-        }
-
         with pot_path.open('w') as fh:
             fh.write("@environment\n")
             fh.write("units: angstrom\n")
@@ -132,18 +156,26 @@ class EnvironmentDriver:
             for (x, y, z), elem, resn, resid in zip(mm_coords, mm_elements, mm_resnames, mm_resids):
                 fh.write(f"{elem:<2} {x:12.6f} {y:12.6f} {z:12.6f}  {resn:>3}  {resid}\n")
             fh.write("@end\n\n")
-
             fh.write("@charges\n")
-            for atom in ['O', 'H', 'H']:
-                fh.write(f"{atom:<2} {charges[atom]:12.8f}  SOL\n")
-            fh.write("@end\n\n")
 
+            for model, resnames in model_to_resnames.items():
+                pattern = self.solvent_models[model]["pattern"]
+                charges = self.solvent_models[model]["charges"]
+                for resn in sorted(resnames):
+                    for atom in pattern:
+                        fh.write(f"{atom:<2} {charges[atom]:12.8f}  {resn}\n")
+            fh.write("@end\n\n")
             fh.write("@polarizabilities\n")
-            for atom in ['O', 'H', 'H']:
-                vals = polar[atom]
-                fh.write(
-                    f"{atom:<2} {vals[0]:12.8f} {vals[1]:12.8f} {vals[2]:12.8f} "
-                    f"{vals[3]:12.8f} {vals[4]:12.8f} {vals[5]:12.8f}  SOL\n"
-                )
+
+            for model, resnames in model_to_resnames.items():
+                pattern = self.solvent_models[model]["pattern"]
+                polar = self.solvent_models[model]["polarizabilities"]
+                for resn in sorted(resnames):
+                    for atom in pattern:
+                        vals = polar[atom]
+                        fh.write(
+                            f"{atom:<2} {vals[0]:12.8f} {vals[1]:12.8f} {vals[2]:12.8f} "
+                            f"{vals[3]:12.8f} {vals[4]:12.8f} {vals[5]:12.8f}  {resn}\n"
+                        )           
             fh.write("@end\n")
 
