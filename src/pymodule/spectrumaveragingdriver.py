@@ -268,7 +268,7 @@ class SpectrumAveragingDriver:
 
     def plot_uv_vis(
         self,
-        rsp_all_or_spectrum,
+        rsp_all,
         *,
         energy_min_ev=None,
         energy_max_ev=None,
@@ -282,9 +282,9 @@ class SpectrumAveragingDriver:
         """
         Plot an averaged UV/Vis spectrum from multiple response results.
 
-        :param rsp_all_or_spectrum:
-            Either a list of response results (frame, rsp_results), or a 
-            precomputed spectrum dictionary (as returned by the compute method).
+        :param rsp_all:
+            A list of response results dictionaries: (frame, rsp_results) tuples 
+            (as returned by the compute method).
         :param energy_min_ev:
             Minimum photon energy in eV for the common grid. If None, it is set to
             (min excitation energy - padding).
@@ -312,12 +312,8 @@ class SpectrumAveragingDriver:
         if plt is None:
             raise ImportError("matplotlib is required for plotting")
 
-        # Accept either precomputed spectrum dict or raw rsp_all
-        if isinstance(rsp_all_or_spectrum, dict) and "eps_mean_wl" in rsp_all_or_spectrum:
-            spectrum = rsp_all_or_spectrum
-        else:
-            spectrum = self.compute(
-                rsp_all_or_spectrum,
+        spectrum = self.compute(
+                rsp_all,
                 energy_min_ev=energy_min_ev,
                 energy_max_ev=energy_max_ev,
             )
