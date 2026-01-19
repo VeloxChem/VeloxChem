@@ -53,9 +53,7 @@ class TrajectoryDriver:
         The MPI communicator.
     : param ostream:
         The output stream.
-
     """
-
     def __init__(self, comm=None, ostream=None):
         """
         Initialize the TrajectoryDriver.
@@ -110,6 +108,7 @@ class TrajectoryDriver:
             - mm_resnames (numpy.ndarray):
                 Residue name for each MM atom, length N.
         """
+        
         if trajectory_file.lower().endswith('.pdb'):
             self.universe = mda.Universe(trajectory_file, guess_bonds=True)
         else:
