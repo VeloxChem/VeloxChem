@@ -57,10 +57,7 @@ au2nm = 1.0e7 / hartree_in_wavenumber()
 class SpectrumAveragingDriver:
     """
     Build and plot an averaged UV/Vis spectrum from multiple LR results.
-
-    Inputs are expected to be VeloxChem response results dictionaries
-    (as returned by LinearResponseEigenSolver.compute), or (frame, rsp_results)
-    tuples.
+    Inputs are expected to be (frame, rsp_results) tuples.
 
     :param comm:
         The MPI communicator.
