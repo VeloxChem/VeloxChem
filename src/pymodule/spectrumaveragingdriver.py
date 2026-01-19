@@ -92,6 +92,8 @@ class SpectrumAveragingDriver:
         self.broadening_value_ev = 0.124
         self.xstep_ev = 0.01
         self.padding_ev = 0.8
+        self.spectrum_color = "k"
+        self.bar_color = "darkcyan"
 
     def unpack_snapshots(self, rsp_all):
         """
@@ -337,9 +339,9 @@ class SpectrumAveragingDriver:
             wl_forward = wl_forward[mask][::-1]
             for eps in spectrum["eps_all"]:
                 eps = np.asarray(eps, dtype=float)
-                ax.plot(wl_forward, eps[mask][::-1], linewidth=1, alpha=0.25)
+                ax.plot(wl_forward, eps[mask][::-1], linewidth=1, alpha=0.45)
 
-        ax.plot(wl, ymean, linewidth=2)
+        ax.plot(wl, ymean, linewidth=2, color=self.spectrum_color)
         ax.set_title(title)
         ax.set_xlabel("Wavelength [nm]")
         ax.set_ylabel(r"$\epsilon$ [L mol$^{-1}$ cm$^{-1}$]")
@@ -360,7 +362,7 @@ class SpectrumAveragingDriver:
                 e_au = np.asarray(e_au, dtype=float)
                 with np.errstate(divide="ignore", invalid="ignore"):
                     wl_t = au2nm / e_au
-                ax2.vlines(wl_t, 0.0, f, alpha=0.35, linewidth=2)
+                ax2.vlines(wl_t, 0.0, f, alpha=0.35, linewidth=2, color=self.bar_color)
 
             ax2.set_ylim(0.0, max(0.2, ax2.get_ylim()[1]))
             ax2.set_xlim(ax.get_xlim())
