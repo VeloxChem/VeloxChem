@@ -30,13 +30,10 @@
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-from pathlib import Path
 from mpi4py import MPI
 import sys
-
-from .veloxchemlib import mpi_master
-from .outputstream import OutputStream
 import numpy as np
+from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
 import MDAnalysis as mda
 import MDAnalysis.transformations as transform
@@ -47,7 +44,7 @@ class TrajectoryDriver:
     Driver for trajectory-driven calculations.
     
     This class automates the parsing of molecular dynamics trajectories and
-    extracts QM and MM region coordinates for each snapshot.
+    extracts information from the qm and environment regions for each snapshot.
 
     : param comm:
         The MPI communicator.
@@ -79,7 +76,10 @@ class TrajectoryDriver:
                           trajectory_file: str,
                           num_snapshots: int,
                           qm_region: str,
-                          topology_file: str = None):
+                          topology_file: str = None,
+                          env_region: str,
+                          pe_cutoff: float | None = None,
+                          npe_cutoff: float | None = None,):
         """
         Parse a molecular dynamics trajectory and extract QM and MM region data.
 
@@ -91,6 +91,12 @@ class TrajectoryDriver:
             Number of snapshots to extract from the trajectory.
         :param qm_region:
             Selection string defining the QM region (MDAnalysis selection syntax).
+        :param env_region:
+            Selection string defining the environment region (MDAnalysis selection syntax).
+        :param pe_cutoff:
+            Cutoff for polarizable embedding (pe) region selection (Angstrom).
+        :param npe_cutoff:
+            Cutoff for non-polarizable embedding (npe) region selection (Angstrom).
         :return:
             A list of snapshot dictionaries, each containing:
             - frame (int):
@@ -115,7 +121,6 @@ class TrajectoryDriver:
             self.universe = mda.Universe(topology_file, trajectory_file)
 
         total_frames = len(self.universe.trajectory)
-        print(self.universe.trajectory.units)
         print(f"Total frames in trajectory: {total_frames}")
         if num_snapshots > total_frames:
             raise ValueError(f"Requested number of snapshots ({num_snapshots}) exceeds total frames in trajectory ({total_frames}).")
@@ -134,7 +139,7 @@ class TrajectoryDriver:
         self.step = step
 
         qm_atoms = self.universe.select_atoms(qm_region)
-        rest = self.universe.select_atoms(f"not ({qm_region})")
+        rest = self.universe.select_atoms(env_region)
 
         transforms = [
         transform.unwrap(qm_atoms),

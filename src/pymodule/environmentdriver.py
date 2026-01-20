@@ -56,7 +56,7 @@ class EnvironmentDriver:
         See this reference, Figure 4, for different "cp3 approach" parameters:
         https://doi.org/10.1021/acs.jctc.5c01719
         """
-        self.solvent_models = {
+        self.solvent_pe_models = {
             "SEP": {
                     "pattern": ["O", "H", "H"],
                     "charges": {"O": -0.67444000, "H": 0.33722000},
@@ -67,10 +67,23 @@ class EnvironmentDriver:
             }
         }
 
-        self.resname_to_model = {
+        self.resname_to_pe_model = {
             "SOL": "SEP",
             "WAT": "SEP",
             "HOH": "SEP",
+        }
+
+        self.solvent_npe_models = {
+            "tip3p": {
+                    "pattern": ["O", "H", "H"],
+                    "charges": {"O": -0.83400000, "H": 0.41700000},
+            }
+        }
+
+        self.resname_to_npe_model = {
+            "SOL": "tip3p",
+            "WAT": "tip3p",
+            "HOH": "tip3p",
         }
 
         if comm is None:
@@ -128,7 +141,7 @@ class EnvironmentDriver:
                 Residue id for each MM atom, length N.
             - mm_resnames (numpy.ndarray):
                 Residue name for each MM atom, length N.
-                
+
         :param outdir:
             Directory where the .pot file will be written.
         :return:
