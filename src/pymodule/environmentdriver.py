@@ -67,23 +67,11 @@ class EnvironmentDriver:
             }
         }
 
-        self.resname_to_pe_model = {
-            "SOL": "SEP",
-            "WAT": "SEP",
-            "HOH": "SEP",
-        }
-
         self.solvent_npe_models = {
             "tip3p": {
                     "pattern": ["O", "H", "H"],
                     "charges": {"O": -0.83400000, "H": 0.41700000},
             }
-        }
-
-        self.resname_to_npe_model = {
-            "SOL": "tip3p",
-            "WAT": "tip3p",
-            "HOH": "tip3p",
         }
 
         if comm is None:
@@ -133,27 +121,25 @@ class EnvironmentDriver:
 
             - frame (int):
                 Frame number used in the output file name.
-            - mm_coords (numpy.ndarray):
-                MM region Cartesian coordinates, shape (N, 3), in Angstrom.
-            - mm_elements (numpy.ndarray):
-                Element symbols for each MM atom, length N.
-            - mm_resids (numpy.ndarray):
-                Residue id for each MM atom, length N.
-            - mm_resnames (numpy.ndarray):
-                Residue name for each MM atom, length N.
-
+            - pe_coords (numpy.ndarray):
+                PE region Cartesian coordinates, shape (N_pe, 3), in Angstrom.
+            - pe_elements (numpy.ndarray):
+                Element symbols for each PE atom, shape (N_pe,).
+            - pe_resids (numpy.ndarray):
+                Residue id for each PE atom, shape (N_pe,).
+            - pe_resnames (numpy.ndarray):
+                Residue name for each PE atom, shape (N_pe,).
         :param outdir:
             Directory where the .pot file will be written.
         :return:
             None.
         """
         frame = snapshot['frame']
-        mm_coords = snapshot['mm_coords']
-        mm_elements = snapshot['mm_elements']
-        mm_resids = snapshot['mm_resids']
-        mm_resnames = snapshot['mm_resnames']
-        present_resnames = sorted(set(str(r) for r in mm_resnames))
-
+        pe_coords = snapshot['pe_coords']
+        pe_elements = snapshot['pe_elements']
+        pe_resids = snapshot['pe_resids']
+        pe_resnames = snapshot['pe_resnames']
+        present_resnames = sorted(set(str(r) for r in pe_resnames))
         model_to_resnames = {}
         for resn in present_resnames:
             model = self.resname_to_model.get(resn)
@@ -166,7 +152,7 @@ class EnvironmentDriver:
             fh.write("@environment\n")
             fh.write("units: angstrom\n")
             fh.write("xyz:\n")
-            for (x, y, z), elem, resn, resid in zip(mm_coords, mm_elements, mm_resnames, mm_resids):
+            for (x, y, z), elem, resn, resid in zip(pe_coords, pe_elements, pe_resnames, pe_resids):
                 fh.write(f"{elem:<2} {x:12.6f} {y:12.6f} {z:12.6f}  {resn:>3}  {resid}\n")
             fh.write("@end\n\n")
             fh.write("@charges\n")
