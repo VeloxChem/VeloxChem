@@ -134,6 +134,9 @@ class ReactionMatcher:
     def _decide_breaking_depth(self):
         N = len(self.rea_graph.edges)
         _breaking_depth = 1
+        
+        if N == 1:
+            return 1
 
         # Equivalent to N! / (N - depth)!
         def estimate_attempts(N, depth):

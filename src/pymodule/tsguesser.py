@@ -165,7 +165,7 @@ class TransitionStateGuesser():
                 "Building forcefields. Disable mute_ff_build to see detailed output."
             )
             self.ostream.flush()
-            self.ffbuilder.ostream.mute()
+            self.ostream.mute()
 
         self.reactant, self.product, self.forming_bonds, self.breaking_bonds, reactants, products, product_mapping = self.ffbuilder.build_forcefields(
             reactant=reactant,
@@ -173,19 +173,15 @@ class TransitionStateGuesser():
             **build_forcefields_kwargs,
         )
 
+        if self.mute_ff_build:
+            self.ostream.unmute()
+
         self.molecule = Molecule.read_xyz_string(
             self.reactant.molecule.get_xyz_string())
         self.molecule.set_charge(self.reactant.molecule.get_charge())
         self.molecule.set_multiplicity(
             self.reactant.molecule.get_multiplicity())
 
-        if self.mute_ff_build:
-            self.ostream.print_blank()
-            self.ostream.flush()
-            self.ffbuilder.ostream.unmute()
-            self.ffbuilder._summarise_reaction(self.reactant, self.product,
-                                               self.ostream)
-            self.ffbuilder.ostream.mute()
         self.ostream.print_info(
             f"System has charge {self.molecule.get_charge()} and multiplicity {self.molecule.get_multiplicity()}. Provide correct values if this is wrong."
         )
@@ -230,6 +226,10 @@ class TransitionStateGuesser():
             self.sys_builder_configuration,
             constraints,
         )
+        if self.mute_ff_build:
+            self.ostream.print_blank()
+            self.ostream.flush()
+            sysbuilder.ostream.unmute()
         self.ostream.print_info(
             f"Saving systems as xml to {self.folder_name}/systems")
         self.ostream.flush()
@@ -242,9 +242,6 @@ class TransitionStateGuesser():
         self.folder = Path().cwd() / self.folder_name
 
         # pdbs are saved in angstrom
-        if self.save_mm_traj:
-            mmapp.PDBFile.writeFile(self.topology, self.initial_positions,
-                                    str(self.folder / 'topology.pdb'))
         exception = None
 
         rea_int = mm.VerletIntegrator(1)
@@ -564,6 +561,9 @@ class TransitionStateGuesser():
             nsteps=self.mm_steps * snapshots,
             snapshots=snapshots,
             temperature=self.mm_temperature,
+            save_trajectory=self.save_mm_traj,
+            trajectory_file=self.folder_name + f'/traj_{l}.xtc',
+            trajectory_interval=10,
         )
         result = []
         for e_int, temp_mol in zip(conformers_dict['energies'],
@@ -616,15 +616,14 @@ class TransitionStateGuesser():
         min_qm_conf_index = 0
         try:
             for l in results['scan'].keys():
-                
+
                 min_qm_conf_E = None
                 min_conf_index = 0
                 scan = sorted(results['scan'][l], key=lambda x: x['v'])
                 results['scan'][l] = scan
                 # Pick out lowest 5 conformers from scan
-                
-                
-                scan_range = min(self.max_qm_conformers,len(scan))
+
+                scan_range = min(self.max_qm_conformers, len(scan))
                 for i, conformer in enumerate(scan[:scan_range]):
                     qm_E = self._get_qm_energy(conformer['xyz'])
 
@@ -653,8 +652,11 @@ class TransitionStateGuesser():
                 results['scan'][l] = sorted_qm_scan + rest
 
             self.ostream.print_blank()
-            min_qm_conf_index,_ = min(enumerate(results['scan'][max_qm_lambda]), key=lambda x: x[1].get('qm_energy', math.inf))
-            max_qm_xyz = results['scan'][max_qm_lambda][min_qm_conf_index]['xyz']
+            min_qm_conf_index, _ = min(
+                enumerate(results['scan'][max_qm_lambda]),
+                key=lambda x: x[1].get('qm_energy', math.inf))
+            max_qm_xyz = results['scan'][max_qm_lambda][min_qm_conf_index][
+                'xyz']
             results.update({
                 'max_qm_xyz': max_qm_xyz,
                 'max_qm_lambda': max_qm_lambda,
@@ -794,7 +796,8 @@ class TransitionStateGuesser():
         if scan[0][0].get('qm_energy', None) is not None:
             for i, conf in enumerate(scan[step]):
                 qm_E = conf.get('qm_energy', None)
-                if min_energy is None or (qm_E is not None and qm_E < min_energy):
+                if min_energy is None or (qm_E is not None
+                                          and qm_E < min_energy):
                     min_energy = qm_E
                     best_index = i
         else:
@@ -859,17 +862,7 @@ class TransitionStateGuesser():
             print("  {:>9} {:>18} {:>19}  ".format("conformer",
                                                    "MM energy [kJ/mol]",
                                                    "QM energy [kJ/mol]"))
-            
-            # mmqmdif0 = np.array(rel_mm_energies[0] - rel_qm_energies[0])
-            # mmqmdif1 = np.array(rel_mm_energies[-1] - rel_qm_energies[-1])
-            # print(f"MM minimum energy at lambda=0: {rel_mm_energies[0]:.3f} kJ/mol" )
-            # print(f"QM minimum energy at lambda=0: {rel_qm_energies[0]:.3f} kJ/mol" )
-            # print( f"MM-QM energy difference at lambda=0: {mmqmdif0:.3f} kJ/mol" )
-            # print( f"MM-QM energy difference at lambda=1: {mmqmdif1:.3f} kJ/mol" )
-            # interpolation = mmqmdif0*(1-np.array(lambda_vec)) + mmqmdif1*np.array(lambda_vec)
-            # rel_mm_energies = rel_mm_energies - interpolation
-            
-            
+
             for i, conf in enumerate(scan[step]):
                 conf_str = f"{i+1}"
                 mm_e = f"{conf['v'] - mm_min:.3f}"
@@ -897,8 +890,7 @@ class TransitionStateGuesser():
                         qm_e,
                     )
                 print(print_str)
-                
-            
+
         else:
             print("  {:>9} {:>19}  ".format("conformer", "MM energy [kJ/mol]"))
             rel_qm_energies = None
@@ -1075,7 +1067,7 @@ class TransitionStateGuesser():
                                       dtype='i')
             forming_bonds = np.array(list(results['forming_bonds']), dtype='i')
             static_bonds = np.array(list(results['static_bonds']), dtype='i')
-            
+
             hf.create_dataset('breaking_bonds', data=breaking_bonds)
             hf.create_dataset('forming_bonds', data=forming_bonds)
             hf.create_dataset('static_bonds', data=static_bonds)
