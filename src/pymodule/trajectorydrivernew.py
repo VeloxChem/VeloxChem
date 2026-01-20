@@ -76,8 +76,8 @@ class TrajectoryDriver:
                           trajectory_file: str,
                           num_snapshots: int,
                           qm_region: str,
-                          topology_file: str = None,
                           env_region: str,
+                          topology_file: str | None = None,
                           pe_cutoff: float | None = None,
                           npe_cutoff: float | None = None,):
         """
@@ -94,37 +94,48 @@ class TrajectoryDriver:
         :param env_region:
             Selection string defining the environment region (MDAnalysis selection syntax).
         :param pe_cutoff:
-            Cutoff for polarizable embedding (pe) region selection (Angstrom).
+            Cutoff for polarizable embedding (PE) region selection (Angstrom).
         :param npe_cutoff:
-            Cutoff for non-polarizable embedding (npe) region selection (Angstrom).
+            Cutoff for non-polarizable embedding (NPE) region selection (Angstrom).
         :return:
             A list of snapshot dictionaries, each containing:
             - frame (int):
                 Frame number.
             - qm_coords (numpy.ndarray):
-                QM region Cartesian coordinates, shape (M, 3), in Angstrom.
+                QM region Cartesian coordinates, shape (N_qm, 3), in Angstrom.
             - qm_elements (numpy.ndarray):
-                Element symbols for each QM atom, length M.
-            - mm_coords (numpy.ndarray):
-                MM region Cartesian coordinates, shape (N, 3), in Angstrom.
-            - mm_elements (numpy.ndarray):
-                Element symbols for each MM atom, length N.
-            - mm_resids (numpy.ndarray):
-                Residue id for each MM atom, length N.
-            - mm_resnames (numpy.ndarray):
-                Residue name for each MM atom, length N.
+                Element symbols for each QM atom, shape (N_qm,).
+            - pe_coords (numpy.ndarray):
+                PE region Cartesian coordinates, shape (N_pe, 3), in Angstrom.
+            - pe_elements (numpy.ndarray):
+                Element symbols for each PE atom, shape (N_pe,).
+            - npe_coords (numpy.ndarray):
+                NPE region Cartesian coordinates, shape (N_npe, 3), in Angstrom.
+            - npe_elements (numpy.ndarray):
+                Element symbols for each NPE atom, shape (N_npe,).
+            - npe_resids (numpy.ndarray):
+                Residue id for each NPE atom, shape (N_npe,).
+            - npe_resnames (numpy.ndarray):
+                Residue name for each NPE atom, shape (N_npe,).
         """
+        
+        if num_snapshots <= 0:
+            raise ValueError("num_snapshots must be a positive integer")
         
         if trajectory_file.lower().endswith('.pdb'):
             self.universe = mda.Universe(trajectory_file, guess_bonds=True)
         else:
+            if topology_file is None:
+                raise ValueError("topology_file is required unless trajectory_file is a .pdb")
             self.universe = mda.Universe(topology_file, trajectory_file)
-
+        
         total_frames = len(self.universe.trajectory)
         print(f"Total frames in trajectory: {total_frames}")
         if num_snapshots > total_frames:
-            raise ValueError(f"Requested number of snapshots ({num_snapshots}) exceeds total frames in trajectory ({total_frames}).")
-        
+            raise ValueError(
+                f"Requested number of snapshots ({num_snapshots}) exceeds total frames ({total_frames})."
+            )
+    
         if num_snapshots == 1:
             start = 0
             stop = 1
@@ -139,31 +150,69 @@ class TrajectoryDriver:
         self.step = step
 
         qm_atoms = self.universe.select_atoms(qm_region)
-        rest = self.universe.select_atoms(env_region)
+        env_atoms = self.universe.select_atoms(env_region)
 
         transforms = [
         transform.unwrap(qm_atoms),
         transform.center_in_box(qm_atoms, wrap=True),
-        transform.wrap(rest)
+        transform.wrap(env_atoms)
         ]
         
         self.universe.trajectory.add_transformations(*transforms)
+
+        empty_xyz = np.empty((0, 3), dtype=float)
+        empty_obj = np.empty((0,), dtype=object)
+        empty_int = np.empty((0,), dtype=int)
+
         snapshots = []
         for ts in self.universe.trajectory[self.start:self.stop:self.step]:
-            qm_coords = qm_atoms.positions
-            qm_elements = np.array([guess_atom_element(n) for n in qm_atoms.names])
-            mm_coords = rest.positions
-            mm_elements = np.array([guess_atom_element(n) for n in rest.atoms.names])
+            qm_coords = np.asarray(qm_atoms.positions, dtype=float).copy()
+            qm_elements = np.array([guess_atom_element(n) for n in qm_atoms.names], dtype=object)
+
+            pe_coords, pe_elements, pe_resids, pe_resnames = empty_xyz, empty_obj, empty_int, empty_obj
+            npe_coords, npe_elements, npe_resids, npe_resnames = empty_xyz, empty_obj, empty_int, empty_obj
+
+            pe_region = None
+
+            if pe_cutoff is not None:
+                pe_region = self.universe.select_atoms(
+                    f"byres ({env_region} and around {float(pe_cutoff)} group qm)",
+                    qm=qm_atoms,
+                ).difference(qm_atoms)
+
+                pe_coords = np.asarray(pe_region.positions, dtype=float).copy()
+                pe_elements = np.array([guess_atom_element(n) for n in pe_region.names], dtype=object)
+                pe_resids = np.asarray(pe_region.resids, dtype=int).copy()
+                pe_resnames = np.asarray(pe_region.resnames, dtype=object).copy()
+
+            if npe_cutoff is not None:
+                outer_shell = self.universe.select_atoms(
+                    f"byres ({env_region} and around {float(npe_cutoff)} group qm)",
+                    qm=qm_atoms,
+                ).difference(qm_atoms)
+
+                npe_region = outer_shell.difference(pe_region) if pe_region is not None else outer_shell
+
+                npe_coords = np.asarray(npe_region.positions, dtype=float).copy()
+                npe_elements = np.array([guess_atom_element(n) for n in npe_region.names], dtype=object)
+                npe_resids = np.asarray(npe_region.resids, dtype=int).copy()
+                npe_resnames = np.asarray(npe_region.resnames, dtype=object).copy()
 
             snapshot = {
-                'frame': ts.frame,
-                'qm_coords': qm_coords,
-                'qm_elements': qm_elements,
-                'mm_coords': mm_coords,
-                'mm_elements': mm_elements,
-                'mm_atom_names': rest.atoms.names,
-                'mm_resids': rest.atoms.resids,
-                'mm_resnames': rest.atoms.resnames
+                    "frame": int(ts.frame),
+
+                    "qm_coords": qm_coords,
+                    "qm_elements": qm_elements,
+
+                    "pe_coords": pe_coords,
+                    "pe_elements": pe_elements,
+                    "pe_resids": pe_resids,
+                    "pe_resnames": pe_resnames,
+
+                    "npe_coords": npe_coords,
+                    "npe_elements": npe_elements,
+                    "npe_resids": npe_resids,
+                    "npe_resnames": npe_resnames,
             }
             snapshots.append(snapshot)
         return snapshots
