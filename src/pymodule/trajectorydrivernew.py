@@ -109,6 +109,10 @@ class TrajectoryDriver:
                 PE region Cartesian coordinates, shape (N_pe, 3), in Angstrom.
             - pe_elements (numpy.ndarray):
                 Element symbols for each PE atom, shape (N_pe,).
+            - pe_resids (numpy.ndarray):
+                Residue id for each PE atom, shape (N_pe,).
+            - pe_resnames (numpy.ndarray):
+                Residue name for each PE atom, shape (N_pe,).
             - npe_coords (numpy.ndarray):
                 NPE region Cartesian coordinates, shape (N_npe, 3), in Angstrom.
             - npe_elements (numpy.ndarray):
@@ -183,6 +187,7 @@ class TrajectoryDriver:
                 pe_coords = np.asarray(pe_region.positions, dtype=float).copy()
                 pe_elements = np.array([guess_atom_element(n) for n in pe_region.names], dtype=object)
                 pe_resids = np.asarray(pe_region.resids, dtype=int).copy()
+                print("NUMBER PE = ", pe_region.residues.n_residues)
                 pe_resnames = np.asarray(pe_region.resnames, dtype=object).copy()
 
             if npe_cutoff is not None:
@@ -196,6 +201,7 @@ class TrajectoryDriver:
                 npe_coords = np.asarray(npe_region.positions, dtype=float).copy()
                 npe_elements = np.array([guess_atom_element(n) for n in npe_region.names], dtype=object)
                 npe_resids = np.asarray(npe_region.resids, dtype=int).copy()
+                print("NUMBER NPE = ", npe_region.residues.n_residues)
                 npe_resnames = np.asarray(npe_region.resnames, dtype=object).copy()
 
             snapshot = {
