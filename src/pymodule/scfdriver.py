@@ -46,7 +46,7 @@ from .veloxchemlib import T4CScreener
 from .veloxchemlib import XCIntegrator
 from .veloxchemlib import mpi_master
 from .veloxchemlib import bohr_in_angstrom, hartree_in_kjpermol
-from .veloxchemlib import xcfun
+from .veloxchemlib import xcfun as xcfun_enum
 from .veloxchemlib import denmat, mat_t
 from .veloxchemlib import make_matrix
 from .matrix import Matrix
@@ -2284,7 +2284,9 @@ class ScfDriver:
         vxc_t0 = tm.time()
 
         if self._dft and not self._first_step:
-            if self.xcfun.get_func_type() in [xcfun.lda, xcfun.gga, xcfun.mgga]:
+            if self.xcfun.get_func_type() in [
+                    xcfun_enum.lda, xcfun_enum.gga, xcfun_enum.mgga
+            ]:
                 xc_drv = XCIntegrator()
                 # Note: vxc_mat will remain distributed across MPI processes.
                 # XC energy and Vxc matrix will be reduced in _comp_energy
