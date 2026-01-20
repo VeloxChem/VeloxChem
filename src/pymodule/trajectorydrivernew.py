@@ -113,6 +113,8 @@ class TrajectoryDriver:
                 Residue id for each PE atom, shape (N_pe,).
             - pe_resnames (numpy.ndarray):
                 Residue name for each PE atom, shape (N_pe,).
+            - pe_n_residues (int):
+                Number of residues in the PE region.
             - npe_coords (numpy.ndarray):
                 NPE region Cartesian coordinates, shape (N_npe, 3), in Angstrom.
             - npe_elements (numpy.ndarray):
@@ -121,6 +123,8 @@ class TrajectoryDriver:
                 Residue id for each NPE atom, shape (N_npe,).
             - npe_resnames (numpy.ndarray):
                 Residue name for each NPE atom, shape (N_npe,).
+            - npe_n_residues (int):
+                Number of residues in the NPE region.
         """
         
         if num_snapshots <= 0:
@@ -173,8 +177,8 @@ class TrajectoryDriver:
             qm_coords = np.asarray(qm_atoms.positions, dtype=float).copy()
             qm_elements = np.array([guess_atom_element(n) for n in qm_atoms.names], dtype=object)
 
-            pe_coords, pe_elements, pe_resids, pe_resnames = empty_xyz, empty_obj, empty_int, empty_obj
-            npe_coords, npe_elements, npe_resids, npe_resnames = empty_xyz, empty_obj, empty_int, empty_obj
+            pe_coords, pe_elements, pe_resids, pe_resnames, pe_n_residues = empty_xyz, empty_obj, empty_int, empty_obj, empty_int
+            npe_coords, npe_elements, npe_resids, npe_resnames, npe_n_residues = empty_xyz, empty_obj, empty_int, empty_obj, empty_int
 
             pe_region = None
 
@@ -188,7 +192,7 @@ class TrajectoryDriver:
                 pe_elements = np.array([guess_atom_element(n) for n in pe_region.names], dtype=object)
                 pe_resids = np.asarray(pe_region.resids, dtype=int).copy()
                 pe_resnames = np.asarray(pe_region.resnames, dtype=object).copy()
-                pe_n_residues = pe_region.residues.n_residues
+                pe_n_residues = np.asarray(pe_region.residues.n_residues, dtype=int).copy()
 
             if npe_cutoff is not None:
                 outer_shell = self.universe.select_atoms(
@@ -202,8 +206,8 @@ class TrajectoryDriver:
                 npe_elements = np.array([guess_atom_element(n) for n in npe_region.names], dtype=object)
                 npe_resids = np.asarray(npe_region.resids, dtype=int).copy()
                 npe_resnames = np.asarray(npe_region.resnames, dtype=object).copy()
-                npe_n_residues = npe_region.residues.n_residues
-                
+                npe_n_residues = np.asarray(npe_region.residues.n_residues, dtype=int).copy()
+
             snapshot = {
                     "frame": int(ts.frame),
 
