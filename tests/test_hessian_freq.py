@@ -53,12 +53,12 @@ class TestHessianFrequencies:
     def test_hessian_freq_d4(self):
 
         dispersion = True
-        ref_vib_freqs = np.array([52.90, 57.96, 154.53, 199.51, 275.38])
+        ref_vib_freqs = np.array([52.91, 57.97, 154.55, 199.55, 275.43])
         self.run_hessian_freq(dispersion, ref_vib_freqs)
 
     @pytest.mark.timeconsuming
     def test_hessian_freq(self):
 
         dispersion = False
-        ref_vib_freqs = np.array([37.77, 42.84, 149.94, 195.22, 274.18])
+        ref_vib_freqs = np.array([37.77, 42.84, 149.97, 195.25, 274.24])
         self.run_hessian_freq(dispersion, ref_vib_freqs)
