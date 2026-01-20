@@ -34,8 +34,9 @@ from contextlib import redirect_stderr
 from io import StringIO
 from pathlib import Path
 import numpy as np
-import h5py
 import tempfile
+import h5py
+import re
 
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
@@ -230,7 +231,7 @@ class VibrationalAnalysis:
                 'temperature': ('float', 'the temperature'),
                 'pressure': ('float', 'the pressure'),
                 'isotopes':
-                    ('seq_fixed_str', 'atomic masses in amu for isotope analysis'),
+                    ('str', 'atomic masses in amu for isotope analysis'),
                 'state_deriv_index': ('int', 'excited state index'),
                 'frequencies':
                     ('seq_range', 'frequencies of external electric field'),
@@ -410,13 +411,20 @@ class VibrationalAnalysis:
         coords = molecule.get_coordinates_in_bohr().reshape(natm * 3)
 
         masses = molecule.get_masses()
+
         # modify masses according to the isotopes
         if self.isotopes is not None:
-            assert_msg_critical(
-                len(self.isotopes) % 2 == 0,
-                'VibrationalAnalysis.frequency_analysis: Expecting even ' +
-                'number of elements in isotopes input')
-            for label, mass in zip(self.isotopes[0::2], self.isotopes[1::2]):
+
+            for entry in self.isotopes.split(','):
+                m = re.search(r'^(.*)\((.*)\)$', entry.strip())
+                assert_msg_critical(
+                    m is not None,
+                    'VibrationalAnalysis.frequency_analysis: Invalid input ' +
+                    'for isotopes')
+
+                label = m.group(1).strip()
+                mass = m.group(2).strip()
+
                 if label.isdigit():
                     assert_msg_critical(
                         (int(label) == float(label) and int(label) >= 1 and
@@ -426,12 +434,14 @@ class VibrationalAnalysis:
                     masses[int(label) - 1] = float(mass)
                     self.ostream.print_info(f'Using isotope mass {mass} for ' +
                                             f'atom {label}')
+
                 elif isinstance(label, str):
                     self.ostream.print_info(
                         f'Using isotope mass {mass} for {label}')
                     for iatom in range(natm):
                         if label.lower() == elem[iatom].lower():
                             masses[iatom] = float(mass)
+
             self.ostream.print_blank()
 
         try:

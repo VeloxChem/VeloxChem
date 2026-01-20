@@ -92,5 +92,5 @@ class TestHessianFrequencies:
     def test_hessian_freq_with_isotopes(self):
 
         ref_vib_freqs = np.array([1349.11, 2556.18, 2662.01])
-        isotopes_input = ['H', 2.01410177812]
+        isotopes_input = 'H (2.01410177812)'
         self.run_hessian_freq_with_isotopes(isotopes_input, ref_vib_freqs)
