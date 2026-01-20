@@ -551,9 +551,6 @@ def main():
         grad_dict = (task.input_dict['gradient']
                      if 'gradient' in task.input_dict else {})
 
-        isotopes = (task.input_dict['isotopes']
-                    if 'isotopes' in task.input_dict else None)
-
         run_excited_state_vibanalysis = ('state_deriv_index' in vib_dict)
         run_ground_state_vibanalysis = (not run_excited_state_vibanalysis)
 
@@ -566,8 +563,7 @@ def main():
                                             hessian_dict=hessian_dict,
                                             cphf_dict=orbrsp_dict,
                                             rsp_dict=rsp_dict,
-                                            polgrad_dict=polgrad_dict,
-                                            isotopes=isotopes)
+                                            polgrad_dict=polgrad_dict)
 
         else:
             if run_ground_state_vibanalysis:
@@ -579,8 +575,7 @@ def main():
                                                 hessian_dict=hessian_dict,
                                                 cphf_dict=orbrsp_dict,
                                                 rsp_dict=rsp_dict,
-                                                polgrad_dict=polgrad_dict,
-                                                isotopes=isotopes)
+                                                polgrad_dict=polgrad_dict)
             elif run_excited_state_vibanalysis:
                 assert_msg_critical(
                     rsp_dict['property'].lower() in ['absorption', 'uv-vis', 'ecd'],
@@ -600,8 +595,7 @@ def main():
                                                 hessian_dict=hessian_dict,
                                                 cphf_dict=orbrsp_dict,
                                                 rsp_dict=rsp_dict,
-                                                polgrad_dict=polgrad_dict,
-                                                isotopes=isotopes)
+                                                polgrad_dict=polgrad_dict)
 
         vib_results = vibrational_drv.compute(task.molecule, task.ao_basis)
 
@@ -711,8 +705,6 @@ def main():
 
                 grad_dict = (task.input_dict['gradient']
                              if 'gradient' in task.input_dict else {})
-                isotopes = (task.input_dict['isotopes']
-                            if 'isotopes' in task.input_dict else None)
 
                 vibrational_drv = VibrationalAnalysis(scf_drv,
                                                       rsp_prop._rsp_driver)
@@ -723,8 +715,7 @@ def main():
                                                 hessian_dict=hessian_dict,
                                                 cphf_dict=orbrsp_dict,
                                                 rsp_dict=rsp_dict,
-                                                polgrad_dict=polgrad_dict,
-                                                isotopes=isotopes)
+                                                polgrad_dict=polgrad_dict)
 
                 vib_results = vibrational_drv.compute(task.molecule, task.ao_basis)
 

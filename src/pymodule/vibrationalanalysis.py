@@ -141,10 +141,6 @@ class VibrationalAnalysis:
         self.rr_damping = None
         self.frequencies = (0,)
 
-        # List of atomic masses in amu used to allow
-        # isotope vibrational analysis via geomeTRIC
-        self.masses = None
-
         # Dictionary to define the isotopes
         self.isotopes = None
 
@@ -233,8 +229,8 @@ class VibrationalAnalysis:
                     ('bool', 'whether to print Raman depolarization ratio'),
                 'temperature': ('float', 'the temperature'),
                 'pressure': ('float', 'the pressure'),
-                'masses':
-                    ('seq_fixed', 'atomic masses in amu for isotope analysis'),
+                'isotopes':
+                    ('seq_fixed_str', 'atomic masses in amu for isotope analysis'),
                 'state_deriv_index': ('int', 'excited state index'),
                 'frequencies':
                     ('seq_range', 'frequencies of external electric field'),
@@ -248,8 +244,7 @@ class VibrationalAnalysis:
                         hessian_dict=None,
                         cphf_dict=None,
                         rsp_dict=None,
-                        polgrad_dict=None,
-                        isotopes=None):
+                        polgrad_dict=None):
         """
         Updates settings in HessianDriver.
 
@@ -265,9 +260,6 @@ class VibrationalAnalysis:
         :param polgrad_dict:
             The input dictionary for the polarizability gradient
             (needed to compute Raman activity).
-        :param isotopes:
-            The dictionary defining the isotope masses for
-            isotope vibrational analysis.
         """
 
         if method_dict is None:
@@ -302,9 +294,6 @@ class VibrationalAnalysis:
         self.cphf_dict = dict(cphf_dict)
         self.rsp_dict = dict(rsp_dict)
         self.polgrad_dict = dict(polgrad_dict)
-
-        if isotopes is not None:
-            self.isotopes = dict(isotopes)
 
     def compute(self, molecule, ao_basis=None, min_basis=None):
         """
@@ -410,36 +399,40 @@ class VibrationalAnalysis:
                    '  geometric via pip or conda.\n')
         assert_msg_critical(hasattr(geometric, 'normal_modes'), err_msg)
 
+        title = 'Free Energy Analysis'
+        self.ostream.print_header(title)
+        self.ostream.print_header('=' * (len(title) + 2))
+        self.ostream.print_blank()
+
         # number of atoms, elements, and coordinates
         natm = molecule.number_of_atoms()
         elem = molecule.get_labels()
         coords = molecule.get_coordinates_in_bohr().reshape(natm * 3)
 
-        if self.masses is None:
-            self.masses = molecule.get_masses()
-            # modify masses according to the isotopes
-            # dictionary (element, or element and index)
-            if self.isotopes is not None:
-                for index, symbol in enumerate(elem):
-                    symbol_index = "%s%d" % (symbol, index + 1)
-                    lower_symbol = symbol.lower()
-                    lower_index = "%s%d" % (lower_symbol, index + 1)
-                    if symbol in self.isotopes:
-                        self.masses[index] = self.isotopes[symbol]
-                    elif symbol_index in self.isotopes:
-                        self.masses[index] = self.isotopes[symbol_index]
-                    # If isotopes is read from input, the symbol will be lowercase
-                    # and the mass will be a string which has to be converted to float.
-                    elif lower_symbol in self.isotopes:
-                        self.masses[index] = float(self.isotopes[lower_symbol])
-                    elif lower_index in self.isotopes:
-                        self.masses[index] = float(self.isotopes[lower_index])
-
-        # Check if masses have been provided for all atoms in the molecule
-        else:
-            err_msg = "VibrationalAnalysis: the number of atoms in the molecule"
-            err_msg += " does not match the number of atomic masses provided."
-            assert_msg_critical(len(elem) == len(self.masses), err_msg)
+        masses = molecule.get_masses()
+        # modify masses according to the isotopes
+        if self.isotopes is not None:
+            assert_msg_critical(
+                len(self.isotopes) % 2 == 0,
+                'VibrationalAnalysis.frequency_analysis: Expecting even ' +
+                'number of elements in isotopes input')
+            for label, mass in zip(self.isotopes[0::2], self.isotopes[1::2]):
+                if label.isdigit():
+                    assert_msg_critical(
+                        (int(label) == float(label) and int(label) >= 1 and
+                            int(label) <= natm),
+                        'VibrationalAnalysis.frequency_analysis: Invalid ' +
+                        'input for one-based atom index')
+                    masses[int(label) - 1] = float(mass)
+                    self.ostream.print_info(f'Using isotope mass {mass} for ' +
+                                            f'atom {label}')
+                elif isinstance(label, str):
+                    self.ostream.print_info(
+                        f'Using isotope mass {mass} for {label}')
+                    for iatom in range(natm):
+                        if label.lower() == elem[iatom].lower():
+                            masses[iatom] = float(mass)
+            self.ostream.print_blank()
 
         try:
             temp_dir = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
@@ -455,7 +448,7 @@ class VibrationalAnalysis:
                 coords,
                 self.hessian,
                 elem,
-                mass=self.masses,
+                mass=masses,
                 energy=self.elec_energy,
                 temperature=self.temperature,
                 pressure=self.pressure,
@@ -470,11 +463,6 @@ class VibrationalAnalysis:
             vdata_file.is_file(),
             'VibrationalAnalysis.frequency_analysis: cannot find vdata file ' +
             f'{str(vdata_file)}')
-
-        title = 'Free Energy Analysis'
-        self.ostream.print_header(title)
-        self.ostream.print_header('=' * (len(title) + 2))
-        self.ostream.print_blank()
 
         text = []
         with vdata_file.open() as fh:
