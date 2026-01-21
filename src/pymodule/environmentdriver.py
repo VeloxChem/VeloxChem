@@ -161,10 +161,13 @@ class EnvironmentDriver:
             pe_resids = np.asarray(snap["pe_resids"], dtype=int)
             pe_resnames = np.asarray(snap["pe_resnames"], dtype=object)
 
+            npe_coords = np.asarray(snap["npe_coords"], dtype=float)
+            npe_elements = np.asarray(snap["npe_elements"], dtype=object)
+
             resname_set = sorted({str(r) for r in pe_resnames}) if pe_resnames.size else []
 
-            pot_path = outdir / f"frame_{frame:06d}.pot"
-            with pot_path.open("w") as fh:
+            pe_pot_path = outdir / f"pe_frame_{frame:06d}.pot"
+            with pe_pot_path.open("w") as fh:
 
                 fh.write("@environment\n")
                 fh.write("units: angstrom\n")
@@ -190,3 +193,17 @@ class EnvironmentDriver:
                             f"{vals[3]:12.8f} {vals[4]:12.8f} {vals[5]:12.8f}  {resn}\n"
                         )
                 fh.write("@end\n")
+
+            npe_pot_path = outdir / f"npe_frame_{frame:06d}.pot"
+            with npe_pot_path.open("w") as fh:
+                if npe_coords.size == 0:
+                    fh.write("0\nxyz\n")
+                else:
+                    fh.write(f"{len(npe_coords)}\n")
+                    fh.write("xyz\n")
+                    for (x, y, z), elem in zip(npe_coords, npe_elements):
+                        charge = self.npe_model["charges"][str(elem)]
+                        fh.write(f"{str(elem):<2} {x:12.6f} {y:12.6f} {z:12.6f} {charge:12.8f}\n")
+                        
+
+            
