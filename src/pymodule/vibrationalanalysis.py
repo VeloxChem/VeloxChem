@@ -456,19 +456,20 @@ class VibrationalAnalysis:
                     atoms.append(j)
             atoms = sorted(atoms)
             natm = molecule.number_of_atoms()
-            self.raw_normal_modes = np.resize(self.raw_normal_modes,(len(self.raw_normal_modes), natm*3))
-            
-            zeros = np.zeros((3,))
-            for i,mode in enumerate(self.raw_normal_modes):
+            self.raw_normal_modes = np.resize(
+                self.raw_normal_modes, (len(self.raw_normal_modes), natm * 3))
+
+            zeros = np.zeros((3, ))
+            for i, mode in enumerate(self.raw_normal_modes):
                 for j in range(natm):
                     if j not in atoms:
                         mode = np.insert(mode, 3 * j, zeros)
                 self.raw_normal_modes[i] = mode[:(natm * 3)]
-                
+
         # normalize the normal modes
         self.normal_modes = self.raw_normal_modes / np.linalg.norm(
             self.raw_normal_modes, axis=1)[:, np.newaxis]
-        
+
         assert_msg_critical(
             vdata_file.is_file(),
             'VibrationalAnalysis.frequency_analysis: cannot find vdata file ' +
@@ -942,7 +943,7 @@ class VibrationalAnalysis:
             for atom_index in range(natm):
                 valstr = '{:<8d}'.format(atom_index + 1)
                 valstr += '{:<8s}'.format(elem[atom_index])
-                
+
                 valstr += '{:12.4f}'.format(
                     self.normal_modes[k][atom_index * 3 + 0])
                 valstr += '{:12.4f}'.format(

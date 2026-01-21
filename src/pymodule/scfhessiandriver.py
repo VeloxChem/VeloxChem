@@ -1764,8 +1764,17 @@ class ScfHessianDriver(HessianDriver):
 
         ovlp_grad_drv = OverlapGeom100Driver()
         dip_grad_drv = ElectricDipoleMomentGeom100Driver()
+        
+        if self.atom_pairs is not None:
+            atoms = set()
+            for i, j in self.atom_pairs:
+                atoms.add(i)
+                atoms.add(j)
+            atoms = sorted(list(atoms))
+        else:
+            atoms = range(natm)
 
-        for a in range(natm):
+        for id_a, a in enumerate(atoms):
 
             # overlap gradient
 
@@ -1784,7 +1793,7 @@ class ScfHessianDriver(HessianDriver):
 
             for x in range(3):
 
-                cphf_ov_ax = dist_cphf_ov[a * 3 + x].get_full_vector(0)
+                cphf_ov_ax = dist_cphf_ov[id_a * 3 + x].get_full_vector(0)
 
                 if self.rank == mpi_master():
 
