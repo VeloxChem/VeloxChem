@@ -62,15 +62,25 @@
         },
         "6": {
             "type": "ow",
-            "name": "O2",
+            "name": "O22",
             "mass": 15.994915,
             "charge": -0.8476,
             "sigma": 0.31658,
             "epsilon": 0.649775,
             "equivalent_atom": "ow_00",
-            "comment": "GAFF"
+            "comment": "cSPC/E water"
         },
         "7": {
+            "type": "hw",
+            "name": "H02",
+            "mass": 1.007825,
+            "charge": 0.4238,
+            "sigma": 0.11658,
+            "epsilon": 0.064978,
+            "equivalent_atom": "hw_00",
+            "comment": "cSPC/E water"
+        },
+        "8": {
             "type": "hw",
             "name": "H12",
             "mass": 1.007825,
@@ -78,17 +88,7 @@
             "sigma": 0.11658,
             "epsilon": 0.064978,
             "equivalent_atom": "hw_00",
-            "comment": "GAFF"
-        },
-        "8": {
-            "type": "hw",
-            "name": "H22",
-            "mass": 1.007825,
-            "charge": 0.4238,
-            "sigma": 0.11658,
-            "epsilon": 0.064978,
-            "equivalent_atom": "hw_00",
-            "comment": "GAFF"
+            "comment": "cSPC/E water"
         }
     },
     "bonds": {
