@@ -561,9 +561,6 @@ class TransitionStateGuesser():
             nsteps=self.mm_steps * snapshots,
             snapshots=snapshots,
             temperature=self.mm_temperature,
-            save_trajectory=self.save_mm_traj,
-            trajectory_file=self.folder_name + f'/traj_{l}.xtc',
-            trajectory_interval=10,
         )
         result = []
         for e_int, temp_mol in zip(conformers_dict['energies'],
