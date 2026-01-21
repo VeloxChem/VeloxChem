@@ -33,6 +33,7 @@
 from pathlib import Path
 from mpi4py import MPI
 import sys
+import numpy as np
 from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
 
@@ -46,14 +47,17 @@ class EnvironmentDriver:
         The output stream.
 
     Instance variables:
-        - solvent_models: Dictionary containing solvent model parameters.
-        - resname_to_model: Mapping from residue names to solvent models.
+        - solvent_pe_models: Dictionary containing solvent PE model parameters.
+        - solvent_npe_models: Dictionary containing solvent NPE model parameters.
+        - pe_model: PE model name.
+        - npe_model: NPE model name.
     """
 
     def __init__(self, comm=None, ostream=None):
         """
         Initialize the environment driver.
-        See this reference, Figure 4, for different "cp3 approach" parameters:
+        See this reference, Figure 4, for a summary of 
+        different "cp3 approach" parameters:
         https://doi.org/10.1021/acs.jctc.5c01719
         """
         self.solvent_pe_models = {
@@ -74,6 +78,8 @@ class EnvironmentDriver:
             }
         }
 
+        self.set_env_models()
+
         if comm is None:
             comm = MPI.COMM_WORLD
 
@@ -83,98 +89,104 @@ class EnvironmentDriver:
             else:
                 ostream = OutputStream(None)
 
-        # mpi information
         self.comm = comm
         self.rank = self.comm.Get_rank()
         self.size = self.comm.Get_size()
-
-        # output stream
         self.ostream = ostream
 
-    def write_pot_files(self, snapshots, outdir: str | Path):
+    def set_env_models(self,
+                       pe_model="SEP",
+                       npe_model="tip3p"):
         """
-        Write environment snapshots to .pot files.
+        Set the parameter PE and NPE models
 
-        Generates one .pot file per snapshot.
-
-        :param snapshots:
-            A list of snapshot dictionaries.
-        :param outdir:
-            Output directory where the .pot files will be written.
+        :param pe_model:
+            Name of the PE parameter model.
+        :param npe_model:
+            Name of the NPE parameter model.
         :return:
             None.
+        :raises KeyError:
+            If an unknown model name is requested.
         """
-        outdir = Path(outdir)
-        outdir.mkdir(parents=True, exist_ok=True)
-        for snap in snapshots:
-            self.write_single_pot(snap, outdir)
+        if pe_model not in self.solvent_pe_models:
+            raise KeyError(
+                f"Unknown PE model '{pe_model}'. Available: {sorted(self.solvent_pe_models)}"
+            )
+        if npe_model not in self.solvent_npe_models:
+            raise KeyError(
+                f"Unknown NPE model '{npe_model}'. Available: {sorted(self.solvent_npe_models)}"
+            )
+        
+        self.pe_model = self.solvent_pe_models[pe_model]
+        self.npe_model = self.solvent_npe_models[npe_model]
+        return self.pe_model, self.npe_model
 
-    def write_single_pot(self, snapshot, outdir: Path):
+
+    def write_pot_files(self,
+                        snapshots, 
+                        outdir: str | Path):
         """
-        Write a single snapshot to a .pot file.
+        Write pe environment snapshots to .pot files.
 
+        Generates one .pot file per snapshot.
         The file contains the @environment,
         @charges, and @polarizabilities sections.
 
-        :param snapshot:
-            A snapshot dictionary containing:
-
-            - frame (int):
-                Frame number used in the output file name.
-            - pe_coords (numpy.ndarray):
-                PE region Cartesian coordinates, shape (N_pe, 3), in Angstrom.
-            - pe_elements (numpy.ndarray):
-                Element symbols for each PE atom, shape (N_pe,).
-            - pe_resids (numpy.ndarray):
-                Residue id for each PE atom, shape (N_pe,).
-            - pe_resnames (numpy.ndarray):
-                Residue name for each PE atom, shape (N_pe,).
+        :param snapshots:
+            A list of snapshot dictionaries returned from TrajectoryDriver.
         :param outdir:
-            Directory where the .pot file will be written.
+            Output directory where the .pot files will be written.
+        :param pe_model:
+            PE model name
         :return:
             None.
         """
-        frame = snapshot['frame']
-        pe_coords = snapshot['pe_coords']
-        pe_elements = snapshot['pe_elements']
-        pe_resids = snapshot['pe_resids']
-        pe_resnames = snapshot['pe_resnames']
-        present_resnames = sorted(set(str(r) for r in pe_resnames))
-        model_to_resnames = {}
-        for resn in present_resnames:
-            model = self.resname_to_model.get(resn)
-            if model is None:
-                raise KeyError(f"No model registered for residue name '{resn}'")
-            model_to_resnames.setdefault(model, set()).add(resn)
+        # Normalize input (single snapshot or list)
+        if isinstance(snapshots, dict):
+            snapshots = [snapshots]
 
-        pot_path = outdir / f"frame_{frame:06d}.pot"
-        with pot_path.open('w') as fh:
-            fh.write("@environment\n")
-            fh.write("units: angstrom\n")
-            fh.write("xyz:\n")
-            for (x, y, z), elem, resn, resid in zip(pe_coords, pe_elements, pe_resnames, pe_resids):
-                fh.write(f"{elem:<2} {x:12.6f} {y:12.6f} {z:12.6f}  {resn:>3}  {resid}\n")
-            fh.write("@end\n\n")
-            fh.write("@charges\n")
+        outdir = Path(outdir)
+        outdir.mkdir(parents=True, exist_ok=True)
 
-            for model, resnames in model_to_resnames.items():
-                pattern = self.solvent_models[model]["pattern"]
-                charges = self.solvent_models[model]["charges"]
-                for resn in sorted(resnames):
+        pattern = self.pe_model["pattern"]
+        charges = self.pe_model["charges"]
+        polar = self.pe_model["polarizabilities"]
+
+        for snap in snapshots:
+            frame = int(snap["frame"])
+
+            pe_coords = np.asarray(snap["pe_coords"], dtype=float)
+            pe_elements = np.asarray(snap["pe_elements"], dtype=object)
+            pe_resids = np.asarray(snap["pe_resids"], dtype=int)
+            pe_resnames = np.asarray(snap["pe_resnames"], dtype=object)
+
+            resname_set = sorted({str(r) for r in pe_resnames}) if pe_resnames.size else []
+
+            pot_path = outdir / f"frame_{frame:06d}.pot"
+            with pot_path.open("w") as fh:
+
+                fh.write("@environment\n")
+                fh.write("units: angstrom\n")
+                fh.write("xyz:\n")
+                for (x, y, z), elem, resn, resid in zip(pe_coords, pe_elements, pe_resnames, pe_resids):
+                    fh.write(
+                        f"{str(elem):<2} {x:12.6f} {y:12.6f} {z:12.6f}  {str(resn):>3}  {int(resid)}\n"
+                    )
+                fh.write("@end\n\n")
+
+                fh.write("@charges\n")
+                for resn in resname_set:
                     for atom in pattern:
                         fh.write(f"{atom:<2} {charges[atom]:12.8f}  {resn}\n")
-            fh.write("@end\n\n")
-            fh.write("@polarizabilities\n")
+                fh.write("@end\n\n")
 
-            for model, resnames in model_to_resnames.items():
-                pattern = self.solvent_models[model]["pattern"]
-                polar = self.solvent_models[model]["polarizabilities"]
-                for resn in sorted(resnames):
+                fh.write("@polarizabilities\n")
+                for resn in resname_set:
                     for atom in pattern:
                         vals = polar[atom]
                         fh.write(
                             f"{atom:<2} {vals[0]:12.8f} {vals[1]:12.8f} {vals[2]:12.8f} "
                             f"{vals[3]:12.8f} {vals[4]:12.8f} {vals[5]:12.8f}  {resn}\n"
-                        )           
-            fh.write("@end\n")
-
+                        )
+                fh.write("@end\n")
