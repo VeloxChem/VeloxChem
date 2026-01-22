@@ -77,6 +77,11 @@ class EnvironmentDriver:
                     "charges": {"O": -0.83400000, "H": 0.41700000},
             }
         }
+        # set them to None:
+        self.pe_model = None
+        self.npe_model = None
+        
+        # fetch them from .csv file 
 
         self.set_env_models()
 
@@ -204,6 +209,6 @@ class EnvironmentDriver:
                     for (x, y, z), elem in zip(npe_coords, npe_elements):
                         charge = self.npe_model["charges"][str(elem)]
                         fh.write(f"{str(elem):<2} {x:12.6f} {y:12.6f} {z:12.6f} {charge:12.8f}\n")
-                        
+
 
             
