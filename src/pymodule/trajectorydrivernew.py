@@ -228,3 +228,46 @@ class TrajectoryDriver:
             }
             snapshots.append(snapshot)
         return snapshots
+    
+    def configurational_parser(self,
+                               configuration_file: str):
+        """
+        Parse a PDB or XYZ that contains different configurations
+
+        :param configuration_file:
+            Path to the configuration file (e.g., .pdb, .xyz).
+ 
+        :return:
+            A list of snapshot dictionaries, each containing:
+            - frame (int):
+                Frame number.
+            - qm_coords (numpy.ndarray):
+                QM region Cartesian coordinates, shape (N_qm, 3), in Angstrom.
+            - qm_elements (numpy.ndarray):
+                Element symbols for each QM atom, shape (N_qm,).
+        """
+        self.universe = mda.Universe(configuration_file, guess_bonds=True)
+
+        total_frames = len(self.universe.trajectory)
+        start = 0
+        stop = total_frames
+        step = (total_frames -1) // (total_frames -1)
+
+        self.start = start
+        self.stop = stop
+        self.step = step
+
+        snapshots = []
+        for ts in self.universe.trajectory[self.start:self.stop:self.step]:
+            qm_coords = np.asarray(self.universe.atoms.positions, dtype=float).copy()
+            qm_elements = np.array([guess_atom_element(n) for n in self.universe.atoms.names], dtype=object)
+
+            snapshot = {
+                    "frame": int(ts.frame),
+
+                    "qm_coords": qm_coords,
+                    "qm_elements": qm_elements,
+
+            }
+            snapshots.append(snapshot)
+        return snapshots
