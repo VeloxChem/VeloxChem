@@ -274,9 +274,15 @@ class EnvironmentDriver:
 
         potdir = Path(potdir)
 
-        # Write PE potfiles only if requested and if PE exists in any snapshot
-        has_any_pe = any(np.asarray(s.get("pe_coords", [])).size > 0 for s in snapshots)
-        if write_pe_potfiles and has_any_pe:
+        # Write PE potfiles only if requested and if any snapshot has PE atoms
+        if write_pe_potfiles:
+            has_any_pe = False
+            for snap in snapshots:
+                pe_coords = snap.get("pe_coords", [])
+                if np.asarray(pe_coords).size > 0:
+                    has_any_pe = True
+                    break
+        if has_any_pe:
             self.write_pot_files(snapshots, outdir=potdir)
 
         scf_all = []
