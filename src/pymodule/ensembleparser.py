@@ -39,9 +39,8 @@ import MDAnalysis as mda
 import MDAnalysis.transformations as transform
 from MDAnalysis.topology.guessers import guess_atom_element
 
-class TrajectoryDriver:
+class EnsembleParser:
     """
-    Driver for trajectory-driven calculations.
     
     This class automates the parsing of molecular dynamics trajectories and
     extracts information from the qm and environment regions for each snapshot.
@@ -53,7 +52,7 @@ class TrajectoryDriver:
     """
     def __init__(self, comm=None, ostream=None):
         """
-        Initialize the TrajectoryDriver.
+        Initialize the EnsembleParser.
         """
         if comm is None:
             comm = MPI.COMM_WORLD
@@ -72,14 +71,14 @@ class TrajectoryDriver:
         # output stream
         self.ostream = ostream
 
-    def trajectory_parser(self,
-                          trajectory_file: str,
-                          num_snapshots: int,
-                          qm_region: str,
-                          env_region: str,
-                          topology_file: str | None = None,
-                          pe_cutoff: float | None = None,
-                          npe_cutoff: float | None = None,):
+    def trajectory(self,
+                   trajectory_file: str,
+                   num_snapshots: int,
+                   qm_region: str,
+                   env_region: str,
+                   topology_file: str | None = None,
+                   pe_cutoff: float | None = None,
+                   npe_cutoff: float | None = None,):
         """
         Parse a molecular dynamics trajectory and extract QM and MM region data.
 
@@ -130,6 +129,10 @@ class TrajectoryDriver:
         if num_snapshots <= 0:
             raise ValueError("num_snapshots must be a positive integer")
         
+        if pe_cutoff is not None and npe_cutoff is not None:
+            if float(npe_cutoff) < float(pe_cutoff):
+                raise ValueError("npe_cutoff must be >= pe_cutoff")
+        
         if trajectory_file.lower().endswith('.pdb'):
             self.universe = mda.Universe(trajectory_file, guess_bonds=True)
         else:
@@ -138,25 +141,18 @@ class TrajectoryDriver:
             self.universe = mda.Universe(topology_file, trajectory_file)
         
         total_frames = len(self.universe.trajectory)
-        print(f"Total frames in trajectory: {total_frames}")
+        self.ostream.print_info(f"Total frames in trajectory: {total_frames}")
+        self.ostream.print_blank()
         if num_snapshots > total_frames:
             raise ValueError(
                 f"Requested number of snapshots ({num_snapshots}) exceeds total frames ({total_frames})."
             )
     
         if num_snapshots == 1:
-            start = 0
-            stop = 1
-            step = 1
+            frame_indices = np.array([0], dtype=int)
         else:
-            start = 0
-            stop = total_frames
-            step = (total_frames -1) // (num_snapshots -1)
-
-        self.start = start
-        self.stop = stop
-        self.step = step
-
+            frame_indices = np.linspace(0, total_frames - 1, num_snapshots, dtype=int)
+        
         qm_atoms = self.universe.select_atoms(qm_region)
         env_atoms = self.universe.select_atoms(env_region)
 
@@ -165,7 +161,6 @@ class TrajectoryDriver:
         transform.center_in_box(qm_atoms, wrap=True),
         transform.wrap(env_atoms)
         ]
-        
         self.universe.trajectory.add_transformations(*transforms)
 
         empty_xyz = np.empty((0, 3), dtype=float)
@@ -173,15 +168,36 @@ class TrajectoryDriver:
         empty_int = np.empty((0,), dtype=int)
 
         snapshots = []
-        for ts in self.universe.trajectory[self.start:self.stop:self.step]:
-            qm_coords = np.asarray(qm_atoms.positions, dtype=float).copy()
-            qm_elements = np.array([guess_atom_element(n) for n in qm_atoms.names], dtype=object)
+        for iframe in frame_indices:
+            self.universe.trajectory[iframe]
 
-            pe_coords, pe_elements, pe_resids, pe_resnames, pe_n_residues = empty_xyz, empty_obj, empty_int, empty_obj, empty_int
-            npe_coords, npe_elements, npe_resids, npe_resnames, npe_n_residues = empty_xyz, empty_obj, empty_int, empty_obj, empty_int
+            qm_coords = np.asarray(qm_atoms.positions, dtype=float).copy()
+            qm_elements = np.asarray(
+                [guess_atom_element(n) for n in qm_atoms.names], dtype=object
+                )
+            
+            # Defaults
+            pe_coords, pe_elements, pe_resids, pe_resnames, pe_n_residues = (
+                empty_xyz, empty_obj, empty_int, empty_obj, 0
+            )
+            npe_coords, npe_elements, npe_resids, npe_resnames, npe_n_residues = (
+                empty_xyz, empty_obj, empty_int, empty_obj, 0
+            )
 
             pe_region = None
 
+            # If neither cutoff is set, interpret as all-NPE environment
+            if pe_cutoff is None and npe_cutoff is None:
+                npe_region = env_atoms.difference(qm_atoms)
+                npe_coords = np.asarray(npe_region.positions, dtype=float).copy()
+                npe_elements = np.asarray(
+                    [guess_atom_element(n) for n in npe_region.names], dtype=object
+                )
+                npe_resids = np.asarray(npe_region.resids, dtype=int).copy()
+                npe_resnames = np.asarray(npe_region.resnames, dtype=object).copy()
+                npe_n_residues = int(npe_region.residues.n_residues)
+            
+            # PE region
             if pe_cutoff is not None:
                 pe_region = self.universe.select_atoms(
                     f"byres ({env_region} and around {float(pe_cutoff)} group qm)",
@@ -189,11 +205,14 @@ class TrajectoryDriver:
                 ).difference(qm_atoms)
 
                 pe_coords = np.asarray(pe_region.positions, dtype=float).copy()
-                pe_elements = np.array([guess_atom_element(n) for n in pe_region.names], dtype=object)
+                pe_elements = np.asarray(
+                    [guess_atom_element(n) for n in pe_region.names], dtype=object
+                )
                 pe_resids = np.asarray(pe_region.resids, dtype=int).copy()
                 pe_resnames = np.asarray(pe_region.resnames, dtype=object).copy()
-                pe_n_residues = np.asarray(pe_region.residues.n_residues, dtype=int).copy()
+                pe_n_residues = int(pe_region.residues.n_residues)
 
+            # NPE region
             if npe_cutoff is not None:
                 outer_shell = self.universe.select_atoms(
                     f"byres ({env_region} and around {float(npe_cutoff)} group qm)",
@@ -203,13 +222,15 @@ class TrajectoryDriver:
                 npe_region = outer_shell.difference(pe_region) if pe_region is not None else outer_shell
 
                 npe_coords = np.asarray(npe_region.positions, dtype=float).copy()
-                npe_elements = np.array([guess_atom_element(n) for n in npe_region.names], dtype=object)
+                npe_elements = np.asarray(
+                    [guess_atom_element(n) for n in npe_region.names], dtype=object
+                )
                 npe_resids = np.asarray(npe_region.resids, dtype=int).copy()
                 npe_resnames = np.asarray(npe_region.resnames, dtype=object).copy()
-                npe_n_residues = np.asarray(npe_region.residues.n_residues, dtype=int).copy()
+                npe_n_residues = int(npe_region.residues.n_residues)
 
             snapshot = {
-                    "frame": int(ts.frame),
+                    "frame": int(self.universe.trajectory.frame),
 
                     "qm_coords": qm_coords,
                     "qm_elements": qm_elements,
@@ -229,13 +250,13 @@ class TrajectoryDriver:
             snapshots.append(snapshot)
         return snapshots
     
-    def configurational_parser(self,
-                               configuration_file: str):
+    def structures(self,
+                   structures_file: str):
         """
-        Parse a PDB or XYZ that contains different configurations
+        Parse a PDB or XYZ that contains different structures
 
-        :param configuration_file:
-            Path to the configuration file (e.g., .pdb, .xyz).
+        :param structures_file:
+            Path to the structures file (e.g., .pdb, .xyz).
  
         :return:
             A list of snapshot dictionaries, each containing:
@@ -246,27 +267,19 @@ class TrajectoryDriver:
             - qm_elements (numpy.ndarray):
                 Element symbols for each QM atom, shape (N_qm,).
         """
-        self.universe = mda.Universe(configuration_file, guess_bonds=True)
-
-        total_frames = len(self.universe.trajectory)
-        start = 0
-        stop = total_frames
-        step = (total_frames -1) // (total_frames -1)
-
-        self.start = start
-        self.stop = stop
-        self.step = step
+        self.universe = mda.Universe(structures_file, guess_bonds=True)
 
         snapshots = []
-        for ts in self.universe.trajectory[self.start:self.stop:self.step]:
-            qm_coords = np.asarray(self.universe.atoms.positions, dtype=float).copy()
-            qm_elements = np.array([guess_atom_element(n) for n in self.universe.atoms.names], dtype=object)
+        for iframe in self.universe.trajectory:
+            coords = np.asarray(self.universe.atoms.positions, dtype=float).copy()
+            elements = np.asarray(
+                [guess_atom_element(n) for n in self.universe.atoms.names], dtype=object
+            )
 
             snapshot = {
-                    "frame": int(ts.frame),
-
-                    "qm_coords": qm_coords,
-                    "qm_elements": qm_elements,
+                    "frame": int(iframe.frame),
+                    "qm_coords": coords,
+                    "qm_elements": elements,
 
             }
             snapshots.append(snapshot)

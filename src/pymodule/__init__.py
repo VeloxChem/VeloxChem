@@ -213,7 +213,7 @@ from .tsguesser import TransitionStateGuesser
 from .reactionmatcher import ReactionMatcher
 from .smddriver import SmdDriver
 from .atombdedriver import AtomBdeDriver
-from .trajectorydrivernew import TrajectoryDriver
+from .ensembleparser import EnsembleParser
 from .environmentdriver import EnvironmentDriver
 from .spectrumaveragingdriver import SpectrumAveragingDriver
 # for backward compatibility only
