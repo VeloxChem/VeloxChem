@@ -54,7 +54,7 @@ au2ev = hartree_in_ev()
 ev2au = 1.0 / au2ev
 au2nm = 1.0e7 / hartree_in_wavenumber()
 
-class SpectrumAveragingDriver:
+class SpectraAverager:
     """
     Build and plot an averaged UV/Vis spectrum from multiple LR results.
     Inputs are expected to be (frame, rsp_results) tuples.
