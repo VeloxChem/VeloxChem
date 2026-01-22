@@ -34,12 +34,15 @@ from pathlib import Path
 from mpi4py import MPI
 import sys
 import numpy as np
-from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
+from .molecule import Molecule
+from .molecularbasis import MolecularBasis
+
+from .veloxchemlib import (mpi_master, bohr_in_angstrom)
 
 class EnvironmentDriver:
     """
-    Handles the environment from the snapshots of a trajectory.
+    Handles the environment from the snapshots from EnsembleParser.
 
     :param comm:
         The MPI communicator.
@@ -53,6 +56,7 @@ class EnvironmentDriver:
         - npe_model: NPE model name.
     """
 
+    # def __init__(self, comm=None, ostream=None, *, scf_drv=None, rsp_drv=None):
     def __init__(self, comm=None, ostream=None):
         """
         Initialize the environment driver.
@@ -80,10 +84,9 @@ class EnvironmentDriver:
         # set them to None:
         self.pe_model = None
         self.npe_model = None
-        
-        # fetch them from .csv file 
-
         self.set_env_models()
+
+        # fetch them from .csv file 
 
         if comm is None:
             comm = MPI.COMM_WORLD
@@ -127,7 +130,40 @@ class EnvironmentDriver:
         self.npe_model = self.solvent_npe_models[npe_model]
         return self.pe_model, self.npe_model
 
+    def _build_point_charges(self, coords_ang, elements):
+        """
+        Build the point charges array expected by ScfDriver.
+    
+        : param coords_ang:
+            Cartesian coordinates in Angstrom
+        : param elements:
+            List of element symbols
+        :return:
+            pe (numpy.ndarray):
+            point charges array, shape (6, N).
+        :raises KeyError:
+            If an elements has no charge in the selected NPE model.
+        """
+        coords_ang = np.asarray(coords_ang, dtype=float)
+        if coords_ang.size == 0:
+            return None
+    
+        elements = np.asarray(elements, dtype=object)
+        charges_map = self.npe_model["charges"]
 
+        try:
+            q = np.array([charges_map[str(e)] for e in elements], dtype=float)
+        except KeyError as exc:
+            raise KeyError(
+                f"NPE model missing charge for element '{exc.args[0]}'. "
+                f"Available keys: {sorted(charges_map)}"
+            ) from exc
+
+        pc = np.zeros((6, coords_ang.shape[0]), dtype=float)
+        pc[0:3, :] = coords_ang.T / bohr_in_angstrom()  # Ang -> Bohr
+        pc[3, :] = q
+        return pc
+        
     def write_pot_files(self,
                         snapshots, 
                         outdir: str | Path):
@@ -166,8 +202,8 @@ class EnvironmentDriver:
             pe_resids = np.asarray(snap["pe_resids"], dtype=int)
             pe_resnames = np.asarray(snap["pe_resnames"], dtype=object)
 
-            npe_coords = np.asarray(snap["npe_coords"], dtype=float)
-            npe_elements = np.asarray(snap["npe_elements"], dtype=object)
+            if pe_coords.size == 0:
+                continue
 
             resname_set = sorted({str(r) for r in pe_resnames}) if pe_resnames.size else []
 
@@ -199,16 +235,76 @@ class EnvironmentDriver:
                         )
                 fh.write("@end\n")
 
-            npe_pot_path = outdir / f"npe_frame_{frame:06d}.pot"
-            with npe_pot_path.open("w") as fh:
-                if npe_coords.size == 0:
-                    fh.write("0\nxyz\n")
-                else:
-                    fh.write(f"{len(npe_coords)}\n")
-                    fh.write("xyz\n")
-                    for (x, y, z), elem in zip(npe_coords, npe_elements):
-                        charge = self.npe_model["charges"][str(elem)]
-                        fh.write(f"{str(elem):<2} {x:12.6f} {y:12.6f} {z:12.6f} {charge:12.8f}\n")
+    def compute(
+        self,
+        snapshots,
+        *,
+        basis_label: str,
+        scf_drv,
+        rsp_drv,
+        potdir: str | Path = "pot_frames",
+        write_pe_potfiles: bool = True,
+    ):
+        """
+        Drives the computation over the ensemble of snapshots.
 
+        :param snapshots:
+            A list of snapshot dictionaries (or a single dict).
+        :param basis_label: (str)
+            Basis set label.
+        :param scf_drv:
+            An initialized SCF driver instance.
+        :param rsp_drv:
+            An initialized LR eigen solver.
+        :param potdir : (str or Path)
+            Directory to store/read PE potfiles.
+        :param write_pe_potfiles: (bool)
+            If True, PE potfiles are (re)generated before the loop when needed.
+        :return:
+            Dictionary with:
+              - scf_all: list of (frame, scf_results)
+              - rsp_all: list of (frame, rsp_results)
+        """
+        if isinstance(snapshots, dict):
+            snapshots = [snapshots]
 
+        potdir = Path(potdir)
+
+        # Write PE potfiles only if requested and if PE exists in any snapshot
+        has_any_pe = any(np.asarray(s.get("pe_coords", [])).size > 0 for s in snapshots)
+        if write_pe_potfiles and has_any_pe:
+            self.write_pot_files(snapshots, outdir=potdir)
+
+        scf_all = []
+        rsp_all = []
+
+        for snap in snapshots:
+            frame = int(snap["frame"])
+
+            labels = [str(x) for x in snap["qm_elements"]]
+            coords = np.asarray(snap["qm_coords"], dtype=float)
+            molecule = Molecule(labels, coords)
+            basis = MolecularBasis.read(molecule, basis_label)
+
+            pe_coords = np.asarray(snap.get("pe_coords", []), dtype=float)
+            npe_coords = np.asarray(snap.get("npe_coords", []), dtype=float)
+
+            has_pe = pe_coords.size > 0
+            has_npe = npe_coords.size > 0
             
+            if has_pe:
+                scf_drv.potfile = str(potdir / f"pe_frame_{frame:06d}.pot")
+
+            if has_npe:
+                scf_drv.point_charges = self._build_point_charges(
+                    snap.get("npe_coords", []), 
+                    snap.get("npe_elements", []),
+                    )
+
+            scf_results = scf_drv.compute(molecule, basis)
+            rsp_results = rsp_drv.compute(molecule, basis, scf_results)
+
+            scf_all.append((frame, scf_results))
+            rsp_all.append((frame, rsp_results))
+
+        return {"scf_all": scf_all, "rsp_all": rsp_all}
