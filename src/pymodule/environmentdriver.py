@@ -151,16 +151,20 @@ class EnvironmentDriver:
         elements = np.asarray(elements, dtype=object)
         charges_map = self.npe_model["charges"]
 
-        try:
-            q = np.array([charges_map[str(e)] for e in elements], dtype=float)
-        except KeyError as exc:
-            raise KeyError(
-                f"NPE model missing charge for element '{exc.args[0]}'. "
-                f"Available keys: {sorted(charges_map)}"
-            ) from exc
+        charges = []
+        for elem in elements:
+            key = str(elem)
+            if key not in charges_map:
+                available = ", ".join(sorted(charges_map))
+                raise KeyError(
+                    f"NPE model missing charge for element '{key}'. "
+                    f"Available keys: {available}"
+                )
+            charges.append(charges_map[key])
+        q = np.array(charges, dtype=float)
 
         pc = np.zeros((6, coords_ang.shape[0]), dtype=float)
-        pc[0:3, :] = coords_ang.T / bohr_in_angstrom()  # Ang -> Bohr
+        pc[0:3, :] = coords_ang.T / bohr_in_angstrom()
         pc[3, :] = q
         return pc
         
