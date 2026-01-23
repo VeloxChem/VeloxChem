@@ -384,7 +384,7 @@ class EvbReporter():
         if self.report_nb_decomp:
             line = ""
             for name in self.decomp_names:
-                line += f"{E[name]:.10e}, "
+                    line += f"{E[name]:.10e}, "
             line= line[:-2]
             line+= '\n'
             self.decomp_out.write(line)

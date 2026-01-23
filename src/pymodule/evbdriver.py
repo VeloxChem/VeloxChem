@@ -240,9 +240,9 @@ class EvbDriver():
             self.product.molecule.write_xyz_file(
                 str(data_folder_path / "product_struct.xyz"))
 
-            MMForceFieldGenerator.save_forcefield(
+            MMForceFieldGenerator.save_forcefield_as_json(
                 self.reactant, str(data_folder_path / f"reactant_ff_data.json"))
-            MMForceFieldGenerator.save_forcefield(
+            MMForceFieldGenerator.save_forcefield_as_json(
                 self.product, str(data_folder_path / f"product_ff_data.json"))
 
             if conf.get('solvent', None) is None and conf.get('pressure',

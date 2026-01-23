@@ -381,7 +381,6 @@ class EvbSystemBuilder():
 
     def _get_mapped_atom_ids_from_residue(self, residue):
         # create a graph of the residue
-        # if the bonds are not available, create them based on proximity from the positions
 
         # figure out a mapping from self.reactant.atoms to the atoms in the residue with networkx
         vlx_elements = self.reactant.molecule.get_element_ids()

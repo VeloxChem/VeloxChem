@@ -758,8 +758,11 @@ class ReactionForceFieldBuilder():
 
                 min_arg = np.argmin(conformers_dict['energies'])
                 new_molecule = conformers_dict['molecules'][min_arg]
+                conf_print_energies = [
+                    f"{energy:.3f}" for energy in conformers_dict['energies']
+                ]
                 self.ostream.print_info(
-                    f"Found {len(conformers_dict['molecules'])} conformers with energies {conformers_dict['energies']} during optimization of the {note} molecule."
+                    f"Found {len(conformers_dict['molecules'])} conformers with energies {conf_print_energies} during optimization of the {note} molecule."
                 )
                 self.ostream.flush()
                 exiting = True
