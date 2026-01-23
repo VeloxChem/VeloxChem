@@ -39,6 +39,7 @@
 #if defined(USE_CUDA)
 
     #define gpuSafe(e)                          cudaSafe(e)
+    #define gpublasSafe(e)                      cublasSafe(e)
 
     #define gpuDeviceProp                       cudaDeviceProp
     #define gpuGetDeviceCount(ptr)              cudaGetDeviceCount(ptr)
@@ -55,9 +56,20 @@
     #define gpuMemcpyHostToDevice               cudaMemcpyHostToDevice
     #define gpuMemcpyDeviceToHost               cudaMemcpyDeviceToHost
 
+    #define gpuStream_t                         cudaStream_t
+    #define gpuStreamCreate(ptr)                cudaStreamCreate(ptr)
+    #define gpuStreamSynchronize(s)             cudaStreamSynchronize(s)
+    #define gpuStreamDestroy(s)                 cudaStreamDestroy(s)
+
+    #define gpublasHandle_t                     cublasHandle_t
+    #define gpublasCreate(ptr)                  cublasCreate(ptr)
+    #define gpublasSetStream(h, s)              cublasSetStream(h, s)
+    #define gpublasDestroy(h)                   cublasDestroy(h)
+
 #elif defined(USE_HIP)
 
     #define gpuSafe(e)                          hipSafe(e)
+    #define gpublasSafe(e)                      hipblasSafe(e)
 
     #define gpuDeviceProp                       hipDeviceProp_t
     #define gpuGetDeviceCount(ptr)              hipGetDeviceCount(ptr)
@@ -73,6 +85,16 @@
     #define gpuMemcpyAsync(dst, src, size, kind, s)     hipMemcpyAsync(dst, src, size, kind, s)
     #define gpuMemcpyHostToDevice               hipMemcpyHostToDevice
     #define gpuMemcpyDeviceToHost               hipMemcpyDeviceToHost
+
+    #define gpuStream_t                         hipStream_t
+    #define gpuStreamCreate(ptr)                hipStreamCreate(ptr)
+    #define gpuStreamSynchronize(s)             hipStreamSynchronize(s)
+    #define gpuStreamDestroy(s)                 hipStreamDestroy(s)
+
+    #define gpublasHandle_t                     hipblasHandle_t
+    #define gpublasCreate(ptr)                  hipblasCreate(ptr)
+    #define gpublasSetStream(h, s)              hipblasSetStream(h, s)
+    #define gpublasDestroy(h)                   hipblasDestroy(h)
 
 #else
 

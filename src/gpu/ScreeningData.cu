@@ -54,7 +54,6 @@
 #include <sstream>
 
 #include "BoysFuncTable.hpp"
-#include "ChunkedMemcpyGPU.hpp"
 #include "ErrorHandler.hpp"
 #include "GpuConstants.hpp"
 #include "GpuDevices.hpp"
@@ -168,6 +167,9 @@ CScreeningData::_computeQMatricesOnGPU(const CMolecule& molecule, const CMolecul
     gpuSafe(gpuSetDevice(0));
 
     gpuSafe(gpuDeviceSynchronize());  // early context initialization after setdevice
+
+    gpuStream_t stream;
+    gpuSafe(gpuStreamCreate(&stream));
 
     // GTOs blocks and number of AOs
 
@@ -377,12 +379,12 @@ CScreeningData::_computeQMatricesOnGPU(const CMolecule& molecule, const CMolecul
     double* d_p_prim_info    ;
     double* d_d_prim_info    ;
 
-    gpuSafe(gpuMallocAsync(&d_mat_Q          , sizeof(double) * static_cast<int64_t>(max_prim_pair_count), 0));
-    gpuSafe(gpuMallocAsync(&d_boys_func_table, sizeof(double) * boys_func_table.size(), 0));
-    gpuSafe(gpuMallocAsync(&d_boys_func_ft   , sizeof(double) * boys_func_ft.size(), 0));
-    gpuSafe(gpuMallocAsync(&d_s_prim_info    , sizeof(double) * s_prim_info.size(), 0));
-    gpuSafe(gpuMallocAsync(&d_p_prim_info    , sizeof(double) * p_prim_info.size(), 0));
-    gpuSafe(gpuMallocAsync(&d_d_prim_info    , sizeof(double) * d_prim_info.size(), 0));
+    gpuSafe(gpuMallocAsync(&d_mat_Q          , sizeof(double) * static_cast<int64_t>(max_prim_pair_count), stream));
+    gpuSafe(gpuMallocAsync(&d_boys_func_table, sizeof(double) * boys_func_table.size(),                    stream));
+    gpuSafe(gpuMallocAsync(&d_boys_func_ft   , sizeof(double) * boys_func_ft.size(),                       stream));
+    gpuSafe(gpuMallocAsync(&d_s_prim_info    , sizeof(double) * s_prim_info.size(),                        stream));
+    gpuSafe(gpuMallocAsync(&d_p_prim_info    , sizeof(double) * p_prim_info.size(),                        stream));
+    gpuSafe(gpuMallocAsync(&d_d_prim_info    , sizeof(double) * d_prim_info.size(),                        stream));
 
     uint32_t* d_ss_first_inds ;
     uint32_t* d_sp_first_inds ;
@@ -397,39 +399,37 @@ CScreeningData::_computeQMatricesOnGPU(const CMolecule& molecule, const CMolecul
     uint32_t* d_pd_second_inds;
     uint32_t* d_dd_second_inds;
 
-    gpuSafe(gpuMallocAsync(&d_ss_first_inds , sizeof(uint32_t) * ss_prim_pair_count, 0));
-    gpuSafe(gpuMallocAsync(&d_sp_first_inds , sizeof(uint32_t) * sp_prim_pair_count, 0));
-    gpuSafe(gpuMallocAsync(&d_sd_first_inds , sizeof(uint32_t) * sd_prim_pair_count, 0));
-    gpuSafe(gpuMallocAsync(&d_pp_first_inds , sizeof(uint32_t) * pp_prim_pair_count, 0));
-    gpuSafe(gpuMallocAsync(&d_pd_first_inds , sizeof(uint32_t) * pd_prim_pair_count, 0));
-    gpuSafe(gpuMallocAsync(&d_dd_first_inds , sizeof(uint32_t) * dd_prim_pair_count, 0));
-    gpuSafe(gpuMallocAsync(&d_ss_second_inds, sizeof(uint32_t) * ss_prim_pair_count, 0));
-    gpuSafe(gpuMallocAsync(&d_sp_second_inds, sizeof(uint32_t) * sp_prim_pair_count, 0));
-    gpuSafe(gpuMallocAsync(&d_sd_second_inds, sizeof(uint32_t) * sd_prim_pair_count, 0));
-    gpuSafe(gpuMallocAsync(&d_pp_second_inds, sizeof(uint32_t) * pp_prim_pair_count, 0));
-    gpuSafe(gpuMallocAsync(&d_pd_second_inds, sizeof(uint32_t) * pd_prim_pair_count, 0));
-    gpuSafe(gpuMallocAsync(&d_dd_second_inds, sizeof(uint32_t) * dd_prim_pair_count, 0));
+    gpuSafe(gpuMallocAsync(&d_ss_first_inds , sizeof(uint32_t) * ss_prim_pair_count, stream));
+    gpuSafe(gpuMallocAsync(&d_sp_first_inds , sizeof(uint32_t) * sp_prim_pair_count, stream));
+    gpuSafe(gpuMallocAsync(&d_sd_first_inds , sizeof(uint32_t) * sd_prim_pair_count, stream));
+    gpuSafe(gpuMallocAsync(&d_pp_first_inds , sizeof(uint32_t) * pp_prim_pair_count, stream));
+    gpuSafe(gpuMallocAsync(&d_pd_first_inds , sizeof(uint32_t) * pd_prim_pair_count, stream));
+    gpuSafe(gpuMallocAsync(&d_dd_first_inds , sizeof(uint32_t) * dd_prim_pair_count, stream));
+    gpuSafe(gpuMallocAsync(&d_ss_second_inds, sizeof(uint32_t) * ss_prim_pair_count, stream));
+    gpuSafe(gpuMallocAsync(&d_sp_second_inds, sizeof(uint32_t) * sp_prim_pair_count, stream));
+    gpuSafe(gpuMallocAsync(&d_sd_second_inds, sizeof(uint32_t) * sd_prim_pair_count, stream));
+    gpuSafe(gpuMallocAsync(&d_pp_second_inds, sizeof(uint32_t) * pp_prim_pair_count, stream));
+    gpuSafe(gpuMallocAsync(&d_pd_second_inds, sizeof(uint32_t) * pd_prim_pair_count, stream));
+    gpuSafe(gpuMallocAsync(&d_dd_second_inds, sizeof(uint32_t) * dd_prim_pair_count, stream));
 
-    gpuSafe(gpuMemcpyAsync(d_boys_func_table, boys_func_table.data(), boys_func_table.size() * sizeof(double), gpuMemcpyHostToDevice, 0));
-    gpuSafe(gpuMemcpyAsync(d_boys_func_ft,    boys_func_ft.data(),    boys_func_ft.size() * sizeof(double), gpuMemcpyHostToDevice, 0));
-    gpuSafe(gpuMemcpyAsync(d_s_prim_info,     s_prim_info.data(),     s_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, 0));
-    gpuSafe(gpuMemcpyAsync(d_p_prim_info,     p_prim_info.data(),     p_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, 0));
-    gpuSafe(gpuMemcpyAsync(d_d_prim_info,     d_prim_info.data(),     d_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, 0));
+    gpuSafe(gpuMemcpyAsync(d_boys_func_table, boys_func_table.data(), boys_func_table.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_boys_func_ft,    boys_func_ft.data(),    boys_func_ft.size()    * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_s_prim_info,     s_prim_info.data(),     s_prim_info.size()     * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_p_prim_info,     p_prim_info.data(),     p_prim_info.size()     * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_d_prim_info,     d_prim_info.data(),     d_prim_info.size()     * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-    gpuSafe(gpuMemcpyAsync(d_ss_first_inds,  ss_first_inds.data(),  ss_prim_pair_count * sizeof(uint32_t), gpuMemcpyHostToDevice, 0));
-    gpuSafe(gpuMemcpyAsync(d_sp_first_inds,  sp_first_inds.data(),  sp_prim_pair_count * sizeof(uint32_t), gpuMemcpyHostToDevice, 0));
-    gpuSafe(gpuMemcpyAsync(d_sd_first_inds,  sd_first_inds.data(),  sd_prim_pair_count * sizeof(uint32_t), gpuMemcpyHostToDevice, 0));
-    gpuSafe(gpuMemcpyAsync(d_pp_first_inds,  pp_first_inds.data(),  pp_prim_pair_count * sizeof(uint32_t), gpuMemcpyHostToDevice, 0));
-    gpuSafe(gpuMemcpyAsync(d_pd_first_inds,  pd_first_inds.data(),  pd_prim_pair_count * sizeof(uint32_t), gpuMemcpyHostToDevice, 0));
-    gpuSafe(gpuMemcpyAsync(d_dd_first_inds,  dd_first_inds.data(),  dd_prim_pair_count * sizeof(uint32_t), gpuMemcpyHostToDevice, 0));
-    gpuSafe(gpuMemcpyAsync(d_ss_second_inds, ss_second_inds.data(), ss_prim_pair_count * sizeof(uint32_t), gpuMemcpyHostToDevice, 0));
-    gpuSafe(gpuMemcpyAsync(d_sp_second_inds, sp_second_inds.data(), sp_prim_pair_count * sizeof(uint32_t), gpuMemcpyHostToDevice, 0));
-    gpuSafe(gpuMemcpyAsync(d_sd_second_inds, sd_second_inds.data(), sd_prim_pair_count * sizeof(uint32_t), gpuMemcpyHostToDevice, 0));
-    gpuSafe(gpuMemcpyAsync(d_pp_second_inds, pp_second_inds.data(), pp_prim_pair_count * sizeof(uint32_t), gpuMemcpyHostToDevice, 0));
-    gpuSafe(gpuMemcpyAsync(d_pd_second_inds, pd_second_inds.data(), pd_prim_pair_count * sizeof(uint32_t), gpuMemcpyHostToDevice, 0));
-    gpuSafe(gpuMemcpyAsync(d_dd_second_inds, dd_second_inds.data(), dd_prim_pair_count * sizeof(uint32_t), gpuMemcpyHostToDevice, 0));
-
-    gpuSafe(gpuDeviceSynchronize());
+    gpuSafe(gpuMemcpyAsync(d_ss_first_inds,  ss_first_inds.data(),  ss_prim_pair_count * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_sp_first_inds,  sp_first_inds.data(),  sp_prim_pair_count * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_sd_first_inds,  sd_first_inds.data(),  sd_prim_pair_count * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pp_first_inds,  pp_first_inds.data(),  pp_prim_pair_count * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pd_first_inds,  pd_first_inds.data(),  pd_prim_pair_count * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_dd_first_inds,  dd_first_inds.data(),  dd_prim_pair_count * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_ss_second_inds, ss_second_inds.data(), ss_prim_pair_count * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_sp_second_inds, sp_second_inds.data(), sp_prim_pair_count * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_sd_second_inds, sd_second_inds.data(), sd_prim_pair_count * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pp_second_inds, pp_second_inds.data(), pp_prim_pair_count * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pd_second_inds, pd_second_inds.data(), pd_prim_pair_count * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_dd_second_inds, dd_second_inds.data(), dd_prim_pair_count * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
     // compute Q
 
@@ -441,7 +441,7 @@ CScreeningData::_computeQMatricesOnGPU(const CMolecule& molecule, const CMolecul
 
         dim3 num_blocks((ss_prim_pair_count + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::computeQMatrixSS<<<num_blocks, threads_per_block>>>(
+        gpu::computeQMatrixSS<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_Q,
                            d_s_prim_info,
                            static_cast<uint32_t>(s_prim_count),
@@ -451,7 +451,7 @@ CScreeningData::_computeQMatricesOnGPU(const CMolecule& molecule, const CMolecul
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        gpuSafe(gpuMemcpyAsync(h_mat_Q.data(), d_mat_Q, ss_prim_pair_count * sizeof(double), gpuMemcpyDeviceToHost, 0));
+        gpuSafe(gpuMemcpyAsync(h_mat_Q.data(), d_mat_Q, ss_prim_pair_count * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         for (int64_t ij = 0; ij < ss_prim_pair_count; ij++)
         {
@@ -472,7 +472,7 @@ CScreeningData::_computeQMatricesOnGPU(const CMolecule& molecule, const CMolecul
 
         dim3 num_blocks((sp_prim_pair_count + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::computeQMatrixSP<<<num_blocks, threads_per_block>>>(
+        gpu::computeQMatrixSP<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_Q,
                            d_s_prim_info,
                            static_cast<uint32_t>(s_prim_count),
@@ -484,7 +484,7 @@ CScreeningData::_computeQMatricesOnGPU(const CMolecule& molecule, const CMolecul
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        gpuSafe(gpuMemcpyAsync(h_mat_Q.data(), d_mat_Q, sp_prim_pair_count * sizeof(double), gpuMemcpyDeviceToHost, 0));
+        gpuSafe(gpuMemcpyAsync(h_mat_Q.data(), d_mat_Q, sp_prim_pair_count * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         for (int64_t ij = 0; ij < sp_prim_pair_count; ij++)
         {
@@ -503,7 +503,7 @@ CScreeningData::_computeQMatricesOnGPU(const CMolecule& molecule, const CMolecul
 
         dim3 num_blocks((sd_prim_pair_count + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::computeQMatrixSD<<<num_blocks, threads_per_block>>>(
+        gpu::computeQMatrixSD<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_Q,
                            d_s_prim_info,
                            static_cast<uint32_t>(s_prim_count),
@@ -515,7 +515,7 @@ CScreeningData::_computeQMatricesOnGPU(const CMolecule& molecule, const CMolecul
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        gpuSafe(gpuMemcpyAsync(h_mat_Q.data(), d_mat_Q, sd_prim_pair_count * sizeof(double), gpuMemcpyDeviceToHost, 0));
+        gpuSafe(gpuMemcpyAsync(h_mat_Q.data(), d_mat_Q, sd_prim_pair_count * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         for (int64_t ij = 0; ij < sd_prim_pair_count; ij++)
         {
@@ -534,7 +534,7 @@ CScreeningData::_computeQMatricesOnGPU(const CMolecule& molecule, const CMolecul
 
         dim3 num_blocks((pp_prim_pair_count + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::computeQMatrixPP<<<num_blocks, threads_per_block>>>(
+        gpu::computeQMatrixPP<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_Q,
                            d_p_prim_info,
                            static_cast<uint32_t>(p_prim_count),
@@ -544,7 +544,7 @@ CScreeningData::_computeQMatricesOnGPU(const CMolecule& molecule, const CMolecul
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        gpuSafe(gpuMemcpyAsync(h_mat_Q.data(), d_mat_Q, pp_prim_pair_count * sizeof(double), gpuMemcpyDeviceToHost, 0));
+        gpuSafe(gpuMemcpyAsync(h_mat_Q.data(), d_mat_Q, pp_prim_pair_count * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         for (int64_t ij = 0; ij < pp_prim_pair_count; ij++)
         {
@@ -565,7 +565,7 @@ CScreeningData::_computeQMatricesOnGPU(const CMolecule& molecule, const CMolecul
 
         dim3 num_blocks((pd_prim_pair_count + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::computeQMatrixPD<<<num_blocks, threads_per_block>>>(
+        gpu::computeQMatrixPD<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_Q,
                            d_p_prim_info,
                            static_cast<uint32_t>(p_prim_count),
@@ -577,7 +577,7 @@ CScreeningData::_computeQMatricesOnGPU(const CMolecule& molecule, const CMolecul
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        gpuSafe(gpuMemcpyAsync(h_mat_Q.data(), d_mat_Q, pd_prim_pair_count * sizeof(double), gpuMemcpyDeviceToHost, 0));
+        gpuSafe(gpuMemcpyAsync(h_mat_Q.data(), d_mat_Q, pd_prim_pair_count * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         for (int64_t ij = 0; ij < pd_prim_pair_count; ij++)
         {
@@ -596,7 +596,7 @@ CScreeningData::_computeQMatricesOnGPU(const CMolecule& molecule, const CMolecul
 
         dim3 num_blocks((dd_prim_pair_count + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::computeQMatrixDD<<<num_blocks, threads_per_block>>>(
+        gpu::computeQMatrixDD<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_Q,
                            d_d_prim_info,
                            static_cast<uint32_t>(d_prim_count),
@@ -606,7 +606,7 @@ CScreeningData::_computeQMatricesOnGPU(const CMolecule& molecule, const CMolecul
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        gpuSafe(gpuMemcpyAsync(h_mat_Q.data(), d_mat_Q, dd_prim_pair_count * sizeof(double), gpuMemcpyDeviceToHost, 0));
+        gpuSafe(gpuMemcpyAsync(h_mat_Q.data(), d_mat_Q, dd_prim_pair_count * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         for (int64_t ij = 0; ij < dd_prim_pair_count; ij++)
         {
@@ -619,28 +619,30 @@ CScreeningData::_computeQMatricesOnGPU(const CMolecule& molecule, const CMolecul
         }
     }
 
-    gpuSafe(gpuDeviceSynchronize());
+    gpuSafe(gpuStreamSynchronize(stream));
 
-    gpuSafe(gpuFreeAsync(d_mat_Q          , 0));
-    gpuSafe(gpuFreeAsync(d_boys_func_table, 0));
-    gpuSafe(gpuFreeAsync(d_boys_func_ft   , 0));
-    gpuSafe(gpuFreeAsync(d_s_prim_info    , 0));
-    gpuSafe(gpuFreeAsync(d_p_prim_info    , 0));
-    gpuSafe(gpuFreeAsync(d_d_prim_info    , 0));
+    gpuSafe(gpuFreeAsync(d_mat_Q          , stream));
+    gpuSafe(gpuFreeAsync(d_boys_func_table, stream));
+    gpuSafe(gpuFreeAsync(d_boys_func_ft   , stream));
+    gpuSafe(gpuFreeAsync(d_s_prim_info    , stream));
+    gpuSafe(gpuFreeAsync(d_p_prim_info    , stream));
+    gpuSafe(gpuFreeAsync(d_d_prim_info    , stream));
 
-    gpuSafe(gpuFreeAsync(d_ss_first_inds , 0));
-    gpuSafe(gpuFreeAsync(d_sp_first_inds , 0));
-    gpuSafe(gpuFreeAsync(d_sd_first_inds , 0));
-    gpuSafe(gpuFreeAsync(d_pp_first_inds , 0));
-    gpuSafe(gpuFreeAsync(d_pd_first_inds , 0));
-    gpuSafe(gpuFreeAsync(d_dd_first_inds , 0));
-    gpuSafe(gpuFreeAsync(d_ss_second_inds, 0));
-    gpuSafe(gpuFreeAsync(d_sp_second_inds, 0));
-    gpuSafe(gpuFreeAsync(d_sd_second_inds, 0));
-    gpuSafe(gpuFreeAsync(d_pp_second_inds, 0));
-    gpuSafe(gpuFreeAsync(d_pd_second_inds, 0));
-    gpuSafe(gpuFreeAsync(d_dd_second_inds, 0));
+    gpuSafe(gpuFreeAsync(d_ss_first_inds , stream));
+    gpuSafe(gpuFreeAsync(d_sp_first_inds , stream));
+    gpuSafe(gpuFreeAsync(d_sd_first_inds , stream));
+    gpuSafe(gpuFreeAsync(d_pp_first_inds , stream));
+    gpuSafe(gpuFreeAsync(d_pd_first_inds , stream));
+    gpuSafe(gpuFreeAsync(d_dd_first_inds , stream));
+    gpuSafe(gpuFreeAsync(d_ss_second_inds, stream));
+    gpuSafe(gpuFreeAsync(d_sp_second_inds, stream));
+    gpuSafe(gpuFreeAsync(d_sd_second_inds, stream));
+    gpuSafe(gpuFreeAsync(d_pp_second_inds, stream));
+    gpuSafe(gpuFreeAsync(d_pd_second_inds, stream));
+    gpuSafe(gpuFreeAsync(d_dd_second_inds, stream));
 
+    gpuSafe(gpuStreamSynchronize(stream));
+    gpuSafe(gpuStreamDestroy(stream));
     gpuSafe(gpuDeviceSynchronize());
 }
 
@@ -2126,6 +2128,9 @@ auto CScreeningData::get_Q_prime_slice(const CDenseMatrix& Q_mat,
 
     gpuSafe(gpuDeviceSynchronize());  // early context initialization after setdevice
 
+    gpuStream_t stream;
+    gpuSafe(gpuStreamCreate(&stream));
+
     errors::assertMsgCritical(
         !omp_in_parallel(),
         std::string("CScreeningData::get_Q_prime_slice: should never be called in omp parallel region"));
@@ -2141,71 +2146,63 @@ auto CScreeningData::get_Q_prime_slice(const CDenseMatrix& Q_mat,
     double *d_matrix_B;
     double *d_matrix_C;
 
-    gpuSafe(gpuMallocAsync(&d_matrix_A, sizeof(double) * n_size * n_size,                                   0));
-    gpuSafe(gpuMallocAsync(&d_matrix_B, sizeof(double) * n_size * n_size,                                   0));
-    gpuSafe(gpuMallocAsync(&d_matrix_C, sizeof(double) * static_cast<size_t>(row_end - row_start) * n_size, 0));
+    gpuSafe(gpuMallocAsync(&d_matrix_A, sizeof(double) * n_size * n_size,                                   stream));
+    gpuSafe(gpuMallocAsync(&d_matrix_B, sizeof(double) * n_size * n_size,                                   stream));
+    gpuSafe(gpuMallocAsync(&d_matrix_C, sizeof(double) * static_cast<size_t>(row_end - row_start) * n_size, stream));
 
-    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_matrix_A, Q_mat.values(),      n_size * n_size);
-    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_matrix_B, cart_D_mat.values(), n_size * n_size);
-
-    gpuSafe(gpuDeviceSynchronize());
+    gpuSafe(gpuMemcpyAsync(d_matrix_A, Q_mat.values(),      n_size * n_size * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_matrix_B, cart_D_mat.values(), n_size * n_size * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     CDenseMatrix Q_prime_slice(row_end - row_start, n_int64);
 
-#if defined(USE_CUDA)
-
-    cublasHandle_t handle;
-    cublasSafe(cublasCreate(&handle));
+    gpublasHandle_t handle;
+    gpublasSafe(gpublasCreate(&handle));
+    gpublasSafe(gpublasSetStream(handle, stream));
 
     double alpha = 1.0, beta = 0.0;
 
     auto n = static_cast<int32_t>(n_int64);
     auto row_count = static_cast<int32_t>(row_end - row_start);
+
+#if defined(USE_CUDA)
 
     // compute A^T * (B^T * A^T) since cublas is column-major
     cublasSafe(cublasDgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, n, row_count, n, &alpha,
                            d_matrix_B, n, d_matrix_A + static_cast<size_t>(row_start) * n_size, n, &beta,
                            d_matrix_C, n));
 
-    cudaSafe(cudaDeviceSynchronize());
-
     cublasSafe(cublasDgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, n, row_count, n, &alpha,
                            d_matrix_A, n, d_matrix_C, n, &beta,
                            d_matrix_B, n));
 
-    cublasSafe(cublasDestroy(handle));
-
 #elif defined(USE_HIP)
-
-    hipblasHandle_t handle;
-    hipblasSafe(hipblasCreate(&handle));
-
-    double alpha = 1.0, beta = 0.0;
-
-    auto n = static_cast<int32_t>(n_int64);
-    auto row_count = static_cast<int32_t>(row_end - row_start);
 
     // compute A^T * (B^T * A^T) since hipblas is column-major
     hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, HIPBLAS_OP_N, n, row_count, n, &alpha,
                              d_matrix_B, n, d_matrix_A + static_cast<size_t>(row_start) * n_size, n, &beta,
                              d_matrix_C, n));
 
-    hipSafe(hipDeviceSynchronize());
-
     hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, HIPBLAS_OP_N, n, row_count, n, &alpha,
                              d_matrix_A, n, d_matrix_C, n, &beta,
                              d_matrix_B, n));
 
-    hipblasSafe(hipblasDestroy(handle));
-
 #endif
 
-    gpu::chunkedMemcpyAsyncDeviceToHost<double>(Q_prime_slice.values(), d_matrix_B, static_cast<size_t>(row_end - row_start) * n_size);
+    gpuSafe(gpuMemcpyAsync(Q_prime_slice.values(),
+                           d_matrix_B,
+                           static_cast<size_t>(row_end - row_start) * n_size * sizeof(double),
+                           gpuMemcpyDeviceToHost,
+                           stream));
+
+    gpuSafe(gpuStreamSynchronize(stream));
 
     gpuSafe(gpuFreeAsync(d_matrix_A, 0));
     gpuSafe(gpuFreeAsync(d_matrix_B, 0));
     gpuSafe(gpuFreeAsync(d_matrix_C, 0));
 
+    gpuSafe(gpuStreamSynchronize(stream));
+    gpublasSafe(gpublasDestroy(handle));
+    gpuSafe(gpuStreamDestroy(stream));
     gpuSafe(gpuDeviceSynchronize());
 
     return Q_prime_slice;
