@@ -80,7 +80,7 @@ getAvailableGpuMemory() -> double
 
     errors::assertMsgCritical(
         !omp_in_parallel(),
-        std::string(__func__) + std::string(": should not be called in omp parallel reigion"));
+        std::string(__func__) + std::string(": should not be called in omp parallel region"));
 
     size_t mem_free_bytes = 0;
     size_t mem_total_bytes = 0;
@@ -97,7 +97,7 @@ computeDotProduct(const double* A, const double* B, const int64_t size_int64) ->
 
     errors::assertMsgCritical(
         !omp_in_parallel(),
-        std::string(__func__) + std::string(": should not be called in omp parallel reigion"));
+        std::string(__func__) + std::string(": should not be called in omp parallel region"));
 
     auto size = static_cast<size_t>(size_int64);
 
@@ -149,7 +149,7 @@ computeWeightedSum(double* weighted_data, const std::vector<double>& weights, co
 
     errors::assertMsgCritical(
         !omp_in_parallel(),
-        std::string(__func__) + std::string(": should not be called in omp parallel reigion"));
+        std::string(__func__) + std::string(": should not be called in omp parallel region"));
 
     auto size = static_cast<size_t>(size_int64);
 
@@ -213,7 +213,7 @@ computeErrorVector(double* errvec, const double* X, const double* F, const doubl
 
     errors::assertMsgCritical(
         !omp_in_parallel(),
-        std::string(__func__) + std::string(": should not be called in omp parallel reigion"));
+        std::string(__func__) + std::string(": should not be called in omp parallel region"));
 
     auto nmo_size = static_cast<size_t>(nmo_int64);
     auto nao_size = static_cast<size_t>(nao_int64);
@@ -352,7 +352,7 @@ transformMatrix(double* transformed_F, const double* X, const double* F,
 
     errors::assertMsgCritical(
         !omp_in_parallel(),
-        std::string(__func__) + std::string(": should not be called in omp parallel reigion"));
+        std::string(__func__) + std::string(": should not be called in omp parallel region"));
 
     auto nmo_size = static_cast<size_t>(nmo_int64);
     auto nao_size = static_cast<size_t>(nao_int64);
@@ -441,7 +441,7 @@ computeMatrixMultiplication(double* C, const double* A, const double* B, const s
 
     errors::assertMsgCritical(
         !omp_in_parallel(),
-        std::string(__func__) + std::string(": should not be called in omp parallel reigion"));
+        std::string(__func__) + std::string(": should not be called in omp parallel region"));
 
     auto m_size = static_cast<size_t>(m_int64);
     auto k_size = static_cast<size_t>(k_int64);
@@ -522,7 +522,7 @@ diagonalizeMatrix(double* A, double* D, const int64_t n_int64) -> void
 
     errors::assertMsgCritical(
         !omp_in_parallel(),
-        std::string(__func__) + std::string(": should not be called in omp parallel reigion"));
+        std::string(__func__) + std::string(": should not be called in omp parallel region"));
 
     auto n_size = static_cast<size_t>(n_int64);
 
@@ -619,7 +619,7 @@ diagonalizeMatrixMultiGPU(double* A, double* D, const int64_t n_int64, const int
 {
     errors::assertMsgCritical(
         !omp_in_parallel(),
-        std::string(__func__) + std::string(": should not be called in omp parallel reigion"));
+        std::string(__func__) + std::string(": should not be called in omp parallel region"));
 
     auto n_size = static_cast<size_t>(n_int64);
 

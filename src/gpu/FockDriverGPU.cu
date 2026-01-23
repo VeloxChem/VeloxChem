@@ -82,8 +82,6 @@ computeQMatrixOnGPU(const CMolecule& molecule,
                     const CMolecularBasis& basis,
                     const CScreeningData& screening) -> CDenseMatrix
 {
-    CGpuDevices gpu_devices;
-
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
 
     int64_t s_prim_count = 0;
@@ -1421,8 +1419,6 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule,
                                              const CMolecularBasis& basis,
                                              const CScreeningData& screening) -> std::vector<CDenseMatrix>
 {
-    CGpuDevices gpu_devices;
-
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
     const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
 
@@ -2002,8 +1998,6 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule,
                                   const double* points_info_ptr,
                                   const int64_t npoints) -> CDenseMatrix
 {
-    CGpuDevices gpu_devices;
-
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
     const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
 
@@ -2566,8 +2560,6 @@ computeElectricDipoleIntegralsOnGPU(const CMolecule& molecule,
                                     const std::vector<double>& origin,
                                     const CScreeningData& screening) -> std::vector<CDenseMatrix>
 {
-    CGpuDevices gpu_devices;
-
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
     const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
 
@@ -3186,8 +3178,6 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule,
                                     const CMolecularBasis& basis,
                                     const CScreeningData& screening) -> std::vector<CDenseMatrix>
 {
-    CGpuDevices gpu_devices;
-
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
     const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
 
@@ -3789,8 +3779,6 @@ computeAngularMomentumIntegralsOnGPU(const CMolecule& molecule,
                                      const std::vector<double>& origin,
                                      const CScreeningData& screening) -> std::vector<CDenseMatrix>
 {
-    CGpuDevices gpu_devices;
-
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
     const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
 
@@ -4505,12 +4493,8 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     // TODO sanity check for flag_K: SYMM or ANTISYMM
 
-    CGpuDevices gpu_devices;
-
     auto nthreads = omp_get_max_threads();
     auto num_gpus_per_node = screening.getNumGpusPerNode();
-
-    gpuSafe(gpuSetDevice(0));
 
     timer.start("Prep. blocks");
 

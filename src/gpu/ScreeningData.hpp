@@ -71,13 +71,6 @@ class CScreeningData
     std::vector<uint32_t> _p_prim_aoinds;
     std::vector<uint32_t> _d_prim_aoinds;
 
-    // gpu pointers
-    std::vector<double*>   _devptr_double;
-    std::vector<uint32_t*> _devptr_uint32;
-
-    std::vector<size_t> _size_devptr_double;
-    std::vector<size_t> _size_devptr_uint32;
-
     // cpu data
     CDenseMatrix _Q_matrix_ss;
     CDenseMatrix _Q_matrix_sp;
@@ -234,18 +227,6 @@ class CScreeningData
     ~CScreeningData();
 
     auto reset_mpi(const int rank, const int nnodes) -> void;
-
-    auto get_devptr_double(const int64_t gpu_id) const -> double*;
-    auto get_devptr_uint32(const int64_t gpu_id) const -> uint32_t*;
-
-    auto resize_devptr_double(const int64_t gpu_id, const size_t n) -> void;
-    auto resize_devptr_uint32(const int64_t gpu_id, const size_t n) -> void;
-
-    auto alloc_devptr_double(const int64_t gpu_id, const size_t n) -> void;
-    auto alloc_devptr_uint32(const int64_t gpu_id, const size_t n) -> void;
-
-    auto clear_devptr_double(const int64_t gpu_id) -> void;
-    auto clear_devptr_uint32(const int64_t gpu_id) -> void;
 
     auto getNumGpusPerNode() const -> const int64_t;
 
