@@ -4702,23 +4702,14 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     gpuSafe(gpuSetDevice(gpu_id));
 
+    gpuSafe(gpuDeviceSynchronize());  // early context initialization after setdevice
+
     omptimers[thread_id].start("Boys func. prep.");
 
     // Boys function (tabulated for order 0-28)
 
     const auto boys_func_table = boysfunc::getFullBoysFuncTable();
     const auto boys_func_ft    = boysfunc::getBoysFuncFactors();
-
-    const auto data_boys_func_size = boys_func_table.size() + boys_func_ft.size();
-
-    double* d_data_boys_func;
-    gpuSafe(gpuMalloc(&d_data_boys_func, data_boys_func_size * sizeof(double)));
-
-    double* d_boys_func_table = d_data_boys_func;
-    double* d_boys_func_ft = d_boys_func_table + boys_func_table.size();
-
-    gpu::chunkedMemcpyHostToDevice<double>(d_boys_func_table, boys_func_table.data(), boys_func_table.size());
-    gpu::chunkedMemcpyHostToDevice<double>(d_boys_func_ft, boys_func_ft.data(), boys_func_ft.size());
 
     omptimers[thread_id].stop("Boys func. prep.");
 
@@ -4762,30 +4753,42 @@ computeFockOnGPU(const              CMolecule& molecule,
     gtoinfo::updatePrimitiveInfoForP(p_prim_info.data(), p_prim_aoinds.data(), p_prim_count, gto_blocks);
     gtoinfo::updatePrimitiveInfoForD(d_prim_info.data(), d_prim_aoinds.data(), d_prim_count, gto_blocks);
 
-    const auto data_spd_prim_info_size = s_prim_info.size() + p_prim_info.size() + d_prim_info.size();
-    const auto data_spd_prim_aoinds_size = s_prim_aoinds.size() + p_prim_aoinds.size() + d_prim_aoinds.size();
+    // Boys function and GTO blocks on device
 
-    double* d_data_spd_prim_info;
-    uint32_t* d_data_spd_prim_aoinds;
+    double* d_boys_func_table;
+    double* d_boys_func_ft;
 
-    gpuSafe(gpuMalloc(&d_data_spd_prim_info, data_spd_prim_info_size * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_data_spd_prim_aoinds, data_spd_prim_aoinds_size * sizeof(uint32_t)));
+    double* d_s_prim_info;
+    double* d_p_prim_info;
+    double* d_d_prim_info;
 
-    double*   d_s_prim_info = d_data_spd_prim_info;
-    double*   d_p_prim_info = d_s_prim_info + s_prim_info.size();
-    double*   d_d_prim_info = d_p_prim_info + p_prim_info.size();
+    uint32_t* d_s_prim_aoinds;
+    uint32_t* d_p_prim_aoinds;
+    uint32_t* d_d_prim_aoinds;
 
-    uint32_t* d_s_prim_aoinds = d_data_spd_prim_aoinds;
-    uint32_t* d_p_prim_aoinds = d_s_prim_aoinds + s_prim_aoinds.size();
-    uint32_t* d_d_prim_aoinds = d_p_prim_aoinds + p_prim_aoinds.size();
+    gpuSafe(gpuMallocAsync(&d_boys_func_table, sizeof(double) * boys_func_table.size(), 0));
+    gpuSafe(gpuMallocAsync(&d_boys_func_ft,    sizeof(double) * boys_func_ft.size(),    0));
 
-    gpu::chunkedMemcpyHostToDevice<double>(d_s_prim_info, s_prim_info.data(), s_prim_info.size());
-    gpu::chunkedMemcpyHostToDevice<double>(d_p_prim_info, p_prim_info.data(), p_prim_info.size());
-    gpu::chunkedMemcpyHostToDevice<double>(d_d_prim_info, d_prim_info.data(), d_prim_info.size());
+    gpuSafe(gpuMallocAsync(&d_s_prim_info, sizeof(double) * s_prim_info.size(), 0));
+    gpuSafe(gpuMallocAsync(&d_p_prim_info, sizeof(double) * p_prim_info.size(), 0));
+    gpuSafe(gpuMallocAsync(&d_d_prim_info, sizeof(double) * d_prim_info.size(), 0));
 
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_s_prim_aoinds, s_prim_aoinds.data(), s_prim_aoinds.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_p_prim_aoinds, p_prim_aoinds.data(), p_prim_aoinds.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_d_prim_aoinds, d_prim_aoinds.data(), d_prim_aoinds.size());
+    gpuSafe(gpuMallocAsync(&d_s_prim_aoinds, sizeof(uint32_t) * s_prim_aoinds.size(), 0));
+    gpuSafe(gpuMallocAsync(&d_p_prim_aoinds, sizeof(uint32_t) * p_prim_aoinds.size(), 0));
+    gpuSafe(gpuMallocAsync(&d_d_prim_aoinds, sizeof(uint32_t) * d_prim_aoinds.size(), 0));
+
+    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_boys_func_table, boys_func_table.data(), boys_func_table.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_boys_func_ft, boys_func_ft.data(), boys_func_ft.size());
+
+    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_s_prim_info, s_prim_info.data(), s_prim_info.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_p_prim_info, p_prim_info.data(), p_prim_info.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_d_prim_info, d_prim_info.data(), d_prim_info.size());
+
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_s_prim_aoinds, s_prim_aoinds.data(), s_prim_aoinds.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_p_prim_aoinds, p_prim_aoinds.data(), p_prim_aoinds.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_d_prim_aoinds, d_prim_aoinds.data(), d_prim_aoinds.size());
+
+    gpuSafe(gpuDeviceSynchronize());
 
     omptimers[thread_id].stop("GTO block prep.");
 
@@ -4881,187 +4884,169 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     std::vector<double> mat_J(max_prim_pair_count_local);
 
-    // sorted Q, D, and indices on device
+    // sorted Q, D, and indices (J data) on device
 
-    size_t data_J_double_size = 0;
+    double* d_mat_D;
+    double* d_mat_J;
+    double* d_ss_mat_Q;
+    double* d_sp_mat_Q;
+    double* d_sd_mat_Q;
+    double* d_pp_mat_Q;
+    double* d_pd_mat_Q;
+    double* d_dd_mat_Q;
+    double* d_ss_pair_data;
+    double* d_sp_pair_data;
+    double* d_sd_pair_data;
+    double* d_pp_pair_data;
+    double* d_pd_pair_data;
+    double* d_dd_pair_data;
+    double* d_ss_mat_Q_local;
+    double* d_sp_mat_Q_local;
+    double* d_sd_mat_Q_local;
+    double* d_pp_mat_Q_local;
+    double* d_pd_mat_Q_local;
+    double* d_dd_mat_Q_local;
+    double* d_ss_pair_data_local;
+    double* d_sp_pair_data_local;
+    double* d_sd_pair_data_local;
+    double* d_pp_pair_data_local;
+    double* d_pd_pair_data_local;
+    double* d_dd_pair_data_local;
 
-    data_J_double_size += static_cast<size_t>(max_prim_pair_count);         // d_mat_D
-    data_J_double_size += static_cast<size_t>(max_prim_pair_count_local);   // d_mat_J
-    data_J_double_size += static_cast<size_t>(ss_prim_pair_count);          // d_ss_mat_Q
-    data_J_double_size += static_cast<size_t>(sp_prim_pair_count);          // d_sp_mat_Q
-    data_J_double_size += static_cast<size_t>(sd_prim_pair_count);          // d_sd_mat_Q
-    data_J_double_size += static_cast<size_t>(pp_prim_pair_count);          // d_pp_mat_Q
-    data_J_double_size += static_cast<size_t>(pd_prim_pair_count);          // d_pd_mat_Q
-    data_J_double_size += static_cast<size_t>(dd_prim_pair_count);          // d_dd_mat_Q
-    data_J_double_size += ss_pair_data.size();                              // d_ss_pair_data
-    data_J_double_size += sp_pair_data.size();                              // d_sp_pair_data
-    data_J_double_size += sd_pair_data.size();                              // d_sd_pair_data
-    data_J_double_size += pp_pair_data.size();                              // d_pp_pair_data
-    data_J_double_size += pd_pair_data.size();                              // d_pd_pair_data
-    data_J_double_size += dd_pair_data.size();                              // d_dd_pair_data
-    data_J_double_size += static_cast<size_t>(ss_prim_pair_count_local);    // d_ss_mat_Q_local
-    data_J_double_size += static_cast<size_t>(sp_prim_pair_count_local);    // d_sp_mat_Q_local
-    data_J_double_size += static_cast<size_t>(sd_prim_pair_count_local);    // d_sd_mat_Q_local
-    data_J_double_size += static_cast<size_t>(pp_prim_pair_count_local);    // d_pp_mat_Q_local
-    data_J_double_size += static_cast<size_t>(pd_prim_pair_count_local);    // d_pd_mat_Q_local
-    data_J_double_size += static_cast<size_t>(dd_prim_pair_count_local);    // d_dd_mat_Q_local
-    data_J_double_size += ss_pair_data_local.size();                        // d_ss_pair_data_local
-    data_J_double_size += sp_pair_data_local.size();                        // d_sp_pair_data_local
-    data_J_double_size += sd_pair_data_local.size();                        // d_sd_pair_data_local
-    data_J_double_size += pp_pair_data_local.size();                        // d_pp_pair_data_local
-    data_J_double_size += pd_pair_data_local.size();                        // d_pd_pair_data_local
-    data_J_double_size += dd_pair_data_local.size();                        // d_dd_pair_data_local
+    gpuSafe(gpuMallocAsync(&d_mat_D,              sizeof(double) * static_cast<size_t>(max_prim_pair_count),       0));
+    gpuSafe(gpuMallocAsync(&d_mat_J,              sizeof(double) * static_cast<size_t>(max_prim_pair_count_local), 0));
+    gpuSafe(gpuMallocAsync(&d_ss_mat_Q,           sizeof(double) * static_cast<size_t>(ss_prim_pair_count),        0));
+    gpuSafe(gpuMallocAsync(&d_sp_mat_Q,           sizeof(double) * static_cast<size_t>(sp_prim_pair_count),        0));
+    gpuSafe(gpuMallocAsync(&d_sd_mat_Q,           sizeof(double) * static_cast<size_t>(sd_prim_pair_count),        0));
+    gpuSafe(gpuMallocAsync(&d_pp_mat_Q,           sizeof(double) * static_cast<size_t>(pp_prim_pair_count),        0));
+    gpuSafe(gpuMallocAsync(&d_pd_mat_Q,           sizeof(double) * static_cast<size_t>(pd_prim_pair_count),        0));
+    gpuSafe(gpuMallocAsync(&d_dd_mat_Q,           sizeof(double) * static_cast<size_t>(dd_prim_pair_count),        0));
+    gpuSafe(gpuMallocAsync(&d_ss_pair_data,       sizeof(double) * ss_pair_data.size(),                            0));
+    gpuSafe(gpuMallocAsync(&d_sp_pair_data,       sizeof(double) * sp_pair_data.size(),                            0));
+    gpuSafe(gpuMallocAsync(&d_sd_pair_data,       sizeof(double) * sd_pair_data.size(),                            0));
+    gpuSafe(gpuMallocAsync(&d_pp_pair_data,       sizeof(double) * pp_pair_data.size(),                            0));
+    gpuSafe(gpuMallocAsync(&d_pd_pair_data,       sizeof(double) * pd_pair_data.size(),                            0));
+    gpuSafe(gpuMallocAsync(&d_dd_pair_data,       sizeof(double) * dd_pair_data.size(),                            0));
+    gpuSafe(gpuMallocAsync(&d_ss_mat_Q_local,     sizeof(double) * static_cast<size_t>(ss_prim_pair_count_local),  0));
+    gpuSafe(gpuMallocAsync(&d_sp_mat_Q_local,     sizeof(double) * static_cast<size_t>(sp_prim_pair_count_local),  0));
+    gpuSafe(gpuMallocAsync(&d_sd_mat_Q_local,     sizeof(double) * static_cast<size_t>(sd_prim_pair_count_local),  0));
+    gpuSafe(gpuMallocAsync(&d_pp_mat_Q_local,     sizeof(double) * static_cast<size_t>(pp_prim_pair_count_local),  0));
+    gpuSafe(gpuMallocAsync(&d_pd_mat_Q_local,     sizeof(double) * static_cast<size_t>(pd_prim_pair_count_local),  0));
+    gpuSafe(gpuMallocAsync(&d_dd_mat_Q_local,     sizeof(double) * static_cast<size_t>(dd_prim_pair_count_local),  0));
+    gpuSafe(gpuMallocAsync(&d_ss_pair_data_local, sizeof(double) * ss_pair_data_local.size(),                      0));
+    gpuSafe(gpuMallocAsync(&d_sp_pair_data_local, sizeof(double) * sp_pair_data_local.size(),                      0));
+    gpuSafe(gpuMallocAsync(&d_sd_pair_data_local, sizeof(double) * sd_pair_data_local.size(),                      0));
+    gpuSafe(gpuMallocAsync(&d_pp_pair_data_local, sizeof(double) * pp_pair_data_local.size(),                      0));
+    gpuSafe(gpuMallocAsync(&d_pd_pair_data_local, sizeof(double) * pd_pair_data_local.size(),                      0));
+    gpuSafe(gpuMallocAsync(&d_dd_pair_data_local, sizeof(double) * dd_pair_data_local.size(),                      0));
 
-    size_t data_J_uint32_size = 0;
+    uint32_t* d_ss_first_inds       ;
+    uint32_t* d_ss_second_inds      ;
+    uint32_t* d_sp_first_inds       ;
+    uint32_t* d_sp_second_inds      ;
+    uint32_t* d_sd_first_inds       ;
+    uint32_t* d_sd_second_inds      ;
+    uint32_t* d_pp_first_inds       ;
+    uint32_t* d_pp_second_inds      ;
+    uint32_t* d_pd_first_inds       ;
+    uint32_t* d_pd_second_inds      ;
+    uint32_t* d_dd_first_inds       ;
+    uint32_t* d_dd_second_inds      ;
+    uint32_t* d_ss_first_inds_local ;
+    uint32_t* d_ss_second_inds_local;
+    uint32_t* d_sp_first_inds_local ;
+    uint32_t* d_sp_second_inds_local;
+    uint32_t* d_sd_first_inds_local ;
+    uint32_t* d_sd_second_inds_local;
+    uint32_t* d_pp_first_inds_local ;
+    uint32_t* d_pp_second_inds_local;
+    uint32_t* d_pd_first_inds_local ;
+    uint32_t* d_pd_second_inds_local;
+    uint32_t* d_dd_first_inds_local ;
+    uint32_t* d_dd_second_inds_local;
 
-    data_J_uint32_size += static_cast<size_t>(ss_prim_pair_count);          // d_ss_first_inds
-    data_J_uint32_size += static_cast<size_t>(ss_prim_pair_count);          // d_ss_second_inds
-    data_J_uint32_size += static_cast<size_t>(sp_prim_pair_count);          // d_sp_first_inds 
-    data_J_uint32_size += static_cast<size_t>(sp_prim_pair_count);          // d_sp_second_inds
-    data_J_uint32_size += static_cast<size_t>(sd_prim_pair_count);          // d_sd_first_inds 
-    data_J_uint32_size += static_cast<size_t>(sd_prim_pair_count);          // d_sd_second_inds
-    data_J_uint32_size += static_cast<size_t>(pp_prim_pair_count);          // d_pp_first_inds 
-    data_J_uint32_size += static_cast<size_t>(pp_prim_pair_count);          // d_pp_second_inds
-    data_J_uint32_size += static_cast<size_t>(pd_prim_pair_count);          // d_pd_first_inds 
-    data_J_uint32_size += static_cast<size_t>(pd_prim_pair_count);          // d_pd_second_inds
-    data_J_uint32_size += static_cast<size_t>(dd_prim_pair_count);          // d_dd_first_inds 
-    data_J_uint32_size += static_cast<size_t>(dd_prim_pair_count);          // d_dd_second_inds
-    data_J_uint32_size += static_cast<size_t>(ss_prim_pair_count_local);    // d_ss_first_inds_local 
-    data_J_uint32_size += static_cast<size_t>(ss_prim_pair_count_local);    // d_ss_second_inds_local
-    data_J_uint32_size += static_cast<size_t>(sp_prim_pair_count_local);    // d_sp_first_inds_local 
-    data_J_uint32_size += static_cast<size_t>(sp_prim_pair_count_local);    // d_sp_second_inds_local
-    data_J_uint32_size += static_cast<size_t>(sd_prim_pair_count_local);    // d_sd_first_inds_local 
-    data_J_uint32_size += static_cast<size_t>(sd_prim_pair_count_local);    // d_sd_second_inds_local
-    data_J_uint32_size += static_cast<size_t>(pp_prim_pair_count_local);    // d_pp_first_inds_local 
-    data_J_uint32_size += static_cast<size_t>(pp_prim_pair_count_local);    // d_pp_second_inds_local
-    data_J_uint32_size += static_cast<size_t>(pd_prim_pair_count_local);    // d_pd_first_inds_local 
-    data_J_uint32_size += static_cast<size_t>(pd_prim_pair_count_local);    // d_pd_second_inds_local
-    data_J_uint32_size += static_cast<size_t>(dd_prim_pair_count_local);    // d_dd_first_inds_local 
-    data_J_uint32_size += static_cast<size_t>(dd_prim_pair_count_local);    // d_dd_second_inds_local
+    gpuSafe(gpuMallocAsync(&d_ss_first_inds       , sizeof(uint32_t) * static_cast<size_t>(ss_prim_pair_count)      , 0));
+    gpuSafe(gpuMallocAsync(&d_ss_second_inds      , sizeof(uint32_t) * static_cast<size_t>(ss_prim_pair_count)      , 0));
+    gpuSafe(gpuMallocAsync(&d_sp_first_inds       , sizeof(uint32_t) * static_cast<size_t>(sp_prim_pair_count)      , 0));
+    gpuSafe(gpuMallocAsync(&d_sp_second_inds      , sizeof(uint32_t) * static_cast<size_t>(sp_prim_pair_count)      , 0));
+    gpuSafe(gpuMallocAsync(&d_sd_first_inds       , sizeof(uint32_t) * static_cast<size_t>(sd_prim_pair_count)      , 0));
+    gpuSafe(gpuMallocAsync(&d_sd_second_inds      , sizeof(uint32_t) * static_cast<size_t>(sd_prim_pair_count)      , 0));
+    gpuSafe(gpuMallocAsync(&d_pp_first_inds       , sizeof(uint32_t) * static_cast<size_t>(pp_prim_pair_count)      , 0));
+    gpuSafe(gpuMallocAsync(&d_pp_second_inds      , sizeof(uint32_t) * static_cast<size_t>(pp_prim_pair_count)      , 0));
+    gpuSafe(gpuMallocAsync(&d_pd_first_inds       , sizeof(uint32_t) * static_cast<size_t>(pd_prim_pair_count)      , 0));
+    gpuSafe(gpuMallocAsync(&d_pd_second_inds      , sizeof(uint32_t) * static_cast<size_t>(pd_prim_pair_count)      , 0));
+    gpuSafe(gpuMallocAsync(&d_dd_first_inds       , sizeof(uint32_t) * static_cast<size_t>(dd_prim_pair_count)      , 0));
+    gpuSafe(gpuMallocAsync(&d_dd_second_inds      , sizeof(uint32_t) * static_cast<size_t>(dd_prim_pair_count)      , 0));
+    gpuSafe(gpuMallocAsync(&d_ss_first_inds_local , sizeof(uint32_t) * static_cast<size_t>(ss_prim_pair_count_local), 0));
+    gpuSafe(gpuMallocAsync(&d_ss_second_inds_local, sizeof(uint32_t) * static_cast<size_t>(ss_prim_pair_count_local), 0));
+    gpuSafe(gpuMallocAsync(&d_sp_first_inds_local , sizeof(uint32_t) * static_cast<size_t>(sp_prim_pair_count_local), 0));
+    gpuSafe(gpuMallocAsync(&d_sp_second_inds_local, sizeof(uint32_t) * static_cast<size_t>(sp_prim_pair_count_local), 0));
+    gpuSafe(gpuMallocAsync(&d_sd_first_inds_local , sizeof(uint32_t) * static_cast<size_t>(sd_prim_pair_count_local), 0));
+    gpuSafe(gpuMallocAsync(&d_sd_second_inds_local, sizeof(uint32_t) * static_cast<size_t>(sd_prim_pair_count_local), 0));
+    gpuSafe(gpuMallocAsync(&d_pp_first_inds_local , sizeof(uint32_t) * static_cast<size_t>(pp_prim_pair_count_local), 0));
+    gpuSafe(gpuMallocAsync(&d_pp_second_inds_local, sizeof(uint32_t) * static_cast<size_t>(pp_prim_pair_count_local), 0));
+    gpuSafe(gpuMallocAsync(&d_pd_first_inds_local , sizeof(uint32_t) * static_cast<size_t>(pd_prim_pair_count_local), 0));
+    gpuSafe(gpuMallocAsync(&d_pd_second_inds_local, sizeof(uint32_t) * static_cast<size_t>(pd_prim_pair_count_local), 0));
+    gpuSafe(gpuMallocAsync(&d_dd_first_inds_local , sizeof(uint32_t) * static_cast<size_t>(dd_prim_pair_count_local), 0));
+    gpuSafe(gpuMallocAsync(&d_dd_second_inds_local, sizeof(uint32_t) * static_cast<size_t>(dd_prim_pair_count_local), 0));
 
-    // J data on device
+    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_ss_mat_Q, ss_mat_Q.data(), ss_mat_Q.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_sp_mat_Q, sp_mat_Q.data(), sp_mat_Q.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_sd_mat_Q, sd_mat_Q.data(), sd_mat_Q.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_pp_mat_Q, pp_mat_Q.data(), pp_mat_Q.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_pd_mat_Q, pd_mat_Q.data(), pd_mat_Q.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_dd_mat_Q, dd_mat_Q.data(), dd_mat_Q.size());
 
-#pragma omp barrier
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_ss_first_inds,  ss_first_inds.data(),  ss_first_inds.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_ss_second_inds, ss_second_inds.data(), ss_second_inds.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_sp_first_inds,  sp_first_inds.data(),  sp_first_inds.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_sp_second_inds, sp_second_inds.data(), sp_second_inds.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_sd_first_inds,  sd_first_inds.data(),  sd_first_inds.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_sd_second_inds, sd_second_inds.data(), sd_second_inds.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pp_first_inds,  pp_first_inds.data(),  pp_first_inds.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pp_second_inds, pp_second_inds.data(), pp_second_inds.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pd_first_inds,  pd_first_inds.data(),  pd_first_inds.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pd_second_inds, pd_second_inds.data(), pd_second_inds.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_dd_first_inds,  dd_first_inds.data(),  dd_first_inds.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_dd_second_inds, dd_second_inds.data(), dd_second_inds.size());
 
-    screening.resize_devptr_double(gpu_id, data_J_double_size);
-    screening.resize_devptr_uint32(gpu_id, data_J_uint32_size);
+    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_ss_pair_data, ss_pair_data.data(), ss_pair_data.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_sp_pair_data, sp_pair_data.data(), sp_pair_data.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_sd_pair_data, sd_pair_data.data(), sd_pair_data.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_pp_pair_data, pp_pair_data.data(), pp_pair_data.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_pd_pair_data, pd_pair_data.data(), pd_pair_data.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_dd_pair_data, dd_pair_data.data(), dd_pair_data.size());
+
+    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_ss_mat_Q_local, ss_mat_Q_local.data(), ss_mat_Q_local.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_sp_mat_Q_local, sp_mat_Q_local.data(), sp_mat_Q_local.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_sd_mat_Q_local, sd_mat_Q_local.data(), sd_mat_Q_local.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_pp_mat_Q_local, pp_mat_Q_local.data(), pp_mat_Q_local.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_pd_mat_Q_local, pd_mat_Q_local.data(), pd_mat_Q_local.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_dd_mat_Q_local, dd_mat_Q_local.data(), dd_mat_Q_local.size());
+
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_ss_first_inds_local,  ss_first_inds_local.data(),  ss_first_inds_local.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_ss_second_inds_local, ss_second_inds_local.data(), ss_second_inds_local.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_sp_first_inds_local,  sp_first_inds_local.data(),  sp_first_inds_local.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_sp_second_inds_local, sp_second_inds_local.data(), sp_second_inds_local.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_sd_first_inds_local,  sd_first_inds_local.data(),  sd_first_inds_local.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_sd_second_inds_local, sd_second_inds_local.data(), sd_second_inds_local.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pp_first_inds_local,  pp_first_inds_local.data(),  pp_first_inds_local.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pp_second_inds_local, pp_second_inds_local.data(), pp_second_inds_local.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pd_first_inds_local,  pd_first_inds_local.data(),  pd_first_inds_local.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pd_second_inds_local, pd_second_inds_local.data(), pd_second_inds_local.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_dd_first_inds_local,  dd_first_inds_local.data(),  dd_first_inds_local.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_dd_second_inds_local, dd_second_inds_local.data(), dd_second_inds_local.size());
+
+    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_ss_pair_data_local, ss_pair_data_local.data(), ss_pair_data_local.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_sp_pair_data_local, sp_pair_data_local.data(), sp_pair_data_local.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_sd_pair_data_local, sd_pair_data_local.data(), sd_pair_data_local.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_pp_pair_data_local, pp_pair_data_local.data(), pp_pair_data_local.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_pd_pair_data_local, pd_pair_data_local.data(), pd_pair_data_local.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_dd_pair_data_local, dd_pair_data_local.data(), dd_pair_data_local.size());
 
     gpuSafe(gpuDeviceSynchronize());
-
-#pragma omp barrier
-
-    auto d_data_J_double = screening.get_devptr_double(gpu_id);
-    auto d_data_J_uint32 = screening.get_devptr_uint32(gpu_id);
-
-    double* d_mat_D              = d_data_J_double;
-    double* d_mat_J              = d_mat_D + max_prim_pair_count;
-    double* d_ss_mat_Q           = d_mat_J + max_prim_pair_count_local;
-    double* d_sp_mat_Q           = d_ss_mat_Q + ss_prim_pair_count;
-    double* d_sd_mat_Q           = d_sp_mat_Q + sp_prim_pair_count;
-    double* d_pp_mat_Q           = d_sd_mat_Q + sd_prim_pair_count;
-    double* d_pd_mat_Q           = d_pp_mat_Q + pp_prim_pair_count;
-    double* d_dd_mat_Q           = d_pd_mat_Q + pd_prim_pair_count;
-    double* d_ss_pair_data       = d_dd_mat_Q + dd_prim_pair_count;
-    double* d_sp_pair_data       = d_ss_pair_data + ss_pair_data.size();
-    double* d_sd_pair_data       = d_sp_pair_data + sp_pair_data.size();
-    double* d_pp_pair_data       = d_sd_pair_data + sd_pair_data.size();
-    double* d_pd_pair_data       = d_pp_pair_data + pp_pair_data.size();
-    double* d_dd_pair_data       = d_pd_pair_data + pd_pair_data.size();
-    double* d_ss_mat_Q_local     = d_dd_pair_data + dd_pair_data.size();
-    double* d_sp_mat_Q_local     = d_ss_mat_Q_local + ss_prim_pair_count_local;
-    double* d_sd_mat_Q_local     = d_sp_mat_Q_local + sp_prim_pair_count_local;
-    double* d_pp_mat_Q_local     = d_sd_mat_Q_local + sd_prim_pair_count_local;
-    double* d_pd_mat_Q_local     = d_pp_mat_Q_local + pp_prim_pair_count_local;
-    double* d_dd_mat_Q_local     = d_pd_mat_Q_local + pd_prim_pair_count_local;
-    double* d_ss_pair_data_local = d_dd_mat_Q_local + dd_prim_pair_count_local;
-    double* d_sp_pair_data_local = d_ss_pair_data_local + ss_pair_data_local.size();
-    double* d_sd_pair_data_local = d_sp_pair_data_local + sp_pair_data_local.size();
-    double* d_pp_pair_data_local = d_sd_pair_data_local + sd_pair_data_local.size();
-    double* d_pd_pair_data_local = d_pp_pair_data_local + pp_pair_data_local.size();
-    double* d_dd_pair_data_local = d_pd_pair_data_local + pd_pair_data_local.size();
-
-    uint32_t* d_ss_first_inds        = d_data_J_uint32;
-    uint32_t* d_ss_second_inds       = d_ss_first_inds  + ss_prim_pair_count;
-    uint32_t* d_sp_first_inds        = d_ss_second_inds + ss_prim_pair_count;
-    uint32_t* d_sp_second_inds       = d_sp_first_inds  + sp_prim_pair_count;
-    uint32_t* d_sd_first_inds        = d_sp_second_inds + sp_prim_pair_count;
-    uint32_t* d_sd_second_inds       = d_sd_first_inds  + sd_prim_pair_count;
-    uint32_t* d_pp_first_inds        = d_sd_second_inds + sd_prim_pair_count;
-    uint32_t* d_pp_second_inds       = d_pp_first_inds  + pp_prim_pair_count;
-    uint32_t* d_pd_first_inds        = d_pp_second_inds + pp_prim_pair_count;
-    uint32_t* d_pd_second_inds       = d_pd_first_inds  + pd_prim_pair_count;
-    uint32_t* d_dd_first_inds        = d_pd_second_inds + pd_prim_pair_count;
-    uint32_t* d_dd_second_inds       = d_dd_first_inds  + dd_prim_pair_count;
-    uint32_t* d_ss_first_inds_local  = d_dd_second_inds + dd_prim_pair_count;
-    uint32_t* d_ss_second_inds_local = d_ss_first_inds_local  + ss_prim_pair_count_local;
-    uint32_t* d_sp_first_inds_local  = d_ss_second_inds_local + ss_prim_pair_count_local;
-    uint32_t* d_sp_second_inds_local = d_sp_first_inds_local  + sp_prim_pair_count_local;
-    uint32_t* d_sd_first_inds_local  = d_sp_second_inds_local + sp_prim_pair_count_local;
-    uint32_t* d_sd_second_inds_local = d_sd_first_inds_local  + sd_prim_pair_count_local;
-    uint32_t* d_pp_first_inds_local  = d_sd_second_inds_local + sd_prim_pair_count_local;
-    uint32_t* d_pp_second_inds_local = d_pp_first_inds_local  + pp_prim_pair_count_local;
-    uint32_t* d_pd_first_inds_local  = d_pp_second_inds_local + pp_prim_pair_count_local;
-    uint32_t* d_pd_second_inds_local = d_pd_first_inds_local  + pd_prim_pair_count_local;
-    uint32_t* d_dd_first_inds_local  = d_pd_second_inds_local + pd_prim_pair_count_local;
-    uint32_t* d_dd_second_inds_local = d_dd_first_inds_local  + dd_prim_pair_count_local;
-
-    gpu::chunkedMemcpyHostToDevice<double>(d_ss_mat_Q, ss_mat_Q.data(), ss_mat_Q.size());
-    gpu::chunkedMemcpyHostToDevice<double>(d_sp_mat_Q, sp_mat_Q.data(), sp_mat_Q.size());
-    gpu::chunkedMemcpyHostToDevice<double>(d_sd_mat_Q, sd_mat_Q.data(), sd_mat_Q.size());
-    gpu::chunkedMemcpyHostToDevice<double>(d_pp_mat_Q, pp_mat_Q.data(), pp_mat_Q.size());
-    gpu::chunkedMemcpyHostToDevice<double>(d_pd_mat_Q, pd_mat_Q.data(), pd_mat_Q.size());
-    gpu::chunkedMemcpyHostToDevice<double>(d_dd_mat_Q, dd_mat_Q.data(), dd_mat_Q.size());
-
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_ss_first_inds,  ss_first_inds.data(),  ss_first_inds.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_ss_second_inds, ss_second_inds.data(), ss_second_inds.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_sp_first_inds,  sp_first_inds.data(),  sp_first_inds.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_sp_second_inds, sp_second_inds.data(), sp_second_inds.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_sd_first_inds,  sd_first_inds.data(),  sd_first_inds.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_sd_second_inds, sd_second_inds.data(), sd_second_inds.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pp_first_inds,  pp_first_inds.data(),  pp_first_inds.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pp_second_inds, pp_second_inds.data(), pp_second_inds.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pd_first_inds,  pd_first_inds.data(),  pd_first_inds.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pd_second_inds, pd_second_inds.data(), pd_second_inds.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_dd_first_inds,  dd_first_inds.data(),  dd_first_inds.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_dd_second_inds, dd_second_inds.data(), dd_second_inds.size());
-
-    gpu::chunkedMemcpyHostToDevice<double>(d_ss_pair_data, ss_pair_data.data(), ss_pair_data.size());
-    gpu::chunkedMemcpyHostToDevice<double>(d_sp_pair_data, sp_pair_data.data(), sp_pair_data.size());
-    gpu::chunkedMemcpyHostToDevice<double>(d_sd_pair_data, sd_pair_data.data(), sd_pair_data.size());
-    gpu::chunkedMemcpyHostToDevice<double>(d_pp_pair_data, pp_pair_data.data(), pp_pair_data.size());
-    gpu::chunkedMemcpyHostToDevice<double>(d_pd_pair_data, pd_pair_data.data(), pd_pair_data.size());
-    gpu::chunkedMemcpyHostToDevice<double>(d_dd_pair_data, dd_pair_data.data(), dd_pair_data.size());
-
-    gpu::chunkedMemcpyHostToDevice<double>(d_ss_mat_Q_local, ss_mat_Q_local.data(), ss_mat_Q_local.size());
-    gpu::chunkedMemcpyHostToDevice<double>(d_sp_mat_Q_local, sp_mat_Q_local.data(), sp_mat_Q_local.size());
-    gpu::chunkedMemcpyHostToDevice<double>(d_sd_mat_Q_local, sd_mat_Q_local.data(), sd_mat_Q_local.size());
-    gpu::chunkedMemcpyHostToDevice<double>(d_pp_mat_Q_local, pp_mat_Q_local.data(), pp_mat_Q_local.size());
-    gpu::chunkedMemcpyHostToDevice<double>(d_pd_mat_Q_local, pd_mat_Q_local.data(), pd_mat_Q_local.size());
-    gpu::chunkedMemcpyHostToDevice<double>(d_dd_mat_Q_local, dd_mat_Q_local.data(), dd_mat_Q_local.size());
-
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_ss_first_inds_local,  ss_first_inds_local.data(),  ss_first_inds_local.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_ss_second_inds_local, ss_second_inds_local.data(), ss_second_inds_local.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_sp_first_inds_local,  sp_first_inds_local.data(),  sp_first_inds_local.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_sp_second_inds_local, sp_second_inds_local.data(), sp_second_inds_local.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_sd_first_inds_local,  sd_first_inds_local.data(),  sd_first_inds_local.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_sd_second_inds_local, sd_second_inds_local.data(), sd_second_inds_local.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pp_first_inds_local,  pp_first_inds_local.data(),  pp_first_inds_local.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pp_second_inds_local, pp_second_inds_local.data(), pp_second_inds_local.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pd_first_inds_local,  pd_first_inds_local.data(),  pd_first_inds_local.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pd_second_inds_local, pd_second_inds_local.data(), pd_second_inds_local.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_dd_first_inds_local,  dd_first_inds_local.data(),  dd_first_inds_local.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_dd_second_inds_local, dd_second_inds_local.data(), dd_second_inds_local.size());
-
-    gpu::chunkedMemcpyHostToDevice<double>(d_ss_pair_data_local, ss_pair_data_local.data(), ss_pair_data_local.size());
-    gpu::chunkedMemcpyHostToDevice<double>(d_sp_pair_data_local, sp_pair_data_local.data(), sp_pair_data_local.size());
-    gpu::chunkedMemcpyHostToDevice<double>(d_sd_pair_data_local, sd_pair_data_local.data(), sd_pair_data_local.size());
-    gpu::chunkedMemcpyHostToDevice<double>(d_pp_pair_data_local, pp_pair_data_local.data(), pp_pair_data_local.size());
-    gpu::chunkedMemcpyHostToDevice<double>(d_pd_pair_data_local, pd_pair_data_local.data(), pd_pair_data_local.size());
-    gpu::chunkedMemcpyHostToDevice<double>(d_dd_pair_data_local, dd_pair_data_local.data(), dd_pair_data_local.size());
 
     mat_Fock_omp[gpu_id].zero();
-
-    gpuSafe(gpuDeviceSynchronize());
 
     omptimers[thread_id].stop("J prep.");
 
@@ -5101,7 +5086,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (ss_prim_pair_count > 0)
         {
-            gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, ss_mat_D.data(), ss_prim_pair_count);
+            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, ss_mat_D.data(), ss_prim_pair_count);
 
             //omptimers[thread_id].start("    J block SSSS");
 
@@ -5134,7 +5119,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (sp_prim_pair_count > 0)
         {
-            gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, sp_mat_D.data(), sp_prim_pair_count);
+            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, sp_mat_D.data(), sp_prim_pair_count);
 
             gpu::computeCoulombFockSSSP<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
@@ -5165,7 +5150,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (sd_prim_pair_count > 0)
         {
-            gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, sd_mat_D.data(), sd_prim_pair_count);
+            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, sd_mat_D.data(), sd_prim_pair_count);
 
             gpu::computeCoulombFockSSSD<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
@@ -5196,7 +5181,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (pp_prim_pair_count > 0)
         {
-            gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, pp_mat_D.data(), pp_prim_pair_count);
+            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, pp_mat_D.data(), pp_prim_pair_count);
 
             gpu::computeCoulombFockSSPP<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
@@ -5227,7 +5212,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (pd_prim_pair_count > 0)
         {
-            gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, pd_mat_D.data(), pd_prim_pair_count);
+            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, pd_mat_D.data(), pd_prim_pair_count);
 
             gpu::computeCoulombFockSSPD<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
@@ -5260,7 +5245,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (dd_prim_pair_count > 0)
         {
-            gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, dd_mat_D.data(), dd_prim_pair_count);
+            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, dd_mat_D.data(), dd_prim_pair_count);
 
             gpu::computeCoulombFockSSDD<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
@@ -5286,7 +5271,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuDeviceSynchronize());
         }
 
-        gpu::chunkedMemcpyDeviceToHost<double>(mat_J.data(), d_mat_J, ss_prim_pair_count_local);
+        gpu::chunkedMemcpyAsyncDeviceToHost<double>(mat_J.data(), d_mat_J, ss_prim_pair_count_local);
 
         for (int64_t ij = 0; ij < ss_prim_pair_count_local; ij++)
         {
@@ -5331,7 +5316,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (ss_prim_pair_count > 0)
         {
-            gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, ss_mat_D.data(), ss_prim_pair_count);
+            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, ss_mat_D.data(), ss_prim_pair_count);
 
             gpu::computeCoulombFockSPSS<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
@@ -5362,7 +5347,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (sp_prim_pair_count > 0)
         {
-            gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, sp_mat_D.data(), sp_prim_pair_count);
+            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, sp_mat_D.data(), sp_prim_pair_count);
 
             gpu::computeCoulombFockSPSP<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
@@ -5393,7 +5378,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (sd_prim_pair_count > 0)
         {
-            gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, sd_mat_D.data(), sd_prim_pair_count);
+            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, sd_mat_D.data(), sd_prim_pair_count);
 
             gpu::computeCoulombFockSPSD<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
@@ -5426,7 +5411,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (pp_prim_pair_count > 0)
         {
-            gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, pp_mat_D.data(), pp_prim_pair_count);
+            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, pp_mat_D.data(), pp_prim_pair_count);
 
             gpu::computeCoulombFockSPPP<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
@@ -5457,7 +5442,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (pd_prim_pair_count > 0)
         {
-            gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, pd_mat_D.data(), pd_prim_pair_count);
+            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, pd_mat_D.data(), pd_prim_pair_count);
 
             gpu::computeCoulombFockSPPD<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
@@ -5490,7 +5475,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (dd_prim_pair_count > 0)
         {
-            gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, dd_mat_D.data(), dd_prim_pair_count);
+            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, dd_mat_D.data(), dd_prim_pair_count);
 
             gpu::computeCoulombFockSPDD<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
@@ -5518,7 +5503,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuDeviceSynchronize());
         }
 
-        gpu::chunkedMemcpyDeviceToHost<double>(mat_J.data(), d_mat_J, sp_prim_pair_count_local);
+        gpu::chunkedMemcpyAsyncDeviceToHost<double>(mat_J.data(), d_mat_J, sp_prim_pair_count_local);
 
         for (int64_t ij = 0; ij < sp_prim_pair_count_local; ij++)
         {
@@ -5571,7 +5556,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (ss_prim_pair_count > 0)
         {
-            gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, ss_mat_D.data(), ss_prim_pair_count);
+            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, ss_mat_D.data(), ss_prim_pair_count);
 
             gpu::computeCoulombFockPPSS<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
@@ -5602,7 +5587,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (sp_prim_pair_count > 0)
         {
-            gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, sp_mat_D.data(), sp_prim_pair_count);
+            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, sp_mat_D.data(), sp_prim_pair_count);
 
             gpu::computeCoulombFockPPSP<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
@@ -5633,7 +5618,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (sd_prim_pair_count > 0)
         {
-            gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, sd_mat_D.data(), sd_prim_pair_count);
+            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, sd_mat_D.data(), sd_prim_pair_count);
 
             gpu::computeCoulombFockPPSD<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
@@ -5666,7 +5651,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (pp_prim_pair_count > 0)
         {
-            gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, pp_mat_D.data(), pp_prim_pair_count);
+            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, pp_mat_D.data(), pp_prim_pair_count);
 
             gpu::computeCoulombFockPPPP<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
@@ -5695,7 +5680,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (pd_prim_pair_count > 0)
         {
-            gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, pd_mat_D.data(), pd_prim_pair_count);
+            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, pd_mat_D.data(), pd_prim_pair_count);
 
             gpu::computeCoulombFockPPPD<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
@@ -5728,7 +5713,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             //omptimers[thread_id].start("    J block PPDD");
 
-            gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, dd_mat_D.data(), dd_prim_pair_count);
+            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, dd_mat_D.data(), dd_prim_pair_count);
 
             gpu::computeCoulombFockPPDD<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
@@ -5756,7 +5741,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             //omptimers[thread_id].stop("    J block PPDD");
         }
 
-        gpu::chunkedMemcpyDeviceToHost<double>(mat_J.data(), d_mat_J, pp_prim_pair_count_local);
+        gpu::chunkedMemcpyAsyncDeviceToHost<double>(mat_J.data(), d_mat_J, pp_prim_pair_count_local);
 
         for (int64_t ij = 0; ij < pp_prim_pair_count_local; ij++)
         {
@@ -5817,7 +5802,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (ss_prim_pair_count > 0)
         {
-            gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, ss_mat_D.data(), ss_prim_pair_count);
+            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, ss_mat_D.data(), ss_prim_pair_count);
 
             gpu::computeCoulombFockSDSS<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
@@ -5848,7 +5833,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (sp_prim_pair_count > 0)
         {
-            gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, sp_mat_D.data(), sp_prim_pair_count);
+            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, sp_mat_D.data(), sp_prim_pair_count);
 
             gpu::computeCoulombFockSDSP<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
@@ -5881,7 +5866,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (sd_prim_pair_count > 0)
         {
-            gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, sd_mat_D.data(), sd_prim_pair_count);
+            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, sd_mat_D.data(), sd_prim_pair_count);
 
             gpu::computeCoulombFockSDSD<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
@@ -5912,7 +5897,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (pp_prim_pair_count > 0)
         {
-            gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, pp_mat_D.data(), pp_prim_pair_count);
+            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, pp_mat_D.data(), pp_prim_pair_count);
 
             gpu::computeCoulombFockSDPP<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
@@ -5945,7 +5930,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (pd_prim_pair_count > 0)
         {
-            gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, pd_mat_D.data(), pd_prim_pair_count);
+            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, pd_mat_D.data(), pd_prim_pair_count);
 
             gpu::computeCoulombFockSDPD<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
@@ -5980,7 +5965,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             //omptimers[thread_id].start("    J block SDDD");
 
-            gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, dd_mat_D.data(), dd_prim_pair_count);
+            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, dd_mat_D.data(), dd_prim_pair_count);
 
             gpu::computeCoulombFockSDDD<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
@@ -6008,7 +5993,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             //omptimers[thread_id].stop("    J block SDDD");
         }
 
-        gpu::chunkedMemcpyDeviceToHost<double>(mat_J.data(), d_mat_J, sd_prim_pair_count_local);
+        gpu::chunkedMemcpyAsyncDeviceToHost<double>(mat_J.data(), d_mat_J, sd_prim_pair_count_local);
 
         for (int64_t ij = 0; ij < sd_prim_pair_count_local; ij++)
         {
@@ -6061,7 +6046,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (ss_prim_pair_count > 0)
         {
-            gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, ss_mat_D.data(), ss_prim_pair_count);
+            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, ss_mat_D.data(), ss_prim_pair_count);
 
             gpu::computeCoulombFockPDSS<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
@@ -6094,7 +6079,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (sp_prim_pair_count > 0)
         {
-            gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, sp_mat_D.data(), sp_prim_pair_count);
+            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, sp_mat_D.data(), sp_prim_pair_count);
 
             gpu::computeCoulombFockPDSP<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
@@ -6129,7 +6114,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             //omptimers[thread_id].start("    J block PDSD");
 
-            gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, sd_mat_D.data(), sd_prim_pair_count);
+            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, sd_mat_D.data(), sd_prim_pair_count);
 
             gpu::computeCoulombFockPDSD<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
@@ -6166,7 +6151,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             //omptimers[thread_id].start("    J block PDPP");
 
-            gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, pp_mat_D.data(), pp_prim_pair_count);
+            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, pp_mat_D.data(), pp_prim_pair_count);
 
             gpu::computeCoulombFockPDPP<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
@@ -6201,7 +6186,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             //omptimers[thread_id].start("    J block PDPD");
 
-            gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, pd_mat_D.data(), pd_prim_pair_count);
+            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, pd_mat_D.data(), pd_prim_pair_count);
 
             gpu::computeCoulombFockPDPD<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
@@ -6236,7 +6221,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             //omptimers[thread_id].start("    J block PDDD");
 
-            gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, dd_mat_D.data(), dd_prim_pair_count);
+            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, dd_mat_D.data(), dd_prim_pair_count);
 
             gpu::computeCoulombFockPDDD0<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
@@ -6390,7 +6375,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             //omptimers[thread_id].stop("    J block PDDD");
         }
 
-        gpu::chunkedMemcpyDeviceToHost<double>(mat_J.data(), d_mat_J, pd_prim_pair_count_local);
+        gpu::chunkedMemcpyAsyncDeviceToHost<double>(mat_J.data(), d_mat_J, pd_prim_pair_count_local);
 
         for (int64_t ij = 0; ij < pd_prim_pair_count_local; ij++)
         {
@@ -6452,7 +6437,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             //omptimers[thread_id].start("    J block DDSS");
 
-            gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, ss_mat_D.data(), ss_prim_pair_count);
+            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, ss_mat_D.data(), ss_prim_pair_count);
 
             dim3 dd_threads_per_block (TILE_DIM_SMALL, TILE_DIM_LARGE);
 
@@ -6491,7 +6476,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             //omptimers[thread_id].start("    J block DDSP");
 
-            gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, sp_mat_D.data(), sp_prim_pair_count);
+            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, sp_mat_D.data(), sp_prim_pair_count);
 
             dim3 dd_threads_per_block (TILE_DIM_SMALL, TILE_DIM_LARGE);
 
@@ -6532,7 +6517,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             //omptimers[thread_id].start("    J block DDSD");
 
-            gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, sd_mat_D.data(), sd_prim_pair_count);
+            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, sd_mat_D.data(), sd_prim_pair_count);
 
             dim3 dd_threads_per_block (TILE_DIM_SMALL, TILE_DIM_LARGE);
 
@@ -6571,7 +6556,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             //omptimers[thread_id].start("    J block DDPP");
 
-            gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, pp_mat_D.data(), pp_prim_pair_count);
+            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, pp_mat_D.data(), pp_prim_pair_count);
 
             dim3 dd_threads_per_block (TILE_DIM_SMALL, TILE_DIM_LARGE);
 
@@ -6610,7 +6595,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             //omptimers[thread_id].start("    J block DDPD");
 
-            gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, pd_mat_D.data(), pd_prim_pair_count);
+            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, pd_mat_D.data(), pd_prim_pair_count);
 
             dim3 dd_threads_per_block (TILE_DIM_SMALL, TILE_DIM_LARGE);
 
@@ -6838,7 +6823,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             //omptimers[thread_id].start("    J block DDDD");
 
-            gpu::chunkedMemcpyHostToDevice<double>(d_mat_D, dd_mat_D.data(), dd_prim_pair_count);
+            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, dd_mat_D.data(), dd_prim_pair_count);
 
             dim3 dd_threads_per_block (TILE_DIM_SMALL, TILE_DIM_LARGE);
 
@@ -7419,7 +7404,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             //omptimers[thread_id].stop("    J block DDDD");
         }
 
-        gpu::chunkedMemcpyDeviceToHost<double>(mat_J.data(), d_mat_J, dd_prim_pair_count_local);
+        gpu::chunkedMemcpyAsyncDeviceToHost<double>(mat_J.data(), d_mat_J, dd_prim_pair_count_local);
 
         for (int64_t ij = 0; ij < dd_prim_pair_count_local; ij++)
         {
@@ -7458,6 +7443,62 @@ computeFockOnGPU(const              CMolecule& molecule,
     gpuSafe(gpuDeviceSynchronize());
 
     omptimers[thread_id].stop("J compute");
+
+#pragma omp barrier
+
+    gpuSafe(gpuFreeAsync(d_mat_D,              0));
+    gpuSafe(gpuFreeAsync(d_mat_J,              0));
+    gpuSafe(gpuFreeAsync(d_ss_mat_Q,           0));
+    gpuSafe(gpuFreeAsync(d_sp_mat_Q,           0));
+    gpuSafe(gpuFreeAsync(d_sd_mat_Q,           0));
+    gpuSafe(gpuFreeAsync(d_pp_mat_Q,           0));
+    gpuSafe(gpuFreeAsync(d_pd_mat_Q,           0));
+    gpuSafe(gpuFreeAsync(d_dd_mat_Q,           0));
+    gpuSafe(gpuFreeAsync(d_ss_pair_data,       0));
+    gpuSafe(gpuFreeAsync(d_sp_pair_data,       0));
+    gpuSafe(gpuFreeAsync(d_sd_pair_data,       0));
+    gpuSafe(gpuFreeAsync(d_pp_pair_data,       0));
+    gpuSafe(gpuFreeAsync(d_pd_pair_data,       0));
+    gpuSafe(gpuFreeAsync(d_dd_pair_data,       0));
+    gpuSafe(gpuFreeAsync(d_ss_mat_Q_local,     0));
+    gpuSafe(gpuFreeAsync(d_sp_mat_Q_local,     0));
+    gpuSafe(gpuFreeAsync(d_sd_mat_Q_local,     0));
+    gpuSafe(gpuFreeAsync(d_pp_mat_Q_local,     0));
+    gpuSafe(gpuFreeAsync(d_pd_mat_Q_local,     0));
+    gpuSafe(gpuFreeAsync(d_dd_mat_Q_local,     0));
+    gpuSafe(gpuFreeAsync(d_ss_pair_data_local, 0));
+    gpuSafe(gpuFreeAsync(d_sp_pair_data_local, 0));
+    gpuSafe(gpuFreeAsync(d_sd_pair_data_local, 0));
+    gpuSafe(gpuFreeAsync(d_pp_pair_data_local, 0));
+    gpuSafe(gpuFreeAsync(d_pd_pair_data_local, 0));
+    gpuSafe(gpuFreeAsync(d_dd_pair_data_local, 0));
+
+    gpuSafe(gpuFreeAsync(d_ss_first_inds       , 0));
+    gpuSafe(gpuFreeAsync(d_ss_second_inds      , 0));
+    gpuSafe(gpuFreeAsync(d_sp_first_inds       , 0));
+    gpuSafe(gpuFreeAsync(d_sp_second_inds      , 0));
+    gpuSafe(gpuFreeAsync(d_sd_first_inds       , 0));
+    gpuSafe(gpuFreeAsync(d_sd_second_inds      , 0));
+    gpuSafe(gpuFreeAsync(d_pp_first_inds       , 0));
+    gpuSafe(gpuFreeAsync(d_pp_second_inds      , 0));
+    gpuSafe(gpuFreeAsync(d_pd_first_inds       , 0));
+    gpuSafe(gpuFreeAsync(d_pd_second_inds      , 0));
+    gpuSafe(gpuFreeAsync(d_dd_first_inds       , 0));
+    gpuSafe(gpuFreeAsync(d_dd_second_inds      , 0));
+    gpuSafe(gpuFreeAsync(d_ss_first_inds_local , 0));
+    gpuSafe(gpuFreeAsync(d_ss_second_inds_local, 0));
+    gpuSafe(gpuFreeAsync(d_sp_first_inds_local , 0));
+    gpuSafe(gpuFreeAsync(d_sp_second_inds_local, 0));
+    gpuSafe(gpuFreeAsync(d_sd_first_inds_local , 0));
+    gpuSafe(gpuFreeAsync(d_sd_second_inds_local, 0));
+    gpuSafe(gpuFreeAsync(d_pp_first_inds_local , 0));
+    gpuSafe(gpuFreeAsync(d_pp_second_inds_local, 0));
+    gpuSafe(gpuFreeAsync(d_pd_first_inds_local , 0));
+    gpuSafe(gpuFreeAsync(d_pd_second_inds_local, 0));
+    gpuSafe(gpuFreeAsync(d_dd_first_inds_local , 0));
+    gpuSafe(gpuFreeAsync(d_dd_second_inds_local, 0));
+
+    gpuSafe(gpuDeviceSynchronize());
 
 #pragma omp barrier
 
@@ -7559,210 +7600,194 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     std::vector<double> mat_K(max_pair_inds_count);
 
-    size_t data_K_double_size = 0;
-
-    data_K_double_size += static_cast<size_t>(max_pair_inds_count);         // d_mat_K
-    data_K_double_size += static_cast<size_t>(cart_naos * cart_naos);       // d_mat_D_full_AO
-    data_K_double_size += Q_K_ss.size();                                    // d_Q_K_ss
-    data_K_double_size += Q_K_sp.size();                                    // d_Q_K_sp
-    data_K_double_size += Q_K_ps.size();                                    // d_Q_K_ps
-    data_K_double_size += Q_K_sd.size();                                    // d_Q_K_sd
-    data_K_double_size += Q_K_ds.size();                                    // d_Q_K_ds
-    data_K_double_size += Q_K_pp.size();                                    // d_Q_K_pp
-    data_K_double_size += Q_K_pd.size();                                    // d_Q_K_pd
-    data_K_double_size += Q_K_dp.size();                                    // d_Q_K_dp
-    data_K_double_size += Q_K_dd.size();                                    // d_Q_K_dd
-    data_K_double_size += pair_data_K_ss.size();                            // d_pair_data_K_ss
-    data_K_double_size += pair_data_K_sp.size();                            // d_pair_data_K_sp
-    data_K_double_size += pair_data_K_ps.size();                            // d_pair_data_K_ps
-    data_K_double_size += pair_data_K_sd.size();                            // d_pair_data_K_sd
-    data_K_double_size += pair_data_K_ds.size();                            // d_pair_data_K_ds
-    data_K_double_size += pair_data_K_pp.size();                            // d_pair_data_K_pp
-    data_K_double_size += pair_data_K_pd.size();                            // d_pair_data_K_pd
-    data_K_double_size += pair_data_K_dp.size();                            // d_pair_data_K_dp
-    data_K_double_size += pair_data_K_dd.size();                            // d_pair_data_K_dd
-
-    size_t data_K_uint32_size = 0;
-
-    data_K_uint32_size += static_cast<size_t>(pair_inds_count_for_K_ss);    // d_pair_inds_i_for_K_ss
-    data_K_uint32_size += static_cast<size_t>(pair_inds_count_for_K_ss);    // d_pair_inds_k_for_K_ss
-    data_K_uint32_size += static_cast<size_t>(pair_inds_count_for_K_sp);    // d_pair_inds_i_for_K_sp
-    data_K_uint32_size += static_cast<size_t>(pair_inds_count_for_K_sp);    // d_pair_inds_k_for_K_sp
-    data_K_uint32_size += static_cast<size_t>(pair_inds_count_for_K_sd);    // d_pair_inds_i_for_K_sd
-    data_K_uint32_size += static_cast<size_t>(pair_inds_count_for_K_sd);    // d_pair_inds_k_for_K_sd
-    data_K_uint32_size += static_cast<size_t>(pair_inds_count_for_K_pp);    // d_pair_inds_i_for_K_pp
-    data_K_uint32_size += static_cast<size_t>(pair_inds_count_for_K_pp);    // d_pair_inds_k_for_K_pp
-    data_K_uint32_size += static_cast<size_t>(pair_inds_count_for_K_pd);    // d_pair_inds_i_for_K_pd
-    data_K_uint32_size += static_cast<size_t>(pair_inds_count_for_K_pd);    // d_pair_inds_k_for_K_pd
-    data_K_uint32_size += static_cast<size_t>(pair_inds_count_for_K_dd);    // d_pair_inds_i_for_K_dd
-    data_K_uint32_size += static_cast<size_t>(pair_inds_count_for_K_dd);    // d_pair_inds_k_for_K_dd
-    data_K_uint32_size += D_inds_K_ss.size();                               // d_D_inds_K_ss
-    data_K_uint32_size += D_inds_K_sp.size();                               // d_D_inds_K_sp
-    data_K_uint32_size += D_inds_K_ps.size();                               // d_D_inds_K_ps
-    data_K_uint32_size += D_inds_K_sd.size();                               // d_D_inds_K_sd
-    data_K_uint32_size += D_inds_K_ds.size();                               // d_D_inds_K_ds
-    data_K_uint32_size += D_inds_K_pp.size();                               // d_D_inds_K_pp
-    data_K_uint32_size += D_inds_K_pd.size();                               // d_D_inds_K_pd
-    data_K_uint32_size += D_inds_K_dp.size();                               // d_D_inds_K_dp
-    data_K_uint32_size += D_inds_K_dd.size();                               // d_D_inds_K_dd
-    data_K_uint32_size += pair_displs_K_ss.size();                          // d_pair_displs_K_ss
-    data_K_uint32_size += pair_displs_K_sp.size();                          // d_pair_displs_K_sp
-    data_K_uint32_size += pair_displs_K_ps.size();                          // d_pair_displs_K_ps
-    data_K_uint32_size += pair_displs_K_sd.size();                          // d_pair_displs_K_sd
-    data_K_uint32_size += pair_displs_K_ds.size();                          // d_pair_displs_K_ds
-    data_K_uint32_size += pair_displs_K_pp.size();                          // d_pair_displs_K_pp
-    data_K_uint32_size += pair_displs_K_pd.size();                          // d_pair_displs_K_pd
-    data_K_uint32_size += pair_displs_K_dp.size();                          // d_pair_displs_K_dp
-    data_K_uint32_size += pair_displs_K_dd.size();                          // d_pair_displs_K_dd
-    data_K_uint32_size += pair_counts_K_ss.size();                          // d_pair_counts_K_ss
-    data_K_uint32_size += pair_counts_K_sp.size();                          // d_pair_counts_K_sp
-    data_K_uint32_size += pair_counts_K_ps.size();                          // d_pair_counts_K_ps
-    data_K_uint32_size += pair_counts_K_sd.size();                          // d_pair_counts_K_sd
-    data_K_uint32_size += pair_counts_K_ds.size();                          // d_pair_counts_K_ds
-    data_K_uint32_size += pair_counts_K_pp.size();                          // d_pair_counts_K_pp
-    data_K_uint32_size += pair_counts_K_pd.size();                          // d_pair_counts_K_pd
-    data_K_uint32_size += pair_counts_K_dp.size();                          // d_pair_counts_K_dp
-    data_K_uint32_size += pair_counts_K_dd.size();                          // d_pair_counts_K_dd
-
     // K data on device
 
-#pragma omp barrier
+    double* d_mat_K         ;
+    double* d_mat_D_full_AO ;
+    double* d_Q_K_ss        ;
+    double* d_Q_K_sp        ;
+    double* d_Q_K_ps        ;
+    double* d_Q_K_sd        ;
+    double* d_Q_K_ds        ;
+    double* d_Q_K_pp        ;
+    double* d_Q_K_pd        ;
+    double* d_Q_K_dp        ;
+    double* d_Q_K_dd        ;
+    double* d_pair_data_K_ss;
+    double* d_pair_data_K_sp;
+    double* d_pair_data_K_ps;
+    double* d_pair_data_K_sd;
+    double* d_pair_data_K_ds;
+    double* d_pair_data_K_pp;
+    double* d_pair_data_K_pd;
+    double* d_pair_data_K_dp;
+    double* d_pair_data_K_dd;
 
-    screening.resize_devptr_double(gpu_id, data_K_double_size);
-    screening.resize_devptr_uint32(gpu_id, data_K_uint32_size);
+    gpuSafe(gpuMallocAsync(&d_mat_K         , sizeof(double) * static_cast<size_t>(max_pair_inds_count), 0));
+    gpuSafe(gpuMallocAsync(&d_mat_D_full_AO , sizeof(double) * static_cast<size_t>(cart_naos * cart_naos), 0));
+    gpuSafe(gpuMallocAsync(&d_Q_K_ss        , sizeof(double) * Q_K_ss.size(), 0));
+    gpuSafe(gpuMallocAsync(&d_Q_K_sp        , sizeof(double) * Q_K_sp.size(), 0));
+    gpuSafe(gpuMallocAsync(&d_Q_K_ps        , sizeof(double) * Q_K_ps.size(), 0));
+    gpuSafe(gpuMallocAsync(&d_Q_K_sd        , sizeof(double) * Q_K_sd.size(), 0));
+    gpuSafe(gpuMallocAsync(&d_Q_K_ds        , sizeof(double) * Q_K_ds.size(), 0));
+    gpuSafe(gpuMallocAsync(&d_Q_K_pp        , sizeof(double) * Q_K_pp.size(), 0));
+    gpuSafe(gpuMallocAsync(&d_Q_K_pd        , sizeof(double) * Q_K_pd.size(), 0));
+    gpuSafe(gpuMallocAsync(&d_Q_K_dp        , sizeof(double) * Q_K_dp.size(), 0));
+    gpuSafe(gpuMallocAsync(&d_Q_K_dd        , sizeof(double) * Q_K_dd.size(), 0));
+    gpuSafe(gpuMallocAsync(&d_pair_data_K_ss, sizeof(double) * pair_data_K_ss.size(), 0));
+    gpuSafe(gpuMallocAsync(&d_pair_data_K_sp, sizeof(double) * pair_data_K_sp.size(), 0));
+    gpuSafe(gpuMallocAsync(&d_pair_data_K_ps, sizeof(double) * pair_data_K_ps.size(), 0));
+    gpuSafe(gpuMallocAsync(&d_pair_data_K_sd, sizeof(double) * pair_data_K_sd.size(), 0));
+    gpuSafe(gpuMallocAsync(&d_pair_data_K_ds, sizeof(double) * pair_data_K_ds.size(), 0));
+    gpuSafe(gpuMallocAsync(&d_pair_data_K_pp, sizeof(double) * pair_data_K_pp.size(), 0));
+    gpuSafe(gpuMallocAsync(&d_pair_data_K_pd, sizeof(double) * pair_data_K_pd.size(), 0));
+    gpuSafe(gpuMallocAsync(&d_pair_data_K_dp, sizeof(double) * pair_data_K_dp.size(), 0));
+    gpuSafe(gpuMallocAsync(&d_pair_data_K_dd, sizeof(double) * pair_data_K_dd.size(), 0));
 
-    gpuSafe(gpuDeviceSynchronize());
+    uint32_t* d_pair_inds_i_for_K_ss;
+    uint32_t* d_pair_inds_k_for_K_ss;
+    uint32_t* d_pair_inds_i_for_K_sp;
+    uint32_t* d_pair_inds_k_for_K_sp;
+    uint32_t* d_pair_inds_i_for_K_sd;
+    uint32_t* d_pair_inds_k_for_K_sd;
+    uint32_t* d_pair_inds_i_for_K_pp;
+    uint32_t* d_pair_inds_k_for_K_pp;
+    uint32_t* d_pair_inds_i_for_K_pd;
+    uint32_t* d_pair_inds_k_for_K_pd;
+    uint32_t* d_pair_inds_i_for_K_dd;
+    uint32_t* d_pair_inds_k_for_K_dd;
+    uint32_t* d_D_inds_K_ss         ;
+    uint32_t* d_D_inds_K_sp         ;
+    uint32_t* d_D_inds_K_ps         ;
+    uint32_t* d_D_inds_K_sd         ;
+    uint32_t* d_D_inds_K_ds         ;
+    uint32_t* d_D_inds_K_pp         ;
+    uint32_t* d_D_inds_K_pd         ;
+    uint32_t* d_D_inds_K_dp         ;
+    uint32_t* d_D_inds_K_dd         ;
+    uint32_t* d_pair_counts_K_ss    ;
+    uint32_t* d_pair_counts_K_sp    ;
+    uint32_t* d_pair_counts_K_ps    ;
+    uint32_t* d_pair_counts_K_sd    ;
+    uint32_t* d_pair_counts_K_ds    ;
+    uint32_t* d_pair_counts_K_pp    ;
+    uint32_t* d_pair_counts_K_pd    ;
+    uint32_t* d_pair_counts_K_dp    ;
+    uint32_t* d_pair_counts_K_dd    ;
+    uint32_t* d_pair_displs_K_ss    ;
+    uint32_t* d_pair_displs_K_sp    ;
+    uint32_t* d_pair_displs_K_ps    ;
+    uint32_t* d_pair_displs_K_sd    ;
+    uint32_t* d_pair_displs_K_ds    ;
+    uint32_t* d_pair_displs_K_pp    ;
+    uint32_t* d_pair_displs_K_pd    ;
+    uint32_t* d_pair_displs_K_dp    ;
+    uint32_t* d_pair_displs_K_dd    ;
 
-#pragma omp barrier
+    gpuSafe(gpuMallocAsync(&d_pair_inds_i_for_K_ss, sizeof(uint32_t) * static_cast<size_t>(pair_inds_count_for_K_ss), 0));
+    gpuSafe(gpuMallocAsync(&d_pair_inds_k_for_K_ss, sizeof(uint32_t) * static_cast<size_t>(pair_inds_count_for_K_ss), 0));
+    gpuSafe(gpuMallocAsync(&d_pair_inds_i_for_K_sp, sizeof(uint32_t) * static_cast<size_t>(pair_inds_count_for_K_sp), 0));
+    gpuSafe(gpuMallocAsync(&d_pair_inds_k_for_K_sp, sizeof(uint32_t) * static_cast<size_t>(pair_inds_count_for_K_sp), 0));
+    gpuSafe(gpuMallocAsync(&d_pair_inds_i_for_K_sd, sizeof(uint32_t) * static_cast<size_t>(pair_inds_count_for_K_sd), 0));
+    gpuSafe(gpuMallocAsync(&d_pair_inds_k_for_K_sd, sizeof(uint32_t) * static_cast<size_t>(pair_inds_count_for_K_sd), 0));
+    gpuSafe(gpuMallocAsync(&d_pair_inds_i_for_K_pp, sizeof(uint32_t) * static_cast<size_t>(pair_inds_count_for_K_pp), 0));
+    gpuSafe(gpuMallocAsync(&d_pair_inds_k_for_K_pp, sizeof(uint32_t) * static_cast<size_t>(pair_inds_count_for_K_pp), 0));
+    gpuSafe(gpuMallocAsync(&d_pair_inds_i_for_K_pd, sizeof(uint32_t) * static_cast<size_t>(pair_inds_count_for_K_pd), 0));
+    gpuSafe(gpuMallocAsync(&d_pair_inds_k_for_K_pd, sizeof(uint32_t) * static_cast<size_t>(pair_inds_count_for_K_pd), 0));
+    gpuSafe(gpuMallocAsync(&d_pair_inds_i_for_K_dd, sizeof(uint32_t) * static_cast<size_t>(pair_inds_count_for_K_dd), 0));
+    gpuSafe(gpuMallocAsync(&d_pair_inds_k_for_K_dd, sizeof(uint32_t) * static_cast<size_t>(pair_inds_count_for_K_dd), 0));
+    gpuSafe(gpuMallocAsync(&d_D_inds_K_ss         , sizeof(uint32_t) * D_inds_K_ss.size(), 0));
+    gpuSafe(gpuMallocAsync(&d_D_inds_K_sp         , sizeof(uint32_t) * D_inds_K_sp.size(), 0));
+    gpuSafe(gpuMallocAsync(&d_D_inds_K_ps         , sizeof(uint32_t) * D_inds_K_ps.size(), 0));
+    gpuSafe(gpuMallocAsync(&d_D_inds_K_sd         , sizeof(uint32_t) * D_inds_K_sd.size(), 0));
+    gpuSafe(gpuMallocAsync(&d_D_inds_K_ds         , sizeof(uint32_t) * D_inds_K_ds.size(), 0));
+    gpuSafe(gpuMallocAsync(&d_D_inds_K_pp         , sizeof(uint32_t) * D_inds_K_pp.size(), 0));
+    gpuSafe(gpuMallocAsync(&d_D_inds_K_pd         , sizeof(uint32_t) * D_inds_K_pd.size(), 0));
+    gpuSafe(gpuMallocAsync(&d_D_inds_K_dp         , sizeof(uint32_t) * D_inds_K_dp.size(), 0));
+    gpuSafe(gpuMallocAsync(&d_D_inds_K_dd         , sizeof(uint32_t) * D_inds_K_dd.size(), 0));
+    gpuSafe(gpuMallocAsync(&d_pair_displs_K_ss    , sizeof(uint32_t) * pair_displs_K_ss.size(), 0));
+    gpuSafe(gpuMallocAsync(&d_pair_displs_K_sp    , sizeof(uint32_t) * pair_displs_K_sp.size(), 0));
+    gpuSafe(gpuMallocAsync(&d_pair_displs_K_ps    , sizeof(uint32_t) * pair_displs_K_ps.size(), 0));
+    gpuSafe(gpuMallocAsync(&d_pair_displs_K_sd    , sizeof(uint32_t) * pair_displs_K_sd.size(), 0));
+    gpuSafe(gpuMallocAsync(&d_pair_displs_K_ds    , sizeof(uint32_t) * pair_displs_K_ds.size(), 0));
+    gpuSafe(gpuMallocAsync(&d_pair_displs_K_pp    , sizeof(uint32_t) * pair_displs_K_pp.size(), 0));
+    gpuSafe(gpuMallocAsync(&d_pair_displs_K_pd    , sizeof(uint32_t) * pair_displs_K_pd.size(), 0));
+    gpuSafe(gpuMallocAsync(&d_pair_displs_K_dp    , sizeof(uint32_t) * pair_displs_K_dp.size(), 0));
+    gpuSafe(gpuMallocAsync(&d_pair_displs_K_dd    , sizeof(uint32_t) * pair_displs_K_dd.size(), 0));
+    gpuSafe(gpuMallocAsync(&d_pair_counts_K_ss    , sizeof(uint32_t) * pair_counts_K_ss.size(), 0));
+    gpuSafe(gpuMallocAsync(&d_pair_counts_K_sp    , sizeof(uint32_t) * pair_counts_K_sp.size(), 0));
+    gpuSafe(gpuMallocAsync(&d_pair_counts_K_ps    , sizeof(uint32_t) * pair_counts_K_ps.size(), 0));
+    gpuSafe(gpuMallocAsync(&d_pair_counts_K_sd    , sizeof(uint32_t) * pair_counts_K_sd.size(), 0));
+    gpuSafe(gpuMallocAsync(&d_pair_counts_K_ds    , sizeof(uint32_t) * pair_counts_K_ds.size(), 0));
+    gpuSafe(gpuMallocAsync(&d_pair_counts_K_pp    , sizeof(uint32_t) * pair_counts_K_pp.size(), 0));
+    gpuSafe(gpuMallocAsync(&d_pair_counts_K_pd    , sizeof(uint32_t) * pair_counts_K_pd.size(), 0));
+    gpuSafe(gpuMallocAsync(&d_pair_counts_K_dp    , sizeof(uint32_t) * pair_counts_K_dp.size(), 0));
+    gpuSafe(gpuMallocAsync(&d_pair_counts_K_dd    , sizeof(uint32_t) * pair_counts_K_dd.size(), 0));
 
-    auto d_data_K_double = screening.get_devptr_double(gpu_id);
-    auto d_data_K_uint32 = screening.get_devptr_uint32(gpu_id);
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_inds_i_for_K_ss, pair_inds_i_for_K_ss.data(), pair_inds_i_for_K_ss.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_inds_k_for_K_ss, pair_inds_k_for_K_ss.data(), pair_inds_k_for_K_ss.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_inds_i_for_K_sp, pair_inds_i_for_K_sp.data(), pair_inds_i_for_K_sp.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_inds_k_for_K_sp, pair_inds_k_for_K_sp.data(), pair_inds_k_for_K_sp.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_inds_i_for_K_sd, pair_inds_i_for_K_sd.data(), pair_inds_i_for_K_sd.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_inds_k_for_K_sd, pair_inds_k_for_K_sd.data(), pair_inds_k_for_K_sd.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_inds_i_for_K_pp, pair_inds_i_for_K_pp.data(), pair_inds_i_for_K_pp.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_inds_k_for_K_pp, pair_inds_k_for_K_pp.data(), pair_inds_k_for_K_pp.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_inds_i_for_K_pd, pair_inds_i_for_K_pd.data(), pair_inds_i_for_K_pd.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_inds_k_for_K_pd, pair_inds_k_for_K_pd.data(), pair_inds_k_for_K_pd.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_inds_i_for_K_dd, pair_inds_i_for_K_dd.data(), pair_inds_i_for_K_dd.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_inds_k_for_K_dd, pair_inds_k_for_K_dd.data(), pair_inds_k_for_K_dd.size());
 
-    double* d_mat_K          = d_data_K_double;
-    double* d_mat_D_full_AO  = d_mat_K          + max_pair_inds_count;
-    double* d_Q_K_ss         = d_mat_D_full_AO  + cart_naos * cart_naos;
-    double* d_Q_K_sp         = d_Q_K_ss         + Q_K_ss.size();
-    double* d_Q_K_ps         = d_Q_K_sp         + Q_K_sp.size();
-    double* d_Q_K_sd         = d_Q_K_ps         + Q_K_ps.size();
-    double* d_Q_K_ds         = d_Q_K_sd         + Q_K_sd.size();
-    double* d_Q_K_pp         = d_Q_K_ds         + Q_K_ds.size();
-    double* d_Q_K_pd         = d_Q_K_pp         + Q_K_pp.size();
-    double* d_Q_K_dp         = d_Q_K_pd         + Q_K_pd.size();
-    double* d_Q_K_dd         = d_Q_K_dp         + Q_K_dp.size();
-    double* d_pair_data_K_ss = d_Q_K_dd         + Q_K_dd.size();
-    double* d_pair_data_K_sp = d_pair_data_K_ss + pair_data_K_ss.size();
-    double* d_pair_data_K_ps = d_pair_data_K_sp + pair_data_K_sp.size();
-    double* d_pair_data_K_sd = d_pair_data_K_ps + pair_data_K_ps.size();
-    double* d_pair_data_K_ds = d_pair_data_K_sd + pair_data_K_sd.size();
-    double* d_pair_data_K_pp = d_pair_data_K_ds + pair_data_K_ds.size();
-    double* d_pair_data_K_pd = d_pair_data_K_pp + pair_data_K_pp.size();
-    double* d_pair_data_K_dp = d_pair_data_K_pd + pair_data_K_pd.size();
-    double* d_pair_data_K_dd = d_pair_data_K_dp + pair_data_K_dp.size();
+    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D_full_AO, cart_dens_ptr, cart_naos * cart_naos);
 
-    uint32_t* d_pair_inds_i_for_K_ss = d_data_K_uint32;
-    uint32_t* d_pair_inds_k_for_K_ss = d_pair_inds_i_for_K_ss + pair_inds_count_for_K_ss;
-    uint32_t* d_pair_inds_i_for_K_sp = d_pair_inds_k_for_K_ss + pair_inds_count_for_K_ss;
-    uint32_t* d_pair_inds_k_for_K_sp = d_pair_inds_i_for_K_sp + pair_inds_count_for_K_sp;
-    uint32_t* d_pair_inds_i_for_K_sd = d_pair_inds_k_for_K_sp + pair_inds_count_for_K_sp;
-    uint32_t* d_pair_inds_k_for_K_sd = d_pair_inds_i_for_K_sd + pair_inds_count_for_K_sd;
-    uint32_t* d_pair_inds_i_for_K_pp = d_pair_inds_k_for_K_sd + pair_inds_count_for_K_sd;
-    uint32_t* d_pair_inds_k_for_K_pp = d_pair_inds_i_for_K_pp + pair_inds_count_for_K_pp;
-    uint32_t* d_pair_inds_i_for_K_pd = d_pair_inds_k_for_K_pp + pair_inds_count_for_K_pp;
-    uint32_t* d_pair_inds_k_for_K_pd = d_pair_inds_i_for_K_pd + pair_inds_count_for_K_pd;
-    uint32_t* d_pair_inds_i_for_K_dd = d_pair_inds_k_for_K_pd + pair_inds_count_for_K_pd;
-    uint32_t* d_pair_inds_k_for_K_dd = d_pair_inds_i_for_K_dd + pair_inds_count_for_K_dd;
-    uint32_t* d_D_inds_K_ss          = d_pair_inds_k_for_K_dd + pair_inds_count_for_K_dd;
-    uint32_t* d_D_inds_K_sp          = d_D_inds_K_ss          + D_inds_K_ss.size();
-    uint32_t* d_D_inds_K_ps          = d_D_inds_K_sp          + D_inds_K_sp.size();
-    uint32_t* d_D_inds_K_sd          = d_D_inds_K_ps          + D_inds_K_ps.size();
-    uint32_t* d_D_inds_K_ds          = d_D_inds_K_sd          + D_inds_K_sd.size();
-    uint32_t* d_D_inds_K_pp          = d_D_inds_K_ds          + D_inds_K_ds.size();
-    uint32_t* d_D_inds_K_pd          = d_D_inds_K_pp          + D_inds_K_pp.size();
-    uint32_t* d_D_inds_K_dp          = d_D_inds_K_pd          + D_inds_K_pd.size();
-    uint32_t* d_D_inds_K_dd          = d_D_inds_K_dp          + D_inds_K_dp.size();
-    uint32_t* d_pair_counts_K_ss     = d_D_inds_K_dd          + D_inds_K_dd.size();
-    uint32_t* d_pair_counts_K_sp     = d_pair_counts_K_ss     + pair_counts_K_ss.size();
-    uint32_t* d_pair_counts_K_ps     = d_pair_counts_K_sp     + pair_counts_K_sp.size();
-    uint32_t* d_pair_counts_K_sd     = d_pair_counts_K_ps     + pair_counts_K_ps.size();
-    uint32_t* d_pair_counts_K_ds     = d_pair_counts_K_sd     + pair_counts_K_sd.size();
-    uint32_t* d_pair_counts_K_pp     = d_pair_counts_K_ds     + pair_counts_K_ds.size();
-    uint32_t* d_pair_counts_K_pd     = d_pair_counts_K_pp     + pair_counts_K_pp.size();
-    uint32_t* d_pair_counts_K_dp     = d_pair_counts_K_pd     + pair_counts_K_pd.size();
-    uint32_t* d_pair_counts_K_dd     = d_pair_counts_K_dp     + pair_counts_K_dp.size();
-    uint32_t* d_pair_displs_K_ss     = d_pair_counts_K_dd     + pair_counts_K_dd.size();
-    uint32_t* d_pair_displs_K_sp     = d_pair_displs_K_ss     + pair_displs_K_ss.size();
-    uint32_t* d_pair_displs_K_ps     = d_pair_displs_K_sp     + pair_displs_K_sp.size();
-    uint32_t* d_pair_displs_K_sd     = d_pair_displs_K_ps     + pair_displs_K_ps.size();
-    uint32_t* d_pair_displs_K_ds     = d_pair_displs_K_sd     + pair_displs_K_sd.size();
-    uint32_t* d_pair_displs_K_pp     = d_pair_displs_K_ds     + pair_displs_K_ds.size();
-    uint32_t* d_pair_displs_K_pd     = d_pair_displs_K_pp     + pair_displs_K_pp.size();
-    uint32_t* d_pair_displs_K_dp     = d_pair_displs_K_pd     + pair_displs_K_pd.size();
-    uint32_t* d_pair_displs_K_dd     = d_pair_displs_K_dp     + pair_displs_K_dp.size();
+    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_Q_K_ss, Q_K_ss.data(), Q_K_ss.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_Q_K_sp, Q_K_sp.data(), Q_K_sp.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_Q_K_ps, Q_K_ps.data(), Q_K_ps.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_Q_K_sd, Q_K_sd.data(), Q_K_sd.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_Q_K_ds, Q_K_ds.data(), Q_K_ds.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_Q_K_pp, Q_K_pp.data(), Q_K_pp.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_Q_K_pd, Q_K_pd.data(), Q_K_pd.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_Q_K_dp, Q_K_dp.data(), Q_K_dp.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_Q_K_dd, Q_K_dd.data(), Q_K_dd.size());
 
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pair_inds_i_for_K_ss, pair_inds_i_for_K_ss.data(), pair_inds_i_for_K_ss.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pair_inds_k_for_K_ss, pair_inds_k_for_K_ss.data(), pair_inds_k_for_K_ss.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pair_inds_i_for_K_sp, pair_inds_i_for_K_sp.data(), pair_inds_i_for_K_sp.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pair_inds_k_for_K_sp, pair_inds_k_for_K_sp.data(), pair_inds_k_for_K_sp.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pair_inds_i_for_K_sd, pair_inds_i_for_K_sd.data(), pair_inds_i_for_K_sd.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pair_inds_k_for_K_sd, pair_inds_k_for_K_sd.data(), pair_inds_k_for_K_sd.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pair_inds_i_for_K_pp, pair_inds_i_for_K_pp.data(), pair_inds_i_for_K_pp.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pair_inds_k_for_K_pp, pair_inds_k_for_K_pp.data(), pair_inds_k_for_K_pp.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pair_inds_i_for_K_pd, pair_inds_i_for_K_pd.data(), pair_inds_i_for_K_pd.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pair_inds_k_for_K_pd, pair_inds_k_for_K_pd.data(), pair_inds_k_for_K_pd.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pair_inds_i_for_K_dd, pair_inds_i_for_K_dd.data(), pair_inds_i_for_K_dd.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pair_inds_k_for_K_dd, pair_inds_k_for_K_dd.data(), pair_inds_k_for_K_dd.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_D_inds_K_ss, D_inds_K_ss.data(), D_inds_K_ss.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_D_inds_K_sp, D_inds_K_sp.data(), D_inds_K_sp.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_D_inds_K_ps, D_inds_K_ps.data(), D_inds_K_ps.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_D_inds_K_sd, D_inds_K_sd.data(), D_inds_K_sd.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_D_inds_K_ds, D_inds_K_ds.data(), D_inds_K_ds.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_D_inds_K_pp, D_inds_K_pp.data(), D_inds_K_pp.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_D_inds_K_pd, D_inds_K_pd.data(), D_inds_K_pd.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_D_inds_K_dp, D_inds_K_dp.data(), D_inds_K_dp.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_D_inds_K_dd, D_inds_K_dd.data(), D_inds_K_dd.size());
 
-    gpu::chunkedMemcpyHostToDevice<double>(d_mat_D_full_AO, cart_dens_ptr, cart_naos * cart_naos);
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_displs_K_ss, pair_displs_K_ss.data(), pair_displs_K_ss.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_displs_K_sp, pair_displs_K_sp.data(), pair_displs_K_sp.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_displs_K_ps, pair_displs_K_ps.data(), pair_displs_K_ps.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_displs_K_sd, pair_displs_K_sd.data(), pair_displs_K_sd.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_displs_K_ds, pair_displs_K_ds.data(), pair_displs_K_ds.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_displs_K_pp, pair_displs_K_pp.data(), pair_displs_K_pp.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_displs_K_pd, pair_displs_K_pd.data(), pair_displs_K_pd.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_displs_K_dp, pair_displs_K_dp.data(), pair_displs_K_dp.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_displs_K_dd, pair_displs_K_dd.data(), pair_displs_K_dd.size());
 
-    gpu::chunkedMemcpyHostToDevice<double>(d_Q_K_ss, Q_K_ss.data(), Q_K_ss.size());
-    gpu::chunkedMemcpyHostToDevice<double>(d_Q_K_sp, Q_K_sp.data(), Q_K_sp.size());
-    gpu::chunkedMemcpyHostToDevice<double>(d_Q_K_ps, Q_K_ps.data(), Q_K_ps.size());
-    gpu::chunkedMemcpyHostToDevice<double>(d_Q_K_sd, Q_K_sd.data(), Q_K_sd.size());
-    gpu::chunkedMemcpyHostToDevice<double>(d_Q_K_ds, Q_K_ds.data(), Q_K_ds.size());
-    gpu::chunkedMemcpyHostToDevice<double>(d_Q_K_pp, Q_K_pp.data(), Q_K_pp.size());
-    gpu::chunkedMemcpyHostToDevice<double>(d_Q_K_pd, Q_K_pd.data(), Q_K_pd.size());
-    gpu::chunkedMemcpyHostToDevice<double>(d_Q_K_dp, Q_K_dp.data(), Q_K_dp.size());
-    gpu::chunkedMemcpyHostToDevice<double>(d_Q_K_dd, Q_K_dd.data(), Q_K_dd.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_counts_K_ss, pair_counts_K_ss.data(), pair_counts_K_ss.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_counts_K_sp, pair_counts_K_sp.data(), pair_counts_K_sp.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_counts_K_ps, pair_counts_K_ps.data(), pair_counts_K_ps.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_counts_K_sd, pair_counts_K_sd.data(), pair_counts_K_sd.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_counts_K_ds, pair_counts_K_ds.data(), pair_counts_K_ds.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_counts_K_pp, pair_counts_K_pp.data(), pair_counts_K_pp.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_counts_K_pd, pair_counts_K_pd.data(), pair_counts_K_pd.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_counts_K_dp, pair_counts_K_dp.data(), pair_counts_K_dp.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_counts_K_dd, pair_counts_K_dd.data(), pair_counts_K_dd.size());
 
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_D_inds_K_ss, D_inds_K_ss.data(), D_inds_K_ss.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_D_inds_K_sp, D_inds_K_sp.data(), D_inds_K_sp.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_D_inds_K_ps, D_inds_K_ps.data(), D_inds_K_ps.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_D_inds_K_sd, D_inds_K_sd.data(), D_inds_K_sd.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_D_inds_K_ds, D_inds_K_ds.data(), D_inds_K_ds.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_D_inds_K_pp, D_inds_K_pp.data(), D_inds_K_pp.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_D_inds_K_pd, D_inds_K_pd.data(), D_inds_K_pd.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_D_inds_K_dp, D_inds_K_dp.data(), D_inds_K_dp.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_D_inds_K_dd, D_inds_K_dd.data(), D_inds_K_dd.size());
-
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pair_displs_K_ss, pair_displs_K_ss.data(), pair_displs_K_ss.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pair_displs_K_sp, pair_displs_K_sp.data(), pair_displs_K_sp.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pair_displs_K_ps, pair_displs_K_ps.data(), pair_displs_K_ps.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pair_displs_K_sd, pair_displs_K_sd.data(), pair_displs_K_sd.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pair_displs_K_ds, pair_displs_K_ds.data(), pair_displs_K_ds.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pair_displs_K_pp, pair_displs_K_pp.data(), pair_displs_K_pp.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pair_displs_K_pd, pair_displs_K_pd.data(), pair_displs_K_pd.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pair_displs_K_dp, pair_displs_K_dp.data(), pair_displs_K_dp.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pair_displs_K_dd, pair_displs_K_dd.data(), pair_displs_K_dd.size());
-
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pair_counts_K_ss, pair_counts_K_ss.data(), pair_counts_K_ss.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pair_counts_K_sp, pair_counts_K_sp.data(), pair_counts_K_sp.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pair_counts_K_ps, pair_counts_K_ps.data(), pair_counts_K_ps.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pair_counts_K_sd, pair_counts_K_sd.data(), pair_counts_K_sd.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pair_counts_K_ds, pair_counts_K_ds.data(), pair_counts_K_ds.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pair_counts_K_pp, pair_counts_K_pp.data(), pair_counts_K_pp.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pair_counts_K_pd, pair_counts_K_pd.data(), pair_counts_K_pd.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pair_counts_K_dp, pair_counts_K_dp.data(), pair_counts_K_dp.size());
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pair_counts_K_dd, pair_counts_K_dd.data(), pair_counts_K_dd.size());
-
-    gpu::chunkedMemcpyHostToDevice<double>(d_pair_data_K_ss, pair_data_K_ss.data(), pair_data_K_ss.size());
-    gpu::chunkedMemcpyHostToDevice<double>(d_pair_data_K_sp, pair_data_K_sp.data(), pair_data_K_sp.size());
-    gpu::chunkedMemcpyHostToDevice<double>(d_pair_data_K_ps, pair_data_K_ps.data(), pair_data_K_ps.size());
-    gpu::chunkedMemcpyHostToDevice<double>(d_pair_data_K_sd, pair_data_K_sd.data(), pair_data_K_sd.size());
-    gpu::chunkedMemcpyHostToDevice<double>(d_pair_data_K_ds, pair_data_K_ds.data(), pair_data_K_ds.size());
-    gpu::chunkedMemcpyHostToDevice<double>(d_pair_data_K_pp, pair_data_K_pp.data(), pair_data_K_pp.size());
-    gpu::chunkedMemcpyHostToDevice<double>(d_pair_data_K_pd, pair_data_K_pd.data(), pair_data_K_pd.size());
-    gpu::chunkedMemcpyHostToDevice<double>(d_pair_data_K_dp, pair_data_K_dp.data(), pair_data_K_dp.size());
-    gpu::chunkedMemcpyHostToDevice<double>(d_pair_data_K_dd, pair_data_K_dd.data(), pair_data_K_dd.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_pair_data_K_ss, pair_data_K_ss.data(), pair_data_K_ss.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_pair_data_K_sp, pair_data_K_sp.data(), pair_data_K_sp.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_pair_data_K_ps, pair_data_K_ps.data(), pair_data_K_ps.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_pair_data_K_sd, pair_data_K_sd.data(), pair_data_K_sd.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_pair_data_K_ds, pair_data_K_ds.data(), pair_data_K_ds.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_pair_data_K_pp, pair_data_K_pp.data(), pair_data_K_pp.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_pair_data_K_pd, pair_data_K_pd.data(), pair_data_K_pd.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_pair_data_K_dp, pair_data_K_dp.data(), pair_data_K_dp.size());
+    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_pair_data_K_dd, pair_data_K_dd.data(), pair_data_K_dd.size());
 
     gpuSafe(gpuDeviceSynchronize());
 
@@ -8096,7 +8121,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpu::chunkedMemcpyDeviceToHost<double>(mat_K.data(), d_mat_K, pair_inds_count_for_K_ss);
+        gpu::chunkedMemcpyAsyncDeviceToHost<double>(mat_K.data(), d_mat_K, pair_inds_count_for_K_ss);
 
         for (int64_t ik = 0; ik < pair_inds_count_for_K_ss; ik++)
         {
@@ -8457,7 +8482,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpu::chunkedMemcpyDeviceToHost<double>(mat_K.data(), d_mat_K, pair_inds_count_for_K_sp);
+        gpu::chunkedMemcpyAsyncDeviceToHost<double>(mat_K.data(), d_mat_K, pair_inds_count_for_K_sp);
 
         for (int64_t ik = 0; ik < pair_inds_count_for_K_sp; ik++)
         {
@@ -8838,7 +8863,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         //omptimers[thread_id].stop("    K block PDPD");
 
-        gpu::chunkedMemcpyDeviceToHost<double>(mat_K.data(), d_mat_K, pair_inds_count_for_K_pp);
+        gpu::chunkedMemcpyAsyncDeviceToHost<double>(mat_K.data(), d_mat_K, pair_inds_count_for_K_pp);
 
         for (int64_t ik = 0; ik < pair_inds_count_for_K_pp; ik++)
         {
@@ -9241,7 +9266,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         //omptimers[thread_id].stop("    K block SDDD");
 
-        gpu::chunkedMemcpyDeviceToHost<double>(mat_K.data(), d_mat_K, pair_inds_count_for_K_sd);
+        gpu::chunkedMemcpyAsyncDeviceToHost<double>(mat_K.data(), d_mat_K, pair_inds_count_for_K_sd);
 
         for (int64_t ik = 0; ik < pair_inds_count_for_K_sd; ik++)
         {
@@ -9852,7 +9877,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         //omptimers[thread_id].stop("    K block PDDD");
 
-        gpu::chunkedMemcpyDeviceToHost<double>(mat_K.data(), d_mat_K, pair_inds_count_for_K_pd);
+        gpu::chunkedMemcpyAsyncDeviceToHost<double>(mat_K.data(), d_mat_K, pair_inds_count_for_K_pd);
 
         for (int64_t ik = 0; ik < pair_inds_count_for_K_pd; ik++)
         {
@@ -10954,7 +10979,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         //omptimers[thread_id].stop("    K block DDDD");
 
-        gpu::chunkedMemcpyDeviceToHost<double>(mat_K.data(), d_mat_K, pair_inds_count_for_K_dd);
+        gpu::chunkedMemcpyAsyncDeviceToHost<double>(mat_K.data(), d_mat_K, pair_inds_count_for_K_dd);
 
         for (int64_t ik = 0; ik < pair_inds_count_for_K_dd; ik++)
         {
@@ -10997,16 +11022,79 @@ computeFockOnGPU(const              CMolecule& molecule,
 
 #pragma omp barrier
 
-    gpuSafe(gpuFree(d_data_boys_func));
+    gpuSafe(gpuFreeAsync(d_boys_func_table, 0));
+    gpuSafe(gpuFreeAsync(d_boys_func_ft,    0));
 
-    gpuSafe(gpuFree(d_data_spd_prim_info));
-    gpuSafe(gpuFree(d_data_spd_prim_aoinds));
+    gpuSafe(gpuFreeAsync(d_s_prim_info, 0));
+    gpuSafe(gpuFreeAsync(d_p_prim_info, 0));
+    gpuSafe(gpuFreeAsync(d_d_prim_info, 0));
 
-    // TODO: keep devptr
-    screening.clear_devptr_double(gpu_id);
-    screening.clear_devptr_uint32(gpu_id);
+    gpuSafe(gpuFreeAsync(d_s_prim_aoinds, 0));
+    gpuSafe(gpuFreeAsync(d_p_prim_aoinds, 0));
+    gpuSafe(gpuFreeAsync(d_d_prim_aoinds, 0));
 
-#pragma omp barrier
+    gpuSafe(gpuFreeAsync(d_mat_K         , 0));
+    gpuSafe(gpuFreeAsync(d_mat_D_full_AO , 0));
+    gpuSafe(gpuFreeAsync(d_Q_K_ss        , 0));
+    gpuSafe(gpuFreeAsync(d_Q_K_sp        , 0));
+    gpuSafe(gpuFreeAsync(d_Q_K_ps        , 0));
+    gpuSafe(gpuFreeAsync(d_Q_K_sd        , 0));
+    gpuSafe(gpuFreeAsync(d_Q_K_ds        , 0));
+    gpuSafe(gpuFreeAsync(d_Q_K_pp        , 0));
+    gpuSafe(gpuFreeAsync(d_Q_K_pd        , 0));
+    gpuSafe(gpuFreeAsync(d_Q_K_dp        , 0));
+    gpuSafe(gpuFreeAsync(d_Q_K_dd        , 0));
+    gpuSafe(gpuFreeAsync(d_pair_data_K_ss, 0));
+    gpuSafe(gpuFreeAsync(d_pair_data_K_sp, 0));
+    gpuSafe(gpuFreeAsync(d_pair_data_K_ps, 0));
+    gpuSafe(gpuFreeAsync(d_pair_data_K_sd, 0));
+    gpuSafe(gpuFreeAsync(d_pair_data_K_ds, 0));
+    gpuSafe(gpuFreeAsync(d_pair_data_K_pp, 0));
+    gpuSafe(gpuFreeAsync(d_pair_data_K_pd, 0));
+    gpuSafe(gpuFreeAsync(d_pair_data_K_dp, 0));
+    gpuSafe(gpuFreeAsync(d_pair_data_K_dd, 0));
+
+    gpuSafe(gpuFreeAsync(d_pair_inds_i_for_K_ss, 0));
+    gpuSafe(gpuFreeAsync(d_pair_inds_k_for_K_ss, 0));
+    gpuSafe(gpuFreeAsync(d_pair_inds_i_for_K_sp, 0));
+    gpuSafe(gpuFreeAsync(d_pair_inds_k_for_K_sp, 0));
+    gpuSafe(gpuFreeAsync(d_pair_inds_i_for_K_sd, 0));
+    gpuSafe(gpuFreeAsync(d_pair_inds_k_for_K_sd, 0));
+    gpuSafe(gpuFreeAsync(d_pair_inds_i_for_K_pp, 0));
+    gpuSafe(gpuFreeAsync(d_pair_inds_k_for_K_pp, 0));
+    gpuSafe(gpuFreeAsync(d_pair_inds_i_for_K_pd, 0));
+    gpuSafe(gpuFreeAsync(d_pair_inds_k_for_K_pd, 0));
+    gpuSafe(gpuFreeAsync(d_pair_inds_i_for_K_dd, 0));
+    gpuSafe(gpuFreeAsync(d_pair_inds_k_for_K_dd, 0));
+    gpuSafe(gpuFreeAsync(d_D_inds_K_ss         , 0));
+    gpuSafe(gpuFreeAsync(d_D_inds_K_sp         , 0));
+    gpuSafe(gpuFreeAsync(d_D_inds_K_ps         , 0));
+    gpuSafe(gpuFreeAsync(d_D_inds_K_sd         , 0));
+    gpuSafe(gpuFreeAsync(d_D_inds_K_ds         , 0));
+    gpuSafe(gpuFreeAsync(d_D_inds_K_pp         , 0));
+    gpuSafe(gpuFreeAsync(d_D_inds_K_pd         , 0));
+    gpuSafe(gpuFreeAsync(d_D_inds_K_dp         , 0));
+    gpuSafe(gpuFreeAsync(d_D_inds_K_dd         , 0));
+    gpuSafe(gpuFreeAsync(d_pair_displs_K_ss    , 0));
+    gpuSafe(gpuFreeAsync(d_pair_displs_K_sp    , 0));
+    gpuSafe(gpuFreeAsync(d_pair_displs_K_ps    , 0));
+    gpuSafe(gpuFreeAsync(d_pair_displs_K_sd    , 0));
+    gpuSafe(gpuFreeAsync(d_pair_displs_K_ds    , 0));
+    gpuSafe(gpuFreeAsync(d_pair_displs_K_pp    , 0));
+    gpuSafe(gpuFreeAsync(d_pair_displs_K_pd    , 0));
+    gpuSafe(gpuFreeAsync(d_pair_displs_K_dp    , 0));
+    gpuSafe(gpuFreeAsync(d_pair_displs_K_dd    , 0));
+    gpuSafe(gpuFreeAsync(d_pair_counts_K_ss    , 0));
+    gpuSafe(gpuFreeAsync(d_pair_counts_K_sp    , 0));
+    gpuSafe(gpuFreeAsync(d_pair_counts_K_ps    , 0));
+    gpuSafe(gpuFreeAsync(d_pair_counts_K_sd    , 0));
+    gpuSafe(gpuFreeAsync(d_pair_counts_K_ds    , 0));
+    gpuSafe(gpuFreeAsync(d_pair_counts_K_pp    , 0));
+    gpuSafe(gpuFreeAsync(d_pair_counts_K_pd    , 0));
+    gpuSafe(gpuFreeAsync(d_pair_counts_K_dp    , 0));
+    gpuSafe(gpuFreeAsync(d_pair_counts_K_dd    , 0));
+
+    gpuSafe(gpuDeviceSynchronize());
 
     omptimers[thread_id].stop("K compute");
     }

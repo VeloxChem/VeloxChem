@@ -91,6 +91,22 @@ void chunkedMemcpyDeviceToHost(T* h_ptr, const T* d_ptr, size_t total_count)
     gpuSafe(gpuDeviceSynchronize());
 }
 
+template <typename T>
+void chunkedMemcpyAsyncHostToDevice(T* d_ptr, const T* h_ptr, size_t total_count)
+{
+    gpuSafe(gpuMemcpyAsync(d_ptr, h_ptr, total_count * sizeof(T), gpuMemcpyHostToDevice, 0));
+
+    gpuSafe(gpuDeviceSynchronize());
+}
+
+template <typename T>
+void chunkedMemcpyAsyncDeviceToHost(T* h_ptr, const T* d_ptr, size_t total_count)
+{
+    gpuSafe(gpuMemcpyAsync(h_ptr, d_ptr, total_count * sizeof(T), gpuMemcpyDeviceToHost, 0));
+
+    gpuSafe(gpuDeviceSynchronize());
+}
+
 }  // namespace gpu
 
 #endif
