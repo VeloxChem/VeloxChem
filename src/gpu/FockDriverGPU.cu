@@ -4426,7 +4426,7 @@ transformDensity(const CMolecule& molecule, const CMolecularBasis& basis, const 
         }
     }
 
-    std::unordered_map<int64_t, std::vector<std::pair<int64_t, double>>> sph_cart_map;
+    std::vector<std::vector<std::pair<int64_t, double>>> sph_cart_map(naos);
 
     for (const auto& gto_block : gto_blocks)
     {
@@ -4450,20 +4450,24 @@ transformDensity(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
     for (int64_t i_cgto = 0; i_cgto < naos; i_cgto++)
     {
+        const auto& i_map = sph_cart_map[i_cgto];
+
         for (int64_t j_cgto = 0; j_cgto < naos; j_cgto++)
         {
-            for (const auto& i_cgto_cart_ind_coef : sph_cart_map[i_cgto])
+            const auto& j_map = sph_cart_map[j_cgto];
+
+            const double D_ij_sph = sph_dens_ptr[i_cgto * naos + j_cgto];
+
+            if (D_ij_sph == 0.0) continue;
+
+            for (const auto& [i_cgto_cart, i_coef_cart] : i_map)
             {
-                auto i_cgto_cart = i_cgto_cart_ind_coef.first;
-                auto i_coef_cart = i_cgto_cart_ind_coef.second;
+                const int64_t i_cgto_cart_offset = i_cgto_cart * cart_naos;
 
-                for (const auto& j_cgto_cart_ind_coef : sph_cart_map[j_cgto])
+                for (const auto& [j_cgto_cart, j_coef_cart] : j_map)
                 {
-                    auto j_cgto_cart = j_cgto_cart_ind_coef.first;
-                    auto j_coef_cart = j_cgto_cart_ind_coef.second;
-
-                    cart_dens_ptr[i_cgto_cart * cart_naos + j_cgto_cart] += 
-                        sph_dens_ptr[i_cgto * naos + j_cgto] * i_coef_cart * j_coef_cart;
+                    cart_dens_ptr[i_cgto_cart_offset + j_cgto_cart] +=
+                        D_ij_sph * i_coef_cart * j_coef_cart;
                 }
             }
         }
@@ -4531,6 +4535,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     // Cartesian to spherical index mapping for P and D
 
+    // TODO: use vector
     std::unordered_map<int64_t, std::vector<std::pair<int64_t, double>>> cart_sph_p;
     std::unordered_map<int64_t, std::vector<std::pair<int64_t, double>>> cart_sph_d;
 
@@ -4585,7 +4590,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     // spherical to Cartesian index mapping
 
-    std::unordered_map<int64_t, std::vector<std::pair<int64_t, double>>> sph_cart_map;
+    std::vector<std::vector<std::pair<int64_t, double>>> sph_cart_map(naos);
 
     for (const auto& gto_block : gto_blocks)
     {
@@ -4609,20 +4614,24 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     for (int64_t i_cgto = 0; i_cgto < naos; i_cgto++)
     {
+        const auto& i_map = sph_cart_map[i_cgto];
+
         for (int64_t j_cgto = 0; j_cgto < naos; j_cgto++)
         {
-            for (const auto& i_cgto_cart_ind_coef : sph_cart_map[i_cgto])
+            const auto& j_map = sph_cart_map[j_cgto];
+
+            const double D_ij_sph = sph_dens_ptr[i_cgto * naos + j_cgto];
+
+            if (D_ij_sph == 0.0) continue;
+
+            for (const auto& [i_cgto_cart, i_coef_cart] : i_map)
             {
-                auto i_cgto_cart = i_cgto_cart_ind_coef.first;
-                auto i_coef_cart = i_cgto_cart_ind_coef.second;
+                const int64_t i_cgto_cart_offset = i_cgto_cart * cart_naos;
 
-                for (const auto& j_cgto_cart_ind_coef : sph_cart_map[j_cgto])
+                for (const auto& [j_cgto_cart, j_coef_cart] : j_map)
                 {
-                    auto j_cgto_cart = j_cgto_cart_ind_coef.first;
-                    auto j_coef_cart = j_cgto_cart_ind_coef.second;
-
-                    cart_dens_ptr[i_cgto_cart * cart_naos + j_cgto_cart] += 
-                        sph_dens_ptr[i_cgto * naos + j_cgto] * i_coef_cart * j_coef_cart;
+                    cart_dens_ptr[i_cgto_cart_offset + j_cgto_cart] +=
+                        D_ij_sph * i_coef_cart * j_coef_cart;
                 }
             }
         }
