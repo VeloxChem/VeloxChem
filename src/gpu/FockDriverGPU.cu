@@ -104,7 +104,6 @@ computeQMatrixOnGPU(const CMolecule& molecule,
 
     auto nthreads = omp_get_max_threads();
     auto num_gpus_per_node = screening.getNumGpusPerNode();
-    // auto num_threads_per_gpu = nthreads / num_gpus_per_node;
 
     std::vector<CDenseMatrix> Q_omp(num_gpus_per_node);
 
@@ -1424,7 +1423,6 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule,
 
     auto nthreads = omp_get_max_threads();
     auto num_gpus_per_node = screening.getNumGpusPerNode();
-    // auto num_threads_per_gpu = nthreads / num_gpus_per_node;
 
     std::vector<CDenseMatrix> S_matrices(num_gpus_per_node);
     std::vector<CDenseMatrix> T_matrices(num_gpus_per_node);
@@ -2003,7 +2001,6 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule,
 
     auto nthreads = omp_get_max_threads();
     auto num_gpus_per_node = screening.getNumGpusPerNode();
-    // auto num_threads_per_gpu = nthreads / num_gpus_per_node;
 
     std::vector<CDenseMatrix> V_matrices(num_gpus_per_node);
 
@@ -2565,7 +2562,6 @@ computeElectricDipoleIntegralsOnGPU(const CMolecule& molecule,
 
     auto nthreads = omp_get_max_threads();
     auto num_gpus_per_node = screening.getNumGpusPerNode();
-    // auto num_threads_per_gpu = nthreads / num_gpus_per_node;
 
     std::vector<CDenseMatrix> MX_matrices(num_gpus_per_node);
     std::vector<CDenseMatrix> MY_matrices(num_gpus_per_node);
@@ -3183,7 +3179,6 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule,
 
     auto nthreads = omp_get_max_threads();
     auto num_gpus_per_node = screening.getNumGpusPerNode();
-    // auto num_threads_per_gpu = nthreads / num_gpus_per_node;
 
     std::vector<CDenseMatrix> MX_matrices(num_gpus_per_node);
     std::vector<CDenseMatrix> MY_matrices(num_gpus_per_node);
@@ -3203,6 +3198,10 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule,
     auto gpu_id = thread_id;
 
     gpuSafe(gpuSetDevice(gpu_id));
+    gpuSafe(gpuDeviceSynchronize());  // early context initialization after setdevice
+
+    gpuStream_t stream;
+    gpuSafe(gpuStreamCreate(&stream));
 
     // GTOs blocks and number of AOs
 
@@ -3264,24 +3263,12 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule,
 
     gtoinfo::updatePrimitiveInfoForS(s_prim_info.data(), s_prim_aoinds.data(), s_prim_count, gto_blocks);
 
-    double*   d_s_prim_info;
-
-    gpuSafe(gpuMalloc(&d_s_prim_info, s_prim_info.size() * sizeof(double)));
-
-    gpu::chunkedMemcpyHostToDevice<double>(d_s_prim_info, s_prim_info.data(), s_prim_info.size());
-
     // P gto block
 
     std::vector<double>   p_prim_info(5 * p_prim_count);
     std::vector<uint32_t> p_prim_aoinds(3 * p_prim_count);
 
     gtoinfo::updatePrimitiveInfoForP(p_prim_info.data(), p_prim_aoinds.data(), p_prim_count, gto_blocks);
-
-    double*   d_p_prim_info;
-
-    gpuSafe(gpuMalloc(&d_p_prim_info, p_prim_info.size() * sizeof(double)));
-
-    gpu::chunkedMemcpyHostToDevice<double>(d_p_prim_info, p_prim_info.data(), p_prim_info.size());
 
     // D gto block
 
@@ -3290,11 +3277,19 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule,
 
     gtoinfo::updatePrimitiveInfoForD(d_prim_info.data(), d_prim_aoinds.data(), d_prim_count, gto_blocks);
 
+    // GTOs on device
+
+    double*   d_s_prim_info;
+    double*   d_p_prim_info;
     double*   d_d_prim_info;
 
-    gpuSafe(gpuMalloc(&d_d_prim_info, d_prim_info.size() * sizeof(double)));
+    gpuSafe(gpuMallocAsync(&d_s_prim_info, s_prim_info.size() * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_p_prim_info, p_prim_info.size() * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_d_prim_info, d_prim_info.size() * sizeof(double), stream));
 
-    gpu::chunkedMemcpyHostToDevice<double>(d_d_prim_info, d_prim_info.data(), d_prim_info.size());
+    gpuSafe(gpuMemcpyAsync(d_s_prim_info, s_prim_info.data(), s_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_p_prim_info, p_prim_info.data(), p_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_d_prim_info, d_prim_info.data(), d_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     // GTO block pairs
 
@@ -3337,45 +3332,35 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule,
     uint32_t *d_pd_first_inds_local, *d_pd_second_inds_local;
     uint32_t *d_dd_first_inds_local, *d_dd_second_inds_local;
 
-    gpuSafe(gpuMalloc(&d_mat_MX, max_prim_pair_count_local * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_mat_MY, max_prim_pair_count_local * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_mat_MZ, max_prim_pair_count_local * sizeof(double)));
+    gpuSafe(gpuMallocAsync(&d_mat_MX, max_prim_pair_count_local * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_mat_MY, max_prim_pair_count_local * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_mat_MZ, max_prim_pair_count_local * sizeof(double), stream));
 
-    gpuSafe(gpuMalloc(&d_ss_first_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_ss_second_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMallocAsync(&d_ss_first_inds_local,  ss_prim_pair_count_local * sizeof(uint32_t), stream));
+    gpuSafe(gpuMallocAsync(&d_ss_second_inds_local, ss_prim_pair_count_local * sizeof(uint32_t), stream));
+    gpuSafe(gpuMallocAsync(&d_sp_first_inds_local,  sp_prim_pair_count_local * sizeof(uint32_t), stream));
+    gpuSafe(gpuMallocAsync(&d_sp_second_inds_local, sp_prim_pair_count_local * sizeof(uint32_t), stream));
+    gpuSafe(gpuMallocAsync(&d_sd_first_inds_local,  sd_prim_pair_count_local * sizeof(uint32_t), stream));
+    gpuSafe(gpuMallocAsync(&d_sd_second_inds_local, sd_prim_pair_count_local * sizeof(uint32_t), stream));
+    gpuSafe(gpuMallocAsync(&d_pp_first_inds_local,  pp_prim_pair_count_local * sizeof(uint32_t), stream));
+    gpuSafe(gpuMallocAsync(&d_pp_second_inds_local, pp_prim_pair_count_local * sizeof(uint32_t), stream));
+    gpuSafe(gpuMallocAsync(&d_pd_first_inds_local,  pd_prim_pair_count_local * sizeof(uint32_t), stream));
+    gpuSafe(gpuMallocAsync(&d_pd_second_inds_local, pd_prim_pair_count_local * sizeof(uint32_t), stream));
+    gpuSafe(gpuMallocAsync(&d_dd_first_inds_local,  dd_prim_pair_count_local * sizeof(uint32_t), stream));
+    gpuSafe(gpuMallocAsync(&d_dd_second_inds_local, dd_prim_pair_count_local * sizeof(uint32_t), stream));
 
-    gpuSafe(gpuMalloc(&d_sp_first_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_sp_second_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
-
-    gpuSafe(gpuMalloc(&d_sd_first_inds_local, sd_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_sd_second_inds_local, sd_prim_pair_count_local * sizeof(uint32_t)));
-
-    gpuSafe(gpuMalloc(&d_pp_first_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_pp_second_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
-
-    gpuSafe(gpuMalloc(&d_pd_first_inds_local, pd_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_pd_second_inds_local, pd_prim_pair_count_local * sizeof(uint32_t)));
-
-    gpuSafe(gpuMalloc(&d_dd_first_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_dd_second_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
-
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_ss_first_inds_local, ss_first_inds_local.data(), ss_prim_pair_count_local);
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_ss_second_inds_local, ss_second_inds_local.data(), ss_prim_pair_count_local);
-
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_sp_first_inds_local, sp_first_inds_local.data(), sp_prim_pair_count_local);
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_sp_second_inds_local, sp_second_inds_local.data(), sp_prim_pair_count_local);
-
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_sd_first_inds_local, sd_first_inds_local.data(), sd_prim_pair_count_local);
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_sd_second_inds_local, sd_second_inds_local.data(), sd_prim_pair_count_local);
-
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pp_first_inds_local, pp_first_inds_local.data(), pp_prim_pair_count_local);
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local);
-
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pd_first_inds_local, pd_first_inds_local.data(), pd_prim_pair_count_local);
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pd_second_inds_local, pd_second_inds_local.data(), pd_prim_pair_count_local);
-
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_dd_first_inds_local, dd_first_inds_local.data(), dd_prim_pair_count_local);
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local);
+    gpuSafe(gpuMemcpyAsync(d_ss_first_inds_local,  ss_first_inds_local.data(),  ss_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_ss_second_inds_local, ss_second_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_sp_first_inds_local,  sp_first_inds_local.data(),  sp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_sp_second_inds_local, sp_second_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_sd_first_inds_local,  sd_first_inds_local.data(),  sd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_sd_second_inds_local, sd_second_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pp_first_inds_local,  pp_first_inds_local.data(),  pp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pd_first_inds_local,  pd_first_inds_local.data(),  pd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pd_second_inds_local, pd_second_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_dd_first_inds_local,  dd_first_inds_local.data(),  dd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
     MX_matrices[gpu_id].zero();
     MY_matrices[gpu_id].zero();
@@ -3385,7 +3370,7 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule,
     auto& mat_mu_y = MY_matrices[gpu_id];
     auto& mat_mu_z = MZ_matrices[gpu_id];
 
-    gpuSafe(gpuDeviceSynchronize());
+    gpuSafe(gpuStreamSynchronize(stream));
 
 #pragma omp barrier
 
@@ -3397,7 +3382,7 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule,
 
         dim3 num_blocks((ss_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::computeLinearMomentumSS<<<num_blocks, threads_per_block>>>(
+        gpu::computeLinearMomentumSS<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_MX,
                            d_mat_MY,
                            d_mat_MZ,
@@ -3407,9 +3392,11 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule,
                            d_ss_second_inds_local,
                            static_cast<uint32_t>(ss_prim_pair_count_local));
 
-        gpu::chunkedMemcpyDeviceToHost<double>(mat_MX.data(), d_mat_MX, ss_prim_pair_count_local);
-        gpu::chunkedMemcpyDeviceToHost<double>(mat_MY.data(), d_mat_MY, ss_prim_pair_count_local);
-        gpu::chunkedMemcpyDeviceToHost<double>(mat_MZ.data(), d_mat_MZ, ss_prim_pair_count_local);
+        gpuSafe(gpuMemcpyAsync(mat_MX.data(), d_mat_MX, ss_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyAsync(mat_MY.data(), d_mat_MY, ss_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyAsync(mat_MZ.data(), d_mat_MZ, ss_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+
+        gpuSafe(gpuStreamSynchronize(stream));
 
         for (int64_t ij = 0; ij < ss_prim_pair_count_local; ij++)
         {
@@ -3441,7 +3428,7 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule,
 
         dim3 num_blocks((sp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::computeLinearMomentumSP<<<num_blocks, threads_per_block>>>(
+        gpu::computeLinearMomentumSP<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_MX,
                            d_mat_MY,
                            d_mat_MZ,
@@ -3453,9 +3440,11 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule,
                            d_sp_second_inds_local,
                            static_cast<uint32_t>(sp_prim_pair_count_local));
 
-        gpu::chunkedMemcpyDeviceToHost<double>(mat_MX.data(), d_mat_MX, sp_prim_pair_count_local);
-        gpu::chunkedMemcpyDeviceToHost<double>(mat_MY.data(), d_mat_MY, sp_prim_pair_count_local);
-        gpu::chunkedMemcpyDeviceToHost<double>(mat_MZ.data(), d_mat_MZ, sp_prim_pair_count_local);
+        gpuSafe(gpuMemcpyAsync(mat_MX.data(), d_mat_MX, sp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyAsync(mat_MY.data(), d_mat_MY, sp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyAsync(mat_MZ.data(), d_mat_MZ, sp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+
+        gpuSafe(gpuStreamSynchronize(stream));
 
         for (int64_t ij = 0; ij < sp_prim_pair_count_local; ij++)
         {
@@ -3493,7 +3482,7 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule,
 
         dim3 num_blocks((sd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::computeLinearMomentumSD<<<num_blocks, threads_per_block>>>(
+        gpu::computeLinearMomentumSD<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_MX,
                            d_mat_MY,
                            d_mat_MZ,
@@ -3505,9 +3494,11 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule,
                            d_sd_second_inds_local,
                            static_cast<uint32_t>(sd_prim_pair_count_local));
 
-        gpu::chunkedMemcpyDeviceToHost<double>(mat_MX.data(), d_mat_MX, sd_prim_pair_count_local);
-        gpu::chunkedMemcpyDeviceToHost<double>(mat_MY.data(), d_mat_MY, sd_prim_pair_count_local);
-        gpu::chunkedMemcpyDeviceToHost<double>(mat_MZ.data(), d_mat_MZ, sd_prim_pair_count_local);
+        gpuSafe(gpuMemcpyAsync(mat_MX.data(), d_mat_MX, sd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyAsync(mat_MY.data(), d_mat_MY, sd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyAsync(mat_MZ.data(), d_mat_MZ, sd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+
+        gpuSafe(gpuStreamSynchronize(stream));
 
         for (int64_t ij = 0; ij < sd_prim_pair_count_local; ij++)
         {
@@ -3545,7 +3536,7 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule,
 
         dim3 num_blocks((pp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::computeLinearMomentumPP<<<num_blocks, threads_per_block>>>(
+        gpu::computeLinearMomentumPP<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_MX,
                            d_mat_MY,
                            d_mat_MZ,
@@ -3555,9 +3546,11 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule,
                            d_pp_second_inds_local,
                            static_cast<uint32_t>(pp_prim_pair_count_local));
 
-        gpu::chunkedMemcpyDeviceToHost<double>(mat_MX.data(), d_mat_MX, pp_prim_pair_count_local);
-        gpu::chunkedMemcpyDeviceToHost<double>(mat_MY.data(), d_mat_MY, pp_prim_pair_count_local);
-        gpu::chunkedMemcpyDeviceToHost<double>(mat_MZ.data(), d_mat_MZ, pp_prim_pair_count_local);
+        gpuSafe(gpuMemcpyAsync(mat_MX.data(), d_mat_MX, pp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyAsync(mat_MY.data(), d_mat_MY, pp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyAsync(mat_MZ.data(), d_mat_MZ, pp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+
+        gpuSafe(gpuStreamSynchronize(stream));
 
         for (int64_t ij = 0; ij < pp_prim_pair_count_local; ij++)
         {
@@ -3605,7 +3598,7 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule,
 
         dim3 num_blocks((pd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::computeLinearMomentumPD<<<num_blocks, threads_per_block>>>(
+        gpu::computeLinearMomentumPD<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_MX,
                            d_mat_MY,
                            d_mat_MZ,
@@ -3617,9 +3610,11 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule,
                            d_pd_second_inds_local,
                            static_cast<uint32_t>(pd_prim_pair_count_local));
 
-        gpu::chunkedMemcpyDeviceToHost<double>(mat_MX.data(), d_mat_MX, pd_prim_pair_count_local);
-        gpu::chunkedMemcpyDeviceToHost<double>(mat_MY.data(), d_mat_MY, pd_prim_pair_count_local);
-        gpu::chunkedMemcpyDeviceToHost<double>(mat_MZ.data(), d_mat_MZ, pd_prim_pair_count_local);
+        gpuSafe(gpuMemcpyAsync(mat_MX.data(), d_mat_MX, pd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyAsync(mat_MY.data(), d_mat_MY, pd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyAsync(mat_MZ.data(), d_mat_MZ, pd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+
+        gpuSafe(gpuStreamSynchronize(stream));
 
         for (int64_t ij = 0; ij < pd_prim_pair_count_local; ij++)
         {
@@ -3664,7 +3659,7 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule,
 
         dim3 num_blocks((dd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::computeLinearMomentumDD<<<num_blocks, threads_per_block>>>(
+        gpu::computeLinearMomentumDD<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_MX,
                            d_mat_MY,
                            d_mat_MZ,
@@ -3674,9 +3669,11 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule,
                            d_dd_second_inds_local,
                            static_cast<uint32_t>(dd_prim_pair_count_local));
 
-        gpu::chunkedMemcpyDeviceToHost<double>(mat_MX.data(), d_mat_MX, dd_prim_pair_count_local);
-        gpu::chunkedMemcpyDeviceToHost<double>(mat_MY.data(), d_mat_MY, dd_prim_pair_count_local);
-        gpu::chunkedMemcpyDeviceToHost<double>(mat_MZ.data(), d_mat_MZ, dd_prim_pair_count_local);
+        gpuSafe(gpuMemcpyAsync(mat_MX.data(), d_mat_MX, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyAsync(mat_MY.data(), d_mat_MY, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyAsync(mat_MZ.data(), d_mat_MZ, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+
+        gpuSafe(gpuStreamSynchronize(stream));
 
         for (int64_t ij = 0; ij < dd_prim_pair_count_local; ij++)
         {
@@ -3716,30 +3713,34 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule,
         }
     }
 
-    gpuSafe(gpuDeviceSynchronize());
+    gpuSafe(gpuStreamSynchronize(stream));
 
 #pragma omp barrier
 
-    gpuSafe(gpuFree(d_s_prim_info));
-    gpuSafe(gpuFree(d_p_prim_info));
-    gpuSafe(gpuFree(d_d_prim_info));
+    gpuSafe(gpuFreeAsync(d_s_prim_info, stream));
+    gpuSafe(gpuFreeAsync(d_p_prim_info, stream));
+    gpuSafe(gpuFreeAsync(d_d_prim_info, stream));
 
-    gpuSafe(gpuFree(d_mat_MX));
-    gpuSafe(gpuFree(d_mat_MY));
-    gpuSafe(gpuFree(d_mat_MZ));
+    gpuSafe(gpuFreeAsync(d_mat_MX, stream));
+    gpuSafe(gpuFreeAsync(d_mat_MY, stream));
+    gpuSafe(gpuFreeAsync(d_mat_MZ, stream));
 
-    gpuSafe(gpuFree(d_ss_first_inds_local));
-    gpuSafe(gpuFree(d_ss_second_inds_local));
-    gpuSafe(gpuFree(d_sp_first_inds_local));
-    gpuSafe(gpuFree(d_sp_second_inds_local));
-    gpuSafe(gpuFree(d_sd_first_inds_local));
-    gpuSafe(gpuFree(d_sd_second_inds_local));
-    gpuSafe(gpuFree(d_pp_first_inds_local));
-    gpuSafe(gpuFree(d_pp_second_inds_local));
-    gpuSafe(gpuFree(d_pd_first_inds_local));
-    gpuSafe(gpuFree(d_pd_second_inds_local));
-    gpuSafe(gpuFree(d_dd_first_inds_local));
-    gpuSafe(gpuFree(d_dd_second_inds_local));
+    gpuSafe(gpuFreeAsync(d_ss_first_inds_local,  stream));
+    gpuSafe(gpuFreeAsync(d_ss_second_inds_local, stream));
+    gpuSafe(gpuFreeAsync(d_sp_first_inds_local,  stream));
+    gpuSafe(gpuFreeAsync(d_sp_second_inds_local, stream));
+    gpuSafe(gpuFreeAsync(d_sd_first_inds_local,  stream));
+    gpuSafe(gpuFreeAsync(d_sd_second_inds_local, stream));
+    gpuSafe(gpuFreeAsync(d_pp_first_inds_local,  stream));
+    gpuSafe(gpuFreeAsync(d_pp_second_inds_local, stream));
+    gpuSafe(gpuFreeAsync(d_pd_first_inds_local,  stream));
+    gpuSafe(gpuFreeAsync(d_pd_second_inds_local, stream));
+    gpuSafe(gpuFreeAsync(d_dd_first_inds_local,  stream));
+    gpuSafe(gpuFreeAsync(d_dd_second_inds_local, stream));
+
+    gpuSafe(gpuStreamSynchronize(stream));
+    gpuSafe(gpuStreamDestroy(stream));
+    gpuSafe(gpuDeviceSynchronize());
     }
 
     std::vector<CDenseMatrix> lmom_matrices(3);
@@ -3784,7 +3785,6 @@ computeAngularMomentumIntegralsOnGPU(const CMolecule& molecule,
 
     auto nthreads = omp_get_max_threads();
     auto num_gpus_per_node = screening.getNumGpusPerNode();
-    // auto num_threads_per_gpu = nthreads / num_gpus_per_node;
 
     std::vector<CDenseMatrix> MX_matrices(num_gpus_per_node);
     std::vector<CDenseMatrix> MY_matrices(num_gpus_per_node);
