@@ -4685,8 +4685,10 @@ computeFockOnGPU(const              CMolecule& molecule,
     auto gpu_id = thread_id;
 
     gpuSafe(gpuSetDevice(gpu_id));
-
     gpuSafe(gpuDeviceSynchronize());  // early context initialization after setdevice
+
+    gpuStream_t stream;
+    gpuSafe(gpuStreamCreate(&stream));
 
     omptimers[thread_id].start("Boys func. prep.");
 
@@ -4750,29 +4752,29 @@ computeFockOnGPU(const              CMolecule& molecule,
     uint32_t* d_p_prim_aoinds;
     uint32_t* d_d_prim_aoinds;
 
-    gpuSafe(gpuMallocAsync(&d_boys_func_table, sizeof(double) * boys_func_table.size(), 0));
-    gpuSafe(gpuMallocAsync(&d_boys_func_ft,    sizeof(double) * boys_func_ft.size(),    0));
+    gpuSafe(gpuMallocAsync(&d_boys_func_table, sizeof(double) * boys_func_table.size(), stream));
+    gpuSafe(gpuMallocAsync(&d_boys_func_ft,    sizeof(double) * boys_func_ft.size(),    stream));
 
-    gpuSafe(gpuMallocAsync(&d_s_prim_info, sizeof(double) * s_prim_info.size(), 0));
-    gpuSafe(gpuMallocAsync(&d_p_prim_info, sizeof(double) * p_prim_info.size(), 0));
-    gpuSafe(gpuMallocAsync(&d_d_prim_info, sizeof(double) * d_prim_info.size(), 0));
+    gpuSafe(gpuMallocAsync(&d_s_prim_info, sizeof(double) * s_prim_info.size(), stream));
+    gpuSafe(gpuMallocAsync(&d_p_prim_info, sizeof(double) * p_prim_info.size(), stream));
+    gpuSafe(gpuMallocAsync(&d_d_prim_info, sizeof(double) * d_prim_info.size(), stream));
 
-    gpuSafe(gpuMallocAsync(&d_s_prim_aoinds, sizeof(uint32_t) * s_prim_aoinds.size(), 0));
-    gpuSafe(gpuMallocAsync(&d_p_prim_aoinds, sizeof(uint32_t) * p_prim_aoinds.size(), 0));
-    gpuSafe(gpuMallocAsync(&d_d_prim_aoinds, sizeof(uint32_t) * d_prim_aoinds.size(), 0));
+    gpuSafe(gpuMallocAsync(&d_s_prim_aoinds, sizeof(uint32_t) * s_prim_aoinds.size(), stream));
+    gpuSafe(gpuMallocAsync(&d_p_prim_aoinds, sizeof(uint32_t) * p_prim_aoinds.size(), stream));
+    gpuSafe(gpuMallocAsync(&d_d_prim_aoinds, sizeof(uint32_t) * d_prim_aoinds.size(), stream));
 
-    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_boys_func_table, boys_func_table.data(), boys_func_table.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_boys_func_ft, boys_func_ft.data(), boys_func_ft.size());
+    gpuSafe(gpuMemcpyAsync(d_boys_func_table, boys_func_table.data(), boys_func_table.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_boys_func_ft,    boys_func_ft.data(),    boys_func_ft.size()    * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_s_prim_info, s_prim_info.data(), s_prim_info.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_p_prim_info, p_prim_info.data(), p_prim_info.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_d_prim_info, d_prim_info.data(), d_prim_info.size());
+    gpuSafe(gpuMemcpyAsync(d_s_prim_info, s_prim_info.data(), s_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_p_prim_info, p_prim_info.data(), p_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_d_prim_info, d_prim_info.data(), d_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_s_prim_aoinds, s_prim_aoinds.data(), s_prim_aoinds.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_p_prim_aoinds, p_prim_aoinds.data(), p_prim_aoinds.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_d_prim_aoinds, d_prim_aoinds.data(), d_prim_aoinds.size());
+    gpuSafe(gpuMemcpyAsync(d_s_prim_aoinds, s_prim_aoinds.data(), s_prim_aoinds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_p_prim_aoinds, p_prim_aoinds.data(), p_prim_aoinds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_d_prim_aoinds, d_prim_aoinds.data(), d_prim_aoinds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-    gpuSafe(gpuDeviceSynchronize());
+    gpuSafe(gpuStreamSynchronize(stream));
 
     omptimers[thread_id].stop("GTO block prep.");
 
@@ -4897,32 +4899,32 @@ computeFockOnGPU(const              CMolecule& molecule,
     double* d_pd_pair_data_local;
     double* d_dd_pair_data_local;
 
-    gpuSafe(gpuMallocAsync(&d_mat_D,              sizeof(double) * static_cast<size_t>(max_prim_pair_count),       0));
-    gpuSafe(gpuMallocAsync(&d_mat_J,              sizeof(double) * static_cast<size_t>(max_prim_pair_count_local), 0));
-    gpuSafe(gpuMallocAsync(&d_ss_mat_Q,           sizeof(double) * static_cast<size_t>(ss_prim_pair_count),        0));
-    gpuSafe(gpuMallocAsync(&d_sp_mat_Q,           sizeof(double) * static_cast<size_t>(sp_prim_pair_count),        0));
-    gpuSafe(gpuMallocAsync(&d_sd_mat_Q,           sizeof(double) * static_cast<size_t>(sd_prim_pair_count),        0));
-    gpuSafe(gpuMallocAsync(&d_pp_mat_Q,           sizeof(double) * static_cast<size_t>(pp_prim_pair_count),        0));
-    gpuSafe(gpuMallocAsync(&d_pd_mat_Q,           sizeof(double) * static_cast<size_t>(pd_prim_pair_count),        0));
-    gpuSafe(gpuMallocAsync(&d_dd_mat_Q,           sizeof(double) * static_cast<size_t>(dd_prim_pair_count),        0));
-    gpuSafe(gpuMallocAsync(&d_ss_pair_data,       sizeof(double) * ss_pair_data.size(),                            0));
-    gpuSafe(gpuMallocAsync(&d_sp_pair_data,       sizeof(double) * sp_pair_data.size(),                            0));
-    gpuSafe(gpuMallocAsync(&d_sd_pair_data,       sizeof(double) * sd_pair_data.size(),                            0));
-    gpuSafe(gpuMallocAsync(&d_pp_pair_data,       sizeof(double) * pp_pair_data.size(),                            0));
-    gpuSafe(gpuMallocAsync(&d_pd_pair_data,       sizeof(double) * pd_pair_data.size(),                            0));
-    gpuSafe(gpuMallocAsync(&d_dd_pair_data,       sizeof(double) * dd_pair_data.size(),                            0));
-    gpuSafe(gpuMallocAsync(&d_ss_mat_Q_local,     sizeof(double) * static_cast<size_t>(ss_prim_pair_count_local),  0));
-    gpuSafe(gpuMallocAsync(&d_sp_mat_Q_local,     sizeof(double) * static_cast<size_t>(sp_prim_pair_count_local),  0));
-    gpuSafe(gpuMallocAsync(&d_sd_mat_Q_local,     sizeof(double) * static_cast<size_t>(sd_prim_pair_count_local),  0));
-    gpuSafe(gpuMallocAsync(&d_pp_mat_Q_local,     sizeof(double) * static_cast<size_t>(pp_prim_pair_count_local),  0));
-    gpuSafe(gpuMallocAsync(&d_pd_mat_Q_local,     sizeof(double) * static_cast<size_t>(pd_prim_pair_count_local),  0));
-    gpuSafe(gpuMallocAsync(&d_dd_mat_Q_local,     sizeof(double) * static_cast<size_t>(dd_prim_pair_count_local),  0));
-    gpuSafe(gpuMallocAsync(&d_ss_pair_data_local, sizeof(double) * ss_pair_data_local.size(),                      0));
-    gpuSafe(gpuMallocAsync(&d_sp_pair_data_local, sizeof(double) * sp_pair_data_local.size(),                      0));
-    gpuSafe(gpuMallocAsync(&d_sd_pair_data_local, sizeof(double) * sd_pair_data_local.size(),                      0));
-    gpuSafe(gpuMallocAsync(&d_pp_pair_data_local, sizeof(double) * pp_pair_data_local.size(),                      0));
-    gpuSafe(gpuMallocAsync(&d_pd_pair_data_local, sizeof(double) * pd_pair_data_local.size(),                      0));
-    gpuSafe(gpuMallocAsync(&d_dd_pair_data_local, sizeof(double) * dd_pair_data_local.size(),                      0));
+    gpuSafe(gpuMallocAsync(&d_mat_D,              sizeof(double) * static_cast<size_t>(max_prim_pair_count),       stream));
+    gpuSafe(gpuMallocAsync(&d_mat_J,              sizeof(double) * static_cast<size_t>(max_prim_pair_count_local), stream));
+    gpuSafe(gpuMallocAsync(&d_ss_mat_Q,           sizeof(double) * static_cast<size_t>(ss_prim_pair_count),        stream));
+    gpuSafe(gpuMallocAsync(&d_sp_mat_Q,           sizeof(double) * static_cast<size_t>(sp_prim_pair_count),        stream));
+    gpuSafe(gpuMallocAsync(&d_sd_mat_Q,           sizeof(double) * static_cast<size_t>(sd_prim_pair_count),        stream));
+    gpuSafe(gpuMallocAsync(&d_pp_mat_Q,           sizeof(double) * static_cast<size_t>(pp_prim_pair_count),        stream));
+    gpuSafe(gpuMallocAsync(&d_pd_mat_Q,           sizeof(double) * static_cast<size_t>(pd_prim_pair_count),        stream));
+    gpuSafe(gpuMallocAsync(&d_dd_mat_Q,           sizeof(double) * static_cast<size_t>(dd_prim_pair_count),        stream));
+    gpuSafe(gpuMallocAsync(&d_ss_pair_data,       sizeof(double) * ss_pair_data.size(),                            stream));
+    gpuSafe(gpuMallocAsync(&d_sp_pair_data,       sizeof(double) * sp_pair_data.size(),                            stream));
+    gpuSafe(gpuMallocAsync(&d_sd_pair_data,       sizeof(double) * sd_pair_data.size(),                            stream));
+    gpuSafe(gpuMallocAsync(&d_pp_pair_data,       sizeof(double) * pp_pair_data.size(),                            stream));
+    gpuSafe(gpuMallocAsync(&d_pd_pair_data,       sizeof(double) * pd_pair_data.size(),                            stream));
+    gpuSafe(gpuMallocAsync(&d_dd_pair_data,       sizeof(double) * dd_pair_data.size(),                            stream));
+    gpuSafe(gpuMallocAsync(&d_ss_mat_Q_local,     sizeof(double) * static_cast<size_t>(ss_prim_pair_count_local),  stream));
+    gpuSafe(gpuMallocAsync(&d_sp_mat_Q_local,     sizeof(double) * static_cast<size_t>(sp_prim_pair_count_local),  stream));
+    gpuSafe(gpuMallocAsync(&d_sd_mat_Q_local,     sizeof(double) * static_cast<size_t>(sd_prim_pair_count_local),  stream));
+    gpuSafe(gpuMallocAsync(&d_pp_mat_Q_local,     sizeof(double) * static_cast<size_t>(pp_prim_pair_count_local),  stream));
+    gpuSafe(gpuMallocAsync(&d_pd_mat_Q_local,     sizeof(double) * static_cast<size_t>(pd_prim_pair_count_local),  stream));
+    gpuSafe(gpuMallocAsync(&d_dd_mat_Q_local,     sizeof(double) * static_cast<size_t>(dd_prim_pair_count_local),  stream));
+    gpuSafe(gpuMallocAsync(&d_ss_pair_data_local, sizeof(double) * ss_pair_data_local.size(),                      stream));
+    gpuSafe(gpuMallocAsync(&d_sp_pair_data_local, sizeof(double) * sp_pair_data_local.size(),                      stream));
+    gpuSafe(gpuMallocAsync(&d_sd_pair_data_local, sizeof(double) * sd_pair_data_local.size(),                      stream));
+    gpuSafe(gpuMallocAsync(&d_pp_pair_data_local, sizeof(double) * pp_pair_data_local.size(),                      stream));
+    gpuSafe(gpuMallocAsync(&d_pd_pair_data_local, sizeof(double) * pd_pair_data_local.size(),                      stream));
+    gpuSafe(gpuMallocAsync(&d_dd_pair_data_local, sizeof(double) * dd_pair_data_local.size(),                      stream));
 
     uint32_t* d_ss_first_inds       ;
     uint32_t* d_ss_second_inds      ;
@@ -4949,86 +4951,86 @@ computeFockOnGPU(const              CMolecule& molecule,
     uint32_t* d_dd_first_inds_local ;
     uint32_t* d_dd_second_inds_local;
 
-    gpuSafe(gpuMallocAsync(&d_ss_first_inds       , sizeof(uint32_t) * static_cast<size_t>(ss_prim_pair_count)      , 0));
-    gpuSafe(gpuMallocAsync(&d_ss_second_inds      , sizeof(uint32_t) * static_cast<size_t>(ss_prim_pair_count)      , 0));
-    gpuSafe(gpuMallocAsync(&d_sp_first_inds       , sizeof(uint32_t) * static_cast<size_t>(sp_prim_pair_count)      , 0));
-    gpuSafe(gpuMallocAsync(&d_sp_second_inds      , sizeof(uint32_t) * static_cast<size_t>(sp_prim_pair_count)      , 0));
-    gpuSafe(gpuMallocAsync(&d_sd_first_inds       , sizeof(uint32_t) * static_cast<size_t>(sd_prim_pair_count)      , 0));
-    gpuSafe(gpuMallocAsync(&d_sd_second_inds      , sizeof(uint32_t) * static_cast<size_t>(sd_prim_pair_count)      , 0));
-    gpuSafe(gpuMallocAsync(&d_pp_first_inds       , sizeof(uint32_t) * static_cast<size_t>(pp_prim_pair_count)      , 0));
-    gpuSafe(gpuMallocAsync(&d_pp_second_inds      , sizeof(uint32_t) * static_cast<size_t>(pp_prim_pair_count)      , 0));
-    gpuSafe(gpuMallocAsync(&d_pd_first_inds       , sizeof(uint32_t) * static_cast<size_t>(pd_prim_pair_count)      , 0));
-    gpuSafe(gpuMallocAsync(&d_pd_second_inds      , sizeof(uint32_t) * static_cast<size_t>(pd_prim_pair_count)      , 0));
-    gpuSafe(gpuMallocAsync(&d_dd_first_inds       , sizeof(uint32_t) * static_cast<size_t>(dd_prim_pair_count)      , 0));
-    gpuSafe(gpuMallocAsync(&d_dd_second_inds      , sizeof(uint32_t) * static_cast<size_t>(dd_prim_pair_count)      , 0));
-    gpuSafe(gpuMallocAsync(&d_ss_first_inds_local , sizeof(uint32_t) * static_cast<size_t>(ss_prim_pair_count_local), 0));
-    gpuSafe(gpuMallocAsync(&d_ss_second_inds_local, sizeof(uint32_t) * static_cast<size_t>(ss_prim_pair_count_local), 0));
-    gpuSafe(gpuMallocAsync(&d_sp_first_inds_local , sizeof(uint32_t) * static_cast<size_t>(sp_prim_pair_count_local), 0));
-    gpuSafe(gpuMallocAsync(&d_sp_second_inds_local, sizeof(uint32_t) * static_cast<size_t>(sp_prim_pair_count_local), 0));
-    gpuSafe(gpuMallocAsync(&d_sd_first_inds_local , sizeof(uint32_t) * static_cast<size_t>(sd_prim_pair_count_local), 0));
-    gpuSafe(gpuMallocAsync(&d_sd_second_inds_local, sizeof(uint32_t) * static_cast<size_t>(sd_prim_pair_count_local), 0));
-    gpuSafe(gpuMallocAsync(&d_pp_first_inds_local , sizeof(uint32_t) * static_cast<size_t>(pp_prim_pair_count_local), 0));
-    gpuSafe(gpuMallocAsync(&d_pp_second_inds_local, sizeof(uint32_t) * static_cast<size_t>(pp_prim_pair_count_local), 0));
-    gpuSafe(gpuMallocAsync(&d_pd_first_inds_local , sizeof(uint32_t) * static_cast<size_t>(pd_prim_pair_count_local), 0));
-    gpuSafe(gpuMallocAsync(&d_pd_second_inds_local, sizeof(uint32_t) * static_cast<size_t>(pd_prim_pair_count_local), 0));
-    gpuSafe(gpuMallocAsync(&d_dd_first_inds_local , sizeof(uint32_t) * static_cast<size_t>(dd_prim_pair_count_local), 0));
-    gpuSafe(gpuMallocAsync(&d_dd_second_inds_local, sizeof(uint32_t) * static_cast<size_t>(dd_prim_pair_count_local), 0));
+    gpuSafe(gpuMallocAsync(&d_ss_first_inds       , sizeof(uint32_t) * static_cast<size_t>(ss_prim_pair_count)      , stream));
+    gpuSafe(gpuMallocAsync(&d_ss_second_inds      , sizeof(uint32_t) * static_cast<size_t>(ss_prim_pair_count)      , stream));
+    gpuSafe(gpuMallocAsync(&d_sp_first_inds       , sizeof(uint32_t) * static_cast<size_t>(sp_prim_pair_count)      , stream));
+    gpuSafe(gpuMallocAsync(&d_sp_second_inds      , sizeof(uint32_t) * static_cast<size_t>(sp_prim_pair_count)      , stream));
+    gpuSafe(gpuMallocAsync(&d_sd_first_inds       , sizeof(uint32_t) * static_cast<size_t>(sd_prim_pair_count)      , stream));
+    gpuSafe(gpuMallocAsync(&d_sd_second_inds      , sizeof(uint32_t) * static_cast<size_t>(sd_prim_pair_count)      , stream));
+    gpuSafe(gpuMallocAsync(&d_pp_first_inds       , sizeof(uint32_t) * static_cast<size_t>(pp_prim_pair_count)      , stream));
+    gpuSafe(gpuMallocAsync(&d_pp_second_inds      , sizeof(uint32_t) * static_cast<size_t>(pp_prim_pair_count)      , stream));
+    gpuSafe(gpuMallocAsync(&d_pd_first_inds       , sizeof(uint32_t) * static_cast<size_t>(pd_prim_pair_count)      , stream));
+    gpuSafe(gpuMallocAsync(&d_pd_second_inds      , sizeof(uint32_t) * static_cast<size_t>(pd_prim_pair_count)      , stream));
+    gpuSafe(gpuMallocAsync(&d_dd_first_inds       , sizeof(uint32_t) * static_cast<size_t>(dd_prim_pair_count)      , stream));
+    gpuSafe(gpuMallocAsync(&d_dd_second_inds      , sizeof(uint32_t) * static_cast<size_t>(dd_prim_pair_count)      , stream));
+    gpuSafe(gpuMallocAsync(&d_ss_first_inds_local , sizeof(uint32_t) * static_cast<size_t>(ss_prim_pair_count_local), stream));
+    gpuSafe(gpuMallocAsync(&d_ss_second_inds_local, sizeof(uint32_t) * static_cast<size_t>(ss_prim_pair_count_local), stream));
+    gpuSafe(gpuMallocAsync(&d_sp_first_inds_local , sizeof(uint32_t) * static_cast<size_t>(sp_prim_pair_count_local), stream));
+    gpuSafe(gpuMallocAsync(&d_sp_second_inds_local, sizeof(uint32_t) * static_cast<size_t>(sp_prim_pair_count_local), stream));
+    gpuSafe(gpuMallocAsync(&d_sd_first_inds_local , sizeof(uint32_t) * static_cast<size_t>(sd_prim_pair_count_local), stream));
+    gpuSafe(gpuMallocAsync(&d_sd_second_inds_local, sizeof(uint32_t) * static_cast<size_t>(sd_prim_pair_count_local), stream));
+    gpuSafe(gpuMallocAsync(&d_pp_first_inds_local , sizeof(uint32_t) * static_cast<size_t>(pp_prim_pair_count_local), stream));
+    gpuSafe(gpuMallocAsync(&d_pp_second_inds_local, sizeof(uint32_t) * static_cast<size_t>(pp_prim_pair_count_local), stream));
+    gpuSafe(gpuMallocAsync(&d_pd_first_inds_local , sizeof(uint32_t) * static_cast<size_t>(pd_prim_pair_count_local), stream));
+    gpuSafe(gpuMallocAsync(&d_pd_second_inds_local, sizeof(uint32_t) * static_cast<size_t>(pd_prim_pair_count_local), stream));
+    gpuSafe(gpuMallocAsync(&d_dd_first_inds_local , sizeof(uint32_t) * static_cast<size_t>(dd_prim_pair_count_local), stream));
+    gpuSafe(gpuMallocAsync(&d_dd_second_inds_local, sizeof(uint32_t) * static_cast<size_t>(dd_prim_pair_count_local), stream));
 
-    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_ss_mat_Q, ss_mat_Q.data(), ss_mat_Q.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_sp_mat_Q, sp_mat_Q.data(), sp_mat_Q.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_sd_mat_Q, sd_mat_Q.data(), sd_mat_Q.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_pp_mat_Q, pp_mat_Q.data(), pp_mat_Q.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_pd_mat_Q, pd_mat_Q.data(), pd_mat_Q.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_dd_mat_Q, dd_mat_Q.data(), dd_mat_Q.size());
+    gpuSafe(gpuMemcpyAsync(d_ss_mat_Q, ss_mat_Q.data(), ss_mat_Q.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_sp_mat_Q, sp_mat_Q.data(), sp_mat_Q.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_sd_mat_Q, sd_mat_Q.data(), sd_mat_Q.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pp_mat_Q, pp_mat_Q.data(), pp_mat_Q.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pd_mat_Q, pd_mat_Q.data(), pd_mat_Q.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_dd_mat_Q, dd_mat_Q.data(), dd_mat_Q.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_ss_first_inds,  ss_first_inds.data(),  ss_first_inds.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_ss_second_inds, ss_second_inds.data(), ss_second_inds.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_sp_first_inds,  sp_first_inds.data(),  sp_first_inds.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_sp_second_inds, sp_second_inds.data(), sp_second_inds.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_sd_first_inds,  sd_first_inds.data(),  sd_first_inds.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_sd_second_inds, sd_second_inds.data(), sd_second_inds.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pp_first_inds,  pp_first_inds.data(),  pp_first_inds.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pp_second_inds, pp_second_inds.data(), pp_second_inds.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pd_first_inds,  pd_first_inds.data(),  pd_first_inds.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pd_second_inds, pd_second_inds.data(), pd_second_inds.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_dd_first_inds,  dd_first_inds.data(),  dd_first_inds.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_dd_second_inds, dd_second_inds.data(), dd_second_inds.size());
+    gpuSafe(gpuMemcpyAsync(d_ss_first_inds,  ss_first_inds.data(),  ss_first_inds.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_ss_second_inds, ss_second_inds.data(), ss_second_inds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_sp_first_inds,  sp_first_inds.data(),  sp_first_inds.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_sp_second_inds, sp_second_inds.data(), sp_second_inds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_sd_first_inds,  sd_first_inds.data(),  sd_first_inds.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_sd_second_inds, sd_second_inds.data(), sd_second_inds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pp_first_inds,  pp_first_inds.data(),  pp_first_inds.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pp_second_inds, pp_second_inds.data(), pp_second_inds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pd_first_inds,  pd_first_inds.data(),  pd_first_inds.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pd_second_inds, pd_second_inds.data(), pd_second_inds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_dd_first_inds,  dd_first_inds.data(),  dd_first_inds.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_dd_second_inds, dd_second_inds.data(), dd_second_inds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_ss_pair_data, ss_pair_data.data(), ss_pair_data.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_sp_pair_data, sp_pair_data.data(), sp_pair_data.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_sd_pair_data, sd_pair_data.data(), sd_pair_data.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_pp_pair_data, pp_pair_data.data(), pp_pair_data.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_pd_pair_data, pd_pair_data.data(), pd_pair_data.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_dd_pair_data, dd_pair_data.data(), dd_pair_data.size());
+    gpuSafe(gpuMemcpyAsync(d_ss_pair_data, ss_pair_data.data(), ss_pair_data.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_sp_pair_data, sp_pair_data.data(), sp_pair_data.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_sd_pair_data, sd_pair_data.data(), sd_pair_data.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pp_pair_data, pp_pair_data.data(), pp_pair_data.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pd_pair_data, pd_pair_data.data(), pd_pair_data.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_dd_pair_data, dd_pair_data.data(), dd_pair_data.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_ss_mat_Q_local, ss_mat_Q_local.data(), ss_mat_Q_local.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_sp_mat_Q_local, sp_mat_Q_local.data(), sp_mat_Q_local.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_sd_mat_Q_local, sd_mat_Q_local.data(), sd_mat_Q_local.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_pp_mat_Q_local, pp_mat_Q_local.data(), pp_mat_Q_local.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_pd_mat_Q_local, pd_mat_Q_local.data(), pd_mat_Q_local.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_dd_mat_Q_local, dd_mat_Q_local.data(), dd_mat_Q_local.size());
+    gpuSafe(gpuMemcpyAsync(d_ss_mat_Q_local, ss_mat_Q_local.data(), ss_mat_Q_local.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_sp_mat_Q_local, sp_mat_Q_local.data(), sp_mat_Q_local.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_sd_mat_Q_local, sd_mat_Q_local.data(), sd_mat_Q_local.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pp_mat_Q_local, pp_mat_Q_local.data(), pp_mat_Q_local.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pd_mat_Q_local, pd_mat_Q_local.data(), pd_mat_Q_local.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_dd_mat_Q_local, dd_mat_Q_local.data(), dd_mat_Q_local.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_ss_first_inds_local,  ss_first_inds_local.data(),  ss_first_inds_local.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_ss_second_inds_local, ss_second_inds_local.data(), ss_second_inds_local.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_sp_first_inds_local,  sp_first_inds_local.data(),  sp_first_inds_local.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_sp_second_inds_local, sp_second_inds_local.data(), sp_second_inds_local.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_sd_first_inds_local,  sd_first_inds_local.data(),  sd_first_inds_local.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_sd_second_inds_local, sd_second_inds_local.data(), sd_second_inds_local.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pp_first_inds_local,  pp_first_inds_local.data(),  pp_first_inds_local.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pp_second_inds_local, pp_second_inds_local.data(), pp_second_inds_local.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pd_first_inds_local,  pd_first_inds_local.data(),  pd_first_inds_local.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pd_second_inds_local, pd_second_inds_local.data(), pd_second_inds_local.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_dd_first_inds_local,  dd_first_inds_local.data(),  dd_first_inds_local.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_dd_second_inds_local, dd_second_inds_local.data(), dd_second_inds_local.size());
+    gpuSafe(gpuMemcpyAsync(d_ss_first_inds_local,  ss_first_inds_local.data(),  ss_first_inds_local.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_ss_second_inds_local, ss_second_inds_local.data(), ss_second_inds_local.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_sp_first_inds_local,  sp_first_inds_local.data(),  sp_first_inds_local.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_sp_second_inds_local, sp_second_inds_local.data(), sp_second_inds_local.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_sd_first_inds_local,  sd_first_inds_local.data(),  sd_first_inds_local.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_sd_second_inds_local, sd_second_inds_local.data(), sd_second_inds_local.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pp_first_inds_local,  pp_first_inds_local.data(),  pp_first_inds_local.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pp_second_inds_local, pp_second_inds_local.data(), pp_second_inds_local.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pd_first_inds_local,  pd_first_inds_local.data(),  pd_first_inds_local.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pd_second_inds_local, pd_second_inds_local.data(), pd_second_inds_local.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_dd_first_inds_local,  dd_first_inds_local.data(),  dd_first_inds_local.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_dd_second_inds_local, dd_second_inds_local.data(), dd_second_inds_local.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_ss_pair_data_local, ss_pair_data_local.data(), ss_pair_data_local.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_sp_pair_data_local, sp_pair_data_local.data(), sp_pair_data_local.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_sd_pair_data_local, sd_pair_data_local.data(), sd_pair_data_local.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_pp_pair_data_local, pp_pair_data_local.data(), pp_pair_data_local.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_pd_pair_data_local, pd_pair_data_local.data(), pd_pair_data_local.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_dd_pair_data_local, dd_pair_data_local.data(), dd_pair_data_local.size());
+    gpuSafe(gpuMemcpyAsync(d_ss_pair_data_local, ss_pair_data_local.data(), ss_pair_data_local.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_sp_pair_data_local, sp_pair_data_local.data(), sp_pair_data_local.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_sd_pair_data_local, sd_pair_data_local.data(), sd_pair_data_local.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pp_pair_data_local, pp_pair_data_local.data(), pp_pair_data_local.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pd_pair_data_local, pd_pair_data_local.data(), pd_pair_data_local.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_dd_pair_data_local, dd_pair_data_local.data(), dd_pair_data_local.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-    gpuSafe(gpuDeviceSynchronize());
+    gpuSafe(gpuStreamSynchronize(stream));
 
     mat_Fock_omp[gpu_id].zero();
 
@@ -5055,9 +5057,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         dim3 num_blocks((ss_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::zeroData<<<num_blocks, threads_per_block>>>(d_mat_J, static_cast<uint32_t>(ss_prim_pair_count_local));
+        gpu::zeroData<<<num_blocks, threads_per_block, 0, stream>>>(d_mat_J, static_cast<uint32_t>(ss_prim_pair_count_local));
 
-        gpuSafe(gpuDeviceSynchronize());
+        gpuSafe(gpuStreamSynchronize(stream));
 
         // set up thread blocks for J
 
@@ -5070,11 +5072,11 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (ss_prim_pair_count > 0)
         {
-            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, ss_mat_D.data(), ss_prim_pair_count);
+            gpuSafe(gpuMemcpyAsync(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
             //omptimers[thread_id].start("    J block SSSS");
 
-            gpu::computeCoulombFockSSSS<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockSSSS<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -5093,8 +5095,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpuSafe(gpuDeviceSynchronize());
-
             //omptimers[thread_id].stop("    J block SSSS");
         }
 
@@ -5103,9 +5103,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (sp_prim_pair_count > 0)
         {
-            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, sp_mat_D.data(), sp_prim_pair_count);
+            gpuSafe(gpuMemcpyAsync(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-            gpu::computeCoulombFockSSSP<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockSSSP<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -5126,7 +5126,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpuSafe(gpuDeviceSynchronize());
         }
 
         // J: (SS|SD)
@@ -5134,9 +5133,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (sd_prim_pair_count > 0)
         {
-            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, sd_mat_D.data(), sd_prim_pair_count);
+            gpuSafe(gpuMemcpyAsync(d_mat_D, sd_mat_D.data(), sd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-            gpu::computeCoulombFockSSSD<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockSSSD<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -5157,7 +5156,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpuSafe(gpuDeviceSynchronize());
         }
 
         // J: (SS|PP)
@@ -5165,9 +5163,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (pp_prim_pair_count > 0)
         {
-            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, pp_mat_D.data(), pp_prim_pair_count);
+            gpuSafe(gpuMemcpyAsync(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-            gpu::computeCoulombFockSSPP<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockSSPP<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -5188,7 +5186,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpuSafe(gpuDeviceSynchronize());
         }
 
         // J: (SS|PD)
@@ -5196,9 +5193,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (pd_prim_pair_count > 0)
         {
-            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, pd_mat_D.data(), pd_prim_pair_count);
+            gpuSafe(gpuMemcpyAsync(d_mat_D, pd_mat_D.data(), pd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-            gpu::computeCoulombFockSSPD<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockSSPD<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -5221,7 +5218,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpuSafe(gpuDeviceSynchronize());
         }
 
         // J: (SS|DD)
@@ -5229,9 +5225,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (dd_prim_pair_count > 0)
         {
-            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, dd_mat_D.data(), dd_prim_pair_count);
+            gpuSafe(gpuMemcpyAsync(d_mat_D, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-            gpu::computeCoulombFockSSDD<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockSSDD<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -5252,10 +5248,11 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpuSafe(gpuDeviceSynchronize());
         }
 
-        gpu::chunkedMemcpyAsyncDeviceToHost<double>(mat_J.data(), d_mat_J, ss_prim_pair_count_local);
+        gpuSafe(gpuMemcpyAsync(mat_J.data(), d_mat_J, ss_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+
+        gpuSafe(gpuStreamSynchronize(stream));
 
         for (int64_t ij = 0; ij < ss_prim_pair_count_local; ij++)
         {
@@ -5285,9 +5282,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         dim3 num_blocks((sp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::zeroData<<<num_blocks, threads_per_block>>>(d_mat_J, static_cast<uint32_t>(sp_prim_pair_count_local));
+        gpu::zeroData<<<num_blocks, threads_per_block, 0, stream>>>(d_mat_J, static_cast<uint32_t>(sp_prim_pair_count_local));
 
-        gpuSafe(gpuDeviceSynchronize());
+        gpuSafe(gpuStreamSynchronize(stream));
 
         // set up thread blocks for J
 
@@ -5300,9 +5297,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (ss_prim_pair_count > 0)
         {
-            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, ss_mat_D.data(), ss_prim_pair_count);
+            gpuSafe(gpuMemcpyAsync(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-            gpu::computeCoulombFockSPSS<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockSPSS<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -5323,7 +5320,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpuSafe(gpuDeviceSynchronize());
         }
 
         // J: (SP|SP)
@@ -5331,9 +5327,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (sp_prim_pair_count > 0)
         {
-            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, sp_mat_D.data(), sp_prim_pair_count);
+            gpuSafe(gpuMemcpyAsync(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-            gpu::computeCoulombFockSPSP<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockSPSP<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -5354,7 +5350,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpuSafe(gpuDeviceSynchronize());
         }
 
         // J: (SP|SD)
@@ -5362,9 +5357,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (sd_prim_pair_count > 0)
         {
-            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, sd_mat_D.data(), sd_prim_pair_count);
+            gpuSafe(gpuMemcpyAsync(d_mat_D, sd_mat_D.data(), sd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-            gpu::computeCoulombFockSPSD<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockSPSD<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -5387,7 +5382,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpuSafe(gpuDeviceSynchronize());
         }
 
         // J: (SP|PP)
@@ -5395,9 +5389,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (pp_prim_pair_count > 0)
         {
-            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, pp_mat_D.data(), pp_prim_pair_count);
+            gpuSafe(gpuMemcpyAsync(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-            gpu::computeCoulombFockSPPP<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockSPPP<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -5418,7 +5412,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpuSafe(gpuDeviceSynchronize());
         }
 
         // J: (SP|PD)
@@ -5426,9 +5419,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (pd_prim_pair_count > 0)
         {
-            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, pd_mat_D.data(), pd_prim_pair_count);
+            gpuSafe(gpuMemcpyAsync(d_mat_D, pd_mat_D.data(), pd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-            gpu::computeCoulombFockSPPD<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockSPPD<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -5451,7 +5444,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpuSafe(gpuDeviceSynchronize());
         }
 
         // J: (SP|DD)
@@ -5459,9 +5451,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (dd_prim_pair_count > 0)
         {
-            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, dd_mat_D.data(), dd_prim_pair_count);
+            gpuSafe(gpuMemcpyAsync(d_mat_D, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-            gpu::computeCoulombFockSPDD<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockSPDD<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -5484,10 +5476,11 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpuSafe(gpuDeviceSynchronize());
         }
 
-        gpu::chunkedMemcpyAsyncDeviceToHost<double>(mat_J.data(), d_mat_J, sp_prim_pair_count_local);
+        gpuSafe(gpuMemcpyAsync(mat_J.data(), d_mat_J, sp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+
+        gpuSafe(gpuStreamSynchronize(stream));
 
         for (int64_t ij = 0; ij < sp_prim_pair_count_local; ij++)
         {
@@ -5525,9 +5518,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         dim3 num_blocks((pp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::zeroData<<<num_blocks, threads_per_block>>>(d_mat_J, static_cast<uint32_t>(pp_prim_pair_count_local));
+        gpu::zeroData<<<num_blocks, threads_per_block, 0, stream>>>(d_mat_J, static_cast<uint32_t>(pp_prim_pair_count_local));
 
-        gpuSafe(gpuDeviceSynchronize());
+        gpuSafe(gpuStreamSynchronize(stream));
 
         // set up thread blocks for J
 
@@ -5540,9 +5533,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (ss_prim_pair_count > 0)
         {
-            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, ss_mat_D.data(), ss_prim_pair_count);
+            gpuSafe(gpuMemcpyAsync(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-            gpu::computeCoulombFockPPSS<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockPPSS<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -5563,7 +5556,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpuSafe(gpuDeviceSynchronize());
         }
 
         // J: (PP|SP)
@@ -5571,9 +5563,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (sp_prim_pair_count > 0)
         {
-            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, sp_mat_D.data(), sp_prim_pair_count);
+            gpuSafe(gpuMemcpyAsync(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-            gpu::computeCoulombFockPPSP<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockPPSP<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -5594,7 +5586,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpuSafe(gpuDeviceSynchronize());
         }
 
         // J: (PP|SD)
@@ -5602,9 +5593,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (sd_prim_pair_count > 0)
         {
-            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, sd_mat_D.data(), sd_prim_pair_count);
+            gpuSafe(gpuMemcpyAsync(d_mat_D, sd_mat_D.data(), sd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-            gpu::computeCoulombFockPPSD<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockPPSD<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -5627,7 +5618,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpuSafe(gpuDeviceSynchronize());
         }
 
         // J: (PP|PP)
@@ -5635,9 +5625,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (pp_prim_pair_count > 0)
         {
-            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, pp_mat_D.data(), pp_prim_pair_count);
+            gpuSafe(gpuMemcpyAsync(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-            gpu::computeCoulombFockPPPP<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockPPPP<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -5656,7 +5646,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpuSafe(gpuDeviceSynchronize());
         }
 
         // J: (PP|PD)
@@ -5664,9 +5653,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (pd_prim_pair_count > 0)
         {
-            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, pd_mat_D.data(), pd_prim_pair_count);
+            gpuSafe(gpuMemcpyAsync(d_mat_D, pd_mat_D.data(), pd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-            gpu::computeCoulombFockPPPD<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockPPPD<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -5687,7 +5676,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpuSafe(gpuDeviceSynchronize());
         }
 
         // J: (PP|DD)
@@ -5697,9 +5685,9 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             //omptimers[thread_id].start("    J block PPDD");
 
-            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, dd_mat_D.data(), dd_prim_pair_count);
+            gpuSafe(gpuMemcpyAsync(d_mat_D, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-            gpu::computeCoulombFockPPDD<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockPPDD<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -5720,12 +5708,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpuSafe(gpuDeviceSynchronize());
-
             //omptimers[thread_id].stop("    J block PPDD");
         }
 
-        gpu::chunkedMemcpyAsyncDeviceToHost<double>(mat_J.data(), d_mat_J, pp_prim_pair_count_local);
+        gpuSafe(gpuMemcpyAsync(mat_J.data(), d_mat_J, pp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+
+        gpuSafe(gpuStreamSynchronize(stream));
 
         for (int64_t ij = 0; ij < pp_prim_pair_count_local; ij++)
         {
@@ -5771,9 +5759,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         dim3 num_blocks((sd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::zeroData<<<num_blocks, threads_per_block>>>(d_mat_J, static_cast<uint32_t>(sd_prim_pair_count_local));
+        gpu::zeroData<<<num_blocks, threads_per_block, 0, stream>>>(d_mat_J, static_cast<uint32_t>(sd_prim_pair_count_local));
 
-        gpuSafe(gpuDeviceSynchronize());
+        gpuSafe(gpuStreamSynchronize(stream));
 
         // set up thread blocks for J
 
@@ -5786,9 +5774,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (ss_prim_pair_count > 0)
         {
-            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, ss_mat_D.data(), ss_prim_pair_count);
+            gpuSafe(gpuMemcpyAsync(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-            gpu::computeCoulombFockSDSS<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockSDSS<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -5809,7 +5797,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpuSafe(gpuDeviceSynchronize());
         }
 
         // J: (SD|SP)
@@ -5817,9 +5804,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (sp_prim_pair_count > 0)
         {
-            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, sp_mat_D.data(), sp_prim_pair_count);
+            gpuSafe(gpuMemcpyAsync(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-            gpu::computeCoulombFockSDSP<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockSDSP<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -5842,7 +5829,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpuSafe(gpuDeviceSynchronize());
         }
 
         // J: (SD|SD)
@@ -5850,9 +5836,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (sd_prim_pair_count > 0)
         {
-            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, sd_mat_D.data(), sd_prim_pair_count);
+            gpuSafe(gpuMemcpyAsync(d_mat_D, sd_mat_D.data(), sd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-            gpu::computeCoulombFockSDSD<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockSDSD<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -5873,7 +5859,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpuSafe(gpuDeviceSynchronize());
         }
 
         // J: (SD|PP)
@@ -5881,9 +5866,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (pp_prim_pair_count > 0)
         {
-            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, pp_mat_D.data(), pp_prim_pair_count);
+            gpuSafe(gpuMemcpyAsync(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-            gpu::computeCoulombFockSDPP<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockSDPP<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -5906,7 +5891,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpuSafe(gpuDeviceSynchronize());
         }
 
         // J: (SD|PD)
@@ -5914,9 +5898,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (pd_prim_pair_count > 0)
         {
-            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, pd_mat_D.data(), pd_prim_pair_count);
+            gpuSafe(gpuMemcpyAsync(d_mat_D, pd_mat_D.data(), pd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-            gpu::computeCoulombFockSDPD<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockSDPD<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -5939,7 +5923,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpuSafe(gpuDeviceSynchronize());
         }
 
         // J: (SD|DD)
@@ -5949,9 +5932,9 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             //omptimers[thread_id].start("    J block SDDD");
 
-            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, dd_mat_D.data(), dd_prim_pair_count);
+            gpuSafe(gpuMemcpyAsync(d_mat_D, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-            gpu::computeCoulombFockSDDD<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockSDDD<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -5972,12 +5955,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpuSafe(gpuDeviceSynchronize());
-
             //omptimers[thread_id].stop("    J block SDDD");
         }
 
-        gpu::chunkedMemcpyAsyncDeviceToHost<double>(mat_J.data(), d_mat_J, sd_prim_pair_count_local);
+        gpuSafe(gpuMemcpyAsync(mat_J.data(), d_mat_J, sd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+
+        gpuSafe(gpuStreamSynchronize(stream));
 
         for (int64_t ij = 0; ij < sd_prim_pair_count_local; ij++)
         {
@@ -6015,9 +5998,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         dim3 num_blocks((pd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::zeroData<<<num_blocks, threads_per_block>>>(d_mat_J, static_cast<uint32_t>(pd_prim_pair_count_local));
+        gpu::zeroData<<<num_blocks, threads_per_block, 0, stream>>>(d_mat_J, static_cast<uint32_t>(pd_prim_pair_count_local));
 
-        gpuSafe(gpuDeviceSynchronize());
+        gpuSafe(gpuStreamSynchronize(stream));
 
         // set up thread blocks for J
 
@@ -6030,9 +6013,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (ss_prim_pair_count > 0)
         {
-            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, ss_mat_D.data(), ss_prim_pair_count);
+            gpuSafe(gpuMemcpyAsync(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-            gpu::computeCoulombFockPDSS<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockPDSS<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -6055,7 +6038,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpuSafe(gpuDeviceSynchronize());
         }
 
         // J: (PD|SP)
@@ -6063,9 +6045,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (sp_prim_pair_count > 0)
         {
-            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, sp_mat_D.data(), sp_prim_pair_count);
+            gpuSafe(gpuMemcpyAsync(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-            gpu::computeCoulombFockPDSP<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockPDSP<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -6088,7 +6070,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpuSafe(gpuDeviceSynchronize());
         }
 
         // J: (PD|SD)
@@ -6098,9 +6079,9 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             //omptimers[thread_id].start("    J block PDSD");
 
-            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, sd_mat_D.data(), sd_prim_pair_count);
+            gpuSafe(gpuMemcpyAsync(d_mat_D, sd_mat_D.data(), sd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-            gpu::computeCoulombFockPDSD<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockPDSD<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -6123,8 +6104,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpuSafe(gpuDeviceSynchronize());
-
             //omptimers[thread_id].stop("    J block PDSD");
         }
 
@@ -6135,9 +6114,9 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             //omptimers[thread_id].start("    J block PDPP");
 
-            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, pp_mat_D.data(), pp_prim_pair_count);
+            gpuSafe(gpuMemcpyAsync(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-            gpu::computeCoulombFockPDPP<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockPDPP<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -6158,8 +6137,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpuSafe(gpuDeviceSynchronize());
-
             //omptimers[thread_id].stop("    J block PDPP");
         }
 
@@ -6170,9 +6147,9 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             //omptimers[thread_id].start("    J block PDPD");
 
-            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, pd_mat_D.data(), pd_prim_pair_count);
+            gpuSafe(gpuMemcpyAsync(d_mat_D, pd_mat_D.data(), pd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-            gpu::computeCoulombFockPDPD<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockPDPD<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -6193,8 +6170,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpuSafe(gpuDeviceSynchronize());
-
             //omptimers[thread_id].stop("    J block PDPD");
         }
 
@@ -6205,9 +6180,9 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             //omptimers[thread_id].start("    J block PDDD");
 
-            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, dd_mat_D.data(), dd_prim_pair_count);
+            gpuSafe(gpuMemcpyAsync(d_mat_D, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-            gpu::computeCoulombFockPDDD0<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockPDDD0<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -6228,7 +6203,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockPDDD1<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockPDDD1<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -6249,7 +6224,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockPDDD2<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockPDDD2<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -6270,7 +6245,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockPDDD3<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockPDDD3<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -6291,7 +6266,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockPDDD4<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockPDDD4<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -6312,7 +6287,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockPDDD5<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockPDDD5<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -6333,7 +6308,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockPDDD6<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockPDDD6<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -6353,13 +6328,13 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-
-            gpuSafe(gpuDeviceSynchronize());
 
             //omptimers[thread_id].stop("    J block PDDD");
         }
 
-        gpu::chunkedMemcpyAsyncDeviceToHost<double>(mat_J.data(), d_mat_J, pd_prim_pair_count_local);
+        gpuSafe(gpuMemcpyAsync(mat_J.data(), d_mat_J, pd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+
+        gpuSafe(gpuStreamSynchronize(stream));
 
         for (int64_t ij = 0; ij < pd_prim_pair_count_local; ij++)
         {
@@ -6404,9 +6379,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         dim3 num_blocks((dd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::zeroData<<<num_blocks, threads_per_block>>>(d_mat_J, static_cast<uint32_t>(dd_prim_pair_count_local));
+        gpu::zeroData<<<num_blocks, threads_per_block, 0, stream>>>(d_mat_J, static_cast<uint32_t>(dd_prim_pair_count_local));
 
-        gpuSafe(gpuDeviceSynchronize());
+        gpuSafe(gpuStreamSynchronize(stream));
 
         // set up thread blocks for J
 
@@ -6421,13 +6396,13 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             //omptimers[thread_id].start("    J block DDSS");
 
-            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, ss_mat_D.data(), ss_prim_pair_count);
+            gpuSafe(gpuMemcpyAsync(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
             dim3 dd_threads_per_block (TILE_DIM_SMALL, TILE_DIM_LARGE);
 
             dim3 dd_num_blocks ((dd_prim_pair_count_local + dd_threads_per_block.x - 1) / dd_threads_per_block.x, 1);
 
-            gpu::computeCoulombFockDDSS<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDSS<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -6448,8 +6423,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpuSafe(gpuDeviceSynchronize());
-
             //omptimers[thread_id].stop("    J block DDSS");
         }
 
@@ -6460,13 +6433,13 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             //omptimers[thread_id].start("    J block DDSP");
 
-            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, sp_mat_D.data(), sp_prim_pair_count);
+            gpuSafe(gpuMemcpyAsync(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
             dim3 dd_threads_per_block (TILE_DIM_SMALL, TILE_DIM_LARGE);
 
             dim3 dd_num_blocks ((dd_prim_pair_count_local + dd_threads_per_block.x - 1) / dd_threads_per_block.x, 1);
 
-            gpu::computeCoulombFockDDSP<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDSP<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -6489,8 +6462,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpuSafe(gpuDeviceSynchronize());
-
             //omptimers[thread_id].stop("    J block DDSP");
         }
 
@@ -6501,13 +6472,13 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             //omptimers[thread_id].start("    J block DDSD");
 
-            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, sd_mat_D.data(), sd_prim_pair_count);
+            gpuSafe(gpuMemcpyAsync(d_mat_D, sd_mat_D.data(), sd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
             dim3 dd_threads_per_block (TILE_DIM_SMALL, TILE_DIM_LARGE);
 
             dim3 dd_num_blocks ((dd_prim_pair_count_local + dd_threads_per_block.x - 1) / dd_threads_per_block.x, 1);
 
-            gpu::computeCoulombFockDDSD<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDSD<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -6528,8 +6499,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpuSafe(gpuDeviceSynchronize());
-
             //omptimers[thread_id].stop("    J block DDSD");
         }
 
@@ -6540,13 +6509,13 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             //omptimers[thread_id].start("    J block DDPP");
 
-            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, pp_mat_D.data(), pp_prim_pair_count);
+            gpuSafe(gpuMemcpyAsync(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
             dim3 dd_threads_per_block (TILE_DIM_SMALL, TILE_DIM_LARGE);
 
             dim3 dd_num_blocks ((dd_prim_pair_count_local + dd_threads_per_block.x - 1) / dd_threads_per_block.x, 1);
 
-            gpu::computeCoulombFockDDPP<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDPP<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -6567,8 +6536,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpuSafe(gpuDeviceSynchronize());
-
             //omptimers[thread_id].stop("    J block DDPP");
         }
 
@@ -6579,13 +6546,13 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             //omptimers[thread_id].start("    J block DDPD");
 
-            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, pd_mat_D.data(), pd_prim_pair_count);
+            gpuSafe(gpuMemcpyAsync(d_mat_D, pd_mat_D.data(), pd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
             dim3 dd_threads_per_block (TILE_DIM_SMALL, TILE_DIM_LARGE);
 
             dim3 dd_num_blocks ((dd_prim_pair_count_local + dd_threads_per_block.x - 1) / dd_threads_per_block.x, 1);
 
-            gpu::computeCoulombFockDDPD0<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDPD0<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -6606,7 +6573,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDPD1<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDPD1<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -6627,7 +6594,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDPD2<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDPD2<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -6648,7 +6615,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDPD3<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDPD3<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -6669,7 +6636,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDPD4<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDPD4<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -6690,7 +6657,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDPD5<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDPD5<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -6711,7 +6678,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDPD6<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDPD6<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -6732,7 +6699,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDPD7<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDPD7<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -6753,7 +6720,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDPD8<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDPD8<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -6774,7 +6741,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDPD9<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDPD9<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -6794,8 +6761,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-
-            gpuSafe(gpuDeviceSynchronize());
 
             //omptimers[thread_id].stop("    J block DDPD");
         }
@@ -6807,13 +6772,13 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             //omptimers[thread_id].start("    J block DDDD");
 
-            gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D, dd_mat_D.data(), dd_prim_pair_count);
+            gpuSafe(gpuMemcpyAsync(d_mat_D, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
             dim3 dd_threads_per_block (TILE_DIM_SMALL, TILE_DIM_LARGE);
 
             dim3 dd_num_blocks ((dd_prim_pair_count_local + dd_threads_per_block.x - 1) / dd_threads_per_block.x, 1);
 
-            gpu::computeCoulombFockDDDD0<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD0<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -6832,7 +6797,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD1<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD1<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -6851,7 +6816,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD2<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD2<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -6870,7 +6835,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD3<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD3<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -6889,7 +6854,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD4<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD4<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -6908,7 +6873,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD5<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD5<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -6927,7 +6892,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD6<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD6<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -6946,7 +6911,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD7<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD7<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -6965,7 +6930,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD8<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD8<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -6984,7 +6949,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD9<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD9<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -7003,7 +6968,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD10<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD10<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -7022,7 +6987,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD11<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD11<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -7041,7 +7006,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD12<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD12<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -7060,7 +7025,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD13<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD13<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -7079,7 +7044,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD14<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD14<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -7098,7 +7063,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD15<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD15<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -7117,7 +7082,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD16<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD16<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -7136,7 +7101,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD17<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD17<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -7155,7 +7120,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD18<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD18<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -7174,7 +7139,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD19<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD19<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -7193,7 +7158,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD20<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD20<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -7212,7 +7177,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD21<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD21<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -7231,7 +7196,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD22<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD22<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -7250,7 +7215,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD23<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD23<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -7269,7 +7234,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD24<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD24<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -7288,7 +7253,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD25<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD25<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -7307,7 +7272,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD26<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD26<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -7326,7 +7291,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD27<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD27<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -7345,7 +7310,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD28<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD28<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -7364,7 +7329,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD29<<<dd_num_blocks, dd_threads_per_block>>>(
+            gpu::computeCoulombFockDDDD29<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -7382,13 +7347,13 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-
-            gpuSafe(gpuDeviceSynchronize());
 
             //omptimers[thread_id].stop("    J block DDDD");
         }
 
-        gpu::chunkedMemcpyAsyncDeviceToHost<double>(mat_J.data(), d_mat_J, dd_prim_pair_count_local);
+        gpuSafe(gpuMemcpyAsync(mat_J.data(), d_mat_J, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+
+        gpuSafe(gpuStreamSynchronize(stream));
 
         for (int64_t ij = 0; ij < dd_prim_pair_count_local; ij++)
         {
@@ -7424,65 +7389,65 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     }  // end of compute J
 
-    gpuSafe(gpuDeviceSynchronize());
+    gpuSafe(gpuStreamSynchronize(stream));
 
     omptimers[thread_id].stop("J compute");
 
 #pragma omp barrier
 
-    gpuSafe(gpuFreeAsync(d_mat_D,              0));
-    gpuSafe(gpuFreeAsync(d_mat_J,              0));
-    gpuSafe(gpuFreeAsync(d_ss_mat_Q,           0));
-    gpuSafe(gpuFreeAsync(d_sp_mat_Q,           0));
-    gpuSafe(gpuFreeAsync(d_sd_mat_Q,           0));
-    gpuSafe(gpuFreeAsync(d_pp_mat_Q,           0));
-    gpuSafe(gpuFreeAsync(d_pd_mat_Q,           0));
-    gpuSafe(gpuFreeAsync(d_dd_mat_Q,           0));
-    gpuSafe(gpuFreeAsync(d_ss_pair_data,       0));
-    gpuSafe(gpuFreeAsync(d_sp_pair_data,       0));
-    gpuSafe(gpuFreeAsync(d_sd_pair_data,       0));
-    gpuSafe(gpuFreeAsync(d_pp_pair_data,       0));
-    gpuSafe(gpuFreeAsync(d_pd_pair_data,       0));
-    gpuSafe(gpuFreeAsync(d_dd_pair_data,       0));
-    gpuSafe(gpuFreeAsync(d_ss_mat_Q_local,     0));
-    gpuSafe(gpuFreeAsync(d_sp_mat_Q_local,     0));
-    gpuSafe(gpuFreeAsync(d_sd_mat_Q_local,     0));
-    gpuSafe(gpuFreeAsync(d_pp_mat_Q_local,     0));
-    gpuSafe(gpuFreeAsync(d_pd_mat_Q_local,     0));
-    gpuSafe(gpuFreeAsync(d_dd_mat_Q_local,     0));
-    gpuSafe(gpuFreeAsync(d_ss_pair_data_local, 0));
-    gpuSafe(gpuFreeAsync(d_sp_pair_data_local, 0));
-    gpuSafe(gpuFreeAsync(d_sd_pair_data_local, 0));
-    gpuSafe(gpuFreeAsync(d_pp_pair_data_local, 0));
-    gpuSafe(gpuFreeAsync(d_pd_pair_data_local, 0));
-    gpuSafe(gpuFreeAsync(d_dd_pair_data_local, 0));
+    gpuSafe(gpuFreeAsync(d_mat_D,              stream));
+    gpuSafe(gpuFreeAsync(d_mat_J,              stream));
+    gpuSafe(gpuFreeAsync(d_ss_mat_Q,           stream));
+    gpuSafe(gpuFreeAsync(d_sp_mat_Q,           stream));
+    gpuSafe(gpuFreeAsync(d_sd_mat_Q,           stream));
+    gpuSafe(gpuFreeAsync(d_pp_mat_Q,           stream));
+    gpuSafe(gpuFreeAsync(d_pd_mat_Q,           stream));
+    gpuSafe(gpuFreeAsync(d_dd_mat_Q,           stream));
+    gpuSafe(gpuFreeAsync(d_ss_pair_data,       stream));
+    gpuSafe(gpuFreeAsync(d_sp_pair_data,       stream));
+    gpuSafe(gpuFreeAsync(d_sd_pair_data,       stream));
+    gpuSafe(gpuFreeAsync(d_pp_pair_data,       stream));
+    gpuSafe(gpuFreeAsync(d_pd_pair_data,       stream));
+    gpuSafe(gpuFreeAsync(d_dd_pair_data,       stream));
+    gpuSafe(gpuFreeAsync(d_ss_mat_Q_local,     stream));
+    gpuSafe(gpuFreeAsync(d_sp_mat_Q_local,     stream));
+    gpuSafe(gpuFreeAsync(d_sd_mat_Q_local,     stream));
+    gpuSafe(gpuFreeAsync(d_pp_mat_Q_local,     stream));
+    gpuSafe(gpuFreeAsync(d_pd_mat_Q_local,     stream));
+    gpuSafe(gpuFreeAsync(d_dd_mat_Q_local,     stream));
+    gpuSafe(gpuFreeAsync(d_ss_pair_data_local, stream));
+    gpuSafe(gpuFreeAsync(d_sp_pair_data_local, stream));
+    gpuSafe(gpuFreeAsync(d_sd_pair_data_local, stream));
+    gpuSafe(gpuFreeAsync(d_pp_pair_data_local, stream));
+    gpuSafe(gpuFreeAsync(d_pd_pair_data_local, stream));
+    gpuSafe(gpuFreeAsync(d_dd_pair_data_local, stream));
 
-    gpuSafe(gpuFreeAsync(d_ss_first_inds       , 0));
-    gpuSafe(gpuFreeAsync(d_ss_second_inds      , 0));
-    gpuSafe(gpuFreeAsync(d_sp_first_inds       , 0));
-    gpuSafe(gpuFreeAsync(d_sp_second_inds      , 0));
-    gpuSafe(gpuFreeAsync(d_sd_first_inds       , 0));
-    gpuSafe(gpuFreeAsync(d_sd_second_inds      , 0));
-    gpuSafe(gpuFreeAsync(d_pp_first_inds       , 0));
-    gpuSafe(gpuFreeAsync(d_pp_second_inds      , 0));
-    gpuSafe(gpuFreeAsync(d_pd_first_inds       , 0));
-    gpuSafe(gpuFreeAsync(d_pd_second_inds      , 0));
-    gpuSafe(gpuFreeAsync(d_dd_first_inds       , 0));
-    gpuSafe(gpuFreeAsync(d_dd_second_inds      , 0));
-    gpuSafe(gpuFreeAsync(d_ss_first_inds_local , 0));
-    gpuSafe(gpuFreeAsync(d_ss_second_inds_local, 0));
-    gpuSafe(gpuFreeAsync(d_sp_first_inds_local , 0));
-    gpuSafe(gpuFreeAsync(d_sp_second_inds_local, 0));
-    gpuSafe(gpuFreeAsync(d_sd_first_inds_local , 0));
-    gpuSafe(gpuFreeAsync(d_sd_second_inds_local, 0));
-    gpuSafe(gpuFreeAsync(d_pp_first_inds_local , 0));
-    gpuSafe(gpuFreeAsync(d_pp_second_inds_local, 0));
-    gpuSafe(gpuFreeAsync(d_pd_first_inds_local , 0));
-    gpuSafe(gpuFreeAsync(d_pd_second_inds_local, 0));
-    gpuSafe(gpuFreeAsync(d_dd_first_inds_local , 0));
-    gpuSafe(gpuFreeAsync(d_dd_second_inds_local, 0));
+    gpuSafe(gpuFreeAsync(d_ss_first_inds       , stream));
+    gpuSafe(gpuFreeAsync(d_ss_second_inds      , stream));
+    gpuSafe(gpuFreeAsync(d_sp_first_inds       , stream));
+    gpuSafe(gpuFreeAsync(d_sp_second_inds      , stream));
+    gpuSafe(gpuFreeAsync(d_sd_first_inds       , stream));
+    gpuSafe(gpuFreeAsync(d_sd_second_inds      , stream));
+    gpuSafe(gpuFreeAsync(d_pp_first_inds       , stream));
+    gpuSafe(gpuFreeAsync(d_pp_second_inds      , stream));
+    gpuSafe(gpuFreeAsync(d_pd_first_inds       , stream));
+    gpuSafe(gpuFreeAsync(d_pd_second_inds      , stream));
+    gpuSafe(gpuFreeAsync(d_dd_first_inds       , stream));
+    gpuSafe(gpuFreeAsync(d_dd_second_inds      , stream));
+    gpuSafe(gpuFreeAsync(d_ss_first_inds_local , stream));
+    gpuSafe(gpuFreeAsync(d_ss_second_inds_local, stream));
+    gpuSafe(gpuFreeAsync(d_sp_first_inds_local , stream));
+    gpuSafe(gpuFreeAsync(d_sp_second_inds_local, stream));
+    gpuSafe(gpuFreeAsync(d_sd_first_inds_local , stream));
+    gpuSafe(gpuFreeAsync(d_sd_second_inds_local, stream));
+    gpuSafe(gpuFreeAsync(d_pp_first_inds_local , stream));
+    gpuSafe(gpuFreeAsync(d_pp_second_inds_local, stream));
+    gpuSafe(gpuFreeAsync(d_pd_first_inds_local , stream));
+    gpuSafe(gpuFreeAsync(d_pd_second_inds_local, stream));
+    gpuSafe(gpuFreeAsync(d_dd_first_inds_local , stream));
+    gpuSafe(gpuFreeAsync(d_dd_second_inds_local, stream));
 
-    gpuSafe(gpuDeviceSynchronize());
+    gpuSafe(gpuStreamSynchronize(stream));
 
 #pragma omp barrier
 
@@ -7607,26 +7572,26 @@ computeFockOnGPU(const              CMolecule& molecule,
     double* d_pair_data_K_dp;
     double* d_pair_data_K_dd;
 
-    gpuSafe(gpuMallocAsync(&d_mat_K         , sizeof(double) * static_cast<size_t>(max_pair_inds_count), 0));
-    gpuSafe(gpuMallocAsync(&d_mat_D_full_AO , sizeof(double) * static_cast<size_t>(cart_naos * cart_naos), 0));
-    gpuSafe(gpuMallocAsync(&d_Q_K_ss        , sizeof(double) * Q_K_ss.size(), 0));
-    gpuSafe(gpuMallocAsync(&d_Q_K_sp        , sizeof(double) * Q_K_sp.size(), 0));
-    gpuSafe(gpuMallocAsync(&d_Q_K_ps        , sizeof(double) * Q_K_ps.size(), 0));
-    gpuSafe(gpuMallocAsync(&d_Q_K_sd        , sizeof(double) * Q_K_sd.size(), 0));
-    gpuSafe(gpuMallocAsync(&d_Q_K_ds        , sizeof(double) * Q_K_ds.size(), 0));
-    gpuSafe(gpuMallocAsync(&d_Q_K_pp        , sizeof(double) * Q_K_pp.size(), 0));
-    gpuSafe(gpuMallocAsync(&d_Q_K_pd        , sizeof(double) * Q_K_pd.size(), 0));
-    gpuSafe(gpuMallocAsync(&d_Q_K_dp        , sizeof(double) * Q_K_dp.size(), 0));
-    gpuSafe(gpuMallocAsync(&d_Q_K_dd        , sizeof(double) * Q_K_dd.size(), 0));
-    gpuSafe(gpuMallocAsync(&d_pair_data_K_ss, sizeof(double) * pair_data_K_ss.size(), 0));
-    gpuSafe(gpuMallocAsync(&d_pair_data_K_sp, sizeof(double) * pair_data_K_sp.size(), 0));
-    gpuSafe(gpuMallocAsync(&d_pair_data_K_ps, sizeof(double) * pair_data_K_ps.size(), 0));
-    gpuSafe(gpuMallocAsync(&d_pair_data_K_sd, sizeof(double) * pair_data_K_sd.size(), 0));
-    gpuSafe(gpuMallocAsync(&d_pair_data_K_ds, sizeof(double) * pair_data_K_ds.size(), 0));
-    gpuSafe(gpuMallocAsync(&d_pair_data_K_pp, sizeof(double) * pair_data_K_pp.size(), 0));
-    gpuSafe(gpuMallocAsync(&d_pair_data_K_pd, sizeof(double) * pair_data_K_pd.size(), 0));
-    gpuSafe(gpuMallocAsync(&d_pair_data_K_dp, sizeof(double) * pair_data_K_dp.size(), 0));
-    gpuSafe(gpuMallocAsync(&d_pair_data_K_dd, sizeof(double) * pair_data_K_dd.size(), 0));
+    gpuSafe(gpuMallocAsync(&d_mat_K         , sizeof(double) * static_cast<size_t>(max_pair_inds_count), stream));
+    gpuSafe(gpuMallocAsync(&d_mat_D_full_AO , sizeof(double) * static_cast<size_t>(cart_naos * cart_naos), stream));
+    gpuSafe(gpuMallocAsync(&d_Q_K_ss        , sizeof(double) * Q_K_ss.size(), stream));
+    gpuSafe(gpuMallocAsync(&d_Q_K_sp        , sizeof(double) * Q_K_sp.size(), stream));
+    gpuSafe(gpuMallocAsync(&d_Q_K_ps        , sizeof(double) * Q_K_ps.size(), stream));
+    gpuSafe(gpuMallocAsync(&d_Q_K_sd        , sizeof(double) * Q_K_sd.size(), stream));
+    gpuSafe(gpuMallocAsync(&d_Q_K_ds        , sizeof(double) * Q_K_ds.size(), stream));
+    gpuSafe(gpuMallocAsync(&d_Q_K_pp        , sizeof(double) * Q_K_pp.size(), stream));
+    gpuSafe(gpuMallocAsync(&d_Q_K_pd        , sizeof(double) * Q_K_pd.size(), stream));
+    gpuSafe(gpuMallocAsync(&d_Q_K_dp        , sizeof(double) * Q_K_dp.size(), stream));
+    gpuSafe(gpuMallocAsync(&d_Q_K_dd        , sizeof(double) * Q_K_dd.size(), stream));
+    gpuSafe(gpuMallocAsync(&d_pair_data_K_ss, sizeof(double) * pair_data_K_ss.size(), stream));
+    gpuSafe(gpuMallocAsync(&d_pair_data_K_sp, sizeof(double) * pair_data_K_sp.size(), stream));
+    gpuSafe(gpuMallocAsync(&d_pair_data_K_ps, sizeof(double) * pair_data_K_ps.size(), stream));
+    gpuSafe(gpuMallocAsync(&d_pair_data_K_sd, sizeof(double) * pair_data_K_sd.size(), stream));
+    gpuSafe(gpuMallocAsync(&d_pair_data_K_ds, sizeof(double) * pair_data_K_ds.size(), stream));
+    gpuSafe(gpuMallocAsync(&d_pair_data_K_pp, sizeof(double) * pair_data_K_pp.size(), stream));
+    gpuSafe(gpuMallocAsync(&d_pair_data_K_pd, sizeof(double) * pair_data_K_pd.size(), stream));
+    gpuSafe(gpuMallocAsync(&d_pair_data_K_dp, sizeof(double) * pair_data_K_dp.size(), stream));
+    gpuSafe(gpuMallocAsync(&d_pair_data_K_dd, sizeof(double) * pair_data_K_dd.size(), stream));
 
     uint32_t* d_pair_inds_i_for_K_ss;
     uint32_t* d_pair_inds_k_for_K_ss;
@@ -7668,112 +7633,112 @@ computeFockOnGPU(const              CMolecule& molecule,
     uint32_t* d_pair_displs_K_dp    ;
     uint32_t* d_pair_displs_K_dd    ;
 
-    gpuSafe(gpuMallocAsync(&d_pair_inds_i_for_K_ss, sizeof(uint32_t) * static_cast<size_t>(pair_inds_count_for_K_ss), 0));
-    gpuSafe(gpuMallocAsync(&d_pair_inds_k_for_K_ss, sizeof(uint32_t) * static_cast<size_t>(pair_inds_count_for_K_ss), 0));
-    gpuSafe(gpuMallocAsync(&d_pair_inds_i_for_K_sp, sizeof(uint32_t) * static_cast<size_t>(pair_inds_count_for_K_sp), 0));
-    gpuSafe(gpuMallocAsync(&d_pair_inds_k_for_K_sp, sizeof(uint32_t) * static_cast<size_t>(pair_inds_count_for_K_sp), 0));
-    gpuSafe(gpuMallocAsync(&d_pair_inds_i_for_K_sd, sizeof(uint32_t) * static_cast<size_t>(pair_inds_count_for_K_sd), 0));
-    gpuSafe(gpuMallocAsync(&d_pair_inds_k_for_K_sd, sizeof(uint32_t) * static_cast<size_t>(pair_inds_count_for_K_sd), 0));
-    gpuSafe(gpuMallocAsync(&d_pair_inds_i_for_K_pp, sizeof(uint32_t) * static_cast<size_t>(pair_inds_count_for_K_pp), 0));
-    gpuSafe(gpuMallocAsync(&d_pair_inds_k_for_K_pp, sizeof(uint32_t) * static_cast<size_t>(pair_inds_count_for_K_pp), 0));
-    gpuSafe(gpuMallocAsync(&d_pair_inds_i_for_K_pd, sizeof(uint32_t) * static_cast<size_t>(pair_inds_count_for_K_pd), 0));
-    gpuSafe(gpuMallocAsync(&d_pair_inds_k_for_K_pd, sizeof(uint32_t) * static_cast<size_t>(pair_inds_count_for_K_pd), 0));
-    gpuSafe(gpuMallocAsync(&d_pair_inds_i_for_K_dd, sizeof(uint32_t) * static_cast<size_t>(pair_inds_count_for_K_dd), 0));
-    gpuSafe(gpuMallocAsync(&d_pair_inds_k_for_K_dd, sizeof(uint32_t) * static_cast<size_t>(pair_inds_count_for_K_dd), 0));
-    gpuSafe(gpuMallocAsync(&d_D_inds_K_ss         , sizeof(uint32_t) * D_inds_K_ss.size(), 0));
-    gpuSafe(gpuMallocAsync(&d_D_inds_K_sp         , sizeof(uint32_t) * D_inds_K_sp.size(), 0));
-    gpuSafe(gpuMallocAsync(&d_D_inds_K_ps         , sizeof(uint32_t) * D_inds_K_ps.size(), 0));
-    gpuSafe(gpuMallocAsync(&d_D_inds_K_sd         , sizeof(uint32_t) * D_inds_K_sd.size(), 0));
-    gpuSafe(gpuMallocAsync(&d_D_inds_K_ds         , sizeof(uint32_t) * D_inds_K_ds.size(), 0));
-    gpuSafe(gpuMallocAsync(&d_D_inds_K_pp         , sizeof(uint32_t) * D_inds_K_pp.size(), 0));
-    gpuSafe(gpuMallocAsync(&d_D_inds_K_pd         , sizeof(uint32_t) * D_inds_K_pd.size(), 0));
-    gpuSafe(gpuMallocAsync(&d_D_inds_K_dp         , sizeof(uint32_t) * D_inds_K_dp.size(), 0));
-    gpuSafe(gpuMallocAsync(&d_D_inds_K_dd         , sizeof(uint32_t) * D_inds_K_dd.size(), 0));
-    gpuSafe(gpuMallocAsync(&d_pair_displs_K_ss    , sizeof(uint32_t) * pair_displs_K_ss.size(), 0));
-    gpuSafe(gpuMallocAsync(&d_pair_displs_K_sp    , sizeof(uint32_t) * pair_displs_K_sp.size(), 0));
-    gpuSafe(gpuMallocAsync(&d_pair_displs_K_ps    , sizeof(uint32_t) * pair_displs_K_ps.size(), 0));
-    gpuSafe(gpuMallocAsync(&d_pair_displs_K_sd    , sizeof(uint32_t) * pair_displs_K_sd.size(), 0));
-    gpuSafe(gpuMallocAsync(&d_pair_displs_K_ds    , sizeof(uint32_t) * pair_displs_K_ds.size(), 0));
-    gpuSafe(gpuMallocAsync(&d_pair_displs_K_pp    , sizeof(uint32_t) * pair_displs_K_pp.size(), 0));
-    gpuSafe(gpuMallocAsync(&d_pair_displs_K_pd    , sizeof(uint32_t) * pair_displs_K_pd.size(), 0));
-    gpuSafe(gpuMallocAsync(&d_pair_displs_K_dp    , sizeof(uint32_t) * pair_displs_K_dp.size(), 0));
-    gpuSafe(gpuMallocAsync(&d_pair_displs_K_dd    , sizeof(uint32_t) * pair_displs_K_dd.size(), 0));
-    gpuSafe(gpuMallocAsync(&d_pair_counts_K_ss    , sizeof(uint32_t) * pair_counts_K_ss.size(), 0));
-    gpuSafe(gpuMallocAsync(&d_pair_counts_K_sp    , sizeof(uint32_t) * pair_counts_K_sp.size(), 0));
-    gpuSafe(gpuMallocAsync(&d_pair_counts_K_ps    , sizeof(uint32_t) * pair_counts_K_ps.size(), 0));
-    gpuSafe(gpuMallocAsync(&d_pair_counts_K_sd    , sizeof(uint32_t) * pair_counts_K_sd.size(), 0));
-    gpuSafe(gpuMallocAsync(&d_pair_counts_K_ds    , sizeof(uint32_t) * pair_counts_K_ds.size(), 0));
-    gpuSafe(gpuMallocAsync(&d_pair_counts_K_pp    , sizeof(uint32_t) * pair_counts_K_pp.size(), 0));
-    gpuSafe(gpuMallocAsync(&d_pair_counts_K_pd    , sizeof(uint32_t) * pair_counts_K_pd.size(), 0));
-    gpuSafe(gpuMallocAsync(&d_pair_counts_K_dp    , sizeof(uint32_t) * pair_counts_K_dp.size(), 0));
-    gpuSafe(gpuMallocAsync(&d_pair_counts_K_dd    , sizeof(uint32_t) * pair_counts_K_dd.size(), 0));
+    gpuSafe(gpuMallocAsync(&d_pair_inds_i_for_K_ss, sizeof(uint32_t) * static_cast<size_t>(pair_inds_count_for_K_ss), stream));
+    gpuSafe(gpuMallocAsync(&d_pair_inds_k_for_K_ss, sizeof(uint32_t) * static_cast<size_t>(pair_inds_count_for_K_ss), stream));
+    gpuSafe(gpuMallocAsync(&d_pair_inds_i_for_K_sp, sizeof(uint32_t) * static_cast<size_t>(pair_inds_count_for_K_sp), stream));
+    gpuSafe(gpuMallocAsync(&d_pair_inds_k_for_K_sp, sizeof(uint32_t) * static_cast<size_t>(pair_inds_count_for_K_sp), stream));
+    gpuSafe(gpuMallocAsync(&d_pair_inds_i_for_K_sd, sizeof(uint32_t) * static_cast<size_t>(pair_inds_count_for_K_sd), stream));
+    gpuSafe(gpuMallocAsync(&d_pair_inds_k_for_K_sd, sizeof(uint32_t) * static_cast<size_t>(pair_inds_count_for_K_sd), stream));
+    gpuSafe(gpuMallocAsync(&d_pair_inds_i_for_K_pp, sizeof(uint32_t) * static_cast<size_t>(pair_inds_count_for_K_pp), stream));
+    gpuSafe(gpuMallocAsync(&d_pair_inds_k_for_K_pp, sizeof(uint32_t) * static_cast<size_t>(pair_inds_count_for_K_pp), stream));
+    gpuSafe(gpuMallocAsync(&d_pair_inds_i_for_K_pd, sizeof(uint32_t) * static_cast<size_t>(pair_inds_count_for_K_pd), stream));
+    gpuSafe(gpuMallocAsync(&d_pair_inds_k_for_K_pd, sizeof(uint32_t) * static_cast<size_t>(pair_inds_count_for_K_pd), stream));
+    gpuSafe(gpuMallocAsync(&d_pair_inds_i_for_K_dd, sizeof(uint32_t) * static_cast<size_t>(pair_inds_count_for_K_dd), stream));
+    gpuSafe(gpuMallocAsync(&d_pair_inds_k_for_K_dd, sizeof(uint32_t) * static_cast<size_t>(pair_inds_count_for_K_dd), stream));
+    gpuSafe(gpuMallocAsync(&d_D_inds_K_ss         , sizeof(uint32_t) * D_inds_K_ss.size(), stream));
+    gpuSafe(gpuMallocAsync(&d_D_inds_K_sp         , sizeof(uint32_t) * D_inds_K_sp.size(), stream));
+    gpuSafe(gpuMallocAsync(&d_D_inds_K_ps         , sizeof(uint32_t) * D_inds_K_ps.size(), stream));
+    gpuSafe(gpuMallocAsync(&d_D_inds_K_sd         , sizeof(uint32_t) * D_inds_K_sd.size(), stream));
+    gpuSafe(gpuMallocAsync(&d_D_inds_K_ds         , sizeof(uint32_t) * D_inds_K_ds.size(), stream));
+    gpuSafe(gpuMallocAsync(&d_D_inds_K_pp         , sizeof(uint32_t) * D_inds_K_pp.size(), stream));
+    gpuSafe(gpuMallocAsync(&d_D_inds_K_pd         , sizeof(uint32_t) * D_inds_K_pd.size(), stream));
+    gpuSafe(gpuMallocAsync(&d_D_inds_K_dp         , sizeof(uint32_t) * D_inds_K_dp.size(), stream));
+    gpuSafe(gpuMallocAsync(&d_D_inds_K_dd         , sizeof(uint32_t) * D_inds_K_dd.size(), stream));
+    gpuSafe(gpuMallocAsync(&d_pair_displs_K_ss    , sizeof(uint32_t) * pair_displs_K_ss.size(), stream));
+    gpuSafe(gpuMallocAsync(&d_pair_displs_K_sp    , sizeof(uint32_t) * pair_displs_K_sp.size(), stream));
+    gpuSafe(gpuMallocAsync(&d_pair_displs_K_ps    , sizeof(uint32_t) * pair_displs_K_ps.size(), stream));
+    gpuSafe(gpuMallocAsync(&d_pair_displs_K_sd    , sizeof(uint32_t) * pair_displs_K_sd.size(), stream));
+    gpuSafe(gpuMallocAsync(&d_pair_displs_K_ds    , sizeof(uint32_t) * pair_displs_K_ds.size(), stream));
+    gpuSafe(gpuMallocAsync(&d_pair_displs_K_pp    , sizeof(uint32_t) * pair_displs_K_pp.size(), stream));
+    gpuSafe(gpuMallocAsync(&d_pair_displs_K_pd    , sizeof(uint32_t) * pair_displs_K_pd.size(), stream));
+    gpuSafe(gpuMallocAsync(&d_pair_displs_K_dp    , sizeof(uint32_t) * pair_displs_K_dp.size(), stream));
+    gpuSafe(gpuMallocAsync(&d_pair_displs_K_dd    , sizeof(uint32_t) * pair_displs_K_dd.size(), stream));
+    gpuSafe(gpuMallocAsync(&d_pair_counts_K_ss    , sizeof(uint32_t) * pair_counts_K_ss.size(), stream));
+    gpuSafe(gpuMallocAsync(&d_pair_counts_K_sp    , sizeof(uint32_t) * pair_counts_K_sp.size(), stream));
+    gpuSafe(gpuMallocAsync(&d_pair_counts_K_ps    , sizeof(uint32_t) * pair_counts_K_ps.size(), stream));
+    gpuSafe(gpuMallocAsync(&d_pair_counts_K_sd    , sizeof(uint32_t) * pair_counts_K_sd.size(), stream));
+    gpuSafe(gpuMallocAsync(&d_pair_counts_K_ds    , sizeof(uint32_t) * pair_counts_K_ds.size(), stream));
+    gpuSafe(gpuMallocAsync(&d_pair_counts_K_pp    , sizeof(uint32_t) * pair_counts_K_pp.size(), stream));
+    gpuSafe(gpuMallocAsync(&d_pair_counts_K_pd    , sizeof(uint32_t) * pair_counts_K_pd.size(), stream));
+    gpuSafe(gpuMallocAsync(&d_pair_counts_K_dp    , sizeof(uint32_t) * pair_counts_K_dp.size(), stream));
+    gpuSafe(gpuMallocAsync(&d_pair_counts_K_dd    , sizeof(uint32_t) * pair_counts_K_dd.size(), stream));
 
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_inds_i_for_K_ss, pair_inds_i_for_K_ss.data(), pair_inds_i_for_K_ss.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_inds_k_for_K_ss, pair_inds_k_for_K_ss.data(), pair_inds_k_for_K_ss.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_inds_i_for_K_sp, pair_inds_i_for_K_sp.data(), pair_inds_i_for_K_sp.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_inds_k_for_K_sp, pair_inds_k_for_K_sp.data(), pair_inds_k_for_K_sp.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_inds_i_for_K_sd, pair_inds_i_for_K_sd.data(), pair_inds_i_for_K_sd.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_inds_k_for_K_sd, pair_inds_k_for_K_sd.data(), pair_inds_k_for_K_sd.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_inds_i_for_K_pp, pair_inds_i_for_K_pp.data(), pair_inds_i_for_K_pp.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_inds_k_for_K_pp, pair_inds_k_for_K_pp.data(), pair_inds_k_for_K_pp.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_inds_i_for_K_pd, pair_inds_i_for_K_pd.data(), pair_inds_i_for_K_pd.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_inds_k_for_K_pd, pair_inds_k_for_K_pd.data(), pair_inds_k_for_K_pd.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_inds_i_for_K_dd, pair_inds_i_for_K_dd.data(), pair_inds_i_for_K_dd.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_inds_k_for_K_dd, pair_inds_k_for_K_dd.data(), pair_inds_k_for_K_dd.size());
+    gpuSafe(gpuMemcpyAsync(d_pair_inds_i_for_K_ss, pair_inds_i_for_K_ss.data(), pair_inds_i_for_K_ss.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pair_inds_k_for_K_ss, pair_inds_k_for_K_ss.data(), pair_inds_k_for_K_ss.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pair_inds_i_for_K_sp, pair_inds_i_for_K_sp.data(), pair_inds_i_for_K_sp.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pair_inds_k_for_K_sp, pair_inds_k_for_K_sp.data(), pair_inds_k_for_K_sp.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pair_inds_i_for_K_sd, pair_inds_i_for_K_sd.data(), pair_inds_i_for_K_sd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pair_inds_k_for_K_sd, pair_inds_k_for_K_sd.data(), pair_inds_k_for_K_sd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pair_inds_i_for_K_pp, pair_inds_i_for_K_pp.data(), pair_inds_i_for_K_pp.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pair_inds_k_for_K_pp, pair_inds_k_for_K_pp.data(), pair_inds_k_for_K_pp.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pair_inds_i_for_K_pd, pair_inds_i_for_K_pd.data(), pair_inds_i_for_K_pd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pair_inds_k_for_K_pd, pair_inds_k_for_K_pd.data(), pair_inds_k_for_K_pd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pair_inds_i_for_K_dd, pair_inds_i_for_K_dd.data(), pair_inds_i_for_K_dd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pair_inds_k_for_K_dd, pair_inds_k_for_K_dd.data(), pair_inds_k_for_K_dd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_mat_D_full_AO, cart_dens_ptr, cart_naos * cart_naos);
+    gpuSafe(gpuMemcpyAsync(d_mat_D_full_AO, cart_dens_ptr, cart_naos * cart_naos * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_Q_K_ss, Q_K_ss.data(), Q_K_ss.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_Q_K_sp, Q_K_sp.data(), Q_K_sp.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_Q_K_ps, Q_K_ps.data(), Q_K_ps.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_Q_K_sd, Q_K_sd.data(), Q_K_sd.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_Q_K_ds, Q_K_ds.data(), Q_K_ds.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_Q_K_pp, Q_K_pp.data(), Q_K_pp.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_Q_K_pd, Q_K_pd.data(), Q_K_pd.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_Q_K_dp, Q_K_dp.data(), Q_K_dp.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_Q_K_dd, Q_K_dd.data(), Q_K_dd.size());
+    gpuSafe(gpuMemcpyAsync(d_Q_K_ss, Q_K_ss.data(), Q_K_ss.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_Q_K_sp, Q_K_sp.data(), Q_K_sp.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_Q_K_ps, Q_K_ps.data(), Q_K_ps.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_Q_K_sd, Q_K_sd.data(), Q_K_sd.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_Q_K_ds, Q_K_ds.data(), Q_K_ds.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_Q_K_pp, Q_K_pp.data(), Q_K_pp.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_Q_K_pd, Q_K_pd.data(), Q_K_pd.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_Q_K_dp, Q_K_dp.data(), Q_K_dp.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_Q_K_dd, Q_K_dd.data(), Q_K_dd.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_D_inds_K_ss, D_inds_K_ss.data(), D_inds_K_ss.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_D_inds_K_sp, D_inds_K_sp.data(), D_inds_K_sp.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_D_inds_K_ps, D_inds_K_ps.data(), D_inds_K_ps.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_D_inds_K_sd, D_inds_K_sd.data(), D_inds_K_sd.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_D_inds_K_ds, D_inds_K_ds.data(), D_inds_K_ds.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_D_inds_K_pp, D_inds_K_pp.data(), D_inds_K_pp.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_D_inds_K_pd, D_inds_K_pd.data(), D_inds_K_pd.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_D_inds_K_dp, D_inds_K_dp.data(), D_inds_K_dp.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_D_inds_K_dd, D_inds_K_dd.data(), D_inds_K_dd.size());
+    gpuSafe(gpuMemcpyAsync(d_D_inds_K_ss, D_inds_K_ss.data(), D_inds_K_ss.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_D_inds_K_sp, D_inds_K_sp.data(), D_inds_K_sp.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_D_inds_K_ps, D_inds_K_ps.data(), D_inds_K_ps.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_D_inds_K_sd, D_inds_K_sd.data(), D_inds_K_sd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_D_inds_K_ds, D_inds_K_ds.data(), D_inds_K_ds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_D_inds_K_pp, D_inds_K_pp.data(), D_inds_K_pp.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_D_inds_K_pd, D_inds_K_pd.data(), D_inds_K_pd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_D_inds_K_dp, D_inds_K_dp.data(), D_inds_K_dp.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_D_inds_K_dd, D_inds_K_dd.data(), D_inds_K_dd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_displs_K_ss, pair_displs_K_ss.data(), pair_displs_K_ss.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_displs_K_sp, pair_displs_K_sp.data(), pair_displs_K_sp.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_displs_K_ps, pair_displs_K_ps.data(), pair_displs_K_ps.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_displs_K_sd, pair_displs_K_sd.data(), pair_displs_K_sd.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_displs_K_ds, pair_displs_K_ds.data(), pair_displs_K_ds.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_displs_K_pp, pair_displs_K_pp.data(), pair_displs_K_pp.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_displs_K_pd, pair_displs_K_pd.data(), pair_displs_K_pd.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_displs_K_dp, pair_displs_K_dp.data(), pair_displs_K_dp.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_displs_K_dd, pair_displs_K_dd.data(), pair_displs_K_dd.size());
+    gpuSafe(gpuMemcpyAsync(d_pair_displs_K_ss, pair_displs_K_ss.data(), pair_displs_K_ss.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pair_displs_K_sp, pair_displs_K_sp.data(), pair_displs_K_sp.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pair_displs_K_ps, pair_displs_K_ps.data(), pair_displs_K_ps.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pair_displs_K_sd, pair_displs_K_sd.data(), pair_displs_K_sd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pair_displs_K_ds, pair_displs_K_ds.data(), pair_displs_K_ds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pair_displs_K_pp, pair_displs_K_pp.data(), pair_displs_K_pp.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pair_displs_K_pd, pair_displs_K_pd.data(), pair_displs_K_pd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pair_displs_K_dp, pair_displs_K_dp.data(), pair_displs_K_dp.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pair_displs_K_dd, pair_displs_K_dd.data(), pair_displs_K_dd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_counts_K_ss, pair_counts_K_ss.data(), pair_counts_K_ss.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_counts_K_sp, pair_counts_K_sp.data(), pair_counts_K_sp.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_counts_K_ps, pair_counts_K_ps.data(), pair_counts_K_ps.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_counts_K_sd, pair_counts_K_sd.data(), pair_counts_K_sd.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_counts_K_ds, pair_counts_K_ds.data(), pair_counts_K_ds.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_counts_K_pp, pair_counts_K_pp.data(), pair_counts_K_pp.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_counts_K_pd, pair_counts_K_pd.data(), pair_counts_K_pd.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_counts_K_dp, pair_counts_K_dp.data(), pair_counts_K_dp.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<uint32_t>(d_pair_counts_K_dd, pair_counts_K_dd.data(), pair_counts_K_dd.size());
+    gpuSafe(gpuMemcpyAsync(d_pair_counts_K_ss, pair_counts_K_ss.data(), pair_counts_K_ss.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pair_counts_K_sp, pair_counts_K_sp.data(), pair_counts_K_sp.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pair_counts_K_ps, pair_counts_K_ps.data(), pair_counts_K_ps.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pair_counts_K_sd, pair_counts_K_sd.data(), pair_counts_K_sd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pair_counts_K_ds, pair_counts_K_ds.data(), pair_counts_K_ds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pair_counts_K_pp, pair_counts_K_pp.data(), pair_counts_K_pp.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pair_counts_K_pd, pair_counts_K_pd.data(), pair_counts_K_pd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pair_counts_K_dp, pair_counts_K_dp.data(), pair_counts_K_dp.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pair_counts_K_dd, pair_counts_K_dd.data(), pair_counts_K_dd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_pair_data_K_ss, pair_data_K_ss.data(), pair_data_K_ss.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_pair_data_K_sp, pair_data_K_sp.data(), pair_data_K_sp.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_pair_data_K_ps, pair_data_K_ps.data(), pair_data_K_ps.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_pair_data_K_sd, pair_data_K_sd.data(), pair_data_K_sd.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_pair_data_K_ds, pair_data_K_ds.data(), pair_data_K_ds.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_pair_data_K_pp, pair_data_K_pp.data(), pair_data_K_pp.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_pair_data_K_pd, pair_data_K_pd.data(), pair_data_K_pd.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_pair_data_K_dp, pair_data_K_dp.data(), pair_data_K_dp.size());
-    gpu::chunkedMemcpyAsyncHostToDevice<double>(d_pair_data_K_dd, pair_data_K_dd.data(), pair_data_K_dd.size());
+    gpuSafe(gpuMemcpyAsync(d_pair_data_K_ss, pair_data_K_ss.data(), pair_data_K_ss.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pair_data_K_sp, pair_data_K_sp.data(), pair_data_K_sp.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pair_data_K_ps, pair_data_K_ps.data(), pair_data_K_ps.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pair_data_K_sd, pair_data_K_sd.data(), pair_data_K_sd.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pair_data_K_ds, pair_data_K_ds.data(), pair_data_K_ds.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pair_data_K_pp, pair_data_K_pp.data(), pair_data_K_pp.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pair_data_K_pd, pair_data_K_pd.data(), pair_data_K_pd.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pair_data_K_dp, pair_data_K_dp.data(), pair_data_K_dp.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pair_data_K_dd, pair_data_K_dd.data(), pair_data_K_dd.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-    gpuSafe(gpuDeviceSynchronize());
+    gpuSafe(gpuStreamSynchronize(stream));
 
     omptimers[thread_id].stop("K prep.");
 
@@ -7803,9 +7768,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         dim3 num_blocks((pair_inds_count_for_K_ss + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::zeroData<<<num_blocks, threads_per_block>>>(d_mat_K, static_cast<uint32_t>(pair_inds_count_for_K_ss));
+        gpu::zeroData<<<num_blocks, threads_per_block, 0, stream>>>(d_mat_K, static_cast<uint32_t>(pair_inds_count_for_K_ss));
 
-        gpuSafe(gpuDeviceSynchronize());
+        gpuSafe(gpuStreamSynchronize(stream));
 
         // set up thread blocks for K
 
@@ -7816,7 +7781,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         // K: (SS|SS)
         //     *  *
 
-        gpu::computeExchangeFockSSSS<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockSSSS<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_ss,
                            d_pair_inds_k_for_K_ss,
@@ -7837,12 +7802,10 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpuSafe(gpuDeviceSynchronize());
-
         // K: (SS|SP)
         //     *  *
 
-        gpu::computeExchangeFockSSSP<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockSSSP<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_ss,
                            d_pair_inds_k_for_K_ss,
@@ -7871,12 +7834,10 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpuSafe(gpuDeviceSynchronize());
-
         // K: (SP|SS)
         //     *  *
 
-        gpu::computeExchangeFockSPSS<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockSPSS<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_ss,
                            d_pair_inds_k_for_K_ss,
@@ -7905,12 +7866,10 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpuSafe(gpuDeviceSynchronize());
-
         // K: (SP|SP)
         //     *  *
 
-        gpu::computeExchangeFockSPSP<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockSPSP<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_ss,
                            d_pair_inds_k_for_K_ss,
@@ -7934,12 +7893,10 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpuSafe(gpuDeviceSynchronize());
-
         // K: (SS|SD)
         //     *  *
 
-        gpu::computeExchangeFockSSSD<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockSSSD<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_ss,
                            d_pair_inds_k_for_K_ss,
@@ -7968,12 +7925,10 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpuSafe(gpuDeviceSynchronize());
-
         // K: (SD|SS)
         //     *  *
 
-        gpu::computeExchangeFockSDSS<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockSDSS<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_ss,
                            d_pair_inds_k_for_K_ss,
@@ -8002,12 +7957,10 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpuSafe(gpuDeviceSynchronize());
-
         // K: (SP|SD)
         //     *  *
 
-        gpu::computeExchangeFockSPSD<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockSPSD<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_ss,
                            d_pair_inds_k_for_K_ss,
@@ -8039,12 +7992,10 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpuSafe(gpuDeviceSynchronize());
-
         // K: (SD|SP)
         //     *  *
 
-        gpu::computeExchangeFockSDSP<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockSDSP<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_ss,
                            d_pair_inds_k_for_K_ss,
@@ -8076,12 +8027,10 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpuSafe(gpuDeviceSynchronize());
-
         // K: (SD|SD)
         //     *  *
 
-        gpu::computeExchangeFockSDSD<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockSDSD<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_ss,
                            d_pair_inds_k_for_K_ss,
@@ -8105,7 +8054,9 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpu::chunkedMemcpyAsyncDeviceToHost<double>(mat_K.data(), d_mat_K, pair_inds_count_for_K_ss);
+        gpuSafe(gpuMemcpyAsync(mat_K.data(), d_mat_K, pair_inds_count_for_K_ss * sizeof(double), gpuMemcpyDeviceToHost, stream));
+
+        gpuSafe(gpuStreamSynchronize(stream));
 
         for (int64_t ik = 0; ik < pair_inds_count_for_K_ss; ik++)
         {
@@ -8137,9 +8088,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         dim3 num_blocks((pair_inds_count_for_K_sp + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::zeroData<<<num_blocks, threads_per_block>>>(d_mat_K, static_cast<uint32_t>(pair_inds_count_for_K_sp));
+        gpu::zeroData<<<num_blocks, threads_per_block, 0, stream>>>(d_mat_K, static_cast<uint32_t>(pair_inds_count_for_K_sp));
 
-        gpuSafe(gpuDeviceSynchronize());
+        gpuSafe(gpuStreamSynchronize(stream));
 
         // set up thread blocks for K
 
@@ -8150,7 +8101,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         // K: (SS|PS)
         //     *  *
 
-        gpu::computeExchangeFockSSPS<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockSSPS<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_sp,
                            d_pair_inds_k_for_K_sp,
@@ -8179,12 +8130,10 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpuSafe(gpuDeviceSynchronize());
-
         // K: (SS|PP)
         //     *  *
 
-        gpu::computeExchangeFockSSPP<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockSSPP<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_sp,
                            d_pair_inds_k_for_K_sp,
@@ -8213,12 +8162,10 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpuSafe(gpuDeviceSynchronize());
-
         // K: (SP|PS)
         //     *  *
 
-        gpu::computeExchangeFockSPPS<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockSPPS<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_sp,
                            d_pair_inds_k_for_K_sp,
@@ -8247,12 +8194,10 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpuSafe(gpuDeviceSynchronize());
-
         // K: (SP|PP)
         //     *  *
 
-        gpu::computeExchangeFockSPPP<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockSPPP<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_sp,
                            d_pair_inds_k_for_K_sp,
@@ -8281,12 +8226,10 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpuSafe(gpuDeviceSynchronize());
-
         // K: (SS|PD)
         //     *  *
 
-        gpu::computeExchangeFockSSPD<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockSSPD<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_sp,
                            d_pair_inds_k_for_K_sp,
@@ -8318,12 +8261,10 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpuSafe(gpuDeviceSynchronize());
-
         // K: (SD|PS)
         //     *  *
 
-        gpu::computeExchangeFockSDPS<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockSDPS<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_sp,
                            d_pair_inds_k_for_K_sp,
@@ -8355,12 +8296,10 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpuSafe(gpuDeviceSynchronize());
-
         // K: (SP|PD)
         //     *  *
 
-        gpu::computeExchangeFockSPPD<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockSPPD<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_sp,
                            d_pair_inds_k_for_K_sp,
@@ -8392,12 +8331,10 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpuSafe(gpuDeviceSynchronize());
-
         // K: (SD|PP)
         //     *  *
 
-        gpu::computeExchangeFockSDPP<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockSDPP<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_sp,
                            d_pair_inds_k_for_K_sp,
@@ -8429,12 +8366,10 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpuSafe(gpuDeviceSynchronize());
-
         // K: (SD|PD)
         //     *  *
 
-        gpu::computeExchangeFockSDPD<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockSDPD<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_sp,
                            d_pair_inds_k_for_K_sp,
@@ -8466,7 +8401,9 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpu::chunkedMemcpyAsyncDeviceToHost<double>(mat_K.data(), d_mat_K, pair_inds_count_for_K_sp);
+        gpuSafe(gpuMemcpyAsync(mat_K.data(), d_mat_K, pair_inds_count_for_K_sp * sizeof(double), gpuMemcpyDeviceToHost, stream));
+
+        gpuSafe(gpuStreamSynchronize(stream));
 
         for (int64_t ik = 0; ik < pair_inds_count_for_K_sp; ik++)
         {
@@ -8507,9 +8444,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         dim3 num_blocks((pair_inds_count_for_K_pp + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::zeroData<<<num_blocks, threads_per_block>>>(d_mat_K, static_cast<uint32_t>(pair_inds_count_for_K_pp));
+        gpu::zeroData<<<num_blocks, threads_per_block, 0, stream>>>(d_mat_K, static_cast<uint32_t>(pair_inds_count_for_K_pp));
 
-        gpuSafe(gpuDeviceSynchronize());
+        gpuSafe(gpuStreamSynchronize(stream));
 
         // set up thread blocks for K
 
@@ -8522,7 +8459,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         //omptimers[thread_id].start("    K block PSPS");
 
-        gpu::computeExchangeFockPSPS<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockPSPS<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pp,
                            d_pair_inds_k_for_K_pp,
@@ -8546,8 +8483,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpuSafe(gpuDeviceSynchronize());
-
         //omptimers[thread_id].stop("    K block PSPS");
 
         // K: (PS|PP)
@@ -8555,7 +8490,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         //omptimers[thread_id].start("    K block PSPP");
 
-        gpu::computeExchangeFockPSPP<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockPSPP<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pp,
                            d_pair_inds_k_for_K_pp,
@@ -8584,8 +8519,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpuSafe(gpuDeviceSynchronize());
-
         //omptimers[thread_id].stop("    K block PSPP");
 
         // K: (PP|PS)
@@ -8593,7 +8526,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         //omptimers[thread_id].start("    K block PPPS");
 
-        gpu::computeExchangeFockPPPS<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockPPPS<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pp,
                            d_pair_inds_k_for_K_pp,
@@ -8622,8 +8555,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpuSafe(gpuDeviceSynchronize());
-
         //omptimers[thread_id].stop("    K block PPPS");
 
         // K: (PP|PP)
@@ -8631,7 +8562,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         //omptimers[thread_id].start("    K block PPPP");
 
-        gpu::computeExchangeFockPPPP<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockPPPP<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pp,
                            d_pair_inds_k_for_K_pp,
@@ -8652,8 +8583,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpuSafe(gpuDeviceSynchronize());
-
         //omptimers[thread_id].stop("    K block PPPP");
 
         // K: (PS|PD)
@@ -8661,7 +8590,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         //omptimers[thread_id].start("    K block PSPD");
 
-        gpu::computeExchangeFockPSPD<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockPSPD<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pp,
                            d_pair_inds_k_for_K_pp,
@@ -8693,8 +8622,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpuSafe(gpuDeviceSynchronize());
-
         //omptimers[thread_id].stop("    K block PSPD");
 
         // K: (PD|PS)
@@ -8702,7 +8629,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         //omptimers[thread_id].start("    K block PDPS");
 
-        gpu::computeExchangeFockPDPS<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockPDPS<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pp,
                            d_pair_inds_k_for_K_pp,
@@ -8734,8 +8661,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpuSafe(gpuDeviceSynchronize());
-
         //omptimers[thread_id].stop("    K block PDPS");
 
         // K: (PP|PD)
@@ -8743,7 +8668,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         //omptimers[thread_id].start("    K block PPPD");
 
-        gpu::computeExchangeFockPPPD<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockPPPD<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pp,
                            d_pair_inds_k_for_K_pp,
@@ -8772,8 +8697,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpuSafe(gpuDeviceSynchronize());
-
         //omptimers[thread_id].stop("    K block PPPD");
 
         // K: (PD|PP)
@@ -8781,7 +8704,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         //omptimers[thread_id].start("    K block PDPP");
 
-        gpu::computeExchangeFockPDPP<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockPDPP<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pp,
                            d_pair_inds_k_for_K_pp,
@@ -8810,8 +8733,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpuSafe(gpuDeviceSynchronize());
-
         //omptimers[thread_id].stop("    K block PDPP");
 
         // K: (PD|PD)
@@ -8819,7 +8740,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         //omptimers[thread_id].start("    K block PDPD");
 
-        gpu::computeExchangeFockPDPD<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockPDPD<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pp,
                            d_pair_inds_k_for_K_pp,
@@ -8843,11 +8764,11 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpuSafe(gpuDeviceSynchronize());
-
         //omptimers[thread_id].stop("    K block PDPD");
 
-        gpu::chunkedMemcpyAsyncDeviceToHost<double>(mat_K.data(), d_mat_K, pair_inds_count_for_K_pp);
+        gpuSafe(gpuMemcpyAsync(mat_K.data(), d_mat_K, pair_inds_count_for_K_pp * sizeof(double), gpuMemcpyDeviceToHost, stream));
+
+        gpuSafe(gpuStreamSynchronize(stream));
 
         for (int64_t ik = 0; ik < pair_inds_count_for_K_pp; ik++)
         {
@@ -8895,9 +8816,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         dim3 num_blocks((pair_inds_count_for_K_sd + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::zeroData<<<num_blocks, threads_per_block>>>(d_mat_K, static_cast<uint32_t>(pair_inds_count_for_K_sd));
+        gpu::zeroData<<<num_blocks, threads_per_block, 0, stream>>>(d_mat_K, static_cast<uint32_t>(pair_inds_count_for_K_sd));
 
-        gpuSafe(gpuDeviceSynchronize());
+        gpuSafe(gpuStreamSynchronize(stream));
 
         // set up thread blocks for K
 
@@ -8908,7 +8829,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         // K: (SS|DS)
         //     *  *
 
-        gpu::computeExchangeFockSSDS<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockSSDS<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_sd,
                            d_pair_inds_k_for_K_sd,
@@ -8937,12 +8858,10 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpuSafe(gpuDeviceSynchronize());
-
         // K: (SS|DP)
         //     *  *
 
-        gpu::computeExchangeFockSSDP<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockSSDP<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_sd,
                            d_pair_inds_k_for_K_sd,
@@ -8974,12 +8893,10 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpuSafe(gpuDeviceSynchronize());
-
         // K: (SP|DS)
         //     *  *
 
-        gpu::computeExchangeFockSPDS<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockSPDS<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_sd,
                            d_pair_inds_k_for_K_sd,
@@ -9011,14 +8928,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpuSafe(gpuDeviceSynchronize());
-
         // K: (SP|DP)
         //     *  *
 
         //omptimers[thread_id].start("    K block SPDP");
 
-        gpu::computeExchangeFockSPDP<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockSPDP<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_sd,
                            d_pair_inds_k_for_K_sd,
@@ -9050,8 +8965,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpuSafe(gpuDeviceSynchronize());
-
         //omptimers[thread_id].stop("    K block SPDP");
 
         // K: (SS|DD)
@@ -9059,7 +8972,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         //omptimers[thread_id].start("    K block SSDD");
 
-        gpu::computeExchangeFockSSDD<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockSSDD<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_sd,
                            d_pair_inds_k_for_K_sd,
@@ -9088,8 +9001,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpuSafe(gpuDeviceSynchronize());
-
         //omptimers[thread_id].stop("    K block SSDD");
 
         // K: (SD|DS)
@@ -9097,7 +9008,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         //omptimers[thread_id].start("    K block SDDS");
 
-        gpu::computeExchangeFockSDDS<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockSDDS<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_sd,
                            d_pair_inds_k_for_K_sd,
@@ -9126,8 +9037,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpuSafe(gpuDeviceSynchronize());
-
         //omptimers[thread_id].stop("    K block SDDS");
 
         // K: (SP|DD)
@@ -9135,7 +9044,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         //omptimers[thread_id].start("    K block SPDD");
 
-        gpu::computeExchangeFockSPDD<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockSPDD<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_sd,
                            d_pair_inds_k_for_K_sd,
@@ -9167,8 +9076,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpuSafe(gpuDeviceSynchronize());
-
         //omptimers[thread_id].stop("    K block SPDD");
 
         // K: (SD|DP)
@@ -9176,7 +9083,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         //omptimers[thread_id].start("    K block SDDP");
 
-        gpu::computeExchangeFockSDDP<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockSDDP<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_sd,
                            d_pair_inds_k_for_K_sd,
@@ -9208,8 +9115,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpuSafe(gpuDeviceSynchronize());
-
         //omptimers[thread_id].stop("    K block SDDP");
 
         // K: (SD|DD)
@@ -9217,7 +9122,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         //omptimers[thread_id].start("    K block SDDD");
 
-        gpu::computeExchangeFockSDDD<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockSDDD<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_sd,
                            d_pair_inds_k_for_K_sd,
@@ -9246,11 +9151,11 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpuSafe(gpuDeviceSynchronize());
-
         //omptimers[thread_id].stop("    K block SDDD");
 
-        gpu::chunkedMemcpyAsyncDeviceToHost<double>(mat_K.data(), d_mat_K, pair_inds_count_for_K_sd);
+        gpuSafe(gpuMemcpyAsync(mat_K.data(), d_mat_K, pair_inds_count_for_K_sd * sizeof(double), gpuMemcpyDeviceToHost, stream));
+
+        gpuSafe(gpuStreamSynchronize(stream));
 
         for (int64_t ik = 0; ik < pair_inds_count_for_K_sd; ik++)
         {
@@ -9291,9 +9196,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         dim3 num_blocks((pair_inds_count_for_K_pd + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::zeroData<<<num_blocks, threads_per_block>>>(d_mat_K, static_cast<uint32_t>(pair_inds_count_for_K_pd));
+        gpu::zeroData<<<num_blocks, threads_per_block, 0, stream>>>(d_mat_K, static_cast<uint32_t>(pair_inds_count_for_K_pd));
 
-        gpuSafe(gpuDeviceSynchronize());
+        gpuSafe(gpuStreamSynchronize(stream));
 
         // set up thread blocks for K
 
@@ -9306,7 +9211,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         //omptimers[thread_id].start("    K block PSDS");
 
-        gpu::computeExchangeFockPSDS<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockPSDS<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pd,
                            d_pair_inds_k_for_K_pd,
@@ -9338,8 +9243,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpuSafe(gpuDeviceSynchronize());
-
         //omptimers[thread_id].stop("    K block PSDS");
 
         // K: (PS|DP)
@@ -9347,7 +9250,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         //omptimers[thread_id].start("    K block PSDP");
 
-        gpu::computeExchangeFockPSDP<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockPSDP<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pd,
                            d_pair_inds_k_for_K_pd,
@@ -9379,8 +9282,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpuSafe(gpuDeviceSynchronize());
-
         //omptimers[thread_id].stop("    K block PSDP");
 
         // K: (PP|DS)
@@ -9388,7 +9289,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         //omptimers[thread_id].start("    K block PPDS");
 
-        gpu::computeExchangeFockPPDS<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockPPDS<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pd,
                            d_pair_inds_k_for_K_pd,
@@ -9420,8 +9321,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpuSafe(gpuDeviceSynchronize());
-
         //omptimers[thread_id].stop("    K block PPDS");
 
         // K: (PS|DD)
@@ -9429,7 +9328,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         //omptimers[thread_id].start("    K block PSDD");
 
-        gpu::computeExchangeFockPSDD<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockPSDD<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pd,
                            d_pair_inds_k_for_K_pd,
@@ -9461,8 +9360,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpuSafe(gpuDeviceSynchronize());
-
         //omptimers[thread_id].stop("    K block PSDD");
 
         // K: (PD|DS)
@@ -9470,7 +9367,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         //omptimers[thread_id].start("    K block PDDS");
 
-        gpu::computeExchangeFockPDDS<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockPDDS<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pd,
                            d_pair_inds_k_for_K_pd,
@@ -9502,8 +9399,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpuSafe(gpuDeviceSynchronize());
-
         //omptimers[thread_id].stop("    K block PDDS");
 
         // K: (PP|DP)
@@ -9511,7 +9406,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         //omptimers[thread_id].start("    K block PPDP");
 
-        gpu::computeExchangeFockPPDP<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockPPDP<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pd,
                            d_pair_inds_k_for_K_pd,
@@ -9540,8 +9435,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpuSafe(gpuDeviceSynchronize());
-
         //omptimers[thread_id].stop("    K block PPDP");
 
         // K: (PP|DD)
@@ -9549,7 +9442,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         //omptimers[thread_id].start("    K block PPDD");
 
-        gpu::computeExchangeFockPPDD<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockPPDD<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pd,
                            d_pair_inds_k_for_K_pd,
@@ -9578,8 +9471,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpuSafe(gpuDeviceSynchronize());
-
         //omptimers[thread_id].stop("    K block PPDD");
 
         // K: (PD|DP)
@@ -9587,7 +9478,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         //omptimers[thread_id].start("    K block PDDP");
 
-        gpu::computeExchangeFockPDDP<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockPDDP<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pd,
                            d_pair_inds_k_for_K_pd,
@@ -9616,8 +9507,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpuSafe(gpuDeviceSynchronize());
-
         //omptimers[thread_id].stop("    K block PDDP");
 
         // K: (PD|DD)
@@ -9625,7 +9514,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         //omptimers[thread_id].start("    K block PDDD");
 
-        gpu::computeExchangeFockPDDD0<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockPDDD0<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pd,
                            d_pair_inds_k_for_K_pd,
@@ -9654,7 +9543,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpu::computeExchangeFockPDDD1<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockPDDD1<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pd,
                            d_pair_inds_k_for_K_pd,
@@ -9683,7 +9572,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpu::computeExchangeFockPDDD2<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockPDDD2<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pd,
                            d_pair_inds_k_for_K_pd,
@@ -9712,7 +9601,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpu::computeExchangeFockPDDD3<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockPDDD3<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pd,
                            d_pair_inds_k_for_K_pd,
@@ -9741,7 +9630,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpu::computeExchangeFockPDDD4<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockPDDD4<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pd,
                            d_pair_inds_k_for_K_pd,
@@ -9770,7 +9659,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpu::computeExchangeFockPDDD5<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockPDDD5<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pd,
                            d_pair_inds_k_for_K_pd,
@@ -9799,7 +9688,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpu::computeExchangeFockPDDD6<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockPDDD6<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pd,
                            d_pair_inds_k_for_K_pd,
@@ -9828,7 +9717,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpu::computeExchangeFockPDDD7<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockPDDD7<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pd,
                            d_pair_inds_k_for_K_pd,
@@ -9856,12 +9745,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_boys_func_ft,
                            omega,
                            eri_threshold);
-
-        gpuSafe(gpuDeviceSynchronize());
 
         //omptimers[thread_id].stop("    K block PDDD");
 
-        gpu::chunkedMemcpyAsyncDeviceToHost<double>(mat_K.data(), d_mat_K, pair_inds_count_for_K_pd);
+        gpuSafe(gpuMemcpyAsync(mat_K.data(), d_mat_K, pair_inds_count_for_K_pd * sizeof(double), gpuMemcpyDeviceToHost, stream));
+
+        gpuSafe(gpuStreamSynchronize(stream));
 
         for (int64_t ik = 0; ik < pair_inds_count_for_K_pd; ik++)
         {
@@ -9909,9 +9798,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         dim3 num_blocks((pair_inds_count_for_K_dd + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::zeroData<<<num_blocks, threads_per_block>>>(d_mat_K, static_cast<uint32_t>(pair_inds_count_for_K_dd));
+        gpu::zeroData<<<num_blocks, threads_per_block, 0, stream>>>(d_mat_K, static_cast<uint32_t>(pair_inds_count_for_K_dd));
 
-        gpuSafe(gpuDeviceSynchronize());
+        gpuSafe(gpuStreamSynchronize(stream));
 
         // set up thread blocks for K
 
@@ -9922,7 +9811,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         // K: (DS|DS)
         //     *  *
 
-        gpu::computeExchangeFockDSDS<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockDSDS<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -9946,12 +9835,10 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpuSafe(gpuDeviceSynchronize());
-
         // K: (DS|DP)
         //     *  *
 
-        gpu::computeExchangeFockDSDP<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockDSDP<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -9983,12 +9870,10 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpuSafe(gpuDeviceSynchronize());
-
         // K: (DP|DS)
         //     *  *
 
-        gpu::computeExchangeFockDPDS<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockDPDS<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -10020,14 +9905,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpuSafe(gpuDeviceSynchronize());
-
         // K: (DS|DD)
         //     *  *
 
         //omptimers[thread_id].start("    K block DSDD");
 
-        gpu::computeExchangeFockDSDD<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockDSDD<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -10056,8 +9939,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpuSafe(gpuDeviceSynchronize());
-
         //omptimers[thread_id].stop("    K block DSDD");
 
         // K: (DD|DS)
@@ -10065,7 +9946,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         //omptimers[thread_id].start("    K block DDDS");
 
-        gpu::computeExchangeFockDDDS<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockDDDS<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -10094,8 +9975,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpuSafe(gpuDeviceSynchronize());
-
         //omptimers[thread_id].stop("    K block DDDS");
 
         // K: (DP|DP)
@@ -10103,7 +9982,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         //omptimers[thread_id].start("    K block DPDP");
 
-        gpu::computeExchangeFockDPDP<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockDPDP<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -10127,8 +10006,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpuSafe(gpuDeviceSynchronize());
-
         //omptimers[thread_id].stop("    K block DPDP");
 
         // K: (DP|DD)
@@ -10136,7 +10013,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         //omptimers[thread_id].start("    K block DPDD");
 
-        gpu::computeExchangeFockDPDD0<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockDPDD0<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -10165,7 +10042,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpu::computeExchangeFockDPDD1<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockDPDD1<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -10194,7 +10071,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpu::computeExchangeFockDPDD2<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockDPDD2<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -10223,7 +10100,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpu::computeExchangeFockDPDD3<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockDPDD3<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -10252,7 +10129,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpu::computeExchangeFockDPDD4<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockDPDD4<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -10281,7 +10158,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpu::computeExchangeFockDPDD5<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockDPDD5<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -10310,7 +10187,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpu::computeExchangeFockDPDD6<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockDPDD6<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -10338,8 +10215,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_boys_func_ft,
                            omega,
                            eri_threshold);
-
-        gpuSafe(gpuDeviceSynchronize());
 
         //omptimers[thread_id].stop("    K block DPDD");
 
@@ -10348,7 +10223,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         //omptimers[thread_id].start("    K block DDDP");
 
-        gpu::computeExchangeFockDDDP0<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockDDDP0<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -10377,7 +10252,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpu::computeExchangeFockDDDP1<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockDDDP1<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -10406,7 +10281,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpu::computeExchangeFockDDDP2<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockDDDP2<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -10435,7 +10310,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpu::computeExchangeFockDDDP3<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockDDDP3<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -10464,7 +10339,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpu::computeExchangeFockDDDP4<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockDDDP4<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -10493,7 +10368,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpu::computeExchangeFockDDDP5<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockDDDP5<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -10522,7 +10397,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpu::computeExchangeFockDDDP6<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockDDDP6<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -10550,8 +10425,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_boys_func_ft,
                            omega,
                            eri_threshold);
-
-        gpuSafe(gpuDeviceSynchronize());
 
         //omptimers[thread_id].stop("    K block DDDP");
 
@@ -10560,7 +10433,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         //omptimers[thread_id].start("    K block DDDD");
 
-        gpu::computeExchangeFockDDDD0<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockDDDD0<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -10581,7 +10454,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpu::computeExchangeFockDDDD1<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockDDDD1<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -10602,7 +10475,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpu::computeExchangeFockDDDD2<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockDDDD2<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -10623,7 +10496,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpu::computeExchangeFockDDDD3<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockDDDD3<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -10644,7 +10517,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpu::computeExchangeFockDDDD4<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockDDDD4<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -10665,7 +10538,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpu::computeExchangeFockDDDD5<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockDDDD5<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -10686,7 +10559,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpu::computeExchangeFockDDDD6<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockDDDD6<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -10707,7 +10580,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpu::computeExchangeFockDDDD7<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockDDDD7<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -10728,7 +10601,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpu::computeExchangeFockDDDD8<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockDDDD8<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -10749,7 +10622,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpu::computeExchangeFockDDDD9<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockDDDD9<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -10770,7 +10643,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpu::computeExchangeFockDDDD10<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockDDDD10<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -10791,7 +10664,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpu::computeExchangeFockDDDD11<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockDDDD11<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -10812,7 +10685,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpu::computeExchangeFockDDDD12<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockDDDD12<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -10833,7 +10706,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpu::computeExchangeFockDDDD13<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockDDDD13<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -10854,7 +10727,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpu::computeExchangeFockDDDD14<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockDDDD14<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -10875,7 +10748,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpu::computeExchangeFockDDDD15<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockDDDD15<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -10896,7 +10769,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpu::computeExchangeFockDDDD16<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockDDDD16<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -10917,7 +10790,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpu::computeExchangeFockDDDD17<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockDDDD17<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -10938,7 +10811,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpu::computeExchangeFockDDDD18<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockDDDD18<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -10958,12 +10831,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_boys_func_ft,
                            omega,
                            eri_threshold);
-
-        gpuSafe(gpuDeviceSynchronize());
 
         //omptimers[thread_id].stop("    K block DDDD");
 
-        gpu::chunkedMemcpyAsyncDeviceToHost<double>(mat_K.data(), d_mat_K, pair_inds_count_for_K_dd);
+        gpuSafe(gpuMemcpyAsync(mat_K.data(), d_mat_K, pair_inds_count_for_K_dd * sizeof(double), gpuMemcpyDeviceToHost, stream));
+
+        gpuSafe(gpuStreamSynchronize(stream));
 
         for (int64_t ik = 0; ik < pair_inds_count_for_K_dd; ik++)
         {
@@ -11002,82 +10875,84 @@ computeFockOnGPU(const              CMolecule& molecule,
     }
     }  // end of compute K
 
-    gpuSafe(gpuDeviceSynchronize());
+    gpuSafe(gpuStreamSynchronize(stream));
 
 #pragma omp barrier
 
-    gpuSafe(gpuFreeAsync(d_boys_func_table, 0));
-    gpuSafe(gpuFreeAsync(d_boys_func_ft,    0));
+    gpuSafe(gpuFreeAsync(d_boys_func_table, stream));
+    gpuSafe(gpuFreeAsync(d_boys_func_ft,    stream));
 
-    gpuSafe(gpuFreeAsync(d_s_prim_info, 0));
-    gpuSafe(gpuFreeAsync(d_p_prim_info, 0));
-    gpuSafe(gpuFreeAsync(d_d_prim_info, 0));
+    gpuSafe(gpuFreeAsync(d_s_prim_info, stream));
+    gpuSafe(gpuFreeAsync(d_p_prim_info, stream));
+    gpuSafe(gpuFreeAsync(d_d_prim_info, stream));
 
-    gpuSafe(gpuFreeAsync(d_s_prim_aoinds, 0));
-    gpuSafe(gpuFreeAsync(d_p_prim_aoinds, 0));
-    gpuSafe(gpuFreeAsync(d_d_prim_aoinds, 0));
+    gpuSafe(gpuFreeAsync(d_s_prim_aoinds, stream));
+    gpuSafe(gpuFreeAsync(d_p_prim_aoinds, stream));
+    gpuSafe(gpuFreeAsync(d_d_prim_aoinds, stream));
 
-    gpuSafe(gpuFreeAsync(d_mat_K         , 0));
-    gpuSafe(gpuFreeAsync(d_mat_D_full_AO , 0));
-    gpuSafe(gpuFreeAsync(d_Q_K_ss        , 0));
-    gpuSafe(gpuFreeAsync(d_Q_K_sp        , 0));
-    gpuSafe(gpuFreeAsync(d_Q_K_ps        , 0));
-    gpuSafe(gpuFreeAsync(d_Q_K_sd        , 0));
-    gpuSafe(gpuFreeAsync(d_Q_K_ds        , 0));
-    gpuSafe(gpuFreeAsync(d_Q_K_pp        , 0));
-    gpuSafe(gpuFreeAsync(d_Q_K_pd        , 0));
-    gpuSafe(gpuFreeAsync(d_Q_K_dp        , 0));
-    gpuSafe(gpuFreeAsync(d_Q_K_dd        , 0));
-    gpuSafe(gpuFreeAsync(d_pair_data_K_ss, 0));
-    gpuSafe(gpuFreeAsync(d_pair_data_K_sp, 0));
-    gpuSafe(gpuFreeAsync(d_pair_data_K_ps, 0));
-    gpuSafe(gpuFreeAsync(d_pair_data_K_sd, 0));
-    gpuSafe(gpuFreeAsync(d_pair_data_K_ds, 0));
-    gpuSafe(gpuFreeAsync(d_pair_data_K_pp, 0));
-    gpuSafe(gpuFreeAsync(d_pair_data_K_pd, 0));
-    gpuSafe(gpuFreeAsync(d_pair_data_K_dp, 0));
-    gpuSafe(gpuFreeAsync(d_pair_data_K_dd, 0));
+    gpuSafe(gpuFreeAsync(d_mat_K         , stream));
+    gpuSafe(gpuFreeAsync(d_mat_D_full_AO , stream));
+    gpuSafe(gpuFreeAsync(d_Q_K_ss        , stream));
+    gpuSafe(gpuFreeAsync(d_Q_K_sp        , stream));
+    gpuSafe(gpuFreeAsync(d_Q_K_ps        , stream));
+    gpuSafe(gpuFreeAsync(d_Q_K_sd        , stream));
+    gpuSafe(gpuFreeAsync(d_Q_K_ds        , stream));
+    gpuSafe(gpuFreeAsync(d_Q_K_pp        , stream));
+    gpuSafe(gpuFreeAsync(d_Q_K_pd        , stream));
+    gpuSafe(gpuFreeAsync(d_Q_K_dp        , stream));
+    gpuSafe(gpuFreeAsync(d_Q_K_dd        , stream));
+    gpuSafe(gpuFreeAsync(d_pair_data_K_ss, stream));
+    gpuSafe(gpuFreeAsync(d_pair_data_K_sp, stream));
+    gpuSafe(gpuFreeAsync(d_pair_data_K_ps, stream));
+    gpuSafe(gpuFreeAsync(d_pair_data_K_sd, stream));
+    gpuSafe(gpuFreeAsync(d_pair_data_K_ds, stream));
+    gpuSafe(gpuFreeAsync(d_pair_data_K_pp, stream));
+    gpuSafe(gpuFreeAsync(d_pair_data_K_pd, stream));
+    gpuSafe(gpuFreeAsync(d_pair_data_K_dp, stream));
+    gpuSafe(gpuFreeAsync(d_pair_data_K_dd, stream));
 
-    gpuSafe(gpuFreeAsync(d_pair_inds_i_for_K_ss, 0));
-    gpuSafe(gpuFreeAsync(d_pair_inds_k_for_K_ss, 0));
-    gpuSafe(gpuFreeAsync(d_pair_inds_i_for_K_sp, 0));
-    gpuSafe(gpuFreeAsync(d_pair_inds_k_for_K_sp, 0));
-    gpuSafe(gpuFreeAsync(d_pair_inds_i_for_K_sd, 0));
-    gpuSafe(gpuFreeAsync(d_pair_inds_k_for_K_sd, 0));
-    gpuSafe(gpuFreeAsync(d_pair_inds_i_for_K_pp, 0));
-    gpuSafe(gpuFreeAsync(d_pair_inds_k_for_K_pp, 0));
-    gpuSafe(gpuFreeAsync(d_pair_inds_i_for_K_pd, 0));
-    gpuSafe(gpuFreeAsync(d_pair_inds_k_for_K_pd, 0));
-    gpuSafe(gpuFreeAsync(d_pair_inds_i_for_K_dd, 0));
-    gpuSafe(gpuFreeAsync(d_pair_inds_k_for_K_dd, 0));
-    gpuSafe(gpuFreeAsync(d_D_inds_K_ss         , 0));
-    gpuSafe(gpuFreeAsync(d_D_inds_K_sp         , 0));
-    gpuSafe(gpuFreeAsync(d_D_inds_K_ps         , 0));
-    gpuSafe(gpuFreeAsync(d_D_inds_K_sd         , 0));
-    gpuSafe(gpuFreeAsync(d_D_inds_K_ds         , 0));
-    gpuSafe(gpuFreeAsync(d_D_inds_K_pp         , 0));
-    gpuSafe(gpuFreeAsync(d_D_inds_K_pd         , 0));
-    gpuSafe(gpuFreeAsync(d_D_inds_K_dp         , 0));
-    gpuSafe(gpuFreeAsync(d_D_inds_K_dd         , 0));
-    gpuSafe(gpuFreeAsync(d_pair_displs_K_ss    , 0));
-    gpuSafe(gpuFreeAsync(d_pair_displs_K_sp    , 0));
-    gpuSafe(gpuFreeAsync(d_pair_displs_K_ps    , 0));
-    gpuSafe(gpuFreeAsync(d_pair_displs_K_sd    , 0));
-    gpuSafe(gpuFreeAsync(d_pair_displs_K_ds    , 0));
-    gpuSafe(gpuFreeAsync(d_pair_displs_K_pp    , 0));
-    gpuSafe(gpuFreeAsync(d_pair_displs_K_pd    , 0));
-    gpuSafe(gpuFreeAsync(d_pair_displs_K_dp    , 0));
-    gpuSafe(gpuFreeAsync(d_pair_displs_K_dd    , 0));
-    gpuSafe(gpuFreeAsync(d_pair_counts_K_ss    , 0));
-    gpuSafe(gpuFreeAsync(d_pair_counts_K_sp    , 0));
-    gpuSafe(gpuFreeAsync(d_pair_counts_K_ps    , 0));
-    gpuSafe(gpuFreeAsync(d_pair_counts_K_sd    , 0));
-    gpuSafe(gpuFreeAsync(d_pair_counts_K_ds    , 0));
-    gpuSafe(gpuFreeAsync(d_pair_counts_K_pp    , 0));
-    gpuSafe(gpuFreeAsync(d_pair_counts_K_pd    , 0));
-    gpuSafe(gpuFreeAsync(d_pair_counts_K_dp    , 0));
-    gpuSafe(gpuFreeAsync(d_pair_counts_K_dd    , 0));
+    gpuSafe(gpuFreeAsync(d_pair_inds_i_for_K_ss, stream));
+    gpuSafe(gpuFreeAsync(d_pair_inds_k_for_K_ss, stream));
+    gpuSafe(gpuFreeAsync(d_pair_inds_i_for_K_sp, stream));
+    gpuSafe(gpuFreeAsync(d_pair_inds_k_for_K_sp, stream));
+    gpuSafe(gpuFreeAsync(d_pair_inds_i_for_K_sd, stream));
+    gpuSafe(gpuFreeAsync(d_pair_inds_k_for_K_sd, stream));
+    gpuSafe(gpuFreeAsync(d_pair_inds_i_for_K_pp, stream));
+    gpuSafe(gpuFreeAsync(d_pair_inds_k_for_K_pp, stream));
+    gpuSafe(gpuFreeAsync(d_pair_inds_i_for_K_pd, stream));
+    gpuSafe(gpuFreeAsync(d_pair_inds_k_for_K_pd, stream));
+    gpuSafe(gpuFreeAsync(d_pair_inds_i_for_K_dd, stream));
+    gpuSafe(gpuFreeAsync(d_pair_inds_k_for_K_dd, stream));
+    gpuSafe(gpuFreeAsync(d_D_inds_K_ss         , stream));
+    gpuSafe(gpuFreeAsync(d_D_inds_K_sp         , stream));
+    gpuSafe(gpuFreeAsync(d_D_inds_K_ps         , stream));
+    gpuSafe(gpuFreeAsync(d_D_inds_K_sd         , stream));
+    gpuSafe(gpuFreeAsync(d_D_inds_K_ds         , stream));
+    gpuSafe(gpuFreeAsync(d_D_inds_K_pp         , stream));
+    gpuSafe(gpuFreeAsync(d_D_inds_K_pd         , stream));
+    gpuSafe(gpuFreeAsync(d_D_inds_K_dp         , stream));
+    gpuSafe(gpuFreeAsync(d_D_inds_K_dd         , stream));
+    gpuSafe(gpuFreeAsync(d_pair_displs_K_ss    , stream));
+    gpuSafe(gpuFreeAsync(d_pair_displs_K_sp    , stream));
+    gpuSafe(gpuFreeAsync(d_pair_displs_K_ps    , stream));
+    gpuSafe(gpuFreeAsync(d_pair_displs_K_sd    , stream));
+    gpuSafe(gpuFreeAsync(d_pair_displs_K_ds    , stream));
+    gpuSafe(gpuFreeAsync(d_pair_displs_K_pp    , stream));
+    gpuSafe(gpuFreeAsync(d_pair_displs_K_pd    , stream));
+    gpuSafe(gpuFreeAsync(d_pair_displs_K_dp    , stream));
+    gpuSafe(gpuFreeAsync(d_pair_displs_K_dd    , stream));
+    gpuSafe(gpuFreeAsync(d_pair_counts_K_ss    , stream));
+    gpuSafe(gpuFreeAsync(d_pair_counts_K_sp    , stream));
+    gpuSafe(gpuFreeAsync(d_pair_counts_K_ps    , stream));
+    gpuSafe(gpuFreeAsync(d_pair_counts_K_sd    , stream));
+    gpuSafe(gpuFreeAsync(d_pair_counts_K_ds    , stream));
+    gpuSafe(gpuFreeAsync(d_pair_counts_K_pp    , stream));
+    gpuSafe(gpuFreeAsync(d_pair_counts_K_pd    , stream));
+    gpuSafe(gpuFreeAsync(d_pair_counts_K_dp    , stream));
+    gpuSafe(gpuFreeAsync(d_pair_counts_K_dd    , stream));
 
+    gpuSafe(gpuStreamSynchronize(stream));
+    gpuSafe(gpuStreamDestroy(stream));
     gpuSafe(gpuDeviceSynchronize());
 
     omptimers[thread_id].stop("K compute");
