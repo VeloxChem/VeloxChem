@@ -422,8 +422,6 @@ export_gpu(py::module& m)
     m.def("compute_angular_momentum_integrals_gpu",
           &gpu::computeAngularMomentumIntegralsOnGPU,
           "Computes angular momentum integral matrices using GPU.");
-
-    m.def("compute_q_matrix_gpu", &gpu::computeQMatrixOnGPU, "Computes Q matrix using GPU.");
 }
 
 }  // namespace vlx_gpu

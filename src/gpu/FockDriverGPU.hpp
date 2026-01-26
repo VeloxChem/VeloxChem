@@ -43,10 +43,6 @@
 
 namespace gpu {
 
-auto computeQMatrixOnGPU(const CMolecule& molecule,
-                         const CMolecularBasis& basis,
-                         const CScreeningData& screening) -> CDenseMatrix;
-
 auto computeMixedBasisOverlapIntegralsOnGPU(const CMolecule& molecule,
                                             const CMolecularBasis& basis_1,
                                             const CMolecularBasis& basis_2,
