@@ -3244,16 +3244,20 @@ integrateVxcFockForGgaClosedShell(const CMolecule&        molecule,
     const auto gpu_id = thread_id;
 
     gpuSafe(gpuSetDevice(gpu_id));
+    gpuSafe(gpuDeviceSynchronize());  // early context initialization after setdevice
+
+    gpuStream_t stream;
+    gpuSafe(gpuStreamCreate(&stream));
 
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
 
     double* d_gto_info;
 
-    gpuSafe(gpuMalloc(&d_gto_info, 5 * max_ncgtos * max_npgtos * sizeof(double)));
+    gpuSafe(gpuMallocAsync(&d_gto_info, 5 * max_ncgtos * max_npgtos * sizeof(double), stream));
 
     uint32_t* d_ao_inds;
 
-    gpuSafe(gpuMalloc(&d_ao_inds, naos * sizeof(uint32_t)));
+    gpuSafe(gpuMallocAsync(&d_ao_inds, naos * sizeof(uint32_t), stream));
 
     // Kohn-Sham matrix
 
@@ -3263,23 +3267,17 @@ integrateVxcFockForGgaClosedShell(const CMolecule&        molecule,
 
     double *d_mat_Vxc_full, *d_mat_Vxc, *d_den_mat_full, *d_den_mat, *d_gto_values, *d_gto_values_x, *d_gto_values_y, *d_gto_values_z, *d_mat_F;
 
-    gpuSafe(gpuMalloc(&d_den_mat, naos * naos * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_gto_values, naos * max_npoints_per_box * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_gto_values_x, naos * max_npoints_per_box * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_gto_values_y, naos * max_npoints_per_box * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_gto_values_z, naos * max_npoints_per_box * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_mat_F, naos * max_npoints_per_box * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_den_mat_full, naos * naos * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_mat_Vxc_full, naos * naos * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_mat_Vxc, naos * naos * sizeof(double)));
+    gpuSafe(gpuMallocAsync(&d_den_mat, naos * naos * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_gto_values, naos * max_npoints_per_box * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_gto_values_x, naos * max_npoints_per_box * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_gto_values_y, naos * max_npoints_per_box * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_gto_values_z, naos * max_npoints_per_box * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_mat_F, naos * max_npoints_per_box * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_den_mat_full, naos * naos * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_mat_Vxc_full, naos * naos * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_mat_Vxc, naos * naos * sizeof(double), stream));
 
-    gpu::chunkedMemcpyHostToDevice<double>(d_den_mat_full, densityMatrix.alphaDensity(0), naos * naos);
-
-    dim3 threads_per_block(TILE_DIM, TILE_DIM);
-
-    dim3 num_blocks((naos + threads_per_block.x - 1) / threads_per_block.x, (naos + threads_per_block.y - 1) / threads_per_block.y);
-
-    gpu::zeroMatrix<<<num_blocks, threads_per_block>>>(d_mat_Vxc_full, static_cast<uint32_t>(naos), static_cast<uint32_t>(naos));
+    gpuSafe(gpuMemcpyAsync(d_den_mat_full, densityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     // density and functional derivatives
 
@@ -3306,13 +3304,13 @@ integrateVxcFockForGgaClosedShell(const CMolecule&        molecule,
 
     double *d_rho, *d_rhograd, *d_sigma, *d_exc, *d_vrho, *d_vsigma;
 
-    gpuSafe(gpuMalloc(&d_rho, dim->rho * max_npoints_per_box * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_rhograd, dim->rho * 3 * max_npoints_per_box * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_sigma, dim->sigma * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMallocAsync(&d_rho, dim->rho * max_npoints_per_box * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_rhograd, dim->rho * 3 * max_npoints_per_box * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_sigma, dim->sigma * max_npoints_per_box * sizeof(double), stream));
 
-    gpuSafe(gpuMalloc(&d_exc, dim->zk * max_npoints_per_box * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_vrho, dim->vrho * max_npoints_per_box * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_vsigma, dim->vsigma * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMallocAsync(&d_exc, dim->zk * max_npoints_per_box * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_vrho, dim->vrho * max_npoints_per_box * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_vsigma, dim->vsigma * max_npoints_per_box * sizeof(double), stream));
 
     // initial values for XC energy and number of electrons
 
@@ -3330,19 +3328,25 @@ integrateVxcFockForGgaClosedShell(const CMolecule&        molecule,
 
     double *d_grid_x, *d_grid_y, *d_grid_z, *d_grid_w;
 
-    gpuSafe(gpuMalloc(&d_grid_x, n_total_grid_points * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_grid_y, n_total_grid_points * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_grid_z, n_total_grid_points * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_grid_w, n_total_grid_points * sizeof(double)));
+    gpuSafe(gpuMallocAsync(&d_grid_x, n_total_grid_points * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_grid_y, n_total_grid_points * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_grid_z, n_total_grid_points * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_grid_w, n_total_grid_points * sizeof(double), stream));
 
-    gpu::chunkedMemcpyHostToDevice<double>(d_grid_x, xcoords, n_total_grid_points);
-    gpu::chunkedMemcpyHostToDevice<double>(d_grid_y, ycoords, n_total_grid_points);
-    gpu::chunkedMemcpyHostToDevice<double>(d_grid_z, zcoords, n_total_grid_points);
-    gpu::chunkedMemcpyHostToDevice<double>(d_grid_w, weights, n_total_grid_points);
+    gpuSafe(gpuMemcpyAsync(d_grid_x, xcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_grid_y, ycoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_grid_z, zcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_grid_w, weights, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-    gpuSafe(gpuDeviceSynchronize());
+    gpuSafe(gpuStreamSynchronize(stream));
 
 #pragma omp barrier
+
+    dim3 threads_per_block(TILE_DIM, TILE_DIM);
+
+    dim3 num_blocks((naos + threads_per_block.x - 1) / threads_per_block.x, (naos + threads_per_block.y - 1) / threads_per_block.y);
+
+    gpu::zeroMatrix<<<num_blocks, threads_per_block, 0, stream>>>(d_mat_Vxc_full, static_cast<uint32_t>(naos), static_cast<uint32_t>(naos));
 
     // counts and displacements of grid points in boxes
 
@@ -3428,7 +3432,7 @@ integrateVxcFockForGgaClosedShell(const CMolecule&        molecule,
             ao_inds_int32[ind] = static_cast<uint32_t>(aoinds[ind]);
         }
 
-        gpu::chunkedMemcpyHostToDevice<uint32_t>(d_ao_inds, ao_inds_int32.data(), aocount);
+        gpuSafe(gpuMemcpyAsync(d_ao_inds, ao_inds_int32.data(), aocount * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
         // sub density matrix for groud-state rho
 
@@ -3436,7 +3440,7 @@ integrateVxcFockForGgaClosedShell(const CMolecule&        molecule,
 
         num_blocks = dim3((aocount + threads_per_block.x - 1) / threads_per_block.x, (aocount + threads_per_block.y - 1) / threads_per_block.y);
 
-        gpu::getSubDensityMatrix<<<num_blocks, threads_per_block>>>(
+        gpu::getSubDensityMatrix<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_den_mat,
                            d_den_mat_full,
                            static_cast<uint32_t>(naos),
@@ -3449,7 +3453,7 @@ integrateVxcFockForGgaClosedShell(const CMolecule&        molecule,
 
         num_blocks = dim3((npoints + threads_per_block.x - 1) / threads_per_block.x, (aocount + threads_per_block.y - 1) / threads_per_block.y);
 
-        gpu::matmulAB<<<num_blocks, threads_per_block>>>(
+        gpu::matmulAB<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_F,
                            d_den_mat,
                            d_gto_values,
@@ -3461,7 +3465,7 @@ integrateVxcFockForGgaClosedShell(const CMolecule&        molecule,
         // Note: one block in y dimension
         num_blocks = dim3((npoints + threads_per_block.x - 1) / threads_per_block.x, 1);
 
-        gpu::getDensitySigmaOnGrids<<<num_blocks, threads_per_block>>>(
+        gpu::getDensitySigmaOnGrids<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_rho,
                            d_rhograd,
                            d_sigma,
@@ -3475,15 +3479,17 @@ integrateVxcFockForGgaClosedShell(const CMolecule&        molecule,
 
         // funtional evaluation
 
-        gpu::chunkedMemcpyDeviceToHost<double>(rho, d_rho, dim->rho * npoints);
-        gpu::chunkedMemcpyDeviceToHost<double>(rhograd, d_rhograd, dim->rho * 3 * npoints);
-        gpu::chunkedMemcpyDeviceToHost<double>(sigma, d_sigma, dim->sigma * npoints);
+        gpuSafe(gpuMemcpyAsync(rho, d_rho, dim->rho * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyAsync(rhograd, d_rhograd, dim->rho * 3 * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyAsync(sigma, d_sigma, dim->sigma * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
+
+        gpuSafe(gpuStreamSynchronize(stream));
 
         xcfun_copy.compute_exc_vxc_for_gga(npoints, rho, sigma, exc, vrho, vsigma);
 
-        gpu::chunkedMemcpyHostToDevice<double>(d_exc, exc, dim->zk * npoints);
-        gpu::chunkedMemcpyHostToDevice<double>(d_vrho, vrho, dim->vrho * npoints);
-        gpu::chunkedMemcpyHostToDevice<double>(d_vsigma, vsigma, dim->vsigma * npoints);
+        gpuSafe(gpuMemcpyAsync(d_exc, exc, dim->zk * npoints * sizeof(double), gpuMemcpyHostToDevice, stream));
+        gpuSafe(gpuMemcpyAsync(d_vrho, vrho, dim->vrho * npoints * sizeof(double), gpuMemcpyHostToDevice, stream));
+        gpuSafe(gpuMemcpyAsync(d_vsigma, vsigma, dim->vsigma * npoints * sizeof(double), gpuMemcpyHostToDevice, stream));
 
         // compute partial contribution to Vxc matrix and distribute partial
         // Vxc to full Kohn-Sham matrix
@@ -3495,7 +3501,7 @@ integrateVxcFockForGgaClosedShell(const CMolecule&        molecule,
 
         num_blocks = dim3((npoints + threads_per_block.x - 1) / threads_per_block.x, (aocount + threads_per_block.y - 1) / threads_per_block.y);
 
-        gpu::getGgaVxcMatrixG<<<num_blocks, threads_per_block>>>(
+        gpu::getGgaVxcMatrixG<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_G,
                            d_grid_w,
                            static_cast<uint32_t>(gridblockpos),
@@ -3513,7 +3519,7 @@ integrateVxcFockForGgaClosedShell(const CMolecule&        molecule,
 
         num_blocks = dim3((aocount + threads_per_block.x - 1) / threads_per_block.x, (aocount + threads_per_block.y - 1) / threads_per_block.y);
 
-        gpu::matmulABtKohnShamMatrix<<<num_blocks, threads_per_block>>>(
+        gpu::matmulABtKohnShamMatrix<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_Vxc_full,
                            static_cast<uint32_t>(naos),
                            d_gto_values,
@@ -3534,9 +3540,9 @@ integrateVxcFockForGgaClosedShell(const CMolecule&        molecule,
         }
     }
 
-    gpuSafe(gpuDeviceSynchronize());
+    gpuSafe(gpuMemcpyAsync(mat_Vxc_omp[gpu_id].alphaValues(), d_mat_Vxc_full, naos * naos * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
-    gpu::chunkedMemcpyDeviceToHost<double>(mat_Vxc_omp[gpu_id].alphaValues(), d_mat_Vxc_full, naos * naos);
+    gpuSafe(gpuStreamSynchronize(stream));
 
     // Note: symmetrize mat_Vxc
 
@@ -3544,35 +3550,38 @@ integrateVxcFockForGgaClosedShell(const CMolecule&        molecule,
 
 #pragma omp barrier
 
-    gpuSafe(gpuFree(d_gto_info));
-    gpuSafe(gpuFree(d_ao_inds));
+    gpuSafe(gpuFreeAsync(d_gto_info, stream));
+    gpuSafe(gpuFreeAsync(d_ao_inds, stream));
 
-    gpuSafe(gpuFree(d_den_mat));
-    gpuSafe(gpuFree(d_gto_values));
-    gpuSafe(gpuFree(d_gto_values_x));
-    gpuSafe(gpuFree(d_gto_values_y));
-    gpuSafe(gpuFree(d_gto_values_z));
-    gpuSafe(gpuFree(d_mat_F));
-    gpuSafe(gpuFree(d_den_mat_full));
-    gpuSafe(gpuFree(d_mat_Vxc_full));
-    gpuSafe(gpuFree(d_mat_Vxc));
+    gpuSafe(gpuFreeAsync(d_den_mat, stream));
+    gpuSafe(gpuFreeAsync(d_gto_values, stream));
+    gpuSafe(gpuFreeAsync(d_gto_values_x, stream));
+    gpuSafe(gpuFreeAsync(d_gto_values_y, stream));
+    gpuSafe(gpuFreeAsync(d_gto_values_z, stream));
+    gpuSafe(gpuFreeAsync(d_mat_F, stream));
+    gpuSafe(gpuFreeAsync(d_den_mat_full, stream));
+    gpuSafe(gpuFreeAsync(d_mat_Vxc_full, stream));
+    gpuSafe(gpuFreeAsync(d_mat_Vxc, stream));
 
-    gpuSafe(gpuFree(d_rho));
-    gpuSafe(gpuFree(d_rhograd));
-    gpuSafe(gpuFree(d_sigma));
-    gpuSafe(gpuFree(d_exc));
-    gpuSafe(gpuFree(d_vrho));
-    gpuSafe(gpuFree(d_vsigma));
+    gpuSafe(gpuFreeAsync(d_rho, stream));
+    gpuSafe(gpuFreeAsync(d_rhograd, stream));
+    gpuSafe(gpuFreeAsync(d_sigma, stream));
+    gpuSafe(gpuFreeAsync(d_exc, stream));
+    gpuSafe(gpuFreeAsync(d_vrho, stream));
+    gpuSafe(gpuFreeAsync(d_vsigma, stream));
 
-    gpuSafe(gpuFree(d_grid_x));
-    gpuSafe(gpuFree(d_grid_y));
-    gpuSafe(gpuFree(d_grid_z));
-    gpuSafe(gpuFree(d_grid_w));
+    gpuSafe(gpuFreeAsync(d_grid_x, stream));
+    gpuSafe(gpuFreeAsync(d_grid_y, stream));
+    gpuSafe(gpuFreeAsync(d_grid_z, stream));
+    gpuSafe(gpuFreeAsync(d_grid_w, stream));
+
+    gpuSafe(gpuStreamSynchronize(stream));
+    gpuSafe(gpuStreamDestroy(stream));
+    gpuSafe(gpuDeviceSynchronize());
 
     mat_Vxc_omp[gpu_id].setNumberOfElectrons(nele);
 
     mat_Vxc_omp[gpu_id].setExchangeCorrelationEnergy(xcene);
-
     }
 
     auto p_mat_Vxc = mat_Vxc_sum.alphaValues();
@@ -4575,6 +4584,10 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
     const auto gpu_id = thread_id;
 
     gpuSafe(gpuSetDevice(gpu_id));
+    gpuSafe(gpuDeviceSynchronize());  // early context initialization after setdevice
+
+    gpuStream_t stream;
+    gpuSafe(gpuStreamCreate(&stream));
 
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
 
@@ -4627,118 +4640,83 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
 
     auto n_total_grid_points = molecularGrid.getNumberOfGridPoints();
 
-    // TODO: use smaller size for sub matrices such as d_den_mat, d_mat_Fxc, d_mat_Fxc_gga
+    // data on device
 
-    // d_gto_info,          5 * max_ncgtos * max_npgtos,               sizeof(double)
-    // d_den_mat,           naos * naos,                               sizeof(double)
-    // d_gto_values,        naos * max_npoints_per_box,                sizeof(double)
-    // d_gto_values_x,      naos * max_npoints_per_box,                sizeof(double)
-    // d_gto_values_y,      naos * max_npoints_per_box,                sizeof(double)
-    // d_gto_values_z,      naos * max_npoints_per_box,                sizeof(double)
-    // d_mat_F,             naos * max_npoints_per_box,                sizeof(double)
-    // d_mat_G_gga,         naos * max_npoints_per_box,                sizeof(double)
-    // d_mat_Fxc,           naos * naos,                               sizeof(double)
-    // d_mat_Fxc_gga,       naos * naos,                               sizeof(double)
-    // d_gs_den_mat_full,   naos * naos,                               sizeof(double)
-    // d_rw_den_mat_full,   naos * naos,                               sizeof(double)
-    // d_mat_Fxc_full,      naos * naos,                               sizeof(double)
-    // d_rho,               dim->rho * max_npoints_per_box,            sizeof(double)
-    // d_rhograd,           dim->rho * 3 * max_npoints_per_box,        sizeof(double)
-    // d_sigma,             dim->sigma * max_npoints_per_box,          sizeof(double)
-    // d_rhow,              dim->rho * max_npoints_per_box,            sizeof(double)
-    // d_rhowgrad,          dim->rho * 3 * max_npoints_per_box,        sizeof(double)
-    // d_vsigma,            dim->vsigma * max_npoints_per_box,         sizeof(double)
-    // d_v2rho2,            dim->v2rho2 * max_npoints_per_box,         sizeof(double)
-    // d_v2rhosigma,        dim->v2rhosigma * max_npoints_per_box,     sizeof(double)
-    // d_v2sigma2,          dim->v2sigma2 * max_npoints_per_box,       sizeof(double)
-    // d_grid_x,            n_total_grid_points,                       sizeof(double)
-    // d_grid_y,            n_total_grid_points,                       sizeof(double)
-    // d_grid_z,            n_total_grid_points,                       sizeof(double)
-    // d_grid_w,            n_total_grid_points,                       sizeof(double)
+    double* d_gto_info       ;
+    double* d_den_mat        ;
+    double* d_gto_values     ;
+    double* d_gto_values_x   ;
+    double* d_gto_values_y   ;
+    double* d_gto_values_z   ;
+    double* d_mat_F          ;
+    double* d_mat_G_gga      ;
+    double* d_mat_Fxc        ;
+    double* d_mat_Fxc_gga    ;
+    double* d_gs_den_mat_full;
+    double* d_rw_den_mat_full;
+    double* d_mat_Fxc_full   ;
+    double* d_rho            ;
+    double* d_rhograd        ;
+    double* d_sigma          ;
+    double* d_rhow           ;
+    double* d_rhowgrad       ;
+    double* d_vsigma         ;
+    double* d_v2rho2         ;
+    double* d_v2rhosigma     ;
+    double* d_v2sigma2       ;
+    double* d_grid_x         ;
+    double* d_grid_y         ;
+    double* d_grid_z         ;
+    double* d_grid_w         ;
 
-    const auto count_double = (5 * max_ncgtos * max_npgtos +
-                               naos * naos +
-                               naos * max_npoints_per_box +
-                               naos * max_npoints_per_box +
-                               naos * max_npoints_per_box +
-                               naos * max_npoints_per_box +
-                               naos * max_npoints_per_box +
-                               naos * max_npoints_per_box +
-                               naos * naos +
-                               naos * naos +
-                               naos * naos +
-                               naos * naos +
-                               naos * naos +
-                               dim->rho * max_npoints_per_box +
-                               dim->rho * 3 * max_npoints_per_box +
-                               dim->sigma * max_npoints_per_box +
-                               dim->rho * max_npoints_per_box +
-                               dim->rho * 3 * max_npoints_per_box +
-                               dim->vsigma * max_npoints_per_box +
-                               dim->v2rho2 * max_npoints_per_box +
-                               dim->v2rhosigma * max_npoints_per_box +
-                               dim->v2sigma2 * max_npoints_per_box +
-                               n_total_grid_points +
-                               n_total_grid_points +
-                               n_total_grid_points +
-                               n_total_grid_points);
+    gpuSafe(gpuMallocAsync(&d_gto_info,          5 * max_ncgtos * max_npgtos           * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_den_mat,           naos * naos                           * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_gto_values,        naos * max_npoints_per_box            * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_gto_values_x,      naos * max_npoints_per_box            * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_gto_values_y,      naos * max_npoints_per_box            * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_gto_values_z,      naos * max_npoints_per_box            * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_mat_F,             naos * max_npoints_per_box            * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_mat_G_gga,         naos * max_npoints_per_box            * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_mat_Fxc,           naos * naos                           * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_mat_Fxc_gga,       naos * naos                           * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_gs_den_mat_full,   naos * naos                           * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_rw_den_mat_full,   naos * naos                           * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_mat_Fxc_full,      naos * naos                           * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_rho,               dim->rho * max_npoints_per_box        * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_rhograd,           dim->rho * 3 * max_npoints_per_box    * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_sigma,             dim->sigma * max_npoints_per_box      * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_rhow,              dim->rho * max_npoints_per_box        * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_rhowgrad,          dim->rho * 3 * max_npoints_per_box    * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_vsigma,            dim->vsigma * max_npoints_per_box     * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_v2rho2,            dim->v2rho2 * max_npoints_per_box     * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_v2rhosigma,        dim->v2rhosigma * max_npoints_per_box * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_v2sigma2,          dim->v2sigma2 * max_npoints_per_box   * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_grid_x,            n_total_grid_points                   * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_grid_y,            n_total_grid_points                   * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_grid_z,            n_total_grid_points                   * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_grid_w,            n_total_grid_points                   * sizeof(double), stream));
 
-    // d_ao_inds, naos, sizeof(uint32_t)
+    uint32_t* d_ao_inds;
 
-    const auto count_uint32 = naos;
+    gpuSafe(gpuMallocAsync(&d_ao_inds, naos * sizeof(uint32_t), stream));
 
-    double* d_data_double;
-    uint32_t* d_data_uint32;
+    gpuSafe(gpuMemcpyAsync(d_gs_den_mat_full, gsDensityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_rw_den_mat_full, rwDensityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-    gpuSafe(gpuMalloc(&d_data_double, count_double * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_data_uint32, count_uint32 * sizeof(uint32_t)));
+    gpuSafe(gpuMemcpyAsync(d_grid_x, xcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_grid_y, ycoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_grid_z, zcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_grid_w, weights, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-    double* d_gto_info        = d_data_double;
-    double* d_den_mat         = d_gto_info        + 5 * max_ncgtos * max_npgtos;
-    double* d_gto_values      = d_den_mat         + naos * naos;
-    double* d_gto_values_x    = d_gto_values      + naos * max_npoints_per_box;
-    double* d_gto_values_y    = d_gto_values_x    + naos * max_npoints_per_box;
-    double* d_gto_values_z    = d_gto_values_y    + naos * max_npoints_per_box;
-    double* d_mat_F           = d_gto_values_z    + naos * max_npoints_per_box;
-    double* d_mat_G_gga       = d_mat_F           + naos * max_npoints_per_box;
-    double* d_mat_Fxc         = d_mat_G_gga       + naos * max_npoints_per_box;
-    double* d_mat_Fxc_gga     = d_mat_Fxc         + naos * naos;
-    double* d_gs_den_mat_full = d_mat_Fxc_gga     + naos * naos;
-    double* d_rw_den_mat_full = d_gs_den_mat_full + naos * naos;
-    double* d_mat_Fxc_full    = d_rw_den_mat_full + naos * naos;
-    double* d_rho             = d_mat_Fxc_full    + naos * naos;
-    double* d_rhograd         = d_rho             + dim->rho * max_npoints_per_box;
-    double* d_sigma           = d_rhograd         + dim->rho * 3 * max_npoints_per_box;
-    double* d_rhow            = d_sigma           + dim->sigma * max_npoints_per_box;
-    double* d_rhowgrad        = d_rhow            + dim->rho * max_npoints_per_box;
-    double* d_vsigma          = d_rhowgrad        + dim->rho * 3 * max_npoints_per_box;
-    double* d_v2rho2          = d_vsigma          + dim->vsigma * max_npoints_per_box;
-    double* d_v2rhosigma      = d_v2rho2          + dim->v2rho2 * max_npoints_per_box;
-    double* d_v2sigma2        = d_v2rhosigma      + dim->v2rhosigma * max_npoints_per_box;
-    double* d_grid_x          = d_v2sigma2        + dim->v2sigma2 * max_npoints_per_box;
-    double* d_grid_y          = d_grid_x          + n_total_grid_points;
-    double* d_grid_z          = d_grid_y          + n_total_grid_points;
-    double* d_grid_w          = d_grid_z          + n_total_grid_points;
+    gpuSafe(gpuStreamSynchronize(stream));
 
-    uint32_t* d_ao_inds = d_data_uint32;
-
-    gpu::chunkedMemcpyHostToDevice<double>(d_gs_den_mat_full, gsDensityMatrix.alphaDensity(0), naos * naos);
-    gpu::chunkedMemcpyHostToDevice<double>(d_rw_den_mat_full, rwDensityMatrix.alphaDensity(0), naos * naos);
-
-    gpu::chunkedMemcpyHostToDevice<double>(d_grid_x, xcoords, n_total_grid_points);
-    gpu::chunkedMemcpyHostToDevice<double>(d_grid_y, ycoords, n_total_grid_points);
-    gpu::chunkedMemcpyHostToDevice<double>(d_grid_z, zcoords, n_total_grid_points);
-    gpu::chunkedMemcpyHostToDevice<double>(d_grid_w, weights, n_total_grid_points);
+#pragma omp barrier
 
     dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
     dim3 num_blocks((naos + threads_per_block.x - 1) / threads_per_block.x, (naos + threads_per_block.y - 1) / threads_per_block.y);
 
-    gpu::zeroMatrix<<<num_blocks, threads_per_block>>>(d_mat_Fxc_full, static_cast<uint32_t>(naos), static_cast<uint32_t>(naos));
-
-    gpuSafe(gpuDeviceSynchronize());
-
-#pragma omp barrier
+    gpu::zeroMatrix<<<num_blocks, threads_per_block, 0, stream>>>(d_mat_Fxc_full, static_cast<uint32_t>(naos), static_cast<uint32_t>(naos));
 
     // counts and displacements of grid points in boxes
 
@@ -4824,7 +4802,7 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
             ao_inds_int32[ind] = static_cast<uint32_t>(aoinds[ind]);
         }
 
-        gpu::chunkedMemcpyHostToDevice<uint32_t>(d_ao_inds, ao_inds_int32.data(), aocount);
+        gpuSafe(gpuMemcpyAsync(d_ao_inds, ao_inds_int32.data(), aocount * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
         // sub density matrix for ground-state rho
 
@@ -4833,7 +4811,7 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
         num_blocks = dim3((aocount + threads_per_block.x - 1) / threads_per_block.x, (aocount + threads_per_block.y - 1) / threads_per_block.y);
 
         // Note: symmetrize density matrix for GGA 
-        gpu::getSymmetricSubDensityMatrix<<<num_blocks, threads_per_block>>>(
+        gpu::getSymmetricSubDensityMatrix<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_den_mat,
                            d_gs_den_mat_full,
                            static_cast<uint32_t>(naos),
@@ -4846,7 +4824,7 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
 
         num_blocks = dim3((npoints + threads_per_block.x - 1) / threads_per_block.x, (aocount + threads_per_block.y - 1) / threads_per_block.y);
 
-        gpu::matmulAB<<<num_blocks, threads_per_block>>>(
+        gpu::matmulAB<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_F,
                            d_den_mat,
                            d_gto_values,
@@ -4858,7 +4836,7 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
         // Note: one block in y dimension
         num_blocks = dim3((npoints + threads_per_block.x - 1) / threads_per_block.x, 1);
 
-        gpu::getDensitySigmaOnGrids<<<num_blocks, threads_per_block>>>(
+        gpu::getDensitySigmaOnGrids<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_rho,
                            d_rhograd,
                            d_sigma,
@@ -4872,19 +4850,21 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
 
         // functional evaluation
 
-        gpu::chunkedMemcpyDeviceToHost<double>(rho, d_rho, dim->rho * npoints);
-        gpu::chunkedMemcpyDeviceToHost<double>(rhograd, d_rhograd, dim->rho * 3 * npoints);
-        gpu::chunkedMemcpyDeviceToHost<double>(sigma, d_sigma, dim->sigma * npoints);
+        gpuSafe(gpuMemcpyAsync(rho, d_rho, dim->rho * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyAsync(rhograd, d_rhograd, dim->rho * 3 * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyAsync(sigma, d_sigma, dim->sigma * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
+
+        gpuSafe(gpuStreamSynchronize(stream));
 
         xcfun_copy.compute_vxc_for_gga(npoints, rho, sigma, vrho, vsigma);
 
         xcfun_copy.compute_fxc_for_gga(npoints, rho, sigma, v2rho2, v2rhosigma, v2sigma2);
 
-        gpu::chunkedMemcpyHostToDevice<double>(d_vsigma, vsigma, dim->vsigma * npoints);
+        gpuSafe(gpuMemcpyAsync(d_vsigma, vsigma, dim->vsigma * npoints * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-        gpu::chunkedMemcpyHostToDevice<double>(d_v2rho2, v2rho2, dim->v2rho2 * npoints);
-        gpu::chunkedMemcpyHostToDevice<double>(d_v2rhosigma, v2rhosigma, dim->v2rhosigma * npoints);
-        gpu::chunkedMemcpyHostToDevice<double>(d_v2sigma2, v2sigma2, dim->v2sigma2 * npoints);
+        gpuSafe(gpuMemcpyAsync(d_v2rho2, v2rho2, dim->v2rho2 * npoints * sizeof(double), gpuMemcpyHostToDevice, stream));
+        gpuSafe(gpuMemcpyAsync(d_v2rhosigma, v2rhosigma, dim->v2rhosigma * npoints * sizeof(double), gpuMemcpyHostToDevice, stream));
+        gpuSafe(gpuMemcpyAsync(d_v2sigma2, v2sigma2, dim->v2sigma2 * npoints * sizeof(double), gpuMemcpyHostToDevice, stream));
 
         // compute partial contribution to Fxc matrix and distribute partial
 
@@ -4896,7 +4876,7 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
         num_blocks = dim3((aocount + threads_per_block.x - 1) / threads_per_block.x, (aocount + threads_per_block.y - 1) / threads_per_block.y);
 
         // Note: symmetrize density matrix for GGA
-        gpu::getSymmetricSubDensityMatrix<<<num_blocks, threads_per_block>>>(
+        gpu::getSymmetricSubDensityMatrix<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_den_mat,
                            d_rw_den_mat_full,
                            static_cast<uint32_t>(naos),
@@ -4910,7 +4890,7 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
 
         num_blocks = dim3((npoints + threads_per_block.x - 1) / threads_per_block.x, (aocount + threads_per_block.y - 1) / threads_per_block.y);
 
-        gpu::matmulAB<<<num_blocks, threads_per_block>>>(
+        gpu::matmulAB<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_F,
                            d_den_mat,
                            d_gto_values,
@@ -4922,7 +4902,7 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
         // Note: one block in y dimension
         num_blocks = dim3((npoints + threads_per_block.x - 1) / threads_per_block.x, 1);
 
-        gpu::getDensitySigmaOnGrids<<<num_blocks, threads_per_block>>>(
+        gpu::getDensitySigmaOnGrids<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_rhow,
                            d_rhowgrad,
                            nullptr,
@@ -4943,7 +4923,7 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
 
         num_blocks = dim3((npoints + threads_per_block.x - 1) / threads_per_block.x, (aocount + threads_per_block.y - 1) / threads_per_block.y);
 
-        gpu::getGgaFxcMatrixG<<<num_blocks, threads_per_block>>>(
+        gpu::getGgaFxcMatrixG<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_G,
                            d_mat_G_gga,
                            d_grid_w,
@@ -4971,21 +4951,21 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
 
         num_blocks = dim3((aocount + threads_per_block.x - 1) / threads_per_block.x, (aocount + threads_per_block.y - 1) / threads_per_block.y);
 
-        gpu::matmulABt<<<num_blocks, threads_per_block>>>(
+        gpu::matmulABt<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_Fxc,
                            d_gto_values,
                            d_mat_G,
                            static_cast<uint32_t>(aocount),
                            static_cast<uint32_t>(npoints));
 
-        gpu::matmulABt<<<num_blocks, threads_per_block>>>(
+        gpu::matmulABt<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_Fxc_gga,
                            d_gto_values,
                            d_mat_G_gga,
                            static_cast<uint32_t>(aocount),
                            static_cast<uint32_t>(npoints));
 
-        gpu::distributeGgaSubmMatrix<<<num_blocks, threads_per_block>>>(
+        gpu::distributeGgaSubmMatrix<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_Fxc_full,
                            static_cast<uint32_t>(naos),
                            d_mat_Fxc,
@@ -4994,15 +4974,44 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
                            static_cast<uint32_t>(aocount));
     }
 
-    gpuSafe(gpuDeviceSynchronize());
+    gpuSafe(gpuMemcpyAsync(mat_Fxc_omp[gpu_id].values(), d_mat_Fxc_full, naos * naos * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
-    gpu::chunkedMemcpyDeviceToHost<double>(mat_Fxc_omp[gpu_id].values(), d_mat_Fxc_full, naos * naos);
+    gpuSafe(gpuStreamSynchronize(stream));
 
 #pragma omp barrier
 
-    gpuSafe(gpuFree(d_data_double));
-    gpuSafe(gpuFree(d_data_uint32));
+    gpuSafe(gpuFreeAsync(d_gto_info       , stream));
+    gpuSafe(gpuFreeAsync(d_den_mat        , stream));
+    gpuSafe(gpuFreeAsync(d_gto_values     , stream));
+    gpuSafe(gpuFreeAsync(d_gto_values_x   , stream));
+    gpuSafe(gpuFreeAsync(d_gto_values_y   , stream));
+    gpuSafe(gpuFreeAsync(d_gto_values_z   , stream));
+    gpuSafe(gpuFreeAsync(d_mat_F          , stream));
+    gpuSafe(gpuFreeAsync(d_mat_G_gga      , stream));
+    gpuSafe(gpuFreeAsync(d_mat_Fxc        , stream));
+    gpuSafe(gpuFreeAsync(d_mat_Fxc_gga    , stream));
+    gpuSafe(gpuFreeAsync(d_gs_den_mat_full, stream));
+    gpuSafe(gpuFreeAsync(d_rw_den_mat_full, stream));
+    gpuSafe(gpuFreeAsync(d_mat_Fxc_full   , stream));
+    gpuSafe(gpuFreeAsync(d_rho            , stream));
+    gpuSafe(gpuFreeAsync(d_rhograd        , stream));
+    gpuSafe(gpuFreeAsync(d_sigma          , stream));
+    gpuSafe(gpuFreeAsync(d_rhow           , stream));
+    gpuSafe(gpuFreeAsync(d_rhowgrad       , stream));
+    gpuSafe(gpuFreeAsync(d_vsigma         , stream));
+    gpuSafe(gpuFreeAsync(d_v2rho2         , stream));
+    gpuSafe(gpuFreeAsync(d_v2rhosigma     , stream));
+    gpuSafe(gpuFreeAsync(d_v2sigma2       , stream));
+    gpuSafe(gpuFreeAsync(d_grid_x         , stream));
+    gpuSafe(gpuFreeAsync(d_grid_y         , stream));
+    gpuSafe(gpuFreeAsync(d_grid_z         , stream));
+    gpuSafe(gpuFreeAsync(d_grid_w         , stream));
 
+    gpuSafe(gpuFreeAsync(d_ao_inds, stream));
+
+    gpuSafe(gpuStreamSynchronize(stream));
+    gpuSafe(gpuStreamDestroy(stream));
+    gpuSafe(gpuDeviceSynchronize());
     }
 
     auto p_mat_Fxc = aoFockMatrix.values();
