@@ -115,18 +115,12 @@ computeOverlapGradientOnGPU(const CMolecule& molecule,
                             const CGradientScreeningData& screening) -> CDenseMatrix
 
 {
-    CGpuDevices gpu_devices;
-
-    const auto total_num_gpus_per_compute_node = gpu_devices.getNumberOfDevices();
-
     const auto natoms = molecule.getNumberOfAtoms();
 
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
     const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
 
-    // auto nthreads = omp_get_max_threads();
     auto num_gpus_per_node = screening.getNumGpusPerNode();
-    // auto num_threads_per_gpu = nthreads / num_gpus_per_node;
 
     std::vector<CDenseMatrix> S_grad_omp(num_gpus_per_node);
 
@@ -142,6 +136,10 @@ computeOverlapGradientOnGPU(const CMolecule& molecule,
     auto gpu_id = thread_id;
 
     gpuSafe(gpuSetDevice(gpu_id));
+    gpuSafe(gpuDeviceSynchronize());  // early context initialization after setdevice
+
+    gpuStream_t stream;
+    gpuSafe(gpuStreamCreate(&stream));
 
     // GTOs blocks and number of AOs
 
@@ -205,9 +203,9 @@ computeOverlapGradientOnGPU(const CMolecule& molecule,
 
     double*   d_s_prim_info;
 
-    gpuSafe(gpuMalloc(&d_s_prim_info, s_prim_info.size() * sizeof(double)));
+    gpuSafe(gpuMallocAsync(&d_s_prim_info, s_prim_info.size() * sizeof(double), stream));
 
-    gpu::chunkedMemcpyHostToDevice<double>(d_s_prim_info, s_prim_info.data(), s_prim_info.size());
+    gpuSafe(gpuMemcpyAsync(d_s_prim_info, s_prim_info.data(), s_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     // P gto block
 
@@ -218,9 +216,9 @@ computeOverlapGradientOnGPU(const CMolecule& molecule,
 
     double*   d_p_prim_info;
 
-    gpuSafe(gpuMalloc(&d_p_prim_info, p_prim_info.size() * sizeof(double)));
+    gpuSafe(gpuMallocAsync(&d_p_prim_info, p_prim_info.size() * sizeof(double), stream));
 
-    gpu::chunkedMemcpyHostToDevice<double>(d_p_prim_info, p_prim_info.data(), p_prim_info.size());
+    gpuSafe(gpuMemcpyAsync(d_p_prim_info, p_prim_info.data(), p_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     // D gto block
 
@@ -231,9 +229,9 @@ computeOverlapGradientOnGPU(const CMolecule& molecule,
 
     double*   d_d_prim_info;
 
-    gpuSafe(gpuMalloc(&d_d_prim_info, d_prim_info.size() * sizeof(double)));
+    gpuSafe(gpuMallocAsync(&d_d_prim_info, d_prim_info.size() * sizeof(double), stream));
 
-    gpu::chunkedMemcpyHostToDevice<double>(d_d_prim_info, d_prim_info.data(), d_prim_info.size());
+    gpuSafe(gpuMemcpyAsync(d_d_prim_info, d_prim_info.data(), d_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     // GTO block pairs
 
@@ -281,59 +279,61 @@ computeOverlapGradientOnGPU(const CMolecule& molecule,
 
     double *d_ss_mat_W_local, *d_sp_mat_W_local, *d_sd_mat_W_local, *d_pp_mat_W_local, *d_pd_mat_W_local, *d_dd_mat_W_local;
 
-    gpuSafe(gpuMalloc(&d_ss_first_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_ss_second_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMallocAsync(&d_ss_first_inds_local, ss_prim_pair_count_local * sizeof(uint32_t), stream));
+    gpuSafe(gpuMallocAsync(&d_ss_second_inds_local, ss_prim_pair_count_local * sizeof(uint32_t), stream));
 
-    gpuSafe(gpuMalloc(&d_sp_first_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_sp_second_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMallocAsync(&d_sp_first_inds_local, sp_prim_pair_count_local * sizeof(uint32_t), stream));
+    gpuSafe(gpuMallocAsync(&d_sp_second_inds_local, sp_prim_pair_count_local * sizeof(uint32_t), stream));
 
-    gpuSafe(gpuMalloc(&d_sd_first_inds_local, sd_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_sd_second_inds_local, sd_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMallocAsync(&d_sd_first_inds_local, sd_prim_pair_count_local * sizeof(uint32_t), stream));
+    gpuSafe(gpuMallocAsync(&d_sd_second_inds_local, sd_prim_pair_count_local * sizeof(uint32_t), stream));
 
-    gpuSafe(gpuMalloc(&d_pp_first_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_pp_second_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMallocAsync(&d_pp_first_inds_local, pp_prim_pair_count_local * sizeof(uint32_t), stream));
+    gpuSafe(gpuMallocAsync(&d_pp_second_inds_local, pp_prim_pair_count_local * sizeof(uint32_t), stream));
 
-    gpuSafe(gpuMalloc(&d_pd_first_inds_local, pd_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_pd_second_inds_local, pd_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMallocAsync(&d_pd_first_inds_local, pd_prim_pair_count_local * sizeof(uint32_t), stream));
+    gpuSafe(gpuMallocAsync(&d_pd_second_inds_local, pd_prim_pair_count_local * sizeof(uint32_t), stream));
 
-    gpuSafe(gpuMalloc(&d_dd_first_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_dd_second_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMallocAsync(&d_dd_first_inds_local, dd_prim_pair_count_local * sizeof(uint32_t), stream));
+    gpuSafe(gpuMallocAsync(&d_dd_second_inds_local, dd_prim_pair_count_local * sizeof(uint32_t), stream));
 
-    gpuSafe(gpuMalloc(&d_ss_mat_W_local, ss_prim_pair_count_local * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_sp_mat_W_local, sp_prim_pair_count_local * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_sd_mat_W_local, sd_prim_pair_count_local * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_pp_mat_W_local, pp_prim_pair_count_local * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_pd_mat_W_local, pd_prim_pair_count_local * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_dd_mat_W_local, dd_prim_pair_count_local * sizeof(double)));
+    gpuSafe(gpuMallocAsync(&d_ss_mat_W_local, ss_prim_pair_count_local * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_sp_mat_W_local, sp_prim_pair_count_local * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_sd_mat_W_local, sd_prim_pair_count_local * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_pp_mat_W_local, pp_prim_pair_count_local * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_pd_mat_W_local, pd_prim_pair_count_local * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_dd_mat_W_local, dd_prim_pair_count_local * sizeof(double), stream));
 
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_ss_first_inds_local, ss_first_inds_local.data(), ss_prim_pair_count_local);
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_ss_second_inds_local, ss_second_inds_local.data(), ss_prim_pair_count_local);
+    gpuSafe(gpuMemcpyAsync(d_ss_first_inds_local, ss_first_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_ss_second_inds_local, ss_second_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_sp_first_inds_local, sp_first_inds_local.data(), sp_prim_pair_count_local);
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_sp_second_inds_local, sp_second_inds_local.data(), sp_prim_pair_count_local);
+    gpuSafe(gpuMemcpyAsync(d_sp_first_inds_local, sp_first_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_sp_second_inds_local, sp_second_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_sd_first_inds_local, sd_first_inds_local.data(), sd_prim_pair_count_local);
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_sd_second_inds_local, sd_second_inds_local.data(), sd_prim_pair_count_local);
+    gpuSafe(gpuMemcpyAsync(d_sd_first_inds_local, sd_first_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_sd_second_inds_local, sd_second_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pp_first_inds_local, pp_first_inds_local.data(), pp_prim_pair_count_local);
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local);
+    gpuSafe(gpuMemcpyAsync(d_pp_first_inds_local, pp_first_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pd_first_inds_local, pd_first_inds_local.data(), pd_prim_pair_count_local);
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pd_second_inds_local, pd_second_inds_local.data(), pd_prim_pair_count_local);
+    gpuSafe(gpuMemcpyAsync(d_pd_first_inds_local, pd_first_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pd_second_inds_local, pd_second_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_dd_first_inds_local, dd_first_inds_local.data(), dd_prim_pair_count_local);
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local);
+    gpuSafe(gpuMemcpyAsync(d_dd_first_inds_local, dd_first_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-    gpu::chunkedMemcpyHostToDevice<double>(d_ss_mat_W_local, ss_mat_W_local.data(), ss_prim_pair_count_local);
-    gpu::chunkedMemcpyHostToDevice<double>(d_sp_mat_W_local, sp_mat_W_local.data(), sp_prim_pair_count_local);
-    gpu::chunkedMemcpyHostToDevice<double>(d_sd_mat_W_local, sd_mat_W_local.data(), sd_prim_pair_count_local);
-    gpu::chunkedMemcpyHostToDevice<double>(d_pp_mat_W_local, pp_mat_W_local.data(), pp_prim_pair_count_local);
-    gpu::chunkedMemcpyHostToDevice<double>(d_pd_mat_W_local, pd_mat_W_local.data(), pd_prim_pair_count_local);
-    gpu::chunkedMemcpyHostToDevice<double>(d_dd_mat_W_local, dd_mat_W_local.data(), dd_prim_pair_count_local);
+    gpuSafe(gpuMemcpyAsync(d_ss_mat_W_local, ss_mat_W_local.data(), ss_prim_pair_count_local * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_sp_mat_W_local, sp_mat_W_local.data(), sp_prim_pair_count_local * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_sd_mat_W_local, sd_mat_W_local.data(), sd_prim_pair_count_local * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pp_mat_W_local, pp_mat_W_local.data(), pp_prim_pair_count_local * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pd_mat_W_local, pd_mat_W_local.data(), pd_prim_pair_count_local * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_dd_mat_W_local, dd_mat_W_local.data(), dd_prim_pair_count_local * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     S_grad_omp[gpu_id].zero();
 
-    gpuSafe(gpuDeviceSynchronize());
+    gpuSafe(gpuStreamSynchronize(stream));
+
+#pragma omp barrier
 
     // set up primitive Cartesian AO to atom mapping
 
@@ -345,7 +345,7 @@ computeOverlapGradientOnGPU(const CMolecule& molecule,
 
     uint32_t *d_prim_cart_ao_to_atom_inds;
 
-    gpuSafe(gpuMalloc(&d_prim_cart_ao_to_atom_inds, all_prim_count * sizeof(uint32_t)));
+    gpuSafe(gpuMallocAsync(&d_prim_cart_ao_to_atom_inds, all_prim_count * sizeof(uint32_t), stream));
 
     for (int64_t ij = 0; ij < ss_prim_pair_count_local; ij++)
     {
@@ -426,19 +426,19 @@ computeOverlapGradientOnGPU(const CMolecule& molecule,
         prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + j] = static_cast<uint32_t>(cart_ao_to_atom_inds[j_cgto]);
     }
 
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_prim_cart_ao_to_atom_inds, prim_cart_ao_to_atom_inds.data(), all_prim_count);
+    gpuSafe(gpuMemcpyAsync(d_prim_cart_ao_to_atom_inds, prim_cart_ao_to_atom_inds.data(), all_prim_count * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
     // gradient
 
     double *d_grad_x, *d_grad_y, *d_grad_z;
 
-    gpuSafe(gpuMalloc(&d_grad_x, natoms * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_grad_y, natoms * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_grad_z, natoms * sizeof(double)));
+    gpuSafe(gpuMallocAsync(&d_grad_x, natoms * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_grad_y, natoms * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_grad_z, natoms * sizeof(double), stream));
 
-    gpu::chunkedMemcpyHostToDevice<double>(d_grad_x, S_grad_omp[gpu_id].row(0), natoms);
-    gpu::chunkedMemcpyHostToDevice<double>(d_grad_y, S_grad_omp[gpu_id].row(1), natoms);
-    gpu::chunkedMemcpyHostToDevice<double>(d_grad_z, S_grad_omp[gpu_id].row(2), natoms);
+    gpuSafe(gpuMemcpyAsync(d_grad_x, S_grad_omp[gpu_id].row(0), natoms * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_grad_y, S_grad_omp[gpu_id].row(1), natoms * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_grad_z, S_grad_omp[gpu_id].row(2), natoms * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     double *d_grad_array[3] = {d_grad_x, d_grad_y, d_grad_z};
 
@@ -454,7 +454,7 @@ computeOverlapGradientOnGPU(const CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeOverlapGradientSS<<<num_blocks,threads_per_block>>>(
+            gpu::computeOverlapGradientSS<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_grad_array[grad_cart_ind],
                            static_cast<uint32_t>(grad_cart_ind),
                            d_s_prim_info,
@@ -477,7 +477,7 @@ computeOverlapGradientOnGPU(const CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeOverlapGradientSP<<<num_blocks,threads_per_block>>>(
+            gpu::computeOverlapGradientSP<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_grad_array[grad_cart_ind],
                            static_cast<uint32_t>(grad_cart_ind),
                            d_s_prim_info,
@@ -502,7 +502,7 @@ computeOverlapGradientOnGPU(const CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeOverlapGradientSD<<<num_blocks,threads_per_block>>>(
+            gpu::computeOverlapGradientSD<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_grad_array[grad_cart_ind],
                            static_cast<uint32_t>(grad_cart_ind),
                            d_s_prim_info,
@@ -528,7 +528,7 @@ computeOverlapGradientOnGPU(const CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeOverlapGradientPP<<<num_blocks,threads_per_block>>>(
+            gpu::computeOverlapGradientPP<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_grad_array[grad_cart_ind],
                            static_cast<uint32_t>(grad_cart_ind),
                            d_p_prim_info,
@@ -552,7 +552,7 @@ computeOverlapGradientOnGPU(const CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeOverlapGradientPD<<<num_blocks,threads_per_block>>>(
+            gpu::computeOverlapGradientPD<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_grad_array[grad_cart_ind],
                            static_cast<uint32_t>(grad_cart_ind),
                            d_p_prim_info,
@@ -578,7 +578,7 @@ computeOverlapGradientOnGPU(const CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeOverlapGradientDD<<<num_blocks,threads_per_block>>>(
+            gpu::computeOverlapGradientDD<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_grad_array[grad_cart_ind],
                            static_cast<uint32_t>(grad_cart_ind),
                            d_d_prim_info,
@@ -593,44 +593,47 @@ computeOverlapGradientOnGPU(const CMolecule& molecule,
         }
     }
 
-    gpuSafe(gpuDeviceSynchronize());
+    gpuSafe(gpuMemcpyAsync(S_grad_omp[gpu_id].row(0), d_grad_x, natoms * sizeof(double), gpuMemcpyDeviceToHost, stream));
+    gpuSafe(gpuMemcpyAsync(S_grad_omp[gpu_id].row(1), d_grad_y, natoms * sizeof(double), gpuMemcpyDeviceToHost, stream));
+    gpuSafe(gpuMemcpyAsync(S_grad_omp[gpu_id].row(2), d_grad_z, natoms * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
-    gpu::chunkedMemcpyDeviceToHost<double>(S_grad_omp[gpu_id].row(0), d_grad_x, natoms);
-    gpu::chunkedMemcpyDeviceToHost<double>(S_grad_omp[gpu_id].row(1), d_grad_y, natoms);
-    gpu::chunkedMemcpyDeviceToHost<double>(S_grad_omp[gpu_id].row(2), d_grad_z, natoms);
+    gpuSafe(gpuStreamSynchronize(stream));
 
 #pragma omp barrier
 
-    gpuSafe(gpuFree(d_grad_x));
-    gpuSafe(gpuFree(d_grad_y));
-    gpuSafe(gpuFree(d_grad_z));
+    gpuSafe(gpuFreeAsync(d_grad_x, stream));
+    gpuSafe(gpuFreeAsync(d_grad_y, stream));
+    gpuSafe(gpuFreeAsync(d_grad_z, stream));
 
-    gpuSafe(gpuFree(d_prim_cart_ao_to_atom_inds));
+    gpuSafe(gpuFreeAsync(d_prim_cart_ao_to_atom_inds, stream));
 
-    gpuSafe(gpuFree(d_s_prim_info));
-    gpuSafe(gpuFree(d_p_prim_info));
-    gpuSafe(gpuFree(d_d_prim_info));
+    gpuSafe(gpuFreeAsync(d_s_prim_info, stream));
+    gpuSafe(gpuFreeAsync(d_p_prim_info, stream));
+    gpuSafe(gpuFreeAsync(d_d_prim_info, stream));
 
-    gpuSafe(gpuFree(d_ss_first_inds_local));
-    gpuSafe(gpuFree(d_ss_second_inds_local));
-    gpuSafe(gpuFree(d_sp_first_inds_local));
-    gpuSafe(gpuFree(d_sp_second_inds_local));
-    gpuSafe(gpuFree(d_sd_first_inds_local));
-    gpuSafe(gpuFree(d_sd_second_inds_local));
-    gpuSafe(gpuFree(d_pp_first_inds_local));
-    gpuSafe(gpuFree(d_pp_second_inds_local));
-    gpuSafe(gpuFree(d_pd_first_inds_local));
-    gpuSafe(gpuFree(d_pd_second_inds_local));
-    gpuSafe(gpuFree(d_dd_first_inds_local));
-    gpuSafe(gpuFree(d_dd_second_inds_local));
+    gpuSafe(gpuFreeAsync(d_ss_first_inds_local, stream));
+    gpuSafe(gpuFreeAsync(d_ss_second_inds_local, stream));
+    gpuSafe(gpuFreeAsync(d_sp_first_inds_local, stream));
+    gpuSafe(gpuFreeAsync(d_sp_second_inds_local, stream));
+    gpuSafe(gpuFreeAsync(d_sd_first_inds_local, stream));
+    gpuSafe(gpuFreeAsync(d_sd_second_inds_local, stream));
+    gpuSafe(gpuFreeAsync(d_pp_first_inds_local, stream));
+    gpuSafe(gpuFreeAsync(d_pp_second_inds_local, stream));
+    gpuSafe(gpuFreeAsync(d_pd_first_inds_local, stream));
+    gpuSafe(gpuFreeAsync(d_pd_second_inds_local, stream));
+    gpuSafe(gpuFreeAsync(d_dd_first_inds_local, stream));
+    gpuSafe(gpuFreeAsync(d_dd_second_inds_local, stream));
 
-    gpuSafe(gpuFree(d_ss_mat_W_local));
-    gpuSafe(gpuFree(d_sp_mat_W_local));
-    gpuSafe(gpuFree(d_sd_mat_W_local));
-    gpuSafe(gpuFree(d_pp_mat_W_local));
-    gpuSafe(gpuFree(d_pd_mat_W_local));
-    gpuSafe(gpuFree(d_dd_mat_W_local));
+    gpuSafe(gpuFreeAsync(d_ss_mat_W_local, stream));
+    gpuSafe(gpuFreeAsync(d_sp_mat_W_local, stream));
+    gpuSafe(gpuFreeAsync(d_sd_mat_W_local, stream));
+    gpuSafe(gpuFreeAsync(d_pp_mat_W_local, stream));
+    gpuSafe(gpuFreeAsync(d_pd_mat_W_local, stream));
+    gpuSafe(gpuFreeAsync(d_dd_mat_W_local, stream));
 
+    gpuSafe(gpuStreamSynchronize(stream));
+    gpuSafe(gpuStreamDestroy(stream));
+    gpuSafe(gpuDeviceSynchronize());
     }
 
     CDenseMatrix S_grad_t(natoms, 3);
@@ -656,18 +659,12 @@ computeKineticEnergyGradientOnGPU(const CMolecule& molecule,
                                   const CMolecularBasis& basis,
                                   const CGradientScreeningData& screening) -> CDenseMatrix
 {
-    CGpuDevices gpu_devices;
-
-    const auto total_num_gpus_per_compute_node = gpu_devices.getNumberOfDevices();
-
     const auto natoms = molecule.getNumberOfAtoms();
 
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
     const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
 
-    // auto nthreads = omp_get_max_threads();
     auto num_gpus_per_node = screening.getNumGpusPerNode();
-    // auto num_threads_per_gpu = nthreads / num_gpus_per_node;
 
     std::vector<CDenseMatrix> T_grad_omp(num_gpus_per_node);
 
@@ -683,6 +680,10 @@ computeKineticEnergyGradientOnGPU(const CMolecule& molecule,
     auto gpu_id = thread_id;
 
     gpuSafe(gpuSetDevice(gpu_id));
+    gpuSafe(gpuDeviceSynchronize());  // early context initialization after setdevice
+
+    gpuStream_t stream;
+    gpuSafe(gpuStreamCreate(&stream));
 
     // GTOs blocks and number of AOs
 
@@ -746,9 +747,9 @@ computeKineticEnergyGradientOnGPU(const CMolecule& molecule,
 
     double*   d_s_prim_info;
 
-    gpuSafe(gpuMalloc(&d_s_prim_info, s_prim_info.size() * sizeof(double)));
+    gpuSafe(gpuMallocAsync(&d_s_prim_info, s_prim_info.size() * sizeof(double), stream));
 
-    gpu::chunkedMemcpyHostToDevice<double>(d_s_prim_info, s_prim_info.data(), s_prim_info.size());
+    gpuSafe(gpuMemcpyAsync(d_s_prim_info, s_prim_info.data(), s_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     // P gto block
 
@@ -759,9 +760,9 @@ computeKineticEnergyGradientOnGPU(const CMolecule& molecule,
 
     double*   d_p_prim_info;
 
-    gpuSafe(gpuMalloc(&d_p_prim_info, p_prim_info.size() * sizeof(double)));
+    gpuSafe(gpuMallocAsync(&d_p_prim_info, p_prim_info.size() * sizeof(double), stream));
 
-    gpu::chunkedMemcpyHostToDevice<double>(d_p_prim_info, p_prim_info.data(), p_prim_info.size());
+    gpuSafe(gpuMemcpyAsync(d_p_prim_info, p_prim_info.data(), p_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     // D gto block
 
@@ -772,9 +773,9 @@ computeKineticEnergyGradientOnGPU(const CMolecule& molecule,
 
     double*   d_d_prim_info;
 
-    gpuSafe(gpuMalloc(&d_d_prim_info, d_prim_info.size() * sizeof(double)));
+    gpuSafe(gpuMallocAsync(&d_d_prim_info, d_prim_info.size() * sizeof(double), stream));
 
-    gpu::chunkedMemcpyHostToDevice<double>(d_d_prim_info, d_prim_info.data(), d_prim_info.size());
+    gpuSafe(gpuMemcpyAsync(d_d_prim_info, d_prim_info.data(), d_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     // GTO block pairs
 
@@ -822,59 +823,61 @@ computeKineticEnergyGradientOnGPU(const CMolecule& molecule,
 
     double *d_ss_mat_D_local, *d_sp_mat_D_local, *d_sd_mat_D_local, *d_pp_mat_D_local, *d_pd_mat_D_local, *d_dd_mat_D_local;
 
-    gpuSafe(gpuMalloc(&d_ss_first_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_ss_second_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMallocAsync(&d_ss_first_inds_local, ss_prim_pair_count_local * sizeof(uint32_t), stream));
+    gpuSafe(gpuMallocAsync(&d_ss_second_inds_local, ss_prim_pair_count_local * sizeof(uint32_t), stream));
 
-    gpuSafe(gpuMalloc(&d_sp_first_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_sp_second_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMallocAsync(&d_sp_first_inds_local, sp_prim_pair_count_local * sizeof(uint32_t), stream));
+    gpuSafe(gpuMallocAsync(&d_sp_second_inds_local, sp_prim_pair_count_local * sizeof(uint32_t), stream));
 
-    gpuSafe(gpuMalloc(&d_sd_first_inds_local, sd_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_sd_second_inds_local, sd_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMallocAsync(&d_sd_first_inds_local, sd_prim_pair_count_local * sizeof(uint32_t), stream));
+    gpuSafe(gpuMallocAsync(&d_sd_second_inds_local, sd_prim_pair_count_local * sizeof(uint32_t), stream));
 
-    gpuSafe(gpuMalloc(&d_pp_first_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_pp_second_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMallocAsync(&d_pp_first_inds_local, pp_prim_pair_count_local * sizeof(uint32_t), stream));
+    gpuSafe(gpuMallocAsync(&d_pp_second_inds_local, pp_prim_pair_count_local * sizeof(uint32_t), stream));
 
-    gpuSafe(gpuMalloc(&d_pd_first_inds_local, pd_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_pd_second_inds_local, pd_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMallocAsync(&d_pd_first_inds_local, pd_prim_pair_count_local * sizeof(uint32_t), stream));
+    gpuSafe(gpuMallocAsync(&d_pd_second_inds_local, pd_prim_pair_count_local * sizeof(uint32_t), stream));
 
-    gpuSafe(gpuMalloc(&d_dd_first_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_dd_second_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMallocAsync(&d_dd_first_inds_local, dd_prim_pair_count_local * sizeof(uint32_t), stream));
+    gpuSafe(gpuMallocAsync(&d_dd_second_inds_local, dd_prim_pair_count_local * sizeof(uint32_t), stream));
 
-    gpuSafe(gpuMalloc(&d_ss_mat_D_local, ss_prim_pair_count_local * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_sp_mat_D_local, sp_prim_pair_count_local * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_sd_mat_D_local, sd_prim_pair_count_local * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_pp_mat_D_local, pp_prim_pair_count_local * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_pd_mat_D_local, pd_prim_pair_count_local * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_dd_mat_D_local, dd_prim_pair_count_local * sizeof(double)));
+    gpuSafe(gpuMallocAsync(&d_ss_mat_D_local, ss_prim_pair_count_local * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_sp_mat_D_local, sp_prim_pair_count_local * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_sd_mat_D_local, sd_prim_pair_count_local * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_pp_mat_D_local, pp_prim_pair_count_local * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_pd_mat_D_local, pd_prim_pair_count_local * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_dd_mat_D_local, dd_prim_pair_count_local * sizeof(double), stream));
 
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_ss_first_inds_local, ss_first_inds_local.data(), ss_prim_pair_count_local);
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_ss_second_inds_local, ss_second_inds_local.data(), ss_prim_pair_count_local);
+    gpuSafe(gpuMemcpyAsync(d_ss_first_inds_local, ss_first_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_ss_second_inds_local, ss_second_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_sp_first_inds_local, sp_first_inds_local.data(), sp_prim_pair_count_local);
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_sp_second_inds_local, sp_second_inds_local.data(), sp_prim_pair_count_local);
+    gpuSafe(gpuMemcpyAsync(d_sp_first_inds_local, sp_first_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_sp_second_inds_local, sp_second_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_sd_first_inds_local, sd_first_inds_local.data(), sd_prim_pair_count_local);
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_sd_second_inds_local, sd_second_inds_local.data(), sd_prim_pair_count_local);
+    gpuSafe(gpuMemcpyAsync(d_sd_first_inds_local, sd_first_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_sd_second_inds_local, sd_second_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pp_first_inds_local, pp_first_inds_local.data(), pp_prim_pair_count_local);
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local);
+    gpuSafe(gpuMemcpyAsync(d_pp_first_inds_local, pp_first_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pd_first_inds_local, pd_first_inds_local.data(), pd_prim_pair_count_local);
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pd_second_inds_local, pd_second_inds_local.data(), pd_prim_pair_count_local);
+    gpuSafe(gpuMemcpyAsync(d_pd_first_inds_local, pd_first_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pd_second_inds_local, pd_second_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_dd_first_inds_local, dd_first_inds_local.data(), dd_prim_pair_count_local);
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local);
+    gpuSafe(gpuMemcpyAsync(d_dd_first_inds_local, dd_first_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-    gpu::chunkedMemcpyHostToDevice<double>(d_ss_mat_D_local, ss_mat_D_local.data(), ss_prim_pair_count_local);
-    gpu::chunkedMemcpyHostToDevice<double>(d_sp_mat_D_local, sp_mat_D_local.data(), sp_prim_pair_count_local);
-    gpu::chunkedMemcpyHostToDevice<double>(d_sd_mat_D_local, sd_mat_D_local.data(), sd_prim_pair_count_local);
-    gpu::chunkedMemcpyHostToDevice<double>(d_pp_mat_D_local, pp_mat_D_local.data(), pp_prim_pair_count_local);
-    gpu::chunkedMemcpyHostToDevice<double>(d_pd_mat_D_local, pd_mat_D_local.data(), pd_prim_pair_count_local);
-    gpu::chunkedMemcpyHostToDevice<double>(d_dd_mat_D_local, dd_mat_D_local.data(), dd_prim_pair_count_local);
+    gpuSafe(gpuMemcpyAsync(d_ss_mat_D_local, ss_mat_D_local.data(), ss_prim_pair_count_local * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_sp_mat_D_local, sp_mat_D_local.data(), sp_prim_pair_count_local * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_sd_mat_D_local, sd_mat_D_local.data(), sd_prim_pair_count_local * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pp_mat_D_local, pp_mat_D_local.data(), pp_prim_pair_count_local * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pd_mat_D_local, pd_mat_D_local.data(), pd_prim_pair_count_local * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_dd_mat_D_local, dd_mat_D_local.data(), dd_prim_pair_count_local * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     T_grad_omp[gpu_id].zero();
 
-    gpuSafe(gpuDeviceSynchronize());
+    gpuSafe(gpuStreamSynchronize(stream));
+
+#pragma omp barrier
 
     // set up primitive Cartesian AO to atom mapping
 
@@ -886,7 +889,7 @@ computeKineticEnergyGradientOnGPU(const CMolecule& molecule,
 
     uint32_t *d_prim_cart_ao_to_atom_inds;
 
-    gpuSafe(gpuMalloc(&d_prim_cart_ao_to_atom_inds, all_prim_count * sizeof(uint32_t)));
+    gpuSafe(gpuMallocAsync(&d_prim_cart_ao_to_atom_inds, all_prim_count * sizeof(uint32_t), stream));
 
     for (int64_t ij = 0; ij < ss_prim_pair_count_local; ij++)
     {
@@ -967,19 +970,19 @@ computeKineticEnergyGradientOnGPU(const CMolecule& molecule,
         prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + j] = static_cast<uint32_t>(cart_ao_to_atom_inds[j_cgto]);
     }
 
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_prim_cart_ao_to_atom_inds, prim_cart_ao_to_atom_inds.data(), all_prim_count);
+    gpuSafe(gpuMemcpyAsync(d_prim_cart_ao_to_atom_inds, prim_cart_ao_to_atom_inds.data(), all_prim_count * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
     // gradient
 
     double *d_grad_x, *d_grad_y, *d_grad_z;
 
-    gpuSafe(gpuMalloc(&d_grad_x, natoms * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_grad_y, natoms * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_grad_z, natoms * sizeof(double)));
+    gpuSafe(gpuMallocAsync(&d_grad_x, natoms * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_grad_y, natoms * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_grad_z, natoms * sizeof(double), stream));
 
-    gpu::chunkedMemcpyHostToDevice<double>(d_grad_x, T_grad_omp[gpu_id].row(0), natoms);
-    gpu::chunkedMemcpyHostToDevice<double>(d_grad_y, T_grad_omp[gpu_id].row(1), natoms);
-    gpu::chunkedMemcpyHostToDevice<double>(d_grad_z, T_grad_omp[gpu_id].row(2), natoms);
+    gpuSafe(gpuMemcpyAsync(d_grad_x, T_grad_omp[gpu_id].row(0), natoms * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_grad_y, T_grad_omp[gpu_id].row(1), natoms * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_grad_z, T_grad_omp[gpu_id].row(2), natoms * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     double *d_grad_array[3] = {d_grad_x, d_grad_y, d_grad_z};
 
@@ -995,7 +998,7 @@ computeKineticEnergyGradientOnGPU(const CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeKineticEnergyGradientSS<<<num_blocks,threads_per_block>>>(
+            gpu::computeKineticEnergyGradientSS<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_grad_array[grad_cart_ind],
                            static_cast<uint32_t>(grad_cart_ind),
                            d_s_prim_info,
@@ -1018,7 +1021,7 @@ computeKineticEnergyGradientOnGPU(const CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeKineticEnergyGradientSP<<<num_blocks,threads_per_block>>>(
+            gpu::computeKineticEnergyGradientSP<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_grad_array[grad_cart_ind],
                            static_cast<uint32_t>(grad_cart_ind),
                            d_s_prim_info,
@@ -1043,7 +1046,7 @@ computeKineticEnergyGradientOnGPU(const CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeKineticEnergyGradientSD<<<num_blocks,threads_per_block>>>(
+            gpu::computeKineticEnergyGradientSD<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_grad_array[grad_cart_ind],
                            static_cast<uint32_t>(grad_cart_ind),
                            d_s_prim_info,
@@ -1069,7 +1072,7 @@ computeKineticEnergyGradientOnGPU(const CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeKineticEnergyGradientPP<<<num_blocks,threads_per_block>>>(
+            gpu::computeKineticEnergyGradientPP<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_grad_array[grad_cart_ind],
                            static_cast<uint32_t>(grad_cart_ind),
                            d_p_prim_info,
@@ -1093,7 +1096,7 @@ computeKineticEnergyGradientOnGPU(const CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeKineticEnergyGradientPD<<<num_blocks,threads_per_block>>>(
+            gpu::computeKineticEnergyGradientPD<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_grad_array[grad_cart_ind],
                            static_cast<uint32_t>(grad_cart_ind),
                            d_p_prim_info,
@@ -1119,7 +1122,7 @@ computeKineticEnergyGradientOnGPU(const CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeKineticEnergyGradientDD<<<num_blocks,threads_per_block>>>(
+            gpu::computeKineticEnergyGradientDD<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_grad_array[grad_cart_ind],
                            static_cast<uint32_t>(grad_cart_ind),
                            d_d_prim_info,
@@ -1134,44 +1137,47 @@ computeKineticEnergyGradientOnGPU(const CMolecule& molecule,
         }
     }
 
-    gpuSafe(gpuDeviceSynchronize());
+    gpuSafe(gpuMemcpyAsync(T_grad_omp[gpu_id].row(0), d_grad_x, natoms * sizeof(double), gpuMemcpyDeviceToHost, stream));
+    gpuSafe(gpuMemcpyAsync(T_grad_omp[gpu_id].row(1), d_grad_y, natoms * sizeof(double), gpuMemcpyDeviceToHost, stream));
+    gpuSafe(gpuMemcpyAsync(T_grad_omp[gpu_id].row(2), d_grad_z, natoms * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
-    gpu::chunkedMemcpyDeviceToHost<double>(T_grad_omp[gpu_id].row(0), d_grad_x, natoms);
-    gpu::chunkedMemcpyDeviceToHost<double>(T_grad_omp[gpu_id].row(1), d_grad_y, natoms);
-    gpu::chunkedMemcpyDeviceToHost<double>(T_grad_omp[gpu_id].row(2), d_grad_z, natoms);
+    gpuSafe(gpuStreamSynchronize(stream));
 
 #pragma omp barrier
 
-    gpuSafe(gpuFree(d_grad_x));
-    gpuSafe(gpuFree(d_grad_y));
-    gpuSafe(gpuFree(d_grad_z));
+    gpuSafe(gpuFreeAsync(d_grad_x, stream));
+    gpuSafe(gpuFreeAsync(d_grad_y, stream));
+    gpuSafe(gpuFreeAsync(d_grad_z, stream));
 
-    gpuSafe(gpuFree(d_prim_cart_ao_to_atom_inds));
+    gpuSafe(gpuFreeAsync(d_prim_cart_ao_to_atom_inds, stream));
 
-    gpuSafe(gpuFree(d_s_prim_info));
-    gpuSafe(gpuFree(d_p_prim_info));
-    gpuSafe(gpuFree(d_d_prim_info));
+    gpuSafe(gpuFreeAsync(d_s_prim_info, stream));
+    gpuSafe(gpuFreeAsync(d_p_prim_info, stream));
+    gpuSafe(gpuFreeAsync(d_d_prim_info, stream));
 
-    gpuSafe(gpuFree(d_ss_first_inds_local));
-    gpuSafe(gpuFree(d_ss_second_inds_local));
-    gpuSafe(gpuFree(d_sp_first_inds_local));
-    gpuSafe(gpuFree(d_sp_second_inds_local));
-    gpuSafe(gpuFree(d_sd_first_inds_local));
-    gpuSafe(gpuFree(d_sd_second_inds_local));
-    gpuSafe(gpuFree(d_pp_first_inds_local));
-    gpuSafe(gpuFree(d_pp_second_inds_local));
-    gpuSafe(gpuFree(d_pd_first_inds_local));
-    gpuSafe(gpuFree(d_pd_second_inds_local));
-    gpuSafe(gpuFree(d_dd_first_inds_local));
-    gpuSafe(gpuFree(d_dd_second_inds_local));
+    gpuSafe(gpuFreeAsync(d_ss_first_inds_local, stream));
+    gpuSafe(gpuFreeAsync(d_ss_second_inds_local, stream));
+    gpuSafe(gpuFreeAsync(d_sp_first_inds_local, stream));
+    gpuSafe(gpuFreeAsync(d_sp_second_inds_local, stream));
+    gpuSafe(gpuFreeAsync(d_sd_first_inds_local, stream));
+    gpuSafe(gpuFreeAsync(d_sd_second_inds_local, stream));
+    gpuSafe(gpuFreeAsync(d_pp_first_inds_local, stream));
+    gpuSafe(gpuFreeAsync(d_pp_second_inds_local, stream));
+    gpuSafe(gpuFreeAsync(d_pd_first_inds_local, stream));
+    gpuSafe(gpuFreeAsync(d_pd_second_inds_local, stream));
+    gpuSafe(gpuFreeAsync(d_dd_first_inds_local, stream));
+    gpuSafe(gpuFreeAsync(d_dd_second_inds_local, stream));
 
-    gpuSafe(gpuFree(d_ss_mat_D_local));
-    gpuSafe(gpuFree(d_sp_mat_D_local));
-    gpuSafe(gpuFree(d_sd_mat_D_local));
-    gpuSafe(gpuFree(d_pp_mat_D_local));
-    gpuSafe(gpuFree(d_pd_mat_D_local));
-    gpuSafe(gpuFree(d_dd_mat_D_local));
+    gpuSafe(gpuFreeAsync(d_ss_mat_D_local, stream));
+    gpuSafe(gpuFreeAsync(d_sp_mat_D_local, stream));
+    gpuSafe(gpuFreeAsync(d_sd_mat_D_local, stream));
+    gpuSafe(gpuFreeAsync(d_pp_mat_D_local, stream));
+    gpuSafe(gpuFreeAsync(d_pd_mat_D_local, stream));
+    gpuSafe(gpuFreeAsync(d_dd_mat_D_local, stream));
 
+    gpuSafe(gpuStreamSynchronize(stream));
+    gpuSafe(gpuStreamDestroy(stream));
+    gpuSafe(gpuDeviceSynchronize());
     }
 
     CDenseMatrix T_grad_t(natoms, 3);
@@ -1197,16 +1203,10 @@ computeNuclearPotentialGradientOnGPU(const CMolecule& molecule,
                                      const CMolecularBasis& basis,
                                      const CGradientScreeningData& screening) -> CDenseMatrix
 {
-    CGpuDevices gpu_devices;
-
-    const auto total_num_gpus_per_compute_node = gpu_devices.getNumberOfDevices();
-
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
     const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
 
-    // auto nthreads = omp_get_max_threads();
     auto num_gpus_per_node = screening.getNumGpusPerNode();
-    // auto num_threads_per_gpu = nthreads / num_gpus_per_node;
 
     const auto mol_charges = molecule.getCharges();
     const auto mol_coords = molecule.getCoordinates(std::string("BOHR"));
@@ -1236,6 +1236,10 @@ computeNuclearPotentialGradientOnGPU(const CMolecule& molecule,
     auto gpu_id = thread_id;
 
     gpuSafe(gpuSetDevice(gpu_id));
+    gpuSafe(gpuDeviceSynchronize());  // early context initialization after setdevice
+
+    gpuStream_t stream;
+    gpuSafe(gpuStreamCreate(&stream));
 
     // Boys function (tabulated for order 0-28)
 
@@ -1243,17 +1247,17 @@ computeNuclearPotentialGradientOnGPU(const CMolecule& molecule,
 
     double* d_boys_func_table;
 
-    gpuSafe(gpuMalloc(&d_boys_func_table, boys_func_table.size() * sizeof(double)));
+    gpuSafe(gpuMallocAsync(&d_boys_func_table, boys_func_table.size() * sizeof(double), stream));
 
-    gpu::chunkedMemcpyHostToDevice<double>(d_boys_func_table, boys_func_table.data(), boys_func_table.size());
+    gpuSafe(gpuMemcpyAsync(d_boys_func_table, boys_func_table.data(), boys_func_table.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     const auto boys_func_ft = boysfunc::getBoysFuncFactors();
 
     double* d_boys_func_ft;
 
-    gpuSafe(gpuMalloc(&d_boys_func_ft, boys_func_ft.size() * sizeof(double)));
+    gpuSafe(gpuMallocAsync(&d_boys_func_ft, boys_func_ft.size() * sizeof(double), stream));
 
-    gpu::chunkedMemcpyHostToDevice<double>(d_boys_func_ft, boys_func_ft.data(), boys_func_ft.size());
+    gpuSafe(gpuMemcpyAsync(d_boys_func_ft, boys_func_ft.data(), boys_func_ft.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     // GTOs blocks and number of AOs
 
@@ -1317,9 +1321,9 @@ computeNuclearPotentialGradientOnGPU(const CMolecule& molecule,
 
     double*   d_s_prim_info;
 
-    gpuSafe(gpuMalloc(&d_s_prim_info, s_prim_info.size() * sizeof(double)));
+    gpuSafe(gpuMallocAsync(&d_s_prim_info, s_prim_info.size() * sizeof(double), stream));
 
-    gpu::chunkedMemcpyHostToDevice<double>(d_s_prim_info, s_prim_info.data(), s_prim_info.size());
+    gpuSafe(gpuMemcpyAsync(d_s_prim_info, s_prim_info.data(), s_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     // P gto block
 
@@ -1330,9 +1334,9 @@ computeNuclearPotentialGradientOnGPU(const CMolecule& molecule,
 
     double*   d_p_prim_info;
 
-    gpuSafe(gpuMalloc(&d_p_prim_info, p_prim_info.size() * sizeof(double)));
+    gpuSafe(gpuMallocAsync(&d_p_prim_info, p_prim_info.size() * sizeof(double), stream));
 
-    gpu::chunkedMemcpyHostToDevice<double>(d_p_prim_info, p_prim_info.data(), p_prim_info.size());
+    gpuSafe(gpuMemcpyAsync(d_p_prim_info, p_prim_info.data(), p_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     // D gto block
 
@@ -1343,9 +1347,9 @@ computeNuclearPotentialGradientOnGPU(const CMolecule& molecule,
 
     double*   d_d_prim_info;
 
-    gpuSafe(gpuMalloc(&d_d_prim_info, d_prim_info.size() * sizeof(double)));
+    gpuSafe(gpuMallocAsync(&d_d_prim_info, d_prim_info.size() * sizeof(double), stream));
 
-    gpu::chunkedMemcpyHostToDevice<double>(d_d_prim_info, d_prim_info.data(), d_prim_info.size());
+    gpuSafe(gpuMemcpyAsync(d_d_prim_info, d_prim_info.data(), d_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     // GTO block pairs
 
@@ -1395,57 +1399,57 @@ computeNuclearPotentialGradientOnGPU(const CMolecule& molecule,
 
     double *d_ss_mat_D_local, *d_sp_mat_D_local, *d_sd_mat_D_local, *d_pp_mat_D_local, *d_pd_mat_D_local, *d_dd_mat_D_local;
 
-    gpuSafe(gpuMalloc(&d_mat_V, max_prim_pair_count_local * sizeof(double)));
+    gpuSafe(gpuMallocAsync(&d_mat_V, max_prim_pair_count_local * sizeof(double), stream));
 
-    gpuSafe(gpuMalloc(&d_ss_first_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_ss_second_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMallocAsync(&d_ss_first_inds_local, ss_prim_pair_count_local * sizeof(uint32_t), stream));
+    gpuSafe(gpuMallocAsync(&d_ss_second_inds_local, ss_prim_pair_count_local * sizeof(uint32_t), stream));
 
-    gpuSafe(gpuMalloc(&d_sp_first_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_sp_second_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMallocAsync(&d_sp_first_inds_local, sp_prim_pair_count_local * sizeof(uint32_t), stream));
+    gpuSafe(gpuMallocAsync(&d_sp_second_inds_local, sp_prim_pair_count_local * sizeof(uint32_t), stream));
 
-    gpuSafe(gpuMalloc(&d_sd_first_inds_local, sd_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_sd_second_inds_local, sd_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMallocAsync(&d_sd_first_inds_local, sd_prim_pair_count_local * sizeof(uint32_t), stream));
+    gpuSafe(gpuMallocAsync(&d_sd_second_inds_local, sd_prim_pair_count_local * sizeof(uint32_t), stream));
 
-    gpuSafe(gpuMalloc(&d_pp_first_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_pp_second_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMallocAsync(&d_pp_first_inds_local, pp_prim_pair_count_local * sizeof(uint32_t), stream));
+    gpuSafe(gpuMallocAsync(&d_pp_second_inds_local, pp_prim_pair_count_local * sizeof(uint32_t), stream));
 
-    gpuSafe(gpuMalloc(&d_pd_first_inds_local, pd_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_pd_second_inds_local, pd_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMallocAsync(&d_pd_first_inds_local, pd_prim_pair_count_local * sizeof(uint32_t), stream));
+    gpuSafe(gpuMallocAsync(&d_pd_second_inds_local, pd_prim_pair_count_local * sizeof(uint32_t), stream));
 
-    gpuSafe(gpuMalloc(&d_dd_first_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_dd_second_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMallocAsync(&d_dd_first_inds_local, dd_prim_pair_count_local * sizeof(uint32_t), stream));
+    gpuSafe(gpuMallocAsync(&d_dd_second_inds_local, dd_prim_pair_count_local * sizeof(uint32_t), stream));
 
-    gpuSafe(gpuMalloc(&d_ss_mat_D_local, ss_prim_pair_count_local * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_sp_mat_D_local, sp_prim_pair_count_local * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_sd_mat_D_local, sd_prim_pair_count_local * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_pp_mat_D_local, pp_prim_pair_count_local * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_pd_mat_D_local, pd_prim_pair_count_local * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_dd_mat_D_local, dd_prim_pair_count_local * sizeof(double)));
+    gpuSafe(gpuMallocAsync(&d_ss_mat_D_local, ss_prim_pair_count_local * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_sp_mat_D_local, sp_prim_pair_count_local * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_sd_mat_D_local, sd_prim_pair_count_local * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_pp_mat_D_local, pp_prim_pair_count_local * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_pd_mat_D_local, pd_prim_pair_count_local * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_dd_mat_D_local, dd_prim_pair_count_local * sizeof(double), stream));
 
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_ss_first_inds_local, ss_first_inds_local.data(), ss_prim_pair_count_local);
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_ss_second_inds_local, ss_second_inds_local.data(), ss_prim_pair_count_local);
+    gpuSafe(gpuMemcpyAsync(d_ss_first_inds_local, ss_first_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_ss_second_inds_local, ss_second_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_sp_first_inds_local, sp_first_inds_local.data(), sp_prim_pair_count_local);
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_sp_second_inds_local, sp_second_inds_local.data(), sp_prim_pair_count_local);
+    gpuSafe(gpuMemcpyAsync(d_sp_first_inds_local, sp_first_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_sp_second_inds_local, sp_second_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_sd_first_inds_local, sd_first_inds_local.data(), sd_prim_pair_count_local);
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_sd_second_inds_local, sd_second_inds_local.data(), sd_prim_pair_count_local);
+    gpuSafe(gpuMemcpyAsync(d_sd_first_inds_local, sd_first_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_sd_second_inds_local, sd_second_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pp_first_inds_local, pp_first_inds_local.data(), pp_prim_pair_count_local);
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local);
+    gpuSafe(gpuMemcpyAsync(d_pp_first_inds_local, pp_first_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pd_first_inds_local, pd_first_inds_local.data(), pd_prim_pair_count_local);
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pd_second_inds_local, pd_second_inds_local.data(), pd_prim_pair_count_local);
+    gpuSafe(gpuMemcpyAsync(d_pd_first_inds_local, pd_first_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pd_second_inds_local, pd_second_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_dd_first_inds_local, dd_first_inds_local.data(), dd_prim_pair_count_local);
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local);
+    gpuSafe(gpuMemcpyAsync(d_dd_first_inds_local, dd_first_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-    gpu::chunkedMemcpyHostToDevice<double>(d_ss_mat_D_local, ss_mat_D_local.data(), ss_prim_pair_count_local);
-    gpu::chunkedMemcpyHostToDevice<double>(d_sp_mat_D_local, sp_mat_D_local.data(), sp_prim_pair_count_local);
-    gpu::chunkedMemcpyHostToDevice<double>(d_sd_mat_D_local, sd_mat_D_local.data(), sd_prim_pair_count_local);
-    gpu::chunkedMemcpyHostToDevice<double>(d_pp_mat_D_local, pp_mat_D_local.data(), pp_prim_pair_count_local);
-    gpu::chunkedMemcpyHostToDevice<double>(d_pd_mat_D_local, pd_mat_D_local.data(), pd_prim_pair_count_local);
-    gpu::chunkedMemcpyHostToDevice<double>(d_dd_mat_D_local, dd_mat_D_local.data(), dd_prim_pair_count_local);
+    gpuSafe(gpuMemcpyAsync(d_ss_mat_D_local, ss_mat_D_local.data(), ss_prim_pair_count_local * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_sp_mat_D_local, sp_mat_D_local.data(), sp_prim_pair_count_local * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_sd_mat_D_local, sd_mat_D_local.data(), sd_prim_pair_count_local * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pp_mat_D_local, pp_mat_D_local.data(), pp_prim_pair_count_local * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pd_mat_D_local, pd_mat_D_local.data(), pd_prim_pair_count_local * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_dd_mat_D_local, dd_mat_D_local.data(), dd_prim_pair_count_local * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     V_grad_omp[gpu_id].zero();
 
@@ -1453,11 +1457,13 @@ computeNuclearPotentialGradientOnGPU(const CMolecule& molecule,
 
     const auto npoints = natoms;
 
-    gpuSafe(gpuMalloc(&d_points_info, npoints * 4 * sizeof(double)));
+    gpuSafe(gpuMallocAsync(&d_points_info, npoints * 4 * sizeof(double), stream));
 
-    gpu::chunkedMemcpyHostToDevice<double>(d_points_info, points_info.data(), npoints * 4);
+    gpuSafe(gpuMemcpyAsync(d_points_info, points_info.data(), npoints * 4 * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-    gpuSafe(gpuDeviceSynchronize());
+    gpuSafe(gpuStreamSynchronize(stream));
+
+#pragma omp barrier
 
     // set up primitive Cartesian AO to atom mapping
 
@@ -1469,7 +1475,7 @@ computeNuclearPotentialGradientOnGPU(const CMolecule& molecule,
 
     uint32_t *d_prim_cart_ao_to_atom_inds;
 
-    gpuSafe(gpuMalloc(&d_prim_cart_ao_to_atom_inds, all_prim_count * sizeof(uint32_t)));
+    gpuSafe(gpuMallocAsync(&d_prim_cart_ao_to_atom_inds, all_prim_count * sizeof(uint32_t), stream));
 
     for (int64_t ij = 0; ij < ss_prim_pair_count_local; ij++)
     {
@@ -1550,19 +1556,19 @@ computeNuclearPotentialGradientOnGPU(const CMolecule& molecule,
         prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + j] = static_cast<uint32_t>(cart_ao_to_atom_inds[j_cgto]);
     }
 
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_prim_cart_ao_to_atom_inds, prim_cart_ao_to_atom_inds.data(), all_prim_count);
+    gpuSafe(gpuMemcpyAsync(d_prim_cart_ao_to_atom_inds, prim_cart_ao_to_atom_inds.data(), all_prim_count * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
     // gradient
 
     double *d_grad_x, *d_grad_y, *d_grad_z;
 
-    gpuSafe(gpuMalloc(&d_grad_x, natoms * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_grad_y, natoms * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_grad_z, natoms * sizeof(double)));
+    gpuSafe(gpuMallocAsync(&d_grad_x, natoms * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_grad_y, natoms * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_grad_z, natoms * sizeof(double), stream));
 
-    gpu::chunkedMemcpyHostToDevice<double>(d_grad_x, V_grad_omp[gpu_id].row(0), natoms);
-    gpu::chunkedMemcpyHostToDevice<double>(d_grad_y, V_grad_omp[gpu_id].row(1), natoms);
-    gpu::chunkedMemcpyHostToDevice<double>(d_grad_z, V_grad_omp[gpu_id].row(2), natoms);
+    gpuSafe(gpuMemcpyAsync(d_grad_x, V_grad_omp[gpu_id].row(0), natoms * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_grad_y, V_grad_omp[gpu_id].row(1), natoms * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_grad_z, V_grad_omp[gpu_id].row(2), natoms * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     double *d_grad_array[3] = {d_grad_x, d_grad_y, d_grad_z};
 
@@ -1578,7 +1584,7 @@ computeNuclearPotentialGradientOnGPU(const CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeNuclearPotentialGradientSS<<<num_blocks,threads_per_block>>>(
+            gpu::computeNuclearPotentialGradientSS<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_grad_array[grad_cart_ind],
                            static_cast<uint32_t>(grad_cart_ind),
                            d_s_prim_info,
@@ -1605,7 +1611,7 @@ computeNuclearPotentialGradientOnGPU(const CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeNuclearPotentialGradientSP<<<num_blocks,threads_per_block>>>(
+            gpu::computeNuclearPotentialGradientSP<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_grad_array[grad_cart_ind],
                            static_cast<uint32_t>(grad_cart_ind),
                            d_s_prim_info,
@@ -1634,7 +1640,7 @@ computeNuclearPotentialGradientOnGPU(const CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeNuclearPotentialGradientSD<<<num_blocks,threads_per_block>>>(
+            gpu::computeNuclearPotentialGradientSD<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_grad_array[grad_cart_ind],
                            static_cast<uint32_t>(grad_cart_ind),
                            d_s_prim_info,
@@ -1664,7 +1670,7 @@ computeNuclearPotentialGradientOnGPU(const CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeNuclearPotentialGradientPP<<<num_blocks,threads_per_block>>>(
+            gpu::computeNuclearPotentialGradientPP<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_grad_array[grad_cart_ind],
                            static_cast<uint32_t>(grad_cart_ind),
                            d_p_prim_info,
@@ -1692,7 +1698,7 @@ computeNuclearPotentialGradientOnGPU(const CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeNuclearPotentialGradientPD<<<num_blocks,threads_per_block>>>(
+            gpu::computeNuclearPotentialGradientPD<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_grad_array[grad_cart_ind],
                            static_cast<uint32_t>(grad_cart_ind),
                            d_p_prim_info,
@@ -1722,7 +1728,7 @@ computeNuclearPotentialGradientOnGPU(const CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeNuclearPotentialGradientDD<<<num_blocks,threads_per_block>>>(
+            gpu::computeNuclearPotentialGradientDD<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_grad_array[grad_cart_ind],
                            static_cast<uint32_t>(grad_cart_ind),
                            d_d_prim_info,
@@ -1741,51 +1747,54 @@ computeNuclearPotentialGradientOnGPU(const CMolecule& molecule,
         }
     }
 
-    gpuSafe(gpuDeviceSynchronize());
+    gpuSafe(gpuMemcpyAsync(V_grad_omp[gpu_id].row(0), d_grad_x, natoms * sizeof(double), gpuMemcpyDeviceToHost, stream));
+    gpuSafe(gpuMemcpyAsync(V_grad_omp[gpu_id].row(1), d_grad_y, natoms * sizeof(double), gpuMemcpyDeviceToHost, stream));
+    gpuSafe(gpuMemcpyAsync(V_grad_omp[gpu_id].row(2), d_grad_z, natoms * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
-    gpu::chunkedMemcpyDeviceToHost<double>(V_grad_omp[gpu_id].row(0), d_grad_x, natoms);
-    gpu::chunkedMemcpyDeviceToHost<double>(V_grad_omp[gpu_id].row(1), d_grad_y, natoms);
-    gpu::chunkedMemcpyDeviceToHost<double>(V_grad_omp[gpu_id].row(2), d_grad_z, natoms);
+    gpuSafe(gpuStreamSynchronize(stream));
 
 #pragma omp barrier
 
-    gpuSafe(gpuFree(d_grad_x));
-    gpuSafe(gpuFree(d_grad_y));
-    gpuSafe(gpuFree(d_grad_z));
+    gpuSafe(gpuFreeAsync(d_grad_x, stream));
+    gpuSafe(gpuFreeAsync(d_grad_y, stream));
+    gpuSafe(gpuFreeAsync(d_grad_z, stream));
 
-    gpuSafe(gpuFree(d_prim_cart_ao_to_atom_inds));
+    gpuSafe(gpuFreeAsync(d_prim_cart_ao_to_atom_inds, stream));
 
-    gpuSafe(gpuFree(d_boys_func_table));
-    gpuSafe(gpuFree(d_boys_func_ft));
+    gpuSafe(gpuFreeAsync(d_boys_func_table, stream));
+    gpuSafe(gpuFreeAsync(d_boys_func_ft, stream));
 
-    gpuSafe(gpuFree(d_s_prim_info));
-    gpuSafe(gpuFree(d_p_prim_info));
-    gpuSafe(gpuFree(d_d_prim_info));
+    gpuSafe(gpuFreeAsync(d_s_prim_info, stream));
+    gpuSafe(gpuFreeAsync(d_p_prim_info, stream));
+    gpuSafe(gpuFreeAsync(d_d_prim_info, stream));
 
-    gpuSafe(gpuFree(d_mat_V));
+    gpuSafe(gpuFreeAsync(d_mat_V, stream));
 
-    gpuSafe(gpuFree(d_ss_first_inds_local));
-    gpuSafe(gpuFree(d_ss_second_inds_local));
-    gpuSafe(gpuFree(d_sp_first_inds_local));
-    gpuSafe(gpuFree(d_sp_second_inds_local));
-    gpuSafe(gpuFree(d_sd_first_inds_local));
-    gpuSafe(gpuFree(d_sd_second_inds_local));
-    gpuSafe(gpuFree(d_pp_first_inds_local));
-    gpuSafe(gpuFree(d_pp_second_inds_local));
-    gpuSafe(gpuFree(d_pd_first_inds_local));
-    gpuSafe(gpuFree(d_pd_second_inds_local));
-    gpuSafe(gpuFree(d_dd_first_inds_local));
-    gpuSafe(gpuFree(d_dd_second_inds_local));
+    gpuSafe(gpuFreeAsync(d_ss_first_inds_local, stream));
+    gpuSafe(gpuFreeAsync(d_ss_second_inds_local, stream));
+    gpuSafe(gpuFreeAsync(d_sp_first_inds_local, stream));
+    gpuSafe(gpuFreeAsync(d_sp_second_inds_local, stream));
+    gpuSafe(gpuFreeAsync(d_sd_first_inds_local, stream));
+    gpuSafe(gpuFreeAsync(d_sd_second_inds_local, stream));
+    gpuSafe(gpuFreeAsync(d_pp_first_inds_local, stream));
+    gpuSafe(gpuFreeAsync(d_pp_second_inds_local, stream));
+    gpuSafe(gpuFreeAsync(d_pd_first_inds_local, stream));
+    gpuSafe(gpuFreeAsync(d_pd_second_inds_local, stream));
+    gpuSafe(gpuFreeAsync(d_dd_first_inds_local, stream));
+    gpuSafe(gpuFreeAsync(d_dd_second_inds_local, stream));
 
-    gpuSafe(gpuFree(d_points_info));
+    gpuSafe(gpuFreeAsync(d_points_info, stream));
 
-    gpuSafe(gpuFree(d_ss_mat_D_local));
-    gpuSafe(gpuFree(d_sp_mat_D_local));
-    gpuSafe(gpuFree(d_sd_mat_D_local));
-    gpuSafe(gpuFree(d_pp_mat_D_local));
-    gpuSafe(gpuFree(d_pd_mat_D_local));
-    gpuSafe(gpuFree(d_dd_mat_D_local));
+    gpuSafe(gpuFreeAsync(d_ss_mat_D_local, stream));
+    gpuSafe(gpuFreeAsync(d_sp_mat_D_local, stream));
+    gpuSafe(gpuFreeAsync(d_sd_mat_D_local, stream));
+    gpuSafe(gpuFreeAsync(d_pp_mat_D_local, stream));
+    gpuSafe(gpuFreeAsync(d_pd_mat_D_local, stream));
+    gpuSafe(gpuFreeAsync(d_dd_mat_D_local, stream));
 
+    gpuSafe(gpuStreamSynchronize(stream));
+    gpuSafe(gpuStreamDestroy(stream));
+    gpuSafe(gpuDeviceSynchronize());
     }
 
     CDenseMatrix V_grad_t(natoms, 3);
@@ -1813,16 +1822,10 @@ computePointChargesGradientOnGPU(const CMolecule& molecule,
                                  const double* points_info_ptr,
                                  const int64_t npoints) -> CDenseMatrix
 {
-    CGpuDevices gpu_devices;
-
-    const auto total_num_gpus_per_compute_node = gpu_devices.getNumberOfDevices();
-
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
     const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
 
-    // auto nthreads = omp_get_max_threads();
     auto num_gpus_per_node = screening.getNumGpusPerNode();
-    // auto num_threads_per_gpu = nthreads / num_gpus_per_node;
 
     const auto natoms = molecule.getNumberOfAtoms();
 
@@ -1840,6 +1843,10 @@ computePointChargesGradientOnGPU(const CMolecule& molecule,
     auto gpu_id = thread_id;
 
     gpuSafe(gpuSetDevice(gpu_id));
+    gpuSafe(gpuDeviceSynchronize());  // early context initialization after setdevice
+
+    gpuStream_t stream;
+    gpuSafe(gpuStreamCreate(&stream));
 
     // Boys function (tabulated for order 0-28)
 
@@ -1847,17 +1854,17 @@ computePointChargesGradientOnGPU(const CMolecule& molecule,
 
     double* d_boys_func_table;
 
-    gpuSafe(gpuMalloc(&d_boys_func_table, boys_func_table.size() * sizeof(double)));
+    gpuSafe(gpuMallocAsync(&d_boys_func_table, boys_func_table.size() * sizeof(double), stream));
 
-    gpu::chunkedMemcpyHostToDevice<double>(d_boys_func_table, boys_func_table.data(), boys_func_table.size());
+    gpuSafe(gpuMemcpyAsync(d_boys_func_table, boys_func_table.data(), boys_func_table.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     const auto boys_func_ft = boysfunc::getBoysFuncFactors();
 
     double* d_boys_func_ft;
 
-    gpuSafe(gpuMalloc(&d_boys_func_ft, boys_func_ft.size() * sizeof(double)));
+    gpuSafe(gpuMallocAsync(&d_boys_func_ft, boys_func_ft.size() * sizeof(double), stream));
 
-    gpu::chunkedMemcpyHostToDevice<double>(d_boys_func_ft, boys_func_ft.data(), boys_func_ft.size());
+    gpuSafe(gpuMemcpyAsync(d_boys_func_ft, boys_func_ft.data(), boys_func_ft.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     // GTOs blocks and number of AOs
 
@@ -1921,9 +1928,9 @@ computePointChargesGradientOnGPU(const CMolecule& molecule,
 
     double*   d_s_prim_info;
 
-    gpuSafe(gpuMalloc(&d_s_prim_info, s_prim_info.size() * sizeof(double)));
+    gpuSafe(gpuMallocAsync(&d_s_prim_info, s_prim_info.size() * sizeof(double), stream));
 
-    gpu::chunkedMemcpyHostToDevice<double>(d_s_prim_info, s_prim_info.data(), s_prim_info.size());
+    gpuSafe(gpuMemcpyAsync(d_s_prim_info, s_prim_info.data(), s_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     // P gto block
 
@@ -1934,9 +1941,9 @@ computePointChargesGradientOnGPU(const CMolecule& molecule,
 
     double*   d_p_prim_info;
 
-    gpuSafe(gpuMalloc(&d_p_prim_info, p_prim_info.size() * sizeof(double)));
+    gpuSafe(gpuMallocAsync(&d_p_prim_info, p_prim_info.size() * sizeof(double), stream));
 
-    gpu::chunkedMemcpyHostToDevice<double>(d_p_prim_info, p_prim_info.data(), p_prim_info.size());
+    gpuSafe(gpuMemcpyAsync(d_p_prim_info, p_prim_info.data(), p_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     // D gto block
 
@@ -1947,9 +1954,9 @@ computePointChargesGradientOnGPU(const CMolecule& molecule,
 
     double*   d_d_prim_info;
 
-    gpuSafe(gpuMalloc(&d_d_prim_info, d_prim_info.size() * sizeof(double)));
+    gpuSafe(gpuMallocAsync(&d_d_prim_info, d_prim_info.size() * sizeof(double), stream));
 
-    gpu::chunkedMemcpyHostToDevice<double>(d_d_prim_info, d_prim_info.data(), d_prim_info.size());
+    gpuSafe(gpuMemcpyAsync(d_d_prim_info, d_prim_info.data(), d_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     // GTO block pairs
 
@@ -1999,67 +2006,69 @@ computePointChargesGradientOnGPU(const CMolecule& molecule,
 
     double *d_ss_mat_D_local, *d_sp_mat_D_local, *d_sd_mat_D_local, *d_pp_mat_D_local, *d_pd_mat_D_local, *d_dd_mat_D_local;
 
-    gpuSafe(gpuMalloc(&d_mat_V, max_prim_pair_count_local * sizeof(double)));
+    gpuSafe(gpuMallocAsync(&d_mat_V, max_prim_pair_count_local * sizeof(double), stream));
 
-    gpuSafe(gpuMalloc(&d_ss_first_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_ss_second_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMallocAsync(&d_ss_first_inds_local, ss_prim_pair_count_local * sizeof(uint32_t), stream));
+    gpuSafe(gpuMallocAsync(&d_ss_second_inds_local, ss_prim_pair_count_local * sizeof(uint32_t), stream));
 
-    gpuSafe(gpuMalloc(&d_sp_first_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_sp_second_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMallocAsync(&d_sp_first_inds_local, sp_prim_pair_count_local * sizeof(uint32_t), stream));
+    gpuSafe(gpuMallocAsync(&d_sp_second_inds_local, sp_prim_pair_count_local * sizeof(uint32_t), stream));
 
-    gpuSafe(gpuMalloc(&d_sd_first_inds_local, sd_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_sd_second_inds_local, sd_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMallocAsync(&d_sd_first_inds_local, sd_prim_pair_count_local * sizeof(uint32_t), stream));
+    gpuSafe(gpuMallocAsync(&d_sd_second_inds_local, sd_prim_pair_count_local * sizeof(uint32_t), stream));
 
-    gpuSafe(gpuMalloc(&d_pp_first_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_pp_second_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMallocAsync(&d_pp_first_inds_local, pp_prim_pair_count_local * sizeof(uint32_t), stream));
+    gpuSafe(gpuMallocAsync(&d_pp_second_inds_local, pp_prim_pair_count_local * sizeof(uint32_t), stream));
 
-    gpuSafe(gpuMalloc(&d_pd_first_inds_local, pd_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_pd_second_inds_local, pd_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMallocAsync(&d_pd_first_inds_local, pd_prim_pair_count_local * sizeof(uint32_t), stream));
+    gpuSafe(gpuMallocAsync(&d_pd_second_inds_local, pd_prim_pair_count_local * sizeof(uint32_t), stream));
 
-    gpuSafe(gpuMalloc(&d_dd_first_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_dd_second_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMallocAsync(&d_dd_first_inds_local, dd_prim_pair_count_local * sizeof(uint32_t), stream));
+    gpuSafe(gpuMallocAsync(&d_dd_second_inds_local, dd_prim_pair_count_local * sizeof(uint32_t), stream));
 
-    gpuSafe(gpuMalloc(&d_ss_mat_D_local, ss_prim_pair_count_local * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_sp_mat_D_local, sp_prim_pair_count_local * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_sd_mat_D_local, sd_prim_pair_count_local * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_pp_mat_D_local, pp_prim_pair_count_local * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_pd_mat_D_local, pd_prim_pair_count_local * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_dd_mat_D_local, dd_prim_pair_count_local * sizeof(double)));
+    gpuSafe(gpuMallocAsync(&d_ss_mat_D_local, ss_prim_pair_count_local * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_sp_mat_D_local, sp_prim_pair_count_local * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_sd_mat_D_local, sd_prim_pair_count_local * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_pp_mat_D_local, pp_prim_pair_count_local * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_pd_mat_D_local, pd_prim_pair_count_local * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_dd_mat_D_local, dd_prim_pair_count_local * sizeof(double), stream));
 
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_ss_first_inds_local, ss_first_inds_local.data(), ss_prim_pair_count_local);
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_ss_second_inds_local, ss_second_inds_local.data(), ss_prim_pair_count_local);
+    gpuSafe(gpuMemcpyAsync(d_ss_first_inds_local, ss_first_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_ss_second_inds_local, ss_second_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_sp_first_inds_local, sp_first_inds_local.data(), sp_prim_pair_count_local);
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_sp_second_inds_local, sp_second_inds_local.data(), sp_prim_pair_count_local);
+    gpuSafe(gpuMemcpyAsync(d_sp_first_inds_local, sp_first_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_sp_second_inds_local, sp_second_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_sd_first_inds_local, sd_first_inds_local.data(), sd_prim_pair_count_local);
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_sd_second_inds_local, sd_second_inds_local.data(), sd_prim_pair_count_local);
+    gpuSafe(gpuMemcpyAsync(d_sd_first_inds_local, sd_first_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_sd_second_inds_local, sd_second_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pp_first_inds_local, pp_first_inds_local.data(), pp_prim_pair_count_local);
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local);
+    gpuSafe(gpuMemcpyAsync(d_pp_first_inds_local, pp_first_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pd_first_inds_local, pd_first_inds_local.data(), pd_prim_pair_count_local);
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pd_second_inds_local, pd_second_inds_local.data(), pd_prim_pair_count_local);
+    gpuSafe(gpuMemcpyAsync(d_pd_first_inds_local, pd_first_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pd_second_inds_local, pd_second_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_dd_first_inds_local, dd_first_inds_local.data(), dd_prim_pair_count_local);
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local);
+    gpuSafe(gpuMemcpyAsync(d_dd_first_inds_local, dd_first_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-    gpu::chunkedMemcpyHostToDevice<double>(d_ss_mat_D_local, ss_mat_D_local.data(), ss_prim_pair_count_local);
-    gpu::chunkedMemcpyHostToDevice<double>(d_sp_mat_D_local, sp_mat_D_local.data(), sp_prim_pair_count_local);
-    gpu::chunkedMemcpyHostToDevice<double>(d_sd_mat_D_local, sd_mat_D_local.data(), sd_prim_pair_count_local);
-    gpu::chunkedMemcpyHostToDevice<double>(d_pp_mat_D_local, pp_mat_D_local.data(), pp_prim_pair_count_local);
-    gpu::chunkedMemcpyHostToDevice<double>(d_pd_mat_D_local, pd_mat_D_local.data(), pd_prim_pair_count_local);
-    gpu::chunkedMemcpyHostToDevice<double>(d_dd_mat_D_local, dd_mat_D_local.data(), dd_prim_pair_count_local);
+    gpuSafe(gpuMemcpyAsync(d_ss_mat_D_local, ss_mat_D_local.data(), ss_prim_pair_count_local * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_sp_mat_D_local, sp_mat_D_local.data(), sp_prim_pair_count_local * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_sd_mat_D_local, sd_mat_D_local.data(), sd_prim_pair_count_local * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pp_mat_D_local, pp_mat_D_local.data(), pp_prim_pair_count_local * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_pd_mat_D_local, pd_mat_D_local.data(), pd_prim_pair_count_local * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_dd_mat_D_local, dd_mat_D_local.data(), dd_prim_pair_count_local * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     V_grad_omp[gpu_id].zero();
 
     double *d_points_info;
 
-    gpuSafe(gpuMalloc(&d_points_info, npoints * 4 * sizeof(double)));
+    gpuSafe(gpuMallocAsync(&d_points_info, npoints * 4 * sizeof(double), stream));
 
-    gpu::chunkedMemcpyHostToDevice<double>(d_points_info, points_info_ptr, npoints * 4);
+    gpuSafe(gpuMemcpyAsync(d_points_info, points_info_ptr, npoints * 4 * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-    gpuSafe(gpuDeviceSynchronize());
+    gpuSafe(gpuStreamSynchronize(stream));
+
+#pragma omp barrier
 
     // set up primitive Cartesian AO to atom mapping
 
@@ -2071,7 +2080,7 @@ computePointChargesGradientOnGPU(const CMolecule& molecule,
 
     uint32_t *d_prim_cart_ao_to_atom_inds;
 
-    gpuSafe(gpuMalloc(&d_prim_cart_ao_to_atom_inds, all_prim_count * sizeof(uint32_t)));
+    gpuSafe(gpuMallocAsync(&d_prim_cart_ao_to_atom_inds, all_prim_count * sizeof(uint32_t), stream));
 
     for (int64_t ij = 0; ij < ss_prim_pair_count_local; ij++)
     {
@@ -2152,19 +2161,19 @@ computePointChargesGradientOnGPU(const CMolecule& molecule,
         prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + j] = static_cast<uint32_t>(cart_ao_to_atom_inds[j_cgto]);
     }
 
-    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_prim_cart_ao_to_atom_inds, prim_cart_ao_to_atom_inds.data(), all_prim_count);
+    gpuSafe(gpuMemcpyAsync(d_prim_cart_ao_to_atom_inds, prim_cart_ao_to_atom_inds.data(), all_prim_count * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
     // gradient
 
     double *d_grad_x, *d_grad_y, *d_grad_z;
 
-    gpuSafe(gpuMalloc(&d_grad_x, natoms * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_grad_y, natoms * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_grad_z, natoms * sizeof(double)));
+    gpuSafe(gpuMallocAsync(&d_grad_x, natoms * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_grad_y, natoms * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_grad_z, natoms * sizeof(double), stream));
 
-    gpu::chunkedMemcpyHostToDevice<double>(d_grad_x, V_grad_omp[gpu_id].row(0), natoms);
-    gpu::chunkedMemcpyHostToDevice<double>(d_grad_y, V_grad_omp[gpu_id].row(1), natoms);
-    gpu::chunkedMemcpyHostToDevice<double>(d_grad_z, V_grad_omp[gpu_id].row(2), natoms);
+    gpuSafe(gpuMemcpyAsync(d_grad_x, V_grad_omp[gpu_id].row(0), natoms * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_grad_y, V_grad_omp[gpu_id].row(1), natoms * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_grad_z, V_grad_omp[gpu_id].row(2), natoms * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     double *d_grad_array[3] = {d_grad_x, d_grad_y, d_grad_z};
 
@@ -2180,7 +2189,7 @@ computePointChargesGradientOnGPU(const CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computePointChargesGradientSS<<<num_blocks,threads_per_block>>>(
+            gpu::computePointChargesGradientSS<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_grad_array[grad_cart_ind],
                            static_cast<uint32_t>(grad_cart_ind),
                            d_s_prim_info,
@@ -2207,7 +2216,7 @@ computePointChargesGradientOnGPU(const CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computePointChargesGradientSP<<<num_blocks,threads_per_block>>>(
+            gpu::computePointChargesGradientSP<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_grad_array[grad_cart_ind],
                            static_cast<uint32_t>(grad_cart_ind),
                            d_s_prim_info,
@@ -2236,7 +2245,7 @@ computePointChargesGradientOnGPU(const CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computePointChargesGradientSD<<<num_blocks,threads_per_block>>>(
+            gpu::computePointChargesGradientSD<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_grad_array[grad_cart_ind],
                            static_cast<uint32_t>(grad_cart_ind),
                            d_s_prim_info,
@@ -2266,7 +2275,7 @@ computePointChargesGradientOnGPU(const CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computePointChargesGradientPP<<<num_blocks,threads_per_block>>>(
+            gpu::computePointChargesGradientPP<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_grad_array[grad_cart_ind],
                            static_cast<uint32_t>(grad_cart_ind),
                            d_p_prim_info,
@@ -2294,7 +2303,7 @@ computePointChargesGradientOnGPU(const CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computePointChargesGradientPD<<<num_blocks,threads_per_block>>>(
+            gpu::computePointChargesGradientPD<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_grad_array[grad_cart_ind],
                            static_cast<uint32_t>(grad_cart_ind),
                            d_p_prim_info,
@@ -2324,7 +2333,7 @@ computePointChargesGradientOnGPU(const CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computePointChargesGradientDD<<<num_blocks,threads_per_block>>>(
+            gpu::computePointChargesGradientDD<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_grad_array[grad_cart_ind],
                            static_cast<uint32_t>(grad_cart_ind),
                            d_d_prim_info,
@@ -2343,51 +2352,54 @@ computePointChargesGradientOnGPU(const CMolecule& molecule,
         }
     }
 
-    gpuSafe(gpuDeviceSynchronize());
+    gpuSafe(gpuMemcpyAsync(V_grad_omp[gpu_id].row(0), d_grad_x, natoms * sizeof(double), gpuMemcpyDeviceToHost, stream));
+    gpuSafe(gpuMemcpyAsync(V_grad_omp[gpu_id].row(1), d_grad_y, natoms * sizeof(double), gpuMemcpyDeviceToHost, stream));
+    gpuSafe(gpuMemcpyAsync(V_grad_omp[gpu_id].row(2), d_grad_z, natoms * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
-    gpu::chunkedMemcpyDeviceToHost<double>(V_grad_omp[gpu_id].row(0), d_grad_x, natoms);
-    gpu::chunkedMemcpyDeviceToHost<double>(V_grad_omp[gpu_id].row(1), d_grad_y, natoms);
-    gpu::chunkedMemcpyDeviceToHost<double>(V_grad_omp[gpu_id].row(2), d_grad_z, natoms);
+    gpuSafe(gpuStreamSynchronize(stream));
 
 #pragma omp barrier
 
-    gpuSafe(gpuFree(d_grad_x));
-    gpuSafe(gpuFree(d_grad_y));
-    gpuSafe(gpuFree(d_grad_z));
+    gpuSafe(gpuFreeAsync(d_grad_x, stream));
+    gpuSafe(gpuFreeAsync(d_grad_y, stream));
+    gpuSafe(gpuFreeAsync(d_grad_z, stream));
 
-    gpuSafe(gpuFree(d_prim_cart_ao_to_atom_inds));
+    gpuSafe(gpuFreeAsync(d_prim_cart_ao_to_atom_inds, stream));
 
-    gpuSafe(gpuFree(d_boys_func_table));
-    gpuSafe(gpuFree(d_boys_func_ft));
+    gpuSafe(gpuFreeAsync(d_boys_func_table, stream));
+    gpuSafe(gpuFreeAsync(d_boys_func_ft, stream));
 
-    gpuSafe(gpuFree(d_s_prim_info));
-    gpuSafe(gpuFree(d_p_prim_info));
-    gpuSafe(gpuFree(d_d_prim_info));
+    gpuSafe(gpuFreeAsync(d_s_prim_info, stream));
+    gpuSafe(gpuFreeAsync(d_p_prim_info, stream));
+    gpuSafe(gpuFreeAsync(d_d_prim_info, stream));
 
-    gpuSafe(gpuFree(d_mat_V));
+    gpuSafe(gpuFreeAsync(d_mat_V, stream));
 
-    gpuSafe(gpuFree(d_ss_first_inds_local));
-    gpuSafe(gpuFree(d_ss_second_inds_local));
-    gpuSafe(gpuFree(d_sp_first_inds_local));
-    gpuSafe(gpuFree(d_sp_second_inds_local));
-    gpuSafe(gpuFree(d_sd_first_inds_local));
-    gpuSafe(gpuFree(d_sd_second_inds_local));
-    gpuSafe(gpuFree(d_pp_first_inds_local));
-    gpuSafe(gpuFree(d_pp_second_inds_local));
-    gpuSafe(gpuFree(d_pd_first_inds_local));
-    gpuSafe(gpuFree(d_pd_second_inds_local));
-    gpuSafe(gpuFree(d_dd_first_inds_local));
-    gpuSafe(gpuFree(d_dd_second_inds_local));
+    gpuSafe(gpuFreeAsync(d_ss_first_inds_local, stream));
+    gpuSafe(gpuFreeAsync(d_ss_second_inds_local, stream));
+    gpuSafe(gpuFreeAsync(d_sp_first_inds_local, stream));
+    gpuSafe(gpuFreeAsync(d_sp_second_inds_local, stream));
+    gpuSafe(gpuFreeAsync(d_sd_first_inds_local, stream));
+    gpuSafe(gpuFreeAsync(d_sd_second_inds_local, stream));
+    gpuSafe(gpuFreeAsync(d_pp_first_inds_local, stream));
+    gpuSafe(gpuFreeAsync(d_pp_second_inds_local, stream));
+    gpuSafe(gpuFreeAsync(d_pd_first_inds_local, stream));
+    gpuSafe(gpuFreeAsync(d_pd_second_inds_local, stream));
+    gpuSafe(gpuFreeAsync(d_dd_first_inds_local, stream));
+    gpuSafe(gpuFreeAsync(d_dd_second_inds_local, stream));
 
-    gpuSafe(gpuFree(d_points_info));
+    gpuSafe(gpuFreeAsync(d_points_info, stream));
 
-    gpuSafe(gpuFree(d_ss_mat_D_local));
-    gpuSafe(gpuFree(d_sp_mat_D_local));
-    gpuSafe(gpuFree(d_sd_mat_D_local));
-    gpuSafe(gpuFree(d_pp_mat_D_local));
-    gpuSafe(gpuFree(d_pd_mat_D_local));
-    gpuSafe(gpuFree(d_dd_mat_D_local));
+    gpuSafe(gpuFreeAsync(d_ss_mat_D_local, stream));
+    gpuSafe(gpuFreeAsync(d_sp_mat_D_local, stream));
+    gpuSafe(gpuFreeAsync(d_sd_mat_D_local, stream));
+    gpuSafe(gpuFreeAsync(d_pp_mat_D_local, stream));
+    gpuSafe(gpuFreeAsync(d_pd_mat_D_local, stream));
+    gpuSafe(gpuFreeAsync(d_dd_mat_D_local, stream));
 
+    gpuSafe(gpuStreamSynchronize(stream));
+    gpuSafe(gpuStreamDestroy(stream));
+    gpuSafe(gpuDeviceSynchronize());
     }
 
     CDenseMatrix V_grad_t(natoms, 3);
@@ -3119,7 +3131,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         dim3 num_blocks((ss_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::zeroGradientData<<<num_blocks,threads_per_block>>>(d_mat_J,static_cast<uint32_t>(ss_prim_pair_count_local));
+        gpu::zeroGradientData<<<num_blocks, threads_per_block>>>(d_mat_J,static_cast<uint32_t>(ss_prim_pair_count_local));
 
         gpuSafe(gpuDeviceSynchronize());
 
@@ -3154,7 +3166,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombGradientSSSS_I_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientSSSS_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -3176,7 +3188,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientSSSS_J_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientSSSS_J_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -3212,7 +3224,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombGradientSSSP_I_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientSSSP_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -3236,7 +3248,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientSSSP_J_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientSSSP_J_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -3274,7 +3286,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombGradientSSSD_I_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientSSSD_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -3298,7 +3310,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientSSSD_J_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientSSSD_J_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -3336,7 +3348,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombGradientSSPP_I_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientSSPP_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -3360,7 +3372,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientSSPP_J_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientSSPP_J_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -3398,7 +3410,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombGradientSSPD_I_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientSSPD_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -3424,7 +3436,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientSSPD_J_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientSSPD_J_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -3464,7 +3476,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombGradientSSDD_I_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientSSDD_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -3488,7 +3500,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientSSDD_J_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientSSDD_J_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -3532,7 +3544,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         dim3 num_blocks((sp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::zeroGradientData<<<num_blocks,threads_per_block>>>(d_mat_J,static_cast<uint32_t>(sp_prim_pair_count_local));
+        gpu::zeroGradientData<<<num_blocks, threads_per_block>>>(d_mat_J,static_cast<uint32_t>(sp_prim_pair_count_local));
 
         gpuSafe(gpuDeviceSynchronize());
 
@@ -3569,7 +3581,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombGradientSPSS_I_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientSPSS_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -3593,7 +3605,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientSPSS_J_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientSPSS_J_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -3631,7 +3643,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombGradientSPSP_I_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientSPSP_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -3655,7 +3667,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientSPSP_J_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientSPSP_J_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -3693,7 +3705,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombGradientSPSD_I_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientSPSD_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -3719,7 +3731,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientSPSD_J_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientSPSD_J_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -3759,7 +3771,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombGradientSPPP_I_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientSPPP_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -3783,7 +3795,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientSPPP_J_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientSPPP_J_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -3821,7 +3833,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombGradientSPPD_I_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientSPPD_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -3847,7 +3859,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientSPPD_J_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientSPPD_J_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -3887,7 +3899,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombGradientSPDD_I_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientSPDD_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -3913,7 +3925,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientSPDD_J_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientSPDD_J_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -3959,7 +3971,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         dim3 num_blocks((pp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::zeroGradientData<<<num_blocks,threads_per_block>>>(d_mat_J,static_cast<uint32_t>(pp_prim_pair_count_local));
+        gpu::zeroGradientData<<<num_blocks, threads_per_block>>>(d_mat_J,static_cast<uint32_t>(pp_prim_pair_count_local));
 
         gpuSafe(gpuDeviceSynchronize());
 
@@ -3995,7 +4007,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombGradientPPSS_I_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPPSS_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -4019,7 +4031,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPPSS_J_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPPSS_J_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -4057,7 +4069,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombGradientPPSP_I_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPPSP_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -4081,7 +4093,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPPSP_J_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPPSP_J_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -4119,7 +4131,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombGradientPPSD_I_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPPSD_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -4145,7 +4157,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPPSD_J_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPPSD_J_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -4185,7 +4197,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombGradientPPPP_I_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPPPP_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -4208,7 +4220,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPPPP_J_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPPPP_J_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -4245,7 +4257,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombGradientPPPD_I_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPPPD_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -4270,7 +4282,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPPPD_J_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPPPD_J_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -4309,7 +4321,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombGradientPPDD_I_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPPDD_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -4334,7 +4346,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPPDD_I_1<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPPDD_I_1<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -4359,7 +4371,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPPDD_I_2<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPPDD_I_2<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -4384,7 +4396,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPPDD_I_3<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPPDD_I_3<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -4409,7 +4421,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPPDD_I_4<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPPDD_I_4<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -4434,7 +4446,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPPDD_J_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPPDD_J_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -4459,7 +4471,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPPDD_J_1<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPPDD_J_1<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -4484,7 +4496,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPPDD_J_2<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPPDD_J_2<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -4509,7 +4521,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPPDD_J_3<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPPDD_J_3<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -4534,7 +4546,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPPDD_J_4<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPPDD_J_4<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -4579,7 +4591,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         dim3 num_blocks((sd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::zeroGradientData<<<num_blocks,threads_per_block>>>(d_mat_J,static_cast<uint32_t>(sd_prim_pair_count_local));
+        gpu::zeroGradientData<<<num_blocks, threads_per_block>>>(d_mat_J,static_cast<uint32_t>(sd_prim_pair_count_local));
 
         gpuSafe(gpuDeviceSynchronize());
 
@@ -4616,7 +4628,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombGradientSDSS_I_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientSDSS_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -4641,7 +4653,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientSDSS_J_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientSDSS_J_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -4680,7 +4692,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombGradientSDSP_I_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientSDSP_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -4706,7 +4718,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientSDSP_J_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientSDSP_J_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -4746,7 +4758,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombGradientSDSD_I_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientSDSD_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -4771,7 +4783,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientSDSD_J_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientSDSD_J_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -4810,7 +4822,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombGradientSDPP_I_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientSDPP_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -4836,7 +4848,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientSDPP_J_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientSDPP_J_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -4876,7 +4888,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombGradientSDPD_I_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientSDPD_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -4902,7 +4914,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientSDPD_J_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientSDPD_J_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -4942,7 +4954,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombGradientSDDD_I_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientSDDD_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -4967,7 +4979,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientSDDD_I_1<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientSDDD_I_1<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -4992,7 +5004,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientSDDD_I_2<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientSDDD_I_2<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5017,7 +5029,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientSDDD_I_3<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientSDDD_I_3<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5042,7 +5054,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientSDDD_I_4<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientSDDD_I_4<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5067,7 +5079,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientSDDD_J_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientSDDD_J_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5092,7 +5104,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientSDDD_J_1<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientSDDD_J_1<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5117,7 +5129,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientSDDD_J_2<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientSDDD_J_2<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5142,7 +5154,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientSDDD_J_3<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientSDDD_J_3<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5167,7 +5179,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientSDDD_J_4<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientSDDD_J_4<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5212,7 +5224,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         dim3 num_blocks((pd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::zeroGradientData<<<num_blocks,threads_per_block>>>(d_mat_J,static_cast<uint32_t>(pd_prim_pair_count_local));
+        gpu::zeroGradientData<<<num_blocks, threads_per_block>>>(d_mat_J,static_cast<uint32_t>(pd_prim_pair_count_local));
 
         gpuSafe(gpuDeviceSynchronize());
 
@@ -5248,7 +5260,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombGradientPDSS_I_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDSS_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5274,7 +5286,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPDSS_J_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDSS_J_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5314,7 +5326,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombGradientPDSP_I_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDSP_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5340,7 +5352,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPDSP_J_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDSP_J_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5380,7 +5392,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombGradientPDSD_I_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDSD_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5406,7 +5418,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPDSD_J_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDSD_J_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5446,7 +5458,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombGradientPDPP_I_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDPP_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5471,7 +5483,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPDPP_J_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDPP_J_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5510,7 +5522,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombGradientPDPD_I_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDPD_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5535,7 +5547,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPDPD_I_1<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDPD_I_1<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5560,7 +5572,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPDPD_I_2<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDPD_I_2<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5585,7 +5597,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPDPD_I_3<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDPD_I_3<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5610,7 +5622,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPDPD_I_4<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDPD_I_4<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5635,7 +5647,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPDPD_I_5<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDPD_I_5<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5660,7 +5672,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPDPD_J_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDPD_J_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5685,7 +5697,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPDPD_J_1<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDPD_J_1<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5710,7 +5722,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPDPD_J_2<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDPD_J_2<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5735,7 +5747,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPDPD_J_3<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDPD_J_3<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5760,7 +5772,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPDPD_J_4<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDPD_J_4<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5785,7 +5797,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPDPD_J_5<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDPD_J_5<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5824,7 +5836,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombGradientPDDD_I_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDDD_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5849,7 +5861,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPDDD_I_1<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDDD_I_1<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5874,7 +5886,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPDDD_I_2<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDDD_I_2<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5899,7 +5911,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPDDD_I_3<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDDD_I_3<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5924,7 +5936,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPDDD_I_4<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDDD_I_4<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5949,7 +5961,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPDDD_I_5<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDDD_I_5<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5974,7 +5986,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPDDD_I_6<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDDD_I_6<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5999,7 +6011,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPDDD_I_7<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDDD_I_7<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6024,7 +6036,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPDDD_I_8<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDDD_I_8<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6049,7 +6061,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPDDD_I_9<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDDD_I_9<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6074,7 +6086,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPDDD_I_10<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDDD_I_10<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6099,7 +6111,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPDDD_I_11<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDDD_I_11<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6124,7 +6136,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPDDD_I_12<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDDD_I_12<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6149,7 +6161,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPDDD_I_13<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDDD_I_13<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6174,7 +6186,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPDDD_I_14<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDDD_I_14<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6199,7 +6211,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPDDD_I_15<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDDD_I_15<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6224,7 +6236,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPDDD_I_16<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDDD_I_16<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6249,7 +6261,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPDDD_I_17<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDDD_I_17<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6274,7 +6286,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPDDD_I_18<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDDD_I_18<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6299,7 +6311,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPDDD_I_19<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDDD_I_19<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6324,7 +6336,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPDDD_J_0<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDDD_J_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6349,7 +6361,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPDDD_J_1<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDDD_J_1<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6374,7 +6386,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPDDD_J_2<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDDD_J_2<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6399,7 +6411,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPDDD_J_3<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDDD_J_3<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6424,7 +6436,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPDDD_J_4<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDDD_J_4<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6449,7 +6461,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPDDD_J_5<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDDD_J_5<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6474,7 +6486,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPDDD_J_6<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDDD_J_6<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6499,7 +6511,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPDDD_J_7<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDDD_J_7<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6524,7 +6536,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPDDD_J_8<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDDD_J_8<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6549,7 +6561,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPDDD_J_9<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDDD_J_9<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6574,7 +6586,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPDDD_J_10<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDDD_J_10<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6599,7 +6611,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPDDD_J_11<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDDD_J_11<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6624,7 +6636,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPDDD_J_12<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDDD_J_12<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6649,7 +6661,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPDDD_J_13<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDDD_J_13<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6674,7 +6686,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPDDD_J_14<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDDD_J_14<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6699,7 +6711,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPDDD_J_15<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDDD_J_15<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6724,7 +6736,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPDDD_J_16<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDDD_J_16<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6749,7 +6761,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPDDD_J_17<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDDD_J_17<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6774,7 +6786,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientPDDD_J_18<<<num_blocks,threads_per_block>>>(
+                gpu::computeCoulombGradientPDDD_J_18<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6819,7 +6831,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         dim3 num_blocks((dd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::zeroGradientData<<<num_blocks,threads_per_block>>>(d_mat_J,static_cast<uint32_t>(dd_prim_pair_count_local));
+        gpu::zeroGradientData<<<num_blocks, threads_per_block>>>(d_mat_J,static_cast<uint32_t>(dd_prim_pair_count_local));
 
         gpuSafe(gpuDeviceSynchronize());
 
@@ -6859,7 +6871,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombGradientDDSS_I_0<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDSS_I_0<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6884,7 +6896,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDSS_J_0<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDSS_J_0<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6927,7 +6939,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombGradientDDSP_I_0<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDSP_I_0<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6953,7 +6965,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDSP_J_0<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDSP_J_0<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6997,7 +7009,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombGradientDDSD_I_0<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDSD_I_0<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7022,7 +7034,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDSD_I_1<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDSD_I_1<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7047,7 +7059,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDSD_I_2<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDSD_I_2<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7072,7 +7084,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDSD_I_3<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDSD_I_3<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7097,7 +7109,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDSD_I_4<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDSD_I_4<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7122,7 +7134,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDSD_I_5<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDSD_I_5<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7147,7 +7159,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDSD_I_6<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDSD_I_6<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7172,7 +7184,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDSD_J_0<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDSD_J_0<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7197,7 +7209,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDSD_J_1<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDSD_J_1<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7222,7 +7234,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDSD_J_2<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDSD_J_2<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7247,7 +7259,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDSD_J_3<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDSD_J_3<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7272,7 +7284,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDSD_J_4<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDSD_J_4<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7297,7 +7309,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDSD_J_5<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDSD_J_5<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7322,7 +7334,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDSD_J_6<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDSD_J_6<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7365,7 +7377,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombGradientDDPP_I_0<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDPP_I_0<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7390,7 +7402,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDPP_I_1<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDPP_I_1<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7415,7 +7427,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDPP_I_2<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDPP_I_2<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7440,7 +7452,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDPP_I_3<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDPP_I_3<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7465,7 +7477,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDPP_I_4<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDPP_I_4<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7490,7 +7502,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDPP_I_5<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDPP_I_5<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7515,7 +7527,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDPP_I_6<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDPP_I_6<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7540,7 +7552,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDPP_I_7<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDPP_I_7<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7565,7 +7577,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDPP_J_0<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDPP_J_0<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7590,7 +7602,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDPP_J_1<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDPP_J_1<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7615,7 +7627,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDPP_J_2<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDPP_J_2<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7640,7 +7652,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDPP_J_3<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDPP_J_3<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7665,7 +7677,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDPP_J_4<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDPP_J_4<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7690,7 +7702,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDPP_J_5<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDPP_J_5<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7715,7 +7727,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDPP_J_6<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDPP_J_6<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7740,7 +7752,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDPP_J_7<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDPP_J_7<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7783,7 +7795,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombGradientDDPD_I_0<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDPD_I_0<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7808,7 +7820,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDPD_I_1<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDPD_I_1<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7833,7 +7845,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDPD_I_2<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDPD_I_2<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7858,7 +7870,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDPD_I_3<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDPD_I_3<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7883,7 +7895,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDPD_I_4<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDPD_I_4<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7908,7 +7920,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDPD_I_5<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDPD_I_5<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7933,7 +7945,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDPD_I_6<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDPD_I_6<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7958,7 +7970,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDPD_I_7<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDPD_I_7<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7983,7 +7995,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDPD_I_8<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDPD_I_8<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -8008,7 +8020,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDPD_I_9<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDPD_I_9<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -8033,7 +8045,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDPD_I_10<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDPD_I_10<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -8058,7 +8070,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDPD_I_11<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDPD_I_11<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -8083,7 +8095,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDPD_I_12<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDPD_I_12<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -8108,7 +8120,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDPD_I_13<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDPD_I_13<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -8133,7 +8145,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDPD_I_14<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDPD_I_14<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -8158,7 +8170,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDPD_I_15<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDPD_I_15<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -8183,7 +8195,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDPD_I_16<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDPD_I_16<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -8208,7 +8220,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDPD_I_17<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDPD_I_17<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -8233,7 +8245,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDPD_I_18<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDPD_I_18<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -8258,7 +8270,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDPD_I_19<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDPD_I_19<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -8283,7 +8295,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDPD_J_0<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDPD_J_0<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -8308,7 +8320,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDPD_J_1<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDPD_J_1<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -8333,7 +8345,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDPD_J_2<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDPD_J_2<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -8358,7 +8370,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDPD_J_3<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDPD_J_3<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -8383,7 +8395,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDPD_J_4<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDPD_J_4<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -8408,7 +8420,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDPD_J_5<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDPD_J_5<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -8433,7 +8445,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDPD_J_6<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDPD_J_6<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -8458,7 +8470,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDPD_J_7<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDPD_J_7<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -8483,7 +8495,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDPD_J_8<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDPD_J_8<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -8508,7 +8520,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDPD_J_9<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDPD_J_9<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -8533,7 +8545,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDPD_J_10<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDPD_J_10<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -8558,7 +8570,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDPD_J_11<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDPD_J_11<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -8583,7 +8595,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDPD_J_12<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDPD_J_12<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -8608,7 +8620,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDPD_J_13<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDPD_J_13<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -8633,7 +8645,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDPD_J_14<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDPD_J_14<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -8658,7 +8670,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDPD_J_15<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDPD_J_15<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -8683,7 +8695,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDPD_J_16<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDPD_J_16<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -8708,7 +8720,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDPD_J_17<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDPD_J_17<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -8733,7 +8745,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDPD_J_18<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDPD_J_18<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -8758,7 +8770,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDPD_J_19<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDPD_J_19<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -8801,7 +8813,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombGradientDDDD_I_0<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_0<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -8825,7 +8837,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_1<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_1<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -8849,7 +8861,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_2<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_2<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -8873,7 +8885,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_3<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_3<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -8897,7 +8909,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_4<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_4<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -8921,7 +8933,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_5<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_5<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -8945,7 +8957,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_6<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_6<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -8969,7 +8981,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_7<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_7<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -8993,7 +9005,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_8<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_8<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -9017,7 +9029,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_9<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_9<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -9041,7 +9053,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_10<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_10<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -9065,7 +9077,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_11<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_11<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -9089,7 +9101,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_12<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_12<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -9113,7 +9125,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_13<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_13<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -9137,7 +9149,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_14<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_14<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -9161,7 +9173,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_15<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_15<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -9185,7 +9197,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_16<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_16<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -9209,7 +9221,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_17<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_17<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -9233,7 +9245,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_18<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_18<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -9257,7 +9269,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_19<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_19<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -9281,7 +9293,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_20<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_20<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -9305,7 +9317,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_21<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_21<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -9329,7 +9341,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_22<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_22<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -9353,7 +9365,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_23<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_23<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -9377,7 +9389,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_24<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_24<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -9401,7 +9413,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_25<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_25<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -9425,7 +9437,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_26<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_26<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -9449,7 +9461,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_27<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_27<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -9473,7 +9485,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_28<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_28<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -9497,7 +9509,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_29<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_29<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -9521,7 +9533,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_30<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_30<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -9545,7 +9557,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_31<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_31<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -9569,7 +9581,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_32<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_32<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -9593,7 +9605,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_33<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_33<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -9617,7 +9629,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_34<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_34<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -9641,7 +9653,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_35<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_35<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -9665,7 +9677,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_36<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_36<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -9689,7 +9701,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_37<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_37<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -9713,7 +9725,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_38<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_38<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -9737,7 +9749,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_39<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_39<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -9761,7 +9773,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_40<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_40<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -9785,7 +9797,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_41<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_41<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -9809,7 +9821,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_42<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_42<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -9833,7 +9845,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_43<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_43<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -9857,7 +9869,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_44<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_44<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -9881,7 +9893,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_45<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_45<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -9905,7 +9917,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_46<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_46<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -9929,7 +9941,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_47<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_47<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -9953,7 +9965,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_48<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_48<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -9977,7 +9989,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_49<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_49<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -10001,7 +10013,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_50<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_50<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -10025,7 +10037,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_51<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_51<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -10049,7 +10061,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_52<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_52<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -10073,7 +10085,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_53<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_53<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -10097,7 +10109,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_54<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_54<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -10121,7 +10133,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_55<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_55<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -10145,7 +10157,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_56<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_56<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -10169,7 +10181,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_57<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_57<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -10193,7 +10205,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_58<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_58<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -10217,7 +10229,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_59<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_59<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -10241,7 +10253,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_I_60<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_I_60<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -10265,7 +10277,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_0<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_0<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -10289,7 +10301,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_1<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_1<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -10313,7 +10325,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_2<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_2<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -10337,7 +10349,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_3<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_3<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -10361,7 +10373,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_4<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_4<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -10385,7 +10397,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_5<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_5<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -10409,7 +10421,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_6<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_6<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -10433,7 +10445,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_7<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_7<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -10457,7 +10469,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_8<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_8<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -10481,7 +10493,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_9<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_9<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -10505,7 +10517,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_10<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_10<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -10529,7 +10541,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_11<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_11<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -10553,7 +10565,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_12<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_12<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -10577,7 +10589,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_13<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_13<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -10601,7 +10613,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_14<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_14<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -10625,7 +10637,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_15<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_15<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -10649,7 +10661,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_16<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_16<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -10673,7 +10685,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_17<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_17<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -10697,7 +10709,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_18<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_18<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -10721,7 +10733,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_19<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_19<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -10745,7 +10757,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_20<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_20<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -10769,7 +10781,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_21<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_21<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -10793,7 +10805,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_22<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_22<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -10817,7 +10829,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_23<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_23<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -10841,7 +10853,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_24<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_24<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -10865,7 +10877,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_25<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_25<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -10889,7 +10901,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_26<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_26<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -10913,7 +10925,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_27<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_27<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -10937,7 +10949,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_28<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_28<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -10961,7 +10973,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_29<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_29<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -10985,7 +10997,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_30<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_30<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -11009,7 +11021,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_31<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_31<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -11033,7 +11045,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_32<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_32<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -11057,7 +11069,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_33<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_33<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -11081,7 +11093,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_34<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_34<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -11105,7 +11117,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_35<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_35<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -11129,7 +11141,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_36<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_36<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -11153,7 +11165,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_37<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_37<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -11177,7 +11189,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_38<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_38<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -11201,7 +11213,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_39<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_39<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -11225,7 +11237,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_40<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_40<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -11249,7 +11261,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_41<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_41<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -11273,7 +11285,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_42<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_42<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -11297,7 +11309,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_43<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_43<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -11321,7 +11333,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_44<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_44<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -11345,7 +11357,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_45<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_45<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -11369,7 +11381,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_46<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_46<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -11393,7 +11405,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_47<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_47<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -11417,7 +11429,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_48<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_48<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -11441,7 +11453,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_49<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_49<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -11465,7 +11477,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_50<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_50<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -11489,7 +11501,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_51<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_51<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -11513,7 +11525,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_52<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_52<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -11537,7 +11549,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_53<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_53<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -11561,7 +11573,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_54<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_54<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -11585,7 +11597,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_55<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_55<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -11609,7 +11621,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_56<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_56<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -11633,7 +11645,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_57<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_57<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -11657,7 +11669,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_58<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_58<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -11681,7 +11693,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_59<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_59<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -11705,7 +11717,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_60<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_60<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -11729,7 +11741,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombGradientDDDD_J_61<<<dd_num_blocks,dd_threads_per_block>>>(
+                gpu::computeCoulombGradientDDDD_J_61<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -12173,7 +12185,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         dim3 num_blocks((pair_inds_count_for_K_ss + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::zeroGradientData<<<num_blocks,threads_per_block>>>(d_mat_K,static_cast<uint32_t>(pair_inds_count_for_K_ss));
+        gpu::zeroGradientData<<<num_blocks, threads_per_block>>>(d_mat_K,static_cast<uint32_t>(pair_inds_count_for_K_ss));
 
         gpuSafe(gpuDeviceSynchronize());
 
@@ -12204,7 +12216,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeExchangeGradientSSSS_I_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSSSS_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -12228,7 +12240,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientSSSS_K_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSSSS_K_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -12261,7 +12273,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeExchangeGradientSSSP_I_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSSSP_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -12293,7 +12305,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientSSSP_K_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSSSP_K_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -12334,7 +12346,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeExchangeGradientSSSD_I_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSSSD_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -12366,7 +12378,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientSSSD_K_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSSSD_K_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -12407,7 +12419,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeExchangeGradientSPSS_I_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSPSS_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -12439,7 +12451,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientSPSS_K_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSPSS_K_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -12480,7 +12492,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeExchangeGradientSPSP_I_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSPSP_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -12507,7 +12519,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientSPSP_K_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSPSP_K_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -12543,7 +12555,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeExchangeGradientSPSD_I_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSPSD_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -12578,7 +12590,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientSPSD_K_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSPSD_K_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -12622,7 +12634,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeExchangeGradientSDSS_I_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSDSS_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -12654,7 +12666,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientSDSS_K_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSDSS_K_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -12695,7 +12707,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeExchangeGradientSDSP_I_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSDSP_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -12730,7 +12742,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientSDSP_K_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSDSP_K_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -12774,7 +12786,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeExchangeGradientSDSD_I_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSDSD_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -12801,7 +12813,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientSDSD_K_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSDSD_K_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -12847,7 +12859,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         dim3 num_blocks((pair_inds_count_for_K_sp + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::zeroGradientData<<<num_blocks,threads_per_block>>>(d_mat_K,static_cast<uint32_t>(pair_inds_count_for_K_sp));
+        gpu::zeroGradientData<<<num_blocks, threads_per_block>>>(d_mat_K,static_cast<uint32_t>(pair_inds_count_for_K_sp));
 
         gpuSafe(gpuDeviceSynchronize());
 
@@ -12880,7 +12892,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeExchangeGradientSSPS_I_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSSPS_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -12912,7 +12924,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientSSPS_K_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSSPS_K_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -12953,7 +12965,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeExchangeGradientSSPP_I_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSSPP_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -12985,7 +12997,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientSSPP_K_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSSPP_K_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -13026,7 +13038,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeExchangeGradientSSPD_I_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSSPD_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -13061,7 +13073,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientSSPD_K_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSSPD_K_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -13105,7 +13117,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeExchangeGradientSPPS_I_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSPPS_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -13137,7 +13149,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientSPPS_K_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSPPS_K_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -13178,7 +13190,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeExchangeGradientSPPP_I_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSPPP_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -13210,7 +13222,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientSPPP_K_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSPPP_K_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -13251,7 +13263,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeExchangeGradientSPPD_I_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSPPD_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -13286,7 +13298,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientSPPD_K_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSPPD_K_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -13330,7 +13342,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeExchangeGradientSDPS_I_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSDPS_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -13365,7 +13377,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientSDPS_K_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSDPS_K_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -13409,7 +13421,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeExchangeGradientSDPP_I_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSDPP_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -13444,7 +13456,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientSDPP_K_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSDPP_K_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -13488,7 +13500,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeExchangeGradientSDPD_I_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSDPD_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -13523,7 +13535,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientSDPD_K_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSDPD_K_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -13577,7 +13589,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         dim3 num_blocks((pair_inds_count_for_K_pp + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::zeroGradientData<<<num_blocks,threads_per_block>>>(d_mat_K,static_cast<uint32_t>(pair_inds_count_for_K_pp));
+        gpu::zeroGradientData<<<num_blocks, threads_per_block>>>(d_mat_K,static_cast<uint32_t>(pair_inds_count_for_K_pp));
 
         gpuSafe(gpuDeviceSynchronize());
 
@@ -13609,7 +13621,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeExchangeGradientPSPS_I_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPSPS_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -13636,7 +13648,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPSPS_K_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPSPS_K_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -13672,7 +13684,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeExchangeGradientPSPP_I_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPSPP_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -13704,7 +13716,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPSPP_K_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPSPP_K_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -13745,7 +13757,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeExchangeGradientPSPD_I_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPSPD_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -13780,7 +13792,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPSPD_K_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPSPD_K_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -13824,7 +13836,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeExchangeGradientPPPS_I_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPPPS_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -13856,7 +13868,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPPPS_K_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPPPS_K_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -13897,7 +13909,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeExchangeGradientPPPP_I_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPPPP_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -13922,7 +13934,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPPPP_K_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPPPP_K_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -13956,7 +13968,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeExchangeGradientPPPD_I_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPPPD_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -13989,7 +14001,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPPPD_K_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPPPD_K_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -14031,7 +14043,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeExchangeGradientPDPS_I_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDPS_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -14066,7 +14078,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDPS_K_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDPS_K_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -14110,7 +14122,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeExchangeGradientPDPP_I_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDPP_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -14143,7 +14155,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDPP_K_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDPP_K_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -14185,7 +14197,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeExchangeGradientPDPD_I_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDPD_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -14213,7 +14225,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDPD_I_1<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDPD_I_1<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -14241,7 +14253,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDPD_I_2<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDPD_I_2<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -14269,7 +14281,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDPD_I_3<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDPD_I_3<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -14297,7 +14309,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDPD_I_4<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDPD_I_4<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -14325,7 +14337,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDPD_I_5<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDPD_I_5<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -14353,7 +14365,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDPD_K_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDPD_K_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -14381,7 +14393,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDPD_K_1<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDPD_K_1<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -14409,7 +14421,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDPD_K_2<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDPD_K_2<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -14437,7 +14449,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDPD_K_3<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDPD_K_3<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -14465,7 +14477,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDPD_K_4<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDPD_K_4<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -14512,7 +14524,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         dim3 num_blocks((pair_inds_count_for_K_sd + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::zeroGradientData<<<num_blocks,threads_per_block>>>(d_mat_K,static_cast<uint32_t>(pair_inds_count_for_K_sd));
+        gpu::zeroGradientData<<<num_blocks, threads_per_block>>>(d_mat_K,static_cast<uint32_t>(pair_inds_count_for_K_sd));
 
         gpuSafe(gpuDeviceSynchronize());
 
@@ -14545,7 +14557,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeExchangeGradientSSDS_I_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSSDS_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -14578,7 +14590,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientSSDS_K_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSSDS_K_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -14620,7 +14632,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeExchangeGradientSSDP_I_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSSDP_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -14655,7 +14667,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientSSDP_K_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSSDP_K_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -14699,7 +14711,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeExchangeGradientSSDD_I_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSSDD_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -14732,7 +14744,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientSSDD_K_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSSDD_K_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -14774,7 +14786,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeExchangeGradientSPDS_I_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSPDS_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -14809,7 +14821,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientSPDS_K_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSPDS_K_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -14853,7 +14865,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeExchangeGradientSPDP_I_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSPDP_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -14888,7 +14900,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientSPDP_K_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSPDP_K_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -14932,7 +14944,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeExchangeGradientSPDD_I_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSPDD_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -14967,7 +14979,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientSPDD_K_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSPDD_K_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -15011,7 +15023,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeExchangeGradientSDDS_I_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSDDS_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -15044,7 +15056,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientSDDS_K_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSDDS_K_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -15086,7 +15098,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeExchangeGradientSDDP_I_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSDDP_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -15121,7 +15133,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientSDDP_K_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSDDP_K_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -15165,7 +15177,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeExchangeGradientSDDD_I_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSDDD_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -15198,7 +15210,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientSDDD_I_1<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSDDD_I_1<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -15231,7 +15243,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientSDDD_I_2<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSDDD_I_2<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -15264,7 +15276,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientSDDD_I_3<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSDDD_I_3<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -15297,7 +15309,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientSDDD_I_4<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSDDD_I_4<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -15330,7 +15342,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientSDDD_K_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSDDD_K_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -15363,7 +15375,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientSDDD_K_1<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSDDD_K_1<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -15396,7 +15408,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientSDDD_K_2<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSDDD_K_2<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -15429,7 +15441,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientSDDD_K_3<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSDDD_K_3<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -15462,7 +15474,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientSDDD_K_4<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientSDDD_K_4<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -15514,7 +15526,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         dim3 num_blocks((pair_inds_count_for_K_pd + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::zeroGradientData<<<num_blocks,threads_per_block>>>(d_mat_K,static_cast<uint32_t>(pair_inds_count_for_K_pd));
+        gpu::zeroGradientData<<<num_blocks, threads_per_block>>>(d_mat_K,static_cast<uint32_t>(pair_inds_count_for_K_pd));
 
         gpuSafe(gpuDeviceSynchronize());
 
@@ -15546,7 +15558,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeExchangeGradientPSDS_I_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPSDS_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -15581,7 +15593,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPSDS_K_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPSDS_K_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -15625,7 +15637,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeExchangeGradientPSDP_I_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPSDP_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -15660,7 +15672,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPSDP_K_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPSDP_K_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -15704,7 +15716,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeExchangeGradientPSDD_I_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPSDD_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -15739,7 +15751,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPSDD_K_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPSDD_K_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -15783,7 +15795,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeExchangeGradientPPDS_I_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPPDS_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -15818,7 +15830,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPPDS_K_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPPDS_K_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -15862,7 +15874,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeExchangeGradientPPDP_I_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPPDP_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -15895,7 +15907,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPPDP_K_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPPDP_K_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -15937,7 +15949,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeExchangeGradientPPDD_I_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPPDD_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -15970,7 +15982,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPPDD_I_1<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPPDD_I_1<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -16003,7 +16015,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPPDD_I_2<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPPDD_I_2<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -16036,7 +16048,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPPDD_I_3<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPPDD_I_3<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -16069,7 +16081,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPPDD_I_4<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPPDD_I_4<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -16102,7 +16114,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPPDD_K_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPPDD_K_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -16135,7 +16147,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPPDD_K_1<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPPDD_K_1<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -16168,7 +16180,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPPDD_K_2<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPPDD_K_2<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -16201,7 +16213,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPPDD_K_3<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPPDD_K_3<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -16234,7 +16246,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPPDD_K_4<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPPDD_K_4<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -16276,7 +16288,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeExchangeGradientPDDS_I_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDDS_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -16311,7 +16323,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDDS_K_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDDS_K_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -16355,7 +16367,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeExchangeGradientPDDP_I_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDDP_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -16388,7 +16400,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDDP_I_1<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDDP_I_1<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -16421,7 +16433,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDDP_I_2<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDDP_I_2<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -16454,7 +16466,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDDP_I_3<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDDP_I_3<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -16487,7 +16499,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDDP_I_4<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDDP_I_4<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -16520,7 +16532,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDDP_I_5<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDDP_I_5<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -16553,7 +16565,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDDP_K_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDDP_K_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -16586,7 +16598,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDDP_K_1<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDDP_K_1<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -16619,7 +16631,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDDP_K_2<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDDP_K_2<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -16652,7 +16664,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDDP_K_3<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDDP_K_3<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -16685,7 +16697,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDDP_K_4<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDDP_K_4<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -16727,7 +16739,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeExchangeGradientPDDD_I_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDDD_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -16760,7 +16772,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDDD_I_1<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDDD_I_1<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -16793,7 +16805,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDDD_I_2<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDDD_I_2<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -16826,7 +16838,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDDD_I_3<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDDD_I_3<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -16859,7 +16871,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDDD_I_4<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDDD_I_4<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -16892,7 +16904,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDDD_I_5<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDDD_I_5<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -16925,7 +16937,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDDD_I_6<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDDD_I_6<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -16958,7 +16970,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDDD_I_7<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDDD_I_7<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -16991,7 +17003,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDDD_I_8<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDDD_I_8<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -17024,7 +17036,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDDD_I_9<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDDD_I_9<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -17057,7 +17069,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDDD_I_10<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDDD_I_10<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -17090,7 +17102,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDDD_I_11<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDDD_I_11<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -17123,7 +17135,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDDD_I_12<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDDD_I_12<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -17156,7 +17168,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDDD_I_13<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDDD_I_13<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -17189,7 +17201,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDDD_I_14<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDDD_I_14<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -17222,7 +17234,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDDD_I_15<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDDD_I_15<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -17255,7 +17267,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDDD_I_16<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDDD_I_16<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -17288,7 +17300,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDDD_I_17<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDDD_I_17<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -17321,7 +17333,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDDD_I_18<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDDD_I_18<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -17354,7 +17366,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDDD_K_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDDD_K_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -17387,7 +17399,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDDD_K_1<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDDD_K_1<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -17420,7 +17432,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDDD_K_2<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDDD_K_2<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -17453,7 +17465,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDDD_K_3<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDDD_K_3<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -17486,7 +17498,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDDD_K_4<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDDD_K_4<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -17519,7 +17531,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDDD_K_5<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDDD_K_5<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -17552,7 +17564,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDDD_K_6<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDDD_K_6<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -17585,7 +17597,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDDD_K_7<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDDD_K_7<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -17618,7 +17630,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDDD_K_8<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDDD_K_8<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -17651,7 +17663,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDDD_K_9<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDDD_K_9<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -17684,7 +17696,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDDD_K_10<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDDD_K_10<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -17717,7 +17729,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDDD_K_11<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDDD_K_11<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -17750,7 +17762,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDDD_K_12<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDDD_K_12<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -17783,7 +17795,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDDD_K_13<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDDD_K_13<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -17816,7 +17828,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDDD_K_14<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDDD_K_14<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -17849,7 +17861,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDDD_K_15<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDDD_K_15<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -17882,7 +17894,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDDD_K_16<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDDD_K_16<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -17915,7 +17927,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPDDD_K_17<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientPDDD_K_17<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -17967,7 +17979,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         dim3 num_blocks((pair_inds_count_for_K_dd + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::zeroGradientData<<<num_blocks,threads_per_block>>>(d_mat_K,static_cast<uint32_t>(pair_inds_count_for_K_dd));
+        gpu::zeroGradientData<<<num_blocks, threads_per_block>>>(d_mat_K,static_cast<uint32_t>(pair_inds_count_for_K_dd));
 
         gpuSafe(gpuDeviceSynchronize());
 
@@ -17998,7 +18010,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeExchangeGradientDSDS_I_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDSDS_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -18026,7 +18038,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDSDS_K_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDSDS_K_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -18063,7 +18075,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeExchangeGradientDSDP_I_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDSDP_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -18098,7 +18110,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDSDP_K_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDSDP_K_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -18142,7 +18154,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeExchangeGradientDSDD_I_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDSDD_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -18175,7 +18187,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDSDD_I_1<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDSDD_I_1<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -18208,7 +18220,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDSDD_I_2<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDSDD_I_2<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -18241,7 +18253,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDSDD_I_3<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDSDD_I_3<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -18274,7 +18286,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDSDD_I_4<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDSDD_I_4<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -18307,7 +18319,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDSDD_K_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDSDD_K_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -18340,7 +18352,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDSDD_K_1<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDSDD_K_1<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -18373,7 +18385,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDSDD_K_2<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDSDD_K_2<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -18406,7 +18418,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDSDD_K_3<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDSDD_K_3<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -18439,7 +18451,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDSDD_K_4<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDSDD_K_4<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -18481,7 +18493,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeExchangeGradientDPDS_I_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDPDS_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -18516,7 +18528,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDPDS_K_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDPDS_K_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -18560,7 +18572,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeExchangeGradientDPDP_I_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDPDP_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -18588,7 +18600,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDPDP_I_1<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDPDP_I_1<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -18616,7 +18628,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDPDP_I_2<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDPDP_I_2<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -18644,7 +18656,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDPDP_I_3<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDPDP_I_3<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -18672,7 +18684,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDPDP_I_4<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDPDP_I_4<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -18700,7 +18712,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDPDP_I_5<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDPDP_I_5<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -18728,7 +18740,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDPDP_K_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDPDP_K_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -18756,7 +18768,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDPDP_K_1<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDPDP_K_1<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -18784,7 +18796,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDPDP_K_2<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDPDP_K_2<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -18812,7 +18824,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDPDP_K_3<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDPDP_K_3<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -18840,7 +18852,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDPDP_K_4<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDPDP_K_4<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -18877,7 +18889,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeExchangeGradientDPDD_I_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDPDD_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -18910,7 +18922,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDPDD_I_1<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDPDD_I_1<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -18943,7 +18955,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDPDD_I_2<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDPDD_I_2<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -18976,7 +18988,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDPDD_I_3<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDPDD_I_3<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -19009,7 +19021,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDPDD_I_4<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDPDD_I_4<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -19042,7 +19054,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDPDD_I_5<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDPDD_I_5<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -19075,7 +19087,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDPDD_I_6<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDPDD_I_6<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -19108,7 +19120,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDPDD_I_7<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDPDD_I_7<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -19141,7 +19153,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDPDD_I_8<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDPDD_I_8<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -19174,7 +19186,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDPDD_I_9<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDPDD_I_9<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -19207,7 +19219,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDPDD_I_10<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDPDD_I_10<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -19240,7 +19252,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDPDD_I_11<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDPDD_I_11<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -19273,7 +19285,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDPDD_I_12<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDPDD_I_12<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -19306,7 +19318,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDPDD_I_13<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDPDD_I_13<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -19339,7 +19351,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDPDD_I_14<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDPDD_I_14<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -19372,7 +19384,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDPDD_I_15<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDPDD_I_15<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -19405,7 +19417,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDPDD_I_16<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDPDD_I_16<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -19438,7 +19450,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDPDD_I_17<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDPDD_I_17<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -19471,7 +19483,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDPDD_K_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDPDD_K_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -19504,7 +19516,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDPDD_K_1<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDPDD_K_1<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -19537,7 +19549,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDPDD_K_2<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDPDD_K_2<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -19570,7 +19582,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDPDD_K_3<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDPDD_K_3<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -19603,7 +19615,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDPDD_K_4<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDPDD_K_4<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -19636,7 +19648,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDPDD_K_5<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDPDD_K_5<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -19669,7 +19681,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDPDD_K_6<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDPDD_K_6<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -19702,7 +19714,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDPDD_K_7<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDPDD_K_7<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -19735,7 +19747,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDPDD_K_8<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDPDD_K_8<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -19768,7 +19780,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDPDD_K_9<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDPDD_K_9<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -19801,7 +19813,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDPDD_K_10<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDPDD_K_10<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -19834,7 +19846,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDPDD_K_11<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDPDD_K_11<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -19867,7 +19879,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDPDD_K_12<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDPDD_K_12<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -19900,7 +19912,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDPDD_K_13<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDPDD_K_13<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -19933,7 +19945,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDPDD_K_14<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDPDD_K_14<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -19966,7 +19978,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDPDD_K_15<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDPDD_K_15<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -19999,7 +20011,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDPDD_K_16<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDPDD_K_16<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -20041,7 +20053,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeExchangeGradientDDDS_I_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDS_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -20074,7 +20086,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDS_I_1<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDS_I_1<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -20107,7 +20119,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDS_I_2<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDS_I_2<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -20140,7 +20152,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDS_I_3<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDS_I_3<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -20173,7 +20185,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDS_I_4<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDS_I_4<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -20206,7 +20218,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDS_I_5<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDS_I_5<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -20239,7 +20251,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDS_I_6<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDS_I_6<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -20272,7 +20284,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDS_K_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDS_K_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -20305,7 +20317,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDS_K_1<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDS_K_1<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -20338,7 +20350,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDS_K_2<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDS_K_2<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -20371,7 +20383,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDS_K_3<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDS_K_3<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -20404,7 +20416,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDS_K_4<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDS_K_4<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -20446,7 +20458,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeExchangeGradientDDDP_I_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDP_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -20479,7 +20491,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDP_I_1<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDP_I_1<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -20512,7 +20524,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDP_I_2<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDP_I_2<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -20545,7 +20557,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDP_I_3<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDP_I_3<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -20578,7 +20590,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDP_I_4<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDP_I_4<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -20611,7 +20623,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDP_I_5<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDP_I_5<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -20644,7 +20656,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDP_I_6<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDP_I_6<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -20677,7 +20689,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDP_I_7<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDP_I_7<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -20710,7 +20722,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDP_I_8<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDP_I_8<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -20743,7 +20755,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDP_I_9<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDP_I_9<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -20776,7 +20788,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDP_I_10<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDP_I_10<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -20809,7 +20821,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDP_I_11<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDP_I_11<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -20842,7 +20854,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDP_I_12<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDP_I_12<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -20875,7 +20887,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDP_I_13<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDP_I_13<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -20908,7 +20920,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDP_I_14<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDP_I_14<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -20941,7 +20953,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDP_I_15<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDP_I_15<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -20974,7 +20986,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDP_I_16<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDP_I_16<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -21007,7 +21019,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDP_I_17<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDP_I_17<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -21040,7 +21052,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDP_I_18<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDP_I_18<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -21073,7 +21085,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDP_I_19<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDP_I_19<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -21106,7 +21118,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDP_K_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDP_K_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -21139,7 +21151,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDP_K_1<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDP_K_1<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -21172,7 +21184,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDP_K_2<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDP_K_2<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -21205,7 +21217,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDP_K_3<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDP_K_3<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -21238,7 +21250,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDP_K_4<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDP_K_4<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -21271,7 +21283,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDP_K_5<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDP_K_5<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -21304,7 +21316,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDP_K_6<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDP_K_6<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -21337,7 +21349,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDP_K_7<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDP_K_7<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -21370,7 +21382,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDP_K_8<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDP_K_8<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -21403,7 +21415,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDP_K_9<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDP_K_9<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -21436,7 +21448,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDP_K_10<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDP_K_10<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -21469,7 +21481,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDP_K_11<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDP_K_11<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -21502,7 +21514,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDP_K_12<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDP_K_12<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -21535,7 +21547,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDP_K_13<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDP_K_13<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -21568,7 +21580,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDP_K_14<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDP_K_14<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -21601,7 +21613,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDP_K_15<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDP_K_15<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -21634,7 +21646,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDP_K_16<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDP_K_16<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -21667,7 +21679,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDP_K_17<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDP_K_17<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -21709,7 +21721,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
         for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
         {
-            gpu::computeExchangeGradientDDDD_I_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -21735,7 +21747,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_1<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_1<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -21761,7 +21773,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_2<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_2<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -21787,7 +21799,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_3<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_3<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -21813,7 +21825,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_4<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_4<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -21839,7 +21851,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_5<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_5<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -21865,7 +21877,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_6<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_6<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -21891,7 +21903,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_7<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_7<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -21917,7 +21929,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_8<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_8<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -21943,7 +21955,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_9<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_9<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -21969,7 +21981,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_10<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_10<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -21995,7 +22007,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_11<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_11<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -22021,7 +22033,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_12<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_12<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -22047,7 +22059,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_13<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_13<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -22073,7 +22085,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_14<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_14<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -22099,7 +22111,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_15<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_15<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -22125,7 +22137,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_16<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_16<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -22151,7 +22163,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_17<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_17<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -22177,7 +22189,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_18<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_18<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -22203,7 +22215,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_19<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_19<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -22229,7 +22241,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_20<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_20<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -22255,7 +22267,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_21<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_21<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -22281,7 +22293,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_22<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_22<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -22307,7 +22319,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_23<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_23<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -22333,7 +22345,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_24<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_24<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -22359,7 +22371,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_25<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_25<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -22385,7 +22397,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_26<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_26<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -22411,7 +22423,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_27<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_27<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -22437,7 +22449,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_28<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_28<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -22463,7 +22475,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_29<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_29<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -22489,7 +22501,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_30<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_30<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -22515,7 +22527,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_31<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_31<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -22541,7 +22553,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_32<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_32<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -22567,7 +22579,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_33<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_33<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -22593,7 +22605,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_34<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_34<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -22619,7 +22631,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_35<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_35<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -22645,7 +22657,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_36<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_36<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -22671,7 +22683,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_37<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_37<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -22697,7 +22709,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_38<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_38<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -22723,7 +22735,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_39<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_39<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -22749,7 +22761,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_40<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_40<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -22775,7 +22787,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_41<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_41<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -22801,7 +22813,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_42<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_42<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -22827,7 +22839,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_43<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_43<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -22853,7 +22865,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_44<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_44<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -22879,7 +22891,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_45<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_45<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -22905,7 +22917,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_46<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_46<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -22931,7 +22943,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_47<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_47<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -22957,7 +22969,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_48<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_48<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -22983,7 +22995,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_49<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_49<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -23009,7 +23021,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_50<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_50<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -23035,7 +23047,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_51<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_51<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -23061,7 +23073,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_52<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_52<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -23087,7 +23099,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_53<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_53<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -23113,7 +23125,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_54<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_54<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -23139,7 +23151,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_55<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_55<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -23165,7 +23177,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_56<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_56<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -23191,7 +23203,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_57<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_57<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -23217,7 +23229,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_58<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_58<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -23243,7 +23255,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_59<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_59<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -23269,7 +23281,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_60<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_60<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -23295,7 +23307,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_61<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_61<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -23321,7 +23333,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_I_62<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_I_62<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -23347,7 +23359,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -23373,7 +23385,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_1<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_1<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -23399,7 +23411,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_2<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_2<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -23425,7 +23437,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_3<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_3<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -23451,7 +23463,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_4<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_4<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -23477,7 +23489,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_5<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_5<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -23503,7 +23515,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_6<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_6<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -23529,7 +23541,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_7<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_7<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -23555,7 +23567,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_8<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_8<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -23581,7 +23593,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_9<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_9<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -23607,7 +23619,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_10<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_10<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -23633,7 +23645,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_11<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_11<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -23659,7 +23671,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_12<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_12<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -23685,7 +23697,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_13<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_13<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -23711,7 +23723,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_14<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_14<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -23737,7 +23749,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_15<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_15<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -23763,7 +23775,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_16<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_16<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -23789,7 +23801,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_17<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_17<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -23815,7 +23827,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_18<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_18<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -23841,7 +23853,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_19<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_19<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -23867,7 +23879,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_20<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_20<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -23893,7 +23905,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_21<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_21<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -23919,7 +23931,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_22<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_22<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -23945,7 +23957,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_23<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_23<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -23971,7 +23983,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_24<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_24<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -23997,7 +24009,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_25<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_25<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -24023,7 +24035,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_26<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_26<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -24049,7 +24061,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_27<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_27<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -24075,7 +24087,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_28<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_28<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -24101,7 +24113,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_29<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_29<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -24127,7 +24139,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_30<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_30<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -24153,7 +24165,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_31<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_31<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -24179,7 +24191,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_32_0<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_32_0<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -24205,7 +24217,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_32_1<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_32_1<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -24231,7 +24243,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_33<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_33<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -24257,7 +24269,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_34<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_34<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -24283,7 +24295,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_35<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_35<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -24309,7 +24321,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_36<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_36<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -24335,7 +24347,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_37<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_37<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -24361,7 +24373,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_38<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_38<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -24387,7 +24399,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_39<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_39<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -24413,7 +24425,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_40<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_40<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -24439,7 +24451,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_41<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_41<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -24465,7 +24477,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_42<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_42<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -24491,7 +24503,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_43<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_43<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -24517,7 +24529,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_44<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_44<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -24543,7 +24555,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_45<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_45<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -24569,7 +24581,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_46<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_46<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -24595,7 +24607,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_47<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_47<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -24621,7 +24633,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_48<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_48<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -24647,7 +24659,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_49<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_49<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -24673,7 +24685,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_50<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_50<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -24699,7 +24711,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_51<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_51<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -24725,7 +24737,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_52<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_52<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -24751,7 +24763,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_53<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_53<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -24777,7 +24789,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_54<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_54<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -24803,7 +24815,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_55<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_55<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -24829,7 +24841,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_56<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_56<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
@@ -24855,7 +24867,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientDDDD_K_57<<<num_blocks,threads_per_block>>>(
+            gpu::computeExchangeGradientDDDD_K_57<<<num_blocks, threads_per_block>>>(
                                d_grad_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                frac_exact_exchange,
