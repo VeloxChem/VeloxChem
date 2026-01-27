@@ -51,7 +51,6 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
-#include <iostream>
 #include <sstream>
 #include <fstream>
 #include <string>
@@ -59,7 +58,6 @@
 #include <utility>
 #include <vector>
 
-#include "ChunkedMemcpyGPU.hpp"
 #include "LinearAlgebraGPU.hpp"
 #include "ErrorHandler.hpp"
 #include "GpuConstants.hpp"
@@ -77,6 +75,7 @@ auto
 getAvailableGpuMemory() -> double
 {
     gpuSafe(gpuSetDevice(0));
+    gpuSafe(gpuDeviceSynchronize());  // early context initialization after setdevice
 
     errors::assertMsgCritical(
         !omp_in_parallel(),
@@ -94,6 +93,10 @@ auto
 computeDotProduct(const double* A, const double* B, const int64_t size_int64) -> double
 {
     gpuSafe(gpuSetDevice(0));
+    gpuSafe(gpuDeviceSynchronize());  // early context initialization after setdevice
+
+    gpuStream_t stream;
+    gpuSafe(gpuStreamCreate(&stream));
 
     errors::assertMsgCritical(
         !omp_in_parallel(),
@@ -101,18 +104,18 @@ computeDotProduct(const double* A, const double* B, const int64_t size_int64) ->
 
     auto size = static_cast<size_t>(size_int64);
 
-    double* d_data;
+    double* d_A;
+    double* d_B;
 
-    gpuSafe(gpuMalloc(&d_data, size * 2 * sizeof(double)));
+    gpuSafe(gpuMallocAsync(&d_A, size * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_B, size * sizeof(double), stream));
 
-    double* d_A = d_data;
-    double* d_B = d_A + size;
-
-    gpu::chunkedMemcpyHostToDevice<double>(d_A, A, size);
-    gpu::chunkedMemcpyHostToDevice<double>(d_B, B, size);
+    gpuSafe(gpuMemcpyAsync(d_A, A, size * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_B, B, size * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     gpublasHandle_t handle;
     gpublasSafe(gpublasCreate(&handle));
+    gpublasSafe(gpublasSetStream(handle, stream));
 
     auto n = static_cast<int32_t>(size);
 
@@ -124,9 +127,15 @@ computeDotProduct(const double* A, const double* B, const int64_t size_int64) ->
     hipblasSafe(hipblasDdot(handle, n, d_A, 1, d_B, 1, &dot_product));
 #endif
 
-    gpublasSafe(gpublasDestroy(handle));
+    gpuSafe(gpuStreamSynchronize(stream));
 
-    gpuSafe(gpuFree(d_data));
+    gpuSafe(gpuFreeAsync(d_A, stream));
+    gpuSafe(gpuFreeAsync(d_B, stream));
+
+    gpuSafe(gpuStreamSynchronize(stream));
+    gpublasSafe(gpublasDestroy(handle));
+    gpuSafe(gpuStreamDestroy(stream));
+    gpuSafe(gpuDeviceSynchronize());
 
     return dot_product;
 }
@@ -135,6 +144,10 @@ auto
 computeWeightedSum(double* weighted_data, const std::vector<double>& weights, const std::vector<const double*>& data_pointers, const int64_t size_int64) -> void
 {
     gpuSafe(gpuSetDevice(0));
+    gpuSafe(gpuDeviceSynchronize());  // early context initialization after setdevice
+
+    gpuStream_t stream;
+    gpuSafe(gpuStreamCreate(&stream));
 
     errors::assertMsgCritical(
         !omp_in_parallel(),
@@ -142,23 +155,23 @@ computeWeightedSum(double* weighted_data, const std::vector<double>& weights, co
 
     auto size = static_cast<size_t>(size_int64);
 
-    double* d_data;
+    double* d_X;
+    double* d_Y;
 
-    gpuSafe(gpuMalloc(&d_data, size * 2 * sizeof(double)));
+    gpuSafe(gpuMallocAsync(&d_X, size * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_Y, size * sizeof(double), stream));
 
-    double* d_X = d_data;
-    double* d_Y = d_X + size;
-
-    gpu::chunkedMemcpyHostToDevice<double>(d_Y, weighted_data, size);
+    gpuSafe(gpuMemcpyAsync(d_Y, weighted_data, size * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     gpublasHandle_t handle;
     gpublasSafe(gpublasCreate(&handle));
+    gpublasSafe(gpublasSetStream(handle, stream));
 
     for (size_t i = 0; i < data_pointers.size(); i++)
     {
         double alpha = weights[i];
 
-        gpu::chunkedMemcpyHostToDevice<double>(d_X, data_pointers[i], size);
+        gpuSafe(gpuMemcpyAsync(d_X, data_pointers[i], size * sizeof(double), gpuMemcpyHostToDevice, stream));
 
         auto n = static_cast<int32_t>(size);
 
@@ -169,11 +182,17 @@ computeWeightedSum(double* weighted_data, const std::vector<double>& weights, co
 #endif
     }
 
+    gpuSafe(gpuMemcpyAsync(weighted_data, d_Y, size * sizeof(double), gpuMemcpyDeviceToHost, stream));
+
+    gpuSafe(gpuStreamSynchronize(stream));
+
+    gpuSafe(gpuFreeAsync(d_X, stream));
+    gpuSafe(gpuFreeAsync(d_Y, stream));
+
+    gpuSafe(gpuStreamSynchronize(stream));
     gpublasSafe(gpublasDestroy(handle));
-
-    gpu::chunkedMemcpyDeviceToHost<double>(weighted_data, d_Y, size);
-
-    gpuSafe(gpuFree(d_data));
+    gpuSafe(gpuStreamDestroy(stream));
+    gpuSafe(gpuDeviceSynchronize());
 }
 
 auto
@@ -181,6 +200,10 @@ computeErrorVector(double* errvec, const double* X, const double* F, const doubl
                    const int64_t nmo_int64, const int64_t nao_int64, const std::string& trans_X) -> void
 {
     gpuSafe(gpuSetDevice(0));
+    gpuSafe(gpuDeviceSynchronize());  // early context initialization after setdevice
+
+    gpuStream_t stream;
+    gpuSafe(gpuStreamCreate(&stream));
 
     errors::assertMsgCritical(
         !omp_in_parallel(),
@@ -189,19 +212,20 @@ computeErrorVector(double* errvec, const double* X, const double* F, const doubl
     auto nmo_size = static_cast<size_t>(nmo_int64);
     auto nao_size = static_cast<size_t>(nao_int64);
 
-    double* d_data;
+    double* d_A;
+    double* d_B;
+    double* d_C;
 
-    gpuSafe(gpuMalloc(&d_data, nao_size * nao_size * 3 * sizeof(double)));
+    gpuSafe(gpuMallocAsync(&d_A, nao_size * nao_size * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_B, nao_size * nao_size * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_C, nao_size * nao_size * sizeof(double), stream));
 
-    double* d_A = d_data;
-    double* d_B = d_A + nao_size * nao_size;
-    double* d_C = d_B + nao_size * nao_size;
-
-    gpu::chunkedMemcpyHostToDevice<double>(d_A, F, nao_size * nao_size);
-    gpu::chunkedMemcpyHostToDevice<double>(d_B, D, nao_size * nao_size);
+    gpuSafe(gpuMemcpyAsync(d_A, F, nao_size * nao_size * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_B, D, nao_size * nao_size * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     gpublasHandle_t handle;
     gpublasSafe(gpublasCreate(&handle));
+    gpublasSafe(gpublasSetStream(handle, stream));
 
     double alpha = 1.0, beta = 0.0;
 
@@ -218,7 +242,7 @@ computeErrorVector(double* errvec, const double* X, const double* F, const doubl
 #endif
 
     // S^T(FD)^T (=> FDS)
-    gpu::chunkedMemcpyHostToDevice<double>(d_A, S, nao_size * nao_size);
+    gpuSafe(gpuMemcpyAsync(d_A, S, nao_size * nao_size * sizeof(double), gpuMemcpyHostToDevice, stream));
 
 #if defined(USE_CUDA)
     cublasSafe(cublasDgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, nao, nao, nao, &alpha, d_A, nao, d_C, nao, &beta, d_B, nao));
@@ -226,22 +250,20 @@ computeErrorVector(double* errvec, const double* X, const double* F, const doubl
     hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, HIPBLAS_OP_N, nao, nao, nao, &alpha, d_A, nao, d_C, nao, &beta, d_B, nao));
 #endif
 
-    gpuSafe(gpuDeviceSynchronize());
-
     // FDS - (FDS)^T
-    beta = -1.0;
+    double geam_beta = -1.0;
 
 #if defined(USE_CUDA)
-    cublasSafe(cublasDgeam(handle, CUBLAS_OP_N, CUBLAS_OP_T, nao, nao, &alpha, d_B, nao, &beta, d_B, nao, d_C, nao));
+    cublasSafe(cublasDgeam(handle, CUBLAS_OP_N, CUBLAS_OP_T, nao, nao, &alpha, d_B, nao, &geam_beta, d_B, nao, d_C, nao));
 #elif defined(USE_HIP)
-    hipblasSafe(hipblasDgeam(handle, HIPBLAS_OP_N, HIPBLAS_OP_T, nao, nao, &alpha, d_B, nao, &beta, d_B, nao, d_C, nao));
+    hipblasSafe(hipblasDgeam(handle, HIPBLAS_OP_N, HIPBLAS_OP_T, nao, nao, &alpha, d_B, nao, &geam_beta, d_B, nao, d_C, nao));
 #endif
 
     // X^T (FDS - (FDS)^T) X
     double* d_X = d_A;  // note: nao >= nmo
     double* d_Y = d_B;  // note: nao >= nmo
 
-    gpu::chunkedMemcpyHostToDevice<double>(d_X, X, nmo_size * nao_size);
+    gpuSafe(gpuMemcpyAsync(d_X, X, nmo_size * nao_size * sizeof(double), gpuMemcpyHostToDevice, stream));
 
 #if defined(USE_CUDA)
     auto op_X  = (trans_X == std::string("N")) ? CUBLAS_OP_N : CUBLAS_OP_T;
@@ -253,8 +275,6 @@ computeErrorVector(double* errvec, const double* X, const double* F, const doubl
 
     auto lda_X = (trans_X == std::string("N")) ? nmo : nao;
 
-    beta = 0.0;
-
     // TODO: double check basis set with linear dependency
 
     // let E == (FDS - SDF)
@@ -265,8 +285,6 @@ computeErrorVector(double* errvec, const double* X, const double* F, const doubl
     hipblasSafe(hipblasDgemm(handle, op_X, HIPBLAS_OP_N, nmo, nao, nao, &alpha, d_X, lda_X, d_C, nao, &beta, d_Y, nmo));
 #endif
 
-    gpuSafe(gpuDeviceSynchronize());
-
     // (EX)^T X (=> X^T(E)X)
 #if defined(USE_CUDA)
     cublasSafe(cublasDgemm(handle, CUBLAS_OP_N, op_XT, nmo, nmo, nao, &alpha, d_Y, nmo, d_X, lda_X, &beta, d_C, nmo));
@@ -274,11 +292,18 @@ computeErrorVector(double* errvec, const double* X, const double* F, const doubl
     hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, op_XT, nmo, nmo, nao, &alpha, d_Y, nmo, d_X, lda_X, &beta, d_C, nmo));
 #endif
 
-    gpu::chunkedMemcpyDeviceToHost<double>(errvec, d_C, nmo_size * nmo_size);
+    gpuSafe(gpuMemcpyAsync(errvec, d_C, nmo_size * nmo_size * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
+    gpuSafe(gpuStreamSynchronize(stream));
+
+    gpuSafe(gpuFreeAsync(d_A, stream));
+    gpuSafe(gpuFreeAsync(d_B, stream));
+    gpuSafe(gpuFreeAsync(d_C, stream));
+
+    gpuSafe(gpuStreamSynchronize(stream));
     gpublasSafe(gpublasDestroy(handle));
-
-    gpuSafe(gpuFree(d_data));
+    gpuSafe(gpuStreamDestroy(stream));
+    gpuSafe(gpuDeviceSynchronize());
 }
 
 auto
@@ -286,6 +311,10 @@ transformMatrix(double* transformed_F, const double* X, const double* F,
                 const int64_t nmo_int64, const int64_t nao_int64, const std::string& trans_X) -> void
 {
     gpuSafe(gpuSetDevice(0));
+    gpuSafe(gpuDeviceSynchronize());  // early context initialization after setdevice
+
+    gpuStream_t stream;
+    gpuSafe(gpuStreamCreate(&stream));
 
     errors::assertMsgCritical(
         !omp_in_parallel(),
@@ -294,19 +323,20 @@ transformMatrix(double* transformed_F, const double* X, const double* F,
     auto nmo_size = static_cast<size_t>(nmo_int64);
     auto nao_size = static_cast<size_t>(nao_int64);
 
-    double* d_data;
+    double* d_F;
+    double* d_X;
+    double* d_Y;
 
-    gpuSafe(gpuMalloc(&d_data, (nao_size * nao_size + nmo_size * nao_size + nmo_size * nao_size) * sizeof(double)));
+    gpuSafe(gpuMallocAsync(&d_F, (nao_size * nao_size) * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_X, (nmo_size * nao_size) * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_Y, (nmo_size * nao_size) * sizeof(double), stream));
 
-    double* d_F = d_data;
-    double* d_X = d_F + nao_size * nao_size;
-    double* d_Y = d_X + nmo_size * nao_size;
-
-    gpu::chunkedMemcpyHostToDevice<double>(d_F, F, nao_size * nao_size);
-    gpu::chunkedMemcpyHostToDevice<double>(d_X, X, nmo_size * nao_size);
+    gpuSafe(gpuMemcpyAsync(d_F, F, nao_size * nao_size * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_X, X, nmo_size * nao_size * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     gpublasHandle_t handle;
     gpublasSafe(gpublasCreate(&handle));
+    gpublasSafe(gpublasSetStream(handle, stream));
 
     double alpha = 1.0, beta = 0.0;
 
@@ -333,8 +363,6 @@ transformMatrix(double* transformed_F, const double* X, const double* F,
     hipblasSafe(hipblasDgemm(handle, op_X, HIPBLAS_OP_N, nmo, nao, nao, &alpha, d_X, lda_X, d_F, nao, &beta, d_Y, nmo));
 #endif
 
-    gpuSafe(gpuDeviceSynchronize());
-
     // (FX)^T X (=> X^T(F)X)
 #if defined(USE_CUDA)
     cublasSafe(cublasDgemm(handle, CUBLAS_OP_N, op_XT, nmo, nmo, nao, &alpha, d_Y, nmo, d_X, lda_X, &beta, d_F, nmo));
@@ -342,11 +370,18 @@ transformMatrix(double* transformed_F, const double* X, const double* F,
     hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, op_XT, nmo, nmo, nao, &alpha, d_Y, nmo, d_X, lda_X, &beta, d_F, nmo));
 #endif
 
-    gpu::chunkedMemcpyDeviceToHost<double>(transformed_F, d_F, nmo_size * nmo_size);
+    gpuSafe(gpuMemcpyAsync(transformed_F, d_F, nmo_size * nmo_size * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
+    gpuSafe(gpuStreamSynchronize(stream));
+
+    gpuSafe(gpuFreeAsync(d_F, stream));
+    gpuSafe(gpuFreeAsync(d_X, stream));
+    gpuSafe(gpuFreeAsync(d_Y, stream));
+
+    gpuSafe(gpuStreamSynchronize(stream));
     gpublasSafe(gpublasDestroy(handle));
-
-    gpuSafe(gpuFree(d_data));
+    gpuSafe(gpuStreamDestroy(stream));
+    gpuSafe(gpuDeviceSynchronize());
 }
 
 auto
@@ -354,6 +389,10 @@ computeMatrixMultiplication(double* C, const double* A, const double* B, const s
                             const int64_t m_int64, const int64_t k_int64, const int64_t n_int64) -> void
 {
     gpuSafe(gpuSetDevice(0));
+    gpuSafe(gpuDeviceSynchronize());  // early context initialization after setdevice
+
+    gpuStream_t stream;
+    gpuSafe(gpuStreamCreate(&stream));
 
     errors::assertMsgCritical(
         !omp_in_parallel(),
@@ -363,19 +402,20 @@ computeMatrixMultiplication(double* C, const double* A, const double* B, const s
     auto k_size = static_cast<size_t>(k_int64);
     auto n_size = static_cast<size_t>(n_int64);
 
-    double* d_data;
+    double* d_A;
+    double* d_B;
+    double* d_C;
 
-    gpuSafe(gpuMalloc(&d_data, (m_size * k_size + k_size * n_size + m_size * n_size) * sizeof(double)));
+    gpuSafe(gpuMallocAsync(&d_A, (m_size * k_size) * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_B, (k_size * n_size) * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_C, (m_size * n_size) * sizeof(double), stream));
 
-    double* d_A = d_data;
-    double* d_B = d_A + m_size * k_size;
-    double* d_C = d_B + k_size * n_size;
-
-    gpu::chunkedMemcpyHostToDevice<double>(d_A, A, m_size * k_size);
-    gpu::chunkedMemcpyHostToDevice<double>(d_B, B, k_size * n_size);
+    gpuSafe(gpuMemcpyAsync(d_A, A, m_size * k_size * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_B, B, k_size * n_size * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     gpublasHandle_t handle;
     gpublasSafe(gpublasCreate(&handle));
+    gpublasSafe(gpublasSetStream(handle, stream));
 
     double alpha = 1.0, beta = 0.0;
 
@@ -403,17 +443,25 @@ computeMatrixMultiplication(double* C, const double* A, const double* B, const s
     hipblasSafe(hipblasDgemm(handle, op_B, op_A, n, m, k, &alpha, d_B, lda_B, d_A, lda_A, &beta, d_C, n));
 #endif
 
-    gpu::chunkedMemcpyDeviceToHost<double>(C, d_C, m_size * n_size);
+    gpuSafe(gpuMemcpyAsync(C, d_C, m_size * n_size * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
+    gpuSafe(gpuStreamSynchronize(stream));
+
+    gpuSafe(gpuFreeAsync(d_A, stream));
+    gpuSafe(gpuFreeAsync(d_B, stream));
+    gpuSafe(gpuFreeAsync(d_C, stream));
+
+    gpuSafe(gpuStreamSynchronize(stream));
     gpublasSafe(gpublasDestroy(handle));
-
-    gpuSafe(gpuFree(d_data));
+    gpuSafe(gpuStreamDestroy(stream));
+    gpuSafe(gpuDeviceSynchronize());
 }
 
 auto
 diagonalizeMatrix(double* A, double* D, const int64_t n_int64) -> void
 {
     gpuSafe(gpuSetDevice(0));
+    gpuSafe(gpuDeviceSynchronize());  // early context initialization after setdevice
 
     errors::assertMsgCritical(
         !omp_in_parallel(),
@@ -423,39 +471,49 @@ diagonalizeMatrix(double* A, double* D, const int64_t n_int64) -> void
 
 #if defined(USE_CUDA)
 
+    gpuStream_t stream;
+    gpuSafe(gpuStreamCreate(&stream));
+
     double *d_A, *d_D, *d_work;
     int32_t *d_info;
 
-    cudaSafe(cudaMalloc(&d_A, n_size * n_size * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_D, n_size * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_info, sizeof(int32_t)));
+    gpuSafe(gpuMallocAsync(&d_A, n_size * n_size * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_D, n_size * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_info, sizeof(int32_t), stream));
 
-    gpu::chunkedMemcpyHostToDevice<double>(d_A, A, n_size * n_size);
+    gpuSafe(gpuMemcpyAsync(d_A, A, n_size * n_size * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     auto n = static_cast<int32_t>(n_int64);
     int32_t lwork, info;
 
     cusolverDnHandle_t handle;
     cusolverSafe(cusolverDnCreate(&handle));
+    cusolverDnSetStream(handle, stream);
 
     cusolverSafe(cusolverDnDsyevd_bufferSize(handle, CUSOLVER_EIG_MODE_VECTOR, CUBLAS_FILL_MODE_UPPER, n, d_A, n, d_D, &lwork));
 
-    cudaSafe(cudaMalloc(&d_work, static_cast<size_t>(lwork) * sizeof(double)));
+    gpuSafe(gpuMallocAsync(&d_work, static_cast<size_t>(lwork) * sizeof(double), stream));
 
     cusolverSafe(cusolverDnDsyevd(handle, CUSOLVER_EIG_MODE_VECTOR, CUBLAS_FILL_MODE_UPPER, n, d_A, n, d_D, d_work, lwork, d_info));
 
-    cusolverSafe(cusolverDnDestroy(handle));
+    gpuSafe(gpuMemcpyAsync(A, d_A, n_size * n_size * sizeof(double), gpuMemcpyDeviceToHost, stream));
+    gpuSafe(gpuMemcpyAsync(D, d_D, n_size * sizeof(double), gpuMemcpyDeviceToHost, stream));
+    gpuSafe(gpuMemcpyAsync(&info, d_info, 1 * sizeof(int32_t), gpuMemcpyDeviceToHost, stream));
 
-    gpu::chunkedMemcpyDeviceToHost<double>(A, d_A, n_size * n_size);
-    gpu::chunkedMemcpyDeviceToHost<double>(D, d_D, n_size);
-    gpu::chunkedMemcpyDeviceToHost<int32_t>(&info, d_info, 1);
+    gpuSafe(gpuStreamSynchronize(stream));
 
     // TODO: check info
 
-    cudaSafe(cudaFree(d_A));
-    cudaSafe(cudaFree(d_D));
-    cudaSafe(cudaFree(d_info));
-    cudaSafe(cudaFree(d_work));
+    gpuSafe(gpuFreeAsync(d_A, stream));
+    gpuSafe(gpuFreeAsync(d_D, stream));
+    gpuSafe(gpuFreeAsync(d_info, stream));
+    gpuSafe(gpuFreeAsync(d_work, stream));
+
+    gpuSafe(gpuStreamSynchronize(stream));
+    // TODO: gpu wrapper for cusolver
+    cusolverSafe(cusolverDnDestroy(handle));
+    gpuSafe(gpuStreamDestroy(stream));
+    gpuSafe(gpuDeviceSynchronize());
 
 #elif defined(USE_HIP)
 
@@ -469,8 +527,8 @@ diagonalizeMatrix(double* A, double* D, const int64_t n_int64) -> void
     double *d_A;
     //hipSafe(hipMalloc(&d_A, n * ldda * sizeof(double)));
     //hipblasSafe(hipblasSetMatrix(n, n, sizeof(double), A, n, d_A, ldda));
-    hipSafe(hipMalloc(&d_A, n_size * n_size * sizeof(double)));
-    gpu::chunkedMemcpyHostToDevice<double>(d_A, A, n_size * n_size);
+    gpuSafe(gpuMalloc(&d_A, n_size * n_size * sizeof(double)));
+    gpuSafe(gpuMemcpy(d_A, A, n_size * n_size * sizeof(double), gpuMemcpyHostToDevice));
 
     auto nb = magma_get_dsytrd_nb(n);
     auto lwork = static_cast<magma_int_t>(std::max(2*n + n*nb, 1 + 6*n + 2*n*n));
@@ -495,9 +553,13 @@ diagonalizeMatrix(double* A, double* D, const int64_t n_int64) -> void
     }
 
     //hipblasSafe(hipblasGetMatrix(n, n, sizeof(double), d_A, ldda, A, n));
-    gpu::chunkedMemcpyDeviceToHost<double>(A, d_A, n_size * n_size);
+    gpuSafe(gpuMemcpy(A, d_A, n_size * n_size * sizeof(double), gpuMemcpyDeviceToHost));
 
-    hipSafe(hipFree(d_A));
+    gpuSafe(gpuDeviceSynchronize());
+
+    gpuSafe(gpuFree(d_A));
+
+    gpuSafe(gpuDeviceSynchronize());
 
     hipSafe(hipHostFree(wA));
     hipSafe(hipHostFree(work));
@@ -544,6 +606,8 @@ diagonalizeMatrixMultiGPU(double* A, double* D, const int64_t n_int64, const int
         ss << "gpu::diagonalizeMatrixMultiGPU: (magma error) " << magma_strerror(info);
         errors::assertMsgCritical(false, ss.str());
     }
+
+    gpuSafe(gpuDeviceSynchronize());
 
     hipSafe(hipHostFree(wA));
     hipSafe(hipHostFree(work));
