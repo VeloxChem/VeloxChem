@@ -38,12 +38,10 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
-#include <iostream>
 #include <string>
 #include <vector>
 
 #include "AOIndices.hpp"
-#include "ChunkedMemcpyGPU.hpp"
 #include "ErrorHandler.hpp"
 #include "FunctionalParser.hpp"
 #include "GpuConstants.hpp"
@@ -1769,7 +1767,8 @@ getGtoValuesForLda(double*                     d_gto_values,
                    const double*               d_grid_z,
                    const int64_t               grid_offset,
                    const int64_t               n_grid_points,
-                   const std::vector<int64_t>& gtos_mask) -> void
+                   const std::vector<int64_t>& gtos_mask,
+                   const gpuStream_t           stream) -> void
 {
     // number of useful CGTOs
 
@@ -1787,7 +1786,7 @@ getGtoValuesForLda(double*                     d_gto_values,
 
     auto gto_info = gtoinfo::getGtoInfo(gto_block, gtos_mask);
 
-    gpu::chunkedMemcpyHostToDevice<double>(d_gto_info, gto_info.data(), gto_info.size());
+    gpuSafe(gpuMemcpyAsync(d_gto_info, gto_info.data(), gto_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     // evaluate GTO values on grid points
 
@@ -1799,7 +1798,7 @@ getGtoValuesForLda(double*                     d_gto_values,
 
     if (gto_ang == 0)
     {
-        gpu::gtoValuesLdaRecS<<<num_blocks, threads_per_block>>>(d_gto_values,
+        gpu::gtoValuesLdaRecS<<<num_blocks, threads_per_block, 0, stream>>>(d_gto_values,
                                                                  static_cast<uint32_t>(row_offset),
                                                                  d_gto_info,
                                                                  d_grid_x,
@@ -1812,7 +1811,7 @@ getGtoValuesForLda(double*                     d_gto_values,
     }
     else if (gto_ang == 1)
     {
-        gpu::gtoValuesLdaRecP<<<num_blocks, threads_per_block>>>(d_gto_values,
+        gpu::gtoValuesLdaRecP<<<num_blocks, threads_per_block, 0, stream>>>(d_gto_values,
                                                                  static_cast<uint32_t>(row_offset),
                                                                  d_gto_info,
                                                                  d_grid_x,
@@ -1827,7 +1826,7 @@ getGtoValuesForLda(double*                     d_gto_values,
     {
         const double f2_3 = 2.0 * std::sqrt(3.0);
 
-        gpu::gtoValuesLdaRecD<<<num_blocks, threads_per_block>>>(d_gto_values,
+        gpu::gtoValuesLdaRecD<<<num_blocks, threads_per_block, 0, stream>>>(d_gto_values,
                                                                  static_cast<uint32_t>(row_offset),
                                                                  f2_3,
                                                                  d_gto_info,
@@ -1841,9 +1840,9 @@ getGtoValuesForLda(double*                     d_gto_values,
     }
     else
     {
-        std::string err_ang("gpu::getGtoValuesForLda: Only implemented for s, p and d-orbitals");
-
-        errors::assertMsgCritical(false, err_ang);
+        errors::assertMsgCritical(
+            false,
+            std::string(__func__) + std::string(": Only implemented for s, p and d-orbitals"));
     }
 }
 
@@ -1860,7 +1859,8 @@ getGtoValuesForGga(double*                     d_gto_values_0,
                    const double*               d_grid_z,
                    const int64_t               grid_offset,
                    const int64_t               n_grid_points,
-                   const std::vector<int64_t>& gtos_mask) -> void
+                   const std::vector<int64_t>& gtos_mask,
+                   const gpuStream_t           stream) -> void
 {
     // number of useful CGTOs
 
@@ -1878,7 +1878,7 @@ getGtoValuesForGga(double*                     d_gto_values_0,
 
     auto gto_info = gtoinfo::getGtoInfo(gto_block, gtos_mask);
 
-    gpu::chunkedMemcpyHostToDevice<double>(d_gto_info, gto_info.data(), gto_info.size());
+    gpuSafe(gpuMemcpyAsync(d_gto_info, gto_info.data(), gto_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     // evaluate GTO values on grid points
 
@@ -1890,7 +1890,7 @@ getGtoValuesForGga(double*                     d_gto_values_0,
 
     if (gto_ang == 0)
     {
-        gpu::gtoValuesGgaRecS<<<num_blocks, threads_per_block>>>(d_gto_values_0,
+        gpu::gtoValuesGgaRecS<<<num_blocks, threads_per_block, 0, stream>>>(d_gto_values_0,
                                                                  d_gto_values_x,
                                                                  d_gto_values_y,
                                                                  d_gto_values_z,
@@ -1906,7 +1906,7 @@ getGtoValuesForGga(double*                     d_gto_values_0,
     }
     else if (gto_ang == 1)
     {
-        gpu::gtoValuesGgaRecP<<<num_blocks, threads_per_block>>>(d_gto_values_0,
+        gpu::gtoValuesGgaRecP<<<num_blocks, threads_per_block, 0, stream>>>(d_gto_values_0,
                                                                  d_gto_values_x,
                                                                  d_gto_values_y,
                                                                  d_gto_values_z,
@@ -1924,7 +1924,7 @@ getGtoValuesForGga(double*                     d_gto_values_0,
     {
         const double f2_3 = 2.0 * std::sqrt(3.0);
 
-        gpu::gtoValuesGgaRecD<<<num_blocks, threads_per_block>>>(d_gto_values_0,
+        gpu::gtoValuesGgaRecD<<<num_blocks, threads_per_block, 0, stream>>>(d_gto_values_0,
                                                                  d_gto_values_x,
                                                                  d_gto_values_y,
                                                                  d_gto_values_z,
@@ -1941,9 +1941,9 @@ getGtoValuesForGga(double*                     d_gto_values_0,
     }
     else
     {
-        std::string err_ang("gpu::getGtoValuesForGga: Only implemented for s, p and d-orbitals");
-
-        errors::assertMsgCritical(false, err_ang);
+        errors::assertMsgCritical(
+            false,
+            std::string(__func__) + std::string(": Only implemented for s, p and d-orbitals"));
     }
 }
 
@@ -1966,7 +1966,8 @@ getGtoValuesForMgga(double*                     d_gto_values_0,
                     const double*               d_grid_z,
                     const int64_t               grid_offset,
                     const int64_t               n_grid_points,
-                    const std::vector<int64_t>& gtos_mask) -> void
+                    const std::vector<int64_t>& gtos_mask,
+                    const gpuStream_t           stream) -> void
 {
     // number of useful CGTOs
 
@@ -1984,7 +1985,7 @@ getGtoValuesForMgga(double*                     d_gto_values_0,
 
     auto gto_info = gtoinfo::getGtoInfo(gto_block, gtos_mask);
 
-    gpu::chunkedMemcpyHostToDevice<double>(d_gto_info, gto_info.data(), gto_info.size());
+    gpuSafe(gpuMemcpyAsync(d_gto_info, gto_info.data(), gto_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     // evaluate GTO values on grid points
 
@@ -1996,7 +1997,7 @@ getGtoValuesForMgga(double*                     d_gto_values_0,
 
     if (gto_ang == 0)
     {
-        gpu::gtoValuesMggaRecS<<<num_blocks, threads_per_block>>>(
+        gpu::gtoValuesMggaRecS<<<num_blocks, threads_per_block, 0, stream>>>(
                                                                  d_gto_values_0,
                                                                  d_gto_values_x,
                                                                  d_gto_values_y,
@@ -2019,7 +2020,7 @@ getGtoValuesForMgga(double*                     d_gto_values_0,
     }
     else if (gto_ang == 1)
     {
-        gpu::gtoValuesMggaRecP<<<num_blocks, threads_per_block>>>(
+        gpu::gtoValuesMggaRecP<<<num_blocks, threads_per_block, 0, stream>>>(
                                                                  d_gto_values_0,
                                                                  d_gto_values_x,
                                                                  d_gto_values_y,
@@ -2044,7 +2045,7 @@ getGtoValuesForMgga(double*                     d_gto_values_0,
     {
         const double f2_3 = 2.0 * std::sqrt(3.0);
 
-        gpu::gtoValuesMggaRecD<<<num_blocks, threads_per_block>>>(
+        gpu::gtoValuesMggaRecD<<<num_blocks, threads_per_block, 0, stream>>>(
                                                                  d_gto_values_0,
                                                                  d_gto_values_x,
                                                                  d_gto_values_y,
@@ -2068,15 +2069,25 @@ getGtoValuesForMgga(double*                     d_gto_values_0,
     }
     else
     {
-        std::string err_ang("gpu::getGtoValuesForMgga: Only implemented for s, p and d-orbitals");
-
-        errors::assertMsgCritical(false, err_ang);
+        errors::assertMsgCritical(
+            false,
+            std::string(__func__) + std::string(": Only implemented for s, p and d-orbitals"));
     }
 }
 
 auto
 computeGtoValuesOnGridPoints(const CMolecule& molecule, const CMolecularBasis& basis, const CMolecularGrid& molecularGrid) -> CDenseMatrix
 {
+    gpuSafe(gpuSetDevice(0));
+    gpuSafe(gpuDeviceSynchronize());  // early context initialization after setdevice
+
+    gpuStream_t stream;
+    gpuSafe(gpuStreamCreate(&stream));
+
+    errors::assertMsgCritical(
+        !omp_in_parallel(),
+        std::string(__func__) + std::string(": should not be called in omp parallel region"));
+
     // GTOs blocks and number of AOs
 
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
@@ -2096,7 +2107,7 @@ computeGtoValuesOnGridPoints(const CMolecule& molecule, const CMolecularBasis& b
 
     double* d_gto_info;
 
-    gpuSafe(gpuMalloc(&d_gto_info, 5 * max_ncgtos * max_npgtos * sizeof(double)));
+    gpuSafe(gpuMallocAsync(&d_gto_info, 5 * max_ncgtos * max_npgtos * sizeof(double), stream));
 
     // GTO values on grid points
 
@@ -2106,7 +2117,7 @@ computeGtoValuesOnGridPoints(const CMolecule& molecule, const CMolecularBasis& b
 
     double* d_gaos;
 
-    gpuSafe(gpuMalloc(&d_gaos, naos * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMallocAsync(&d_gaos, naos * max_npoints_per_box * sizeof(double), stream));
 
     // coordinates of grid points
 
@@ -2118,13 +2129,13 @@ computeGtoValuesOnGridPoints(const CMolecule& molecule, const CMolecularBasis& b
 
     double *d_grid_x, *d_grid_y, *d_grid_z;
 
-    gpuSafe(gpuMalloc(&d_grid_x, n_total_grid_points * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_grid_y, n_total_grid_points * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_grid_z, n_total_grid_points * sizeof(double)));
+    gpuSafe(gpuMallocAsync(&d_grid_x, n_total_grid_points * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_grid_y, n_total_grid_points * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_grid_z, n_total_grid_points * sizeof(double), stream));
 
-    gpu::chunkedMemcpyHostToDevice<double>(d_grid_x, xcoords, n_total_grid_points);
-    gpu::chunkedMemcpyHostToDevice<double>(d_grid_y, ycoords, n_total_grid_points);
-    gpu::chunkedMemcpyHostToDevice<double>(d_grid_z, zcoords, n_total_grid_points);
+    gpuSafe(gpuMemcpyAsync(d_grid_x, xcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_grid_y, ycoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_grid_z, zcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     // counts and displacements of grid points in boxes
 
@@ -2194,12 +2205,14 @@ computeGtoValuesOnGridPoints(const CMolecule& molecule, const CMolecularBasis& b
 
             const auto& pre_ao_inds = pre_ao_inds_blocks[i_block];
 
-            gpu::getGtoValuesForLda(d_gaos, row_offset, d_gto_info, gto_block, d_grid_x, d_grid_y, d_grid_z, gridblockpos, npoints, cgto_mask);
+            gpu::getGtoValuesForLda(d_gaos, row_offset, d_gto_info, gto_block, d_grid_x, d_grid_y, d_grid_z, gridblockpos, npoints, cgto_mask, stream);
 
             row_offset += static_cast<int64_t>(pre_ao_inds.size());
         }
 
-        gpu::chunkedMemcpyDeviceToHost<double>(mat_chi.values(), d_gaos, aocount * npoints);
+        gpuSafe(gpuMemcpyAsync(mat_chi.values(), d_gaos, aocount * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
+
+        gpuSafe(gpuStreamSynchronize(stream));
 
         for (int64_t nu = 0; nu < aocount; nu++)
         {
@@ -2207,11 +2220,15 @@ computeGtoValuesOnGridPoints(const CMolecule& molecule, const CMolecularBasis& b
         }
     }
 
-    gpuSafe(gpuFree(d_gto_info));
-    gpuSafe(gpuFree(d_gaos));
-    gpuSafe(gpuFree(d_grid_x));
-    gpuSafe(gpuFree(d_grid_y));
-    gpuSafe(gpuFree(d_grid_z));
+    gpuSafe(gpuFreeAsync(d_gto_info, stream));
+    gpuSafe(gpuFreeAsync(d_gaos, stream));
+    gpuSafe(gpuFreeAsync(d_grid_x, stream));
+    gpuSafe(gpuFreeAsync(d_grid_y, stream));
+    gpuSafe(gpuFreeAsync(d_grid_z, stream));
+
+    gpuSafe(gpuStreamSynchronize(stream));
+    gpuSafe(gpuStreamDestroy(stream));
+    gpuSafe(gpuDeviceSynchronize());
 
     return allgtovalues;
 }
@@ -2220,6 +2237,16 @@ auto
 computeGtoValuesAndDerivativesOnGridPoints(const CMolecule& molecule, const CMolecularBasis& basis, const CMolecularGrid& molecularGrid)
     -> std::vector<CDenseMatrix>
 {
+    gpuSafe(gpuSetDevice(0));
+    gpuSafe(gpuDeviceSynchronize());  // early context initialization after setdevice
+
+    gpuStream_t stream;
+    gpuSafe(gpuStreamCreate(&stream));
+
+    errors::assertMsgCritical(
+        !omp_in_parallel(),
+        std::string(__func__) + std::string(": should not be called in omp parallel region"));
+
     // GTOs blocks and number of AOs
 
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
@@ -2239,7 +2266,7 @@ computeGtoValuesAndDerivativesOnGridPoints(const CMolecule& molecule, const CMol
 
     double* d_gto_info;
 
-    gpuSafe(gpuMalloc(&d_gto_info, 5 * max_ncgtos * max_npgtos * sizeof(double)));
+    gpuSafe(gpuMallocAsync(&d_gto_info, 5 * max_ncgtos * max_npgtos * sizeof(double), stream));
 
     // GTO values on grid points
 
@@ -2252,10 +2279,10 @@ computeGtoValuesAndDerivativesOnGridPoints(const CMolecule& molecule, const CMol
 
     double *d_gaos, *d_gaox, *d_gaoy, *d_gaoz;
 
-    gpuSafe(gpuMalloc(&d_gaos, naos * max_npoints_per_box * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_gaox, naos * max_npoints_per_box * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_gaoy, naos * max_npoints_per_box * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_gaoz, naos * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMallocAsync(&d_gaos, naos * max_npoints_per_box * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_gaox, naos * max_npoints_per_box * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_gaoy, naos * max_npoints_per_box * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_gaoz, naos * max_npoints_per_box * sizeof(double), stream));
 
     // coordinates of grid points
 
@@ -2267,13 +2294,13 @@ computeGtoValuesAndDerivativesOnGridPoints(const CMolecule& molecule, const CMol
 
     double *d_grid_x, *d_grid_y, *d_grid_z;
 
-    gpuSafe(gpuMalloc(&d_grid_x, n_total_grid_points * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_grid_y, n_total_grid_points * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_grid_z, n_total_grid_points * sizeof(double)));
+    gpuSafe(gpuMallocAsync(&d_grid_x, n_total_grid_points * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_grid_y, n_total_grid_points * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_grid_z, n_total_grid_points * sizeof(double), stream));
 
-    gpu::chunkedMemcpyHostToDevice<double>(d_grid_x, xcoords, n_total_grid_points);
-    gpu::chunkedMemcpyHostToDevice<double>(d_grid_y, ycoords, n_total_grid_points);
-    gpu::chunkedMemcpyHostToDevice<double>(d_grid_z, zcoords, n_total_grid_points);
+    gpuSafe(gpuMemcpyAsync(d_grid_x, xcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_grid_y, ycoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_grid_z, zcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     // counts and displacements of grid points in boxes
 
@@ -2347,15 +2374,17 @@ computeGtoValuesAndDerivativesOnGridPoints(const CMolecule& molecule, const CMol
             const auto& pre_ao_inds = pre_ao_inds_blocks[i_block];
 
             gpu::getGtoValuesForGga(
-                d_gaos, d_gaox, d_gaoy, d_gaoz, row_offset, d_gto_info, gto_block, d_grid_x, d_grid_y, d_grid_z, gridblockpos, npoints, cgto_mask);
+                d_gaos, d_gaox, d_gaoy, d_gaoz, row_offset, d_gto_info, gto_block, d_grid_x, d_grid_y, d_grid_z, gridblockpos, npoints, cgto_mask, stream);
 
             row_offset += static_cast<int64_t>(pre_ao_inds.size());
         }
 
-        gpu::chunkedMemcpyDeviceToHost<double>(mat_chi_0.values(), d_gaos, aocount * npoints);
-        gpu::chunkedMemcpyDeviceToHost<double>(mat_chi_x.values(), d_gaox, aocount * npoints);
-        gpu::chunkedMemcpyDeviceToHost<double>(mat_chi_y.values(), d_gaoy, aocount * npoints);
-        gpu::chunkedMemcpyDeviceToHost<double>(mat_chi_z.values(), d_gaoz, aocount * npoints);
+        gpuSafe(gpuMemcpyAsync(mat_chi_0.values(), d_gaos, aocount * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyAsync(mat_chi_x.values(), d_gaox, aocount * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyAsync(mat_chi_y.values(), d_gaoy, aocount * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyAsync(mat_chi_z.values(), d_gaoz, aocount * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
+
+        gpuSafe(gpuStreamSynchronize(stream));
 
         for (int64_t nu = 0; nu < aocount; nu++)
         {
@@ -2366,14 +2395,18 @@ computeGtoValuesAndDerivativesOnGridPoints(const CMolecule& molecule, const CMol
         }
     }
 
-    gpuSafe(gpuFree(d_gto_info));
-    gpuSafe(gpuFree(d_gaos));
-    gpuSafe(gpuFree(d_gaox));
-    gpuSafe(gpuFree(d_gaoy));
-    gpuSafe(gpuFree(d_gaoz));
-    gpuSafe(gpuFree(d_grid_x));
-    gpuSafe(gpuFree(d_grid_y));
-    gpuSafe(gpuFree(d_grid_z));
+    gpuSafe(gpuFreeAsync(d_gto_info, stream));
+    gpuSafe(gpuFreeAsync(d_gaos, stream));
+    gpuSafe(gpuFreeAsync(d_gaox, stream));
+    gpuSafe(gpuFreeAsync(d_gaoy, stream));
+    gpuSafe(gpuFreeAsync(d_gaoz, stream));
+    gpuSafe(gpuFreeAsync(d_grid_x, stream));
+    gpuSafe(gpuFreeAsync(d_grid_y, stream));
+    gpuSafe(gpuFreeAsync(d_grid_z, stream));
+
+    gpuSafe(gpuStreamSynchronize(stream));
+    gpuSafe(gpuStreamDestroy(stream));
+    gpuSafe(gpuDeviceSynchronize());
 
     return std::vector<CDenseMatrix>({allgtovalues_0, allgtovalues_x, allgtovalues_y, allgtovalues_z});
 }
@@ -2596,7 +2629,7 @@ integrateVxcFockForLdaClosedShell(const CMolecule&        molecule,
 
             const auto& pre_ao_inds = pre_ao_inds_blocks[i_block];
 
-            gpu::getGtoValuesForLda(d_gto_values, row_offset, d_gto_info, gto_block, d_grid_x, d_grid_y, d_grid_z, gridblockpos, npoints, cgto_mask);
+            gpu::getGtoValuesForLda(d_gto_values, row_offset, d_gto_info, gto_block, d_grid_x, d_grid_y, d_grid_z, gridblockpos, npoints, cgto_mask, stream);
 
             row_offset += static_cast<int64_t>(pre_ao_inds.size());
         }
@@ -2994,7 +3027,7 @@ integrateVxcFockForLdaOpenShell(const CMolecule&        molecule,
 
             const auto& pre_ao_inds = pre_ao_inds_blocks[i_block];
 
-            gpu::getGtoValuesForLda(d_gto_values, row_offset, d_gto_info, gto_block, d_grid_x, d_grid_y, d_grid_z, gridblockpos, npoints, cgto_mask);
+            gpu::getGtoValuesForLda(d_gto_values, row_offset, d_gto_info, gto_block, d_grid_x, d_grid_y, d_grid_z, gridblockpos, npoints, cgto_mask, stream);
 
             row_offset += static_cast<int64_t>(pre_ao_inds.size());
         }
@@ -3434,7 +3467,8 @@ integrateVxcFockForGgaClosedShell(const CMolecule&        molecule,
                                     d_grid_z,
                                     gridblockpos,
                                     npoints,
-                                    cgto_mask);
+                                    cgto_mask,
+                                    stream);
 
             row_offset += static_cast<int64_t>(pre_ao_inds.size());
         }
@@ -3884,7 +3918,8 @@ integrateVxcFockForGgaOpenShell(const CMolecule&        molecule,
                                     d_grid_z,
                                     gridblockpos,
                                     npoints,
-                                    cgto_mask);
+                                    cgto_mask,
+                                    stream);
 
             row_offset += static_cast<int64_t>(pre_ao_inds.size());
         }
@@ -4366,7 +4401,7 @@ integrateFxcFockForLDA(CDenseMatrix&           aoFockMatrix,
 
             const auto& pre_ao_inds = pre_ao_inds_blocks[i_block];
 
-            gpu::getGtoValuesForLda(d_gto_values, row_offset, d_gto_info, gto_block, d_grid_x, d_grid_y, d_grid_z, gridblockpos, npoints, cgto_mask);
+            gpu::getGtoValuesForLda(d_gto_values, row_offset, d_gto_info, gto_block, d_grid_x, d_grid_y, d_grid_z, gridblockpos, npoints, cgto_mask, stream);
 
             row_offset += static_cast<int64_t>(pre_ao_inds.size());
         }
@@ -4821,7 +4856,8 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
                                     d_grid_z,
                                     gridblockpos,
                                     npoints,
-                                    cgto_mask);
+                                    cgto_mask,
+                                    stream);
 
             row_offset += static_cast<int64_t>(pre_ao_inds.size());
         }
@@ -5349,7 +5385,8 @@ integrateVxcGradientForLdaClosedShell(const CMolecule&        molecule,
                                     d_grid_z,
                                     gridblockpos,
                                     npoints,
-                                    cgto_mask);
+                                    cgto_mask,
+                                    stream);
 
             row_offset += static_cast<int64_t>(pre_ao_inds.size());
         }
@@ -5806,7 +5843,8 @@ integrateVxcGradientForLdaOpenShell(const CMolecule&        molecule,
                                     d_grid_z,
                                     gridblockpos,
                                     npoints,
-                                    cgto_mask);
+                                    cgto_mask,
+                                    stream);
 
             row_offset += static_cast<int64_t>(pre_ao_inds.size());
         }
@@ -6317,7 +6355,8 @@ integrateVxcGradientForGgaClosedShell(const CMolecule&        molecule,
                                      d_grid_z,
                                      gridblockpos,
                                      npoints,
-                                     cgto_mask);
+                                     cgto_mask,
+                                     stream);
 
             row_offset += static_cast<int64_t>(pre_ao_inds.size());
         }
@@ -6925,7 +6964,8 @@ integrateVxcGradientForGgaOpenShell(const CMolecule&        molecule,
                                      d_grid_z,
                                      gridblockpos,
                                      npoints,
-                                     cgto_mask);
+                                     cgto_mask,
+                                     stream);
 
             row_offset += static_cast<int64_t>(pre_ao_inds.size());
         }
