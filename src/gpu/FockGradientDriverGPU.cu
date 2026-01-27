@@ -99,14 +99,6 @@
 
 namespace gpu {  // gpu namespace
 
-__global__ void
-zeroGradientData(double* d_data, const uint32_t n)
-{
-    const uint32_t i = blockDim.x * blockIdx.x + threadIdx.x;
-
-    if (i < n) d_data[i] = 0.0;
-}
-
 auto
 computeOverlapGradientOnGPU(const CMolecule& molecule,
                             const CMolecularBasis& basis,
@@ -2709,20 +2701,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
     // Boys function (tabulated for order 0-28)
 
     const auto boys_func_table = boysfunc::getFullBoysFuncTable();
-
-    double* d_boys_func_table;
-
-    gpuSafe(gpuMallocAsync(&d_boys_func_table, boys_func_table.size() * sizeof(double), stream));
-
-    gpuSafe(gpuMemcpyAsync(d_boys_func_table, boys_func_table.data(), boys_func_table.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-
     const auto boys_func_ft = boysfunc::getBoysFuncFactors();
-
-    double* d_boys_func_ft;
-
-    gpuSafe(gpuMallocAsync(&d_boys_func_ft, boys_func_ft.size() * sizeof(double), stream));
-
-    gpuSafe(gpuMemcpyAsync(d_boys_func_ft, boys_func_ft.data(), boys_func_ft.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     timer.stop("Boys func. prep.");
 
@@ -2759,15 +2738,6 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
     gtoinfo::updatePrimitiveInfoForS(s_prim_info.data(), s_prim_aoinds.data(), s_prim_count, gto_blocks);
 
-    double*   d_s_prim_info;
-    uint32_t* d_s_prim_aoinds;
-
-    gpuSafe(gpuMallocAsync(&d_s_prim_info, s_prim_info.size() * sizeof(double), stream));
-    gpuSafe(gpuMallocAsync(&d_s_prim_aoinds, s_prim_aoinds.size() * sizeof(uint32_t), stream));
-
-    gpuSafe(gpuMemcpyAsync(d_s_prim_info, s_prim_info.data(), s_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_s_prim_aoinds, s_prim_aoinds.data(), s_prim_aoinds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-
     // P gto block
 
     std::vector<double>   p_prim_info(5 * p_prim_count);
@@ -2775,29 +2745,46 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
     gtoinfo::updatePrimitiveInfoForP(p_prim_info.data(), p_prim_aoinds.data(), p_prim_count, gto_blocks);
 
-    double*   d_p_prim_info;
-    uint32_t* d_p_prim_aoinds;
-
-    gpuSafe(gpuMallocAsync(&d_p_prim_info, p_prim_info.size() * sizeof(double), stream));
-    gpuSafe(gpuMallocAsync(&d_p_prim_aoinds, p_prim_aoinds.size() * sizeof(uint32_t), stream));
-
-    gpuSafe(gpuMemcpyAsync(d_p_prim_info, p_prim_info.data(), p_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_p_prim_aoinds, p_prim_aoinds.data(), p_prim_aoinds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-
     // D gto block
 
     std::vector<double>   d_prim_info(5 * d_prim_count);
     std::vector<uint32_t> d_prim_aoinds(6 * d_prim_count);
 
-    double*   d_d_prim_info;
-    uint32_t* d_d_prim_aoinds;
-
     gtoinfo::updatePrimitiveInfoForD(d_prim_info.data(), d_prim_aoinds.data(), d_prim_count, gto_blocks);
 
+    // Boys function and GTOs on device
+
+    double* d_boys_func_table;
+    double* d_boys_func_ft;
+
+    double* d_s_prim_info;
+    double* d_p_prim_info;
+    double* d_d_prim_info;
+
+    uint32_t* d_s_prim_aoinds;
+    uint32_t* d_p_prim_aoinds;
+    uint32_t* d_d_prim_aoinds;
+
+    gpuSafe(gpuMallocAsync(&d_boys_func_table, boys_func_table.size() * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_boys_func_ft,    boys_func_ft.size()    * sizeof(double), stream));
+
+    gpuSafe(gpuMallocAsync(&d_s_prim_info, s_prim_info.size() * sizeof(double), stream));
+    gpuSafe(gpuMallocAsync(&d_p_prim_info, p_prim_info.size() * sizeof(double), stream));
     gpuSafe(gpuMallocAsync(&d_d_prim_info, d_prim_info.size() * sizeof(double), stream));
+
+    gpuSafe(gpuMallocAsync(&d_s_prim_aoinds, s_prim_aoinds.size() * sizeof(uint32_t), stream));
+    gpuSafe(gpuMallocAsync(&d_p_prim_aoinds, p_prim_aoinds.size() * sizeof(uint32_t), stream));
     gpuSafe(gpuMallocAsync(&d_d_prim_aoinds, d_prim_aoinds.size() * sizeof(uint32_t), stream));
 
+    gpuSafe(gpuMemcpyAsync(d_boys_func_table, boys_func_table.data(), boys_func_table.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_boys_func_ft,    boys_func_ft.data(),    boys_func_ft.size()    * sizeof(double), gpuMemcpyHostToDevice, stream));
+
+    gpuSafe(gpuMemcpyAsync(d_s_prim_info, s_prim_info.data(), s_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_p_prim_info, p_prim_info.data(), p_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
     gpuSafe(gpuMemcpyAsync(d_d_prim_info, d_prim_info.data(), d_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+
+    gpuSafe(gpuMemcpyAsync(d_s_prim_aoinds, s_prim_aoinds.data(), s_prim_aoinds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyAsync(d_p_prim_aoinds, p_prim_aoinds.data(), p_prim_aoinds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
     gpuSafe(gpuMemcpyAsync(d_d_prim_aoinds, d_prim_aoinds.data(), d_prim_aoinds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
     gpuSafe(gpuStreamSynchronize(stream));
@@ -3124,17 +3111,11 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
     {
         timer.start("  J block SS");
 
-        // zeroize J on device
-
-        dim3 threads_per_block(TILE_DIM * TILE_DIM);
-
-        dim3 num_blocks((ss_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
-
         // set up thread blocks for J
 
-        threads_per_block = dim3(TILE_DIM, TILE_DIM);
+        dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
-        num_blocks = dim3((ss_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x, 1);
+        dim3 num_blocks((ss_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x, 1);
 
         // set up primitive Cartesian AO to atom mapping
 
@@ -3207,6 +3188,9 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                eri_threshold);
             }
 
+            // Note: d_mat_D is reused in subsequent kernels
+            //       so we need to sync stream here
+            //       otherwise it may be overwritten
             gpuSafe(gpuStreamSynchronize(stream));
         }
 
@@ -3533,17 +3517,11 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
     {
         timer.start("  J block SP");
 
-        // zeroize J on device
-
-        dim3 threads_per_block(TILE_DIM * TILE_DIM);
-
-        dim3 num_blocks((sp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
-
         // set up thread blocks for J
 
-        threads_per_block = dim3(TILE_DIM, TILE_DIM);
+        dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
-        num_blocks = dim3((sp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x, 1);
+        dim3 num_blocks((sp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x, 1);
 
         // set up primitive Cartesian AO to atom mapping
 
@@ -3956,17 +3934,11 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
     {
         timer.start("  J block PP");
 
-        // zeroize J on device
-
-        dim3 threads_per_block(TILE_DIM * TILE_DIM);
-
-        dim3 num_blocks((pp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
-
         // set up thread blocks for J
 
-        threads_per_block = dim3(TILE_DIM, TILE_DIM);
+        dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
-        num_blocks = dim3((pp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x, 1);
+        dim3 num_blocks((pp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x, 1);
 
         // set up primitive Cartesian AO to atom mapping
 
@@ -4572,17 +4544,11 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
     {
         timer.start("  J block SD");
 
-        // zeroize J on device
-
-        dim3 threads_per_block(TILE_DIM * TILE_DIM);
-
-        dim3 num_blocks((sd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
-
         // set up thread blocks for J
 
-        threads_per_block = dim3(TILE_DIM, TILE_DIM);
+        dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
-        num_blocks = dim3((sd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x, 1);
+        dim3 num_blocks((sd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x, 1);
 
         // set up primitive Cartesian AO to atom mapping
 
@@ -5201,17 +5167,11 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
     {
         timer.start("  J block PD");
 
-        // zeroize J on device
-
-        dim3 threads_per_block(TILE_DIM * TILE_DIM);
-
-        dim3 num_blocks((pd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
-
         // set up thread blocks for J
 
-        threads_per_block = dim3(TILE_DIM, TILE_DIM);
+        dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
-        num_blocks = dim3((pd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x, 1);
+        dim3 num_blocks((pd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x, 1);
 
         // set up primitive Cartesian AO to atom mapping
 
@@ -6804,17 +6764,11 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
     {
         timer.start("  J block DD");
 
-        // zeroize J on device
-
-        dim3 threads_per_block(TILE_DIM * TILE_DIM);
-
-        dim3 num_blocks((dd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
-
         // set up thread blocks for J
 
-        threads_per_block = dim3(TILE_DIM, TILE_DIM);
+        dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
-        num_blocks = dim3((dd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x, 1);
+        dim3 num_blocks((dd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x, 1);
 
         // set up primitive Cartesian AO to atom mapping
 
@@ -6840,9 +6794,9 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
         {
             gpuSafe(gpuMemcpyAsync(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-            dim3 dd_threads_per_block (TILE_DIM_SMALL, TILE_DIM_LARGE);
+            dim3 dd_threads_per_block(TILE_DIM_SMALL, TILE_DIM_LARGE);
 
-            dim3 dd_num_blocks ((dd_prim_pair_count_local + dd_threads_per_block.x - 1) / dd_threads_per_block.x, 1);
+            dim3 dd_num_blocks((dd_prim_pair_count_local + dd_threads_per_block.x - 1) / dd_threads_per_block.x, 1);
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
@@ -6908,9 +6862,9 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
         {
             gpuSafe(gpuMemcpyAsync(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-            dim3 dd_threads_per_block (TILE_DIM_SMALL, TILE_DIM_LARGE);
+            dim3 dd_threads_per_block(TILE_DIM_SMALL, TILE_DIM_LARGE);
 
-            dim3 dd_num_blocks ((dd_prim_pair_count_local + dd_threads_per_block.x - 1) / dd_threads_per_block.x, 1);
+            dim3 dd_num_blocks((dd_prim_pair_count_local + dd_threads_per_block.x - 1) / dd_threads_per_block.x, 1);
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
@@ -6978,9 +6932,9 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
         {
             gpuSafe(gpuMemcpyAsync(d_mat_D, sd_mat_D.data(), sd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-            dim3 dd_threads_per_block (TILE_DIM_SMALL, TILE_DIM_LARGE);
+            dim3 dd_threads_per_block(TILE_DIM_SMALL, TILE_DIM_LARGE);
 
-            dim3 dd_num_blocks ((dd_prim_pair_count_local + dd_threads_per_block.x - 1) / dd_threads_per_block.x, 1);
+            dim3 dd_num_blocks((dd_prim_pair_count_local + dd_threads_per_block.x - 1) / dd_threads_per_block.x, 1);
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
@@ -7346,9 +7300,9 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
         {
             gpuSafe(gpuMemcpyAsync(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-            dim3 dd_threads_per_block (TILE_DIM_SMALL, TILE_DIM_LARGE);
+            dim3 dd_threads_per_block(TILE_DIM_SMALL, TILE_DIM_LARGE);
 
-            dim3 dd_num_blocks ((dd_prim_pair_count_local + dd_threads_per_block.x - 1) / dd_threads_per_block.x, 1);
+            dim3 dd_num_blocks((dd_prim_pair_count_local + dd_threads_per_block.x - 1) / dd_threads_per_block.x, 1);
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
@@ -7764,9 +7718,9 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
         {
             gpuSafe(gpuMemcpyAsync(d_mat_D, pd_mat_D.data(), pd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-            dim3 dd_threads_per_block (TILE_DIM_SMALL, TILE_DIM_LARGE);
+            dim3 dd_threads_per_block(TILE_DIM_SMALL, TILE_DIM_LARGE);
 
-            dim3 dd_num_blocks ((dd_prim_pair_count_local + dd_threads_per_block.x - 1) / dd_threads_per_block.x, 1);
+            dim3 dd_num_blocks((dd_prim_pair_count_local + dd_threads_per_block.x - 1) / dd_threads_per_block.x, 1);
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
@@ -8782,9 +8736,9 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
         {
             gpuSafe(gpuMemcpyAsync(d_mat_D, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-            dim3 dd_threads_per_block (TILE_DIM_SMALL, TILE_DIM_LARGE);
+            dim3 dd_threads_per_block(TILE_DIM_SMALL, TILE_DIM_LARGE);
 
-            dim3 dd_num_blocks ((dd_prim_pair_count_local + dd_threads_per_block.x - 1) / dd_threads_per_block.x, 1);
+            dim3 dd_num_blocks((dd_prim_pair_count_local + dd_threads_per_block.x - 1) / dd_threads_per_block.x, 1);
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
@@ -11750,9 +11704,9 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
     }  // end of compute J
 
-    timer.stop("J computation");
-
     gpuSafe(gpuStreamSynchronize(stream));
+
+    timer.stop("J computation");
 
     coulomb_timer.stop();
 
@@ -12152,17 +12106,11 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
     {
         timer.start("  K block SS");
 
-        // zeroize K on device
-
-        dim3 threads_per_block(TILE_DIM * TILE_DIM);
-
-        dim3 num_blocks((pair_inds_count_for_K_ss + threads_per_block.x - 1) / threads_per_block.x);
-
         // set up thread blocks for K
 
-        threads_per_block = dim3(TILE_DIM_X_K, TILE_DIM_Y_K);
+        dim3 threads_per_block(TILE_DIM_X_K, TILE_DIM_Y_K);
 
-        num_blocks = dim3(pair_inds_count_for_K_ss, 1);
+        dim3 num_blocks(pair_inds_count_for_K_ss, 1);
 
         // set up primitive Cartesian AO to atom mapping
 
@@ -12235,8 +12183,6 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                eri_threshold);
         }
 
-        gpuSafe(gpuStreamSynchronize(stream));
-
         // K: (SS|SP)
         //     *  *
 
@@ -12307,8 +12253,6 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                omega,
                                eri_threshold);
         }
-
-        gpuSafe(gpuStreamSynchronize(stream));
 
         // K: (SS|SD)
         //     *  *
@@ -12381,8 +12325,6 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                eri_threshold);
         }
 
-        gpuSafe(gpuStreamSynchronize(stream));
-
         // K: (SP|SS)
         //     *  *
 
@@ -12454,8 +12396,6 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                eri_threshold);
         }
 
-        gpuSafe(gpuStreamSynchronize(stream));
-
         // K: (SP|SP)
         //     *  *
 
@@ -12516,8 +12456,6 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                omega,
                                eri_threshold);
         }
-
-        gpuSafe(gpuStreamSynchronize(stream));
 
         // K: (SP|SD)
         //     *  *
@@ -12596,8 +12534,6 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                eri_threshold);
         }
 
-        gpuSafe(gpuStreamSynchronize(stream));
-
         // K: (SD|SS)
         //     *  *
 
@@ -12668,8 +12604,6 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                omega,
                                eri_threshold);
         }
-
-        gpuSafe(gpuStreamSynchronize(stream));
 
         // K: (SD|SP)
         //     *  *
@@ -12748,8 +12682,6 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                eri_threshold);
         }
 
-        gpuSafe(gpuStreamSynchronize(stream));
-
         // K: (SD|SD)
         //     *  *
 
@@ -12811,6 +12743,9 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                eri_threshold);
         }
 
+        // Note: d_prim_cart_ao_to_atom_inds is reused in subsequent kernels
+        //       so we need to sync stream here
+        //       otherwise it may be overwritten
         gpuSafe(gpuStreamSynchronize(stream));
 
         timer.stop("  K block SS");
@@ -12822,17 +12757,11 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
     {
         timer.start("  K block SP");
 
-        // zeroize K on device
-
-        dim3 threads_per_block(TILE_DIM * TILE_DIM);
-
-        dim3 num_blocks((pair_inds_count_for_K_sp + threads_per_block.x - 1) / threads_per_block.x);
-
         // set up thread blocks for K
 
-        threads_per_block = dim3(TILE_DIM_X_K, TILE_DIM_Y_K);
+        dim3 threads_per_block(TILE_DIM_X_K, TILE_DIM_Y_K);
 
-        num_blocks = dim3(pair_inds_count_for_K_sp, 1);
+        dim3 num_blocks(pair_inds_count_for_K_sp, 1);
 
         // set up primitive Cartesian AO to atom mapping
 
@@ -12923,8 +12852,6 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                eri_threshold);
         }
 
-        gpuSafe(gpuStreamSynchronize(stream));
-
         // K: (SS|PP)
         //     *  *
 
@@ -12995,8 +12922,6 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                omega,
                                eri_threshold);
         }
-
-        gpuSafe(gpuStreamSynchronize(stream));
 
         // K: (SS|PD)
         //     *  *
@@ -13075,8 +13000,6 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                eri_threshold);
         }
 
-        gpuSafe(gpuStreamSynchronize(stream));
-
         // K: (SP|PS)
         //     *  *
 
@@ -13148,8 +13071,6 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                eri_threshold);
         }
 
-        gpuSafe(gpuStreamSynchronize(stream));
-
         // K: (SP|PP)
         //     *  *
 
@@ -13220,8 +13141,6 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                omega,
                                eri_threshold);
         }
-
-        gpuSafe(gpuStreamSynchronize(stream));
 
         // K: (SP|PD)
         //     *  *
@@ -13300,8 +13219,6 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                eri_threshold);
         }
 
-        gpuSafe(gpuStreamSynchronize(stream));
-
         // K: (SD|PS)
         //     *  *
 
@@ -13379,8 +13296,6 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                eri_threshold);
         }
 
-        gpuSafe(gpuStreamSynchronize(stream));
-
         // K: (SD|PP)
         //     *  *
 
@@ -13457,8 +13372,6 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                omega,
                                eri_threshold);
         }
-
-        gpuSafe(gpuStreamSynchronize(stream));
 
         // K: (SD|PD)
         //     *  *
@@ -13548,17 +13461,11 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
     {
         timer.start("  K block PP");
 
-        // zeroize K on device
-
-        dim3 threads_per_block(TILE_DIM * TILE_DIM);
-
-        dim3 num_blocks((pair_inds_count_for_K_pp + threads_per_block.x - 1) / threads_per_block.x);
-
         // set up thread blocks for K
 
-        threads_per_block = dim3(TILE_DIM_X_K, TILE_DIM_Y_K);
+        dim3 threads_per_block(TILE_DIM_X_K, TILE_DIM_Y_K);
 
-        num_blocks = dim3(pair_inds_count_for_K_pp, 1);
+        dim3 num_blocks(pair_inds_count_for_K_pp, 1);
 
         // set up primitive Cartesian AO to atom mapping
 
@@ -13638,8 +13545,6 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                eri_threshold);
         }
 
-        gpuSafe(gpuStreamSynchronize(stream));
-
         // K: (PS|PP)
         //     *  *
 
@@ -13710,8 +13615,6 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                omega,
                                eri_threshold);
         }
-
-        gpuSafe(gpuStreamSynchronize(stream));
 
         // K: (PS|PD)
         //     *  *
@@ -13790,8 +13693,6 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                eri_threshold);
         }
 
-        gpuSafe(gpuStreamSynchronize(stream));
-
         // K: (PP|PS)
         //     *  *
 
@@ -13863,8 +13764,6 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                eri_threshold);
         }
 
-        gpuSafe(gpuStreamSynchronize(stream));
-
         // K: (PP|PP)
         //     *  *
 
@@ -13921,8 +13820,6 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                omega,
                                eri_threshold);
         }
-
-        gpuSafe(gpuStreamSynchronize(stream));
 
         // K: (PP|PD)
         //     *  *
@@ -13996,8 +13893,6 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                omega,
                                eri_threshold);
         }
-
-        gpuSafe(gpuStreamSynchronize(stream));
 
         // K: (PD|PS)
         //     *  *
@@ -14076,8 +13971,6 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                eri_threshold);
         }
 
-        gpuSafe(gpuStreamSynchronize(stream));
-
         // K: (PD|PP)
         //     *  *
 
@@ -14150,8 +14043,6 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                omega,
                                eri_threshold);
         }
-
-        gpuSafe(gpuStreamSynchronize(stream));
 
         // K: (PD|PD)
         //     *  *
@@ -14479,17 +14370,11 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
     {
         timer.start("  K block SD");
 
-        // zeroize K on device
-
-        dim3 threads_per_block(TILE_DIM * TILE_DIM);
-
-        dim3 num_blocks((pair_inds_count_for_K_sd + threads_per_block.x - 1) / threads_per_block.x);
-
         // set up thread blocks for K
 
-        threads_per_block = dim3(TILE_DIM_X_K, TILE_DIM_Y_K);
+        dim3 threads_per_block(TILE_DIM_X_K, TILE_DIM_Y_K);
 
-        num_blocks = dim3(pair_inds_count_for_K_sd, 1);
+        dim3 num_blocks(pair_inds_count_for_K_sd, 1);
 
         // set up primitive Cartesian AO to atom mapping
 
@@ -14582,8 +14467,6 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                eri_threshold);
         }
 
-        gpuSafe(gpuStreamSynchronize(stream));
-
         // K: (SS|DP)
         //     *  *
 
@@ -14661,8 +14544,6 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                eri_threshold);
         }
 
-        gpuSafe(gpuStreamSynchronize(stream));
-
         // K: (SS|DD)
         //     *  *
 
@@ -14735,8 +14616,6 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                omega,
                                eri_threshold);
         }
-
-        gpuSafe(gpuStreamSynchronize(stream));
 
         // K: (SP|DS)
         //     *  *
@@ -14815,8 +14694,6 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                eri_threshold);
         }
 
-        gpuSafe(gpuStreamSynchronize(stream));
-
         // K: (SP|DP)
         //     *  *
 
@@ -14893,8 +14770,6 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                omega,
                                eri_threshold);
         }
-
-        gpuSafe(gpuStreamSynchronize(stream));
 
         // K: (SP|DD)
         //     *  *
@@ -14973,8 +14848,6 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                eri_threshold);
         }
 
-        gpuSafe(gpuStreamSynchronize(stream));
-
         // K: (SD|DS)
         //     *  *
 
@@ -15047,8 +14920,6 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                omega,
                                eri_threshold);
         }
-
-        gpuSafe(gpuStreamSynchronize(stream));
 
         // K: (SD|DP)
         //     *  *
@@ -15126,8 +14997,6 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                omega,
                                eri_threshold);
         }
-
-        gpuSafe(gpuStreamSynchronize(stream));
 
         // K: (SD|DD)
         //     *  *
@@ -15477,17 +15346,11 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
     {
         timer.start("  K block PD");
 
-        // zeroize K on device
-
-        dim3 threads_per_block(TILE_DIM * TILE_DIM);
-
-        dim3 num_blocks((pair_inds_count_for_K_pd + threads_per_block.x - 1) / threads_per_block.x);
-
         // set up thread blocks for K
 
-        threads_per_block = dim3(TILE_DIM_X_K, TILE_DIM_Y_K);
+        dim3 threads_per_block(TILE_DIM_X_K, TILE_DIM_Y_K);
 
-        num_blocks = dim3(pair_inds_count_for_K_pd, 1);
+        dim3 num_blocks(pair_inds_count_for_K_pd, 1);
 
         // set up primitive Cartesian AO to atom mapping
 
@@ -15583,8 +15446,6 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                eri_threshold);
         }
 
-        gpuSafe(gpuStreamSynchronize(stream));
-
         // K: (PS|DP)
         //     *  *
 
@@ -15661,8 +15522,6 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                omega,
                                eri_threshold);
         }
-
-        gpuSafe(gpuStreamSynchronize(stream));
 
         // K: (PS|DD)
         //     *  *
@@ -15741,8 +15600,6 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                eri_threshold);
         }
 
-        gpuSafe(gpuStreamSynchronize(stream));
-
         // K: (PP|DS)
         //     *  *
 
@@ -15820,8 +15677,6 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                eri_threshold);
         }
 
-        gpuSafe(gpuStreamSynchronize(stream));
-
         // K: (PP|DP)
         //     *  *
 
@@ -15894,8 +15749,6 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                omega,
                                eri_threshold);
         }
-
-        gpuSafe(gpuStreamSynchronize(stream));
 
         // K: (PP|DD)
         //     *  *
@@ -16234,8 +16087,6 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                eri_threshold);
         }
 
-        gpuSafe(gpuStreamSynchronize(stream));
-
         // K: (PD|DS)
         //     *  *
 
@@ -16312,8 +16163,6 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                omega,
                                eri_threshold);
         }
-
-        gpuSafe(gpuStreamSynchronize(stream));
 
         // K: (PD|DP)
         //     *  *
@@ -16684,8 +16533,6 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                omega,
                                eri_threshold);
         }
-
-        gpuSafe(gpuStreamSynchronize(stream));
 
         // K: (PD|DD)
         //     *  *
@@ -17926,17 +17773,11 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
     {
         timer.start("  K block DD");
 
-        // zeroize K on device
-
-        dim3 threads_per_block(TILE_DIM * TILE_DIM);
-
-        dim3 num_blocks((pair_inds_count_for_K_dd + threads_per_block.x - 1) / threads_per_block.x);
-
         // set up thread blocks for K
 
-        threads_per_block = dim3(TILE_DIM_X_K, TILE_DIM_Y_K);
+        dim3 threads_per_block(TILE_DIM_X_K, TILE_DIM_Y_K);
 
-        num_blocks = dim3(pair_inds_count_for_K_dd, 1);
+        dim3 num_blocks(pair_inds_count_for_K_dd, 1);
 
         // set up primitive Cartesian AO to atom mapping
 
@@ -18017,8 +17858,6 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                eri_threshold);
         }
 
-        gpuSafe(gpuStreamSynchronize(stream));
-
         // K: (DS|DP)
         //     *  *
 
@@ -18095,8 +17934,6 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                omega,
                                eri_threshold);
         }
-
-        gpuSafe(gpuStreamSynchronize(stream));
 
         // K: (DS|DD)
         //     *  *
@@ -18435,8 +18272,6 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                eri_threshold);
         }
 
-        gpuSafe(gpuStreamSynchronize(stream));
-
         // K: (DP|DS)
         //     *  *
 
@@ -18513,8 +18348,6 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                omega,
                                eri_threshold);
         }
-
-        gpuSafe(gpuStreamSynchronize(stream));
 
         // K: (DP|DP)
         //     *  *
@@ -18830,8 +18663,6 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                omega,
                                eri_threshold);
         }
-
-        gpuSafe(gpuStreamSynchronize(stream));
 
         // K: (DP|DD)
         //     *  *
@@ -19995,8 +19826,6 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                eri_threshold);
         }
 
-        gpuSafe(gpuStreamSynchronize(stream));
-
         // K: (DD|DS)
         //     *  *
 
@@ -20399,8 +20228,6 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                omega,
                                eri_threshold);
         }
-
-        gpuSafe(gpuStreamSynchronize(stream));
 
         // K: (DD|DP)
         //     *  *
@@ -21662,8 +21489,6 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                                omega,
                                eri_threshold);
         }
-
-        gpuSafe(gpuStreamSynchronize(stream));
 
         // K: (DD|DD)
         //     *  *
@@ -24852,9 +24677,9 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
     }
     }  // end of compute K
 
-    timer.stop("K computation");
-
     gpuSafe(gpuStreamSynchronize(stream));
+
+    timer.stop("K computation");
 
     exchange_timer.stop();
 
