@@ -37,7 +37,6 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
-#include <iostream>
 #include <sstream>
 #include <fstream>
 #include <string>
@@ -47,7 +46,6 @@
 
 #include "ScreeningData.hpp"
 #include "BoysFuncTable.hpp"
-#include "ChunkedMemcpyGPU.hpp"
 #include "FockDriverGPU.hpp"
 #include "ElectricDipoleIntegrals.hpp"
 #include "LinearMomentumIntegrals.hpp"
