@@ -33,6 +33,7 @@
 import numpy as np
 import sys
 
+from .veloxchemlib import mpi_master
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 from .visualizationdriver import VisualizationDriver
@@ -75,11 +76,8 @@ class ValetAnalyzer:
         self.attachment_color = "#FFFFFF"  # White
         
         # Results and molecular data
-        self._scf_results = None
-        self._rsp_results = None
         self._molecule = None
         self._basis = None
-        self._num_states = None
         self._subgroups = None
         
         # Density viewer for computing densities on grid
@@ -88,31 +86,29 @@ class ValetAnalyzer:
         # Interactive viewer state
         self._mol_grid_viewer = None
     
-    def initialize(self, scf_results, rsp_results, subgroups=None):
+    def initialize(self, molecule, basis, subgroups=None):
         """
         Initialize VALET analyzer with SCF and response results.
         Extracts and stores molecule, basis, and number of states.
         
-        :param scf_results:
-            The dictionary of results from converged SCF wavefunction.
-        :param rsp_results:
-            The dictionary containing the rsp results.
+        :param molecule:
+            The Molecule.
+        :param basis:
+            The AO basis set.
         :param subgroups:
             Optional list of subgroup tuples for transition diagrams.
             Each tuple contains (name, atom_index or list_of_atom_indices).
         """
-        self._scf_results = scf_results
-        self._rsp_results = rsp_results
-        self._molecule = self._extract_molecule_from_scf(scf_results)
-        self._basis = self._extract_basis_from_scf(scf_results, self._molecule)
-        self._num_states = len(rsp_results['eigenvalues'])
+
+        self._molecule = molecule
+        self._basis = basis
+
         self._subgroups = subgroups
         
         # Initialize density viewer for computing densities
         self._density_viewer = DensityViewer()
         self._density_viewer.initialize(self._molecule, self._basis)
         
-        print(f"VALET initialized with {self._num_states} excited states")
         print(f"Molecule: {self._molecule.number_of_atoms()} atoms")
         print(f"Basis: {self._basis.get_label()}")
     
@@ -161,7 +157,7 @@ class ValetAnalyzer:
         basis = MolecularBasis.read(molecule, basis_set_label)
         return basis
 
-    def compute_nto_densities(self, scf_results, rsp_results, state_index=1):
+    def compute_detach_attach_densities(self, scf_results, rsp_results, state_index=1):
         """
         Computes NTO attachment and detachment densities for a given excited state.
         
@@ -176,34 +172,35 @@ class ValetAnalyzer:
             A dictionary containing detachment and attachment density matrices.
         """
         
-        # Extract molecule from SCF results
-        molecule = self._extract_molecule_from_scf(scf_results)
+        # TODO: check that self._molecule etc. is initialized
+
+        # TODO: this only works for closed-shell
+
+        # TODO: make sure state_index >= 1
         
         # Get MO coefficients and orbital information
         mo = scf_results["C_alpha"]
-        nocc = molecule.number_of_alpha_electrons()
+        nocc = self._molecule.number_of_alpha_electrons()
         norb = mo.shape[1]
-        nvirt = norb - nocc
+        nvir = norb - nocc
         mo_occ = mo[:, :nocc].copy()
         mo_vir = mo[:, nocc:].copy()
 
-        # Get eigenvector for the specified state
-        excstate_ident = "S" + str(state_index)
-        
-        if excstate_ident not in rsp_results:
-            raise ValueError(f"State {excstate_ident} not found in rsp_results. "
-                           f"Available keys: {list(rsp_results.keys())}")
-        
-        eigvec = rsp_results[excstate_ident]
+        # RPA vs TDA
+        if 'eigenvectors_distributed' in rsp_results:
+            eigvec = self.get_full_solution_vector(
+                rsp_results['eigenvectors_distributed'][state_index - 1])
+        else:
+            # TODO: TDA
+            assert False
 
-        # Construct transition density matrix
-        nexc = nocc * nvirt
+        nexc = nocc * nvir
         z_mat = eigvec[:nexc]
         if eigvec.shape[0] == nexc:
-            tdens_mo = np.reshape(z_mat, (nocc, nvirt))
+            tdens_mo = np.reshape(z_mat, (nocc, nvir))
         else:
             y_mat = eigvec[nexc:]
-            tdens_mo = np.reshape(z_mat - y_mat, (nocc, nvirt))
+            tdens_mo = np.reshape(z_mat - y_mat, (nocc, nvir))
 
         # Compute hole (detachment) density matrix in MO basis
         hole_dens_mo = np.matmul(tdens_mo, tdens_mo.T)
@@ -236,41 +233,42 @@ class ValetAnalyzer:
             A dictionary containing detachment and attachment charges per atom.
         """
         
-        # Extract molecule and basis from SCF results
-        molecule = self._extract_molecule_from_scf(scf_results)
-        basis = self._extract_basis_from_scf(scf_results, molecule)
+        # TODO: check that self._molecule etc. is initialized
         
         # Get density matrices
-        densities = self.compute_nto_densities(scf_results, rsp_results, state_index)
+        densities = self.compute_detach_attach_densities(scf_results, rsp_results, state_index)
         
         # Get overlap matrix
         S = scf_results["S"]
         
         # Map atoms to AOs
         vis_drv = VisualizationDriver()
-        atom_to_aos = vis_drv.map_atom_to_atomic_orbitals(molecule, basis)
+        atom_to_aos = vis_drv.map_atom_to_atomic_orbitals(self._molecule, self._basis)
         
-        # Compute detachment charges using Mulliken analysis
         detach_dens_ao = densities['detachment_density_matrix_AO']
+        attach_dens_ao = densities['attachment_density_matrix_AO']
+
         # Note: detachment density is negative, so we take absolute values
         detach_dens_ao = np.abs(detach_dens_ao)
-        PS_detach = np.matmul(detach_dens_ao, S)
         
-        detachment_charges = []
-        for atom_aos in atom_to_aos:
-            # Sum diagonal elements of PS for this atom's AOs
-            charge = np.sum([PS_detach[i, i] for i in atom_aos])
-            detachment_charges.append(charge)
-        
-        # Compute attachment charges using Mulliken analysis
-        attach_dens_ao = densities['attachment_density_matrix_AO']
-        PS_attach = np.matmul(attach_dens_ao, S)
-        
-        attachment_charges = []
-        for atom_aos in atom_to_aos:
-            # Sum diagonal elements of PS for this atom's AOs
-            charge = np.sum([PS_attach[i, i] for i in atom_aos])
-            attachment_charges.append(charge)
+        # Compute attachment charges using Lowdin analysis
+        S = scf_results['S']
+        S_eigvals, S_eigvecs = np.linalg.eigh(S)
+        S_eigvals = np.where(S_eigvals > 1.0e-12, S_eigvals,
+                             0.0)
+        S_sqrt = np.matmul(S_eigvecs * np.sqrt(S_eigvals),
+                           S_eigvecs.T)
+
+        diag_DS = np.diag(
+            np.linalg.multi_dot([S_sqrt, detach_dens_ao, S_sqrt]))
+        diag_AS = np.diag(
+            np.linalg.multi_dot([S_sqrt, attach_dens_ao, S_sqrt]))
+
+        detachment_charges = np.zeros(self._molecule.number_of_atoms())
+        attachment_charges = np.zeros(self._molecule.number_of_atoms())
+        for atomidx, aoinds in enumerate(atom_to_aos):
+            detachment_charges[atomidx] += np.sum(diag_DS[aoinds])
+            attachment_charges[atomidx] += np.sum(diag_AS[aoinds])
         
         # Normalize charges to sum to 1.0
         detach_sum = sum(detachment_charges)
@@ -613,13 +611,17 @@ class ValetAnalyzer:
 
         return fig, ax
     
-    def show(self, initial_state=1, aspect_ratio=0.6):
+    def show(self, scf_results, rsp_results, initial_state=1, aspect_ratio=0.6):
         """
         Display interactive viewer with transition diagram and density views.
         Diagrams are generated on-demand when changing states.
         
         Must call initialize() first with scf_results, rsp_results, and subgroups.
         
+        :param scf_results:
+            The dictionary of results from converged SCF wavefunction.
+        :param rsp_results:
+            The dictionary containing the rsp results.
         :param initial_state:
             Initial excited state to display (default: 1).
         :param aspect_ratio:
@@ -627,16 +629,11 @@ class ValetAnalyzer:
             Height will be calculated as width * aspect_ratio.
         """
         
-        # Check if initialized
-        assert_msg_critical(
-            self._scf_results is not None,
-            'VALET.show: Must call initialize() first with scf_results and rsp_results.'
-        )
+        # Check if subgoups defined
         assert_msg_critical(
             self._subgroups is not None,
-            'VALET.show: Must provide subgroups via initialize() or set_subgroups().'
+            'ValetAnalyzer.show: Must provide subgroups via initialize() or set_subgroups().'
         )
-
         
         assert_msg_critical('py3Dmol' in sys.modules,
                     'py3Dmol is required for interactive viewer.')
@@ -644,9 +641,6 @@ class ValetAnalyzer:
         try:
             from IPython.display import display, HTML
             import ipywidgets as widgets
-            import base64
-            from io import BytesIO
-            import json
         except ImportError:
             raise ImportError('IPython.display and ipywidgets are required for interactive viewer.')
         
@@ -669,7 +663,8 @@ class ValetAnalyzer:
         viewer_width = int(reference_width * right_width_pct * 0.01)
         viewer_height = height
         
-        num_states = self._num_states
+        num_states = len(rsp_results['eigenvalues'])
+        print(f"Visualizing {num_states} excited states")
         
         # Validate initial state
         if initial_state < 1 or initial_state > num_states:
@@ -678,7 +673,7 @@ class ValetAnalyzer:
         
         # Compute initial transition data
         transition_data = self.compute_transition_data(
-            self._scf_results, self._rsp_results,
+            scf_results, rsp_results,
             self._subgroups, state_index=initial_state
         )
         
@@ -717,7 +712,7 @@ class ValetAnalyzer:
         # Helper function to display transition diagram
         def display_diagram(state_idx):
             transition_data = self.compute_transition_data(
-                self._scf_results, self._rsp_results,
+                scf_results, rsp_results,
                 self._subgroups, state_index=state_idx
             )
             fig, ax = self.plot_transition_diagram(
@@ -752,7 +747,7 @@ class ValetAnalyzer:
             self._viewer_output.clear_output(wait=True)
             with self._viewer_output:
                 # Create new viewer with densities
-                new_viewer = self._create_viewer_with_densities(state_idx, trans_data)
+                new_viewer = self._create_viewer_with_densities(scf_results, rsp_results, state_idx, trans_data)
                 self._mol_grid_viewer = new_viewer
                 display(HTML(new_viewer._make_html()))
         
@@ -783,10 +778,14 @@ class ValetAnalyzer:
         
         return None
     
-    def _create_viewer_with_densities(self, state_idx, transition_data):
+    def _create_viewer_with_densities(self, scf_results, rsp_results, state_idx, transition_data):
         """
         Create a new grid viewer with molecule, subgroup coloring, and density isosurfaces.
         
+        :param scf_results:
+            The dictionary of results from converged SCF wavefunction.
+        :param rsp_results:
+            The dictionary containing the rsp results.
         :param state_idx:
             The excited state index (1-based).
         :param transition_data:
@@ -825,8 +824,8 @@ class ValetAnalyzer:
         viewer.zoomTo()
         
         # Compute densities
-        densities = self.compute_nto_densities(
-            self._scf_results, self._rsp_results, state_idx
+        densities = self.compute_detach_attach_densities(
+            scf_results, rsp_results, state_idx
         )
         
         # Compute attachment density
@@ -861,3 +860,25 @@ class ValetAnalyzer:
         )
         
         return viewer
+
+    @staticmethod
+    def get_full_solution_vector(solution):
+        """
+        Gets a full solution vector from the distributed solution.
+
+        :param solution:
+            The distributed solution as a tuple.
+
+        :return:
+            The full solution vector.
+        """
+
+        x_ger = solution.get_full_vector(0)
+        x_ung = solution.get_full_vector(1)
+
+        if solution.rank == mpi_master():
+            x_ger_full = np.hstack((x_ger, x_ger))
+            x_ung_full = np.hstack((x_ung, -x_ung))
+            return x_ger_full + x_ung_full
+        else:
+            return None
