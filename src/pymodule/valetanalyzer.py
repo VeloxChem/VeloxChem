@@ -172,12 +172,16 @@ class ValetAnalyzer:
             A dictionary containing detachment and attachment density matrices.
         """
         
-        # TODO: check that self._molecule etc. is initialized
+        assert_msg_critical(self._molecule is not None,
+                            'ValetAnalyzer is not yet initialized.')
 
-        # TODO: this only works for closed-shell
+        assert_msg_critical(scf_results['scf_type'] == 'restricted',
+                            'ValetAnalyzer does not yet support open-shell.')
 
-        # TODO: make sure state_index >= 1
-        
+        num_states = len(rsp_results['eigenvalues'])
+        assert_msg_critical(1 <= state_index and state_index <= num_states,
+                            'ValetAnalyzer: Invalid state_index.')
+
         # Get MO coefficients and orbital information
         mo = scf_results["C_alpha"]
         nocc = self._molecule.number_of_alpha_electrons()
@@ -190,9 +194,8 @@ class ValetAnalyzer:
         if 'eigenvectors_distributed' in rsp_results:
             eigvec = self.get_full_solution_vector(
                 rsp_results['eigenvectors_distributed'][state_index - 1])
-        else:
-            # TODO: TDA
-            assert False
+        elif 'eigenvectors' in rsp_results:
+            eigvec = rsp_results['eigenvectors'][:, state_index - 1].copy()
 
         nexc = nocc * nvir
         z_mat = eigvec[:nexc]
@@ -232,8 +235,6 @@ class ValetAnalyzer:
         :return:
             A dictionary containing detachment and attachment charges per atom.
         """
-        
-        # TODO: check that self._molecule etc. is initialized
         
         # Get density matrices
         densities = self.compute_detach_attach_densities(scf_results, rsp_results, state_index)
