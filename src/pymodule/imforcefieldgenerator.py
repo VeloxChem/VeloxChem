@@ -459,7 +459,7 @@ class IMForceFieldGenerator:
                                         'exponent_p':self.exponent_p,
                                         'exponent_q':self.exponent_q, 
                                         'confidence_radius':self.confidence_radius,
-                                        'imforcefield_file':self.imforcefieldfiles[self.roots_to_follow[root]],
+                                        'imforcefield_file':self.imforcefieldfiles[root],
                                         'use_inverse_bond_length':self.use_inverse_bond_length,
                                         'use_eq_bond_length':self.use_eq_bond_length,
                                         'use_cosine_dihedral':self.use_cosine_dihedral,
@@ -617,14 +617,14 @@ class IMForceFieldGenerator:
             self.imforcefieldfiles = {}
             standard_files = [f'im_database_{root}.h5' for root in self.roots_to_follow]
             root_extract_z_matrix = {}
-            for root in self.roots_to_follow:
+            for root_idx, standard_file in enumerate(standard_files):
                 
-                if os.path.exists(standard_files[root]):
-                    if root not in root_extract_z_matrix:
-                        root_extract_z_matrix[root] = True 
+                if os.path.exists(standard_file):
+                    if self.roots_to_follow[root_idx] not in root_extract_z_matrix:
+                        root_extract_z_matrix[self.roots_to_follow[root_idx]] = True 
                 else:
-                    root_extract_z_matrix[root] = False     
-                self.imforcefieldfiles[root] = standard_files[root]
+                    root_extract_z_matrix[self.roots_to_follow[root_idx]] = False     
+                self.imforcefieldfiles[self.roots_to_follow[root_idx]] = standard_file
                 
         print(f'IMPORTANT: IM ForceFieldFile is initalized from the current directory as {self.imforcefieldfiles}')
         self.set_up_the_system(molecule, extract_z_matrix=root_extract_z_matrix)
