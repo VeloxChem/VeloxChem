@@ -243,7 +243,7 @@ class EnvironmentDriver:
         *,
         basis_label: str,
         scf_drv,
-        rsp_drv,
+        rsp_drv=None,
         potdir: str | Path = "pot_frames",
         write_pe_potfiles: bool = True,
     ):
@@ -270,6 +270,12 @@ class EnvironmentDriver:
         if isinstance(snapshots, dict):
             snapshots = [snapshots]
 
+        if scf_drv is None:
+            raise ValueError("scf_drv must be provided.")
+        
+        if rsp_drv is not None and scf_drv is None:
+            raise ValueError("rsp_drv requires scf_drv to be provided.")
+
         potdir = Path(potdir)
 
         # Write PE potfiles only if requested and if any snapshot has PE atoms
@@ -284,7 +290,10 @@ class EnvironmentDriver:
             self.write_pot_files(snapshots, outdir=potdir)
 
         scf_all = []
-        rsp_all = []
+        if rsp_drv is not None:
+            rsp_all = []
+        else:
+            None
 
         for snap in snapshots:
             frame = int(snap["frame"])
@@ -310,9 +319,12 @@ class EnvironmentDriver:
                     )
 
             scf_results = scf_drv.compute(molecule, basis)
-            rsp_results = rsp_drv.compute(molecule, basis, scf_results)
-
             scf_all.append((frame, scf_results))
-            rsp_all.append((frame, rsp_results))
+            if rsp_drv is not None:
+                rsp_results = rsp_drv.compute(molecule, basis, scf_results)
+                rsp_all.append((frame, rsp_results))
 
-        return {"scf_all": scf_all, "rsp_all": rsp_all}
+        results = {"scf_all": scf_all}
+        if rsp_drv is not None:
+            results["rsp_all"] = rsp_all
+        return results
