@@ -86,8 +86,6 @@ class EnvironmentDriver:
         self.npe_model = None
         self.set_env_models()
 
-        # fetch them from .csv file 
-
         if comm is None:
             comm = MPI.COMM_WORLD
 
