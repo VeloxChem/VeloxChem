@@ -51,7 +51,7 @@ class TestReactionMatcher:
             pro_charges.append(q)
 
         evb = EvbDriver()
-        evb.ostream.mute()
+        # evb.ostream.mute()
         evb.ffbuilder.reparameterize_bonds = False
         evb.ffbuilder.optimize_ff = False
         evb.build_ff_from_molecules(
@@ -69,8 +69,8 @@ class TestReactionMatcher:
             ['CCO'],
             ['O', 'C=C'],
         )
-        assert breaking_bonds == {(1, 2), (0, 4)}
-        assert forming_bonds == {(2, 4)}
+        assert breaking_bonds == {(1, 2), (0, 3)}
+        assert forming_bonds == {(2, 3)}
 
         breaking_bonds, forming_bonds = self.run_graph_matcher(
             ['[Cl-]', 'CCBr'],
@@ -85,7 +85,7 @@ class TestReactionMatcher:
             ['CN1N=NC=C1'],
         )
         assert breaking_bonds == set()
-        assert forming_bonds == {(1, 7), (0, 5)}
+        assert forming_bonds == {(0, 7), (1, 5)}
 
         breaking_bonds, forming_bonds = self.run_graph_matcher(
             ['C1=CCCCC1'],

@@ -667,8 +667,8 @@ class AtomTypeIdentifier:
                                         connected_atom_number,
                                         phosphorus_type):
 
-        if phosphorus_type is None:
-            return None
+        # if phosphorus_type is None:
+        #     return None
 
         hydrogen_type = None
 
