@@ -292,8 +292,6 @@ class EnvironmentDriver:
         scf_all = []
         if rsp_drv is not None:
             rsp_all = []
-        else:
-            None
 
         for snap in snapshots:
             frame = int(snap["frame"])
