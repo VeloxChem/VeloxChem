@@ -323,8 +323,15 @@ class ExcitedStateAnalysisDriver:
             # Carl Svennerstedt, master thesis 2025
             y_mat = eigvec[nexc:]
             tdens_mo = np.zeros((norb, norb))
-            tdens_mo[:nocc, nocc:] = np.reshape(z_mat, (nocc, nvirt))
-            tdens_mo[nocc:, :nocc] = -np.reshape(y_mat,
+            if num_core_orbitals is None:
+                tdens_mo[:nocc, nocc:] = np.reshape(z_mat, (nocc, nvirt))
+                tdens_mo[nocc:, :nocc] = -np.reshape(y_mat,
+                                                 (nocc, nvirt)).transpose()
+            else:
+                start_virt = molecule.number_of_alpha_electrons()
+
+                tdens_mo[:nocc, start_virt:] = np.reshape(z_mat, (nocc, nvirt))
+                tdens_mo[start_virt:, :nocc] = -np.reshape(y_mat,
                                                  (nocc, nvirt)).transpose()
             tdens_ao = np.linalg.multi_dot([mo, tdens_mo, mo.T])
             hole_dens_mo = -np.matmul(tdens_mo, tdens_mo.T)
