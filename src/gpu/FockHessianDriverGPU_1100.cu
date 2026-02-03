@@ -881,11 +881,15 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
         {
             gpuSafe(gpuMemcpyAsync(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-            for (int64_t grad_cart_ind_0 = 0, grad_cart_ind = 0; grad_cart_ind_0 < 3; grad_cart_ind_0++)
-            for (int64_t grad_cart_ind_1 = 0; grad_cart_ind_1 < 3; grad_cart_ind_1++, grad_cart_ind++)
+            for (int64_t grad_cart_ind_0 = 0; grad_cart_ind_0 < 3; grad_cart_ind_0++)
+            for (int64_t grad_cart_ind_1 = 0; grad_cart_ind_1 < 3; grad_cart_ind_1++)
             {
-                gpu::computeCoulombHessianSSSP_II_0<<<num_blocks, threads_per_block, 0, stream>>>(
+                const int64_t grad_cart_ind   = grad_cart_ind_0 * 3 + grad_cart_ind_1;
+                const int64_t grad_cart_ind_T = grad_cart_ind_1 * 3 + grad_cart_ind_0;
+
+                gpu::computeCoulombHessianSSSP_IJ_0<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
+                               d_hess_array[grad_cart_ind_T],
                                static_cast<uint32_t>(grad_cart_ind_0),
                                static_cast<uint32_t>(grad_cart_ind_1),
                                prefac_coulomb,
@@ -906,31 +910,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_sp_pair_data,
                                static_cast<uint32_t>(sp_prim_pair_count),
                                d_prim_cart_ao_to_atom_inds,
-                               d_boys_func_table,
-                               d_boys_func_ft,
-                               eri_threshold);
-                gpu::computeCoulombHessianSSSP_JJ_0<<<num_blocks, threads_per_block, 0, stream>>>(
-                               d_hess_array[grad_cart_ind],
-                               static_cast<uint32_t>(grad_cart_ind_0),
-                               static_cast<uint32_t>(grad_cart_ind_1),
-                               prefac_coulomb,
-                               d_s_prim_info,
-                               static_cast<uint32_t>(s_prim_count),
-                               d_p_prim_info,
-                               static_cast<uint32_t>(p_prim_count),
-                               d_ss_mat_D_local,
-                               d_mat_D,
-                               d_ss_mat_Q_local,
-                               d_sp_mat_Q,
-                               d_ss_first_inds_local,
-                               d_ss_second_inds_local,
-                               d_ss_pair_data_local,
-                               static_cast<uint32_t>(ss_prim_pair_count_local),
-                               d_sp_first_inds,
-                               d_sp_second_inds,
-                               d_sp_pair_data,
-                               static_cast<uint32_t>(sp_prim_pair_count),
-                               d_prim_cart_ao_to_atom_inds,
+                               static_cast<uint32_t>(natoms),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -949,7 +929,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombHessianSSSD_II_0<<<num_blocks, threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianSSSD_IJ_0<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -1010,11 +990,15 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
         {
             gpuSafe(gpuMemcpyAsync(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-            for (int64_t grad_cart_ind_0 = 0, grad_cart_ind = 0; grad_cart_ind_0 < 3; grad_cart_ind_0++)
-            for (int64_t grad_cart_ind_1 = 0; grad_cart_ind_1 < 3; grad_cart_ind_1++, grad_cart_ind++)
+            for (int64_t grad_cart_ind_0 = 0; grad_cart_ind_0 < 3; grad_cart_ind_0++)
+            for (int64_t grad_cart_ind_1 = 0; grad_cart_ind_1 < 3; grad_cart_ind_1++)
             {
-                gpu::computeCoulombHessianSSPP_II_0<<<num_blocks, threads_per_block, 0, stream>>>(
+                const int64_t grad_cart_ind   = grad_cart_ind_0 * 3 + grad_cart_ind_1;
+                const int64_t grad_cart_ind_T = grad_cart_ind_1 * 3 + grad_cart_ind_0;
+
+                gpu::computeCoulombHessianSSPP_IJ_0<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
+                               d_hess_array[grad_cart_ind_T],
                                static_cast<uint32_t>(grad_cart_ind_0),
                                static_cast<uint32_t>(grad_cart_ind_1),
                                prefac_coulomb,
@@ -1035,31 +1019,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_pp_pair_data,
                                static_cast<uint32_t>(pp_prim_pair_count),
                                d_prim_cart_ao_to_atom_inds,
-                               d_boys_func_table,
-                               d_boys_func_ft,
-                               eri_threshold);
-                gpu::computeCoulombHessianSSPP_JJ_0<<<num_blocks, threads_per_block, 0, stream>>>(
-                               d_hess_array[grad_cart_ind],
-                               static_cast<uint32_t>(grad_cart_ind_0),
-                               static_cast<uint32_t>(grad_cart_ind_1),
-                               prefac_coulomb,
-                               d_s_prim_info,
-                               static_cast<uint32_t>(s_prim_count),
-                               d_p_prim_info,
-                               static_cast<uint32_t>(p_prim_count),
-                               d_ss_mat_D_local,
-                               d_mat_D,
-                               d_ss_mat_Q_local,
-                               d_pp_mat_Q,
-                               d_ss_first_inds_local,
-                               d_ss_second_inds_local,
-                               d_ss_pair_data_local,
-                               static_cast<uint32_t>(ss_prim_pair_count_local),
-                               d_pp_first_inds,
-                               d_pp_second_inds,
-                               d_pp_pair_data,
-                               static_cast<uint32_t>(pp_prim_pair_count),
-                               d_prim_cart_ao_to_atom_inds,
+                               static_cast<uint32_t>(natoms),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -1078,7 +1038,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombHessianSSPD_II_0<<<num_blocks, threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianSSPD_IJ_0<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -1144,7 +1104,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombHessianSSDD_II_0<<<num_blocks, threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianSSDD_IJ_0<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -1238,11 +1198,15 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
         {
             gpuSafe(gpuMemcpyAsync(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-            for (int64_t grad_cart_ind_0 = 0, grad_cart_ind = 0; grad_cart_ind_0 < 3; grad_cart_ind_0++)
-            for (int64_t grad_cart_ind_1 = 0; grad_cart_ind_1 < 3; grad_cart_ind_1++, grad_cart_ind++)
+            for (int64_t grad_cart_ind_0 = 0; grad_cart_ind_0 < 3; grad_cart_ind_0++)
+            for (int64_t grad_cart_ind_1 = 0; grad_cart_ind_1 < 3; grad_cart_ind_1++)
             {
-                gpu::computeCoulombHessianSPSS_II_0<<<num_blocks, threads_per_block, 0, stream>>>(
+                const int64_t grad_cart_ind   = grad_cart_ind_0 * 3 + grad_cart_ind_1;
+                const int64_t grad_cart_ind_T = grad_cart_ind_1 * 3 + grad_cart_ind_0;
+
+                gpu::computeCoulombHessianSPSS_IJ_0<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
+                               d_hess_array[grad_cart_ind_T],
                                static_cast<uint32_t>(grad_cart_ind_0),
                                static_cast<uint32_t>(grad_cart_ind_1),
                                prefac_coulomb,
@@ -1263,31 +1227,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_ss_pair_data,
                                static_cast<uint32_t>(ss_prim_pair_count),
                                d_prim_cart_ao_to_atom_inds,
-                               d_boys_func_table,
-                               d_boys_func_ft,
-                               eri_threshold);
-                gpu::computeCoulombHessianSPSS_JJ_0<<<num_blocks, threads_per_block, 0, stream>>>(
-                               d_hess_array[grad_cart_ind],
-                               static_cast<uint32_t>(grad_cart_ind_0),
-                               static_cast<uint32_t>(grad_cart_ind_1),
-                               prefac_coulomb,
-                               d_s_prim_info,
-                               static_cast<uint32_t>(s_prim_count),
-                               d_p_prim_info,
-                               static_cast<uint32_t>(p_prim_count),
-                               d_sp_mat_D_local,
-                               d_mat_D,
-                               d_sp_mat_Q_local,
-                               d_ss_mat_Q,
-                               d_sp_first_inds_local,
-                               d_sp_second_inds_local,
-                               d_sp_pair_data_local,
-                               static_cast<uint32_t>(sp_prim_pair_count_local),
-                               d_ss_first_inds,
-                               d_ss_second_inds,
-                               d_ss_pair_data,
-                               static_cast<uint32_t>(ss_prim_pair_count),
-                               d_prim_cart_ao_to_atom_inds,
+                               static_cast<uint32_t>(natoms),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -1303,11 +1243,15 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
         {
             gpuSafe(gpuMemcpyAsync(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-            for (int64_t grad_cart_ind_0 = 0, grad_cart_ind = 0; grad_cart_ind_0 < 3; grad_cart_ind_0++)
-            for (int64_t grad_cart_ind_1 = 0; grad_cart_ind_1 < 3; grad_cart_ind_1++, grad_cart_ind++)
+            for (int64_t grad_cart_ind_0 = 0; grad_cart_ind_0 < 3; grad_cart_ind_0++)
+            for (int64_t grad_cart_ind_1 = 0; grad_cart_ind_1 < 3; grad_cart_ind_1++)
             {
-                gpu::computeCoulombHessianSPSP_II_0<<<num_blocks, threads_per_block, 0, stream>>>(
+                const int64_t grad_cart_ind   = grad_cart_ind_0 * 3 + grad_cart_ind_1;
+                const int64_t grad_cart_ind_T = grad_cart_ind_1 * 3 + grad_cart_ind_0;
+
+                gpu::computeCoulombHessianSPSP_IJ_0<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
+                               d_hess_array[grad_cart_ind_T],
                                static_cast<uint32_t>(grad_cart_ind_0),
                                static_cast<uint32_t>(grad_cart_ind_1),
                                prefac_coulomb,
@@ -1328,31 +1272,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_sp_pair_data,
                                static_cast<uint32_t>(sp_prim_pair_count),
                                d_prim_cart_ao_to_atom_inds,
-                               d_boys_func_table,
-                               d_boys_func_ft,
-                               eri_threshold);
-                gpu::computeCoulombHessianSPSP_JJ_0<<<num_blocks, threads_per_block, 0, stream>>>(
-                               d_hess_array[grad_cart_ind],
-                               static_cast<uint32_t>(grad_cart_ind_0),
-                               static_cast<uint32_t>(grad_cart_ind_1),
-                               prefac_coulomb,
-                               d_s_prim_info,
-                               static_cast<uint32_t>(s_prim_count),
-                               d_p_prim_info,
-                               static_cast<uint32_t>(p_prim_count),
-                               d_sp_mat_D_local,
-                               d_mat_D,
-                               d_sp_mat_Q_local,
-                               d_sp_mat_Q,
-                               d_sp_first_inds_local,
-                               d_sp_second_inds_local,
-                               d_sp_pair_data_local,
-                               static_cast<uint32_t>(sp_prim_pair_count_local),
-                               d_sp_first_inds,
-                               d_sp_second_inds,
-                               d_sp_pair_data,
-                               static_cast<uint32_t>(sp_prim_pair_count),
-                               d_prim_cart_ao_to_atom_inds,
+                               static_cast<uint32_t>(natoms),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -1371,7 +1291,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombHessianSPSD_II_0<<<num_blocks, threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianSPSD_IJ_0<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -1436,11 +1356,15 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
         {
             gpuSafe(gpuMemcpyAsync(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-            for (int64_t grad_cart_ind_0 = 0, grad_cart_ind = 0; grad_cart_ind_0 < 3; grad_cart_ind_0++)
-            for (int64_t grad_cart_ind_1 = 0; grad_cart_ind_1 < 3; grad_cart_ind_1++, grad_cart_ind++)
+            for (int64_t grad_cart_ind_0 = 0; grad_cart_ind_0 < 3; grad_cart_ind_0++)
+            for (int64_t grad_cart_ind_1 = 0; grad_cart_ind_1 < 3; grad_cart_ind_1++)
             {
-                gpu::computeCoulombHessianSPPP_II_0<<<num_blocks, threads_per_block, 0, stream>>>(
+                const int64_t grad_cart_ind   = grad_cart_ind_0 * 3 + grad_cart_ind_1;
+                const int64_t grad_cart_ind_T = grad_cart_ind_1 * 3 + grad_cart_ind_0;
+
+                gpu::computeCoulombHessianSPPP_IJ_0<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
+                               d_hess_array[grad_cart_ind_T],
                                static_cast<uint32_t>(grad_cart_ind_0),
                                static_cast<uint32_t>(grad_cart_ind_1),
                                prefac_coulomb,
@@ -1461,31 +1385,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_pp_pair_data,
                                static_cast<uint32_t>(pp_prim_pair_count),
                                d_prim_cart_ao_to_atom_inds,
-                               d_boys_func_table,
-                               d_boys_func_ft,
-                               eri_threshold);
-                gpu::computeCoulombHessianSPPP_JJ_0<<<num_blocks, threads_per_block, 0, stream>>>(
-                               d_hess_array[grad_cart_ind],
-                               static_cast<uint32_t>(grad_cart_ind_0),
-                               static_cast<uint32_t>(grad_cart_ind_1),
-                               prefac_coulomb,
-                               d_s_prim_info,
-                               static_cast<uint32_t>(s_prim_count),
-                               d_p_prim_info,
-                               static_cast<uint32_t>(p_prim_count),
-                               d_sp_mat_D_local,
-                               d_mat_D,
-                               d_sp_mat_Q_local,
-                               d_pp_mat_Q,
-                               d_sp_first_inds_local,
-                               d_sp_second_inds_local,
-                               d_sp_pair_data_local,
-                               static_cast<uint32_t>(sp_prim_pair_count_local),
-                               d_pp_first_inds,
-                               d_pp_second_inds,
-                               d_pp_pair_data,
-                               static_cast<uint32_t>(pp_prim_pair_count),
-                               d_prim_cart_ao_to_atom_inds,
+                               static_cast<uint32_t>(natoms),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -1504,7 +1404,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombHessianSPPD_II_0<<<num_blocks, threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianSPPD_IJ_0<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -1570,7 +1470,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombHessianSPDD_II_0<<<num_blocks, threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianSPDD_IJ_0<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -1667,11 +1567,15 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
         {
             gpuSafe(gpuMemcpyAsync(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-            for (int64_t grad_cart_ind_0 = 0, grad_cart_ind = 0; grad_cart_ind_0 < 3; grad_cart_ind_0++)
-            for (int64_t grad_cart_ind_1 = 0; grad_cart_ind_1 < 3; grad_cart_ind_1++, grad_cart_ind++)
+            for (int64_t grad_cart_ind_0 = 0; grad_cart_ind_0 < 3; grad_cart_ind_0++)
+            for (int64_t grad_cart_ind_1 = 0; grad_cart_ind_1 < 3; grad_cart_ind_1++)
             {
-                gpu::computeCoulombHessianPPSS_II_0<<<num_blocks, threads_per_block, 0, stream>>>(
+                const int64_t grad_cart_ind   = grad_cart_ind_0 * 3 + grad_cart_ind_1;
+                const int64_t grad_cart_ind_T = grad_cart_ind_1 * 3 + grad_cart_ind_0;
+
+                gpu::computeCoulombHessianPPSS_IJ_0<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
+                               d_hess_array[grad_cart_ind_T],
                                static_cast<uint32_t>(grad_cart_ind_0),
                                static_cast<uint32_t>(grad_cart_ind_1),
                                prefac_coulomb,
@@ -1692,31 +1596,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_ss_pair_data,
                                static_cast<uint32_t>(ss_prim_pair_count),
                                d_prim_cart_ao_to_atom_inds,
-                               d_boys_func_table,
-                               d_boys_func_ft,
-                               eri_threshold);
-                gpu::computeCoulombHessianPPSS_JJ_0<<<num_blocks, threads_per_block, 0, stream>>>(
-                               d_hess_array[grad_cart_ind],
-                               static_cast<uint32_t>(grad_cart_ind_0),
-                               static_cast<uint32_t>(grad_cart_ind_1),
-                               prefac_coulomb,
-                               d_s_prim_info,
-                               static_cast<uint32_t>(s_prim_count),
-                               d_p_prim_info,
-                               static_cast<uint32_t>(p_prim_count),
-                               d_pp_mat_D_local,
-                               d_mat_D,
-                               d_pp_mat_Q_local,
-                               d_ss_mat_Q,
-                               d_pp_first_inds_local,
-                               d_pp_second_inds_local,
-                               d_pp_pair_data_local,
-                               static_cast<uint32_t>(pp_prim_pair_count_local),
-                               d_ss_first_inds,
-                               d_ss_second_inds,
-                               d_ss_pair_data,
-                               static_cast<uint32_t>(ss_prim_pair_count),
-                               d_prim_cart_ao_to_atom_inds,
+                               static_cast<uint32_t>(natoms),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -1732,11 +1612,15 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
         {
             gpuSafe(gpuMemcpyAsync(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-            for (int64_t grad_cart_ind_0 = 0, grad_cart_ind = 0; grad_cart_ind_0 < 3; grad_cart_ind_0++)
-            for (int64_t grad_cart_ind_1 = 0; grad_cart_ind_1 < 3; grad_cart_ind_1++, grad_cart_ind++)
+            for (int64_t grad_cart_ind_0 = 0; grad_cart_ind_0 < 3; grad_cart_ind_0++)
+            for (int64_t grad_cart_ind_1 = 0; grad_cart_ind_1 < 3; grad_cart_ind_1++)
             {
-                gpu::computeCoulombHessianPPSP_II_0<<<num_blocks, threads_per_block, 0, stream>>>(
+                const int64_t grad_cart_ind   = grad_cart_ind_0 * 3 + grad_cart_ind_1;
+                const int64_t grad_cart_ind_T = grad_cart_ind_1 * 3 + grad_cart_ind_0;
+
+                gpu::computeCoulombHessianPPSP_IJ_0<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
+                               d_hess_array[grad_cart_ind_T],
                                static_cast<uint32_t>(grad_cart_ind_0),
                                static_cast<uint32_t>(grad_cart_ind_1),
                                prefac_coulomb,
@@ -1757,31 +1641,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_sp_pair_data,
                                static_cast<uint32_t>(sp_prim_pair_count),
                                d_prim_cart_ao_to_atom_inds,
-                               d_boys_func_table,
-                               d_boys_func_ft,
-                               eri_threshold);
-                gpu::computeCoulombHessianPPSP_JJ_0<<<num_blocks, threads_per_block, 0, stream>>>(
-                               d_hess_array[grad_cart_ind],
-                               static_cast<uint32_t>(grad_cart_ind_0),
-                               static_cast<uint32_t>(grad_cart_ind_1),
-                               prefac_coulomb,
-                               d_s_prim_info,
-                               static_cast<uint32_t>(s_prim_count),
-                               d_p_prim_info,
-                               static_cast<uint32_t>(p_prim_count),
-                               d_pp_mat_D_local,
-                               d_mat_D,
-                               d_pp_mat_Q_local,
-                               d_sp_mat_Q,
-                               d_pp_first_inds_local,
-                               d_pp_second_inds_local,
-                               d_pp_pair_data_local,
-                               static_cast<uint32_t>(pp_prim_pair_count_local),
-                               d_sp_first_inds,
-                               d_sp_second_inds,
-                               d_sp_pair_data,
-                               static_cast<uint32_t>(sp_prim_pair_count),
-                               d_prim_cart_ao_to_atom_inds,
+                               static_cast<uint32_t>(natoms),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -1800,7 +1660,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombHessianPPSD_II_0<<<num_blocks, threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianPPSD_IJ_0<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -1865,11 +1725,15 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
         {
             gpuSafe(gpuMemcpyAsync(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-            for (int64_t grad_cart_ind_0 = 0, grad_cart_ind = 0; grad_cart_ind_0 < 3; grad_cart_ind_0++)
-            for (int64_t grad_cart_ind_1 = 0; grad_cart_ind_1 < 3; grad_cart_ind_1++, grad_cart_ind++)
+            for (int64_t grad_cart_ind_0 = 0; grad_cart_ind_0 < 3; grad_cart_ind_0++)
+            for (int64_t grad_cart_ind_1 = 0; grad_cart_ind_1 < 3; grad_cart_ind_1++)
             {
-                gpu::computeCoulombHessianPPPP_II_0<<<num_blocks, threads_per_block, 0, stream>>>(
+                const int64_t grad_cart_ind   = grad_cart_ind_0 * 3 + grad_cart_ind_1;
+                const int64_t grad_cart_ind_T = grad_cart_ind_1 * 3 + grad_cart_ind_0;
+
+                gpu::computeCoulombHessianPPPP_IJ_0<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
+                               d_hess_array[grad_cart_ind_T],
                                static_cast<uint32_t>(grad_cart_ind_0),
                                static_cast<uint32_t>(grad_cart_ind_1),
                                prefac_coulomb,
@@ -1888,30 +1752,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_pp_pair_data,
                                static_cast<uint32_t>(pp_prim_pair_count),
                                d_prim_cart_ao_to_atom_inds,
-                               static_cast<uint32_t>(s_prim_count),
-                               d_boys_func_table,
-                               d_boys_func_ft,
-                               eri_threshold);
-                gpu::computeCoulombHessianPPPP_JJ_0<<<num_blocks, threads_per_block, 0, stream>>>(
-                               d_hess_array[grad_cart_ind],
-                               static_cast<uint32_t>(grad_cart_ind_0),
-                               static_cast<uint32_t>(grad_cart_ind_1),
-                               prefac_coulomb,
-                               d_p_prim_info,
-                               static_cast<uint32_t>(p_prim_count),
-                               d_pp_mat_D_local,
-                               d_mat_D,
-                               d_pp_mat_Q_local,
-                               d_pp_mat_Q,
-                               d_pp_first_inds_local,
-                               d_pp_second_inds_local,
-                               d_pp_pair_data_local,
-                               static_cast<uint32_t>(pp_prim_pair_count_local),
-                               d_pp_first_inds,
-                               d_pp_second_inds,
-                               d_pp_pair_data,
-                               static_cast<uint32_t>(pp_prim_pair_count),
-                               d_prim_cart_ao_to_atom_inds,
+                               static_cast<uint32_t>(natoms),
                                static_cast<uint32_t>(s_prim_count),
                                d_boys_func_table,
                                d_boys_func_ft,
@@ -1931,7 +1772,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombHessianPPPD_II_0<<<num_blocks, threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianPPPD_IJ_0<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -1995,7 +1836,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombHessianPPDD_II_0<<<num_blocks, threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianPPDD_IJ_0<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -2020,7 +1861,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianPPDD_II_1<<<num_blocks, threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianPPDD_IJ_1<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -2045,7 +1886,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianPPDD_II_2<<<num_blocks, threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianPPDD_IJ_2<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -2070,7 +1911,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianPPDD_II_3<<<num_blocks, threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianPPDD_IJ_3<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -2095,7 +1936,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianPPDD_II_4<<<num_blocks, threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianPPDD_IJ_4<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -2294,7 +2135,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombHessianSDSS_II_0<<<num_blocks, threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianSDSS_IJ_0<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -2358,7 +2199,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombHessianSDSP_II_0<<<num_blocks, threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianSDSP_IJ_0<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -2424,7 +2265,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombHessianSDSD_II_0<<<num_blocks, threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianSDSD_IJ_0<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -2488,7 +2329,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombHessianSDPP_II_0<<<num_blocks, threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianSDPP_IJ_0<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -2554,7 +2395,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombHessianSDPD_II_0<<<num_blocks, threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianSDPD_IJ_0<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -2620,7 +2461,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombHessianSDDD_II_0<<<num_blocks, threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianSDDD_IJ_0<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -2645,7 +2486,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianSDDD_II_1<<<num_blocks, threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianSDDD_IJ_1<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -2670,7 +2511,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianSDDD_II_2<<<num_blocks, threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianSDDD_IJ_2<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -2695,7 +2536,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianSDDD_II_3<<<num_blocks, threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianSDDD_IJ_3<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -2720,7 +2561,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianSDDD_II_4<<<num_blocks, threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianSDDD_IJ_4<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -2916,7 +2757,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombHessianPDSS_II_0<<<num_blocks, threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianPDSS_IJ_0<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -2982,7 +2823,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombHessianPDSP_II_0<<<num_blocks, threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianPDSP_IJ_0<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -3048,7 +2889,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombHessianPDSD_II_0<<<num_blocks, threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianPDSD_IJ_0<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -3114,7 +2955,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombHessianPDPP_II_0<<<num_blocks, threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianPDPP_IJ_0<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -3178,7 +3019,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombHessianPDPD_II_0<<<num_blocks, threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianPDPD_IJ_0<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -3203,7 +3044,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianPDPD_II_1<<<num_blocks, threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianPDPD_IJ_1<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -3228,7 +3069,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianPDPD_II_2<<<num_blocks, threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianPDPD_IJ_2<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -3253,7 +3094,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianPDPD_II_3<<<num_blocks, threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianPDPD_IJ_3<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -3278,7 +3119,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianPDPD_II_4<<<num_blocks, threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianPDPD_IJ_4<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -3303,7 +3144,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianPDPD_II_5<<<num_blocks, threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianPDPD_IJ_5<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -3492,7 +3333,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombHessianPDDD_II_0<<<num_blocks, threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianPDDD_IJ_0<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -3517,7 +3358,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianPDDD_II_1<<<num_blocks, threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianPDDD_IJ_1<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -3542,7 +3383,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianPDDD_II_2<<<num_blocks, threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianPDDD_IJ_2<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -3567,7 +3408,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianPDDD_II_3<<<num_blocks, threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianPDDD_IJ_3<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -3592,7 +3433,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianPDDD_II_4<<<num_blocks, threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianPDDD_IJ_4<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -3617,7 +3458,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianPDDD_II_5<<<num_blocks, threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianPDDD_IJ_5<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -3642,7 +3483,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianPDDD_II_6<<<num_blocks, threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianPDDD_IJ_6<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -3667,7 +3508,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianPDDD_II_7<<<num_blocks, threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianPDDD_IJ_7<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -3692,7 +3533,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianPDDD_II_8<<<num_blocks, threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianPDDD_IJ_8<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -3717,7 +3558,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianPDDD_II_9<<<num_blocks, threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianPDDD_IJ_9<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -3742,7 +3583,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianPDDD_II_10<<<num_blocks, threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianPDDD_IJ_10<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -3767,7 +3608,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianPDDD_II_11<<<num_blocks, threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianPDDD_IJ_11<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -3792,7 +3633,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianPDDD_II_12<<<num_blocks, threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianPDDD_IJ_12<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -3817,7 +3658,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianPDDD_II_13<<<num_blocks, threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianPDDD_IJ_13<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -3842,7 +3683,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianPDDD_II_14<<<num_blocks, threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianPDDD_IJ_14<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -3867,7 +3708,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianPDDD_II_15<<<num_blocks, threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianPDDD_IJ_15<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -3892,7 +3733,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianPDDD_II_16<<<num_blocks, threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianPDDD_IJ_16<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -3917,7 +3758,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianPDDD_II_17<<<num_blocks, threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianPDDD_IJ_17<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -3942,7 +3783,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianPDDD_II_18<<<num_blocks, threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianPDDD_IJ_18<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -3967,7 +3808,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianPDDD_II_19<<<num_blocks, threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianPDDD_IJ_19<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -4517,7 +4358,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombHessianDDSS_II_0<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDSS_IJ_0<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -4585,7 +4426,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombHessianDDSP_II_0<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDSP_IJ_0<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -4655,7 +4496,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombHessianDDSD_II_0<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDSD_IJ_0<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -4680,7 +4521,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDSD_II_1<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDSD_IJ_1<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -4705,7 +4546,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDSD_II_2<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDSD_IJ_2<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -4730,7 +4571,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDSD_II_3<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDSD_IJ_3<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -4755,7 +4596,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDSD_II_4<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDSD_IJ_4<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -4780,7 +4621,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDSD_II_5<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDSD_IJ_5<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -4805,7 +4646,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDSD_II_6<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDSD_IJ_6<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5023,7 +4864,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombHessianDDPP_II_0<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDPP_IJ_0<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5048,7 +4889,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDPP_II_1<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDPP_IJ_1<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5073,7 +4914,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDPP_II_2<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDPP_IJ_2<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5098,7 +4939,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDPP_II_3<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDPP_IJ_3<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5123,7 +4964,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDPP_II_4<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDPP_IJ_4<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5148,7 +4989,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDPP_II_5<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDPP_IJ_5<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5173,7 +5014,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDPP_II_6<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDPP_IJ_6<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5198,7 +5039,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDPP_II_7<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDPP_IJ_7<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5441,7 +5282,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombHessianDDPD_II_0<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDPD_IJ_0<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5466,7 +5307,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDPD_II_1<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDPD_IJ_1<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5491,7 +5332,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDPD_II_2<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDPD_IJ_2<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5516,7 +5357,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDPD_II_3<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDPD_IJ_3<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5541,7 +5382,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDPD_II_4<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDPD_IJ_4<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5566,7 +5407,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDPD_II_5<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDPD_IJ_5<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5591,7 +5432,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDPD_II_6<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDPD_IJ_6<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5616,7 +5457,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDPD_II_7<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDPD_IJ_7<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5641,7 +5482,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDPD_II_8<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDPD_IJ_8<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5666,7 +5507,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDPD_II_9<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDPD_IJ_9<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5691,7 +5532,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDPD_II_10<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDPD_IJ_10<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5716,7 +5557,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDPD_II_11<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDPD_IJ_11<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5741,7 +5582,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDPD_II_12<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDPD_IJ_12<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5766,7 +5607,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDPD_II_13<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDPD_IJ_13<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5791,7 +5632,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDPD_II_14<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDPD_IJ_14<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5816,7 +5657,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDPD_II_15<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDPD_IJ_15<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5841,7 +5682,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDPD_II_16<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDPD_IJ_16<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5866,7 +5707,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDPD_II_17<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDPD_IJ_17<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5891,7 +5732,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDPD_II_18<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDPD_IJ_18<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -5916,7 +5757,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDPD_II_19<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDPD_IJ_19<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6459,7 +6300,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
 
             for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
             {
-                gpu::computeCoulombHessianDDDD_II_0<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_0<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6483,7 +6324,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_1<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_1<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6507,7 +6348,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_2<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_2<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6531,7 +6372,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_3<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_3<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6555,7 +6396,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_4<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_4<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6579,7 +6420,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_5<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_5<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6603,7 +6444,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_6<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_6<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6627,7 +6468,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_7<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_7<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6651,7 +6492,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_8<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_8<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6675,7 +6516,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_9<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_9<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6699,7 +6540,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_10<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_10<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6723,7 +6564,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_11<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_11<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6747,7 +6588,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_12<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_12<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6771,7 +6612,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_13<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_13<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6795,7 +6636,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_14<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_14<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6819,7 +6660,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_15<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_15<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6843,7 +6684,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_16<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_16<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6867,7 +6708,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_17<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_17<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6891,7 +6732,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_18<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_18<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6915,7 +6756,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_19<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_19<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6939,7 +6780,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_20<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_20<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6963,7 +6804,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_21<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_21<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -6987,7 +6828,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_22<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_22<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7011,7 +6852,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_23<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_23<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7035,7 +6876,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_24<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_24<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7059,7 +6900,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_25<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_25<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7083,7 +6924,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_26<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_26<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7107,7 +6948,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_27<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_27<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7131,7 +6972,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_28<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_28<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7155,7 +6996,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_29<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_29<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7179,7 +7020,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_30<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_30<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7203,7 +7044,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_31<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_31<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7227,7 +7068,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_32<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_32<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7251,7 +7092,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_33<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_33<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7275,7 +7116,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_34<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_34<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7299,7 +7140,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_35<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_35<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7323,7 +7164,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_36<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_36<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7347,7 +7188,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_37<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_37<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7371,7 +7212,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_38<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_38<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7395,7 +7236,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_39<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_39<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7419,7 +7260,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_40<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_40<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7443,7 +7284,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_41<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_41<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7467,7 +7308,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_42<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_42<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7491,7 +7332,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_43<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_43<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7515,7 +7356,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_44<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_44<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7539,7 +7380,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_45<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_45<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7563,7 +7404,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_46<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_46<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7587,7 +7428,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_47<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_47<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7611,7 +7452,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_48<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_48<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7635,7 +7476,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_49<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_49<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7659,7 +7500,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_50<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_50<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7683,7 +7524,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_51<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_51<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7707,7 +7548,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_52<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_52<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7731,7 +7572,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_53<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_53<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7755,7 +7596,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_54<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_54<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7779,7 +7620,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_55<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_55<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7803,7 +7644,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_56<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_56<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7827,7 +7668,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_57<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_57<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7851,7 +7692,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_58<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_58<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7875,7 +7716,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_59<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_59<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
@@ -7899,7 +7740,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
-                gpu::computeCoulombHessianDDDD_II_60<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                gpu::computeCoulombHessianDDDD_IJ_60<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                static_cast<uint32_t>(grad_cart_ind),
                                prefac_coulomb,
