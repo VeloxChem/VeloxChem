@@ -191,6 +191,32 @@ computeCoulombHessianSSPP_JJ_0(double*         hess_xy,
                                const double*   boys_func_ft,
                                const double    eri_threshold);
 
+__global__ void __launch_bounds__(TILE_SIZE_J)
+computeCoulombHessianSSSS_IJ_0(double*         hess_xy,
+                               double*         hess_yx,
+                               const uint32_t  hess_cart_ind_0,
+                               const uint32_t  hess_cart_ind_1,
+                               const double    prefac_coulomb,
+                               const double*   s_prim_info,
+                               const uint32_t  s_prim_count,
+                               const double*   ss_mat_D_local,
+                               const double*   ss_mat_D,
+                               const double*   ss_mat_Q_local,
+                               const double*   ss_mat_Q,
+                               const uint32_t* ss_first_inds_local,
+                               const uint32_t* ss_second_inds_local,
+                               const double*   ss_pair_data_local,
+                               const uint32_t  ss_prim_pair_count_local,
+                               const uint32_t* ss_first_inds,
+                               const uint32_t* ss_second_inds,
+                               const double*   ss_pair_data,
+                               const uint32_t  ss_prim_pair_count,
+                               const uint32_t* prim_cart_ao_to_atom_inds,
+                               const uint32_t  natoms,
+                               const double*   boys_func_table,
+                               const double*   boys_func_ft,
+                               const double    eri_threshold);
+
 }  // namespace gpu
 
 #endif
