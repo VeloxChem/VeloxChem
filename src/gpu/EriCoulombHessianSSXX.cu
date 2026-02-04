@@ -642,6 +642,9 @@ computeCoulombHessianSSSS_IK_0(double*         hess_xy,
                                const uint32_t  ss_prim_pair_count,
                                const uint32_t* prim_cart_ao_to_atom_inds,
                                const uint32_t  natoms,
+                               const uint32_t* d_kl_inds_for_atom_k,
+                               const uint32_t* d_kl_counts_for_atom_k,
+                               const uint32_t* d_kl_displs_for_atom_k,
                                const double*   boys_func_table,
                                const double*   boys_func_ft,
                                const double    eri_threshold)
@@ -703,9 +706,24 @@ computeCoulombHessianSSSS_IK_0(double*         hess_xy,
 
     }
 
-    for (uint32_t m = 0; m < (ss_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t atom_idx_k = 0; atom_idx_k < natoms; atom_idx_k++)
     {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+
+    __syncthreads();
+
+    const auto kl_pair_count = d_kl_counts_for_atom_k[atom_idx_k];
+    const auto kl_pair_displ = d_kl_displs_for_atom_k[atom_idx_k];
+
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    {
+        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+
+        if (kl_raw >= kl_pair_count) break;
+
+        // note non-coalesced read wrt kl
+        const uint32_t kl = d_kl_inds_for_atom_k[kl_pair_displ + kl_raw];
 
         if ((kl >= ss_prim_pair_count) || (ij >= ss_prim_pair_count_local) || (fabs(ss_mat_Q_local[ij] * ss_mat_Q[kl] * ss_mat_D[kl]) <= eri_threshold))
         {
@@ -794,12 +812,6 @@ computeCoulombHessianSSSS_IK_0(double*         hess_xy,
 
         ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * ss_mat_D[kl] * kl_factor;
 
-        double hess_ik_xy = eri_ijkl * ss_mat_D[kl] * kl_factor;
-
-        atomicAdd(
-            hess_xy + prim_cart_ao_to_atom_inds[i] * natoms + prim_cart_ao_to_atom_inds[k],
-            hess_ik_xy * ij_factor_D * 2.0 * prefac_coulomb);
-
     }
 
     __syncthreads();
@@ -812,6 +824,13 @@ computeCoulombHessianSSSS_IK_0(double*         hess_xy,
         {
             hess_ik_xy += ERIs[n][threadIdx.x];
         }
+
+        atomicAdd(
+            hess_xy + prim_cart_ao_to_atom_inds[i] * natoms + atom_idx_k,
+            hess_ik_xy * ij_factor_D * 2.0 * prefac_coulomb);
+    }
+
+    __syncthreads();
 
     }
 }
@@ -838,6 +857,9 @@ computeCoulombHessianSSSS_JK_0(double*         hess_xy,
                                const uint32_t  ss_prim_pair_count,
                                const uint32_t* prim_cart_ao_to_atom_inds,
                                const uint32_t  natoms,
+                               const uint32_t* d_kl_inds_for_atom_k,
+                               const uint32_t* d_kl_counts_for_atom_k,
+                               const uint32_t* d_kl_displs_for_atom_k,
                                const double*   boys_func_table,
                                const double*   boys_func_ft,
                                const double    eri_threshold)
@@ -899,9 +921,24 @@ computeCoulombHessianSSSS_JK_0(double*         hess_xy,
 
     }
 
-    for (uint32_t m = 0; m < (ss_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t atom_idx_k = 0; atom_idx_k < natoms; atom_idx_k++)
     {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+
+    __syncthreads();
+
+    const auto kl_pair_count = d_kl_counts_for_atom_k[atom_idx_k];
+    const auto kl_pair_displ = d_kl_displs_for_atom_k[atom_idx_k];
+
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    {
+        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+
+        if (kl_raw >= kl_pair_count) break;
+
+        // note non-coalesced read wrt kl
+        const uint32_t kl = d_kl_inds_for_atom_k[kl_pair_displ + kl_raw];
 
         if ((kl >= ss_prim_pair_count) || (ij >= ss_prim_pair_count_local) || (fabs(ss_mat_Q_local[ij] * ss_mat_Q[kl] * ss_mat_D[kl]) <= eri_threshold))
         {
@@ -990,17 +1027,6 @@ computeCoulombHessianSSSS_JK_0(double*         hess_xy,
 
         ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * ss_mat_D[kl] * kl_factor;
 
-        double hess_jk_xy = eri_ijkl * ss_mat_D[kl] * kl_factor;
-
-        atomicAdd(
-            hess_xy + prim_cart_ao_to_atom_inds[j] * natoms + prim_cart_ao_to_atom_inds[k],
-            hess_jk_xy * ij_factor_D * 2.0 * prefac_coulomb);
-
-        /*
-        atomicAdd(
-            hess_yx + prim_cart_ao_to_atom_inds[k] * natoms + prim_cart_ao_to_atom_inds[j],
-            hess_jk_xy * ij_factor_D * 2.0 * prefac_coulomb);
-        */
     }
 
     __syncthreads();
@@ -1013,6 +1039,13 @@ computeCoulombHessianSSSS_JK_0(double*         hess_xy,
         {
             hess_jk_xy += ERIs[n][threadIdx.x];
         }
+
+        atomicAdd(
+            hess_xy + prim_cart_ao_to_atom_inds[j] * natoms + atom_idx_k,
+            hess_jk_xy * ij_factor_D * 2.0 * prefac_coulomb);
+    }
+
+    __syncthreads();
 
     }
 }
@@ -1039,6 +1072,9 @@ computeCoulombHessianSSSS_IL_0(double*         hess_xy,
                                const uint32_t  ss_prim_pair_count,
                                const uint32_t* prim_cart_ao_to_atom_inds,
                                const uint32_t  natoms,
+                               const uint32_t* d_kl_inds_for_atom_l,
+                               const uint32_t* d_kl_counts_for_atom_l,
+                               const uint32_t* d_kl_displs_for_atom_l,
                                const double*   boys_func_table,
                                const double*   boys_func_ft,
                                const double    eri_threshold)
@@ -1100,9 +1136,24 @@ computeCoulombHessianSSSS_IL_0(double*         hess_xy,
 
     }
 
-    for (uint32_t m = 0; m < (ss_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t atom_idx_l = 0; atom_idx_l < natoms; atom_idx_l++)
     {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+
+    __syncthreads();
+
+    const auto kl_pair_count = d_kl_counts_for_atom_l[atom_idx_l];
+    const auto kl_pair_displ = d_kl_displs_for_atom_l[atom_idx_l];
+
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    {
+        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+
+        if (kl_raw >= kl_pair_count) break;
+
+        // note non-coalesced read wrt kl
+        const uint32_t kl = d_kl_inds_for_atom_l[kl_pair_displ + kl_raw];
 
         if ((kl >= ss_prim_pair_count) || (ij >= ss_prim_pair_count_local) || (fabs(ss_mat_Q_local[ij] * ss_mat_Q[kl] * ss_mat_D[kl]) <= eri_threshold))
         {
@@ -1191,12 +1242,6 @@ computeCoulombHessianSSSS_IL_0(double*         hess_xy,
 
         ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * ss_mat_D[kl] * kl_factor;
 
-        double hess_il_xy = eri_ijkl * ss_mat_D[kl] * kl_factor;
-
-        atomicAdd(
-            hess_xy + prim_cart_ao_to_atom_inds[i] * natoms + prim_cart_ao_to_atom_inds[l],
-            hess_il_xy * ij_factor_D * 2.0 * prefac_coulomb);
-
     }
 
     __syncthreads();
@@ -1209,6 +1254,13 @@ computeCoulombHessianSSSS_IL_0(double*         hess_xy,
         {
             hess_il_xy += ERIs[n][threadIdx.x];
         }
+
+        atomicAdd(
+            hess_xy + prim_cart_ao_to_atom_inds[i] * natoms + atom_idx_l,
+            hess_il_xy * ij_factor_D * 2.0 * prefac_coulomb);
+    }
+
+    __syncthreads();
 
     }
 }
@@ -1235,6 +1287,9 @@ computeCoulombHessianSSSS_JL_0(double*         hess_xy,
                                const uint32_t  ss_prim_pair_count,
                                const uint32_t* prim_cart_ao_to_atom_inds,
                                const uint32_t  natoms,
+                               const uint32_t* d_kl_inds_for_atom_l,
+                               const uint32_t* d_kl_counts_for_atom_l,
+                               const uint32_t* d_kl_displs_for_atom_l,
                                const double*   boys_func_table,
                                const double*   boys_func_ft,
                                const double    eri_threshold)
@@ -1295,10 +1350,24 @@ computeCoulombHessianSSSS_JL_0(double*         hess_xy,
 
 
     }
-
-    for (uint32_t m = 0; m < (ss_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t atom_idx_l = 0; atom_idx_l < natoms; atom_idx_l++)
     {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+
+    __syncthreads();
+
+    const auto kl_pair_count = d_kl_counts_for_atom_l[atom_idx_l];
+    const auto kl_pair_displ = d_kl_displs_for_atom_l[atom_idx_l];
+
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    {
+        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+
+        if (kl_raw >= kl_pair_count) break;
+
+        // note non-coalesced read wrt kl
+        const uint32_t kl = d_kl_inds_for_atom_l[kl_pair_displ + kl_raw];
 
         if ((kl >= ss_prim_pair_count) || (ij >= ss_prim_pair_count_local) || (fabs(ss_mat_Q_local[ij] * ss_mat_Q[kl] * ss_mat_D[kl]) <= eri_threshold))
         {
@@ -1387,12 +1456,6 @@ computeCoulombHessianSSSS_JL_0(double*         hess_xy,
 
         ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * ss_mat_D[kl] * kl_factor;
 
-        double hess_jl_xy = eri_ijkl * ss_mat_D[kl] * kl_factor;
-
-        atomicAdd(
-            hess_xy + prim_cart_ao_to_atom_inds[j] * natoms + prim_cart_ao_to_atom_inds[l],
-            hess_jl_xy * ij_factor_D * 2.0 * prefac_coulomb);
-
     }
 
     __syncthreads();
@@ -1405,6 +1468,13 @@ computeCoulombHessianSSSS_JL_0(double*         hess_xy,
         {
             hess_jl_xy += ERIs[n][threadIdx.x];
         }
+
+        atomicAdd(
+            hess_xy + prim_cart_ao_to_atom_inds[j] * natoms + atom_idx_l,
+            hess_jl_xy * ij_factor_D * 2.0 * prefac_coulomb);
+    }
+
+    __syncthreads();
 
     }
 }
