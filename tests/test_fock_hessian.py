@@ -6,6 +6,7 @@ from veloxchem.veloxchemlib import AODensityMatrix, denmat
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.veloxchemlib import compute_fock_hessian_gpu_2000
 from veloxchem.veloxchemlib import compute_fock_hessian_gpu_1100
+from veloxchem.veloxchemlib import compute_fock_hessian_gpu_1010
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
@@ -74,6 +75,20 @@ class TestFockHessian:
 
             if scf_drv.rank == 0:
                 assert np.max(np.abs(fock_hess_1100 - ref_hessian)) < tol
+
+        elif hessian_flag == 'hessian_1010':
+
+            fock_hess_1010 = compute_fock_hessian_gpu_1010(
+                mol, bas, dmat, coulomb_coef, [exchange_coef], [omega], 'symm',
+                1e-12, 5e-6, grad_screener)
+
+            fock_hess_1010 = fock_hess_1010.to_numpy()
+
+            fock_hess_1010 = scf_drv.comm.reduce(fock_hess_1010,
+                                                 root=mpi_master())
+
+            if scf_drv.rank == 0:
+                assert np.max(np.abs(fock_hess_1010 - ref_hessian)) < tol
 
     def test_fock_hessian_methanol(self):
 
@@ -337,3 +352,106 @@ class TestFockHessian:
 
         self.run_fock_hessian(mol, bas, coulomb_coef, exchange_coef,
                               'hessian_1100', ref_hessian_1100, 1e-5)
+
+        ref_hessian_1010_triu = np.array([
+            [
+                0.533073, 0.006574, -0., 0.006574, 0.265546, 0., -0., 0.,
+                0.271104
+            ],
+            [
+                -0.203544, 0.007639, -0., -0.006466, 0.200808, 0., 0., 0.,
+                0.205471
+            ],
+            [
+                -0.030848, 0.020435, -0., -0.014456, 0.042545, 0., -0., -0.,
+                0.044815
+            ],
+            [
+                -0.029589, -0.021513, -0., 0.015896, 0.035235, 0., -0., 0.,
+                0.045127
+            ],
+            [
+                0.012965, 0.030601, 0.063905, 0.003616, -0.023784, -0.024838,
+                0.000458, -0.004564, 0.014662
+            ],
+            [
+                0.012965, 0.030601, -0.063905, 0.003616, -0.023784, 0.024838,
+                -0.000458, 0.004564, 0.014662
+            ],
+            [
+                0.512113, -0.004205, 0., -0.004205, 0.336133, 0., 0., 0.,
+                0.341181
+            ],
+            [
+                -0.037992, -0.079709, 0., -0.005137, 0.021602, 0., -0., -0.,
+                0.020971
+            ],
+            [
+                -0.040136, 0.079066, 0., 0.005833, 0.016273, 0., -0., 0.,
+                0.021136
+            ],
+            [
+                0.014067, -0.022209, -0.04023, -0.006431, -0.026372, -0.028511,
+                -0.000764, -0.005014, 0.016173
+            ],
+            [
+                0.014067, -0.022209, 0.04023, -0.006431, -0.026372, 0.028511,
+                0.000764, 0.005014, 0.016173
+            ],
+            [
+                0.254012, -0.027096, -0., -0.027096, 0.480609, -0., -0., -0.,
+                0.269229
+            ],
+            [
+                0.170582, 0.035982, -0., -0.034387, -0.168898, -0., -0., 0.,
+                0.18306
+            ],
+            [
+                -0.000447, 0.00803, 0.001633, 0.005623, 0.004249, 0.018476,
+                0.002114, -0.002112, 0.010336
+            ],
+            [
+                -0.000447, 0.00803, -0.001633, 0.005623, 0.004249, -0.018476,
+                -0.002114, 0.002112, 0.010336
+            ],
+            [
+                0.251653, 0.025649, -0., 0.025649, 0.476909, 0., -0., 0.,
+                0.266162
+            ],
+            [
+                0.00183, 0.003839, -0.002001, 0.020273, -0.016, -0.049989,
+                0.001016, -0.001272, 0.006665
+            ],
+            [
+                0.00183, 0.003839, 0.002001, 0.020273, -0.016, 0.049989,
+                -0.001016, 0.001272, 0.006665
+            ],
+            [
+                0.267047, 0.000103, 0.000134, 0.000103, 0.263159, -0.00516,
+                0.000134, -0.00516, 0.477973
+            ],
+            [
+                0.183963, 0.000092, -0.000171, 0.000092, 0.180517, 0.006794,
+                0.000171, -0.006794, -0.168694
+            ],
+            [
+                0.267047, 0.000103, -0.000134, 0.000103, 0.263159, 0.00516,
+                -0.000134, 0.00516, 0.477973
+            ],
+        ])
+
+        natoms = mol.number_of_atoms()
+        ref_hessian_1010 = np.zeros((natoms, natoms, 3, 3))
+
+        ij_index = 0
+        for i in range(natoms):
+            for j in range(i, natoms):
+                hess_ij = ref_hessian_1010_triu[ij_index]
+                ref_hessian_1010[i, j] = hess_ij.reshape(3, 3)
+                ref_hessian_1010[j, i] = hess_ij.reshape(3, 3).T
+                ij_index += 1
+
+        ref_hessian_1010 = ref_hessian_1010.reshape(natoms * natoms, 3 * 3)
+
+        self.run_fock_hessian(mol, bas, coulomb_coef, exchange_coef,
+                              'hessian_1010', ref_hessian_1010, 1e-5)

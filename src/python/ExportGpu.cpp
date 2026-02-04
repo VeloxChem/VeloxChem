@@ -45,6 +45,7 @@
 #include "FockGradientDriverGPU.hpp"
 #include "FockHessianDriverGPU.hpp"
 #include "FockHessianDriverGPU_1100.hpp"
+#include "FockHessianDriverGPU_1010.hpp"
 #include "GpuDevices.hpp"
 #include "LinearAlgebraGPU.hpp"
 #include "ScreeningData.hpp"
@@ -369,6 +370,7 @@ export_gpu(py::module& m)
 
     m.def("compute_fock_hessian_gpu_2000", &gpu::computeFockHessianOnGPU_2000, "Computes Fock Hessian (20|00) using GPU.");
     m.def("compute_fock_hessian_gpu_1100", &gpu::computeFockHessianOnGPU_1100, "Computes Fock Hessian (11|00) using GPU.");
+    m.def("compute_fock_hessian_gpu_1010", &gpu::computeFockHessianOnGPU_1010, "Computes Fock Hessian (10|10) using GPU.");
 
     m.def("transform_density", &gpu::transformDensity, "Transforms density matrix (spherical to Cartesian).");
 
