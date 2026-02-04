@@ -482,10 +482,14 @@ class CGradientScreeningData
                               const int64_t naos,
                               const double* dens_ptr) -> void;
 
-    auto update_kl_vectors(const int64_t                natoms,
-                           const int64_t                kl_prim_pair_count,
+    auto update_kl_vectors(const uint32_t               natoms,
+                           const uint32_t               kl_prim_pair_count,
                            const std::vector<uint32_t>& kl_first_inds,
                            const std::vector<uint32_t>& kl_second_inds,
+                           const uint32_t               k_prim_count,
+                           const uint32_t               l_prim_count,
+                           const std::string&           k_prim_type,
+                           const std::string&           l_prim_type,
                            const std::vector<uint32_t>& k_prim_aoinds,
                            const std::vector<uint32_t>& l_prim_aoinds,
                            const std::vector<uint32_t>& cart_ao_to_atom_inds,
