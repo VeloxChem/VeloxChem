@@ -567,6 +567,13 @@ computeFockHessianOnGPU_1010(const              CMolecule& molecule,
 
     std::vector<double> mat_J(max_prim_pair_count_local);
 
+    std::vector<uint32_t> kl_inds_for_atom_k(max_prim_pair_count);
+    std::vector<uint32_t> kl_inds_for_atom_l(max_prim_pair_count);
+    std::vector<uint32_t> kl_counts_for_atom_k(natoms);
+    std::vector<uint32_t> kl_counts_for_atom_l(natoms);
+    std::vector<uint32_t> kl_displs_for_atom_k(natoms);
+    std::vector<uint32_t> kl_displs_for_atom_l(natoms);
+
     // sorted Q, D, and indices on device
 
     uint32_t *d_prim_cart_ao_to_atom_inds;
@@ -596,6 +603,13 @@ computeFockHessianOnGPU_1010(const              CMolecule& molecule,
 
     double *d_ss_pair_data_local, *d_sp_pair_data_local, *d_sd_pair_data_local,
            *d_pp_pair_data_local, *d_pd_pair_data_local, *d_dd_pair_data_local;
+
+    uint32_t* d_kl_inds_for_atom_k;
+    uint32_t* d_kl_inds_for_atom_l;
+    uint32_t* d_kl_counts_for_atom_k;
+    uint32_t* d_kl_counts_for_atom_l;
+    uint32_t* d_kl_displs_for_atom_k;
+    uint32_t* d_kl_displs_for_atom_l;
 
     gpuSafe(gpuMallocAsync(&d_prim_cart_ao_to_atom_inds, all_prim_count * sizeof(uint32_t), stream));
 
@@ -671,6 +685,13 @@ computeFockHessianOnGPU_1010(const              CMolecule& molecule,
     gpuSafe(gpuMallocAsync(&d_pp_pair_data_local, pp_pair_data_local.size() * sizeof(double), stream));
     gpuSafe(gpuMallocAsync(&d_pd_pair_data_local, pd_pair_data_local.size() * sizeof(double), stream));
     gpuSafe(gpuMallocAsync(&d_dd_pair_data_local, dd_pair_data_local.size() * sizeof(double), stream));
+
+    gpuSafe(gpuMallocAsync(&d_kl_inds_for_atom_k,   static_cast<size_t>(max_prim_pair_count) * sizeof(uint32_t), stream));
+    gpuSafe(gpuMallocAsync(&d_kl_counts_for_atom_k, static_cast<size_t>(natoms)              * sizeof(uint32_t), stream));
+    gpuSafe(gpuMallocAsync(&d_kl_displs_for_atom_k, static_cast<size_t>(natoms)              * sizeof(uint32_t), stream));
+    gpuSafe(gpuMallocAsync(&d_kl_inds_for_atom_l,   static_cast<size_t>(max_prim_pair_count) * sizeof(uint32_t), stream));
+    gpuSafe(gpuMallocAsync(&d_kl_counts_for_atom_l, static_cast<size_t>(natoms)              * sizeof(uint32_t), stream));
+    gpuSafe(gpuMallocAsync(&d_kl_displs_for_atom_l, static_cast<size_t>(natoms)              * sizeof(uint32_t), stream));
 
     gpuSafe(gpuMemcpyAsync(d_ss_mat_Q, ss_mat_Q.data(), ss_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
     gpuSafe(gpuMemcpyAsync(d_sp_mat_Q, sp_mat_Q.data(), sp_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
@@ -835,15 +856,6 @@ computeFockHessianOnGPU_1010(const              CMolecule& molecule,
         {
             gpuSafe(gpuMemcpyAsync(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-            std::vector<uint32_t> kl_inds_for_atom_k;
-            std::vector<uint32_t> kl_inds_for_atom_l;
-
-            std::vector<uint32_t> kl_counts_for_atom_k (natoms);
-            std::vector<uint32_t> kl_counts_for_atom_l (natoms);
-
-            std::vector<uint32_t> kl_displs_for_atom_k (natoms);
-            std::vector<uint32_t> kl_displs_for_atom_l (natoms);
-
             screening.update_kl_vectors(natoms,
                                         ss_prim_pair_count,
                                         ss_first_inds,
@@ -857,20 +869,6 @@ computeFockHessianOnGPU_1010(const              CMolecule& molecule,
                                         kl_counts_for_atom_l,
                                         kl_displs_for_atom_k,
                                         kl_displs_for_atom_l);
-
-            uint32_t* d_kl_inds_for_atom_k;
-            uint32_t* d_kl_inds_for_atom_l;
-            uint32_t* d_kl_counts_for_atom_k;
-            uint32_t* d_kl_counts_for_atom_l;
-            uint32_t* d_kl_displs_for_atom_k;
-            uint32_t* d_kl_displs_for_atom_l;
-
-            gpuSafe(gpuMallocAsync(&d_kl_inds_for_atom_k,   kl_inds_for_atom_k.size()   * sizeof(uint32_t), stream));
-            gpuSafe(gpuMallocAsync(&d_kl_counts_for_atom_k, kl_counts_for_atom_k.size() * sizeof(uint32_t), stream));
-            gpuSafe(gpuMallocAsync(&d_kl_displs_for_atom_k, kl_displs_for_atom_k.size() * sizeof(uint32_t), stream));
-            gpuSafe(gpuMallocAsync(&d_kl_inds_for_atom_l,   kl_inds_for_atom_l.size()   * sizeof(uint32_t), stream));
-            gpuSafe(gpuMallocAsync(&d_kl_counts_for_atom_l, kl_counts_for_atom_l.size() * sizeof(uint32_t), stream));
-            gpuSafe(gpuMallocAsync(&d_kl_displs_for_atom_l, kl_displs_for_atom_l.size() * sizeof(uint32_t), stream));
 
             gpuSafe(gpuMemcpyAsync(d_kl_inds_for_atom_k,   kl_inds_for_atom_k.data(),   kl_inds_for_atom_k.size()   * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             gpuSafe(gpuMemcpyAsync(d_kl_counts_for_atom_k, kl_counts_for_atom_k.data(), kl_counts_for_atom_k.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
@@ -1002,15 +1000,6 @@ computeFockHessianOnGPU_1010(const              CMolecule& molecule,
             // Note: d_mat_D is reused in subsequent kernels
             //       so we need to sync stream here
             //       otherwise it may be overwritten
-            gpuSafe(gpuStreamSynchronize(stream));
-
-            gpuSafe(gpuFree(d_kl_inds_for_atom_k  ));
-            gpuSafe(gpuFree(d_kl_counts_for_atom_k));
-            gpuSafe(gpuFree(d_kl_displs_for_atom_k));
-            gpuSafe(gpuFree(d_kl_inds_for_atom_l  ));
-            gpuSafe(gpuFree(d_kl_counts_for_atom_l));
-            gpuSafe(gpuFree(d_kl_displs_for_atom_l));
-
             gpuSafe(gpuStreamSynchronize(stream));
         }
 
@@ -9477,6 +9466,13 @@ computeFockHessianOnGPU_1010(const              CMolecule& molecule,
     gpuSafe(gpuFreeAsync(d_pp_pair_data_local, stream));
     gpuSafe(gpuFreeAsync(d_pd_pair_data_local, stream));
     gpuSafe(gpuFreeAsync(d_dd_pair_data_local, stream));
+
+    gpuSafe(gpuFree(d_kl_inds_for_atom_k  ));
+    gpuSafe(gpuFree(d_kl_counts_for_atom_k));
+    gpuSafe(gpuFree(d_kl_displs_for_atom_k));
+    gpuSafe(gpuFree(d_kl_inds_for_atom_l  ));
+    gpuSafe(gpuFree(d_kl_counts_for_atom_l));
+    gpuSafe(gpuFree(d_kl_displs_for_atom_l));
 
     gpuSafe(gpuStreamSynchronize(stream));
 

@@ -3886,15 +3886,12 @@ auto CGradientScreeningData::update_kl_vectors(const int64_t                nato
     }
 
     // update these vectors
-    // kl_inds_for_atom_k
-    // kl_inds_for_atom_l
+    // kl_inds_for_atom_k (max_prim_pair_count)
+    // kl_inds_for_atom_l (max_prim_pair_count)
     // kl_counts_for_atom_k (natoms)
     // kl_counts_for_atom_l (natoms)
     // kl_displs_for_atom_k (natoms)
     // kl_displs_for_atom_l (natoms)
-
-    kl_inds_for_atom_k.resize(atom_k_pair_count);
-    kl_inds_for_atom_l.resize(atom_l_pair_count);
 
     for (int64_t a = 0, displ_k = 0, displ_l = 0; a < natoms; a++)
     {
