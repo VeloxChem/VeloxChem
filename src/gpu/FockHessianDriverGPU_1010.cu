@@ -835,33 +835,6 @@ computeFockHessianOnGPU_1010(const              CMolecule& molecule,
         {
             gpuSafe(gpuMemcpyAsync(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-            std::vector<std::vector<uint32_t>> atom_k_pair_kl(natoms);
-            std::vector<std::vector<uint32_t>> atom_l_pair_kl(natoms);
-
-            for (int64_t kl = 0; kl < ss_prim_pair_count; kl++)
-            {
-                const auto k = ss_first_inds[kl];
-                const auto l = ss_second_inds[kl];
-
-                const auto k_cgto = s_prim_aoinds[k];
-                const auto l_cgto = s_prim_aoinds[l];
-
-                const auto atom_k = static_cast<uint32_t>(cart_ao_to_atom_inds[k_cgto]);
-                const auto atom_l = static_cast<uint32_t>(cart_ao_to_atom_inds[l_cgto]);
-
-                atom_k_pair_kl[atom_k].push_back(kl);
-                atom_l_pair_kl[atom_l].push_back(kl);
-            }
-
-            int64_t atom_k_pair_count = 0;
-            int64_t atom_l_pair_count = 0;
-
-            for (int64_t a = 0; a < natoms; a++)
-            {
-                atom_k_pair_count += static_cast<int64_t>(atom_k_pair_kl[a].size());
-                atom_l_pair_count += static_cast<int64_t>(atom_l_pair_kl[a].size());
-            }
-
             std::vector<uint32_t> kl_inds_for_atom_k;
             std::vector<uint32_t> kl_inds_for_atom_l;
 
@@ -871,17 +844,19 @@ computeFockHessianOnGPU_1010(const              CMolecule& molecule,
             std::vector<uint32_t> kl_displs_for_atom_k (natoms);
             std::vector<uint32_t> kl_displs_for_atom_l (natoms);
 
-            for (int64_t a = 0; a < natoms; a++)
-            {
-                kl_displs_for_atom_k[a] = static_cast<uint32_t>(kl_inds_for_atom_k.size());
-                kl_displs_for_atom_l[a] = static_cast<uint32_t>(kl_inds_for_atom_l.size());
-
-                kl_counts_for_atom_k[a] = static_cast<uint32_t>(atom_k_pair_kl[a].size());
-                kl_counts_for_atom_l[a] = static_cast<uint32_t>(atom_l_pair_kl[a].size());
-
-                kl_inds_for_atom_k.insert(kl_inds_for_atom_k.end(), atom_k_pair_kl[a].begin(), atom_k_pair_kl[a].end());
-                kl_inds_for_atom_l.insert(kl_inds_for_atom_l.end(), atom_l_pair_kl[a].begin(), atom_l_pair_kl[a].end());
-            }
+            screening.update_kl_vectors(natoms,
+                                        ss_prim_pair_count,
+                                        ss_first_inds,
+                                        ss_second_inds,
+                                        s_prim_aoinds,
+                                        s_prim_aoinds,
+                                        cart_ao_to_atom_inds,
+                                        kl_inds_for_atom_k,
+                                        kl_inds_for_atom_l,
+                                        kl_counts_for_atom_k,
+                                        kl_counts_for_atom_l,
+                                        kl_displs_for_atom_k,
+                                        kl_displs_for_atom_l);
 
             uint32_t* d_kl_inds_for_atom_k;
             uint32_t* d_kl_inds_for_atom_l;

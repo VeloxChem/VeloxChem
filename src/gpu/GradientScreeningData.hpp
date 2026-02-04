@@ -481,6 +481,20 @@ class CGradientScreeningData
                               const double Q_prime_thresh,
                               const int64_t naos,
                               const double* dens_ptr) -> void;
+
+    auto update_kl_vectors(const int64_t                natoms,
+                           const int64_t                kl_prim_pair_count,
+                           const std::vector<uint32_t>& kl_first_inds,
+                           const std::vector<uint32_t>& kl_second_inds,
+                           const std::vector<uint32_t>& k_prim_aoinds,
+                           const std::vector<uint32_t>& l_prim_aoinds,
+                           const std::vector<uint32_t>& cart_ao_to_atom_inds,
+                           std::vector<uint32_t>&       kl_inds_for_atom_k,
+                           std::vector<uint32_t>&       kl_inds_for_atom_l,
+                           std::vector<uint32_t>&       kl_counts_for_atom_k,
+                           std::vector<uint32_t>&       kl_counts_for_atom_l,
+                           std::vector<uint32_t>&       kl_displs_for_atom_k,
+                           std::vector<uint32_t>&       kl_displs_for_atom_l) -> void;
 };
 
 #endif /* GradientScreeningData_hpp */
