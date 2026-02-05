@@ -51,8 +51,8 @@ class EnvironmentDriver:
         The output stream.
 
     Instance variables:
-        - solvent_pe_models: Dictionary containing solvent PE model parameters.
-        - solvent_npe_models: Dictionary containing solvent NPE model parameters.
+        - pe_models: Dictionary containing solvent PE model parameters.
+        - npe_models: Dictionary containing solvent NPE model parameters.
         - pe_model: PE model name.
         - npe_model: NPE model name.
     """
@@ -84,27 +84,32 @@ class EnvironmentDriver:
         sep_parameters_file = db_dir / "pe_sep.csv"
         cp3_parameters_file = db_dir / "pe_cp3.csv"
         tip3p_parameters_file = db_dir / "npe_tip3p.csv"
+        ff19sb_parameters_file = db_dir / "npe_ff19sb.csv"
 
 
         if self.rank == mpi_master():
             self._sep_db = self._load_pe_db(sep_parameters_file)
             self._cp3_db = self._load_pe_db(cp3_parameters_file)
             self._tip3p_db = self._load_npe_db(tip3p_parameters_file)
+            self._ff19sb_db = self._load_npe_db(ff19sb_parameters_file)
         else:
             self._sep_db = None
             self._cp3_db = None
             self._tip3p_db = None
+            self._ff19sb_db = None
 
         self._sep_db = self.comm.bcast(self._sep_db, root=mpi_master())
         self._cp3_db = self.comm.bcast(self._cp3_db, root=mpi_master())
         self._tip3p_db = self.comm.bcast(self._tip3p_db, root=mpi_master())
+        self._ff19sb_db = self.comm.bcast(self._ff19sb_db, root=mpi_master())
 
-        self.solvent_pe_models = {
+        self.pe_models = {
             "SEP": {"db": self._sep_db},
             "CP3": {"db": self._cp3_db},
         }
-        self.solvent_npe_models = {
+        self.npe_models = {
             "tip3p": {"db": self._tip3p_db},
+            "ff19sb": {"db": self._ff19sb_db},
         }
 
         self.pe_model = None
@@ -186,6 +191,7 @@ class EnvironmentDriver:
                         raise ValueError(f"Inconsistent duplicate entries for {resn}/{atom} in {csv_path}")
                 rdb[atom] = {"element": elem, "charge": q}
         return db
+
     def set_env_models(self,
                        pe_model: str,
                        npe_model: str):
@@ -201,17 +207,17 @@ class EnvironmentDriver:
         :raises KeyError:
             If an unknown model name is requested.
         """
-        if pe_model not in self.solvent_pe_models:
+        if pe_model not in self.pe_models:
             raise KeyError(
-                f"Unknown PE model '{pe_model}'. Available: {sorted(self.solvent_pe_models)}"
+                f"Unknown PE model '{pe_model}'. Available: {sorted(self.pe_models)}"
             )
-        if npe_model not in self.solvent_npe_models:
+        if npe_model not in self.npe_models:
             raise KeyError(
-                f"Unknown NPE model '{npe_model}'. Available: {sorted(self.solvent_npe_models)}"
+                f"Unknown NPE model '{npe_model}'. Available: {sorted(self.npe_models)}"
             )
         
-        self.pe_model = self.solvent_pe_models[pe_model]
-        self.npe_model = self.solvent_npe_models[npe_model]
+        self.pe_model = self.pe_models[pe_model]
+        self.npe_model = self.npe_models[npe_model]
         return self.pe_model, self.npe_model
     
     @staticmethod

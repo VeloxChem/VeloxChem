@@ -1,0 +1,1283 @@
+molecule,res_name,atom_name,element,M0
+alanine,ALA,N,N,-0.4157
+alanine,ALA,H,H,0.2719
+alanine,ALA,CA,C,0.0337
+alanine,ALA,HA,H,0.0823
+alanine,ALA,CB,C,-0.1825
+alanine,ALA,HB1,H,0.0603
+alanine,ALA,HB2,H,0.0603
+alanine,ALA,HB3,H,0.0603
+alanine,ALA,C,C,0.5973
+alanine,ALA,O,O,-0.5679
+arginine,ARG,N,N,-0.3479
+arginine,ARG,H,H,0.2747
+arginine,ARG,CA,C,-0.2637
+arginine,ARG,HA,H,0.156
+arginine,ARG,CB,C,-0.0007
+arginine,ARG,HB2,H,0.0327
+arginine,ARG,HB3,H,0.0327
+arginine,ARG,CG,C,0.039
+arginine,ARG,HG2,H,0.0285
+arginine,ARG,HG3,H,0.0285
+arginine,ARG,CD,C,0.0486
+arginine,ARG,HD2,H,0.0687
+arginine,ARG,HD3,H,0.0687
+arginine,ARG,NE,N,-0.5295
+arginine,ARG,HE,H,0.3456
+arginine,ARG,CZ,C,0.8076
+arginine,ARG,NH1,N,-0.8627
+arginine,ARG,HH11,H,0.4478
+arginine,ARG,HH12,H,0.4478
+arginine,ARG,NH2,N,-0.8627
+arginine,ARG,HH21,H,0.4478
+arginine,ARG,HH22,H,0.4478
+arginine,ARG,C,C,0.7341
+arginine,ARG,O,O,-0.5894
+aspartic acid,ASH,N,N,-0.4157
+aspartic acid,ASH,H,H,0.2719
+aspartic acid,ASH,CA,C,0.0341
+aspartic acid,ASH,HA,H,0.0864
+aspartic acid,ASH,CB,C,-0.0316
+aspartic acid,ASH,HB2,H,0.0488
+aspartic acid,ASH,HB3,H,0.0488
+aspartic acid,ASH,CG,C,0.6462
+aspartic acid,ASH,OD1,O,-0.5554
+aspartic acid,ASH,OD2,O,-0.6376
+aspartic acid,ASH,HD2,H,0.4747
+aspartic acid,ASH,C,C,0.5973
+aspartic acid,ASH,O,O,-0.5679
+asparagine,ASN,N,N,-0.4157
+asparagine,ASN,H,H,0.2719
+asparagine,ASN,CA,C,0.0143
+asparagine,ASN,HA,H,0.1048
+asparagine,ASN,CB,C,-0.2041
+asparagine,ASN,HB2,H,0.0797
+asparagine,ASN,HB3,H,0.0797
+asparagine,ASN,CG,C,0.713
+asparagine,ASN,OD1,O,-0.5931
+asparagine,ASN,ND2,N,-0.9191
+asparagine,ASN,HD21,H,0.4196
+asparagine,ASN,HD22,H,0.4196
+asparagine,ASN,C,C,0.5973
+asparagine,ASN,O,O,-0.5679
+aspartate,ASP,N,N,-0.5163
+aspartate,ASP,H,H,0.2936
+aspartate,ASP,CA,C,0.0381
+aspartate,ASP,HA,H,0.088
+aspartate,ASP,CB,C,-0.0303
+aspartate,ASP,HB2,H,-0.0122
+aspartate,ASP,HB3,H,-0.0122
+aspartate,ASP,CG,C,0.7994
+aspartate,ASP,OD1,O,-0.8014
+aspartate,ASP,OD2,O,-0.8014
+aspartate,ASP,C,C,0.5366
+aspartate,ASP,O,O,-0.5819
+cysteine (thiolate),CYM,N,N,-0.4157
+cysteine (thiolate),CYM,H,H,0.2719
+cysteine (thiolate),CYM,CA,C,-0.0351
+cysteine (thiolate),CYM,HA,H,0.0508
+cysteine (thiolate),CYM,CB,C,-0.2413
+cysteine (thiolate),CYM,HB3,H,0.1122
+cysteine (thiolate),CYM,HB2,H,0.1122
+cysteine (thiolate),CYM,SG,S,-0.8844
+cysteine (thiolate),CYM,C,C,0.5973
+cysteine (thiolate),CYM,O,O,-0.5679
+cysteine,CYS,N,N,-0.4157
+cysteine,CYS,H,H,0.2719
+cysteine,CYS,CA,C,0.0213
+cysteine,CYS,HA,H,0.1124
+cysteine,CYS,CB,C,-0.1231
+cysteine,CYS,HB2,H,0.1112
+cysteine,CYS,HB3,H,0.1112
+cysteine,CYS,SG,S,-0.3119
+cysteine,CYS,HG,H,0.1933
+cysteine,CYS,C,C,0.5973
+cysteine,CYS,O,O,-0.5679
+cysteine (disulfide),CYX,N,N,-0.4157
+cysteine (disulfide),CYX,H,H,0.2719
+cysteine (disulfide),CYX,CA,C,0.0429
+cysteine (disulfide),CYX,HA,H,0.0766
+cysteine (disulfide),CYX,CB,C,-0.079
+cysteine (disulfide),CYX,HB2,H,0.091
+cysteine (disulfide),CYX,HB3,H,0.091
+cysteine (disulfide),CYX,SG,S,-0.1081
+cysteine (disulfide),CYX,C,C,0.5973
+cysteine (disulfide),CYX,O,O,-0.5679
+glutamic acid,GLH,N,N,-0.4157
+glutamic acid,GLH,H,H,0.2719
+glutamic acid,GLH,CA,C,0.0145
+glutamic acid,GLH,HA,H,0.0779
+glutamic acid,GLH,CB,C,-0.0071
+glutamic acid,GLH,HB2,H,0.0256
+glutamic acid,GLH,HB3,H,0.0256
+glutamic acid,GLH,CG,C,-0.0174
+glutamic acid,GLH,HG2,H,0.043
+glutamic acid,GLH,HG3,H,0.043
+glutamic acid,GLH,CD,C,0.6801
+glutamic acid,GLH,OE1,O,-0.5838
+glutamic acid,GLH,OE2,O,-0.6511
+glutamic acid,GLH,HE2,H,0.4641
+glutamic acid,GLH,C,C,0.5973
+glutamic acid,GLH,O,O,-0.5679
+glutamine,GLN,N,N,-0.4157
+glutamine,GLN,H,H,0.2719
+glutamine,GLN,CA,C,-0.0031
+glutamine,GLN,HA,H,0.085
+glutamine,GLN,CB,C,-0.0036
+glutamine,GLN,HB2,H,0.0171
+glutamine,GLN,HB3,H,0.0171
+glutamine,GLN,CG,C,-0.0645
+glutamine,GLN,HG2,H,0.0352
+glutamine,GLN,HG3,H,0.0352
+glutamine,GLN,CD,C,0.6951
+glutamine,GLN,OE1,O,-0.6086
+glutamine,GLN,NE2,N,-0.9407
+glutamine,GLN,HE21,H,0.4251
+glutamine,GLN,HE22,H,0.4251
+glutamine,GLN,C,C,0.5973
+glutamine,GLN,O,O,-0.5679
+glutamate,GLU,N,N,-0.5163
+glutamate,GLU,H,H,0.2936
+glutamate,GLU,CA,C,0.0397
+glutamate,GLU,HA,H,0.1105
+glutamate,GLU,CB,C,0.056
+glutamate,GLU,HB2,H,-0.0173
+glutamate,GLU,HB3,H,-0.0173
+glutamate,GLU,CG,C,0.0136
+glutamate,GLU,HG2,H,-0.0425
+glutamate,GLU,HG3,H,-0.0425
+glutamate,GLU,CD,C,0.8054
+glutamate,GLU,OE1,O,-0.8188
+glutamate,GLU,OE2,O,-0.8188
+glutamate,GLU,C,C,0.5366
+glutamate,GLU,O,O,-0.5819
+glycine,GLY,N,N,-0.4157
+glycine,GLY,H,H,0.2719
+glycine,GLY,CA,C,-0.0252
+glycine,GLY,HA2,H,0.0698
+glycine,GLY,HA3,H,0.0698
+glycine,GLY,C,C,0.5973
+glycine,GLY,O,O,-0.5679
+histidine (delta-protonated),HID,N,N,-0.4157
+histidine (delta-protonated),HID,H,H,0.2719
+histidine (delta-protonated),HID,CA,C,0.0188
+histidine (delta-protonated),HID,HA,H,0.0881
+histidine (delta-protonated),HID,CB,C,-0.0462
+histidine (delta-protonated),HID,HB2,H,0.0402
+histidine (delta-protonated),HID,HB3,H,0.0402
+histidine (delta-protonated),HID,CG,C,-0.0266
+histidine (delta-protonated),HID,ND1,N,-0.3811
+histidine (delta-protonated),HID,HD1,H,0.3649
+histidine (delta-protonated),HID,CE1,C,0.2057
+histidine (delta-protonated),HID,HE1,H,0.1392
+histidine (delta-protonated),HID,NE2,N,-0.5727
+histidine (delta-protonated),HID,CD2,C,0.1292
+histidine (delta-protonated),HID,HD2,H,0.1147
+histidine (delta-protonated),HID,C,C,0.5973
+histidine (delta-protonated),HID,O,O,-0.5679
+histidine (epsilon-protonated),HIE,N,N,-0.4157
+histidine (epsilon-protonated),HIE,H,H,0.2719
+histidine (epsilon-protonated),HIE,CA,C,-0.0581
+histidine (epsilon-protonated),HIE,HA,H,0.136
+histidine (epsilon-protonated),HIE,CB,C,-0.0074
+histidine (epsilon-protonated),HIE,HB2,H,0.0367
+histidine (epsilon-protonated),HIE,HB3,H,0.0367
+histidine (epsilon-protonated),HIE,CG,C,0.1868
+histidine (epsilon-protonated),HIE,ND1,N,-0.5432
+histidine (epsilon-protonated),HIE,CE1,C,0.1635
+histidine (epsilon-protonated),HIE,HE1,H,0.1435
+histidine (epsilon-protonated),HIE,NE2,N,-0.2795
+histidine (epsilon-protonated),HIE,HE2,H,0.3339
+histidine (epsilon-protonated),HIE,CD2,C,-0.2207
+histidine (epsilon-protonated),HIE,HD2,H,0.1862
+histidine (epsilon-protonated),HIE,C,C,0.5973
+histidine (epsilon-protonated),HIE,O,O,-0.5679
+histidine (doubly protonated),HIP,N,N,-0.3479
+histidine (doubly protonated),HIP,H,H,0.2747
+histidine (doubly protonated),HIP,CA,C,-0.1354
+histidine (doubly protonated),HIP,HA,H,0.1212
+histidine (doubly protonated),HIP,CB,C,-0.0414
+histidine (doubly protonated),HIP,HB2,H,0.081
+histidine (doubly protonated),HIP,HB3,H,0.081
+histidine (doubly protonated),HIP,CG,C,-0.0012
+histidine (doubly protonated),HIP,ND1,N,-0.1513
+histidine (doubly protonated),HIP,HD1,H,0.3866
+histidine (doubly protonated),HIP,CE1,C,-0.017
+histidine (doubly protonated),HIP,HE1,H,0.2681
+histidine (doubly protonated),HIP,NE2,N,-0.1718
+histidine (doubly protonated),HIP,HE2,H,0.3911
+histidine (doubly protonated),HIP,CD2,C,-0.1141
+histidine (doubly protonated),HIP,HD2,H,0.2317
+histidine (doubly protonated),HIP,C,C,0.7341
+histidine (doubly protonated),HIP,O,O,-0.5894
+HYP,HYP,N,N,-0.2548
+HYP,HYP,CD,C,0.0595
+HYP,HYP,HD22,H,0.07
+HYP,HYP,HD23,H,0.07
+HYP,HYP,CG,C,0.04
+HYP,HYP,HG,H,0.0416
+HYP,HYP,OD1,O,-0.6134
+HYP,HYP,HD1,H,0.3851
+HYP,HYP,CB,C,0.0203
+HYP,HYP,HB2,H,0.0426
+HYP,HYP,HB3,H,0.0426
+HYP,HYP,CA,C,0.0047
+HYP,HYP,HA,H,0.077
+HYP,HYP,C,C,0.5896
+HYP,HYP,O,O,-0.5748
+isoleucine,ILE,N,N,-0.4157
+isoleucine,ILE,H,H,0.2719
+isoleucine,ILE,CA,C,-0.0597
+isoleucine,ILE,HA,H,0.0869
+isoleucine,ILE,CB,C,0.1303
+isoleucine,ILE,HB,H,0.0187
+isoleucine,ILE,CG2,C,-0.3204
+isoleucine,ILE,HG21,H,0.0882
+isoleucine,ILE,HG22,H,0.0882
+isoleucine,ILE,HG23,H,0.0882
+isoleucine,ILE,CG1,C,-0.043
+isoleucine,ILE,HG12,H,0.0236
+isoleucine,ILE,HG13,H,0.0236
+isoleucine,ILE,CD1,C,-0.066
+isoleucine,ILE,HD11,H,0.0186
+isoleucine,ILE,HD12,H,0.0186
+isoleucine,ILE,HD13,H,0.0186
+isoleucine,ILE,C,C,0.5973
+isoleucine,ILE,O,O,-0.5679
+leucine,LEU,N,N,-0.4157
+leucine,LEU,H,H,0.2719
+leucine,LEU,CA,C,-0.0518
+leucine,LEU,HA,H,0.0922
+leucine,LEU,CB,C,-0.1102
+leucine,LEU,HB2,H,0.0457
+leucine,LEU,HB3,H,0.0457
+leucine,LEU,CG,C,0.3531
+leucine,LEU,HG,H,-0.0361
+leucine,LEU,CD1,C,-0.4121
+leucine,LEU,HD11,H,0.1
+leucine,LEU,HD12,H,0.1
+leucine,LEU,HD13,H,0.1
+leucine,LEU,CD2,C,-0.4121
+leucine,LEU,HD21,H,0.1
+leucine,LEU,HD22,H,0.1
+leucine,LEU,HD23,H,0.1
+leucine,LEU,C,C,0.5973
+leucine,LEU,O,O,-0.5679
+lysine (deprotonated),LYN,N,N,-0.4157
+lysine (deprotonated),LYN,H,H,0.2719
+lysine (deprotonated),LYN,CA,C,-0.07206
+lysine (deprotonated),LYN,HA,H,0.0994
+lysine (deprotonated),LYN,CB,C,-0.04845
+lysine (deprotonated),LYN,HB2,H,0.034
+lysine (deprotonated),LYN,HB3,H,0.034
+lysine (deprotonated),LYN,CG,C,0.06612
+lysine (deprotonated),LYN,HG2,H,0.01041
+lysine (deprotonated),LYN,HG3,H,0.01041
+lysine (deprotonated),LYN,CD,C,-0.03768
+lysine (deprotonated),LYN,HD2,H,0.01155
+lysine (deprotonated),LYN,HD3,H,0.01155
+lysine (deprotonated),LYN,CE,C,0.32604
+lysine (deprotonated),LYN,HE2,H,-0.03358
+lysine (deprotonated),LYN,HE3,H,-0.03358
+lysine (deprotonated),LYN,NZ,N,-1.03581
+lysine (deprotonated),LYN,HZ2,H,0.38604
+lysine (deprotonated),LYN,HZ3,H,0.38604
+lysine (deprotonated),LYN,C,C,0.5973
+lysine (deprotonated),LYN,O,O,-0.5679
+lysine,LYS,N,N,-0.3479
+lysine,LYS,H,H,0.2747
+lysine,LYS,CA,C,-0.24
+lysine,LYS,HA,H,0.1426
+lysine,LYS,CB,C,-0.0094
+lysine,LYS,HB2,H,0.0362
+lysine,LYS,HB3,H,0.0362
+lysine,LYS,CG,C,0.0187
+lysine,LYS,HG2,H,0.0103
+lysine,LYS,HG3,H,0.0103
+lysine,LYS,CD,C,-0.0479
+lysine,LYS,HD2,H,0.0621
+lysine,LYS,HD3,H,0.0621
+lysine,LYS,CE,C,-0.0143
+lysine,LYS,HE2,H,0.1135
+lysine,LYS,HE3,H,0.1135
+lysine,LYS,NZ,N,-0.3854
+lysine,LYS,HZ1,H,0.34
+lysine,LYS,HZ2,H,0.34
+lysine,LYS,HZ3,H,0.34
+lysine,LYS,C,C,0.7341
+lysine,LYS,O,O,-0.5894
+methionine,MET,N,N,-0.4157
+methionine,MET,H,H,0.2719
+methionine,MET,CA,C,-0.0237
+methionine,MET,HA,H,0.088
+methionine,MET,CB,C,0.0342
+methionine,MET,HB2,H,0.0241
+methionine,MET,HB3,H,0.0241
+methionine,MET,CG,C,0.0018
+methionine,MET,HG2,H,0.044
+methionine,MET,HG3,H,0.044
+methionine,MET,SD,S,-0.2737
+methionine,MET,CE,C,-0.0536
+methionine,MET,HE1,H,0.0684
+methionine,MET,HE2,H,0.0684
+methionine,MET,HE3,H,0.0684
+methionine,MET,C,C,0.5973
+methionine,MET,O,O,-0.5679
+phenylalanine,PHE,N,N,-0.4157
+phenylalanine,PHE,H,H,0.2719
+phenylalanine,PHE,CA,C,-0.0024
+phenylalanine,PHE,HA,H,0.0978
+phenylalanine,PHE,CB,C,-0.0343
+phenylalanine,PHE,HB2,H,0.0295
+phenylalanine,PHE,HB3,H,0.0295
+phenylalanine,PHE,CG,C,0.0118
+phenylalanine,PHE,CD1,C,-0.1256
+phenylalanine,PHE,HD1,H,0.133
+phenylalanine,PHE,CE1,C,-0.1704
+phenylalanine,PHE,HE1,H,0.143
+phenylalanine,PHE,CZ,C,-0.1072
+phenylalanine,PHE,HZ,H,0.1297
+phenylalanine,PHE,CE2,C,-0.1704
+phenylalanine,PHE,HE2,H,0.143
+phenylalanine,PHE,CD2,C,-0.1256
+phenylalanine,PHE,HD2,H,0.133
+phenylalanine,PHE,C,C,0.5973
+phenylalanine,PHE,O,O,-0.5679
+proline,PRO,N,N,-0.2548
+proline,PRO,CD,C,0.0192
+proline,PRO,HD2,H,0.0391
+proline,PRO,HD3,H,0.0391
+proline,PRO,CG,C,0.0189
+proline,PRO,HG2,H,0.0213
+proline,PRO,HG3,H,0.0213
+proline,PRO,CB,C,-0.007
+proline,PRO,HB2,H,0.0253
+proline,PRO,HB3,H,0.0253
+proline,PRO,CA,C,-0.0266
+proline,PRO,HA,H,0.0641
+proline,PRO,C,C,0.5896
+proline,PRO,O,O,-0.5748
+serine,SER,N,N,-0.4157
+serine,SER,H,H,0.2719
+serine,SER,CA,C,-0.0249
+serine,SER,HA,H,0.0843
+serine,SER,CB,C,0.2117
+serine,SER,HB2,H,0.0352
+serine,SER,HB3,H,0.0352
+serine,SER,OG,O,-0.6546
+serine,SER,HG,H,0.4275
+serine,SER,C,C,0.5973
+serine,SER,O,O,-0.5679
+threonine,THR,N,N,-0.4157
+threonine,THR,H,H,0.2719
+threonine,THR,CA,C,-0.0389
+threonine,THR,HA,H,0.1007
+threonine,THR,CB,C,0.3654
+threonine,THR,HB,H,0.0043
+threonine,THR,CG2,C,-0.2438
+threonine,THR,HG21,H,0.0642
+threonine,THR,HG22,H,0.0642
+threonine,THR,HG23,H,0.0642
+threonine,THR,OG1,O,-0.6761
+threonine,THR,HG1,H,0.4102
+threonine,THR,C,C,0.5973
+threonine,THR,O,O,-0.5679
+tryptophan,TRP,N,N,-0.4157
+tryptophan,TRP,H,H,0.2719
+tryptophan,TRP,CA,C,-0.0275
+tryptophan,TRP,HA,H,0.1123
+tryptophan,TRP,CB,C,-0.005
+tryptophan,TRP,HB2,H,0.0339
+tryptophan,TRP,HB3,H,0.0339
+tryptophan,TRP,CG,C,-0.1415
+tryptophan,TRP,CD1,C,-0.1638
+tryptophan,TRP,HD1,H,0.2062
+tryptophan,TRP,NE1,N,-0.3418
+tryptophan,TRP,HE1,H,0.3412
+tryptophan,TRP,CE2,C,0.138
+tryptophan,TRP,CZ2,C,-0.2601
+tryptophan,TRP,HZ2,H,0.1572
+tryptophan,TRP,CH2,C,-0.1134
+tryptophan,TRP,HH2,H,0.1417
+tryptophan,TRP,CZ3,C,-0.1972
+tryptophan,TRP,HZ3,H,0.1447
+tryptophan,TRP,CE3,C,-0.2387
+tryptophan,TRP,HE3,H,0.17
+tryptophan,TRP,CD2,C,0.1243
+tryptophan,TRP,C,C,0.5973
+tryptophan,TRP,O,O,-0.5679
+tyrosine,TYR,N,N,-0.4157
+tyrosine,TYR,H,H,0.2719
+tyrosine,TYR,CA,C,-0.0014
+tyrosine,TYR,HA,H,0.0876
+tyrosine,TYR,CB,C,-0.0152
+tyrosine,TYR,HB2,H,0.0295
+tyrosine,TYR,HB3,H,0.0295
+tyrosine,TYR,CG,C,-0.0011
+tyrosine,TYR,CD1,C,-0.1906
+tyrosine,TYR,HD1,H,0.1699
+tyrosine,TYR,CE1,C,-0.2341
+tyrosine,TYR,HE1,H,0.1656
+tyrosine,TYR,CZ,C,0.3226
+tyrosine,TYR,OH,O,-0.5579
+tyrosine,TYR,HH,H,0.3992
+tyrosine,TYR,CE2,C,-0.2341
+tyrosine,TYR,HE2,H,0.1656
+tyrosine,TYR,CD2,C,-0.1906
+tyrosine,TYR,HD2,H,0.1699
+tyrosine,TYR,C,C,0.5973
+tyrosine,TYR,O,O,-0.5679
+valine,VAL,N,N,-0.4157
+valine,VAL,H,H,0.2719
+valine,VAL,CA,C,-0.0875
+valine,VAL,HA,H,0.0969
+valine,VAL,CB,C,0.2985
+valine,VAL,HB,H,-0.0297
+valine,VAL,CG1,C,-0.3192
+valine,VAL,HG11,H,0.0791
+valine,VAL,HG12,H,0.0791
+valine,VAL,HG13,H,0.0791
+valine,VAL,CG2,C,-0.3192
+valine,VAL,HG21,H,0.0791
+valine,VAL,HG22,H,0.0791
+valine,VAL,HG23,H,0.0791
+valine,VAL,C,C,0.5973
+valine,VAL,O,O,-0.5679
+acetyl (N-terminus cap),ACE,H1,H,0.1123
+acetyl (N-terminus cap),ACE,CH3,C,-0.3662
+acetyl (N-terminus cap),ACE,H2,H,0.1123
+acetyl (N-terminus cap),ACE,H3,H,0.1123
+acetyl (N-terminus cap),ACE,C,C,0.5972
+acetyl (N-terminus cap),ACE,O,O,-0.5679
+alanine,NALA,N,N,0.1414
+alanine,NALA,H1,H,0.1997
+alanine,NALA,H2,H,0.1997
+alanine,NALA,H3,H,0.1997
+alanine,NALA,CA,C,0.0962
+alanine,NALA,HA,H,0.0889
+alanine,NALA,CB,C,-0.0597
+alanine,NALA,HB1,H,0.03
+alanine,NALA,HB2,H,0.03
+alanine,NALA,HB3,H,0.03
+alanine,NALA,C,C,0.6163
+alanine,NALA,O,O,-0.5722
+arginine,NARG,N,N,0.1305
+arginine,NARG,H1,H,0.2083
+arginine,NARG,H2,H,0.2083
+arginine,NARG,H3,H,0.2083
+arginine,NARG,CA,C,-0.0223
+arginine,NARG,HA,H,0.1242
+arginine,NARG,CB,C,0.0118
+arginine,NARG,HB2,H,0.0226
+arginine,NARG,HB3,H,0.0226
+arginine,NARG,CG,C,0.0236
+arginine,NARG,HG2,H,0.0309
+arginine,NARG,HG3,H,0.0309
+arginine,NARG,CD,C,0.0935
+arginine,NARG,HD2,H,0.0527
+arginine,NARG,HD3,H,0.0527
+arginine,NARG,NE,N,-0.565
+arginine,NARG,HE,H,0.3592
+arginine,NARG,CZ,C,0.8281
+arginine,NARG,NH1,N,-0.8693
+arginine,NARG,HH11,H,0.4494
+arginine,NARG,HH12,H,0.4494
+arginine,NARG,NH2,N,-0.8693
+arginine,NARG,HH21,H,0.4494
+arginine,NARG,HH22,H,0.4494
+arginine,NARG,C,C,0.7214
+arginine,NARG,O,O,-0.6013
+asparagine,NASN,N,N,0.1801
+asparagine,NASN,H1,H,0.1921
+asparagine,NASN,H2,H,0.1921
+asparagine,NASN,H3,H,0.1921
+asparagine,NASN,CA,C,0.0368
+asparagine,NASN,HA,H,0.1231
+asparagine,NASN,CB,C,-0.0283
+asparagine,NASN,HB2,H,0.0515
+asparagine,NASN,HB3,H,0.0515
+asparagine,NASN,CG,C,0.5833
+asparagine,NASN,OD1,O,-0.5744
+asparagine,NASN,ND2,N,-0.8634
+asparagine,NASN,HD21,H,0.4097
+asparagine,NASN,HD22,H,0.4097
+asparagine,NASN,C,C,0.6163
+asparagine,NASN,O,O,-0.5722
+aspartate,NASP,N,N,0.0782
+aspartate,NASP,H1,H,0.22
+aspartate,NASP,H2,H,0.22
+aspartate,NASP,H3,H,0.22
+aspartate,NASP,CA,C,0.0292
+aspartate,NASP,HA,H,0.1141
+aspartate,NASP,CB,C,-0.0235
+aspartate,NASP,HB2,H,-0.0169
+aspartate,NASP,HB3,H,-0.0169
+aspartate,NASP,CG,C,0.8194
+aspartate,NASP,OD1,O,-0.8084
+aspartate,NASP,OD2,O,-0.8084
+aspartate,NASP,C,C,0.5621
+aspartate,NASP,O,O,-0.5889
+cysteine,NCYS,N,N,0.1325
+cysteine,NCYS,H1,H,0.2023
+cysteine,NCYS,H2,H,0.2023
+cysteine,NCYS,H3,H,0.2023
+cysteine,NCYS,CA,C,0.0927
+cysteine,NCYS,HA,H,0.1411
+cysteine,NCYS,CB,C,-0.1195
+cysteine,NCYS,HB2,H,0.1188
+cysteine,NCYS,HB3,H,0.1188
+cysteine,NCYS,SG,S,-0.3298
+cysteine,NCYS,HG,H,0.1975
+cysteine,NCYS,C,C,0.6123
+cysteine,NCYS,O,O,-0.5713
+cysteine (disulfide),NCYX,N,N,0.2069
+cysteine (disulfide),NCYX,H1,H,0.1815
+cysteine (disulfide),NCYX,H2,H,0.1815
+cysteine (disulfide),NCYX,H3,H,0.1815
+cysteine (disulfide),NCYX,CA,C,0.1055
+cysteine (disulfide),NCYX,HA,H,0.0922
+cysteine (disulfide),NCYX,CB,C,-0.0277
+cysteine (disulfide),NCYX,HB2,H,0.068
+cysteine (disulfide),NCYX,HB3,H,0.068
+cysteine (disulfide),NCYX,SG,S,-0.0984
+cysteine (disulfide),NCYX,C,C,0.6123
+cysteine (disulfide),NCYX,O,O,-0.5713
+glutamine,NGLN,N,N,0.1493
+glutamine,NGLN,H1,H,0.1996
+glutamine,NGLN,H2,H,0.1996
+glutamine,NGLN,H3,H,0.1996
+glutamine,NGLN,CA,C,0.0536
+glutamine,NGLN,HA,H,0.1015
+glutamine,NGLN,CB,C,0.0651
+glutamine,NGLN,HB2,H,0.005
+glutamine,NGLN,HB3,H,0.005
+glutamine,NGLN,CG,C,-0.0903
+glutamine,NGLN,HG2,H,0.0331
+glutamine,NGLN,HG3,H,0.0331
+glutamine,NGLN,CD,C,0.7354
+glutamine,NGLN,OE1,O,-0.6133
+glutamine,NGLN,NE2,N,-1.0031
+glutamine,NGLN,HE21,H,0.4429
+glutamine,NGLN,HE22,H,0.4429
+glutamine,NGLN,C,C,0.6123
+glutamine,NGLN,O,O,-0.5713
+glutamate,NGLU,N,N,0.0017
+glutamate,NGLU,H1,H,0.2391
+glutamate,NGLU,H2,H,0.2391
+glutamate,NGLU,H3,H,0.2391
+glutamate,NGLU,CA,C,0.0588
+glutamate,NGLU,HA,H,0.1202
+glutamate,NGLU,CB,C,0.0909
+glutamate,NGLU,HB2,H,-0.0232
+glutamate,NGLU,HB3,H,-0.0232
+glutamate,NGLU,CG,C,-0.0236
+glutamate,NGLU,HG2,H,-0.0315
+glutamate,NGLU,HG3,H,-0.0315
+glutamate,NGLU,CD,C,0.8087
+glutamate,NGLU,OE1,O,-0.8189
+glutamate,NGLU,OE2,O,-0.8189
+glutamate,NGLU,C,C,0.5621
+glutamate,NGLU,O,O,-0.5889
+glycine,NGLY,N,N,0.2943
+glycine,NGLY,H1,H,0.1642
+glycine,NGLY,H2,H,0.1642
+glycine,NGLY,H3,H,0.1642
+glycine,NGLY,CA,C,-0.01
+glycine,NGLY,HA2,H,0.0895
+glycine,NGLY,HA3,H,0.0895
+glycine,NGLY,C,C,0.6163
+glycine,NGLY,O,O,-0.5722
+histidine (delta-protonated),NHID,N,N,0.1542
+histidine (delta-protonated),NHID,H1,H,0.1963
+histidine (delta-protonated),NHID,H2,H,0.1963
+histidine (delta-protonated),NHID,H3,H,0.1963
+histidine (delta-protonated),NHID,CA,C,0.0964
+histidine (delta-protonated),NHID,HA,H,0.0958
+histidine (delta-protonated),NHID,CB,C,0.0259
+histidine (delta-protonated),NHID,HB2,H,0.0209
+histidine (delta-protonated),NHID,HB3,H,0.0209
+histidine (delta-protonated),NHID,CG,C,-0.0399
+histidine (delta-protonated),NHID,ND1,N,-0.3819
+histidine (delta-protonated),NHID,HD1,H,0.3632
+histidine (delta-protonated),NHID,CE1,C,0.2127
+histidine (delta-protonated),NHID,HE1,H,0.1385
+histidine (delta-protonated),NHID,NE2,N,-0.5711
+histidine (delta-protonated),NHID,CD2,C,0.1046
+histidine (delta-protonated),NHID,HD2,H,0.1299
+histidine (delta-protonated),NHID,C,C,0.6123
+histidine (delta-protonated),NHID,O,O,-0.5713
+histidine (epsilon-protonated),NHIE,N,N,0.1472
+histidine (epsilon-protonated),NHIE,H1,H,0.2016
+histidine (epsilon-protonated),NHIE,H2,H,0.2016
+histidine (epsilon-protonated),NHIE,H3,H,0.2016
+histidine (epsilon-protonated),NHIE,CA,C,0.0236
+histidine (epsilon-protonated),NHIE,HA,H,0.138
+histidine (epsilon-protonated),NHIE,CB,C,0.0489
+histidine (epsilon-protonated),NHIE,HB2,H,0.0223
+histidine (epsilon-protonated),NHIE,HB3,H,0.0223
+histidine (epsilon-protonated),NHIE,CG,C,0.174
+histidine (epsilon-protonated),NHIE,ND1,N,-0.5579
+histidine (epsilon-protonated),NHIE,CE1,C,0.1804
+histidine (epsilon-protonated),NHIE,HE1,H,0.1397
+histidine (epsilon-protonated),NHIE,NE2,N,-0.2781
+histidine (epsilon-protonated),NHIE,HE2,H,0.3324
+histidine (epsilon-protonated),NHIE,CD2,C,-0.2349
+histidine (epsilon-protonated),NHIE,HD2,H,0.1963
+histidine (epsilon-protonated),NHIE,C,C,0.6123
+histidine (epsilon-protonated),NHIE,O,O,-0.5713
+histidine (doubly protonated),NHIP,N,N,0.256
+histidine (doubly protonated),NHIP,H1,H,0.1704
+histidine (doubly protonated),NHIP,H2,H,0.1704
+histidine (doubly protonated),NHIP,H3,H,0.1704
+histidine (doubly protonated),NHIP,CA,C,0.0581
+histidine (doubly protonated),NHIP,HA,H,0.1047
+histidine (doubly protonated),NHIP,CB,C,0.0484
+histidine (doubly protonated),NHIP,HB2,H,0.0531
+histidine (doubly protonated),NHIP,HB3,H,0.0531
+histidine (doubly protonated),NHIP,CG,C,-0.0236
+histidine (doubly protonated),NHIP,ND1,N,-0.151
+histidine (doubly protonated),NHIP,HD1,H,0.3821
+histidine (doubly protonated),NHIP,CE1,C,-0.0011
+histidine (doubly protonated),NHIP,HE1,H,0.2645
+histidine (doubly protonated),NHIP,NE2,N,-0.1739
+histidine (doubly protonated),NHIP,HE2,H,0.3921
+histidine (doubly protonated),NHIP,CD2,C,-0.1433
+histidine (doubly protonated),NHIP,HD2,H,0.2495
+histidine (doubly protonated),NHIP,C,C,0.7214
+histidine (doubly protonated),NHIP,O,O,-0.6013
+isoleucine,NILE,N,N,0.0311
+isoleucine,NILE,H1,H,0.2329
+isoleucine,NILE,H2,H,0.2329
+isoleucine,NILE,H3,H,0.2329
+isoleucine,NILE,CA,C,0.0257
+isoleucine,NILE,HA,H,0.1031
+isoleucine,NILE,CB,C,0.1885
+isoleucine,NILE,HB,H,0.0213
+isoleucine,NILE,CG2,C,-0.372
+isoleucine,NILE,HG21,H,0.0947
+isoleucine,NILE,HG22,H,0.0947
+isoleucine,NILE,HG23,H,0.0947
+isoleucine,NILE,CG1,C,-0.0387
+isoleucine,NILE,HG12,H,0.0201
+isoleucine,NILE,HG13,H,0.0201
+isoleucine,NILE,CD1,C,-0.0908
+isoleucine,NILE,HD11,H,0.0226
+isoleucine,NILE,HD12,H,0.0226
+isoleucine,NILE,HD13,H,0.0226
+isoleucine,NILE,C,C,0.6123
+isoleucine,NILE,O,O,-0.5713
+leucine,NLEU,N,N,0.101
+leucine,NLEU,H1,H,0.2148
+leucine,NLEU,H2,H,0.2148
+leucine,NLEU,H3,H,0.2148
+leucine,NLEU,CA,C,0.0104
+leucine,NLEU,HA,H,0.1053
+leucine,NLEU,CB,C,-0.0244
+leucine,NLEU,HB2,H,0.0256
+leucine,NLEU,HB3,H,0.0256
+leucine,NLEU,CG,C,0.3421
+leucine,NLEU,HG,H,-0.038
+leucine,NLEU,CD1,C,-0.4106
+leucine,NLEU,HD11,H,0.098
+leucine,NLEU,HD12,H,0.098
+leucine,NLEU,HD13,H,0.098
+leucine,NLEU,CD2,C,-0.4104
+leucine,NLEU,HD21,H,0.098
+leucine,NLEU,HD22,H,0.098
+leucine,NLEU,HD23,H,0.098
+leucine,NLEU,C,C,0.6123
+leucine,NLEU,O,O,-0.5713
+lysine,NLYS,N,N,0.0966
+lysine,NLYS,H1,H,0.2165
+lysine,NLYS,H2,H,0.2165
+lysine,NLYS,H3,H,0.2165
+lysine,NLYS,CA,C,-0.0015
+lysine,NLYS,HA,H,0.118
+lysine,NLYS,CB,C,0.0212
+lysine,NLYS,HB2,H,0.0283
+lysine,NLYS,HB3,H,0.0283
+lysine,NLYS,CG,C,-0.0048
+lysine,NLYS,HG2,H,0.0121
+lysine,NLYS,HG3,H,0.0121
+lysine,NLYS,CD,C,-0.0608
+lysine,NLYS,HD2,H,0.0633
+lysine,NLYS,HD3,H,0.0633
+lysine,NLYS,CE,C,-0.0181
+lysine,NLYS,HE2,H,0.1171
+lysine,NLYS,HE3,H,0.1171
+lysine,NLYS,NZ,N,-0.3764
+lysine,NLYS,HZ1,H,0.3382
+lysine,NLYS,HZ2,H,0.3382
+lysine,NLYS,HZ3,H,0.3382
+lysine,NLYS,C,C,0.7214
+lysine,NLYS,O,O,-0.6013
+methionine,NMET,N,N,0.1592
+methionine,NMET,H1,H,0.1984
+methionine,NMET,H2,H,0.1984
+methionine,NMET,H3,H,0.1984
+methionine,NMET,CA,C,0.0221
+methionine,NMET,HA,H,0.1116
+methionine,NMET,CB,C,0.0865
+methionine,NMET,HB2,H,0.0125
+methionine,NMET,HB3,H,0.0125
+methionine,NMET,CG,C,0.0334
+methionine,NMET,HG2,H,0.0292
+methionine,NMET,HG3,H,0.0292
+methionine,NMET,SD,S,-0.2774
+methionine,NMET,CE,C,-0.0341
+methionine,NMET,HE1,H,0.0597
+methionine,NMET,HE2,H,0.0597
+methionine,NMET,HE3,H,0.0597
+methionine,NMET,C,C,0.6123
+methionine,NMET,O,O,-0.5713
+phenylalanine,NPHE,N,N,0.1737
+phenylalanine,NPHE,H1,H,0.1921
+phenylalanine,NPHE,H2,H,0.1921
+phenylalanine,NPHE,H3,H,0.1921
+phenylalanine,NPHE,CA,C,0.0733
+phenylalanine,NPHE,HA,H,0.1041
+phenylalanine,NPHE,CB,C,0.033
+phenylalanine,NPHE,HB2,H,0.0104
+phenylalanine,NPHE,HB3,H,0.0104
+phenylalanine,NPHE,CG,C,0.0031
+phenylalanine,NPHE,CD1,C,-0.1392
+phenylalanine,NPHE,HD1,H,0.1374
+phenylalanine,NPHE,CE1,C,-0.1602
+phenylalanine,NPHE,HE1,H,0.1433
+phenylalanine,NPHE,CZ,C,-0.1208
+phenylalanine,NPHE,HZ,H,0.1329
+phenylalanine,NPHE,CE2,C,-0.1603
+phenylalanine,NPHE,HE2,H,0.1433
+phenylalanine,NPHE,CD2,C,-0.1391
+phenylalanine,NPHE,HD2,H,0.1374
+phenylalanine,NPHE,C,C,0.6123
+phenylalanine,NPHE,O,O,-0.5713
+proline,NPRO,N,N,-0.202
+proline,NPRO,H2,H,0.312
+proline,NPRO,H3,H,0.312
+proline,NPRO,CD,C,-0.012
+proline,NPRO,HD2,H,0.1
+proline,NPRO,HD3,H,0.1
+proline,NPRO,CG,C,-0.121
+proline,NPRO,HG2,H,0.1
+proline,NPRO,HG3,H,0.1
+proline,NPRO,CB,C,-0.115
+proline,NPRO,HB2,H,0.1
+proline,NPRO,HB3,H,0.1
+proline,NPRO,CA,C,0.1
+proline,NPRO,HA,H,0.1
+proline,NPRO,C,C,0.526
+proline,NPRO,O,O,-0.5
+serine,NSER,N,N,0.1849
+serine,NSER,H1,H,0.1898
+serine,NSER,H2,H,0.1898
+serine,NSER,H3,H,0.1898
+serine,NSER,CA,C,0.0567
+serine,NSER,HA,H,0.0782
+serine,NSER,CB,C,0.2596
+serine,NSER,HB2,H,0.0273
+serine,NSER,HB3,H,0.0273
+serine,NSER,OG,O,-0.6714
+serine,NSER,HG,H,0.4239
+serine,NSER,C,C,0.6163
+serine,NSER,O,O,-0.5722
+threonine,NTHR,N,N,0.1812
+threonine,NTHR,H1,H,0.1934
+threonine,NTHR,H2,H,0.1934
+threonine,NTHR,H3,H,0.1934
+threonine,NTHR,CA,C,0.0034
+threonine,NTHR,HA,H,0.1087
+threonine,NTHR,CB,C,0.4514
+threonine,NTHR,HB,H,-0.0323
+threonine,NTHR,CG2,C,-0.2554
+threonine,NTHR,HG21,H,0.0627
+threonine,NTHR,HG22,H,0.0627
+threonine,NTHR,HG23,H,0.0627
+threonine,NTHR,OG1,O,-0.6764
+threonine,NTHR,HG1,H,0.407
+threonine,NTHR,C,C,0.6163
+threonine,NTHR,O,O,-0.5722
+tryptophan,NTRP,N,N,0.1913
+tryptophan,NTRP,H1,H,0.1888
+tryptophan,NTRP,H2,H,0.1888
+tryptophan,NTRP,H3,H,0.1888
+tryptophan,NTRP,CA,C,0.0421
+tryptophan,NTRP,HA,H,0.1162
+tryptophan,NTRP,CB,C,0.0543
+tryptophan,NTRP,HB2,H,0.0222
+tryptophan,NTRP,HB3,H,0.0222
+tryptophan,NTRP,CG,C,-0.1654
+tryptophan,NTRP,CD1,C,-0.1788
+tryptophan,NTRP,HD1,H,0.2195
+tryptophan,NTRP,NE1,N,-0.3444
+tryptophan,NTRP,HE1,H,0.3412
+tryptophan,NTRP,CE2,C,0.1575
+tryptophan,NTRP,CZ2,C,-0.271
+tryptophan,NTRP,HZ2,H,0.1589
+tryptophan,NTRP,CH2,C,-0.108
+tryptophan,NTRP,HH2,H,0.1411
+tryptophan,NTRP,CZ3,C,-0.2034
+tryptophan,NTRP,HZ3,H,0.1458
+tryptophan,NTRP,CE3,C,-0.2265
+tryptophan,NTRP,HE3,H,0.1646
+tryptophan,NTRP,CD2,C,0.1132
+tryptophan,NTRP,C,C,0.6123
+tryptophan,NTRP,O,O,-0.5713
+tyrosine,NTYR,N,N,0.194
+tyrosine,NTYR,H1,H,0.1873
+tyrosine,NTYR,H2,H,0.1873
+tyrosine,NTYR,H3,H,0.1873
+tyrosine,NTYR,CA,C,0.057
+tyrosine,NTYR,HA,H,0.0983
+tyrosine,NTYR,CB,C,0.0659
+tyrosine,NTYR,HB2,H,0.0102
+tyrosine,NTYR,HB3,H,0.0102
+tyrosine,NTYR,CG,C,-0.0205
+tyrosine,NTYR,CD1,C,-0.2002
+tyrosine,NTYR,HD1,H,0.172
+tyrosine,NTYR,CE1,C,-0.2239
+tyrosine,NTYR,HE1,H,0.165
+tyrosine,NTYR,CZ,C,0.3139
+tyrosine,NTYR,OH,O,-0.5578
+tyrosine,NTYR,HH,H,0.4001
+tyrosine,NTYR,CE2,C,-0.2239
+tyrosine,NTYR,HE2,H,0.165
+tyrosine,NTYR,CD2,C,-0.2002
+tyrosine,NTYR,HD2,H,0.172
+tyrosine,NTYR,C,C,0.6123
+tyrosine,NTYR,O,O,-0.5713
+valine,NVAL,N,N,0.0577
+valine,NVAL,H1,H,0.2272
+valine,NVAL,H2,H,0.2272
+valine,NVAL,H3,H,0.2272
+valine,NVAL,CA,C,-0.0054
+valine,NVAL,HA,H,0.1093
+valine,NVAL,CB,C,0.3196
+valine,NVAL,HB,H,-0.0221
+valine,NVAL,CG1,C,-0.3129
+valine,NVAL,HG11,H,0.0735
+valine,NVAL,HG12,H,0.0735
+valine,NVAL,HG13,H,0.0735
+valine,NVAL,CG2,C,-0.3129
+valine,NVAL,HG21,H,0.0735
+valine,NVAL,HG22,H,0.0735
+valine,NVAL,HG23,H,0.0735
+valine,NVAL,C,C,0.6163
+valine,NVAL,O,O,-0.5722
+alanine,CALA,N,N,-0.3821
+alanine,CALA,H,H,0.2681
+alanine,CALA,CA,C,-0.1747
+alanine,CALA,HA,H,0.1067
+alanine,CALA,CB,C,-0.2093
+alanine,CALA,HB1,H,0.0764
+alanine,CALA,HB2,H,0.0764
+alanine,CALA,HB3,H,0.0764
+alanine,CALA,C,C,0.7731
+alanine,CALA,O,O,-0.8055
+alanine,CALA,OXT,O,-0.8055
+arginine,CARG,N,N,-0.3481
+arginine,CARG,H,H,0.2764
+arginine,CARG,CA,C,-0.3068
+arginine,CARG,HA,H,0.1447
+arginine,CARG,CB,C,-0.0374
+arginine,CARG,HB2,H,0.0371
+arginine,CARG,HB3,H,0.0371
+arginine,CARG,CG,C,0.0744
+arginine,CARG,HG2,H,0.0185
+arginine,CARG,HG3,H,0.0185
+arginine,CARG,CD,C,0.1114
+arginine,CARG,HD2,H,0.0468
+arginine,CARG,HD3,H,0.0468
+arginine,CARG,NE,N,-0.5564
+arginine,CARG,HE,H,0.3479
+arginine,CARG,CZ,C,0.8368
+arginine,CARG,NH1,N,-0.8737
+arginine,CARG,HH11,H,0.4493
+arginine,CARG,HH12,H,0.4493
+arginine,CARG,NH2,N,-0.8737
+arginine,CARG,HH21,H,0.4493
+arginine,CARG,HH22,H,0.4493
+arginine,CARG,C,C,0.8557
+arginine,CARG,O,O,-0.8266
+arginine,CARG,OXT,O,-0.8266
+asparagine,CASN,N,N,-0.3821
+asparagine,CASN,H,H,0.2681
+asparagine,CASN,CA,C,-0.208
+asparagine,CASN,HA,H,0.1358
+asparagine,CASN,CB,C,-0.2299
+asparagine,CASN,HB2,H,0.1023
+asparagine,CASN,HB3,H,0.1023
+asparagine,CASN,CG,C,0.7153
+asparagine,CASN,OD1,O,-0.601
+asparagine,CASN,ND2,N,-0.9084
+asparagine,CASN,HD21,H,0.415
+asparagine,CASN,HD22,H,0.415
+asparagine,CASN,C,C,0.805
+asparagine,CASN,O,O,-0.8147
+asparagine,CASN,OXT,O,-0.8147
+aspartate,CASP,N,N,-0.5192
+aspartate,CASP,H,H,0.3055
+aspartate,CASP,CA,C,-0.1817
+aspartate,CASP,HA,H,0.1046
+aspartate,CASP,CB,C,-0.0677
+aspartate,CASP,HB2,H,-0.0212
+aspartate,CASP,HB3,H,-0.0212
+aspartate,CASP,CG,C,0.8851
+aspartate,CASP,OD1,O,-0.8162
+aspartate,CASP,OD2,O,-0.8162
+aspartate,CASP,C,C,0.7256
+aspartate,CASP,O,O,-0.7887
+aspartate,CASP,OXT,O,-0.7887
+cysteine,CCYS,N,N,-0.3821
+cysteine,CCYS,H,H,0.2681
+cysteine,CCYS,CA,C,-0.1635
+cysteine,CCYS,HA,H,0.1396
+cysteine,CCYS,CB,C,-0.1996
+cysteine,CCYS,HB2,H,0.1437
+cysteine,CCYS,HB3,H,0.1437
+cysteine,CCYS,SG,S,-0.3102
+cysteine,CCYS,HG,H,0.2068
+cysteine,CCYS,C,C,0.7497
+cysteine,CCYS,O,O,-0.7981
+cysteine,CCYS,OXT,O,-0.7981
+cysteine (disulfide),CCYX,N,N,-0.3821
+cysteine (disulfide),CCYX,H,H,0.2681
+cysteine (disulfide),CCYX,CA,C,-0.1318
+cysteine (disulfide),CCYX,HA,H,0.0938
+cysteine (disulfide),CCYX,CB,C,-0.1943
+cysteine (disulfide),CCYX,HB2,H,0.1228
+cysteine (disulfide),CCYX,HB3,H,0.1228
+cysteine (disulfide),CCYX,SG,S,-0.0529
+cysteine (disulfide),CCYX,C,C,0.7618
+cysteine (disulfide),CCYX,O,O,-0.8041
+cysteine (disulfide),CCYX,OXT,O,-0.8041
+glutamine,CGLN,N,N,-0.3821
+glutamine,CGLN,H,H,0.2681
+glutamine,CGLN,CA,C,-0.2248
+glutamine,CGLN,HA,H,0.1232
+glutamine,CGLN,CB,C,-0.0664
+glutamine,CGLN,HB2,H,0.0452
+glutamine,CGLN,HB3,H,0.0452
+glutamine,CGLN,CG,C,-0.021
+glutamine,CGLN,HG2,H,0.0203
+glutamine,CGLN,HG3,H,0.0203
+glutamine,CGLN,CD,C,0.7093
+glutamine,CGLN,OE1,O,-0.6098
+glutamine,CGLN,NE2,N,-0.9574
+glutamine,CGLN,HE21,H,0.4304
+glutamine,CGLN,HE22,H,0.4304
+glutamine,CGLN,C,C,0.7775
+glutamine,CGLN,O,O,-0.8042
+glutamine,CGLN,OXT,O,-0.8042
+glutamate,CGLU,N,N,-0.5192
+glutamate,CGLU,H,H,0.3055
+glutamate,CGLU,CA,C,-0.2059
+glutamate,CGLU,HA,H,0.1399
+glutamate,CGLU,CB,C,0.0071
+glutamate,CGLU,HB2,H,-0.0078
+glutamate,CGLU,HB3,H,-0.0078
+glutamate,CGLU,CG,C,0.0675
+glutamate,CGLU,HG2,H,-0.0548
+glutamate,CGLU,HG3,H,-0.0548
+glutamate,CGLU,CD,C,0.8183
+glutamate,CGLU,OE1,O,-0.822
+glutamate,CGLU,OE2,O,-0.822
+glutamate,CGLU,C,C,0.742
+glutamate,CGLU,O,O,-0.793
+glutamate,CGLU,OXT,O,-0.793
+glycine,CGLY,N,N,-0.3821
+glycine,CGLY,H,H,0.2681
+glycine,CGLY,CA,C,-0.2493
+glycine,CGLY,HA2,H,0.1056
+glycine,CGLY,HA3,H,0.1056
+glycine,CGLY,C,C,0.7231
+glycine,CGLY,O,O,-0.7855
+glycine,CGLY,OXT,O,-0.7855
+histidine (delta-protonated),CHID,N,N,-0.3821
+histidine (delta-protonated),CHID,H,H,0.2681
+histidine (delta-protonated),CHID,CA,C,-0.1739
+histidine (delta-protonated),CHID,HA,H,0.11
+histidine (delta-protonated),CHID,CB,C,-0.1046
+histidine (delta-protonated),CHID,HB2,H,0.0565
+histidine (delta-protonated),CHID,HB3,H,0.0565
+histidine (delta-protonated),CHID,CG,C,0.0293
+histidine (delta-protonated),CHID,ND1,N,-0.3892
+histidine (delta-protonated),CHID,HD1,H,0.3755
+histidine (delta-protonated),CHID,CE1,C,0.1925
+histidine (delta-protonated),CHID,HE1,H,0.1418
+histidine (delta-protonated),CHID,NE2,N,-0.5629
+histidine (delta-protonated),CHID,CD2,C,0.1001
+histidine (delta-protonated),CHID,HD2,H,0.1241
+histidine (delta-protonated),CHID,C,C,0.7615
+histidine (delta-protonated),CHID,O,O,-0.8016
+histidine (delta-protonated),CHID,OXT,O,-0.8016
+histidine (epsilon-protonated),CHIE,N,N,-0.3821
+histidine (epsilon-protonated),CHIE,H,H,0.2681
+histidine (epsilon-protonated),CHIE,CA,C,-0.2699
+histidine (epsilon-protonated),CHIE,HA,H,0.165
+histidine (epsilon-protonated),CHIE,CB,C,-0.1068
+histidine (epsilon-protonated),CHIE,HB2,H,0.062
+histidine (epsilon-protonated),CHIE,HB3,H,0.062
+histidine (epsilon-protonated),CHIE,CG,C,0.2724
+histidine (epsilon-protonated),CHIE,ND1,N,-0.5517
+histidine (epsilon-protonated),CHIE,CE1,C,0.1558
+histidine (epsilon-protonated),CHIE,HE1,H,0.1448
+histidine (epsilon-protonated),CHIE,NE2,N,-0.267
+histidine (epsilon-protonated),CHIE,HE2,H,0.3319
+histidine (epsilon-protonated),CHIE,CD2,C,-0.2588
+histidine (epsilon-protonated),CHIE,HD2,H,0.1957
+histidine (epsilon-protonated),CHIE,C,C,0.7916
+histidine (epsilon-protonated),CHIE,O,O,-0.8065
+histidine (epsilon-protonated),CHIE,OXT,O,-0.8065
+histidine (doubly protonated),CHIP,N,N,-0.3481
+histidine (doubly protonated),CHIP,H,H,0.2764
+histidine (doubly protonated),CHIP,CA,C,-0.1445
+histidine (doubly protonated),CHIP,HA,H,0.1115
+histidine (doubly protonated),CHIP,CB,C,-0.08
+histidine (doubly protonated),CHIP,HB2,H,0.0868
+histidine (doubly protonated),CHIP,HB3,H,0.0868
+histidine (doubly protonated),CHIP,CG,C,0.0298
+histidine (doubly protonated),CHIP,ND1,N,-0.1501
+histidine (doubly protonated),CHIP,HD1,H,0.3883
+histidine (doubly protonated),CHIP,CE1,C,-0.0251
+histidine (doubly protonated),CHIP,HE1,H,0.2694
+histidine (doubly protonated),CHIP,NE2,N,-0.1683
+histidine (doubly protonated),CHIP,HE2,H,0.3913
+histidine (doubly protonated),CHIP,CD2,C,-0.1256
+histidine (doubly protonated),CHIP,HD2,H,0.2336
+histidine (doubly protonated),CHIP,C,C,0.8032
+histidine (doubly protonated),CHIP,O,O,-0.8177
+histidine (doubly protonated),CHIP,OXT,O,-0.8177
+hydroxyproline,CHYP,N,N,-0.2802
+hydroxyproline,CHYP,CD,C,0.0778
+hydroxyproline,CHYP,HD22,H,0.0331
+hydroxyproline,CHYP,HD23,H,0.0331
+hydroxyproline,CHYP,CG,C,0.081
+hydroxyproline,CHYP,HG,H,0.0416
+hydroxyproline,CHYP,OD1,O,-0.6134
+hydroxyproline,CHYP,HD1,H,0.3851
+hydroxyproline,CHYP,CB,C,0.0547
+hydroxyproline,CHYP,HB2,H,0.0426
+hydroxyproline,CHYP,HB3,H,0.0426
+hydroxyproline,CHYP,CA,C,-0.0993
+hydroxyproline,CHYP,HA,H,0.0776
+hydroxyproline,CHYP,C,C,0.6631
+hydroxyproline,CHYP,O,O,-0.7697
+hydroxyproline,CHYP,OXT,O,-0.7697
+isoleucine,CILE,N,N,-0.3821
+isoleucine,CILE,H,H,0.2681
+isoleucine,CILE,CA,C,-0.31
+isoleucine,CILE,HA,H,0.1375
+isoleucine,CILE,CB,C,0.0363
+isoleucine,CILE,HB,H,0.0766
+isoleucine,CILE,CG2,C,-0.3498
+isoleucine,CILE,HG21,H,0.1021
+isoleucine,CILE,HG22,H,0.1021
+isoleucine,CILE,HG23,H,0.1021
+isoleucine,CILE,CG1,C,-0.0323
+isoleucine,CILE,HG12,H,0.0321
+isoleucine,CILE,HG13,H,0.0321
+isoleucine,CILE,CD1,C,-0.0699
+isoleucine,CILE,HD11,H,0.0196
+isoleucine,CILE,HD12,H,0.0196
+isoleucine,CILE,HD13,H,0.0196
+isoleucine,CILE,C,C,0.8343
+isoleucine,CILE,O,O,-0.819
+isoleucine,CILE,OXT,O,-0.819
+leucine,CLEU,N,N,-0.3821
+leucine,CLEU,H,H,0.2681
+leucine,CLEU,CA,C,-0.2847
+leucine,CLEU,HA,H,0.1346
+leucine,CLEU,CB,C,-0.2469
+leucine,CLEU,HB2,H,0.0974
+leucine,CLEU,HB3,H,0.0974
+leucine,CLEU,CG,C,0.3706
+leucine,CLEU,HG,H,-0.0374
+leucine,CLEU,CD1,C,-0.4163
+leucine,CLEU,HD11,H,0.1038
+leucine,CLEU,HD12,H,0.1038
+leucine,CLEU,HD13,H,0.1038
+leucine,CLEU,CD2,C,-0.4163
+leucine,CLEU,HD21,H,0.1038
+leucine,CLEU,HD22,H,0.1038
+leucine,CLEU,HD23,H,0.1038
+leucine,CLEU,C,C,0.8326
+leucine,CLEU,O,O,-0.8199
+leucine,CLEU,OXT,O,-0.8199
+lysine,CLYS,N,N,-0.3481
+lysine,CLYS,H,H,0.2764
+lysine,CLYS,CA,C,-0.2903
+lysine,CLYS,HA,H,0.1438
+lysine,CLYS,CB,C,-0.0538
+lysine,CLYS,HB2,H,0.0482
+lysine,CLYS,HB3,H,0.0482
+lysine,CLYS,CG,C,0.0227
+lysine,CLYS,HG2,H,0.0134
+lysine,CLYS,HG3,H,0.0134
+lysine,CLYS,CD,C,-0.0392
+lysine,CLYS,HD2,H,0.0611
+lysine,CLYS,HD3,H,0.0611
+lysine,CLYS,CE,C,-0.0176
+lysine,CLYS,HE2,H,0.1121
+lysine,CLYS,HE3,H,0.1121
+lysine,CLYS,NZ,N,-0.3741
+lysine,CLYS,HZ1,H,0.3374
+lysine,CLYS,HZ2,H,0.3374
+lysine,CLYS,HZ3,H,0.3374
+lysine,CLYS,C,C,0.8488
+lysine,CLYS,O,O,-0.8252
+lysine,CLYS,OXT,O,-0.8252
+methionine,CMET,N,N,-0.3821
+methionine,CMET,H,H,0.2681
+methionine,CMET,CA,C,-0.2597
+methionine,CMET,HA,H,0.1277
+methionine,CMET,CB,C,-0.0236
+methionine,CMET,HB2,H,0.048
+methionine,CMET,HB3,H,0.048
+methionine,CMET,CG,C,0.0492
+methionine,CMET,HG2,H,0.0317
+methionine,CMET,HG3,H,0.0317
+methionine,CMET,SD,S,-0.2692
+methionine,CMET,CE,C,-0.0376
+methionine,CMET,HE1,H,0.0625
+methionine,CMET,HE2,H,0.0625
+methionine,CMET,HE3,H,0.0625
+methionine,CMET,C,C,0.8013
+methionine,CMET,O,O,-0.8105
+methionine,CMET,OXT,O,-0.8105
+phenylalanine,CPHE,N,N,-0.3821
+phenylalanine,CPHE,H,H,0.2681
+phenylalanine,CPHE,CA,C,-0.1825
+phenylalanine,CPHE,HA,H,0.1098
+phenylalanine,CPHE,CB,C,-0.0959
+phenylalanine,CPHE,HB2,H,0.0443
+phenylalanine,CPHE,HB3,H,0.0443
+phenylalanine,CPHE,CG,C,0.0552
+phenylalanine,CPHE,CD1,C,-0.13
+phenylalanine,CPHE,HD1,H,0.1408
+phenylalanine,CPHE,CE1,C,-0.1847
+phenylalanine,CPHE,HE1,H,0.1461
+phenylalanine,CPHE,CZ,C,-0.0944
+phenylalanine,CPHE,HZ,H,0.128
+phenylalanine,CPHE,CE2,C,-0.1847
+phenylalanine,CPHE,HE2,H,0.1461
+phenylalanine,CPHE,CD2,C,-0.13
+phenylalanine,CPHE,HD2,H,0.1408
+phenylalanine,CPHE,C,C,0.766
+phenylalanine,CPHE,O,O,-0.8026
+phenylalanine,CPHE,OXT,O,-0.8026
+proline,CPRO,N,N,-0.2802
+proline,CPRO,CD,C,0.0434
+proline,CPRO,HD2,H,0.0331
+proline,CPRO,HD3,H,0.0331
+proline,CPRO,CG,C,0.0466
+proline,CPRO,HG2,H,0.0172
+proline,CPRO,HG3,H,0.0172
+proline,CPRO,CB,C,-0.0543
+proline,CPRO,HB2,H,0.0381
+proline,CPRO,HB3,H,0.0381
+proline,CPRO,CA,C,-0.1336
+proline,CPRO,HA,H,0.0776
+proline,CPRO,C,C,0.6631
+proline,CPRO,O,O,-0.7697
+proline,CPRO,OXT,O,-0.7697
+serine,CSER,N,N,-0.3821
+serine,CSER,H,H,0.2681
+serine,CSER,CA,C,-0.2722
+serine,CSER,HA,H,0.1304
+serine,CSER,CB,C,0.1123
+serine,CSER,HB2,H,0.0813
+serine,CSER,HB3,H,0.0813
+serine,CSER,OG,O,-0.6514
+serine,CSER,HG,H,0.4474
+serine,CSER,C,C,0.8113
+serine,CSER,O,O,-0.8132
+serine,CSER,OXT,O,-0.8132
+threonine,CTHR,N,N,-0.3821
+threonine,CTHR,H,H,0.2681
+threonine,CTHR,CA,C,-0.242
+threonine,CTHR,HA,H,0.1207
+threonine,CTHR,CB,C,0.3025
+threonine,CTHR,HB,H,0.0078
+threonine,CTHR,CG2,C,-0.1853
+threonine,CTHR,HG21,H,0.0586
+threonine,CTHR,HG22,H,0.0586
+threonine,CTHR,HG23,H,0.0586
+threonine,CTHR,OG1,O,-0.6496
+threonine,CTHR,HG1,H,0.4119
+threonine,CTHR,C,C,0.781
+threonine,CTHR,O,O,-0.8044
+threonine,CTHR,OXT,O,-0.8044
+tryptophan,CTRP,N,N,-0.3821
+tryptophan,CTRP,H,H,0.2681
+tryptophan,CTRP,CA,C,-0.2084
+tryptophan,CTRP,HA,H,0.1272
+tryptophan,CTRP,CB,C,-0.0742
+tryptophan,CTRP,HB2,H,0.0497
+tryptophan,CTRP,HB3,H,0.0497
+tryptophan,CTRP,CG,C,-0.0796
+tryptophan,CTRP,CD1,C,-0.1808
+tryptophan,CTRP,HD1,H,0.2043
+tryptophan,CTRP,NE1,N,-0.3316
+tryptophan,CTRP,HE1,H,0.3413
+tryptophan,CTRP,CE2,C,0.1222
+tryptophan,CTRP,CZ2,C,-0.2594
+tryptophan,CTRP,HZ2,H,0.1567
+tryptophan,CTRP,CH2,C,-0.102
+tryptophan,CTRP,HH2,H,0.1401
+tryptophan,CTRP,CZ3,C,-0.2287
+tryptophan,CTRP,HZ3,H,0.1507
+tryptophan,CTRP,CE3,C,-0.1837
+tryptophan,CTRP,HE3,H,0.1491
+tryptophan,CTRP,CD2,C,0.1078
+tryptophan,CTRP,C,C,0.7658
+tryptophan,CTRP,O,O,-0.8011
+tryptophan,CTRP,OXT,O,-0.8011
+tyrosine,CTYR,N,N,-0.3821
+tyrosine,CTYR,H,H,0.2681
+tyrosine,CTYR,CA,C,-0.2015
+tyrosine,CTYR,HA,H,0.1092
+tyrosine,CTYR,CB,C,-0.0752
+tyrosine,CTYR,HB2,H,0.049
+tyrosine,CTYR,HB3,H,0.049
+tyrosine,CTYR,CG,C,0.0243
+tyrosine,CTYR,CD1,C,-0.1922
+tyrosine,CTYR,HD1,H,0.178
+tyrosine,CTYR,CE1,C,-0.2458
+tyrosine,CTYR,HE1,H,0.1673
+tyrosine,CTYR,CZ,C,0.3395
+tyrosine,CTYR,OH,O,-0.5643
+tyrosine,CTYR,HH,H,0.4017
+tyrosine,CTYR,CE2,C,-0.2458
+tyrosine,CTYR,HE2,H,0.1673
+tyrosine,CTYR,CD2,C,-0.1922
+tyrosine,CTYR,HD2,H,0.178
+tyrosine,CTYR,C,C,0.7817
+tyrosine,CTYR,O,O,-0.807
+tyrosine,CTYR,OXT,O,-0.807
+valine,CVAL,N,N,-0.3821
+valine,CVAL,H,H,0.2681
+valine,CVAL,CA,C,-0.3438
+valine,CVAL,HA,H,0.1438
+valine,CVAL,CB,C,0.194
+valine,CVAL,HB,H,0.0308
+valine,CVAL,CG1,C,-0.3064
+valine,CVAL,HG11,H,0.0836
+valine,CVAL,HG12,H,0.0836
+valine,CVAL,HG13,H,0.0836
+valine,CVAL,CG2,C,-0.3064
+valine,CVAL,HG21,H,0.0836
+valine,CVAL,HG22,H,0.0836
+valine,CVAL,HG23,H,0.0836
+valine,CVAL,C,C,0.835
+valine,CVAL,O,O,-0.8173
+valine,CVAL,OXT,O,-0.8173
+NHE,NHE,N,N,-0.463
+NHE,NHE,HN1,H,0.2315
+NHE,NHE,HN2,H,0.2315
+methylamide (C-terminus cap),NME,N,N,-0.4157
+methylamide (C-terminus cap),NME,H,H,0.2719
+methylamide (C-terminus cap),NME,C,C,-0.149
+methylamide (C-terminus cap),NME,H1,H,0.0976
+methylamide (C-terminus cap),NME,H2,H,0.0976
+methylamide (C-terminus cap),NME,H3,H,0.0976
