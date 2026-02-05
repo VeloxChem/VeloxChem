@@ -156,12 +156,24 @@ class EnsembleParser:
         qm_atoms = self.universe.select_atoms(qm_region)
         env_atoms = self.universe.select_atoms(env_region)
 
-        transforms = [
-        transform.unwrap(qm_atoms),
-        transform.center_in_box(qm_atoms, wrap=True),
-        transform.wrap(env_atoms)
-        ]
-        self.universe.trajectory.add_transformations(*transforms)
+        has_box = False
+        try:
+            self.universe.trajectory[0]
+            dims = getattr(self.universe.trajectory.ts, 'dimensions', None)
+            if dims is not None:
+                dims = np.asarray(dims, dtype=float)
+                if dims.size > 3 and np.all(dims[:3] > 0):
+                    has_box = True
+        except Exception:
+            has_box = False
+
+        if has_box:
+            transforms = [
+                transform.unwrap(qm_atoms),
+                transform.center_in_box(qm_atoms, wrap=True),
+                transform.wrap(env_atoms)
+            ]
+            self.universe.trajectory.add_transformations(*transforms)
 
         empty_xyz = np.empty((0, 3), dtype=float)
         empty_obj = np.empty((0,), dtype=object)
@@ -176,28 +188,23 @@ class EnsembleParser:
                 [guess_atom_element(n) for n in qm_atoms.names], dtype=object
                 )
             
-            # Defaults
-            pe_coords, pe_elements, pe_resids, pe_resnames, pe_n_residues = (
-                empty_xyz, empty_obj, empty_int, empty_obj, 0
-            )
-            npe_coords, npe_elements, npe_resids, npe_resnames, npe_n_residues = (
-                empty_xyz, empty_obj, empty_int, empty_obj, 0
-            )
+            pe_coords = empty_xyz
+            pe_elements = empty_obj
+            pe_resids = empty_int
+            pe_resnames = empty_obj
+            pe_n_residues = 0
+            pe_atom_names = empty_obj
+
+            npe_coords = empty_xyz
+            npe_elements = empty_obj
+            npe_resids = empty_int
+            npe_resnames = empty_obj
+            npe_n_residues = 0
+            npe_atom_names = empty_obj
 
             pe_region = None
 
-            # If neither cutoff is set, interpret as all-NPE environment
-            if pe_cutoff is None and npe_cutoff is None:
-                npe_region = env_atoms.difference(qm_atoms)
-                npe_coords = np.asarray(npe_region.positions, dtype=float).copy()
-                npe_elements = np.asarray(
-                    [guess_atom_element(n) for n in npe_region.names], dtype=object
-                )
-                npe_resids = np.asarray(npe_region.resids, dtype=int).copy()
-                npe_resnames = np.asarray(npe_region.resnames, dtype=object).copy()
-                npe_n_residues = int(npe_region.residues.n_residues)
-            
-            # PE region
+            # PE selection
             if pe_cutoff is not None:
                 pe_region = self.universe.select_atoms(
                     f"byres ({env_region} and around {float(pe_cutoff)} group qm)",
@@ -213,7 +220,7 @@ class EnsembleParser:
                 pe_resnames = np.asarray(pe_region.resnames, dtype=object).copy()
                 pe_n_residues = int(pe_region.residues.n_residues)
 
-            # NPE region
+            # NPE selection
             if npe_cutoff is not None:
                 outer_shell = self.universe.select_atoms(
                     f"byres ({env_region} and around {float(npe_cutoff)} group qm)",
@@ -230,6 +237,18 @@ class EnsembleParser:
                 npe_resids = np.asarray(npe_region.resids, dtype=int).copy()
                 npe_resnames = np.asarray(npe_region.resnames, dtype=object).copy()
                 npe_n_residues = int(npe_region.residues.n_residues)
+
+            # If neither cutoff is set, interpret as all-NPE environment
+            # if pe_cutoff is None and npe_cutoff is None:
+            #     npe_region = env_atoms.difference(qm_atoms)
+            #     npe_coords = np.asarray(npe_region.positions, dtype=float).copy()
+            #     npe_elements = np.asarray(
+            #         [guess_atom_element(n) for n in npe_region.names], dtype=object
+            #     )
+            #     npe_resids = np.asarray(npe_region.resids, dtype=int).copy()
+            #     npe_resnames = np.asarray(npe_region.resnames, dtype=object).copy()
+            #     npe_n_residues = int(npe_region.residues.n_residues)
+            #     npe_atom_names = np.asarray(npe_region.names, dtype=object).copy()
 
             snapshot = {
                     "frame": int(self.universe.trajectory.frame),

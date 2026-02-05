@@ -51,20 +51,21 @@ class EnvironmentDriver:
         The output stream.
 
     Instance variables:
-        - pe_models: Dictionary containing solvent PE model parameters.
-        - npe_models: Dictionary containing solvent NPE model parameters.
-        - pe_model: PE model name.
-        - npe_model: NPE model name.
+        - pe_models: Dictionary containing PE model parameters.
+        - npe_models: Dictionary containing NPE model parameters.
+        - pe_model: Selected PE model dict
+        - npe_model: Selected NPE model dict
     """
 
     def __init__(self, comm=None, ostream=None):
         """
         Initialize the environment driver.
+
         See this reference, Figure 4, for a summary of 
         different PE parameters approaches: SEP and CP3.
         https://doi.org/10.1021/acs.jctc.5c01719
 
-        For NPE parameters, we use standard TIP3P point charges.
+        For NPE parameters, models supported: tip3p and ff19sb point charges.
         """
         if comm is None:
             comm = MPI.COMM_WORLD
@@ -138,10 +139,6 @@ class EnvironmentDriver:
 
         with csv_path.open("r", newline="") as fh:
             reader = csv.DictReader(fh)
-            # required = {"res_name", "atom_name", "element", "M0", "P11"}
-            # if not required.issubset(set(reader.fieldnames or [])):
-            #     raise ValueError(f"{csv_path} missing columns {sorted(required)}; found {reader.fieldnames}")
-
             for row in reader:
                 resn = str(row["res_name"]).strip()
                 atom = str(row["atom_name"]).strip()
@@ -155,8 +152,12 @@ class EnvironmentDriver:
                 rdb = db.setdefault(resn, {})
                 if atom in rdb:
                     old = rdb[atom]
-                    if abs(old["charge"] - q) > 1e-12 or any(abs(a - b) > 1e-12 for a, b in zip(old["polar"], pol6)):
-                        raise ValueError(f"Inconsistent duplicate entries for {resn}/{atom} in {csv_path}")
+                    if abs(old["charge"] - q) > 1e-12 or any(
+                        abs(a - b) > 1e-12 for a, b in zip(old["polar"], pol6)
+                    ):
+                        raise ValueError(
+                            f"Inconsistent duplicate entries for {resn}/{atom} in {csv_path}"
+                        )
                 rdb[atom] = {"element": elem, "charge": q, "polar": pol6}
 
         return db
@@ -164,7 +165,7 @@ class EnvironmentDriver:
     @staticmethod
     def _load_npe_db(csv_path: Path) -> dict:
         """
-        Loads TIP3P-like table:
+        Loads NPE-like table:
             molecule,res_name,atom_name,element,M0
         Returns:
             db[res_name][atom_name] = {"element": str, "charge": float}
@@ -182,21 +183,30 @@ class EnvironmentDriver:
                 elem = str(row["element"]).strip()
                 if not resn or not atom or not elem:
                     continue
+
                 q = float(row["M0"])
 
                 rdb = db.setdefault(resn, {})
                 if atom in rdb:
                     old = rdb[atom]
                     if abs(old["charge"] - q) > 1e-12 or old["element"] != elem:
-                        raise ValueError(f"Inconsistent duplicate entries for {resn}/{atom} in {csv_path}")
+                        raise ValueError(
+                            f"Inconsistent duplicate entries for {resn}/{atom} in {csv_path}"
+                        )
                 rdb[atom] = {"element": elem, "charge": q}
         return db
 
     def set_env_models(self,
-                       pe_model: str,
-                       npe_model: str):
+                       pe_model: str | None = None,
+                       npe_model: str | None = None):
         """
-        Set the parameter PE and NPE models
+        Set PE and/or NPE models
+
+        Valid scenarios:
+
+        - PE only:  set_env_models(pe_model="CP3")
+        - NPE only: set_env_models(npe_model="ff19sb")
+        - Both:     set_env_models(pe_model="CP3", npe_model="ff19sb")
 
         :param pe_model:
             Name of the PE parameter model.
@@ -204,20 +214,32 @@ class EnvironmentDriver:
             Name of the NPE parameter model.
         :return:
             None.
+        :raises ValueError:
+            If neither is provided.
         :raises KeyError:
             If an unknown model name is requested.
         """
-        if pe_model not in self.pe_models:
-            raise KeyError(
-                f"Unknown PE model '{pe_model}'. Available: {sorted(self.pe_models)}"
-            )
-        if npe_model not in self.npe_models:
-            raise KeyError(
-                f"Unknown NPE model '{npe_model}'. Available: {sorted(self.npe_models)}"
-            )
+        if pe_model is None and npe_model is None:
+            raise ValueError("At least one of pe_model or npe_model must be provided.")
         
-        self.pe_model = self.pe_models[pe_model]
-        self.npe_model = self.npe_models[npe_model]
+        if pe_model is not None:
+            if pe_model not in self.pe_models:
+                raise KeyError(
+                    f"Unknown PE model '{pe_model}'. \nAvailable: {sorted(self.pe_models)}"
+                )
+            self.pe_model = self.pe_models[pe_model]
+        else:
+            self.pe_model = None
+
+        if npe_model is not None:
+            if npe_model not in self.npe_models:
+                raise KeyError(
+                    f"Unknown NPE model '{npe_model}'. \nAvailable: {sorted(self.npe_models)}"
+                )
+            self.npe_model = self.npe_models[npe_model]
+        else:
+            self.npe_model = None
+        
         return self.pe_model, self.npe_model
     
     @staticmethod
@@ -241,11 +263,14 @@ class EnvironmentDriver:
     def _build_point_charges(self, coords_ang, atom_names, resnames) -> np.ndarray | None:
         """
         Build point charges array expected by SCF driver: shape (6, N), coords in bohr.
-        Charges are taken from TIP3P DB by (resname, atom_name).
+        Charges are taken from NPE database (db) by (resname, atom_name).
         """
         coords_ang = np.asarray(coords_ang, dtype=float)
         if coords_ang.size == 0:
             return None
+        
+        if self.npe_model is None:
+            raise RuntimeError("Snapshot contains NPE atoms but npe_model is not set.")
 
         atom_names = np.asarray(atom_names, dtype=object)
         resnames = np.asarray(resnames, dtype=object)
@@ -256,14 +281,16 @@ class EnvironmentDriver:
             resn = str(resn)
             atom = str(atom)
             if resn not in db:
-                raise KeyError(f"No TIP3P parameters for residue name '{resn}'")
+                raise KeyError(f"No NPE parameters for residue name '{resn}'")
             if atom not in db[resn]:
-                raise KeyError(f"No TIP3P charge for {resn}/{atom}. Available: {sorted(db[resn].keys())}")
+                raise KeyError(f"No NPE charge for {resn}/{atom}. "
+                               f"Available: {sorted(db[resn].keys())}")
             q[i] = db[resn][atom]["charge"]
 
         pc = np.zeros((6, coords_ang.shape[0]), dtype=float)
         pc[0:3, :] = coords_ang.T / bohr_in_angstrom()
         pc[3, :] = q
+        print(pc)
         return pc
 
     def write_pot_files(self, snapshots, outdir: str | Path):
@@ -316,15 +343,14 @@ class EnvironmentDriver:
             pot_path = outdir / f"pe_frame_{frame:06d}.pot"
 
             with pot_path.open("w") as fh:
-                # @environment (1st col = element)
                 fh.write("@environment\n")
                 fh.write("units: angstrom\n")
                 fh.write("xyz:\n")
                 for (x, y, z), elem, resn, resid in zip(pe_coords, pe_elements, pe_resnames, pe_resids):
+                    print (resid)
                     fh.write(f"{str(elem):<2} {x:12.6f} {y:12.6f} {z:12.6f}  {str(resn):>3}  {int(resid)}\n")
                 fh.write("@end\n\n")
 
-                # @charges (lookup by atom_name, but print element)
                 fh.write("@charges\n")
                 for resn in resname_set:
                     if resn not in pe_db:
@@ -337,7 +363,6 @@ class EnvironmentDriver:
                         fh.write(f"{p['element']:<2} {p['charge']:12.8f}  {resn}\n")
                 fh.write("@end\n\n")
 
-                # @polarizabilities (lookup by atom_name, but print element; P11 exact)
                 fh.write("@polarizabilities\n")
                 for resn in resname_set:
                     pattern_atoms = self._first_residue_atom_pattern(pe_atom_names, pe_resids, pe_resnames, resn)
@@ -380,7 +405,7 @@ class EnvironmentDriver:
               - scf_all: list of (frame, scf_results)
               - rsp_all: list of (frame, rsp_results)
         """
-        if self.pe_model is None or self.npe_model is None:
+        if self.pe_model is None and self.npe_model is None:
             raise RuntimeError("Models not set. Call set_env_models(pe_model=..., npe_model=...) first.")
     
         if isinstance(snapshots, dict):
@@ -394,15 +419,17 @@ class EnvironmentDriver:
 
         potdir = Path(potdir)
 
-        # Write PE potfiles only if requested and if any snapshot has PE atoms
-        if write_pe_potfiles:
-            has_any_pe = False
-            for snap in snapshots:
-                pe_coords = snap.get("pe_coords", [])
-                if np.asarray(pe_coords).size > 0:
-                    has_any_pe = True
-                    break
-        if has_any_pe:
+        # Detect whether we actually need PE / NPE
+        has_any_pe = any(np.asarray(s.get("pe_coords", [])).size > 0 for s in snapshots)
+        has_any_npe = any(np.asarray(s.get("npe_coords", [])).size > 0 for s in snapshots)
+
+        if has_any_pe and self.pe_model is None:
+            raise RuntimeError("Snapshots contain PE atoms but pe_model is not set. Call set_env_models(pe_model=...).")
+
+        if has_any_npe and self.npe_model is None:
+            raise RuntimeError("Snapshots contain NPE atoms but npe_model is not set. Call set_env_models(npe_model=...).")
+
+        if write_pe_potfiles and has_any_pe:
             self.write_pot_files(snapshots, outdir=potdir)
 
         scf_all = []
@@ -422,6 +449,9 @@ class EnvironmentDriver:
 
             has_pe = pe_coords.size > 0
             has_npe = npe_coords.size > 0
+
+            scf_drv.potfile = ""
+            scf_drv.point_charges = None
             
             if has_pe:
                 scf_drv.potfile = str(potdir / f"pe_frame_{frame:06d}.pot")
@@ -430,8 +460,11 @@ class EnvironmentDriver:
                 npe_atom_names = snap.get("npe_atom_names", [])
                 npe_resnames = snap.get("npe_resnames", [])
                 if len(npe_atom_names) == 0:
-                    raise ValueError("npe_atom_names missing in snapshots (required to read NPE charges from CSV).")
-                scf_drv.point_charges = self._build_point_charges(npe_coords, npe_atom_names, npe_resnames)
+                    raise ValueError("npe_atom_names missing in snapshots (required to read NPE charges from CSV)."
+                    )
+                scf_drv.point_charges = self._build_point_charges(
+                    npe_coords, npe_atom_names, npe_resnames
+                )
 
             scf_results = scf_drv.compute(molecule, basis)
             scf_all.append((frame, scf_results))
