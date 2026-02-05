@@ -205,6 +205,7 @@ class EnsembleParser:
                 ).difference(qm_atoms)
 
                 pe_coords = np.asarray(pe_region.positions, dtype=float).copy()
+                pe_atom_names = np.asarray(pe_region.names, dtype=object).copy()
                 pe_elements = np.asarray(
                     [guess_atom_element(n) for n in pe_region.names], dtype=object
                 )
@@ -222,6 +223,7 @@ class EnsembleParser:
                 npe_region = outer_shell.difference(pe_region) if pe_region is not None else outer_shell
 
                 npe_coords = np.asarray(npe_region.positions, dtype=float).copy()
+                npe_atom_names = np.asarray(npe_region.names, dtype=object).copy()
                 npe_elements = np.asarray(
                     [guess_atom_element(n) for n in npe_region.names], dtype=object
                 )
@@ -236,12 +238,14 @@ class EnsembleParser:
                     "qm_elements": qm_elements,
 
                     "pe_coords": pe_coords,
+                    "pe_atom_names": pe_atom_names,
                     "pe_elements": pe_elements,
                     "pe_resids": pe_resids,
                     "pe_resnames": pe_resnames,
                     "pe_n_residues": pe_n_residues,
 
                     "npe_coords": npe_coords,
+                    "npe_atom_names": npe_atom_names,
                     "npe_elements": npe_elements,
                     "npe_resids": npe_resids,
                     "npe_resnames": npe_resnames,
