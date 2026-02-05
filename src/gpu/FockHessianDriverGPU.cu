@@ -947,7 +947,6 @@ computeFockHessianOnGPU_2000(const              CMolecule& molecule,
             gpuSafe(gpuStreamSynchronize(stream));
         }
 
-        /*
         // J: (SS|SD)
         //     **
 
@@ -955,11 +954,13 @@ computeFockHessianOnGPU_2000(const              CMolecule& molecule,
         {
             gpuSafe(gpuMemcpyAsync(d_mat_D, sd_mat_D.data(), sd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-            for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+            for (int64_t grad_cart_ind_0 = 0, grad_cart_ind = 0; grad_cart_ind_0 < 3; grad_cart_ind_0++)
+            for (int64_t grad_cart_ind_1 = grad_cart_ind_0; grad_cart_ind_1 < 3; grad_cart_ind_1++, grad_cart_ind++)
             {
                 gpu::computeCoulombHessianSSSD_II_0<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_grad_array[grad_cart_ind],
-                               static_cast<uint32_t>(grad_cart_ind),
+                               static_cast<uint32_t>(grad_cart_ind_0),
+                               static_cast<uint32_t>(grad_cart_ind_1),
                                prefac_coulomb,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -983,7 +984,8 @@ computeFockHessianOnGPU_2000(const              CMolecule& molecule,
                                eri_threshold);
                 gpu::computeCoulombHessianSSSD_JJ_0<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_grad_array[grad_cart_ind],
-                               static_cast<uint32_t>(grad_cart_ind),
+                               static_cast<uint32_t>(grad_cart_ind_0),
+                               static_cast<uint32_t>(grad_cart_ind_1),
                                prefac_coulomb,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -1009,7 +1011,6 @@ computeFockHessianOnGPU_2000(const              CMolecule& molecule,
 
             gpuSafe(gpuStreamSynchronize(stream));
         }
-        */
 
         // J: (SS|PP)
         //     **
@@ -1076,7 +1077,6 @@ computeFockHessianOnGPU_2000(const              CMolecule& molecule,
             gpuSafe(gpuStreamSynchronize(stream));
         }
 
-        /*
         // J: (SS|PD)
         //     **
 
@@ -1084,11 +1084,13 @@ computeFockHessianOnGPU_2000(const              CMolecule& molecule,
         {
             gpuSafe(gpuMemcpyAsync(d_mat_D, pd_mat_D.data(), pd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-            for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+            for (int64_t grad_cart_ind_0 = 0, grad_cart_ind = 0; grad_cart_ind_0 < 3; grad_cart_ind_0++)
+            for (int64_t grad_cart_ind_1 = grad_cart_ind_0; grad_cart_ind_1 < 3; grad_cart_ind_1++, grad_cart_ind++)
             {
                 gpu::computeCoulombHessianSSPD_II_0<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_grad_array[grad_cart_ind],
-                               static_cast<uint32_t>(grad_cart_ind),
+                               static_cast<uint32_t>(grad_cart_ind_0),
+                               static_cast<uint32_t>(grad_cart_ind_1),
                                prefac_coulomb,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -1114,7 +1116,8 @@ computeFockHessianOnGPU_2000(const              CMolecule& molecule,
                                eri_threshold);
                 gpu::computeCoulombHessianSSPD_JJ_0<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_grad_array[grad_cart_ind],
-                               static_cast<uint32_t>(grad_cart_ind),
+                               static_cast<uint32_t>(grad_cart_ind_0),
+                               static_cast<uint32_t>(grad_cart_ind_1),
                                prefac_coulomb,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -1150,11 +1153,13 @@ computeFockHessianOnGPU_2000(const              CMolecule& molecule,
         {
             gpuSafe(gpuMemcpyAsync(d_mat_D, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-            for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+            for (int64_t grad_cart_ind_0 = 0, grad_cart_ind = 0; grad_cart_ind_0 < 3; grad_cart_ind_0++)
+            for (int64_t grad_cart_ind_1 = grad_cart_ind_0; grad_cart_ind_1 < 3; grad_cart_ind_1++, grad_cart_ind++)
             {
                 gpu::computeCoulombHessianSSDD_II_0<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_grad_array[grad_cart_ind],
-                               static_cast<uint32_t>(grad_cart_ind),
+                               static_cast<uint32_t>(grad_cart_ind_0),
+                               static_cast<uint32_t>(grad_cart_ind_1),
                                prefac_coulomb,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -1178,7 +1183,8 @@ computeFockHessianOnGPU_2000(const              CMolecule& molecule,
                                eri_threshold);
                 gpu::computeCoulombHessianSSDD_JJ_0<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_grad_array[grad_cart_ind],
-                               static_cast<uint32_t>(grad_cart_ind),
+                               static_cast<uint32_t>(grad_cart_ind_0),
+                               static_cast<uint32_t>(grad_cart_ind_1),
                                prefac_coulomb,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -1204,7 +1210,6 @@ computeFockHessianOnGPU_2000(const              CMolecule& molecule,
 
             gpuSafe(gpuStreamSynchronize(stream));
         }
-        */
 
         timer.stop("  J block SS");
     }
