@@ -1374,7 +1374,6 @@ computeFockHessianOnGPU_2000(const              CMolecule& molecule,
             gpuSafe(gpuStreamSynchronize(stream));
         }
 
-        /*
         // J: (SP|SD)
         //     **
 
@@ -1382,11 +1381,13 @@ computeFockHessianOnGPU_2000(const              CMolecule& molecule,
         {
             gpuSafe(gpuMemcpyAsync(d_mat_D, sd_mat_D.data(), sd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-            for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+            for (int64_t grad_cart_ind_0 = 0, grad_cart_ind = 0; grad_cart_ind_0 < 3; grad_cart_ind_0++)
+            for (int64_t grad_cart_ind_1 = grad_cart_ind_0; grad_cart_ind_1 < 3; grad_cart_ind_1++, grad_cart_ind++)
             {
                 gpu::computeCoulombHessianSPSD_II_0<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_grad_array[grad_cart_ind],
-                               static_cast<uint32_t>(grad_cart_ind),
+                               static_cast<uint32_t>(grad_cart_ind_0),
+                               static_cast<uint32_t>(grad_cart_ind_1),
                                prefac_coulomb,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -1412,7 +1413,8 @@ computeFockHessianOnGPU_2000(const              CMolecule& molecule,
                                eri_threshold);
                 gpu::computeCoulombHessianSPSD_JJ_0<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_grad_array[grad_cart_ind],
-                               static_cast<uint32_t>(grad_cart_ind),
+                               static_cast<uint32_t>(grad_cart_ind_0),
+                               static_cast<uint32_t>(grad_cart_ind_1),
                                prefac_coulomb,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -1440,7 +1442,6 @@ computeFockHessianOnGPU_2000(const              CMolecule& molecule,
 
             gpuSafe(gpuStreamSynchronize(stream));
         }
-        */
 
         // J: (SP|PP)
         //     **
@@ -1507,7 +1508,6 @@ computeFockHessianOnGPU_2000(const              CMolecule& molecule,
             gpuSafe(gpuStreamSynchronize(stream));
         }
 
-        /*
         // J: (SP|PD)
         //     **
 
@@ -1515,11 +1515,13 @@ computeFockHessianOnGPU_2000(const              CMolecule& molecule,
         {
             gpuSafe(gpuMemcpyAsync(d_mat_D, pd_mat_D.data(), pd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-            for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+            for (int64_t grad_cart_ind_0 = 0, grad_cart_ind = 0; grad_cart_ind_0 < 3; grad_cart_ind_0++)
+            for (int64_t grad_cart_ind_1 = grad_cart_ind_0; grad_cart_ind_1 < 3; grad_cart_ind_1++, grad_cart_ind++)
             {
                 gpu::computeCoulombHessianSPPD_II_0<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_grad_array[grad_cart_ind],
-                               static_cast<uint32_t>(grad_cart_ind),
+                               static_cast<uint32_t>(grad_cart_ind_0),
+                               static_cast<uint32_t>(grad_cart_ind_1),
                                prefac_coulomb,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -1545,7 +1547,8 @@ computeFockHessianOnGPU_2000(const              CMolecule& molecule,
                                eri_threshold);
                 gpu::computeCoulombHessianSPPD_JJ_0<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_grad_array[grad_cart_ind],
-                               static_cast<uint32_t>(grad_cart_ind),
+                               static_cast<uint32_t>(grad_cart_ind_0),
+                               static_cast<uint32_t>(grad_cart_ind_1),
                                prefac_coulomb,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -1581,11 +1584,94 @@ computeFockHessianOnGPU_2000(const              CMolecule& molecule,
         {
             gpuSafe(gpuMemcpyAsync(d_mat_D, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-            for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+            for (int64_t grad_cart_ind_0 = 0, grad_cart_ind = 0; grad_cart_ind_0 < 3; grad_cart_ind_0++)
+            for (int64_t grad_cart_ind_1 = grad_cart_ind_0; grad_cart_ind_1 < 3; grad_cart_ind_1++, grad_cart_ind++)
             {
                 gpu::computeCoulombHessianSPDD_II_0<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_grad_array[grad_cart_ind],
-                               static_cast<uint32_t>(grad_cart_ind),
+                               static_cast<uint32_t>(grad_cart_ind_0),
+                               static_cast<uint32_t>(grad_cart_ind_1),
+                               prefac_coulomb,
+                               d_s_prim_info,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               static_cast<uint32_t>(d_prim_count),
+                               d_sp_mat_D_local,
+                               d_mat_D,
+                               d_sp_mat_Q_local,
+                               d_dd_mat_Q,
+                               d_sp_first_inds_local,
+                               d_sp_second_inds_local,
+                               d_sp_pair_data_local,
+                               static_cast<uint32_t>(sp_prim_pair_count_local),
+                               d_dd_first_inds,
+                               d_dd_second_inds,
+                               d_dd_pair_data,
+                               static_cast<uint32_t>(dd_prim_pair_count),
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               eri_threshold);
+                gpu::computeCoulombHessianSPDD_II_1<<<num_blocks, threads_per_block, 0, stream>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind_0),
+                               static_cast<uint32_t>(grad_cart_ind_1),
+                               prefac_coulomb,
+                               d_s_prim_info,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               static_cast<uint32_t>(d_prim_count),
+                               d_sp_mat_D_local,
+                               d_mat_D,
+                               d_sp_mat_Q_local,
+                               d_dd_mat_Q,
+                               d_sp_first_inds_local,
+                               d_sp_second_inds_local,
+                               d_sp_pair_data_local,
+                               static_cast<uint32_t>(sp_prim_pair_count_local),
+                               d_dd_first_inds,
+                               d_dd_second_inds,
+                               d_dd_pair_data,
+                               static_cast<uint32_t>(dd_prim_pair_count),
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               eri_threshold);
+                gpu::computeCoulombHessianSPDD_II_2<<<num_blocks, threads_per_block, 0, stream>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind_0),
+                               static_cast<uint32_t>(grad_cart_ind_1),
+                               prefac_coulomb,
+                               d_s_prim_info,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               static_cast<uint32_t>(d_prim_count),
+                               d_sp_mat_D_local,
+                               d_mat_D,
+                               d_sp_mat_Q_local,
+                               d_dd_mat_Q,
+                               d_sp_first_inds_local,
+                               d_sp_second_inds_local,
+                               d_sp_pair_data_local,
+                               static_cast<uint32_t>(sp_prim_pair_count_local),
+                               d_dd_first_inds,
+                               d_dd_second_inds,
+                               d_dd_pair_data,
+                               static_cast<uint32_t>(dd_prim_pair_count),
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               eri_threshold);
+                gpu::computeCoulombHessianSPDD_II_3<<<num_blocks, threads_per_block, 0, stream>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind_0),
+                               static_cast<uint32_t>(grad_cart_ind_1),
                                prefac_coulomb,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -1611,7 +1697,116 @@ computeFockHessianOnGPU_2000(const              CMolecule& molecule,
                                eri_threshold);
                 gpu::computeCoulombHessianSPDD_JJ_0<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_grad_array[grad_cart_ind],
-                               static_cast<uint32_t>(grad_cart_ind),
+                               static_cast<uint32_t>(grad_cart_ind_0),
+                               static_cast<uint32_t>(grad_cart_ind_1),
+                               prefac_coulomb,
+                               d_s_prim_info,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               static_cast<uint32_t>(d_prim_count),
+                               d_sp_mat_D_local,
+                               d_mat_D,
+                               d_sp_mat_Q_local,
+                               d_dd_mat_Q,
+                               d_sp_first_inds_local,
+                               d_sp_second_inds_local,
+                               d_sp_pair_data_local,
+                               static_cast<uint32_t>(sp_prim_pair_count_local),
+                               d_dd_first_inds,
+                               d_dd_second_inds,
+                               d_dd_pair_data,
+                               static_cast<uint32_t>(dd_prim_pair_count),
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               eri_threshold);
+                gpu::computeCoulombHessianSPDD_JJ_1<<<num_blocks, threads_per_block, 0, stream>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind_0),
+                               static_cast<uint32_t>(grad_cart_ind_1),
+                               prefac_coulomb,
+                               d_s_prim_info,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               static_cast<uint32_t>(d_prim_count),
+                               d_sp_mat_D_local,
+                               d_mat_D,
+                               d_sp_mat_Q_local,
+                               d_dd_mat_Q,
+                               d_sp_first_inds_local,
+                               d_sp_second_inds_local,
+                               d_sp_pair_data_local,
+                               static_cast<uint32_t>(sp_prim_pair_count_local),
+                               d_dd_first_inds,
+                               d_dd_second_inds,
+                               d_dd_pair_data,
+                               static_cast<uint32_t>(dd_prim_pair_count),
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               eri_threshold);
+                gpu::computeCoulombHessianSPDD_JJ_2<<<num_blocks, threads_per_block, 0, stream>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind_0),
+                               static_cast<uint32_t>(grad_cart_ind_1),
+                               prefac_coulomb,
+                               d_s_prim_info,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               static_cast<uint32_t>(d_prim_count),
+                               d_sp_mat_D_local,
+                               d_mat_D,
+                               d_sp_mat_Q_local,
+                               d_dd_mat_Q,
+                               d_sp_first_inds_local,
+                               d_sp_second_inds_local,
+                               d_sp_pair_data_local,
+                               static_cast<uint32_t>(sp_prim_pair_count_local),
+                               d_dd_first_inds,
+                               d_dd_second_inds,
+                               d_dd_pair_data,
+                               static_cast<uint32_t>(dd_prim_pair_count),
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               eri_threshold);
+                gpu::computeCoulombHessianSPDD_JJ_3<<<num_blocks, threads_per_block, 0, stream>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind_0),
+                               static_cast<uint32_t>(grad_cart_ind_1),
+                               prefac_coulomb,
+                               d_s_prim_info,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               static_cast<uint32_t>(d_prim_count),
+                               d_sp_mat_D_local,
+                               d_mat_D,
+                               d_sp_mat_Q_local,
+                               d_dd_mat_Q,
+                               d_sp_first_inds_local,
+                               d_sp_second_inds_local,
+                               d_sp_pair_data_local,
+                               static_cast<uint32_t>(sp_prim_pair_count_local),
+                               d_dd_first_inds,
+                               d_dd_second_inds,
+                               d_dd_pair_data,
+                               static_cast<uint32_t>(dd_prim_pair_count),
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               eri_threshold);
+                gpu::computeCoulombHessianSPDD_JJ_4<<<num_blocks, threads_per_block, 0, stream>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind_0),
+                               static_cast<uint32_t>(grad_cart_ind_1),
                                prefac_coulomb,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -1639,7 +1834,6 @@ computeFockHessianOnGPU_2000(const              CMolecule& molecule,
 
             gpuSafe(gpuStreamSynchronize(stream));
         }
-        */
 
         timer.stop("  J block SP");
     }
