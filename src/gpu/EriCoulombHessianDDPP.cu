@@ -68,18 +68,18 @@ computeCoulombHessianDDPP_II_0(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PA_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x, PA_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -96,54 +96,54 @@ computeCoulombHessianDDPP_II_0(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
         PA_y = (a_j  * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -325,8 +325,7 @@ computeCoulombHessianDDPP_II_0(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -335,9 +334,9 @@ computeCoulombHessianDDPP_II_0(double*         hess_xy,
     {
         double hess_ii_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ii_xy += ERIs[n][threadIdx.x];
+            hess_ii_xy += ERIs[n];
         }
 
         atomicAdd(hess_xy + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + i], hess_ii_xy * ij_factor_D * 2.0 * prefac_coulomb);
@@ -374,18 +373,18 @@ computeCoulombHessianDDPP_II_1(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PA_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x, PA_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -402,54 +401,54 @@ computeCoulombHessianDDPP_II_1(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
         PA_y = (a_j  * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -653,8 +652,7 @@ computeCoulombHessianDDPP_II_1(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -663,9 +661,9 @@ computeCoulombHessianDDPP_II_1(double*         hess_xy,
     {
         double hess_ii_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ii_xy += ERIs[n][threadIdx.x];
+            hess_ii_xy += ERIs[n];
         }
 
         atomicAdd(hess_xy + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + i], hess_ii_xy * ij_factor_D * 2.0 * prefac_coulomb);
@@ -702,18 +700,18 @@ computeCoulombHessianDDPP_II_2(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PA_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x, PA_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -730,54 +728,54 @@ computeCoulombHessianDDPP_II_2(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
         PA_y = (a_j  * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -917,8 +915,7 @@ computeCoulombHessianDDPP_II_2(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -927,9 +924,9 @@ computeCoulombHessianDDPP_II_2(double*         hess_xy,
     {
         double hess_ii_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ii_xy += ERIs[n][threadIdx.x];
+            hess_ii_xy += ERIs[n];
         }
 
         atomicAdd(hess_xy + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + i], hess_ii_xy * ij_factor_D * 2.0 * prefac_coulomb);
@@ -966,18 +963,18 @@ computeCoulombHessianDDPP_II_3(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PA_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x, PA_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -994,54 +991,54 @@ computeCoulombHessianDDPP_II_3(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
         PA_y = (a_j  * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -1141,8 +1138,7 @@ computeCoulombHessianDDPP_II_3(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -1151,9 +1147,9 @@ computeCoulombHessianDDPP_II_3(double*         hess_xy,
     {
         double hess_ii_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ii_xy += ERIs[n][threadIdx.x];
+            hess_ii_xy += ERIs[n];
         }
 
         atomicAdd(hess_xy + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + i], hess_ii_xy * ij_factor_D * 2.0 * prefac_coulomb);
@@ -1190,18 +1186,18 @@ computeCoulombHessianDDPP_II_4(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PA_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x, PA_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -1218,54 +1214,54 @@ computeCoulombHessianDDPP_II_4(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
         PA_y = (a_j  * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -1355,8 +1351,7 @@ computeCoulombHessianDDPP_II_4(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -1365,9 +1360,9 @@ computeCoulombHessianDDPP_II_4(double*         hess_xy,
     {
         double hess_ii_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ii_xy += ERIs[n][threadIdx.x];
+            hess_ii_xy += ERIs[n];
         }
 
         atomicAdd(hess_xy + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + i], hess_ii_xy * ij_factor_D * 2.0 * prefac_coulomb);
@@ -1404,18 +1399,18 @@ computeCoulombHessianDDPP_II_5(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PA_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x, PA_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -1432,54 +1427,54 @@ computeCoulombHessianDDPP_II_5(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
         PA_y = (a_j  * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -1631,8 +1626,7 @@ computeCoulombHessianDDPP_II_5(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -1641,9 +1635,9 @@ computeCoulombHessianDDPP_II_5(double*         hess_xy,
     {
         double hess_ii_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ii_xy += ERIs[n][threadIdx.x];
+            hess_ii_xy += ERIs[n];
         }
 
         atomicAdd(hess_xy + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + i], hess_ii_xy * ij_factor_D * 2.0 * prefac_coulomb);
@@ -1680,18 +1674,18 @@ computeCoulombHessianDDPP_II_6(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PA_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x, PA_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -1708,54 +1702,54 @@ computeCoulombHessianDDPP_II_6(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
         PA_y = (a_j  * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -1849,8 +1843,7 @@ computeCoulombHessianDDPP_II_6(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -1859,9 +1852,9 @@ computeCoulombHessianDDPP_II_6(double*         hess_xy,
     {
         double hess_ii_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ii_xy += ERIs[n][threadIdx.x];
+            hess_ii_xy += ERIs[n];
         }
 
         atomicAdd(hess_xy + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + i], hess_ii_xy * ij_factor_D * 2.0 * prefac_coulomb);
@@ -1898,18 +1891,18 @@ computeCoulombHessianDDPP_II_7(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PA_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x, PA_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -1926,54 +1919,54 @@ computeCoulombHessianDDPP_II_7(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
         PA_y = (a_j  * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -2101,8 +2094,7 @@ computeCoulombHessianDDPP_II_7(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -2111,9 +2103,9 @@ computeCoulombHessianDDPP_II_7(double*         hess_xy,
     {
         double hess_ii_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ii_xy += ERIs[n][threadIdx.x];
+            hess_ii_xy += ERIs[n];
         }
 
         atomicAdd(hess_xy + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + i], hess_ii_xy * ij_factor_D * 2.0 * prefac_coulomb);
@@ -2150,18 +2142,18 @@ computeCoulombHessianDDPP_II_8(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PA_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x, PA_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -2178,54 +2170,54 @@ computeCoulombHessianDDPP_II_8(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
         PA_y = (a_j  * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -2355,8 +2347,7 @@ computeCoulombHessianDDPP_II_8(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -2365,9 +2356,9 @@ computeCoulombHessianDDPP_II_8(double*         hess_xy,
     {
         double hess_ii_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ii_xy += ERIs[n][threadIdx.x];
+            hess_ii_xy += ERIs[n];
         }
 
         atomicAdd(hess_xy + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + i], hess_ii_xy * ij_factor_D * 2.0 * prefac_coulomb);
@@ -2404,18 +2395,18 @@ computeCoulombHessianDDPP_II_9(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PA_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x, PA_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -2432,54 +2423,54 @@ computeCoulombHessianDDPP_II_9(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
         PA_y = (a_j  * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -2573,8 +2564,7 @@ computeCoulombHessianDDPP_II_9(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -2583,9 +2573,9 @@ computeCoulombHessianDDPP_II_9(double*         hess_xy,
     {
         double hess_ii_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ii_xy += ERIs[n][threadIdx.x];
+            hess_ii_xy += ERIs[n];
         }
 
         atomicAdd(hess_xy + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + i], hess_ii_xy * ij_factor_D * 2.0 * prefac_coulomb);
@@ -2622,18 +2612,18 @@ computeCoulombHessianDDPP_II_10(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PA_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x, PA_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -2650,54 +2640,54 @@ computeCoulombHessianDDPP_II_10(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
         PA_y = (a_j  * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -2797,8 +2787,7 @@ computeCoulombHessianDDPP_II_10(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -2807,9 +2796,9 @@ computeCoulombHessianDDPP_II_10(double*         hess_xy,
     {
         double hess_ii_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ii_xy += ERIs[n][threadIdx.x];
+            hess_ii_xy += ERIs[n];
         }
 
         atomicAdd(hess_xy + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + i], hess_ii_xy * ij_factor_D * 2.0 * prefac_coulomb);
@@ -2846,18 +2835,18 @@ computeCoulombHessianDDPP_II_11(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PA_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x, PA_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -2874,54 +2863,54 @@ computeCoulombHessianDDPP_II_11(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
         PA_y = (a_j  * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -3019,8 +3008,7 @@ computeCoulombHessianDDPP_II_11(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -3029,9 +3017,9 @@ computeCoulombHessianDDPP_II_11(double*         hess_xy,
     {
         double hess_ii_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ii_xy += ERIs[n][threadIdx.x];
+            hess_ii_xy += ERIs[n];
         }
 
         atomicAdd(hess_xy + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + i], hess_ii_xy * ij_factor_D * 2.0 * prefac_coulomb);
@@ -3068,18 +3056,18 @@ computeCoulombHessianDDPP_II_12(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PA_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x, PA_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -3096,54 +3084,54 @@ computeCoulombHessianDDPP_II_12(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
         PA_y = (a_j  * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -3277,8 +3265,7 @@ computeCoulombHessianDDPP_II_12(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -3287,9 +3274,9 @@ computeCoulombHessianDDPP_II_12(double*         hess_xy,
     {
         double hess_ii_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ii_xy += ERIs[n][threadIdx.x];
+            hess_ii_xy += ERIs[n];
         }
 
         atomicAdd(hess_xy + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + i], hess_ii_xy * ij_factor_D * 2.0 * prefac_coulomb);
@@ -3326,18 +3313,18 @@ computeCoulombHessianDDPP_II_13(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PA_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x, PA_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -3354,54 +3341,54 @@ computeCoulombHessianDDPP_II_13(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
         PA_y = (a_j  * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -3499,8 +3486,7 @@ computeCoulombHessianDDPP_II_13(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -3509,9 +3495,9 @@ computeCoulombHessianDDPP_II_13(double*         hess_xy,
     {
         double hess_ii_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ii_xy += ERIs[n][threadIdx.x];
+            hess_ii_xy += ERIs[n];
         }
 
         atomicAdd(hess_xy + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + i], hess_ii_xy * ij_factor_D * 2.0 * prefac_coulomb);
@@ -3548,18 +3534,18 @@ computeCoulombHessianDDPP_II_14(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PA_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x, PA_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -3576,54 +3562,54 @@ computeCoulombHessianDDPP_II_14(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
         PA_y = (a_j  * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -3695,8 +3681,7 @@ computeCoulombHessianDDPP_II_14(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -3705,9 +3690,9 @@ computeCoulombHessianDDPP_II_14(double*         hess_xy,
     {
         double hess_ii_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ii_xy += ERIs[n][threadIdx.x];
+            hess_ii_xy += ERIs[n];
         }
 
         atomicAdd(hess_xy + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + i], hess_ii_xy * ij_factor_D * 2.0 * prefac_coulomb);
@@ -3744,18 +3729,18 @@ computeCoulombHessianDDPP_II_15(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PA_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x, PA_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -3772,54 +3757,54 @@ computeCoulombHessianDDPP_II_15(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
         PA_y = (a_j  * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -3901,8 +3886,7 @@ computeCoulombHessianDDPP_II_15(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -3911,9 +3895,9 @@ computeCoulombHessianDDPP_II_15(double*         hess_xy,
     {
         double hess_ii_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ii_xy += ERIs[n][threadIdx.x];
+            hess_ii_xy += ERIs[n];
         }
 
         atomicAdd(hess_xy + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + i], hess_ii_xy * ij_factor_D * 2.0 * prefac_coulomb);
@@ -3950,18 +3934,18 @@ computeCoulombHessianDDPP_II_16(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PA_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x, PA_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -3978,54 +3962,54 @@ computeCoulombHessianDDPP_II_16(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
         PA_y = (a_j  * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -4115,8 +4099,7 @@ computeCoulombHessianDDPP_II_16(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -4125,9 +4108,9 @@ computeCoulombHessianDDPP_II_16(double*         hess_xy,
     {
         double hess_ii_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ii_xy += ERIs[n][threadIdx.x];
+            hess_ii_xy += ERIs[n];
         }
 
         atomicAdd(hess_xy + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + i], hess_ii_xy * ij_factor_D * 2.0 * prefac_coulomb);
@@ -4164,18 +4147,18 @@ computeCoulombHessianDDPP_II_17(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PA_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x, PA_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -4192,54 +4175,54 @@ computeCoulombHessianDDPP_II_17(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
         PA_y = (a_j  * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -4323,8 +4306,7 @@ computeCoulombHessianDDPP_II_17(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -4333,9 +4315,9 @@ computeCoulombHessianDDPP_II_17(double*         hess_xy,
     {
         double hess_ii_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ii_xy += ERIs[n][threadIdx.x];
+            hess_ii_xy += ERIs[n];
         }
 
         atomicAdd(hess_xy + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + i], hess_ii_xy * ij_factor_D * 2.0 * prefac_coulomb);
@@ -4372,18 +4354,18 @@ computeCoulombHessianDDPP_II_18(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PA_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x, PA_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -4400,54 +4382,54 @@ computeCoulombHessianDDPP_II_18(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
         PA_y = (a_j  * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -4527,8 +4509,7 @@ computeCoulombHessianDDPP_II_18(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -4537,9 +4518,9 @@ computeCoulombHessianDDPP_II_18(double*         hess_xy,
     {
         double hess_ii_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ii_xy += ERIs[n][threadIdx.x];
+            hess_ii_xy += ERIs[n];
         }
 
         atomicAdd(hess_xy + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + i], hess_ii_xy * ij_factor_D * 2.0 * prefac_coulomb);
@@ -4576,18 +4557,18 @@ computeCoulombHessianDDPP_II_19(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PA_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x, PA_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -4604,54 +4585,54 @@ computeCoulombHessianDDPP_II_19(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
         PA_y = (a_j  * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -4737,8 +4718,7 @@ computeCoulombHessianDDPP_II_19(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -4747,9 +4727,9 @@ computeCoulombHessianDDPP_II_19(double*         hess_xy,
     {
         double hess_ii_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ii_xy += ERIs[n][threadIdx.x];
+            hess_ii_xy += ERIs[n];
         }
 
         atomicAdd(hess_xy + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + i], hess_ii_xy * ij_factor_D * 2.0 * prefac_coulomb);
@@ -4786,18 +4766,18 @@ computeCoulombHessianDDPP_II_20(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PA_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x, PA_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -4814,54 +4794,54 @@ computeCoulombHessianDDPP_II_20(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
         PA_y = (a_j  * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -4955,8 +4935,7 @@ computeCoulombHessianDDPP_II_20(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -4965,9 +4944,9 @@ computeCoulombHessianDDPP_II_20(double*         hess_xy,
     {
         double hess_ii_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ii_xy += ERIs[n][threadIdx.x];
+            hess_ii_xy += ERIs[n];
         }
 
         atomicAdd(hess_xy + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + i], hess_ii_xy * ij_factor_D * 2.0 * prefac_coulomb);
@@ -5004,18 +4983,18 @@ computeCoulombHessianDDPP_II_21(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PA_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x, PA_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -5032,54 +5011,54 @@ computeCoulombHessianDDPP_II_21(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
         PA_y = (a_j  * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -5261,8 +5240,7 @@ computeCoulombHessianDDPP_II_21(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -5271,9 +5249,9 @@ computeCoulombHessianDDPP_II_21(double*         hess_xy,
     {
         double hess_ii_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ii_xy += ERIs[n][threadIdx.x];
+            hess_ii_xy += ERIs[n];
         }
 
         atomicAdd(hess_xy + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + i], hess_ii_xy * ij_factor_D * 2.0 * prefac_coulomb);
@@ -5310,18 +5288,18 @@ computeCoulombHessianDDPP_JJ_0(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x, PB_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x, PB_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -5338,54 +5316,54 @@ computeCoulombHessianDDPP_JJ_0(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
         PB_y = (-a_i * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -5567,8 +5545,7 @@ computeCoulombHessianDDPP_JJ_0(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -5577,9 +5554,9 @@ computeCoulombHessianDDPP_JJ_0(double*         hess_xy,
     {
         double hess_jj_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jj_xy += ERIs[n][threadIdx.x];
+            hess_jj_xy += ERIs[n];
         }
 
         atomicAdd(hess_xy + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + j], hess_jj_xy * ij_factor_D * 2.0 * prefac_coulomb);
@@ -5616,18 +5593,18 @@ computeCoulombHessianDDPP_JJ_1(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x, PB_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x, PB_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -5644,54 +5621,54 @@ computeCoulombHessianDDPP_JJ_1(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
         PB_y = (-a_i * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -5895,8 +5872,7 @@ computeCoulombHessianDDPP_JJ_1(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -5905,9 +5881,9 @@ computeCoulombHessianDDPP_JJ_1(double*         hess_xy,
     {
         double hess_jj_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jj_xy += ERIs[n][threadIdx.x];
+            hess_jj_xy += ERIs[n];
         }
 
         atomicAdd(hess_xy + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + j], hess_jj_xy * ij_factor_D * 2.0 * prefac_coulomb);
@@ -5944,18 +5920,18 @@ computeCoulombHessianDDPP_JJ_2(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x, PB_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x, PB_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -5972,54 +5948,54 @@ computeCoulombHessianDDPP_JJ_2(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
         PB_y = (-a_i * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -6159,8 +6135,7 @@ computeCoulombHessianDDPP_JJ_2(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -6169,9 +6144,9 @@ computeCoulombHessianDDPP_JJ_2(double*         hess_xy,
     {
         double hess_jj_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jj_xy += ERIs[n][threadIdx.x];
+            hess_jj_xy += ERIs[n];
         }
 
         atomicAdd(hess_xy + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + j], hess_jj_xy * ij_factor_D * 2.0 * prefac_coulomb);
@@ -6208,18 +6183,18 @@ computeCoulombHessianDDPP_JJ_3(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x, PB_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x, PB_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -6236,54 +6211,54 @@ computeCoulombHessianDDPP_JJ_3(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
         PB_y = (-a_i * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -6383,8 +6358,7 @@ computeCoulombHessianDDPP_JJ_3(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -6393,9 +6367,9 @@ computeCoulombHessianDDPP_JJ_3(double*         hess_xy,
     {
         double hess_jj_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jj_xy += ERIs[n][threadIdx.x];
+            hess_jj_xy += ERIs[n];
         }
 
         atomicAdd(hess_xy + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + j], hess_jj_xy * ij_factor_D * 2.0 * prefac_coulomb);
@@ -6432,18 +6406,18 @@ computeCoulombHessianDDPP_JJ_4(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x, PB_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x, PB_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -6460,54 +6434,54 @@ computeCoulombHessianDDPP_JJ_4(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
         PB_y = (-a_i * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -6597,8 +6571,7 @@ computeCoulombHessianDDPP_JJ_4(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -6607,9 +6580,9 @@ computeCoulombHessianDDPP_JJ_4(double*         hess_xy,
     {
         double hess_jj_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jj_xy += ERIs[n][threadIdx.x];
+            hess_jj_xy += ERIs[n];
         }
 
         atomicAdd(hess_xy + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + j], hess_jj_xy * ij_factor_D * 2.0 * prefac_coulomb);
@@ -6646,18 +6619,18 @@ computeCoulombHessianDDPP_JJ_5(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x, PB_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x, PB_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -6674,54 +6647,54 @@ computeCoulombHessianDDPP_JJ_5(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
         PB_y = (-a_i * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -6873,8 +6846,7 @@ computeCoulombHessianDDPP_JJ_5(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -6883,9 +6855,9 @@ computeCoulombHessianDDPP_JJ_5(double*         hess_xy,
     {
         double hess_jj_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jj_xy += ERIs[n][threadIdx.x];
+            hess_jj_xy += ERIs[n];
         }
 
         atomicAdd(hess_xy + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + j], hess_jj_xy * ij_factor_D * 2.0 * prefac_coulomb);
@@ -6922,18 +6894,18 @@ computeCoulombHessianDDPP_JJ_6(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x, PB_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x, PB_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -6950,54 +6922,54 @@ computeCoulombHessianDDPP_JJ_6(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
         PB_y = (-a_i * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -7091,8 +7063,7 @@ computeCoulombHessianDDPP_JJ_6(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -7101,9 +7072,9 @@ computeCoulombHessianDDPP_JJ_6(double*         hess_xy,
     {
         double hess_jj_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jj_xy += ERIs[n][threadIdx.x];
+            hess_jj_xy += ERIs[n];
         }
 
         atomicAdd(hess_xy + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + j], hess_jj_xy * ij_factor_D * 2.0 * prefac_coulomb);
@@ -7140,18 +7111,18 @@ computeCoulombHessianDDPP_JJ_7(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x, PB_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x, PB_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -7168,54 +7139,54 @@ computeCoulombHessianDDPP_JJ_7(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
         PB_y = (-a_i * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -7343,8 +7314,7 @@ computeCoulombHessianDDPP_JJ_7(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -7353,9 +7323,9 @@ computeCoulombHessianDDPP_JJ_7(double*         hess_xy,
     {
         double hess_jj_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jj_xy += ERIs[n][threadIdx.x];
+            hess_jj_xy += ERIs[n];
         }
 
         atomicAdd(hess_xy + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + j], hess_jj_xy * ij_factor_D * 2.0 * prefac_coulomb);
@@ -7392,18 +7362,18 @@ computeCoulombHessianDDPP_JJ_8(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x, PB_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x, PB_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -7420,54 +7390,54 @@ computeCoulombHessianDDPP_JJ_8(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
         PB_y = (-a_i * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -7597,8 +7567,7 @@ computeCoulombHessianDDPP_JJ_8(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -7607,9 +7576,9 @@ computeCoulombHessianDDPP_JJ_8(double*         hess_xy,
     {
         double hess_jj_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jj_xy += ERIs[n][threadIdx.x];
+            hess_jj_xy += ERIs[n];
         }
 
         atomicAdd(hess_xy + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + j], hess_jj_xy * ij_factor_D * 2.0 * prefac_coulomb);
@@ -7646,18 +7615,18 @@ computeCoulombHessianDDPP_JJ_9(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x, PB_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x, PB_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -7674,54 +7643,54 @@ computeCoulombHessianDDPP_JJ_9(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
         PB_y = (-a_i * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -7815,8 +7784,7 @@ computeCoulombHessianDDPP_JJ_9(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -7825,9 +7793,9 @@ computeCoulombHessianDDPP_JJ_9(double*         hess_xy,
     {
         double hess_jj_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jj_xy += ERIs[n][threadIdx.x];
+            hess_jj_xy += ERIs[n];
         }
 
         atomicAdd(hess_xy + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + j], hess_jj_xy * ij_factor_D * 2.0 * prefac_coulomb);
@@ -7864,18 +7832,18 @@ computeCoulombHessianDDPP_JJ_10(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x, PB_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x, PB_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -7892,54 +7860,54 @@ computeCoulombHessianDDPP_JJ_10(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
         PB_y = (-a_i * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -8039,8 +8007,7 @@ computeCoulombHessianDDPP_JJ_10(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -8049,9 +8016,9 @@ computeCoulombHessianDDPP_JJ_10(double*         hess_xy,
     {
         double hess_jj_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jj_xy += ERIs[n][threadIdx.x];
+            hess_jj_xy += ERIs[n];
         }
 
         atomicAdd(hess_xy + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + j], hess_jj_xy * ij_factor_D * 2.0 * prefac_coulomb);
@@ -8088,18 +8055,18 @@ computeCoulombHessianDDPP_JJ_11(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x, PB_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x, PB_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -8116,54 +8083,54 @@ computeCoulombHessianDDPP_JJ_11(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
         PB_y = (-a_i * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -8261,8 +8228,7 @@ computeCoulombHessianDDPP_JJ_11(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -8271,9 +8237,9 @@ computeCoulombHessianDDPP_JJ_11(double*         hess_xy,
     {
         double hess_jj_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jj_xy += ERIs[n][threadIdx.x];
+            hess_jj_xy += ERIs[n];
         }
 
         atomicAdd(hess_xy + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + j], hess_jj_xy * ij_factor_D * 2.0 * prefac_coulomb);
@@ -8310,18 +8276,18 @@ computeCoulombHessianDDPP_JJ_12(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x, PB_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x, PB_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -8338,54 +8304,54 @@ computeCoulombHessianDDPP_JJ_12(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
         PB_y = (-a_i * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -8519,8 +8485,7 @@ computeCoulombHessianDDPP_JJ_12(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -8529,9 +8494,9 @@ computeCoulombHessianDDPP_JJ_12(double*         hess_xy,
     {
         double hess_jj_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jj_xy += ERIs[n][threadIdx.x];
+            hess_jj_xy += ERIs[n];
         }
 
         atomicAdd(hess_xy + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + j], hess_jj_xy * ij_factor_D * 2.0 * prefac_coulomb);
@@ -8568,18 +8533,18 @@ computeCoulombHessianDDPP_JJ_13(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x, PB_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x, PB_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -8596,54 +8561,54 @@ computeCoulombHessianDDPP_JJ_13(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
         PB_y = (-a_i * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -8741,8 +8706,7 @@ computeCoulombHessianDDPP_JJ_13(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -8751,9 +8715,9 @@ computeCoulombHessianDDPP_JJ_13(double*         hess_xy,
     {
         double hess_jj_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jj_xy += ERIs[n][threadIdx.x];
+            hess_jj_xy += ERIs[n];
         }
 
         atomicAdd(hess_xy + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + j], hess_jj_xy * ij_factor_D * 2.0 * prefac_coulomb);
@@ -8790,18 +8754,18 @@ computeCoulombHessianDDPP_JJ_14(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x, PB_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x, PB_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -8818,54 +8782,54 @@ computeCoulombHessianDDPP_JJ_14(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
         PB_y = (-a_i * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -8937,8 +8901,7 @@ computeCoulombHessianDDPP_JJ_14(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -8947,9 +8910,9 @@ computeCoulombHessianDDPP_JJ_14(double*         hess_xy,
     {
         double hess_jj_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jj_xy += ERIs[n][threadIdx.x];
+            hess_jj_xy += ERIs[n];
         }
 
         atomicAdd(hess_xy + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + j], hess_jj_xy * ij_factor_D * 2.0 * prefac_coulomb);
@@ -8986,18 +8949,18 @@ computeCoulombHessianDDPP_JJ_15(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x, PB_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x, PB_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -9014,54 +8977,54 @@ computeCoulombHessianDDPP_JJ_15(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
         PB_y = (-a_i * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -9143,8 +9106,7 @@ computeCoulombHessianDDPP_JJ_15(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -9153,9 +9115,9 @@ computeCoulombHessianDDPP_JJ_15(double*         hess_xy,
     {
         double hess_jj_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jj_xy += ERIs[n][threadIdx.x];
+            hess_jj_xy += ERIs[n];
         }
 
         atomicAdd(hess_xy + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + j], hess_jj_xy * ij_factor_D * 2.0 * prefac_coulomb);
@@ -9192,18 +9154,18 @@ computeCoulombHessianDDPP_JJ_16(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x, PB_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x, PB_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -9220,54 +9182,54 @@ computeCoulombHessianDDPP_JJ_16(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
         PB_y = (-a_i * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -9357,8 +9319,7 @@ computeCoulombHessianDDPP_JJ_16(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -9367,9 +9328,9 @@ computeCoulombHessianDDPP_JJ_16(double*         hess_xy,
     {
         double hess_jj_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jj_xy += ERIs[n][threadIdx.x];
+            hess_jj_xy += ERIs[n];
         }
 
         atomicAdd(hess_xy + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + j], hess_jj_xy * ij_factor_D * 2.0 * prefac_coulomb);
@@ -9406,18 +9367,18 @@ computeCoulombHessianDDPP_JJ_17(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x, PB_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x, PB_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -9434,54 +9395,54 @@ computeCoulombHessianDDPP_JJ_17(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
         PB_y = (-a_i * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -9565,8 +9526,7 @@ computeCoulombHessianDDPP_JJ_17(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -9575,9 +9535,9 @@ computeCoulombHessianDDPP_JJ_17(double*         hess_xy,
     {
         double hess_jj_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jj_xy += ERIs[n][threadIdx.x];
+            hess_jj_xy += ERIs[n];
         }
 
         atomicAdd(hess_xy + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + j], hess_jj_xy * ij_factor_D * 2.0 * prefac_coulomb);
@@ -9614,18 +9574,18 @@ computeCoulombHessianDDPP_JJ_18(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x, PB_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x, PB_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -9642,54 +9602,54 @@ computeCoulombHessianDDPP_JJ_18(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
         PB_y = (-a_i * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -9769,8 +9729,7 @@ computeCoulombHessianDDPP_JJ_18(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -9779,9 +9738,9 @@ computeCoulombHessianDDPP_JJ_18(double*         hess_xy,
     {
         double hess_jj_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jj_xy += ERIs[n][threadIdx.x];
+            hess_jj_xy += ERIs[n];
         }
 
         atomicAdd(hess_xy + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + j], hess_jj_xy * ij_factor_D * 2.0 * prefac_coulomb);
@@ -9818,18 +9777,18 @@ computeCoulombHessianDDPP_JJ_19(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x, PB_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x, PB_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -9846,54 +9805,54 @@ computeCoulombHessianDDPP_JJ_19(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
         PB_y = (-a_i * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -9979,8 +9938,7 @@ computeCoulombHessianDDPP_JJ_19(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -9989,9 +9947,9 @@ computeCoulombHessianDDPP_JJ_19(double*         hess_xy,
     {
         double hess_jj_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jj_xy += ERIs[n][threadIdx.x];
+            hess_jj_xy += ERIs[n];
         }
 
         atomicAdd(hess_xy + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + j], hess_jj_xy * ij_factor_D * 2.0 * prefac_coulomb);
@@ -10028,18 +9986,18 @@ computeCoulombHessianDDPP_JJ_20(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x, PB_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x, PB_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -10056,54 +10014,54 @@ computeCoulombHessianDDPP_JJ_20(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
         PB_y = (-a_i * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -10197,8 +10155,7 @@ computeCoulombHessianDDPP_JJ_20(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -10207,9 +10164,9 @@ computeCoulombHessianDDPP_JJ_20(double*         hess_xy,
     {
         double hess_jj_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jj_xy += ERIs[n][threadIdx.x];
+            hess_jj_xy += ERIs[n];
         }
 
         atomicAdd(hess_xy + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + j], hess_jj_xy * ij_factor_D * 2.0 * prefac_coulomb);
@@ -10246,18 +10203,18 @@ computeCoulombHessianDDPP_JJ_21(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x, PB_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x, PB_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -10274,54 +10231,54 @@ computeCoulombHessianDDPP_JJ_21(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
         PB_y = (-a_i * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -10503,8 +10460,7 @@ computeCoulombHessianDDPP_JJ_21(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -10513,9 +10469,9 @@ computeCoulombHessianDDPP_JJ_21(double*         hess_xy,
     {
         double hess_jj_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jj_xy += ERIs[n][threadIdx.x];
+            hess_jj_xy += ERIs[n];
         }
 
         atomicAdd(hess_xy + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + j], hess_jj_xy * ij_factor_D * 2.0 * prefac_coulomb);
@@ -10554,18 +10510,18 @@ computeCoulombHessianDDPP_IJ_0(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PB_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x, PB_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -10582,54 +10538,54 @@ computeCoulombHessianDDPP_IJ_0(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
         PB_y = (-a_i * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -10843,8 +10799,7 @@ computeCoulombHessianDDPP_IJ_0(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -10853,9 +10808,9 @@ computeCoulombHessianDDPP_IJ_0(double*         hess_xy,
     {
         double hess_ij_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ij_xy += ERIs[n][threadIdx.x];
+            hess_ij_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -10900,18 +10855,18 @@ computeCoulombHessianDDPP_IJ_1(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PB_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x, PB_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -10928,54 +10883,54 @@ computeCoulombHessianDDPP_IJ_1(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
         PB_y = (-a_i * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -11211,8 +11166,7 @@ computeCoulombHessianDDPP_IJ_1(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -11221,9 +11175,9 @@ computeCoulombHessianDDPP_IJ_1(double*         hess_xy,
     {
         double hess_ij_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ij_xy += ERIs[n][threadIdx.x];
+            hess_ij_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -11268,18 +11222,18 @@ computeCoulombHessianDDPP_IJ_2(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PB_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x, PB_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -11296,54 +11250,54 @@ computeCoulombHessianDDPP_IJ_2(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
         PB_y = (-a_i * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -11577,8 +11531,7 @@ computeCoulombHessianDDPP_IJ_2(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -11587,9 +11540,9 @@ computeCoulombHessianDDPP_IJ_2(double*         hess_xy,
     {
         double hess_ij_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ij_xy += ERIs[n][threadIdx.x];
+            hess_ij_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -11634,18 +11587,18 @@ computeCoulombHessianDDPP_IJ_3(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PB_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x, PB_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -11662,54 +11615,54 @@ computeCoulombHessianDDPP_IJ_3(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
         PB_y = (-a_i * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -11839,8 +11792,7 @@ computeCoulombHessianDDPP_IJ_3(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -11849,9 +11801,9 @@ computeCoulombHessianDDPP_IJ_3(double*         hess_xy,
     {
         double hess_ij_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ij_xy += ERIs[n][threadIdx.x];
+            hess_ij_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -11896,18 +11848,18 @@ computeCoulombHessianDDPP_IJ_4(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PB_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x, PB_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -11924,54 +11876,54 @@ computeCoulombHessianDDPP_IJ_4(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
         PB_y = (-a_i * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -12099,8 +12051,7 @@ computeCoulombHessianDDPP_IJ_4(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -12109,9 +12060,9 @@ computeCoulombHessianDDPP_IJ_4(double*         hess_xy,
     {
         double hess_ij_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ij_xy += ERIs[n][threadIdx.x];
+            hess_ij_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -12156,18 +12107,18 @@ computeCoulombHessianDDPP_IJ_5(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PB_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x, PB_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -12184,54 +12135,54 @@ computeCoulombHessianDDPP_IJ_5(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
         PB_y = (-a_i * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -12387,8 +12338,7 @@ computeCoulombHessianDDPP_IJ_5(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -12397,9 +12347,9 @@ computeCoulombHessianDDPP_IJ_5(double*         hess_xy,
     {
         double hess_ij_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ij_xy += ERIs[n][threadIdx.x];
+            hess_ij_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -12444,18 +12394,18 @@ computeCoulombHessianDDPP_IJ_6(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PB_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x, PB_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -12472,54 +12422,54 @@ computeCoulombHessianDDPP_IJ_6(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
         PB_y = (-a_i * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -12651,8 +12601,7 @@ computeCoulombHessianDDPP_IJ_6(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -12661,9 +12610,9 @@ computeCoulombHessianDDPP_IJ_6(double*         hess_xy,
     {
         double hess_ij_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ij_xy += ERIs[n][threadIdx.x];
+            hess_ij_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -12708,18 +12657,18 @@ computeCoulombHessianDDPP_IJ_7(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PB_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x, PB_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -12736,54 +12685,54 @@ computeCoulombHessianDDPP_IJ_7(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
         PB_y = (-a_i * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -12867,8 +12816,7 @@ computeCoulombHessianDDPP_IJ_7(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -12877,9 +12825,9 @@ computeCoulombHessianDDPP_IJ_7(double*         hess_xy,
     {
         double hess_ij_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ij_xy += ERIs[n][threadIdx.x];
+            hess_ij_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -12924,18 +12872,18 @@ computeCoulombHessianDDPP_IJ_8(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PB_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x, PB_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -12952,54 +12900,54 @@ computeCoulombHessianDDPP_IJ_8(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
         PB_y = (-a_i * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -13091,8 +13039,7 @@ computeCoulombHessianDDPP_IJ_8(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -13101,9 +13048,9 @@ computeCoulombHessianDDPP_IJ_8(double*         hess_xy,
     {
         double hess_ij_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ij_xy += ERIs[n][threadIdx.x];
+            hess_ij_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -13148,18 +13095,18 @@ computeCoulombHessianDDPP_IJ_9(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PB_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x, PB_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -13176,54 +13123,54 @@ computeCoulombHessianDDPP_IJ_9(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
         PB_y = (-a_i * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -13365,8 +13312,7 @@ computeCoulombHessianDDPP_IJ_9(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -13375,9 +13321,9 @@ computeCoulombHessianDDPP_IJ_9(double*         hess_xy,
     {
         double hess_ij_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ij_xy += ERIs[n][threadIdx.x];
+            hess_ij_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -13422,18 +13368,18 @@ computeCoulombHessianDDPP_IJ_10(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PB_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x, PB_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -13450,54 +13396,54 @@ computeCoulombHessianDDPP_IJ_10(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
         PB_y = (-a_i * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -13609,8 +13555,7 @@ computeCoulombHessianDDPP_IJ_10(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -13619,9 +13564,9 @@ computeCoulombHessianDDPP_IJ_10(double*         hess_xy,
     {
         double hess_ij_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ij_xy += ERIs[n][threadIdx.x];
+            hess_ij_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -13666,18 +13611,18 @@ computeCoulombHessianDDPP_IJ_11(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PB_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x, PB_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -13694,54 +13639,54 @@ computeCoulombHessianDDPP_IJ_11(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
         PB_y = (-a_i * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -13841,8 +13786,7 @@ computeCoulombHessianDDPP_IJ_11(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -13851,9 +13795,9 @@ computeCoulombHessianDDPP_IJ_11(double*         hess_xy,
     {
         double hess_ij_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ij_xy += ERIs[n][threadIdx.x];
+            hess_ij_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -13898,18 +13842,18 @@ computeCoulombHessianDDPP_IJ_12(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PB_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x, PB_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -13926,54 +13870,54 @@ computeCoulombHessianDDPP_IJ_12(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
         PB_y = (-a_i * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -14115,8 +14059,7 @@ computeCoulombHessianDDPP_IJ_12(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -14125,9 +14068,9 @@ computeCoulombHessianDDPP_IJ_12(double*         hess_xy,
     {
         double hess_ij_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ij_xy += ERIs[n][threadIdx.x];
+            hess_ij_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -14172,18 +14115,18 @@ computeCoulombHessianDDPP_IJ_13(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PB_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x, PB_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -14200,54 +14143,54 @@ computeCoulombHessianDDPP_IJ_13(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
         PB_y = (-a_i * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -14331,8 +14274,7 @@ computeCoulombHessianDDPP_IJ_13(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -14341,9 +14283,9 @@ computeCoulombHessianDDPP_IJ_13(double*         hess_xy,
     {
         double hess_ij_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ij_xy += ERIs[n][threadIdx.x];
+            hess_ij_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -14388,18 +14330,18 @@ computeCoulombHessianDDPP_IJ_14(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PB_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x, PB_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -14416,54 +14358,54 @@ computeCoulombHessianDDPP_IJ_14(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
         PB_y = (-a_i * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -14553,8 +14495,7 @@ computeCoulombHessianDDPP_IJ_14(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -14563,9 +14504,9 @@ computeCoulombHessianDDPP_IJ_14(double*         hess_xy,
     {
         double hess_ij_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ij_xy += ERIs[n][threadIdx.x];
+            hess_ij_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -14610,18 +14551,18 @@ computeCoulombHessianDDPP_IJ_15(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PB_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x, PB_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -14638,54 +14579,54 @@ computeCoulombHessianDDPP_IJ_15(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
         PB_y = (-a_i * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -14793,8 +14734,7 @@ computeCoulombHessianDDPP_IJ_15(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -14803,9 +14743,9 @@ computeCoulombHessianDDPP_IJ_15(double*         hess_xy,
     {
         double hess_ij_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ij_xy += ERIs[n][threadIdx.x];
+            hess_ij_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -14850,18 +14790,18 @@ computeCoulombHessianDDPP_IJ_16(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PB_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x, PB_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -14878,54 +14818,54 @@ computeCoulombHessianDDPP_IJ_16(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
         PB_y = (-a_i * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -15063,8 +15003,7 @@ computeCoulombHessianDDPP_IJ_16(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -15073,9 +15012,9 @@ computeCoulombHessianDDPP_IJ_16(double*         hess_xy,
     {
         double hess_ij_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ij_xy += ERIs[n][threadIdx.x];
+            hess_ij_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -15120,18 +15059,18 @@ computeCoulombHessianDDPP_IJ_17(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PB_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x, PB_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -15148,54 +15087,54 @@ computeCoulombHessianDDPP_IJ_17(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
         PB_y = (-a_i * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -15335,8 +15274,7 @@ computeCoulombHessianDDPP_IJ_17(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -15345,9 +15283,9 @@ computeCoulombHessianDDPP_IJ_17(double*         hess_xy,
     {
         double hess_ij_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ij_xy += ERIs[n][threadIdx.x];
+            hess_ij_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -15392,18 +15330,18 @@ computeCoulombHessianDDPP_IJ_18(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PB_y;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x, PB_y;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -15420,54 +15358,54 @@ computeCoulombHessianDDPP_IJ_18(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
-    }
 
-    __syncthreads();
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
 
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
+            S_ij_00 = dd_pair_data_local[ij];
 
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
         PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
         PB_y = (-a_i * inv_S1) * (r_j[g1] - r_i[g1]);
 
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
 
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+        }
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+    __syncthreads();
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -15603,8 +15541,7 @@ computeCoulombHessianDDPP_IJ_18(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -15613,9 +15550,9 @@ computeCoulombHessianDDPP_IJ_18(double*         hess_xy,
     {
         double hess_ij_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ij_xy += ERIs[n][threadIdx.x];
+            hess_ij_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -15663,18 +15600,18 @@ computeCoulombHessianDDPP_IK_0(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -15691,68 +15628,68 @@ computeCoulombHessianDDPP_IK_0(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_k = 0; atom_idx_k < natoms; atom_idx_k++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_k[atom_idx_k];
     const auto kl_pair_displ = d_kl_displs_for_atom_k[atom_idx_k];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_k[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -15964,8 +15901,7 @@ computeCoulombHessianDDPP_IK_0(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -15974,9 +15910,9 @@ computeCoulombHessianDDPP_IK_0(double*         hess_xy,
     {
         double hess_ik_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ik_xy += ERIs[n][threadIdx.x];
+            hess_ik_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -16024,18 +15960,18 @@ computeCoulombHessianDDPP_IK_1(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -16052,68 +15988,68 @@ computeCoulombHessianDDPP_IK_1(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_k = 0; atom_idx_k < natoms; atom_idx_k++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_k[atom_idx_k];
     const auto kl_pair_displ = d_kl_displs_for_atom_k[atom_idx_k];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_k[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -16339,8 +16275,7 @@ computeCoulombHessianDDPP_IK_1(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -16349,9 +16284,9 @@ computeCoulombHessianDDPP_IK_1(double*         hess_xy,
     {
         double hess_ik_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ik_xy += ERIs[n][threadIdx.x];
+            hess_ik_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -16399,18 +16334,18 @@ computeCoulombHessianDDPP_IK_2(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -16427,68 +16362,68 @@ computeCoulombHessianDDPP_IK_2(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_k = 0; atom_idx_k < natoms; atom_idx_k++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_k[atom_idx_k];
     const auto kl_pair_displ = d_kl_displs_for_atom_k[atom_idx_k];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_k[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -16634,8 +16569,7 @@ computeCoulombHessianDDPP_IK_2(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -16644,9 +16578,9 @@ computeCoulombHessianDDPP_IK_2(double*         hess_xy,
     {
         double hess_ik_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ik_xy += ERIs[n][threadIdx.x];
+            hess_ik_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -16694,18 +16628,18 @@ computeCoulombHessianDDPP_IK_3(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -16722,68 +16656,68 @@ computeCoulombHessianDDPP_IK_3(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_k = 0; atom_idx_k < natoms; atom_idx_k++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_k[atom_idx_k];
     const auto kl_pair_displ = d_kl_displs_for_atom_k[atom_idx_k];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_k[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -16945,8 +16879,7 @@ computeCoulombHessianDDPP_IK_3(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -16955,9 +16888,9 @@ computeCoulombHessianDDPP_IK_3(double*         hess_xy,
     {
         double hess_ik_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ik_xy += ERIs[n][threadIdx.x];
+            hess_ik_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -17005,18 +16938,18 @@ computeCoulombHessianDDPP_IK_4(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -17033,68 +16966,68 @@ computeCoulombHessianDDPP_IK_4(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_k = 0; atom_idx_k < natoms; atom_idx_k++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_k[atom_idx_k];
     const auto kl_pair_displ = d_kl_displs_for_atom_k[atom_idx_k];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_k[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -17316,8 +17249,7 @@ computeCoulombHessianDDPP_IK_4(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -17326,9 +17258,9 @@ computeCoulombHessianDDPP_IK_4(double*         hess_xy,
     {
         double hess_ik_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ik_xy += ERIs[n][threadIdx.x];
+            hess_ik_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -17376,18 +17308,18 @@ computeCoulombHessianDDPP_IK_5(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -17404,68 +17336,68 @@ computeCoulombHessianDDPP_IK_5(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_k = 0; atom_idx_k < natoms; atom_idx_k++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_k[atom_idx_k];
     const auto kl_pair_displ = d_kl_displs_for_atom_k[atom_idx_k];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_k[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -17587,8 +17519,7 @@ computeCoulombHessianDDPP_IK_5(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -17597,9 +17528,9 @@ computeCoulombHessianDDPP_IK_5(double*         hess_xy,
     {
         double hess_ik_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ik_xy += ERIs[n][threadIdx.x];
+            hess_ik_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -17647,18 +17578,18 @@ computeCoulombHessianDDPP_IK_6(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -17675,68 +17606,68 @@ computeCoulombHessianDDPP_IK_6(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_k = 0; atom_idx_k < natoms; atom_idx_k++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_k[atom_idx_k];
     const auto kl_pair_displ = d_kl_displs_for_atom_k[atom_idx_k];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_k[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -17826,8 +17757,7 @@ computeCoulombHessianDDPP_IK_6(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -17836,9 +17766,9 @@ computeCoulombHessianDDPP_IK_6(double*         hess_xy,
     {
         double hess_ik_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ik_xy += ERIs[n][threadIdx.x];
+            hess_ik_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -17886,18 +17816,18 @@ computeCoulombHessianDDPP_IK_7(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -17914,68 +17844,68 @@ computeCoulombHessianDDPP_IK_7(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_k = 0; atom_idx_k < natoms; atom_idx_k++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_k[atom_idx_k];
     const auto kl_pair_displ = d_kl_displs_for_atom_k[atom_idx_k];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_k[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -18061,8 +17991,7 @@ computeCoulombHessianDDPP_IK_7(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -18071,9 +18000,9 @@ computeCoulombHessianDDPP_IK_7(double*         hess_xy,
     {
         double hess_ik_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ik_xy += ERIs[n][threadIdx.x];
+            hess_ik_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -18121,18 +18050,18 @@ computeCoulombHessianDDPP_IK_8(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -18149,68 +18078,68 @@ computeCoulombHessianDDPP_IK_8(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_k = 0; atom_idx_k < natoms; atom_idx_k++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_k[atom_idx_k];
     const auto kl_pair_displ = d_kl_displs_for_atom_k[atom_idx_k];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_k[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -18328,8 +18257,7 @@ computeCoulombHessianDDPP_IK_8(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -18338,9 +18266,9 @@ computeCoulombHessianDDPP_IK_8(double*         hess_xy,
     {
         double hess_ik_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ik_xy += ERIs[n][threadIdx.x];
+            hess_ik_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -18388,18 +18316,18 @@ computeCoulombHessianDDPP_IK_9(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -18416,68 +18344,68 @@ computeCoulombHessianDDPP_IK_9(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_k = 0; atom_idx_k < natoms; atom_idx_k++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_k[atom_idx_k];
     const auto kl_pair_displ = d_kl_displs_for_atom_k[atom_idx_k];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_k[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -18575,8 +18503,7 @@ computeCoulombHessianDDPP_IK_9(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -18585,9 +18512,9 @@ computeCoulombHessianDDPP_IK_9(double*         hess_xy,
     {
         double hess_ik_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ik_xy += ERIs[n][threadIdx.x];
+            hess_ik_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -18635,18 +18562,18 @@ computeCoulombHessianDDPP_IK_10(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -18663,68 +18590,68 @@ computeCoulombHessianDDPP_IK_10(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_k = 0; atom_idx_k < natoms; atom_idx_k++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_k[atom_idx_k];
     const auto kl_pair_displ = d_kl_displs_for_atom_k[atom_idx_k];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_k[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -18850,8 +18777,7 @@ computeCoulombHessianDDPP_IK_10(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -18860,9 +18786,9 @@ computeCoulombHessianDDPP_IK_10(double*         hess_xy,
     {
         double hess_ik_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ik_xy += ERIs[n][threadIdx.x];
+            hess_ik_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -18910,18 +18836,18 @@ computeCoulombHessianDDPP_IK_11(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -18938,68 +18864,68 @@ computeCoulombHessianDDPP_IK_11(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_k = 0; atom_idx_k < natoms; atom_idx_k++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_k[atom_idx_k];
     const auto kl_pair_displ = d_kl_displs_for_atom_k[atom_idx_k];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_k[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -19083,8 +19009,7 @@ computeCoulombHessianDDPP_IK_11(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -19093,9 +19018,9 @@ computeCoulombHessianDDPP_IK_11(double*         hess_xy,
     {
         double hess_ik_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ik_xy += ERIs[n][threadIdx.x];
+            hess_ik_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -19143,18 +19068,18 @@ computeCoulombHessianDDPP_IK_12(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -19171,68 +19096,68 @@ computeCoulombHessianDDPP_IK_12(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_k = 0; atom_idx_k < natoms; atom_idx_k++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_k[atom_idx_k];
     const auto kl_pair_displ = d_kl_displs_for_atom_k[atom_idx_k];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_k[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -19328,8 +19253,7 @@ computeCoulombHessianDDPP_IK_12(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -19338,9 +19262,9 @@ computeCoulombHessianDDPP_IK_12(double*         hess_xy,
     {
         double hess_ik_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ik_xy += ERIs[n][threadIdx.x];
+            hess_ik_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -19388,18 +19312,18 @@ computeCoulombHessianDDPP_IK_13(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -19416,68 +19340,68 @@ computeCoulombHessianDDPP_IK_13(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_k = 0; atom_idx_k < natoms; atom_idx_k++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_k[atom_idx_k];
     const auto kl_pair_displ = d_kl_displs_for_atom_k[atom_idx_k];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_k[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -19573,8 +19497,7 @@ computeCoulombHessianDDPP_IK_13(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -19583,9 +19506,9 @@ computeCoulombHessianDDPP_IK_13(double*         hess_xy,
     {
         double hess_ik_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ik_xy += ERIs[n][threadIdx.x];
+            hess_ik_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -19633,18 +19556,18 @@ computeCoulombHessianDDPP_IK_14(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -19661,68 +19584,68 @@ computeCoulombHessianDDPP_IK_14(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_k = 0; atom_idx_k < natoms; atom_idx_k++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_k[atom_idx_k];
     const auto kl_pair_displ = d_kl_displs_for_atom_k[atom_idx_k];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_k[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -19802,8 +19725,7 @@ computeCoulombHessianDDPP_IK_14(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -19812,9 +19734,9 @@ computeCoulombHessianDDPP_IK_14(double*         hess_xy,
     {
         double hess_ik_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ik_xy += ERIs[n][threadIdx.x];
+            hess_ik_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -19862,18 +19784,18 @@ computeCoulombHessianDDPP_IK_15(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -19890,68 +19812,68 @@ computeCoulombHessianDDPP_IK_15(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_k = 0; atom_idx_k < natoms; atom_idx_k++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_k[atom_idx_k];
     const auto kl_pair_displ = d_kl_displs_for_atom_k[atom_idx_k];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_k[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -20081,8 +20003,7 @@ computeCoulombHessianDDPP_IK_15(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -20091,9 +20012,9 @@ computeCoulombHessianDDPP_IK_15(double*         hess_xy,
     {
         double hess_ik_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ik_xy += ERIs[n][threadIdx.x];
+            hess_ik_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -20141,18 +20062,18 @@ computeCoulombHessianDDPP_IK_16(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -20169,68 +20090,68 @@ computeCoulombHessianDDPP_IK_16(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_k = 0; atom_idx_k < natoms; atom_idx_k++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_k[atom_idx_k];
     const auto kl_pair_displ = d_kl_displs_for_atom_k[atom_idx_k];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_k[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -20334,8 +20255,7 @@ computeCoulombHessianDDPP_IK_16(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -20344,9 +20264,9 @@ computeCoulombHessianDDPP_IK_16(double*         hess_xy,
     {
         double hess_ik_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ik_xy += ERIs[n][threadIdx.x];
+            hess_ik_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -20394,18 +20314,18 @@ computeCoulombHessianDDPP_IK_17(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -20422,68 +20342,68 @@ computeCoulombHessianDDPP_IK_17(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_k = 0; atom_idx_k < natoms; atom_idx_k++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_k[atom_idx_k];
     const auto kl_pair_displ = d_kl_displs_for_atom_k[atom_idx_k];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_k[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -20593,8 +20513,7 @@ computeCoulombHessianDDPP_IK_17(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -20603,9 +20522,9 @@ computeCoulombHessianDDPP_IK_17(double*         hess_xy,
     {
         double hess_ik_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ik_xy += ERIs[n][threadIdx.x];
+            hess_ik_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -20653,18 +20572,18 @@ computeCoulombHessianDDPP_IK_18(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -20681,68 +20600,68 @@ computeCoulombHessianDDPP_IK_18(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_k = 0; atom_idx_k < natoms; atom_idx_k++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_k[atom_idx_k];
     const auto kl_pair_displ = d_kl_displs_for_atom_k[atom_idx_k];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_k[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -20940,8 +20859,7 @@ computeCoulombHessianDDPP_IK_18(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -20950,9 +20868,9 @@ computeCoulombHessianDDPP_IK_18(double*         hess_xy,
     {
         double hess_ik_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_ik_xy += ERIs[n][threadIdx.x];
+            hess_ik_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -21000,18 +20918,18 @@ computeCoulombHessianDDPP_JK_0(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -21028,68 +20946,68 @@ computeCoulombHessianDDPP_JK_0(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_k = 0; atom_idx_k < natoms; atom_idx_k++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_k[atom_idx_k];
     const auto kl_pair_displ = d_kl_displs_for_atom_k[atom_idx_k];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_k[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -21301,8 +21219,7 @@ computeCoulombHessianDDPP_JK_0(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -21311,9 +21228,9 @@ computeCoulombHessianDDPP_JK_0(double*         hess_xy,
     {
         double hess_jk_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jk_xy += ERIs[n][threadIdx.x];
+            hess_jk_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -21361,18 +21278,18 @@ computeCoulombHessianDDPP_JK_1(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -21389,68 +21306,68 @@ computeCoulombHessianDDPP_JK_1(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_k = 0; atom_idx_k < natoms; atom_idx_k++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_k[atom_idx_k];
     const auto kl_pair_displ = d_kl_displs_for_atom_k[atom_idx_k];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_k[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -21676,8 +21593,7 @@ computeCoulombHessianDDPP_JK_1(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -21686,9 +21602,9 @@ computeCoulombHessianDDPP_JK_1(double*         hess_xy,
     {
         double hess_jk_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jk_xy += ERIs[n][threadIdx.x];
+            hess_jk_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -21736,18 +21652,18 @@ computeCoulombHessianDDPP_JK_2(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -21764,68 +21680,68 @@ computeCoulombHessianDDPP_JK_2(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_k = 0; atom_idx_k < natoms; atom_idx_k++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_k[atom_idx_k];
     const auto kl_pair_displ = d_kl_displs_for_atom_k[atom_idx_k];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_k[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -21971,8 +21887,7 @@ computeCoulombHessianDDPP_JK_2(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -21981,9 +21896,9 @@ computeCoulombHessianDDPP_JK_2(double*         hess_xy,
     {
         double hess_jk_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jk_xy += ERIs[n][threadIdx.x];
+            hess_jk_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -22031,18 +21946,18 @@ computeCoulombHessianDDPP_JK_3(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -22059,68 +21974,68 @@ computeCoulombHessianDDPP_JK_3(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_k = 0; atom_idx_k < natoms; atom_idx_k++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_k[atom_idx_k];
     const auto kl_pair_displ = d_kl_displs_for_atom_k[atom_idx_k];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_k[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -22282,8 +22197,7 @@ computeCoulombHessianDDPP_JK_3(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -22292,9 +22206,9 @@ computeCoulombHessianDDPP_JK_3(double*         hess_xy,
     {
         double hess_jk_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jk_xy += ERIs[n][threadIdx.x];
+            hess_jk_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -22342,18 +22256,18 @@ computeCoulombHessianDDPP_JK_4(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -22370,68 +22284,68 @@ computeCoulombHessianDDPP_JK_4(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_k = 0; atom_idx_k < natoms; atom_idx_k++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_k[atom_idx_k];
     const auto kl_pair_displ = d_kl_displs_for_atom_k[atom_idx_k];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_k[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -22653,8 +22567,7 @@ computeCoulombHessianDDPP_JK_4(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -22663,9 +22576,9 @@ computeCoulombHessianDDPP_JK_4(double*         hess_xy,
     {
         double hess_jk_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jk_xy += ERIs[n][threadIdx.x];
+            hess_jk_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -22713,18 +22626,18 @@ computeCoulombHessianDDPP_JK_5(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -22741,68 +22654,68 @@ computeCoulombHessianDDPP_JK_5(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_k = 0; atom_idx_k < natoms; atom_idx_k++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_k[atom_idx_k];
     const auto kl_pair_displ = d_kl_displs_for_atom_k[atom_idx_k];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_k[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -22924,8 +22837,7 @@ computeCoulombHessianDDPP_JK_5(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -22934,9 +22846,9 @@ computeCoulombHessianDDPP_JK_5(double*         hess_xy,
     {
         double hess_jk_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jk_xy += ERIs[n][threadIdx.x];
+            hess_jk_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -22984,18 +22896,18 @@ computeCoulombHessianDDPP_JK_6(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -23012,68 +22924,68 @@ computeCoulombHessianDDPP_JK_6(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_k = 0; atom_idx_k < natoms; atom_idx_k++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_k[atom_idx_k];
     const auto kl_pair_displ = d_kl_displs_for_atom_k[atom_idx_k];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_k[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -23163,8 +23075,7 @@ computeCoulombHessianDDPP_JK_6(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -23173,9 +23084,9 @@ computeCoulombHessianDDPP_JK_6(double*         hess_xy,
     {
         double hess_jk_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jk_xy += ERIs[n][threadIdx.x];
+            hess_jk_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -23223,18 +23134,18 @@ computeCoulombHessianDDPP_JK_7(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -23251,68 +23162,68 @@ computeCoulombHessianDDPP_JK_7(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_k = 0; atom_idx_k < natoms; atom_idx_k++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_k[atom_idx_k];
     const auto kl_pair_displ = d_kl_displs_for_atom_k[atom_idx_k];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_k[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -23398,8 +23309,7 @@ computeCoulombHessianDDPP_JK_7(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -23408,9 +23318,9 @@ computeCoulombHessianDDPP_JK_7(double*         hess_xy,
     {
         double hess_jk_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jk_xy += ERIs[n][threadIdx.x];
+            hess_jk_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -23458,18 +23368,18 @@ computeCoulombHessianDDPP_JK_8(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -23486,68 +23396,68 @@ computeCoulombHessianDDPP_JK_8(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_k = 0; atom_idx_k < natoms; atom_idx_k++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_k[atom_idx_k];
     const auto kl_pair_displ = d_kl_displs_for_atom_k[atom_idx_k];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_k[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -23665,8 +23575,7 @@ computeCoulombHessianDDPP_JK_8(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -23675,9 +23584,9 @@ computeCoulombHessianDDPP_JK_8(double*         hess_xy,
     {
         double hess_jk_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jk_xy += ERIs[n][threadIdx.x];
+            hess_jk_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -23725,18 +23634,18 @@ computeCoulombHessianDDPP_JK_9(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -23753,68 +23662,68 @@ computeCoulombHessianDDPP_JK_9(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_k = 0; atom_idx_k < natoms; atom_idx_k++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_k[atom_idx_k];
     const auto kl_pair_displ = d_kl_displs_for_atom_k[atom_idx_k];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_k[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -23912,8 +23821,7 @@ computeCoulombHessianDDPP_JK_9(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -23922,9 +23830,9 @@ computeCoulombHessianDDPP_JK_9(double*         hess_xy,
     {
         double hess_jk_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jk_xy += ERIs[n][threadIdx.x];
+            hess_jk_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -23972,18 +23880,18 @@ computeCoulombHessianDDPP_JK_10(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -24000,68 +23908,68 @@ computeCoulombHessianDDPP_JK_10(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_k = 0; atom_idx_k < natoms; atom_idx_k++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_k[atom_idx_k];
     const auto kl_pair_displ = d_kl_displs_for_atom_k[atom_idx_k];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_k[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -24187,8 +24095,7 @@ computeCoulombHessianDDPP_JK_10(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -24197,9 +24104,9 @@ computeCoulombHessianDDPP_JK_10(double*         hess_xy,
     {
         double hess_jk_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jk_xy += ERIs[n][threadIdx.x];
+            hess_jk_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -24247,18 +24154,18 @@ computeCoulombHessianDDPP_JK_11(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -24275,68 +24182,68 @@ computeCoulombHessianDDPP_JK_11(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_k = 0; atom_idx_k < natoms; atom_idx_k++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_k[atom_idx_k];
     const auto kl_pair_displ = d_kl_displs_for_atom_k[atom_idx_k];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_k[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -24420,8 +24327,7 @@ computeCoulombHessianDDPP_JK_11(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -24430,9 +24336,9 @@ computeCoulombHessianDDPP_JK_11(double*         hess_xy,
     {
         double hess_jk_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jk_xy += ERIs[n][threadIdx.x];
+            hess_jk_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -24480,18 +24386,18 @@ computeCoulombHessianDDPP_JK_12(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -24508,68 +24414,68 @@ computeCoulombHessianDDPP_JK_12(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_k = 0; atom_idx_k < natoms; atom_idx_k++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_k[atom_idx_k];
     const auto kl_pair_displ = d_kl_displs_for_atom_k[atom_idx_k];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_k[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -24665,8 +24571,7 @@ computeCoulombHessianDDPP_JK_12(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -24675,9 +24580,9 @@ computeCoulombHessianDDPP_JK_12(double*         hess_xy,
     {
         double hess_jk_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jk_xy += ERIs[n][threadIdx.x];
+            hess_jk_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -24725,18 +24630,18 @@ computeCoulombHessianDDPP_JK_13(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -24753,68 +24658,68 @@ computeCoulombHessianDDPP_JK_13(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_k = 0; atom_idx_k < natoms; atom_idx_k++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_k[atom_idx_k];
     const auto kl_pair_displ = d_kl_displs_for_atom_k[atom_idx_k];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_k[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -24910,8 +24815,7 @@ computeCoulombHessianDDPP_JK_13(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -24920,9 +24824,9 @@ computeCoulombHessianDDPP_JK_13(double*         hess_xy,
     {
         double hess_jk_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jk_xy += ERIs[n][threadIdx.x];
+            hess_jk_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -24970,18 +24874,18 @@ computeCoulombHessianDDPP_JK_14(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -24998,68 +24902,68 @@ computeCoulombHessianDDPP_JK_14(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_k = 0; atom_idx_k < natoms; atom_idx_k++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_k[atom_idx_k];
     const auto kl_pair_displ = d_kl_displs_for_atom_k[atom_idx_k];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_k[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -25139,8 +25043,7 @@ computeCoulombHessianDDPP_JK_14(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -25149,9 +25052,9 @@ computeCoulombHessianDDPP_JK_14(double*         hess_xy,
     {
         double hess_jk_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jk_xy += ERIs[n][threadIdx.x];
+            hess_jk_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -25199,18 +25102,18 @@ computeCoulombHessianDDPP_JK_15(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -25227,68 +25130,68 @@ computeCoulombHessianDDPP_JK_15(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_k = 0; atom_idx_k < natoms; atom_idx_k++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_k[atom_idx_k];
     const auto kl_pair_displ = d_kl_displs_for_atom_k[atom_idx_k];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_k[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -25418,8 +25321,7 @@ computeCoulombHessianDDPP_JK_15(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -25428,9 +25330,9 @@ computeCoulombHessianDDPP_JK_15(double*         hess_xy,
     {
         double hess_jk_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jk_xy += ERIs[n][threadIdx.x];
+            hess_jk_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -25478,18 +25380,18 @@ computeCoulombHessianDDPP_JK_16(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -25506,68 +25408,68 @@ computeCoulombHessianDDPP_JK_16(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_k = 0; atom_idx_k < natoms; atom_idx_k++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_k[atom_idx_k];
     const auto kl_pair_displ = d_kl_displs_for_atom_k[atom_idx_k];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_k[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -25671,8 +25573,7 @@ computeCoulombHessianDDPP_JK_16(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -25681,9 +25582,9 @@ computeCoulombHessianDDPP_JK_16(double*         hess_xy,
     {
         double hess_jk_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jk_xy += ERIs[n][threadIdx.x];
+            hess_jk_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -25731,18 +25632,18 @@ computeCoulombHessianDDPP_JK_17(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -25759,68 +25660,68 @@ computeCoulombHessianDDPP_JK_17(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_k = 0; atom_idx_k < natoms; atom_idx_k++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_k[atom_idx_k];
     const auto kl_pair_displ = d_kl_displs_for_atom_k[atom_idx_k];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_k[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -25930,8 +25831,7 @@ computeCoulombHessianDDPP_JK_17(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -25940,9 +25840,9 @@ computeCoulombHessianDDPP_JK_17(double*         hess_xy,
     {
         double hess_jk_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jk_xy += ERIs[n][threadIdx.x];
+            hess_jk_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -25990,18 +25890,18 @@ computeCoulombHessianDDPP_JK_18(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -26018,68 +25918,68 @@ computeCoulombHessianDDPP_JK_18(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_k = 0; atom_idx_k < natoms; atom_idx_k++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_k[atom_idx_k];
     const auto kl_pair_displ = d_kl_displs_for_atom_k[atom_idx_k];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_k[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -26277,8 +26177,7 @@ computeCoulombHessianDDPP_JK_18(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -26287,9 +26186,9 @@ computeCoulombHessianDDPP_JK_18(double*         hess_xy,
     {
         double hess_jk_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jk_xy += ERIs[n][threadIdx.x];
+            hess_jk_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -26337,18 +26236,18 @@ computeCoulombHessianDDPP_IL_0(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -26365,68 +26264,68 @@ computeCoulombHessianDDPP_IL_0(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_l = 0; atom_idx_l < natoms; atom_idx_l++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_l[atom_idx_l];
     const auto kl_pair_displ = d_kl_displs_for_atom_l[atom_idx_l];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_l[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -26638,8 +26537,7 @@ computeCoulombHessianDDPP_IL_0(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -26648,9 +26546,9 @@ computeCoulombHessianDDPP_IL_0(double*         hess_xy,
     {
         double hess_il_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_il_xy += ERIs[n][threadIdx.x];
+            hess_il_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -26698,18 +26596,18 @@ computeCoulombHessianDDPP_IL_1(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -26726,68 +26624,68 @@ computeCoulombHessianDDPP_IL_1(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_l = 0; atom_idx_l < natoms; atom_idx_l++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_l[atom_idx_l];
     const auto kl_pair_displ = d_kl_displs_for_atom_l[atom_idx_l];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_l[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -27013,8 +26911,7 @@ computeCoulombHessianDDPP_IL_1(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -27023,9 +26920,9 @@ computeCoulombHessianDDPP_IL_1(double*         hess_xy,
     {
         double hess_il_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_il_xy += ERIs[n][threadIdx.x];
+            hess_il_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -27073,18 +26970,18 @@ computeCoulombHessianDDPP_IL_2(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -27101,68 +26998,68 @@ computeCoulombHessianDDPP_IL_2(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_l = 0; atom_idx_l < natoms; atom_idx_l++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_l[atom_idx_l];
     const auto kl_pair_displ = d_kl_displs_for_atom_l[atom_idx_l];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_l[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -27308,8 +27205,7 @@ computeCoulombHessianDDPP_IL_2(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -27318,9 +27214,9 @@ computeCoulombHessianDDPP_IL_2(double*         hess_xy,
     {
         double hess_il_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_il_xy += ERIs[n][threadIdx.x];
+            hess_il_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -27368,18 +27264,18 @@ computeCoulombHessianDDPP_IL_3(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -27396,68 +27292,68 @@ computeCoulombHessianDDPP_IL_3(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_l = 0; atom_idx_l < natoms; atom_idx_l++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_l[atom_idx_l];
     const auto kl_pair_displ = d_kl_displs_for_atom_l[atom_idx_l];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_l[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -27619,8 +27515,7 @@ computeCoulombHessianDDPP_IL_3(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -27629,9 +27524,9 @@ computeCoulombHessianDDPP_IL_3(double*         hess_xy,
     {
         double hess_il_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_il_xy += ERIs[n][threadIdx.x];
+            hess_il_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -27679,18 +27574,18 @@ computeCoulombHessianDDPP_IL_4(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -27707,68 +27602,68 @@ computeCoulombHessianDDPP_IL_4(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_l = 0; atom_idx_l < natoms; atom_idx_l++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_l[atom_idx_l];
     const auto kl_pair_displ = d_kl_displs_for_atom_l[atom_idx_l];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_l[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -27990,8 +27885,7 @@ computeCoulombHessianDDPP_IL_4(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -28000,9 +27894,9 @@ computeCoulombHessianDDPP_IL_4(double*         hess_xy,
     {
         double hess_il_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_il_xy += ERIs[n][threadIdx.x];
+            hess_il_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -28050,18 +27944,18 @@ computeCoulombHessianDDPP_IL_5(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -28078,68 +27972,68 @@ computeCoulombHessianDDPP_IL_5(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_l = 0; atom_idx_l < natoms; atom_idx_l++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_l[atom_idx_l];
     const auto kl_pair_displ = d_kl_displs_for_atom_l[atom_idx_l];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_l[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -28261,8 +28155,7 @@ computeCoulombHessianDDPP_IL_5(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -28271,9 +28164,9 @@ computeCoulombHessianDDPP_IL_5(double*         hess_xy,
     {
         double hess_il_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_il_xy += ERIs[n][threadIdx.x];
+            hess_il_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -28321,18 +28214,18 @@ computeCoulombHessianDDPP_IL_6(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -28349,68 +28242,68 @@ computeCoulombHessianDDPP_IL_6(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_l = 0; atom_idx_l < natoms; atom_idx_l++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_l[atom_idx_l];
     const auto kl_pair_displ = d_kl_displs_for_atom_l[atom_idx_l];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_l[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -28500,8 +28393,7 @@ computeCoulombHessianDDPP_IL_6(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -28510,9 +28402,9 @@ computeCoulombHessianDDPP_IL_6(double*         hess_xy,
     {
         double hess_il_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_il_xy += ERIs[n][threadIdx.x];
+            hess_il_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -28560,18 +28452,18 @@ computeCoulombHessianDDPP_IL_7(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -28588,68 +28480,68 @@ computeCoulombHessianDDPP_IL_7(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_l = 0; atom_idx_l < natoms; atom_idx_l++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_l[atom_idx_l];
     const auto kl_pair_displ = d_kl_displs_for_atom_l[atom_idx_l];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_l[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -28735,8 +28627,7 @@ computeCoulombHessianDDPP_IL_7(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -28745,9 +28636,9 @@ computeCoulombHessianDDPP_IL_7(double*         hess_xy,
     {
         double hess_il_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_il_xy += ERIs[n][threadIdx.x];
+            hess_il_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -28795,18 +28686,18 @@ computeCoulombHessianDDPP_IL_8(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -28823,68 +28714,68 @@ computeCoulombHessianDDPP_IL_8(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_l = 0; atom_idx_l < natoms; atom_idx_l++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_l[atom_idx_l];
     const auto kl_pair_displ = d_kl_displs_for_atom_l[atom_idx_l];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_l[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -29002,8 +28893,7 @@ computeCoulombHessianDDPP_IL_8(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -29012,9 +28902,9 @@ computeCoulombHessianDDPP_IL_8(double*         hess_xy,
     {
         double hess_il_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_il_xy += ERIs[n][threadIdx.x];
+            hess_il_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -29062,18 +28952,18 @@ computeCoulombHessianDDPP_IL_9(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -29090,68 +28980,68 @@ computeCoulombHessianDDPP_IL_9(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_l = 0; atom_idx_l < natoms; atom_idx_l++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_l[atom_idx_l];
     const auto kl_pair_displ = d_kl_displs_for_atom_l[atom_idx_l];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_l[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -29249,8 +29139,7 @@ computeCoulombHessianDDPP_IL_9(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -29259,9 +29148,9 @@ computeCoulombHessianDDPP_IL_9(double*         hess_xy,
     {
         double hess_il_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_il_xy += ERIs[n][threadIdx.x];
+            hess_il_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -29309,18 +29198,18 @@ computeCoulombHessianDDPP_IL_10(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -29337,68 +29226,68 @@ computeCoulombHessianDDPP_IL_10(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_l = 0; atom_idx_l < natoms; atom_idx_l++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_l[atom_idx_l];
     const auto kl_pair_displ = d_kl_displs_for_atom_l[atom_idx_l];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_l[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -29526,8 +29415,7 @@ computeCoulombHessianDDPP_IL_10(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -29536,9 +29424,9 @@ computeCoulombHessianDDPP_IL_10(double*         hess_xy,
     {
         double hess_il_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_il_xy += ERIs[n][threadIdx.x];
+            hess_il_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -29586,18 +29474,18 @@ computeCoulombHessianDDPP_IL_11(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -29614,68 +29502,68 @@ computeCoulombHessianDDPP_IL_11(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_l = 0; atom_idx_l < natoms; atom_idx_l++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_l[atom_idx_l];
     const auto kl_pair_displ = d_kl_displs_for_atom_l[atom_idx_l];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_l[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -29757,8 +29645,7 @@ computeCoulombHessianDDPP_IL_11(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -29767,9 +29654,9 @@ computeCoulombHessianDDPP_IL_11(double*         hess_xy,
     {
         double hess_il_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_il_xy += ERIs[n][threadIdx.x];
+            hess_il_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -29817,18 +29704,18 @@ computeCoulombHessianDDPP_IL_12(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -29845,68 +29732,68 @@ computeCoulombHessianDDPP_IL_12(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_l = 0; atom_idx_l < natoms; atom_idx_l++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_l[atom_idx_l];
     const auto kl_pair_displ = d_kl_displs_for_atom_l[atom_idx_l];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_l[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -30002,8 +29889,7 @@ computeCoulombHessianDDPP_IL_12(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -30012,9 +29898,9 @@ computeCoulombHessianDDPP_IL_12(double*         hess_xy,
     {
         double hess_il_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_il_xy += ERIs[n][threadIdx.x];
+            hess_il_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -30062,18 +29948,18 @@ computeCoulombHessianDDPP_IL_13(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -30090,68 +29976,68 @@ computeCoulombHessianDDPP_IL_13(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_l = 0; atom_idx_l < natoms; atom_idx_l++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_l[atom_idx_l];
     const auto kl_pair_displ = d_kl_displs_for_atom_l[atom_idx_l];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_l[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -30247,8 +30133,7 @@ computeCoulombHessianDDPP_IL_13(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -30257,9 +30142,9 @@ computeCoulombHessianDDPP_IL_13(double*         hess_xy,
     {
         double hess_il_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_il_xy += ERIs[n][threadIdx.x];
+            hess_il_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -30307,18 +30192,18 @@ computeCoulombHessianDDPP_IL_14(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -30335,68 +30220,68 @@ computeCoulombHessianDDPP_IL_14(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_l = 0; atom_idx_l < natoms; atom_idx_l++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_l[atom_idx_l];
     const auto kl_pair_displ = d_kl_displs_for_atom_l[atom_idx_l];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_l[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -30476,8 +30361,7 @@ computeCoulombHessianDDPP_IL_14(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -30486,9 +30370,9 @@ computeCoulombHessianDDPP_IL_14(double*         hess_xy,
     {
         double hess_il_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_il_xy += ERIs[n][threadIdx.x];
+            hess_il_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -30536,18 +30420,18 @@ computeCoulombHessianDDPP_IL_15(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -30564,68 +30448,68 @@ computeCoulombHessianDDPP_IL_15(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_l = 0; atom_idx_l < natoms; atom_idx_l++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_l[atom_idx_l];
     const auto kl_pair_displ = d_kl_displs_for_atom_l[atom_idx_l];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_l[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -30755,8 +30639,7 @@ computeCoulombHessianDDPP_IL_15(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -30765,9 +30648,9 @@ computeCoulombHessianDDPP_IL_15(double*         hess_xy,
     {
         double hess_il_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_il_xy += ERIs[n][threadIdx.x];
+            hess_il_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -30815,18 +30698,18 @@ computeCoulombHessianDDPP_IL_16(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -30843,68 +30726,68 @@ computeCoulombHessianDDPP_IL_16(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_l = 0; atom_idx_l < natoms; atom_idx_l++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_l[atom_idx_l];
     const auto kl_pair_displ = d_kl_displs_for_atom_l[atom_idx_l];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_l[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -31008,8 +30891,7 @@ computeCoulombHessianDDPP_IL_16(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -31018,9 +30900,9 @@ computeCoulombHessianDDPP_IL_16(double*         hess_xy,
     {
         double hess_il_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_il_xy += ERIs[n][threadIdx.x];
+            hess_il_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -31068,18 +30950,18 @@ computeCoulombHessianDDPP_IL_17(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -31096,68 +30978,68 @@ computeCoulombHessianDDPP_IL_17(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_l = 0; atom_idx_l < natoms; atom_idx_l++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_l[atom_idx_l];
     const auto kl_pair_displ = d_kl_displs_for_atom_l[atom_idx_l];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_l[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -31267,8 +31149,7 @@ computeCoulombHessianDDPP_IL_17(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -31277,9 +31158,9 @@ computeCoulombHessianDDPP_IL_17(double*         hess_xy,
     {
         double hess_il_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_il_xy += ERIs[n][threadIdx.x];
+            hess_il_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -31327,18 +31208,18 @@ computeCoulombHessianDDPP_IL_18(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PA_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -31355,68 +31236,68 @@ computeCoulombHessianDDPP_IL_18(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_l = 0; atom_idx_l < natoms; atom_idx_l++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_l[atom_idx_l];
     const auto kl_pair_displ = d_kl_displs_for_atom_l[atom_idx_l];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_l[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -31614,8 +31495,7 @@ computeCoulombHessianDDPP_IL_18(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -31624,9 +31504,9 @@ computeCoulombHessianDDPP_IL_18(double*         hess_xy,
     {
         double hess_il_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_il_xy += ERIs[n][threadIdx.x];
+            hess_il_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -31674,18 +31554,18 @@ computeCoulombHessianDDPP_JL_0(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -31702,68 +31582,68 @@ computeCoulombHessianDDPP_JL_0(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_l = 0; atom_idx_l < natoms; atom_idx_l++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_l[atom_idx_l];
     const auto kl_pair_displ = d_kl_displs_for_atom_l[atom_idx_l];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_l[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -31975,8 +31855,7 @@ computeCoulombHessianDDPP_JL_0(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -31985,9 +31864,9 @@ computeCoulombHessianDDPP_JL_0(double*         hess_xy,
     {
         double hess_jl_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jl_xy += ERIs[n][threadIdx.x];
+            hess_jl_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -32035,18 +31914,18 @@ computeCoulombHessianDDPP_JL_1(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -32063,68 +31942,68 @@ computeCoulombHessianDDPP_JL_1(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_l = 0; atom_idx_l < natoms; atom_idx_l++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_l[atom_idx_l];
     const auto kl_pair_displ = d_kl_displs_for_atom_l[atom_idx_l];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_l[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -32350,8 +32229,7 @@ computeCoulombHessianDDPP_JL_1(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -32360,9 +32238,9 @@ computeCoulombHessianDDPP_JL_1(double*         hess_xy,
     {
         double hess_jl_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jl_xy += ERIs[n][threadIdx.x];
+            hess_jl_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -32410,18 +32288,18 @@ computeCoulombHessianDDPP_JL_2(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -32438,68 +32316,68 @@ computeCoulombHessianDDPP_JL_2(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_l = 0; atom_idx_l < natoms; atom_idx_l++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_l[atom_idx_l];
     const auto kl_pair_displ = d_kl_displs_for_atom_l[atom_idx_l];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_l[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -32645,8 +32523,7 @@ computeCoulombHessianDDPP_JL_2(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -32655,9 +32532,9 @@ computeCoulombHessianDDPP_JL_2(double*         hess_xy,
     {
         double hess_jl_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jl_xy += ERIs[n][threadIdx.x];
+            hess_jl_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -32705,18 +32582,18 @@ computeCoulombHessianDDPP_JL_3(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -32733,68 +32610,68 @@ computeCoulombHessianDDPP_JL_3(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_l = 0; atom_idx_l < natoms; atom_idx_l++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_l[atom_idx_l];
     const auto kl_pair_displ = d_kl_displs_for_atom_l[atom_idx_l];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_l[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -32956,8 +32833,7 @@ computeCoulombHessianDDPP_JL_3(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -32966,9 +32842,9 @@ computeCoulombHessianDDPP_JL_3(double*         hess_xy,
     {
         double hess_jl_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jl_xy += ERIs[n][threadIdx.x];
+            hess_jl_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -33016,18 +32892,18 @@ computeCoulombHessianDDPP_JL_4(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -33044,68 +32920,68 @@ computeCoulombHessianDDPP_JL_4(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_l = 0; atom_idx_l < natoms; atom_idx_l++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_l[atom_idx_l];
     const auto kl_pair_displ = d_kl_displs_for_atom_l[atom_idx_l];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_l[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -33327,8 +33203,7 @@ computeCoulombHessianDDPP_JL_4(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -33337,9 +33212,9 @@ computeCoulombHessianDDPP_JL_4(double*         hess_xy,
     {
         double hess_jl_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jl_xy += ERIs[n][threadIdx.x];
+            hess_jl_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -33387,18 +33262,18 @@ computeCoulombHessianDDPP_JL_5(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -33415,68 +33290,68 @@ computeCoulombHessianDDPP_JL_5(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_l = 0; atom_idx_l < natoms; atom_idx_l++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_l[atom_idx_l];
     const auto kl_pair_displ = d_kl_displs_for_atom_l[atom_idx_l];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_l[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -33598,8 +33473,7 @@ computeCoulombHessianDDPP_JL_5(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -33608,9 +33482,9 @@ computeCoulombHessianDDPP_JL_5(double*         hess_xy,
     {
         double hess_jl_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jl_xy += ERIs[n][threadIdx.x];
+            hess_jl_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -33658,18 +33532,18 @@ computeCoulombHessianDDPP_JL_6(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -33686,68 +33560,68 @@ computeCoulombHessianDDPP_JL_6(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_l = 0; atom_idx_l < natoms; atom_idx_l++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_l[atom_idx_l];
     const auto kl_pair_displ = d_kl_displs_for_atom_l[atom_idx_l];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_l[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -33837,8 +33711,7 @@ computeCoulombHessianDDPP_JL_6(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -33847,9 +33720,9 @@ computeCoulombHessianDDPP_JL_6(double*         hess_xy,
     {
         double hess_jl_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jl_xy += ERIs[n][threadIdx.x];
+            hess_jl_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -33897,18 +33770,18 @@ computeCoulombHessianDDPP_JL_7(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -33925,68 +33798,68 @@ computeCoulombHessianDDPP_JL_7(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_l = 0; atom_idx_l < natoms; atom_idx_l++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_l[atom_idx_l];
     const auto kl_pair_displ = d_kl_displs_for_atom_l[atom_idx_l];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_l[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -34072,8 +33945,7 @@ computeCoulombHessianDDPP_JL_7(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -34082,9 +33954,9 @@ computeCoulombHessianDDPP_JL_7(double*         hess_xy,
     {
         double hess_jl_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jl_xy += ERIs[n][threadIdx.x];
+            hess_jl_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -34132,18 +34004,18 @@ computeCoulombHessianDDPP_JL_8(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -34160,68 +34032,68 @@ computeCoulombHessianDDPP_JL_8(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_l = 0; atom_idx_l < natoms; atom_idx_l++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_l[atom_idx_l];
     const auto kl_pair_displ = d_kl_displs_for_atom_l[atom_idx_l];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_l[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -34339,8 +34211,7 @@ computeCoulombHessianDDPP_JL_8(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -34349,9 +34220,9 @@ computeCoulombHessianDDPP_JL_8(double*         hess_xy,
     {
         double hess_jl_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jl_xy += ERIs[n][threadIdx.x];
+            hess_jl_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -34399,18 +34270,18 @@ computeCoulombHessianDDPP_JL_9(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -34427,68 +34298,68 @@ computeCoulombHessianDDPP_JL_9(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_l = 0; atom_idx_l < natoms; atom_idx_l++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_l[atom_idx_l];
     const auto kl_pair_displ = d_kl_displs_for_atom_l[atom_idx_l];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_l[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -34586,8 +34457,7 @@ computeCoulombHessianDDPP_JL_9(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -34596,9 +34466,9 @@ computeCoulombHessianDDPP_JL_9(double*         hess_xy,
     {
         double hess_jl_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jl_xy += ERIs[n][threadIdx.x];
+            hess_jl_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -34646,18 +34516,18 @@ computeCoulombHessianDDPP_JL_10(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -34674,68 +34544,68 @@ computeCoulombHessianDDPP_JL_10(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_l = 0; atom_idx_l < natoms; atom_idx_l++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_l[atom_idx_l];
     const auto kl_pair_displ = d_kl_displs_for_atom_l[atom_idx_l];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_l[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -34863,8 +34733,7 @@ computeCoulombHessianDDPP_JL_10(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -34873,9 +34742,9 @@ computeCoulombHessianDDPP_JL_10(double*         hess_xy,
     {
         double hess_jl_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jl_xy += ERIs[n][threadIdx.x];
+            hess_jl_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -34923,18 +34792,18 @@ computeCoulombHessianDDPP_JL_11(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -34951,68 +34820,68 @@ computeCoulombHessianDDPP_JL_11(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_l = 0; atom_idx_l < natoms; atom_idx_l++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_l[atom_idx_l];
     const auto kl_pair_displ = d_kl_displs_for_atom_l[atom_idx_l];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_l[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -35094,8 +34963,7 @@ computeCoulombHessianDDPP_JL_11(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -35104,9 +34972,9 @@ computeCoulombHessianDDPP_JL_11(double*         hess_xy,
     {
         double hess_jl_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jl_xy += ERIs[n][threadIdx.x];
+            hess_jl_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -35154,18 +35022,18 @@ computeCoulombHessianDDPP_JL_12(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -35182,68 +35050,68 @@ computeCoulombHessianDDPP_JL_12(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_l = 0; atom_idx_l < natoms; atom_idx_l++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_l[atom_idx_l];
     const auto kl_pair_displ = d_kl_displs_for_atom_l[atom_idx_l];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_l[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -35339,8 +35207,7 @@ computeCoulombHessianDDPP_JL_12(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -35349,9 +35216,9 @@ computeCoulombHessianDDPP_JL_12(double*         hess_xy,
     {
         double hess_jl_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jl_xy += ERIs[n][threadIdx.x];
+            hess_jl_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -35399,18 +35266,18 @@ computeCoulombHessianDDPP_JL_13(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -35427,68 +35294,68 @@ computeCoulombHessianDDPP_JL_13(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_l = 0; atom_idx_l < natoms; atom_idx_l++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_l[atom_idx_l];
     const auto kl_pair_displ = d_kl_displs_for_atom_l[atom_idx_l];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_l[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -35584,8 +35451,7 @@ computeCoulombHessianDDPP_JL_13(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -35594,9 +35460,9 @@ computeCoulombHessianDDPP_JL_13(double*         hess_xy,
     {
         double hess_jl_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jl_xy += ERIs[n][threadIdx.x];
+            hess_jl_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -35644,18 +35510,18 @@ computeCoulombHessianDDPP_JL_14(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -35672,68 +35538,68 @@ computeCoulombHessianDDPP_JL_14(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_l = 0; atom_idx_l < natoms; atom_idx_l++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_l[atom_idx_l];
     const auto kl_pair_displ = d_kl_displs_for_atom_l[atom_idx_l];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_l[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -35813,8 +35679,7 @@ computeCoulombHessianDDPP_JL_14(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -35823,9 +35688,9 @@ computeCoulombHessianDDPP_JL_14(double*         hess_xy,
     {
         double hess_jl_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jl_xy += ERIs[n][threadIdx.x];
+            hess_jl_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -35873,18 +35738,18 @@ computeCoulombHessianDDPP_JL_15(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -35901,68 +35766,68 @@ computeCoulombHessianDDPP_JL_15(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_l = 0; atom_idx_l < natoms; atom_idx_l++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_l[atom_idx_l];
     const auto kl_pair_displ = d_kl_displs_for_atom_l[atom_idx_l];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_l[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -36092,8 +35957,7 @@ computeCoulombHessianDDPP_JL_15(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -36102,9 +35966,9 @@ computeCoulombHessianDDPP_JL_15(double*         hess_xy,
     {
         double hess_jl_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jl_xy += ERIs[n][threadIdx.x];
+            hess_jl_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -36152,18 +36016,18 @@ computeCoulombHessianDDPP_JL_16(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -36180,68 +36044,68 @@ computeCoulombHessianDDPP_JL_16(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_l = 0; atom_idx_l < natoms; atom_idx_l++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_l[atom_idx_l];
     const auto kl_pair_displ = d_kl_displs_for_atom_l[atom_idx_l];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_l[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -36345,8 +36209,7 @@ computeCoulombHessianDDPP_JL_16(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -36355,9 +36218,9 @@ computeCoulombHessianDDPP_JL_16(double*         hess_xy,
     {
         double hess_jl_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jl_xy += ERIs[n][threadIdx.x];
+            hess_jl_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -36405,18 +36268,18 @@ computeCoulombHessianDDPP_JL_17(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -36433,68 +36296,68 @@ computeCoulombHessianDDPP_JL_17(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_l = 0; atom_idx_l < natoms; atom_idx_l++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_l[atom_idx_l];
     const auto kl_pair_displ = d_kl_displs_for_atom_l[atom_idx_l];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_l[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -36604,8 +36467,7 @@ computeCoulombHessianDDPP_JL_17(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -36614,9 +36476,9 @@ computeCoulombHessianDDPP_JL_17(double*         hess_xy,
     {
         double hess_jl_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jl_xy += ERIs[n][threadIdx.x];
+            hess_jl_xy += ERIs[n];
         }
 
         atomicAdd(
@@ -36664,18 +36526,18 @@ computeCoulombHessianDDPP_JL_18(double*         hess_xy,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
     __shared__ uint32_t g0, g1;
 
+    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x;
+    __shared__ uint32_t i, j, a0, a1, b0, b1;
+
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PA_0, PA_1, PB_0, PB_1, PB_x;
-    uint32_t i, j, a0, a1, b0, b1;
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -36692,68 +36554,68 @@ computeCoulombHessianDDPP_JL_18(double*         hess_xy,
 
         g0 = hess_cart_ind_0;
         g1 = hess_cart_ind_1;
+
+        if (ij < dd_prim_pair_count_local)
+        {
+            i = dd_first_inds_local[ij];
+            j = dd_second_inds_local[ij];
+
+            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = dd_pair_data_local[ij];
+
+            ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
+
+        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            b0 = d_cart_inds[j % 6][0];
+            b1 = d_cart_inds[j % 6][1];
+
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
     }
 
     __syncthreads();
 
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S1 = a_i + a_j;
-        inv_S1 = 1.0 / S1;
-
-        S_ij_00 = dd_pair_data_local[ij];
-
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
-
-        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
-
-        a0 = d_cart_inds[i % 6][0];
-        a1 = d_cart_inds[i % 6][1];
-        b0 = d_cart_inds[j % 6][0];
-        b1 = d_cart_inds[j % 6][1];
-
-        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-
-    }
-
     for (uint32_t atom_idx_l = 0; atom_idx_l < natoms; atom_idx_l++)
     {
 
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+    ERIs[threadIdx.y] = 0.0;
 
     __syncthreads();
 
     const auto kl_pair_count = d_kl_counts_for_atom_l[atom_idx_l];
     const auto kl_pair_displ = d_kl_displs_for_atom_l[atom_idx_l];
 
-    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (kl_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl_raw = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl_raw = m * TILE_DIM_LARGE + threadIdx.y;
 
         if (kl_raw >= kl_pair_count) break;
 
         // note non-coalesced read wrt kl
         const uint32_t kl = d_kl_inds_for_atom_l[kl_pair_displ + kl_raw];
 
-        if ((kl >= pp_prim_pair_count) || (ij >= dd_prim_pair_count_local) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
             break;
         }
@@ -36951,8 +36813,7 @@ computeCoulombHessianDDPP_JL_18(double*         hess_xy,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
-
+        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
     __syncthreads();
@@ -36961,9 +36822,9 @@ computeCoulombHessianDDPP_JL_18(double*         hess_xy,
     {
         double hess_jl_xy = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
-            hess_jl_xy += ERIs[n][threadIdx.x];
+            hess_jl_xy += ERIs[n];
         }
 
         atomicAdd(
