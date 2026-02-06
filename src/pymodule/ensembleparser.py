@@ -71,6 +71,102 @@ class EnsembleParser:
         # output stream
         self.ostream = ostream
 
+    @staticmethod
+    def _prefixed_resname(resname: str, prefix: str) -> str:
+        """
+        Resname in PDBs often go by 3 letters, and terminal residues (e.g., NASN or CASN for
+        n-terminal or c-terminal ASN) contain atom parameters slightly different from 
+        the non-terminal residues.
+        This routine adds a terminal prefix to a residue name, 
+        so that the correct parameters can be later assigned.
+
+        Parameters
+        ----------
+        resname : str
+            Residue name as read from the structure/topology (e.g. 'ASN').
+        prefix : str
+            Terminal prefix to add. Expected values are 'N' or 'C'.
+
+        Returns
+        -------
+        str
+            Prefixed residue name (e.g. 'NASN', 'CASN'), or the original name
+            if it already looks prefixed.
+        """
+        # If the residue name already appears to be terminal-prefixed 
+        # (four characters starting with 'N' or 'C'),
+        # it is returned unchanged.
+        if isinstance(resname, str) and len(resname) == 4 and resname[0] in ("N", "C"):
+            return resname
+        return f"{prefix}{resname}"
+    
+    def _terminal_resname_map(self, env_atoms):
+        """
+        Identifies N- and C-terminal protein residues and returns a renaming map.
+
+        For each protein chain found in the selection, the first residue is 
+        considered the N-terminus and the last residue the C-terminus. 
+        These residues are assigned terminal-prefixed 
+        residue names (e.g. 'ASN' -> 'NASN' or 'CASN').
+
+        The returned mapping is keyed by MDAnalysis `resindex` (unique per
+        residue in the Universe) and can be used to update per-atom `resnames`
+        arrays (e.g. `AtomGroup.resnames`) based on `AtomGroup.resindices`.
+
+        Parameters
+        ----------
+        env_atoms : MDAnalysis.core.groups.AtomGroup
+            AtomGroup corresponding to the environment selection used in
+            trajectory parsing (e.g. `universe.select_atoms(env_region)`).
+
+        Returns
+        -------
+        dict[int, str]
+            Dictionary mapping residue `resindex` to the renamed residue name
+            with terminal prefix. Only protein terminal residues are included.
+            Returns an empty dictionary if no protein is present in `env_atoms`.
+        """
+        # Restrict to protein residues
+        prot = env_atoms.select_atoms("protein")
+        if len(prot) == 0:
+            return {}
+
+        # Identify chains
+        chains = []
+        try:
+            if len(prot.bonds) > 0:
+                frags = [f for f in prot.fragments if len(f.residues) > 1]
+                if frags:
+                    chains = frags
+        except Exception:
+            chains = []
+
+        # Fallback: group by chainIDs (PDB) or segids
+        if not chains:
+            ids = getattr(prot.atoms, "chainIDs", None)
+            if ids is None:
+                ids = prot.atoms.segids
+            ids = np.asarray(ids, dtype=object)
+
+            for uid in np.unique(ids):
+                ag = prot[ids == uid]
+                if len(ag.residues) > 0:
+                    chains.append(ag)
+
+        term_map = {}
+        for ch in chains:
+            res = ch.residues
+            if len(res) == 0:
+                continue
+
+            nterm = res[0]
+            cterm = res[-1]
+
+            term_map[nterm.resindex] = self._prefixed_resname(nterm.resname, "N")
+            term_map[cterm.resindex] = self._prefixed_resname(cterm.resname, "C")
+
+        return term_map
+
     def trajectory(self,
                    trajectory_file: str,
                    num_snapshots: int,
@@ -83,7 +179,9 @@ class EnsembleParser:
         Parse a molecular dynamics trajectory and extract QM and MM region data.
 
         :param trajectory_file:
-            Path to the trajectory file (e.g., .dcd, .xtc, .pdb).
+            Path to the trajectory file:
+                - .xtc with a corresponding topology (.tpr) via topology_file
+                - .pdb (single frame); bonds are guessed        
         :param topology_file:
             Path to the topology file (e.g., .tpr).
         :param num_snapshots:
@@ -156,6 +254,13 @@ class EnsembleParser:
         qm_atoms = self.universe.select_atoms(qm_region)
         env_atoms = self.universe.select_atoms(env_region)
 
+        # Identify terminal protein residues (if any) and assign N*/C* residue names
+        # so that terminal variants can be treated as separate residue types downstream.
+        term_map = self._terminal_resname_map(env_atoms)
+
+        # MDAnalysis transforms require valid box dimensions (ts.dimensions)
+        # (e.g. unwrap/center_in_box/wrap). For single PDBs without box info,
+        # skip transformations.
         has_box = False
         try:
             self.universe.trajectory[0]
@@ -218,6 +323,13 @@ class EnsembleParser:
                 )
                 pe_resids = np.asarray(pe_region.resids, dtype=int).copy()
                 pe_resnames = np.asarray(pe_region.resnames, dtype=object).copy()
+                
+                # Apply terminal residue renaming (NASN/CASN, etc.) if applicable
+                if term_map and len(pe_resnames) > 0:
+                    pe_residx = np.asarray(pe_region.resindices, dtype=int)
+                    for ridx, newname in term_map.items():
+                        pe_resnames[pe_residx == ridx] = newname
+
                 pe_n_residues = int(pe_region.residues.n_residues)
 
             # NPE selection
@@ -236,7 +348,14 @@ class EnsembleParser:
                 )
                 npe_resids = np.asarray(npe_region.resids, dtype=int).copy()
                 npe_resnames = np.asarray(npe_region.resnames, dtype=object).copy()
-                npe_n_residues = int(npe_region.residues.n_residues)
+
+                # Apply terminal residue renaming (NASN/CASN, etc.) if applicable
+                if term_map and len(npe_resnames) > 0:
+                    npe_residx = np.asarray(npe_region.resindices, dtype=int)
+                    for ridx, newname in term_map.items():
+                        npe_resnames[npe_residx == ridx] = newname
+
+                npe_n_residues = int(npe_region.residues.n_residues)                
 
             # If neither cutoff is set, interpret as all-NPE environment
             # if pe_cutoff is None and npe_cutoff is None:
