@@ -20,33 +20,33 @@ LIB_LIST = #-undefined dynamic_lookup
 
 # Python interface
 
-PYTHON := python3.14
+PYTHON := python3.13
 
 PYTHON_INC += $(shell $(PYTHON) -m pybind11 --includes)
-PYTHON_LD  := -L /opt/homebrew/opt/python@3.14/Frameworks/Python.framework/Versions/3.14/lib/ -lpython3.14
+PYTHON_LD  := -L /usr/local/opt/python@3.13/Frameworks/Python.framework/Versions/3.13/lib/ -lpython3.13
 
 CXX_REL_FLG += -fPIC $(PYTHON_INC)
 CXX_DEB_FLG += -fPIC $(PYTHON_INC)
 
 # OpenMP interface
 
-OPENMP_INC := -I /opt/homebrew/Cellar/libomp/21.1.6/include 
-OPENMP_LD  := -L /opt/homebrew/Cellar/libomp/21.1.6/lib -lomp
+OPENMP_INC := -I /usr/local/Cellar/libomp/18.1.8/include 
+OPENMP_LD  := -L /usr/local/Cellar/libomp/18.1.8/lib -lomp
 
 CXX_REL_FLG += $(OPENMP_INC)
 CXX_DEB_FLG += $(OPENMP_INC)
 
 # LibXC interface
 
-LIBXC_INC := -I /opt/libxc/include
-LIBXC_LD  := -L /opt/libxc/lib -lxc
+LIBXC_INC := -I /Users/rinkevic/Development/Frameworks/libxc/include
+LIBXC_LD  := -L /Users/rinkevic/Development/Frameworks/libxc/lib -lxc
 
 CXX_REL_FLG += $(LIBXC_INC)
 CXX_DEB_FLG += $(LIBXC_INC)
 
 # Eigen interface
 
-EIGEN_INC := -I /Users/rinkevic/Development/Libraries/Eigen
+EIGEN_INC := -I /Users/rinkevic/Development/Frameworks/eigen
 
 CXX_REL_FLG += $(EIGEN_INC)
 CXX_DEB_FLG += $(EIGEN_INC)
