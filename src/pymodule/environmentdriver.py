@@ -339,8 +339,17 @@ class EnvironmentDriver:
                     "Required for CP3/SEP when same element has different parameters."
                 )
 
-            resname_set = sorted({str(r) for r in pe_resnames}) if pe_resnames.size else []
+            # Unique residue names
+            resname_set = []
+            seen = set()
+            for r in pe_resnames.tolist():
+                r = str(r)
+                if r not in seen:
+                    seen.add(r)
+                    resname_set.append(r)
+
             pot_path = outdir / f"pe_frame_{frame:06d}.pot"
+            
 
             with pot_path.open("w") as fh:
                 fh.write("@environment\n")

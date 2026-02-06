@@ -726,6 +726,11 @@ def write_pe_jsonfile(molecule, potfile):
         # charges
 
         if resname in charges:
+            print("resname = ", resname)
+            print("charges[resname] = ", charges[resname])
+            print("len(charges[resname]) = ", len(charges[resname]))
+            print("residues[resid]['atoms'] = ", residues[resid]['atoms'])
+            print("len(residues[resid]['atoms']) = ", len(residues[resid]['atoms']))
             assert len(charges[resname]) == len(residues[resid]['atoms'])
             atom_chgs = [float(x) for x in charges[resname]]
         else:
