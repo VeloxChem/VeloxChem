@@ -1,0 +1,268 @@
+//
+//                                   VELOXCHEM
+//              ----------------------------------------------------
+//                          An Electronic Structure Code
+//
+//  SPDX-License-Identifier: BSD-3-Clause
+//
+//  Copyright 2018-2025 VeloxChem developers
+//
+//  Redistribution and use in source and binary forms, with or without modification,
+//  are permitted provided that the following conditions are met:
+//
+//  1. Redistributions of source code must retain the above copyright notice, this
+//     list of conditions and the following disclaimer.
+//  2. Redistributions in binary form must reproduce the above copyright notice,
+//     this list of conditions and the following disclaimer in the documentation
+//     and/or other materials provided with the distribution.
+//  3. Neither the name of the copyright holder nor the names of its contributors
+//     may be used to endorse or promote products derived from this software without
+//     specific prior written permission.
+//
+//  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+//  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+//  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+//  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+//  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+//  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+//  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+//  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+//  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+//  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+#ifndef LocalCorePotentialFunc_hpp
+#define LocalCorePotentialFunc_hpp
+
+#include <array>
+
+#include "GtoBlock.hpp"
+#include "BaseCorePotential.hpp"
+#include "LocalCorePotentialDD.hpp"
+#include "LocalCorePotentialDF.hpp"
+#include "LocalCorePotentialDG.hpp"
+#include "LocalCorePotentialDP.hpp"
+#include "LocalCorePotentialDS.hpp"
+#include "LocalCorePotentialFD.hpp"
+#include "LocalCorePotentialFF.hpp"
+#include "LocalCorePotentialFG.hpp"
+#include "LocalCorePotentialFP.hpp"
+#include "LocalCorePotentialFS.hpp"
+#include "LocalCorePotentialGD.hpp"
+#include "LocalCorePotentialGF.hpp"
+#include "LocalCorePotentialGG.hpp"
+#include "LocalCorePotentialGP.hpp"
+#include "LocalCorePotentialGS.hpp"
+#include "LocalCorePotentialPD.hpp"
+#include "LocalCorePotentialPF.hpp"
+#include "LocalCorePotentialPG.hpp"
+#include "LocalCorePotentialPP.hpp"
+#include "LocalCorePotentialPS.hpp"
+#include "LocalCorePotentialSD.hpp"
+#include "LocalCorePotentialSF.hpp"
+#include "LocalCorePotentialSG.hpp"
+#include "LocalCorePotentialSP.hpp"
+#include "LocalCorePotentialSS.hpp"
+
+namespace t2lecp {
+
+/// @brief Computes local ECP integrals for given of pair basis functions blocks.
+/// @param distributor The integrals distributor.
+/// @param bra_gto_block The basis functions block on bra side.
+/// @param ket_gto_block The basis functions block on ket side.
+/// @param ecp_potential The local ECP potential.
+/// @param bra_indices The range [bra_first, bra_last) of basis functions on bra side.
+/// @param ket_indices The range [ket_first, ket_last) of basis functions on ket side.
+/// @param bra_eq_ket True if basis functions blocks on bra and ket are the same, False otherwise.
+template <class T>
+auto
+compute(T&                               distributor,
+        const CGtoBlock&                 bra_gto_block,
+        const CGtoBlock&                 ket_gto_block,
+        const CBaseCorePotential&        ecp_potential,
+        const std::pair<size_t, size_t>& bra_indices,
+        const std::pair<size_t, size_t>& ket_indices,
+        const bool                       bra_eq_ket) -> void
+{
+    const auto bra_angmom = bra_gto_block.angular_momentum();
+
+    const auto ket_angmom = ket_gto_block.angular_momentum();
+
+    if ((bra_angmom == 0) && (ket_angmom == 0))
+    {
+        t2lecp::comp_local_core_ss(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+
+    if ((bra_angmom == 0) && (ket_angmom == 1))
+    {
+        t2lecp::comp_local_core_sp(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+
+    if ((bra_angmom == 1) && (ket_angmom == 0))
+    {
+        t2lecp::comp_local_core_ps(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+
+    if ((bra_angmom == 1) && (ket_angmom == 1))
+    {
+        t2lecp::comp_local_core_pp(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+
+    if ((bra_angmom == 0) && (ket_angmom == 2))
+    {
+        t2lecp::comp_local_core_sd(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+
+    if ((bra_angmom == 2) && (ket_angmom == 0))
+    {
+        t2lecp::comp_local_core_ds(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+
+    if ((bra_angmom == 0) && (ket_angmom == 3))
+    {
+        t2lecp::comp_local_core_sf(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+
+    if ((bra_angmom == 3) && (ket_angmom == 0))
+    {
+        t2lecp::comp_local_core_fs(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+
+    if ((bra_angmom == 1) && (ket_angmom == 2))
+    {
+        t2lecp::comp_local_core_pd(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+
+    if ((bra_angmom == 2) && (ket_angmom == 1))
+    {
+        t2lecp::comp_local_core_dp(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+
+    if ((bra_angmom == 0) && (ket_angmom == 4))
+    {
+        t2lecp::comp_local_core_sg(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+
+    if ((bra_angmom == 4) && (ket_angmom == 0))
+    {
+        t2lecp::comp_local_core_gs(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+
+    if ((bra_angmom == 1) && (ket_angmom == 3))
+    {
+        t2lecp::comp_local_core_pf(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+
+    if ((bra_angmom == 3) && (ket_angmom == 1))
+    {
+        t2lecp::comp_local_core_fp(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+
+    if ((bra_angmom == 2) && (ket_angmom == 2))
+    {
+        t2lecp::comp_local_core_dd(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+
+    if ((bra_angmom == 1) && (ket_angmom == 4))
+    {
+        t2lecp::comp_local_core_pg(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+
+    if ((bra_angmom == 4) && (ket_angmom == 1))
+    {
+        t2lecp::comp_local_core_gp(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+
+    if ((bra_angmom == 2) && (ket_angmom == 3))
+    {
+        t2lecp::comp_local_core_df(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+
+    if ((bra_angmom == 3) && (ket_angmom == 2))
+    {
+        t2lecp::comp_local_core_fd(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+
+    if ((bra_angmom == 2) && (ket_angmom == 4))
+    {
+        t2lecp::comp_local_core_dg(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+
+    if ((bra_angmom == 4) && (ket_angmom == 2))
+    {
+        t2lecp::comp_local_core_gd(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+
+    if ((bra_angmom == 3) && (ket_angmom == 3))
+    {
+        t2lecp::comp_local_core_ff(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+
+    if ((bra_angmom == 3) && (ket_angmom == 4))
+    {
+        t2lecp::comp_local_core_fg(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+
+    if ((bra_angmom == 4) && (ket_angmom == 3))
+    {
+        t2lecp::comp_local_core_gf(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+
+    if ((bra_angmom == 4) && (ket_angmom == 4))
+    {
+        t2lecp::comp_local_core_gg(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+}
+
+}  // namespace t2lecp
+
+#endif /* LocalCorePotentialFunc_hpp */
