@@ -716,6 +716,7 @@ def write_pe_jsonfile(molecule, potfile):
     mm_atom_count = 0
 
     for res_count, resid in enumerate(sorted(list(residues.keys()))):
+        resname = residues[resid]['resname']
 
         classical_fragments.append({
             "index": res_count + 1,
