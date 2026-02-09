@@ -3884,6 +3884,13 @@ auto CGradientScreeningData::update_kl_vectors(const uint32_t               nato
         {
             k_cgto = k_prim_aoinds[(k / 6) + k_prim_count * (k % 6)];
         }
+        else
+        {
+            errors::assertMsgCritical(false, std::string(__func__) + std::string(": Invalid k_prim_type"));
+
+            // to suppress compiler warning "may be used uninitialized"
+            k_cgto = 0;
+        }
 
         if (l_prim_type == std::string("s"))
         {
@@ -3897,21 +3904,19 @@ auto CGradientScreeningData::update_kl_vectors(const uint32_t               nato
         {
             l_cgto = l_prim_aoinds[(l / 6) + l_prim_count * (l % 6)];
         }
+        else
+        {
+            errors::assertMsgCritical(false, std::string(__func__) + std::string(": Invalid l_prim_type"));
+
+            // to suppress compiler warning "may be used uninitialized"
+            l_cgto = 0;
+        }
 
         const auto atom_k = cart_ao_to_atom_inds[k_cgto];
         const auto atom_l = cart_ao_to_atom_inds[l_cgto];
 
         atom_k_pair_kl[atom_k].push_back(kl);
         atom_l_pair_kl[atom_l].push_back(kl);
-    }
-
-    uint32_t atom_k_pair_count = 0;
-    uint32_t atom_l_pair_count = 0;
-
-    for (uint32_t a = 0; a < natoms; a++)
-    {
-        atom_k_pair_count += static_cast<uint32_t>(atom_k_pair_kl[a].size());
-        atom_l_pair_count += static_cast<uint32_t>(atom_l_pair_kl[a].size());
     }
 
     // update these vectors
