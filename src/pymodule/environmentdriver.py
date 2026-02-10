@@ -38,9 +38,17 @@ import csv
 from .outputstream import OutputStream
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
+from .scfrestdriver import ScfRestrictedDriver
+from .scfunrestdriver import ScfUnrestrictedDriver
+from .sanitychecks import ensemble_driver_sanity_check
 
 from .veloxchemlib import (mpi_master, bohr_in_angstrom)
 
+# IULIA's comment: should probably change name to EnsembleDriver.
+# according to Patrick's suggestion.
+# Question: is PE or NPE mandatory? I think this class could also
+# be used for purely QM calculations using a bunch of snapshots from MD.
+# Perhaps you can consider making pe_model and npe_model optional. 
 class EnvironmentDriver:
     """
     Handles the environment from the snapshots from EnsembleParser.
@@ -74,6 +82,27 @@ class EnvironmentDriver:
                 ostream = OutputStream(sys.stdout)
             else:
                 ostream = OutputStream(None)
+
+        # settings for SCF and choice of rsp driver 
+        self._is_restricted = True
+        self._rsp_property = None
+
+        # IULIA's comment: Here starts the suggestions
+        # SCF settings which we would like users to be able to change
+        # TODO: add other possible settings
+        self.xcfun = None
+        self.eri_thresh = None
+        self.ri_coulomb = None
+        self.grid_level = None
+
+        # PE settings for SCF which the user should
+        # be able to change
+        self.potfile = None
+        self.embedding = None
+
+        # TODO: response settings can also be
+        # added here in a similar way.
+        # IULIA's comment: end of code block.
 
         self.comm = comm
         self.rank = self.comm.Get_rank()
@@ -115,6 +144,34 @@ class EnvironmentDriver:
 
         self.pe_model = None
         self.npe_model = None
+
+        # IULIA's comment: I add scf_dict, method_dict and rsp_dict as
+        # instance variables, updated in update_settings and used in compute.
+        self.scf_dict = None
+        self.method_dict = None
+        self.rsp_dict = None
+
+    # IULIA's comment: This is a good routine to have to enable input-output runs later on.
+    def update_settings(self, scf_dict=None, method_dict=None, rsp_dict=None):
+        """ Updates the SCF, method, and response settings.
+
+            :param scf_dict:
+                The dictionary of SCF settings.
+            :param method_dict:
+                The dictionary of method settings.
+            :param rsp_dict:
+                The dictionary of response settings.
+        """
+        if scf_dict is None:
+            scf_dict = {}
+        if method_dict is None:
+            method_dict = {}
+        if rsp_dict is None:
+            rsp_dict = {}
+
+        self.scf_dict = dict(scf_dict)
+        self.method_dict = dict(method_dict)
+        self.rsp_dict = dict(rsp_dict)
 
     @staticmethod
     def _parse_six_floats(field: str) -> list[float]:
@@ -384,13 +441,13 @@ class EnvironmentDriver:
                         )
                 fh.write("@end\n")
 
+    # IULIA's comment: I deleted the scf_drv and rsp_drv from the function definition
+    # since they will be instantiated inside the routine, under-the-hood.
+    # I also deleted the lone "*" since we don't normally use it in Vlx.
     def compute(
         self,
         snapshots,
-        *,
         basis_label: str,
-        scf_drv,
-        rsp_drv=None,
         potdir: str | Path = "pot_frames",
         write_pe_potfiles: bool = True,
     ):
@@ -401,10 +458,6 @@ class EnvironmentDriver:
             A list of snapshot dictionaries (or a single dict).
         :param basis_label: (str)
             Basis set label.
-        :param scf_drv:
-            An initialized SCF driver instance.
-        :param rsp_drv:
-            An initialized LR eigen solver.
         :param potdir : (str or Path)
             Directory to store/read PE potfiles.
         :param write_pe_potfiles: (bool)
@@ -414,17 +467,43 @@ class EnvironmentDriver:
               - scf_all: list of (frame, scf_results)
               - rsp_all: list of (frame, rsp_results)
         """
+        # IULIA's comment: in Vlx we typically use the module errorhandler to
+        # handle this types of checks. See src/pymodule/errorhandler.py and examples
+        # from other modules (grep for "assert_msg_critical")
+        # The convention for the errormessage is to include the name of the driver as well
+        # "EnvironmentDriver: Models not set. ..."
         if self.pe_model is None and self.npe_model is None:
             raise RuntimeError("Models not set. Call set_env_models(pe_model=..., npe_model=...) first.")
     
         if isinstance(snapshots, dict):
             snapshots = [snapshots]
 
-        if scf_drv is None:
-            raise ValueError("scf_drv must be provided.")
+        # IULIA's comment: Here starts the suggestion of how to handle
+        # SCF under the hood
+        if self._is_restricted:
+            scf_driver = ScfRestrictedDriver()
+        else:
+            scf_driver = ScfUnrestrictedDriver()
         
-        if rsp_drv is not None and scf_drv is None:
-            raise ValueError("rsp_drv requires scf_drv to be provided.")
+        # update settings if necessary
+        if self.scf_dict is not None or self.method_dict is not None:
+            scf_driver.update_settings(self.scf_dict, self.method_dict)
+
+        # sanity check -- update settings in SCF according to
+        # which variables the user set.
+        # see routine in sanitychecks.py
+        # I changed the name to ensemble_driver_sanity_check
+        ensemble_driver_sanity_check(scf_driver, self)
+
+        # IULIA's comment: END of suggested code block
+        # Something similar can be done for rsp_drv;
+        # a bit more complicated, but one could use the example
+        # of creating the right response driver with a routine
+        # similar to "select_rsp_property" from main.py
+        # For now, I set rsp_drv to None. A first implementation could
+        # be done with rsp_drv = LinearResponseEigensolver();
+        # other response drivers can be added later.
+        rsp_drv = None
 
         potdir = Path(potdir)
 
