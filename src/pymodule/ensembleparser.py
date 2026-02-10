@@ -167,7 +167,7 @@ class EnsembleParser:
 
         return term_map
 
-    def trajectory(self,
+    def structures(self,
                    trajectory_file: str,
                    num_snapshots: int,
                    qm_region: str,
@@ -176,12 +176,12 @@ class EnsembleParser:
                    pe_cutoff: float | None = None,
                    npe_cutoff: float | None = None,):
         """
-        Parse a molecular dynamics trajectory and extract QM and MM region data.
+        Parse a set of structures and extract QM and MM region data.
 
         :param trajectory_file:
             Path to the trajectory file:
                 - .xtc with a corresponding topology (.tpr) via topology_file
-                - .pdb (single frame); bonds are guessed        
+                - .pdb (several configurations, or a single configuration; bonds are guessed        
         :param topology_file:
             Path to the topology file (e.g., .tpr).
         :param num_snapshots:
@@ -357,17 +357,7 @@ class EnsembleParser:
 
                 npe_n_residues = int(npe_region.residues.n_residues)                
 
-            # If neither cutoff is set, interpret as all-NPE environment
-            # if pe_cutoff is None and npe_cutoff is None:
-            #     npe_region = env_atoms.difference(qm_atoms)
-            #     npe_coords = np.asarray(npe_region.positions, dtype=float).copy()
-            #     npe_elements = np.asarray(
-            #         [guess_atom_element(n) for n in npe_region.names], dtype=object
-            #     )
-            #     npe_resids = np.asarray(npe_region.resids, dtype=int).copy()
-            #     npe_resnames = np.asarray(npe_region.resnames, dtype=object).copy()
-            #     npe_n_residues = int(npe_region.residues.n_residues)
-            #     npe_atom_names = np.asarray(npe_region.names, dtype=object).copy()
+            # If neither cutoff is set, interpret as all-qm
 
             snapshot = {
                     "frame": int(self.universe.trajectory.frame),
@@ -388,41 +378,6 @@ class EnsembleParser:
                     "npe_resids": npe_resids,
                     "npe_resnames": npe_resnames,
                     "npe_n_residues": npe_n_residues,
-            }
-            snapshots.append(snapshot)
-        return snapshots
-    
-    def structures(self,
-                   structures_file: str):
-        """
-        Parse a PDB or XYZ that contains different structures
-
-        :param structures_file:
-            Path to the structures file (e.g., .pdb, .xyz).
- 
-        :return:
-            A list of snapshot dictionaries, each containing:
-            - frame (int):
-                Frame number.
-            - qm_coords (numpy.ndarray):
-                QM region Cartesian coordinates, shape (N_qm, 3), in Angstrom.
-            - qm_elements (numpy.ndarray):
-                Element symbols for each QM atom, shape (N_qm,).
-        """
-        self.universe = mda.Universe(structures_file, guess_bonds=True)
-
-        snapshots = []
-        for iframe in self.universe.trajectory:
-            coords = np.asarray(self.universe.atoms.positions, dtype=float).copy()
-            elements = np.asarray(
-                [guess_atom_element(n) for n in self.universe.atoms.names], dtype=object
-            )
-
-            snapshot = {
-                    "frame": int(iframe.frame),
-                    "qm_coords": coords,
-                    "qm_elements": elements,
-
             }
             snapshots.append(snapshot)
         return snapshots
