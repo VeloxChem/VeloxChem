@@ -169,12 +169,13 @@ class EnsembleParser:
 
     def structures(self,
                    trajectory_file: str,
-                   num_snapshots: int,
-                   qm_region: str,
-                   env_region: str,
+                   num_snapshots: int | None = None,
+                   qm_region: str = "",
+                   env_region: str = "",
                    topology_file: str | None = None,
                    pe_cutoff: float | None = None,
-                   npe_cutoff: float | None = None,):
+                   npe_cutoff: float | None = None,
+    ):
         """
         Parse a set of structures and extract QM and MM region data.
 
@@ -185,7 +186,8 @@ class EnsembleParser:
         :param topology_file:
             Path to the topology file (e.g., .tpr).
         :param num_snapshots:
-            Number of snapshots to extract from the trajectory.
+            Number of snapshots to extract. If None (default), all frames are
+            processed. If an integer, frames are sampled evenly.
         :param qm_region:
             Selection string defining the QM region (MDAnalysis selection syntax).
         :param env_region:
@@ -223,10 +225,7 @@ class EnsembleParser:
             - npe_n_residues (int):
                 Number of residues in the NPE region.
         """
-        
-        if num_snapshots <= 0:
-            raise ValueError("num_snapshots must be a positive integer")
-        
+               
         if pe_cutoff is not None and npe_cutoff is not None:
             if float(npe_cutoff) < float(pe_cutoff):
                 raise ValueError("npe_cutoff must be >= pe_cutoff")
@@ -241,16 +240,25 @@ class EnsembleParser:
         total_frames = len(self.universe.trajectory)
         self.ostream.print_info(f"Total frames in trajectory: {total_frames}")
         self.ostream.print_blank()
+
+        if num_snapshots is None:
+            num_snapshots = total_frames
+
+        if num_snapshots <= 0:
+            raise ValueError("num_snapshots must be a positive integer")
+        
         if num_snapshots > total_frames:
             raise ValueError(
                 f"Requested number of snapshots ({num_snapshots}) exceeds total frames ({total_frames})."
             )
-    
-        if num_snapshots == 1:
+        
+        if num_snapshots == total_frames:
+            frame_indices = np.arange(total_frames, dtype=int)
+        elif num_snapshots == 1:
             frame_indices = np.array([0], dtype=int)
         else:
             frame_indices = np.linspace(0, total_frames - 1, num_snapshots, dtype=int)
-        
+           
         qm_atoms = self.universe.select_atoms(qm_region)
         env_atoms = self.universe.select_atoms(env_region)
 
