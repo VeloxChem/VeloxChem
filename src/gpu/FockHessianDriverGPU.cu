@@ -90,6 +90,8 @@
 #include "EriCoulombHessianDDDD.hpp"
 #include "EriCoulombHessianDDDD_1010.hpp"
 
+#include "EriExchangeHessianSXSX.hpp"
+
 namespace gpu {  // gpu namespace
 
 auto
@@ -26187,7 +26189,6 @@ computeFockHessianOnGPU_2000(const              CMolecule& molecule,
 
 #pragma omp barrier
 
-    /*
     timer.start("Exchange prep.");
 
     // K preparation
@@ -26536,11 +26537,13 @@ computeFockHessianOnGPU_2000(const              CMolecule& molecule,
         // K: (SS|SS)
         //     *  *
 
-        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        for (int64_t grad_cart_ind_0 = 0, grad_cart_ind = 0; grad_cart_ind_0 < 3; grad_cart_ind_0++)
+        for (int64_t grad_cart_ind_1 = grad_cart_ind_0; grad_cart_ind_1 < 3; grad_cart_ind_1++, grad_cart_ind++)
         {
-            gpu::computeExchangeGradientSSSS_I_0<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeHessianSSSS_II_0<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_grad_array[grad_cart_ind],
-                               static_cast<uint32_t>(grad_cart_ind),
+                               static_cast<uint32_t>(grad_cart_ind_0),
+                               static_cast<uint32_t>(grad_cart_ind_1),
                                frac_exact_exchange,
                                d_pair_inds_i_for_K_ss,
                                d_pair_inds_k_for_K_ss,
@@ -26562,9 +26565,10 @@ computeFockHessianOnGPU_2000(const              CMolecule& molecule,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientSSSS_K_0<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeHessianSSSS_KK_0<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_grad_array[grad_cart_ind],
-                               static_cast<uint32_t>(grad_cart_ind),
+                               static_cast<uint32_t>(grad_cart_ind_0),
+                               static_cast<uint32_t>(grad_cart_ind_1),
                                frac_exact_exchange,
                                d_pair_inds_i_for_K_ss,
                                d_pair_inds_k_for_K_ss,
@@ -26588,6 +26592,7 @@ computeFockHessianOnGPU_2000(const              CMolecule& molecule,
                                eri_threshold);
         }
 
+        /*
         // K: (SS|SP)
         //     *  *
 
@@ -27152,10 +27157,12 @@ computeFockHessianOnGPU_2000(const              CMolecule& molecule,
         //       so we need to sync stream here
         //       otherwise it may be overwritten
         gpuSafe(gpuStreamSynchronize(stream));
+        */
 
         timer.stop("  K block SS");
     }
 
+    /*
     // K: S-P block
 
     if (pair_inds_count_for_K_sp > 0)
@@ -39078,6 +39085,7 @@ computeFockHessianOnGPU_2000(const              CMolecule& molecule,
 
         timer.stop("  K block DD");
     }
+    */
 
     }
     }  // end of compute K
@@ -39091,7 +39099,6 @@ computeFockHessianOnGPU_2000(const              CMolecule& molecule,
     auto exchange_elapsed_time = exchange_timer.getElapsedTime();
 
     screening.setExchangeTime(gpu_id, exchange_elapsed_time);
-    */
 
     // copy gradient to host
 
@@ -39118,7 +39125,6 @@ computeFockHessianOnGPU_2000(const              CMolecule& molecule,
     gpuSafe(gpuFreeAsync(d_d_prim_info, stream));
     gpuSafe(gpuFreeAsync(d_d_prim_aoinds, stream));
 
-    /*
     gpuSafe(gpuFreeAsync(d_pair_inds_i_for_K_ss, stream));
     gpuSafe(gpuFreeAsync(d_pair_inds_k_for_K_ss, stream));
     gpuSafe(gpuFreeAsync(d_pair_inds_i_for_K_sp, stream));
@@ -39190,7 +39196,6 @@ computeFockHessianOnGPU_2000(const              CMolecule& molecule,
     gpuSafe(gpuFreeAsync(d_pair_data_K_pd, stream));
     gpuSafe(gpuFreeAsync(d_pair_data_K_dp, stream));
     gpuSafe(gpuFreeAsync(d_pair_data_K_dd, stream));
-    */
 
     gpuSafe(gpuFreeAsync(d_grad_xx, stream));
     gpuSafe(gpuFreeAsync(d_grad_xy, stream));
