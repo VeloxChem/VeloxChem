@@ -177,11 +177,9 @@ class ReactionForceFieldBuilder():
             forced_forming_bonds = {(bond[0] - 1, bond[1] - 1)
                                     for bond in forced_forming_bonds}
 
-            product_ff, product_mapping = self._match_reactant_and_product(
-                reactant_ff,
-                reactant_ff.molecule.get_element_ids(),
-                product_ff,
-                product_ff.molecule.get_element_ids(),
+            product_mapping = self._match_reactant_and_product(
+                reactant_ff.molecule,
+                product_ff.molecule,
                 forced_breaking_bonds,
                 forced_forming_bonds,
             )
@@ -519,24 +517,18 @@ class ReactionForceFieldBuilder():
     #Match the indices of the reactant and product forcefield generators
     def _match_reactant_and_product(
         self,
-        reactant_ff: MMForceFieldGenerator,
-        rea_elems: list,
-        product_ff: MMForceFieldGenerator,
-        pro_elems: list,
+        reactant: Molecule,
+        product: Molecule,
         breaking_bonds: set[tuple[int, int]],
         forming_bonds: set[tuple[int, int]],
     ):
-        assert len(reactant_ff.atoms) == len(
-            product_ff.atoms
+        assert reactant.number_of_atoms() == product.number_of_atoms(
         ), "The number of atoms in the reactant and product do not match"
         # Turn the reactand and product into graphs
 
         rm = ReactionMatcher(ostream=self.ostream)
         total_mapping, breaking_bonds, forming_bonds = rm.get_mapping(
-            reactant_ff,
-            rea_elems,
-            product_ff,
-            pro_elems,
+            reactant,product,
             breaking_bonds,
             forming_bonds,
         )  # type: ignore
@@ -548,7 +540,7 @@ class ReactionForceFieldBuilder():
         print_mapping = {k + 1: v + 1 for k, v in total_mapping.items()}
         self.ostream.print_info(f"Mapping: {print_mapping}")
         self.ostream.flush()
-        return product_ff, total_mapping
+        return total_mapping
 
         # Merge a list of forcefield generators into a single forcefield generator while taking care of the atom indices
 

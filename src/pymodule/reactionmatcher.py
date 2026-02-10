@@ -83,18 +83,16 @@ class ReactionMatcher:
 
     def get_mapping(
         self,
-        reactant_ff,
-        rea_elems,
-        product_ff,
-        pro_elems,
+        reactant,
+        product,
         breaking_bonds,
         forming_bonds,
     ):
 
         self.rea_graph, self.pro_graph, self.assisting_map = self._create_reaction_graphs(
-            reactant_ff, rea_elems, product_ff, pro_elems, breaking_bonds,
-            forming_bonds, self.force_hydrogen_inclusion)
-        
+            reactant, product, breaking_bonds, forming_bonds,
+            self.force_hydrogen_inclusion)
+
         if len(self.assisting_map) == len(self.rea_graph.nodes):
             # inverted_map = {v: k for k, v in self.assisting_map.items()}
             return self.assisting_map, breaking_bonds, forming_bonds
@@ -134,7 +132,7 @@ class ReactionMatcher:
     def _decide_breaking_depth(self):
         N = len(self.rea_graph.edges)
         _breaking_depth = 1
-        
+
         if N == 1:
             return 1
 
@@ -155,14 +153,12 @@ class ReactionMatcher:
         self.ostream.flush()
         return _breaking_depth
 
-    def _create_reaction_graphs(self, reactant_ff, rea_elems, product_ff,
-                                pro_elems, breaking_bonds, forming_bonds,
-                                force_hydrogen_inclusion):
+    def _create_reaction_graphs(self, reactant, product, breaking_bonds,
+                                forming_bonds, force_hydrogen_inclusion):
 
-        rea_graph = self._prepare_graph(reactant_ff, rea_elems, breaking_bonds,
-                                        forming_bonds)
+        rea_graph = self._prepare_graph(reactant, breaking_bonds, forming_bonds)
 
-        pro_graph = self._prepare_graph(product_ff, pro_elems)
+        pro_graph = self._prepare_graph(product)
 
         if not force_hydrogen_inclusion:
             self._reduce_hydrogen = self._decide_hydrogen_reduction(
@@ -186,16 +182,17 @@ class ReactionMatcher:
 
         return rea_graph, pro_graph, assisting_map
 
-    def _prepare_graph(self,
-                       forcefield,
-                       elements,
-                       breaking_bonds=None,
-                       forming_bonds=None):
+    def _prepare_graph(self, molecule, breaking_bonds=None, forming_bonds=None):
         graph = nx.Graph()
-        bonds = list(forcefield.bonds.keys())
+        mat = molecule.get_connectivity_matrix()
+        bonds = set()
+        for i in range(len(mat)):
+            for j in range(i, len(mat)):
+                if mat[i, j]:
+                    bonds.add((i, j))
         # Remove the bonds that are being broken, so that these segments get treated as seperate reactants
 
-        graph.add_nodes_from(forcefield.atoms.keys())
+        graph.add_nodes_from(list(range(len(mat))))
         graph.add_edges_from(bonds)
 
         if breaking_bonds is not None:
@@ -206,6 +203,7 @@ class ReactionMatcher:
             for edge in forming_bonds:
                 graph.add_edge(*edge)
 
+        elements = [float(id) for id in molecule.get_element_ids()]
         for i, elem in enumerate(elements):
             graph.nodes[i]['elem'] = elem
 
@@ -415,7 +413,8 @@ class ReactionMatcher:
             for k in sorted(assisting_map)
         }
         self.ostream.print_info(
-            f"Assigned {len(assisting_map)} assist ids: {self._print_mapping(sorted_assisting_map)}")
+            f"Assigned {len(assisting_map)} assist ids: {self._print_mapping(sorted_assisting_map)}"
+        )
         self._assisting_map = sorted_assisting_map
         self.ostream.flush()
         return rea_graph, pro_graph, sorted_assisting_map
@@ -428,7 +427,7 @@ class ReactionMatcher:
         """
         Find a mapping between the connected components of A and B, while avoiding reconnecting broken edges.
         """
-        
+
         if forced_breaking_edges is None:
             forced_breaking_edges = set()
         if forced_forming_edges is None:
@@ -454,18 +453,22 @@ class ReactionMatcher:
         # B_assist = nx.relabel_nodes(B_assist, self.assisting_map)
 
         unassigned_nodes_A = A.nodes - A_assist.nodes
-        unassigned_elems_count = list(Counter([A.nodes[i]['elem'] for i in unassigned_nodes_A]).values())
+        unassigned_elems_count = list(
+            Counter([A.nodes[i]['elem'] for i in unassigned_nodes_A]).values())
         total_expected_perms = 1
         for elem_count in unassigned_elems_count:
             total_expected_perms *= math.factorial(elem_count)
-            
+
         if total_expected_perms <= self.brute_force_lim:
             unassigned_nodes_B = B.nodes - B_assist.nodes
             permuted_unassigned_nodes_B = list(permutations(unassigned_nodes_B))
             self.ostream.print_info(
                 f"Trying all {len(permuted_unassigned_nodes_B)} permutations of unassigned nodes. Expecting to consider {total_expected_perms} permutations based on element counts."
             )
-            return self._find_brute_force_mapping(A,B,forced_breaking_edges,forced_forming_edges,swapped,unassigned_nodes_A,permuted_unassigned_nodes_B)
+            return self._find_brute_force_mapping(A, B, forced_breaking_edges,
+                                                  forced_forming_edges, swapped,
+                                                  unassigned_nodes_A,
+                                                  permuted_unassigned_nodes_B)
 
         self._start_time = time.time()
         breaking_edges = self._find_breaking_edges(
@@ -525,19 +528,22 @@ class ReactionMatcher:
                 A_assisting.remove_node(n)
 
         return A_assisting
-    
-    def _find_brute_force_mapping(self,A,B,forced_breaking_edges,forced_forming_edges,swapped,unassigned_nodes_A,permuted_unassigned_nodes_B):
+
+    def _find_brute_force_mapping(self, A, B, forced_breaking_edges,
+                                  forced_forming_edges, swapped,
+                                  unassigned_nodes_A,
+                                  permuted_unassigned_nodes_B):
         maps = []
         breaking_edges_list = []
         forming_edges_list = []
         N_changing_bonds = []
         N_changing_H_bonds = []
-        
+
         # Loop through all permutations
         for perm in permuted_unassigned_nodes_B:
             temp_map = {k: v for k, v in zip(unassigned_nodes_A, perm)}
             skip = False
-            
+
             # Check if the map is chemically valid
             for k, v in temp_map.items():
                 if A.nodes[k]['elem'] != B.nodes[v]['elem']:
@@ -545,7 +551,7 @@ class ReactionMatcher:
                     break
             if skip:
                 continue
-            
+
             total_temp_map = copy.copy(temp_map)
             total_temp_map.update(self.assisting_map)
 
@@ -557,7 +563,10 @@ class ReactionMatcher:
             breaking_edges = A.edges - B_copy.edges
             forming_edges = B_copy.edges - A.edges
             # Check if we obey the forced breaking and forming edges
-            if (forced_breaking_edges.issubset(forming_edges) and len(forced_breaking_edges)>0) or (forced_forming_edges.issubset(breaking_edges) and len(forced_forming_edges)>0):
+            if (forced_breaking_edges.issubset(forming_edges)
+                    and len(forced_breaking_edges)
+                    > 0) or (forced_forming_edges.issubset(breaking_edges)
+                             and len(forced_forming_edges) > 0):
                 continue
 
             changing_bonds = breaking_edges | forming_edges
@@ -570,7 +579,7 @@ class ReactionMatcher:
                     f"Permutation {self._print_mapping(temp_map)} has a total of {len(changing_bonds)} changing bonds, forming: {self._print_bond_list(forming_edges)}, breaking: {self._print_bond_list(breaking_edges)} of which {n_changing_H_bonds} involve hydrogens."
                 )
                 self.ostream.flush()
-            
+
             maps.append(copy.copy(total_temp_map))
             breaking_edges_list.append(breaking_edges)
             forming_edges_list.append(forming_edges)
@@ -586,15 +595,19 @@ class ReactionMatcher:
             self.ostream.print_info(
                 "Multiple mappings with same least amount of changing bonds found, picking one the most changing H-bonds."
             )
-            least_changing_bonds_H_bond_counts = [N_changing_H_bonds[i] for i in least_changing_bonds_indices]
-            best_H_bond_count = np.array(least_changing_bonds_H_bond_counts).max()
-            least_changing_bonds_index = np.where(least_changing_bonds_H_bond_counts== best_H_bond_count)[0]
-            best_index = least_changing_bonds_indices[least_changing_bonds_index[0]]
-            
+            least_changing_bonds_H_bond_counts = [
+                N_changing_H_bonds[i] for i in least_changing_bonds_indices
+            ]
+            best_H_bond_count = np.array(
+                least_changing_bonds_H_bond_counts).max()
+            least_changing_bonds_index = np.where(
+                least_changing_bonds_H_bond_counts == best_H_bond_count)[0]
+            best_index = least_changing_bonds_indices[
+                least_changing_bonds_index[0]]
+
             if len(least_changing_bonds_index):
                 self.ostream.print_info(
-                    "Multiple equally good mappings found, picking first one."
-                )
+                    "Multiple equally good mappings found, picking first one.")
         else:
             best_index = least_changing_bonds_indices[0]
         self.ostream.print_info(
@@ -609,7 +622,6 @@ class ReactionMatcher:
             to_return_map = {v: k for k, v in to_return_map.items()}
         return to_return_map, breaking_edges_list[
             best_index], forming_edges_list[best_index]
-        
 
     def _find_breaking_edges(self, A, A_assist, B, B_assist,
                              forced_forming_edges):
@@ -943,11 +955,14 @@ class ReactionMatcher:
             )
             return False
         return True
-    
-    def _print_mapping(self,mapping):
+
+    def _print_mapping(self, mapping):
         items = list(mapping.items())
         items.sort()
-        return "{" + ", ".join([f"{k+self.print_starting_index}: {v+self.print_starting_index}" for k,v in items]) + "}"
+        return "{" + ", ".join([
+            f"{k+self.print_starting_index}: {v+self.print_starting_index}"
+            for k, v in items
+        ]) + "}"
 
     def _print_bond_list(self, bonds):
         bonds = list(bonds)

@@ -1290,6 +1290,7 @@ def _Molecule_show(
     breaking_bonds=None,
     forming_width=0.15,
     breaking_width=0.15,
+    label_font_size=16,
 ):
     """
     Creates a 3D view with py3dmol.
@@ -1452,6 +1453,7 @@ def _Molecule_show(
                         'fontColor': 0x000000,
                         'backgroundColor': 0xffffff,
                         'backgroundOpacity': 0.0,
+                        'fontSize': label_font_size,
                     })
         viewer.setViewStyle({"style": "outline", "width": 0.05})
         viewer.setStyle({
