@@ -62165,34 +62165,9 @@ computeFockHessianOnGPU_1010(const              CMolecule& molecule,
             const int64_t grad_cart_ind   = grad_cart_ind_0 * 3 + grad_cart_ind_1;
             const int64_t grad_cart_ind_T = grad_cart_ind_1 * 3 + grad_cart_ind_0;
 
+            // we make use of IK<->JL symmetry for ground state Hessian
+
             gpu::computeExchangeHessianSSSS_IK_0<<<num_blocks, threads_per_block, 0, stream>>>(
-                               d_hess_array[grad_cart_ind],
-                               d_hess_array[grad_cart_ind_T],
-                               static_cast<uint32_t>(grad_cart_ind_0),
-                               static_cast<uint32_t>(grad_cart_ind_1),
-                               frac_exact_exchange,
-                               d_pair_inds_i_for_K_ss,
-                               d_pair_inds_k_for_K_ss,
-                               d_D_ik_for_K_ss,
-                               static_cast<uint32_t>(pair_inds_count_for_K_ss),
-                               d_s_prim_info,
-                               d_s_prim_aoinds,
-                               static_cast<uint32_t>(s_prim_count),
-                               ss_max_D,
-                               d_mat_D_full_AO,
-                               static_cast<uint32_t>(cart_naos),
-                               d_Q_K_ss,
-                               d_D_inds_K_ss,
-                               d_pair_displs_K_ss,
-                               d_pair_counts_K_ss,
-                               d_pair_data_K_ss,
-                               d_prim_cart_ao_to_atom_inds,
-                               static_cast<uint32_t>(natoms),
-                               d_boys_func_table,
-                               d_boys_func_ft,
-                               omega,
-                               eri_threshold);
-            gpu::computeExchangeHessianSSSS_JL_0<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
                                d_hess_array[grad_cart_ind_T],
                                static_cast<uint32_t>(grad_cart_ind_0),
