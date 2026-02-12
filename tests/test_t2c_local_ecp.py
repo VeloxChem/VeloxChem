@@ -33,6 +33,13 @@ class TestLocalECPDriver:
         ecp_drv = LocalECPDriver()
         ecp_mat = ecp_drv.compute(mol_auh2, bas_svp, lpot, 0)
         
-        print(ecp_mat.full_matrix())
+        # load reference overlap data
+        here = Path(__file__).parent
+        npyfile = str(here / 'data' / 'auh2.def2svp.au.ecp.only.ul.npy')
+        ref_mat = np.load(npyfile)
+        
+        print(ecp_mat.full_matrix().to_numpy()[5,5])
+        
+        print(ref_mat[5, 5])
         
         assert False

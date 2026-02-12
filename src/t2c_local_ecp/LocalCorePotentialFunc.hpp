@@ -94,173 +94,173 @@ compute(T&                               distributor,
         return;
     }
 
-    if ((bra_angmom == 0) && (ket_angmom == 1))
-    {
-        t2lecp::comp_local_core_potential_sp(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
-
-        return;
-    }
-
-    if ((bra_angmom == 1) && (ket_angmom == 0))
-    {
-        t2lecp::comp_local_core_potential_ps(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
-
-        return;
-    }
-
-    if ((bra_angmom == 1) && (ket_angmom == 1))
-    {
-        t2lecp::comp_local_core_potential_pp(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
-
-        return;
-    }
-
-    if ((bra_angmom == 0) && (ket_angmom == 2))
-    {
-        t2lecp::comp_local_core_potential_sd(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
-
-        return;
-    }
-
-    if ((bra_angmom == 2) && (ket_angmom == 0))
-    {
-        t2lecp::comp_local_core_potential_ds(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
-
-        return;
-    }
-
-    if ((bra_angmom == 0) && (ket_angmom == 3))
-    {
-        t2lecp::comp_local_core_potential_sf(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
-
-        return;
-    }
-
-    if ((bra_angmom == 3) && (ket_angmom == 0))
-    {
-        t2lecp::comp_local_core_potential_fs(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
-
-        return;
-    }
-
-    if ((bra_angmom == 1) && (ket_angmom == 2))
-    {
-        t2lecp::comp_local_core_potential_pd(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
-
-        return;
-    }
-
-    if ((bra_angmom == 2) && (ket_angmom == 1))
-    {
-        t2lecp::comp_local_core_potential_dp(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
-
-        return;
-    }
-
-    if ((bra_angmom == 0) && (ket_angmom == 4))
-    {
-        t2lecp::comp_local_core_potential_sg(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
-
-        return;
-    }
-
-    if ((bra_angmom == 4) && (ket_angmom == 0))
-    {
-        t2lecp::comp_local_core_potential_gs(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
-
-        return;
-    }
-
-    if ((bra_angmom == 1) && (ket_angmom == 3))
-    {
-        t2lecp::comp_local_core_potential_pf(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
-
-        return;
-    }
-
-    if ((bra_angmom == 3) && (ket_angmom == 1))
-    {
-        t2lecp::comp_local_core_potential_fp(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
-
-        return;
-    }
-
-    if ((bra_angmom == 2) && (ket_angmom == 2))
-    {
-        t2lecp::comp_local_core_potential_dd(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
-
-        return;
-    }
-
-    if ((bra_angmom == 1) && (ket_angmom == 4))
-    {
-        t2lecp::comp_local_core_potential_pg(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
-
-        return;
-    }
-
-    if ((bra_angmom == 4) && (ket_angmom == 1))
-    {
-        t2lecp::comp_local_core_potential_gp(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
-
-        return;
-    }
-
-    if ((bra_angmom == 2) && (ket_angmom == 3))
-    {
-        t2lecp::comp_local_core_potential_df(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
-
-        return;
-    }
-
-    if ((bra_angmom == 3) && (ket_angmom == 2))
-    {
-        t2lecp::comp_local_core_potential_fd(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
-
-        return;
-    }
-
-    if ((bra_angmom == 2) && (ket_angmom == 4))
-    {
-        t2lecp::comp_local_core_potential_dg(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
-
-        return;
-    }
-
-    if ((bra_angmom == 4) && (ket_angmom == 2))
-    {
-        t2lecp::comp_local_core_potential_gd(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
-
-        return;
-    }
-
-    if ((bra_angmom == 3) && (ket_angmom == 3))
-    {
-        t2lecp::comp_local_core_potential_ff(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
-
-        return;
-    }
-
-    if ((bra_angmom == 3) && (ket_angmom == 4))
-    {
-        t2lecp::comp_local_core_potential_fg(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
-
-        return;
-    }
-
-    if ((bra_angmom == 4) && (ket_angmom == 3))
-    {
-        t2lecp::comp_local_core_potential_gf(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
-
-        return;
-    }
-
-    if ((bra_angmom == 4) && (ket_angmom == 4))
-    {
-        t2lecp::comp_local_core_potential_gg(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
-
-        return;
-    }
+//    if ((bra_angmom == 0) && (ket_angmom == 1))
+//    {
+//        t2lecp::comp_local_core_potential_sp(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
+//
+//        return;
+//    }
+//
+//    if ((bra_angmom == 1) && (ket_angmom == 0))
+//    {
+//        t2lecp::comp_local_core_potential_ps(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
+//
+//        return;
+//    }
+//
+//    if ((bra_angmom == 1) && (ket_angmom == 1))
+//    {
+//        t2lecp::comp_local_core_potential_pp(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
+//
+//        return;
+//    }
+//
+//    if ((bra_angmom == 0) && (ket_angmom == 2))
+//    {
+//        t2lecp::comp_local_core_potential_sd(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
+//
+//        return;
+//    }
+//
+//    if ((bra_angmom == 2) && (ket_angmom == 0))
+//    {
+//        t2lecp::comp_local_core_potential_ds(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
+//
+//        return;
+//    }
+//
+//    if ((bra_angmom == 0) && (ket_angmom == 3))
+//    {
+//        t2lecp::comp_local_core_potential_sf(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
+//
+//        return;
+//    }
+//
+//    if ((bra_angmom == 3) && (ket_angmom == 0))
+//    {
+//        t2lecp::comp_local_core_potential_fs(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
+//
+//        return;
+//    }
+//
+//    if ((bra_angmom == 1) && (ket_angmom == 2))
+//    {
+//        t2lecp::comp_local_core_potential_pd(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
+//
+//        return;
+//    }
+//
+//    if ((bra_angmom == 2) && (ket_angmom == 1))
+//    {
+//        t2lecp::comp_local_core_potential_dp(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
+//
+//        return;
+//    }
+//
+//    if ((bra_angmom == 0) && (ket_angmom == 4))
+//    {
+//        t2lecp::comp_local_core_potential_sg(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
+//
+//        return;
+//    }
+//
+//    if ((bra_angmom == 4) && (ket_angmom == 0))
+//    {
+//        t2lecp::comp_local_core_potential_gs(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
+//
+//        return;
+//    }
+//
+//    if ((bra_angmom == 1) && (ket_angmom == 3))
+//    {
+//        t2lecp::comp_local_core_potential_pf(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
+//
+//        return;
+//    }
+//
+//    if ((bra_angmom == 3) && (ket_angmom == 1))
+//    {
+//        t2lecp::comp_local_core_potential_fp(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
+//
+//        return;
+//    }
+//
+//    if ((bra_angmom == 2) && (ket_angmom == 2))
+//    {
+//        t2lecp::comp_local_core_potential_dd(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
+//
+//        return;
+//    }
+//
+//    if ((bra_angmom == 1) && (ket_angmom == 4))
+//    {
+//        t2lecp::comp_local_core_potential_pg(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
+//
+//        return;
+//    }
+//
+//    if ((bra_angmom == 4) && (ket_angmom == 1))
+//    {
+//        t2lecp::comp_local_core_potential_gp(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
+//
+//        return;
+//    }
+//
+//    if ((bra_angmom == 2) && (ket_angmom == 3))
+//    {
+//        t2lecp::comp_local_core_potential_df(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
+//
+//        return;
+//    }
+//
+//    if ((bra_angmom == 3) && (ket_angmom == 2))
+//    {
+//        t2lecp::comp_local_core_potential_fd(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
+//
+//        return;
+//    }
+//
+//    if ((bra_angmom == 2) && (ket_angmom == 4))
+//    {
+//        t2lecp::comp_local_core_potential_dg(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
+//
+//        return;
+//    }
+//
+//    if ((bra_angmom == 4) && (ket_angmom == 2))
+//    {
+//        t2lecp::comp_local_core_potential_gd(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
+//
+//        return;
+//    }
+//
+//    if ((bra_angmom == 3) && (ket_angmom == 3))
+//    {
+//        t2lecp::comp_local_core_potential_ff(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
+//
+//        return;
+//    }
+//
+//    if ((bra_angmom == 3) && (ket_angmom == 4))
+//    {
+//        t2lecp::comp_local_core_potential_fg(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
+//
+//        return;
+//    }
+//
+//    if ((bra_angmom == 4) && (ket_angmom == 3))
+//    {
+//        t2lecp::comp_local_core_potential_gf(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
+//
+//        return;
+//    }
+//
+//    if ((bra_angmom == 4) && (ket_angmom == 4))
+//    {
+//        t2lecp::comp_local_core_potential_gg(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
+//
+//        return;
+//    }
 }
 
 }  // namespace t2lecp

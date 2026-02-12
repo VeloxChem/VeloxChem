@@ -132,8 +132,6 @@ comp_local_core_potential_ss(T& distributor,
 
                     t2cfunc::comp_coordinates_r(pfactors, 5, 2, r_a, a_exp, c_exp);
 
-                    t2cfunc::comp_distances_rb(pfactors, 8, 5, 2);
-
                     t2lecp::comp_prim_local_core_potential_ss(pbuffer, 0, pfactors, r_a, a_exp, c_exp, a_norm, c_norm);
 
                     t2cfunc::reduce(cbuffer, 0, pbuffer, 0, 1, ket_width, ket_npgtos);
