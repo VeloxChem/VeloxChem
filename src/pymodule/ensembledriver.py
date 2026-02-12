@@ -240,7 +240,7 @@ class EnsembleDriver:
         else:
             self.npe_model = None
         
-        return self.pe_model, self.npe_model
+        # return self.pe_model, self.npe_model
     
     @staticmethod
     def _first_residue_atom_pattern(atom_names, resids, resnames, target_resname: str) -> list[str]:
@@ -290,7 +290,7 @@ class EnsembleDriver:
         pc = np.zeros((6, coords_ang.shape[0]), dtype=float)
         pc[0:3, :] = coords_ang.T / bohr_in_angstrom()
         pc[3, :] = q
-        print(pc)
+        # print(pc)
         return pc
 
     def write_pot_files(self, snapshots, outdir: str | Path):
@@ -356,7 +356,7 @@ class EnsembleDriver:
                 fh.write("units: angstrom\n")
                 fh.write("xyz:\n")
                 for (x, y, z), elem, resn, resid in zip(pe_coords, pe_elements, pe_resnames, pe_resids):
-                    print (resid)
+                    # print (resid)
                     fh.write(f"{str(elem):<2} {x:12.6f} {y:12.6f} {z:12.6f}  {str(resn):>3}  {int(resid)}\n")
                 fh.write("@end\n\n")
 
