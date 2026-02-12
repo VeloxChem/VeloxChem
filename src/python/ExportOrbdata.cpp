@@ -52,6 +52,7 @@
 #include "GtoPairBlock.hpp"
 #include "GtoPairBlockFunc.hpp"
 #include "MolecularBasis.hpp"
+#include "BaseCorePotential.hpp"
 
 namespace py = pybind11;
 using namespace py::literals;
@@ -408,7 +409,7 @@ export_orbdata(py::module &m)
         .def("__neq__", [](const CBlockedGtoPairBlock &self, const CBlockedGtoPairBlock &other) { return self != other; })
         .def("__copy__", [](const CBlockedGtoPairBlock &self) { return CBlockedGtoPairBlock(self); })
         .def("__deepcopy__", [](const CBlockedGtoPairBlock &self, py::dict) { return CBlockedGtoPairBlock(self); });
-
+    
     // CAODensityMatrix class
 
     // clang-format off
@@ -442,6 +443,28 @@ export_orbdata(py::module &m)
         .def("number_of_density_matrices", &CAODensityMatrix::getNumberOfDensityMatrices, "Gets number of density matrices.")
         .def("get_density_type", &CAODensityMatrix::getDensityType, "Gets type of density matrix.")
         .def(py::self == py::self);
+    
+    // CBaseCorePotential class
+    PyClass<CBaseCorePotential>(m, "BaseCorePotential")
+        .def(py::init<>())
+        .def(py::init<const CBaseCorePotential&>())
+        .def(py::init<const std::vector<double> &, const std::vector<double> &, const std::vector<int> &>())
+        .def(py::pickle(
+            [](const CBaseCorePotential &ecp) { return py::make_tuple(ecp.get_exponents(), ecp.get_factors(), ecp.get_radial_orders()); },
+            [](py::tuple t) { return CBaseCorePotential(t[0].cast<std::vector<double>>(), t[1].cast<std::vector<double>>(), t[2].cast<std::vector<int>>()); }))
+        .def("set_exponents", &CBaseCorePotential::set_exponents, "Sets exponents of base core potential.")
+        .def("set_factors", &CBaseCorePotential::set_factors, "Sets factors of base core potential.")
+        .def("set_radial_orders", &CBaseCorePotential::set_radial_orders, "Sets radial orders of base core potential.")
+        .def("add",
+             &CBaseCorePotential::add,
+             "Add primitive i.e. exponent, factor and radial order to base core potentia.")
+        .def("get_exponents", &CBaseCorePotential::get_exponents, "Gets vector of exponents in base core potential.")
+        .def("get_factors", &CBaseCorePotential::get_factors, "Gets vector of factors in base core potential.")
+        .def("get_radial_orders", &CBaseCorePotential::get_radial_orders, "Gets vector of radial orders in base core potential.")
+        .def("number_of_primitive_potentials", &CBaseCorePotential::number_of_primitive_potentials, "Gets number of primitive potentials in base core potential.")
+        .def("__eq__", [](const CBaseCorePotential &self, const CBaseCorePotential &other) { return self == other; })
+        .def("__copy__", [](const CBaseCorePotential &self) { return CBaseCorePotential(self); })
+        .def("__deepcopy__", [](const CBaseCorePotential &self, py::dict) { return CBaseCorePotential(self); });
 
     // exposing functions
 

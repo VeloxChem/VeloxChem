@@ -104,8 +104,6 @@ comp_local_core_potential_ss(T& distributor,
 
         const auto ket_width = ket_range.second - ket_range.first;
 
-        sbuffer.set_active_width(ket_width);
-
         cbuffer.set_active_width(ket_width);
 
         pbuffer.set_active_width(ket_width);
@@ -115,8 +113,6 @@ comp_local_core_potential_ss(T& distributor,
         for (auto j = bra_indices.first; j < bra_indices.second; j++)
         {
             cbuffer.zero();
-
-            sbuffer.zero();
 
             const auto r_a = bra_gto_coords[j];
 
@@ -144,8 +140,6 @@ comp_local_core_potential_ss(T& distributor,
 
                 }
             }
-
-            t2cfunc::transform<0, 0>(sbuffer, cbuffer, 0);
 
             distributor.distribute(cbuffer, bra_gto_indices, ket_gto_indices, 0, 0, j, ket_range, bra_eq_ket);
         }

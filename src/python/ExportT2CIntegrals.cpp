@@ -53,6 +53,7 @@
 #include "OverlapGeomX0YDriver.hpp"
 #include "TwoCenterElectronRepulsionDriver.hpp"
 #include "TwoCenterElectronRepulsionGeomX00Driver.hpp"
+#include "LocalCorePotentialDriver.hpp"
 
 namespace vlx_t2cintegrals {
 
@@ -423,6 +424,21 @@ export_t2cintegrals(py::module& m)
             [](const CTwoCenterElectronRepulsionGeomX00Driver<1>& geom_drv, const CMolecule& molecule, const CMolecularBasis& basis, const int iatom)
                 -> CMatrices { return geom_drv.compute(basis, molecule, iatom); },
             "Computes overlap first derivatives matrices for given molecule, basis and selected atom.");
+    
+    // CLocalCorePotentialDriver class
+    PyClass<CLocalCorePotentialDriver>(m, "LocalECPDriver")
+        .def(py::init<>())
+        .def(
+            "compute",
+            [](const CLocalCorePotentialDriver& ecp_drv,
+               const CMolecule&                 molecule,
+               const CMolecularBasis&           basis,
+               const CBaseCorePotential&        ecp_potential,
+               const int                        iatom) -> CMatrix {
+               return ecp_drv.compute(basis, molecule, ecp_potential, iatom);
+            },
+             "Computes local ECP matrix for given molecule, basis, base core potential.");
+    
 }
 
 }  // namespace vlx_t2cintegrals

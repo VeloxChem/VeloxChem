@@ -94,6 +94,39 @@ auto comp_distances_pa_from_p(CSimdArray<double>& buffer, const size_t index_pa,
 /// @param r_c The Cartesian C point coordinates.
 auto comp_distances_pc(CSimdArray<double>& buffer, const size_t index_pc, const size_t index_p, const TPoint<double>& r_c) -> void;
 
+/// @brief Computes R center coordinates.
+/// @param buffer The SIMD array containing R(AB) distances and Cartesian A, B coordinates.
+/// @param index_r The primary row index of  Cartesian R points coordinates in SIMD array.
+/// @param index_b  The primary row index of  Cartesian B points coordinates in SIMD array.
+/// @param r_a The Cartesian A point coordinates.
+/// @param a_exp The exponent on A center.
+/// @param c_exp The exponent on C center.
+auto comp_coordinates_r(CSimdArray<double>& buffer, const size_t index_r, const size_t index_b, const TPoint<double>& r_a, const double a_exp, const double c_exp)
+    -> void;
+
+/// @brief Computes R(RB) = R - B distances.
+/// @param buffer The SIMD array containing R(RB) distances.
+/// @param index_rb The primary row index of R(RB) distances in SIMD array.
+/// @param index_r The primary row index of  Cartesian R points coordinates in SIMD array.
+/// @param index_b  The primary row index of  Cartesian B points coordinates in SIMD array.
+auto comp_distances_rb(CSimdArray<double>& buffer, const size_t index_rb, const size_t index_r, const size_t index_b) -> void;
+
+
+/// @brief Computes R(RA) = R - A distances.
+/// @param buffer The SIMD array containing R(RA) distances.
+/// @param index_ra The primary row index of R(RA) distances in SIMD array.
+/// @param index_r The primary row index of  Cartesian R points coordinates in SIMD array.
+/// @param r_a The Cartesian A point coordinates.
+auto comp_distances_ra(CSimdArray<double>& buffer, const size_t index_ra, const size_t index_r, const TPoint<double>& r_a) -> void;
+
+/// @brief Computes inverted zeta factors for local ECP.
+/// @param buffer The SIMD array containing zeta factors.
+/// @param index_fact The primary row index of  zeta factors in SIMD array.
+/// @param a_exp The exponent on A center.
+/// @param c_exp The exponent on C center.
+auto comp_inverted_zeta(CSimdArray<double>& buffer, const size_t index_fact, const double a_exp, const double c_exp)
+    -> void;
+
 /// Computes Boys function arguments.
 /// @param bf_data The Boys function data.
 /// @param index_args The primary row index of arguments in Boys function data.
