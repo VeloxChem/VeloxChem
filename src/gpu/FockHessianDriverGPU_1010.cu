@@ -62159,6 +62159,74 @@ computeFockHessianOnGPU_1010(const              CMolecule& molecule,
         // K: (SS|SS)
         //     *  *
 
+        std::vector<uint32_t> atom_ids_j;
+        std::vector<uint32_t> atom_ids_j_displs;
+        std::vector<uint32_t> atom_ids_j_counts;
+
+        atom_ids_j_displs.reserve(pair_counts_K_ss.size() * natoms);
+        atom_ids_j_counts.reserve(pair_counts_K_ss.size() * natoms);
+
+        for (int64_t i = 0; i < static_cast<int64_t>(pair_counts_K_ss.size()); i++)
+        {
+            auto count_i = pair_counts_K_ss[i];
+            auto displ_i = pair_displs_K_ss[i];
+
+            std::vector<std::vector<uint32_t>> local_atom_ids (natoms);
+
+            for (int64_t j = 0; j < count_i; j++)
+            {
+                auto j_prim = D_inds_K_ss[displ_i + j];
+                auto j_cgto = s_prim_aoinds[j_prim];
+                auto atom_j = cart_ao_to_atom_inds[j_cgto];
+
+                local_atom_ids[atom_j].push_back(j);
+            }
+
+            int64_t running_displ = 0;
+
+            for (int64_t a = 0; a < natoms; a++)
+            {
+                atom_ids_j.insert(atom_ids_j.end(), local_atom_ids[a].begin(), local_atom_ids[a].end());
+
+                atom_ids_j_displs.push_back(static_cast<uint32_t>(running_displ));
+                atom_ids_j_counts.push_back(static_cast<uint32_t>(local_atom_ids[a].size()));
+
+                running_displ += static_cast<int64_t>(local_atom_ids[a].size());
+            }
+
+            errors::assertMsgCritical(
+                running_displ == count_i,
+                std::string(__func__) + std::string(": running_displ and count_i do not match"));
+        }
+
+        std::vector<uint32_t> atom_ids_l =        atom_ids_j;
+        std::vector<uint32_t> atom_ids_l_displs = atom_ids_j_displs;
+        std::vector<uint32_t> atom_ids_l_counts = atom_ids_j_counts;
+
+        uint32_t* d_atom_ids_j;
+        uint32_t* d_atom_ids_j_displs;
+        uint32_t* d_atom_ids_j_counts;
+
+        uint32_t* d_atom_ids_l;
+        uint32_t* d_atom_ids_l_displs;
+        uint32_t* d_atom_ids_l_counts;
+
+        gpuSafe(gpuMallocAsync(&d_atom_ids_j,        atom_ids_j.size()        * sizeof(uint32_t), stream));
+        gpuSafe(gpuMallocAsync(&d_atom_ids_j_displs, atom_ids_j_displs.size() * sizeof(uint32_t), stream));
+        gpuSafe(gpuMallocAsync(&d_atom_ids_j_counts, atom_ids_j_counts.size() * sizeof(uint32_t), stream));
+
+        gpuSafe(gpuMallocAsync(&d_atom_ids_l,        atom_ids_l.size()        * sizeof(uint32_t), stream));
+        gpuSafe(gpuMallocAsync(&d_atom_ids_l_displs, atom_ids_l_displs.size() * sizeof(uint32_t), stream));
+        gpuSafe(gpuMallocAsync(&d_atom_ids_l_counts, atom_ids_l_counts.size() * sizeof(uint32_t), stream));
+
+        gpuSafe(gpuMemcpyAsync(d_atom_ids_j,        atom_ids_j.data(),        atom_ids_j.size()        * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+        gpuSafe(gpuMemcpyAsync(d_atom_ids_j_displs, atom_ids_j_displs.data(), atom_ids_j_displs.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+        gpuSafe(gpuMemcpyAsync(d_atom_ids_j_counts, atom_ids_j_counts.data(), atom_ids_j_counts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+
+        gpuSafe(gpuMemcpyAsync(d_atom_ids_l,        atom_ids_l.data(),        atom_ids_l.size()        * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+        gpuSafe(gpuMemcpyAsync(d_atom_ids_l_displs, atom_ids_l_displs.data(), atom_ids_l_displs.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+        gpuSafe(gpuMemcpyAsync(d_atom_ids_l_counts, atom_ids_l_counts.data(), atom_ids_l_counts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+
         for (int64_t grad_cart_ind_0 = 0; grad_cart_ind_0 < 3; grad_cart_ind_0++)
         for (int64_t grad_cart_ind_1 = 0; grad_cart_ind_1 < 3; grad_cart_ind_1++)
         {
@@ -62217,6 +62285,9 @@ computeFockHessianOnGPU_1010(const              CMolecule& molecule,
                                d_pair_data_K_ss,
                                d_prim_cart_ao_to_atom_inds,
                                static_cast<uint32_t>(natoms),
+                               d_atom_ids_l,
+                               d_atom_ids_l_displs,
+                               d_atom_ids_l_counts,
                                d_boys_func_table,
                                d_boys_func_ft,
                                omega,
@@ -62244,11 +62315,22 @@ computeFockHessianOnGPU_1010(const              CMolecule& molecule,
                                d_pair_data_K_ss,
                                d_prim_cart_ao_to_atom_inds,
                                static_cast<uint32_t>(natoms),
+                               d_atom_ids_j,
+                               d_atom_ids_j_displs,
+                               d_atom_ids_j_counts,
                                d_boys_func_table,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
         }
+
+        gpuSafe(gpuFree(d_atom_ids_j       ));
+        gpuSafe(gpuFree(d_atom_ids_j_displs));
+        gpuSafe(gpuFree(d_atom_ids_j_counts));
+
+        gpuSafe(gpuFree(d_atom_ids_l       ));
+        gpuSafe(gpuFree(d_atom_ids_l_displs));
+        gpuSafe(gpuFree(d_atom_ids_l_counts));
 
         /*
         // K: (SS|SP)
