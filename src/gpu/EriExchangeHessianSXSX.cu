@@ -32,6 +32,7 @@
 
 #include "GpuRuntime.hpp"
 
+#include <assert.h>
 
 #include "BoysFuncGPU.hpp"
 #include "EriExchangeHessianSXSX.hpp"
@@ -776,6 +777,9 @@ computeExchangeHessianSSSS_IJ_0(double*         hess_xy,
                                 const double*   pair_data_K_ss,
                                 const uint32_t* prim_cart_ao_to_atom_inds,
                                 const uint32_t  natoms,
+                                const uint32_t* atom_ids_j,
+                                const uint32_t* atom_ids_j_displs,
+                                const uint32_t* atom_ids_j_counts,
                                 const double*   boys_func_table,
                                 const double*   boys_func_ft,
                                 const double    omega,
@@ -793,8 +797,6 @@ computeExchangeHessianSSSS_IJ_0(double*         hess_xy,
     const uint32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_ss when calling the kernel
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -832,9 +834,19 @@ computeExchangeHessianSSSS_IJ_0(double*         hess_xy,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (uint32_t atom_idx_j = 0; atom_idx_j < natoms; atom_idx_j++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+
+    __syncthreads();
+
+    const auto atom_j_displ = atom_ids_j_displs[i * natoms + atom_idx_j];
+    const auto atom_j_count = atom_ids_j_counts[i * natoms + atom_idx_j];
+
+    for (uint32_t m = 0; m < (atom_j_count + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    {
+        const auto j_raw = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
@@ -843,8 +855,11 @@ computeExchangeHessianSSSS_IJ_0(double*         hess_xy,
         double PA_x, PB_y;
         uint32_t j_prim, j_cgto;
 
-        if (j < count_i)
+        if (j_raw < atom_j_count)
         {
+            // note non-coalesced read wrt j
+            const auto j = atom_ids_j[displ_i + atom_j_displ + j_raw];
+
             Q_ij   = Q_K_ss[displ_i + j];
 
             j_prim = D_inds_K_ss[displ_i + j];
@@ -874,7 +889,7 @@ computeExchangeHessianSSSS_IJ_0(double*         hess_xy,
             const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
             // Q_kl == Q_K_ss[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_ss[displ_k + l] * ss_max_D) <= eri_threshold))
+            if ((j_raw >= atom_j_count) || (l >= count_k) || (fabs(Q_ij * Q_K_ss[displ_k + l] * ss_max_D) <= eri_threshold))
             {
                 break;
             }
@@ -965,12 +980,6 @@ computeExchangeHessianSSSS_IJ_0(double*         hess_xy,
                     );
 
             ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
-
-            double val = -eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
-
-            atomicAdd(
-                hess_xy + prim_cart_ao_to_atom_inds[i] * natoms + prim_cart_ao_to_atom_inds[j_prim],
-                val * ik_factor_D * 2.0 * frac_exact_exchange);
         }
     }
 
@@ -987,6 +996,13 @@ computeExchangeHessianSSSS_IJ_0(double*         hess_xy,
                 hess_ij_xy += ERIs[y][x];
             }
         }
+
+        atomicAdd(
+            hess_xy + prim_cart_ao_to_atom_inds[i] * natoms + atom_idx_j,
+            hess_ij_xy * ik_factor_D * 2.0 * frac_exact_exchange);
+    }
+
+    __syncthreads();
 
     }
 }
