@@ -499,6 +499,18 @@ class CGradientScreeningData
                            std::vector<uint32_t>&       kl_counts_for_atom_l,
                            std::vector<uint32_t>&       kl_displs_for_atom_k,
                            std::vector<uint32_t>&       kl_displs_for_atom_l) -> void;
+
+    auto update_j_or_l_vectors(const uint32_t               natoms,
+                               const std::vector<uint32_t>& pair_displs_K_ij,
+                               const std::vector<uint32_t>& pair_counts_K_ij,
+                               const std::vector<uint32_t>& D_inds_K_ij,
+                               const uint32_t               j_prim_count,
+                               const std::string&           j_prim_type,
+                               const std::vector<uint32_t>& j_prim_aoinds,
+                               const std::vector<uint32_t>& cart_ao_to_atom_inds,
+                               std::vector<uint32_t>&       atom_ids_j,
+                               std::vector<uint32_t>&       atom_ids_j_displs,
+                               std::vector<uint32_t>&       atom_ids_j_counts) -> void;
 };
 
 #endif /* GradientScreeningData_hpp */
