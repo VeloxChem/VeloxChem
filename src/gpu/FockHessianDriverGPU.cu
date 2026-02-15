@@ -26815,9 +26815,6 @@ computeFockHessianOnGPU_2000(const              CMolecule& molecule,
                                eri_threshold);
         }
 
-        // Note: d_prim_cart_ao_to_atom_inds is reused in subsequent kernels
-        //       so we need to sync stream here
-        //       otherwise it may be overwritten
         gpuSafe(gpuStreamSynchronize(stream));
 
         timer.stop("  K block SS");
