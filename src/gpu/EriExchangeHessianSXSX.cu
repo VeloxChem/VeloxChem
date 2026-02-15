@@ -777,9 +777,6 @@ computeExchangeHessianSSSS_IJ_0(double*         hess_xy,
                                 const double*   pair_data_K_ss,
                                 const uint32_t* prim_cart_ao_to_atom_inds,
                                 const uint32_t  natoms,
-                                const uint32_t* atom_ids_j,
-                                const uint32_t* atom_ids_j_displs,
-                                const uint32_t* atom_ids_j_counts,
                                 const double*   boys_func_table,
                                 const double*   boys_func_ft,
                                 const double    omega,
@@ -788,7 +785,6 @@ computeExchangeHessianSSSS_IJ_0(double*         hess_xy,
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
     __shared__ double   delta[3][3];
@@ -834,19 +830,9 @@ computeExchangeHessianSSSS_IJ_0(double*         hess_xy,
 
     __syncthreads();
 
-    for (uint32_t atom_idx_j = 0; atom_idx_j < natoms; atom_idx_j++)
+    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
-
-    __syncthreads();
-
-    const auto atom_j_displ = atom_ids_j_displs[i * natoms + atom_idx_j];
-    const auto atom_j_count = atom_ids_j_counts[i * natoms + atom_idx_j];
-
-    for (uint32_t m = 0; m < (atom_j_count + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
-    {
-        const auto j_raw = m * TILE_DIM_Y_K + threadIdx.y;
+        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
@@ -855,11 +841,8 @@ computeExchangeHessianSSSS_IJ_0(double*         hess_xy,
         double PA_x, PB_y;
         uint32_t j_prim, j_cgto;
 
-        if (j_raw < atom_j_count)
+        if (j < count_i)
         {
-            // note non-coalesced read wrt j
-            const auto j = atom_ids_j[displ_i + atom_j_displ + j_raw];
-
             Q_ij   = Q_K_ss[displ_i + j];
 
             j_prim = D_inds_K_ss[displ_i + j];
@@ -889,7 +872,7 @@ computeExchangeHessianSSSS_IJ_0(double*         hess_xy,
             const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
             // Q_kl == Q_K_ss[displ_k + l]
-            if ((j_raw >= atom_j_count) || (l >= count_k) || (fabs(Q_ij * Q_K_ss[displ_k + l] * ss_max_D) <= eri_threshold))
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_ss[displ_k + l] * ss_max_D) <= eri_threshold))
             {
                 break;
             }
@@ -979,32 +962,15 @@ computeExchangeHessianSSSS_IJ_0(double*         hess_xy,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            double hess_ij_xy = -eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+
+            atomicAdd(
+                hess_xy + prim_cart_ao_to_atom_inds[i] * natoms + prim_cart_ao_to_atom_inds[j_prim],
+                hess_ij_xy * ik_factor_D * 2.0 * frac_exact_exchange);
         }
     }
 
     __syncthreads();
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_ss))
-    {
-        double hess_ij_xy = 0.0;
-
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
-        {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
-            {
-                hess_ij_xy += ERIs[y][x];
-            }
-        }
-
-        atomicAdd(
-            hess_xy + prim_cart_ao_to_atom_inds[i] * natoms + atom_idx_j,
-            hess_ij_xy * ik_factor_D * 2.0 * frac_exact_exchange);
-    }
-
-    __syncthreads();
-
-    }
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -1030,9 +996,6 @@ computeExchangeHessianSSSS_KL_0(double*         hess_xy,
                                 const double*   pair_data_K_ss,
                                 const uint32_t* prim_cart_ao_to_atom_inds,
                                 const uint32_t  natoms,
-                                const uint32_t* atom_ids_l,
-                                const uint32_t* atom_ids_l_displs,
-                                const uint32_t* atom_ids_l_counts,
                                 const double*   boys_func_table,
                                 const double*   boys_func_ft,
                                 const double    omega,
@@ -1041,7 +1004,6 @@ computeExchangeHessianSSSS_KL_0(double*         hess_xy,
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
     __shared__ double   delta[3][3];
@@ -1087,16 +1049,6 @@ computeExchangeHessianSSSS_KL_0(double*         hess_xy,
 
     __syncthreads();
 
-    for (uint32_t atom_idx_l = 0; atom_idx_l < natoms; atom_idx_l++)
-    {
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
-
-    __syncthreads();
-
-    const auto atom_l_displ = atom_ids_l_displs[k * natoms + atom_idx_l];
-    const auto atom_l_count = atom_ids_l_counts[k * natoms + atom_idx_l];
-
     for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
         const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
@@ -1131,25 +1083,17 @@ computeExchangeHessianSSSS_KL_0(double*         hess_xy,
 
         }
 
-        for (uint32_t n = 0; n < (atom_l_count + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const auto l_raw = n * TILE_DIM_X_K + threadIdx.x;
-
-            if ((j >= count_i) || (l_raw >= atom_l_count))
-            {
-                break;
-            }
-
-            // note non-coalesced read wrt l
-            const auto l = atom_ids_l[displ_k + atom_l_displ + l_raw];
-
-            // const auto Q_kl = Q_K_ss[displ_k + l];
+            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
             // Q_kl == Q_K_ss[displ_k + l]
-            if (fabs(Q_ij * Q_K_ss[displ_k + l] * ss_max_D) <= eri_threshold)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_ss[displ_k + l] * ss_max_D) <= eri_threshold))
             {
                 break;
             }
+
+            // const auto Q_kl = Q_K_ss[displ_k + l];
 
             const auto l_prim = D_inds_K_ss[displ_k + l];
 
@@ -1237,32 +1181,15 @@ computeExchangeHessianSSSS_KL_0(double*         hess_xy,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            double hess_kl_xy = -eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+
+            atomicAdd(
+                hess_xy + prim_cart_ao_to_atom_inds[k] * natoms + prim_cart_ao_to_atom_inds[l_prim],
+                hess_kl_xy * ik_factor_D * 2.0 * frac_exact_exchange);
         }
     }
 
     __syncthreads();
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_ss))
-    {
-        double hess_kl_xy = 0.0;
-
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
-        {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
-            {
-                hess_kl_xy += ERIs[y][x];
-            }
-        }
-
-        atomicAdd(
-            hess_xy + prim_cart_ao_to_atom_inds[k] * natoms + atom_idx_l,
-            hess_kl_xy * ik_factor_D * 2.0 * frac_exact_exchange);
-    }
-
-    __syncthreads();
-
-    }
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -1288,9 +1215,6 @@ computeExchangeHessianSSSS_IL_0(double*         hess_xy,
                                 const double*   pair_data_K_ss,
                                 const uint32_t* prim_cart_ao_to_atom_inds,
                                 const uint32_t  natoms,
-                                const uint32_t* atom_ids_l,
-                                const uint32_t* atom_ids_l_displs,
-                                const uint32_t* atom_ids_l_counts,
                                 const double*   boys_func_table,
                                 const double*   boys_func_ft,
                                 const double    omega,
@@ -1299,7 +1223,6 @@ computeExchangeHessianSSSS_IL_0(double*         hess_xy,
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
     __shared__ double   delta[3][3];
@@ -1345,16 +1268,6 @@ computeExchangeHessianSSSS_IL_0(double*         hess_xy,
 
     __syncthreads();
 
-    for (uint32_t atom_idx_l = 0; atom_idx_l < natoms; atom_idx_l++)
-    {
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
-
-    __syncthreads();
-
-    const auto atom_l_displ = atom_ids_l_displs[k * natoms + atom_idx_l];
-    const auto atom_l_count = atom_ids_l_counts[k * natoms + atom_idx_l];
-
     for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
         const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
@@ -1391,25 +1304,17 @@ computeExchangeHessianSSSS_IL_0(double*         hess_xy,
 
         }
 
-        for (uint32_t n = 0; n < (atom_l_count + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const auto l_raw = n * TILE_DIM_X_K + threadIdx.x;
-
-            if ((j >= count_i) || (l_raw >= atom_l_count))
-            {
-                break;
-            }
-
-            // note non-coalesced read wrt l
-            const auto l = atom_ids_l[displ_k + atom_l_displ + l_raw];
-
-            // const auto Q_kl = Q_K_ss[displ_k + l];
+            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
             // Q_kl == Q_K_ss[displ_k + l]
-            if (fabs(Q_ij * Q_K_ss[displ_k + l] * ss_max_D) <= eri_threshold)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_ss[displ_k + l] * ss_max_D) <= eri_threshold))
             {
                 break;
             }
+
+            // const auto Q_kl = Q_K_ss[displ_k + l];
 
             const auto l_prim = D_inds_K_ss[displ_k + l];
 
@@ -1496,36 +1401,19 @@ computeExchangeHessianSSSS_IL_0(double*         hess_xy,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            double hess_il_xy = -eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+
+            atomicAdd(
+                hess_xy + prim_cart_ao_to_atom_inds[i] * natoms + prim_cart_ao_to_atom_inds[l_prim],
+                hess_il_xy * ik_factor_D * frac_exact_exchange);
+
+            atomicAdd(
+                hess_yx + prim_cart_ao_to_atom_inds[l_prim] * natoms + prim_cart_ao_to_atom_inds[i],
+                hess_il_xy * ik_factor_D * frac_exact_exchange);
         }
     }
 
     __syncthreads();
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_ss))
-    {
-        double hess_il_xy = 0.0;
-
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
-        {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
-            {
-                hess_il_xy += ERIs[y][x];
-            }
-        }
-
-        atomicAdd(
-            hess_xy + prim_cart_ao_to_atom_inds[i] * natoms + atom_idx_l,
-            hess_il_xy * ik_factor_D * frac_exact_exchange);
-
-        atomicAdd(
-            hess_yx + atom_idx_l * natoms + prim_cart_ao_to_atom_inds[i],
-            hess_il_xy * ik_factor_D * frac_exact_exchange);
-    }
-
-    __syncthreads();
-
-    }
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -1551,9 +1439,6 @@ computeExchangeHessianSSSS_JK_0(double*         hess_xy,
                                 const double*   pair_data_K_ss,
                                 const uint32_t* prim_cart_ao_to_atom_inds,
                                 const uint32_t  natoms,
-                                const uint32_t* atom_ids_j,
-                                const uint32_t* atom_ids_j_displs,
-                                const uint32_t* atom_ids_j_counts,
                                 const double*   boys_func_table,
                                 const double*   boys_func_ft,
                                 const double    omega,
@@ -1562,7 +1447,6 @@ computeExchangeHessianSSSS_JK_0(double*         hess_xy,
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
     __shared__ double   delta[3][3];
@@ -1608,19 +1492,9 @@ computeExchangeHessianSSSS_JK_0(double*         hess_xy,
 
     __syncthreads();
 
-    for (uint32_t atom_idx_j = 0; atom_idx_j < natoms; atom_idx_j++)
+    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
-
-    __syncthreads();
-
-    const auto atom_j_displ = atom_ids_j_displs[i * natoms + atom_idx_j];
-    const auto atom_j_count = atom_ids_j_counts[i * natoms + atom_idx_j];
-
-    for (uint32_t m = 0; m < (atom_j_count + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
-    {
-        const auto j_raw = m * TILE_DIM_Y_K + threadIdx.y;
+        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
@@ -1629,11 +1503,8 @@ computeExchangeHessianSSSS_JK_0(double*         hess_xy,
         double PB_x;
         uint32_t j_prim, j_cgto;
 
-        if (j_raw < atom_j_count)
+        if (j < count_i)
         {
-            // note non-coalesced read wrt j
-            const auto j = atom_ids_j[displ_i + atom_j_displ + j_raw];
-
             Q_ij   = Q_K_ss[displ_i + j];
 
             j_prim = D_inds_K_ss[displ_i + j];
@@ -1662,7 +1533,7 @@ computeExchangeHessianSSSS_JK_0(double*         hess_xy,
             const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
             // Q_kl == Q_K_ss[displ_k + l]
-            if ((j_raw >= atom_j_count) || (l >= count_k) || (fabs(Q_ij * Q_K_ss[displ_k + l] * ss_max_D) <= eri_threshold))
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_ss[displ_k + l] * ss_max_D) <= eri_threshold))
             {
                 break;
             }
@@ -1754,36 +1625,19 @@ computeExchangeHessianSSSS_JK_0(double*         hess_xy,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            double hess_jk_xy = -eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+
+            atomicAdd(
+                hess_xy + prim_cart_ao_to_atom_inds[j_prim] * natoms + prim_cart_ao_to_atom_inds[k],
+                hess_jk_xy * ik_factor_D * frac_exact_exchange);
+
+            atomicAdd(
+                hess_yx + prim_cart_ao_to_atom_inds[k] * natoms + prim_cart_ao_to_atom_inds[j_prim],
+                hess_jk_xy * ik_factor_D * frac_exact_exchange);
         }
     }
 
     __syncthreads();
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_ss))
-    {
-        double hess_jk_xy = 0.0;
-
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
-        {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
-            {
-                hess_jk_xy += ERIs[y][x];
-            }
-        }
-
-        atomicAdd(
-            hess_xy + atom_idx_j * natoms + prim_cart_ao_to_atom_inds[k],
-            hess_jk_xy * ik_factor_D * frac_exact_exchange);
-
-        atomicAdd(
-            hess_yx + prim_cart_ao_to_atom_inds[k] * natoms + atom_idx_j,
-            hess_jk_xy * ik_factor_D * frac_exact_exchange);
-    }
-
-    __syncthreads();
-
-    }
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -2654,9 +2508,6 @@ computeExchangeHessianSSSP_IJ_0(double*         hess_xy,
                                 const double*   pair_data_K_sp,
                                 const uint32_t* prim_cart_ao_to_atom_inds,
                                 const uint32_t  natoms,
-                                const uint32_t* atom_ids_j,
-                                const uint32_t* atom_ids_j_displs,
-                                const uint32_t* atom_ids_j_counts,
                                 const double*   boys_func_table,
                                 const double*   boys_func_ft,
                                 const double    omega,
@@ -2665,7 +2516,6 @@ computeExchangeHessianSSSP_IJ_0(double*         hess_xy,
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
     __shared__ double   delta[3][3];
@@ -2711,19 +2561,9 @@ computeExchangeHessianSSSP_IJ_0(double*         hess_xy,
 
     __syncthreads();
 
-    for (uint32_t atom_idx_j = 0; atom_idx_j < natoms; atom_idx_j++)
+    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
-
-    __syncthreads();
-
-    const auto atom_j_displ = atom_ids_j_displs[i * natoms + atom_idx_j];
-    const auto atom_j_count = atom_ids_j_counts[i * natoms + atom_idx_j];
-
-    for (uint32_t m = 0; m < (atom_j_count + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
-    {
-        const auto j_raw = m * TILE_DIM_Y_K + threadIdx.y;
+        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
@@ -2732,11 +2572,8 @@ computeExchangeHessianSSSP_IJ_0(double*         hess_xy,
         double PA_x, PB_y;
         uint32_t j_prim, j_cgto;
 
-        if (j_raw < atom_j_count)
+        if (j < count_i)
         {
-            // note non-coalesced read wrt j
-            const auto j = atom_ids_j[displ_i + atom_j_displ + j_raw];
-
             Q_ij   = Q_K_ss[displ_i + j];
 
             j_prim = D_inds_K_ss[displ_i + j];
@@ -2766,7 +2603,7 @@ computeExchangeHessianSSSP_IJ_0(double*         hess_xy,
             const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
             // Q_kl == Q_K_sp[displ_k + l]
-            if ((j_raw >= atom_j_count) || (l >= count_k) || (fabs(Q_ij * Q_K_sp[displ_k + l] * sp_max_D) <= eri_threshold))
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_sp[displ_k + l] * sp_max_D) <= eri_threshold))
             {
                 break;
             }
@@ -2891,32 +2728,15 @@ computeExchangeHessianSSSP_IJ_0(double*         hess_xy,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            double hess_ij_xy = -eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+
+            atomicAdd(
+                hess_xy + prim_cart_ao_to_atom_inds[i] * natoms + prim_cart_ao_to_atom_inds[j_prim],
+                hess_ij_xy * ik_factor_D * 2.0 * frac_exact_exchange);
         }
     }
 
     __syncthreads();
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_ss))
-    {
-        double hess_ij_xy = 0.0;
-
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
-        {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
-            {
-                hess_ij_xy += ERIs[y][x];
-            }
-        }
-
-        atomicAdd(
-            hess_xy + prim_cart_ao_to_atom_inds[i] * natoms + atom_idx_j,
-            hess_ij_xy * ik_factor_D * 2.0 * frac_exact_exchange);
-    }
-
-    __syncthreads();
-
-    }
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -2950,9 +2770,6 @@ computeExchangeHessianSSSP_KL_0(double*         hess_xy,
                                 const double*   pair_data_K_sp,
                                 const uint32_t* prim_cart_ao_to_atom_inds,
                                 const uint32_t  natoms,
-                                const uint32_t* atom_ids_l,
-                                const uint32_t* atom_ids_l_displs,
-                                const uint32_t* atom_ids_l_counts,
                                 const double*   boys_func_table,
                                 const double*   boys_func_ft,
                                 const double    omega,
@@ -2961,7 +2778,6 @@ computeExchangeHessianSSSP_KL_0(double*         hess_xy,
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
     __shared__ double   delta[3][3];
@@ -3007,16 +2823,6 @@ computeExchangeHessianSSSP_KL_0(double*         hess_xy,
 
     __syncthreads();
 
-    for (uint32_t atom_idx_l = 0; atom_idx_l < natoms; atom_idx_l++)
-    {
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
-
-    __syncthreads();
-
-    const auto atom_l_displ = atom_ids_l_displs[k * natoms + atom_idx_l];
-    const auto atom_l_count = atom_ids_l_counts[k * natoms + atom_idx_l];
-
     for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
         const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
@@ -3051,25 +2857,17 @@ computeExchangeHessianSSSP_KL_0(double*         hess_xy,
 
         }
 
-        for (uint32_t n = 0; n < (atom_l_count + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const auto l_raw = n * TILE_DIM_X_K + threadIdx.x;
-
-            if ((j >= count_i) || (l_raw >= atom_l_count))
-            {
-                break;
-            }
-
-            // note non-coalesced read wrt l
-            const auto l = atom_ids_l[displ_k + atom_l_displ + l_raw];
-
-            // const auto Q_kl = Q_K_sp[displ_k + l];
+            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
             // Q_kl == Q_K_sp[displ_k + l]
-            if (fabs(Q_ij * Q_K_sp[displ_k + l] * sp_max_D) <= eri_threshold)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_sp[displ_k + l] * sp_max_D) <= eri_threshold))
             {
                 break;
             }
+
+            // const auto Q_kl = Q_K_sp[displ_k + l];
 
             const auto l_prim = D_inds_K_sp[displ_k + l];
 
@@ -3186,32 +2984,15 @@ computeExchangeHessianSSSP_KL_0(double*         hess_xy,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            double hess_kl_xy = -eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+
+            atomicAdd(
+                hess_xy + prim_cart_ao_to_atom_inds[k] * natoms + prim_cart_ao_to_atom_inds[s_prim_count + l_prim],
+                hess_kl_xy * ik_factor_D * 2.0 * frac_exact_exchange);
         }
     }
 
     __syncthreads();
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_ss))
-    {
-        double hess_kl_xy = 0.0;
-
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
-        {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
-            {
-                hess_kl_xy += ERIs[y][x];
-            }
-        }
-
-        atomicAdd(
-            hess_xy + prim_cart_ao_to_atom_inds[k] * natoms + atom_idx_l,
-            hess_kl_xy * ik_factor_D * 2.0 * frac_exact_exchange);
-    }
-
-    __syncthreads();
-
-    }
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -3245,9 +3026,6 @@ computeExchangeHessianSSSP_IL_0(double*         hess_xy,
                                 const double*   pair_data_K_sp,
                                 const uint32_t* prim_cart_ao_to_atom_inds,
                                 const uint32_t  natoms,
-                                const uint32_t* atom_ids_l,
-                                const uint32_t* atom_ids_l_displs,
-                                const uint32_t* atom_ids_l_counts,
                                 const double*   boys_func_table,
                                 const double*   boys_func_ft,
                                 const double    omega,
@@ -3256,7 +3034,6 @@ computeExchangeHessianSSSP_IL_0(double*         hess_xy,
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
     __shared__ double   delta[3][3];
@@ -3302,16 +3079,6 @@ computeExchangeHessianSSSP_IL_0(double*         hess_xy,
 
     __syncthreads();
 
-    for (uint32_t atom_idx_l = 0; atom_idx_l < natoms; atom_idx_l++)
-    {
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
-
-    __syncthreads();
-
-    const auto atom_l_displ = atom_ids_l_displs[k * natoms + atom_idx_l];
-    const auto atom_l_count = atom_ids_l_counts[k * natoms + atom_idx_l];
-
     for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
         const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
@@ -3348,25 +3115,17 @@ computeExchangeHessianSSSP_IL_0(double*         hess_xy,
 
         }
 
-        for (uint32_t n = 0; n < (atom_l_count + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const auto l_raw = n * TILE_DIM_X_K + threadIdx.x;
-
-            if ((j >= count_i) || (l_raw >= atom_l_count))
-            {
-                break;
-            }
-
-            // note non-coalesced read wrt l
-            const auto l = atom_ids_l[displ_k + atom_l_displ + l_raw];
-
-            // const auto Q_kl = Q_K_sp[displ_k + l];
+            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
             // Q_kl == Q_K_sp[displ_k + l]
-            if (fabs(Q_ij * Q_K_sp[displ_k + l] * sp_max_D) <= eri_threshold)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_sp[displ_k + l] * sp_max_D) <= eri_threshold))
             {
                 break;
             }
+
+            // const auto Q_kl = Q_K_sp[displ_k + l];
 
             const auto l_prim = D_inds_K_sp[displ_k + l];
 
@@ -3494,36 +3253,19 @@ computeExchangeHessianSSSP_IL_0(double*         hess_xy,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            double hess_il_xy = -eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+
+            atomicAdd(
+                hess_xy + prim_cart_ao_to_atom_inds[i] * natoms + prim_cart_ao_to_atom_inds[s_prim_count + l_prim],
+                hess_il_xy * ik_factor_D * frac_exact_exchange);
+
+            atomicAdd(
+                hess_yx + prim_cart_ao_to_atom_inds[s_prim_count + l_prim] * natoms + prim_cart_ao_to_atom_inds[i],
+                hess_il_xy * ik_factor_D * frac_exact_exchange);
         }
     }
 
     __syncthreads();
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_ss))
-    {
-        double hess_il_xy = 0.0;
-
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
-        {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
-            {
-                hess_il_xy += ERIs[y][x];
-            }
-        }
-
-        atomicAdd(
-            hess_xy + prim_cart_ao_to_atom_inds[i] * natoms + atom_idx_l,
-            hess_il_xy * ik_factor_D * frac_exact_exchange);
-
-        atomicAdd(
-            hess_yx + atom_idx_l * natoms + prim_cart_ao_to_atom_inds[i],
-            hess_il_xy * ik_factor_D * frac_exact_exchange);
-    }
-
-    __syncthreads();
-
-    }
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -3557,9 +3299,6 @@ computeExchangeHessianSSSP_JK_0(double*         hess_xy,
                                 const double*   pair_data_K_sp,
                                 const uint32_t* prim_cart_ao_to_atom_inds,
                                 const uint32_t  natoms,
-                                const uint32_t* atom_ids_j,
-                                const uint32_t* atom_ids_j_displs,
-                                const uint32_t* atom_ids_j_counts,
                                 const double*   boys_func_table,
                                 const double*   boys_func_ft,
                                 const double    omega,
@@ -3568,7 +3307,6 @@ computeExchangeHessianSSSP_JK_0(double*         hess_xy,
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
     __shared__ double   delta[3][3];
@@ -3614,19 +3352,9 @@ computeExchangeHessianSSSP_JK_0(double*         hess_xy,
 
     __syncthreads();
 
-    for (uint32_t atom_idx_j = 0; atom_idx_j < natoms; atom_idx_j++)
+    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
-
-    __syncthreads();
-
-    const auto atom_j_displ = atom_ids_j_displs[i * natoms + atom_idx_j];
-    const auto atom_j_count = atom_ids_j_counts[i * natoms + atom_idx_j];
-
-    for (uint32_t m = 0; m < (atom_j_count + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
-    {
-        const auto j_raw = m * TILE_DIM_Y_K + threadIdx.y;
+        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
@@ -3635,11 +3363,8 @@ computeExchangeHessianSSSP_JK_0(double*         hess_xy,
         double PB_x;
         uint32_t j_prim, j_cgto;
 
-        if (j_raw < atom_j_count)
+        if (j < count_i)
         {
-            // note non-coalesced read wrt j
-            const auto j = atom_ids_j[displ_i + atom_j_displ + j_raw];
-
             Q_ij   = Q_K_ss[displ_i + j];
 
             j_prim = D_inds_K_ss[displ_i + j];
@@ -3668,7 +3393,7 @@ computeExchangeHessianSSSP_JK_0(double*         hess_xy,
             const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
             // Q_kl == Q_K_sp[displ_k + l]
-            if ((j_raw >= atom_j_count) || (l >= count_k) || (fabs(Q_ij * Q_K_sp[displ_k + l] * sp_max_D) <= eri_threshold))
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_sp[displ_k + l] * sp_max_D) <= eri_threshold))
             {
                 break;
             }
@@ -3795,36 +3520,19 @@ computeExchangeHessianSSSP_JK_0(double*         hess_xy,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            double hess_jk_xy = -eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+
+            atomicAdd(
+                hess_xy + prim_cart_ao_to_atom_inds[j_prim] * natoms + prim_cart_ao_to_atom_inds[k],
+                hess_jk_xy * ik_factor_D * frac_exact_exchange);
+
+            atomicAdd(
+                hess_yx + prim_cart_ao_to_atom_inds[k] * natoms + prim_cart_ao_to_atom_inds[j_prim],
+                hess_jk_xy * ik_factor_D * frac_exact_exchange);
         }
     }
 
     __syncthreads();
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_ss))
-    {
-        double hess_jk_xy = 0.0;
-
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
-        {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
-            {
-                hess_jk_xy += ERIs[y][x];
-            }
-        }
-
-        atomicAdd(
-            hess_xy + atom_idx_j * natoms + prim_cart_ao_to_atom_inds[k],
-            hess_jk_xy * ik_factor_D * frac_exact_exchange);
-
-        atomicAdd(
-            hess_yx + prim_cart_ao_to_atom_inds[k] * natoms + atom_idx_j,
-            hess_jk_xy * ik_factor_D * frac_exact_exchange);
-    }
-
-    __syncthreads();
-
-    }
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -4688,9 +4396,6 @@ computeExchangeHessianSPSS_IJ_0(double*         hess_xy,
                                 const double*   pair_data_K_ss,
                                 const uint32_t* prim_cart_ao_to_atom_inds,
                                 const uint32_t  natoms,
-                                const uint32_t* atom_ids_j,
-                                const uint32_t* atom_ids_j_displs,
-                                const uint32_t* atom_ids_j_counts,
                                 const double*   boys_func_table,
                                 const double*   boys_func_ft,
                                 const double    omega,
@@ -4699,7 +4404,6 @@ computeExchangeHessianSPSS_IJ_0(double*         hess_xy,
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
     __shared__ double   delta[3][3];
@@ -4745,19 +4449,9 @@ computeExchangeHessianSPSS_IJ_0(double*         hess_xy,
 
     __syncthreads();
 
-    for (uint32_t atom_idx_j = 0; atom_idx_j < natoms; atom_idx_j++)
+    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
-
-    __syncthreads();
-
-    const auto atom_j_displ = atom_ids_j_displs[i * natoms + atom_idx_j];
-    const auto atom_j_count = atom_ids_j_counts[i * natoms + atom_idx_j];
-
-    for (uint32_t m = 0; m < (atom_j_count + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
-    {
-        const auto j_raw = m * TILE_DIM_Y_K + threadIdx.y;
+        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
@@ -4766,11 +4460,8 @@ computeExchangeHessianSPSS_IJ_0(double*         hess_xy,
         double PB_0, PA_x, PB_y;
         uint32_t j_prim, j_cgto, b0;
 
-        if (j_raw < atom_j_count)
+        if (j < count_i)
         {
-            // note non-coalesced read wrt j
-            const auto j = atom_ids_j[displ_i + atom_j_displ + j_raw];
-
             Q_ij   = Q_K_sp[displ_i + j];
 
             j_prim = D_inds_K_sp[displ_i + j];
@@ -4802,7 +4493,7 @@ computeExchangeHessianSPSS_IJ_0(double*         hess_xy,
             const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
             // Q_kl == Q_K_ss[displ_k + l]
-            if ((j_raw >= atom_j_count) || (l >= count_k) || (fabs(Q_ij * Q_K_ss[displ_k + l] * ps_max_D) <= eri_threshold))
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_ss[displ_k + l] * ps_max_D) <= eri_threshold))
             {
                 break;
             }
@@ -4919,32 +4610,15 @@ computeExchangeHessianSPSS_IJ_0(double*         hess_xy,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            double hess_ij_xy = -eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+
+            atomicAdd(
+                hess_xy + prim_cart_ao_to_atom_inds[i] * natoms + prim_cart_ao_to_atom_inds[s_prim_count + j_prim],
+                hess_ij_xy * ik_factor_D * 2.0 * frac_exact_exchange);
         }
     }
 
     __syncthreads();
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_ss))
-    {
-        double hess_ij_xy = 0.0;
-
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
-        {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
-            {
-                hess_ij_xy += ERIs[y][x];
-            }
-        }
-
-        atomicAdd(
-            hess_xy + prim_cart_ao_to_atom_inds[i] * natoms + atom_idx_j,
-            hess_ij_xy * ik_factor_D * 2.0 * frac_exact_exchange);
-    }
-
-    __syncthreads();
-
-    }
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -4978,9 +4652,6 @@ computeExchangeHessianSPSS_KL_0(double*         hess_xy,
                                 const double*   pair_data_K_ss,
                                 const uint32_t* prim_cart_ao_to_atom_inds,
                                 const uint32_t  natoms,
-                                const uint32_t* atom_ids_l,
-                                const uint32_t* atom_ids_l_displs,
-                                const uint32_t* atom_ids_l_counts,
                                 const double*   boys_func_table,
                                 const double*   boys_func_ft,
                                 const double    omega,
@@ -4989,7 +4660,6 @@ computeExchangeHessianSPSS_KL_0(double*         hess_xy,
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
     __shared__ double   delta[3][3];
@@ -5035,16 +4705,6 @@ computeExchangeHessianSPSS_KL_0(double*         hess_xy,
 
     __syncthreads();
 
-    for (uint32_t atom_idx_l = 0; atom_idx_l < natoms; atom_idx_l++)
-    {
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
-
-    __syncthreads();
-
-    const auto atom_l_displ = atom_ids_l_displs[k * natoms + atom_idx_l];
-    const auto atom_l_count = atom_ids_l_counts[k * natoms + atom_idx_l];
-
     for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
         const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
@@ -5082,25 +4742,17 @@ computeExchangeHessianSPSS_KL_0(double*         hess_xy,
 
         }
 
-        for (uint32_t n = 0; n < (atom_l_count + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const auto l_raw = n * TILE_DIM_X_K + threadIdx.x;
-
-            if ((j >= count_i) || (l_raw >= atom_l_count))
-            {
-                break;
-            }
-
-            // note non-coalesced read wrt l
-            const auto l = atom_ids_l[displ_k + atom_l_displ + l_raw];
-
-            // const auto Q_kl = Q_K_ss[displ_k + l];
+            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
             // Q_kl == Q_K_ss[displ_k + l]
-            if (fabs(Q_ij * Q_K_ss[displ_k + l] * ps_max_D) <= eri_threshold)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_ss[displ_k + l] * ps_max_D) <= eri_threshold))
             {
                 break;
             }
+
+            // const auto Q_kl = Q_K_ss[displ_k + l];
 
             const auto l_prim = D_inds_K_ss[displ_k + l];
 
@@ -5219,32 +4871,15 @@ computeExchangeHessianSPSS_KL_0(double*         hess_xy,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            double hess_kl_xy = -eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+
+            atomicAdd(
+                hess_xy + prim_cart_ao_to_atom_inds[k] * natoms + prim_cart_ao_to_atom_inds[l_prim],
+                hess_kl_xy * ik_factor_D * 2.0 * frac_exact_exchange);
         }
     }
 
     __syncthreads();
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_ss))
-    {
-        double hess_kl_xy = 0.0;
-
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
-        {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
-            {
-                hess_kl_xy += ERIs[y][x];
-            }
-        }
-
-        atomicAdd(
-            hess_xy + prim_cart_ao_to_atom_inds[k] * natoms + atom_idx_l,
-            hess_kl_xy * ik_factor_D * 2.0 * frac_exact_exchange);
-    }
-
-    __syncthreads();
-
-    }
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -5278,9 +4913,6 @@ computeExchangeHessianSPSS_IL_0(double*         hess_xy,
                                 const double*   pair_data_K_ss,
                                 const uint32_t* prim_cart_ao_to_atom_inds,
                                 const uint32_t  natoms,
-                                const uint32_t* atom_ids_l,
-                                const uint32_t* atom_ids_l_displs,
-                                const uint32_t* atom_ids_l_counts,
                                 const double*   boys_func_table,
                                 const double*   boys_func_ft,
                                 const double    omega,
@@ -5289,7 +4921,6 @@ computeExchangeHessianSPSS_IL_0(double*         hess_xy,
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
     __shared__ double   delta[3][3];
@@ -5335,16 +4966,6 @@ computeExchangeHessianSPSS_IL_0(double*         hess_xy,
 
     __syncthreads();
 
-    for (uint32_t atom_idx_l = 0; atom_idx_l < natoms; atom_idx_l++)
-    {
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
-
-    __syncthreads();
-
-    const auto atom_l_displ = atom_ids_l_displs[k * natoms + atom_idx_l];
-    const auto atom_l_count = atom_ids_l_counts[k * natoms + atom_idx_l];
-
     for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
         const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
@@ -5383,25 +5004,17 @@ computeExchangeHessianSPSS_IL_0(double*         hess_xy,
 
         }
 
-        for (uint32_t n = 0; n < (atom_l_count + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const auto l_raw = n * TILE_DIM_X_K + threadIdx.x;
-
-            if ((j >= count_i) || (l_raw >= atom_l_count))
-            {
-                break;
-            }
-
-            // note non-coalesced read wrt l
-            const auto l = atom_ids_l[displ_k + atom_l_displ + l_raw];
-
-            // const auto Q_kl = Q_K_ss[displ_k + l];
+            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
             // Q_kl == Q_K_ss[displ_k + l]
-            if (fabs(Q_ij * Q_K_ss[displ_k + l] * ps_max_D) <= eri_threshold)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_ss[displ_k + l] * ps_max_D) <= eri_threshold))
             {
                 break;
             }
+
+            // const auto Q_kl = Q_K_ss[displ_k + l];
 
             const auto l_prim = D_inds_K_ss[displ_k + l];
 
@@ -5519,36 +5132,19 @@ computeExchangeHessianSPSS_IL_0(double*         hess_xy,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            double hess_il_xy = -eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+
+            atomicAdd(
+                hess_xy + prim_cart_ao_to_atom_inds[i] * natoms + prim_cart_ao_to_atom_inds[l_prim],
+                hess_il_xy * ik_factor_D * frac_exact_exchange);
+
+            atomicAdd(
+                hess_yx + prim_cart_ao_to_atom_inds[l_prim] * natoms + prim_cart_ao_to_atom_inds[i],
+                hess_il_xy * ik_factor_D * frac_exact_exchange);
         }
     }
 
     __syncthreads();
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_ss))
-    {
-        double hess_il_xy = 0.0;
-
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
-        {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
-            {
-                hess_il_xy += ERIs[y][x];
-            }
-        }
-
-        atomicAdd(
-            hess_xy + prim_cart_ao_to_atom_inds[i] * natoms + atom_idx_l,
-            hess_il_xy * ik_factor_D * frac_exact_exchange);
-
-        atomicAdd(
-            hess_yx + atom_idx_l * natoms + prim_cart_ao_to_atom_inds[i],
-            hess_il_xy * ik_factor_D * frac_exact_exchange);
-    }
-
-    __syncthreads();
-
-    }
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -5582,9 +5178,6 @@ computeExchangeHessianSPSS_JK_0(double*         hess_xy,
                                 const double*   pair_data_K_ss,
                                 const uint32_t* prim_cart_ao_to_atom_inds,
                                 const uint32_t  natoms,
-                                const uint32_t* atom_ids_j,
-                                const uint32_t* atom_ids_j_displs,
-                                const uint32_t* atom_ids_j_counts,
                                 const double*   boys_func_table,
                                 const double*   boys_func_ft,
                                 const double    omega,
@@ -5593,7 +5186,6 @@ computeExchangeHessianSPSS_JK_0(double*         hess_xy,
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
     __shared__ double   delta[3][3];
@@ -5639,19 +5231,9 @@ computeExchangeHessianSPSS_JK_0(double*         hess_xy,
 
     __syncthreads();
 
-    for (uint32_t atom_idx_j = 0; atom_idx_j < natoms; atom_idx_j++)
+    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
-
-    __syncthreads();
-
-    const auto atom_j_displ = atom_ids_j_displs[i * natoms + atom_idx_j];
-    const auto atom_j_count = atom_ids_j_counts[i * natoms + atom_idx_j];
-
-    for (uint32_t m = 0; m < (atom_j_count + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
-    {
-        const auto j_raw = m * TILE_DIM_Y_K + threadIdx.y;
+        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
@@ -5660,11 +5242,8 @@ computeExchangeHessianSPSS_JK_0(double*         hess_xy,
         double PB_0, PB_x;
         uint32_t j_prim, j_cgto, b0;
 
-        if (j_raw < atom_j_count)
+        if (j < count_i)
         {
-            // note non-coalesced read wrt j
-            const auto j = atom_ids_j[displ_i + atom_j_displ + j_raw];
-
             Q_ij   = Q_K_sp[displ_i + j];
 
             j_prim = D_inds_K_sp[displ_i + j];
@@ -5695,7 +5274,7 @@ computeExchangeHessianSPSS_JK_0(double*         hess_xy,
             const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
             // Q_kl == Q_K_ss[displ_k + l]
-            if ((j_raw >= atom_j_count) || (l >= count_k) || (fabs(Q_ij * Q_K_ss[displ_k + l] * ps_max_D) <= eri_threshold))
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_ss[displ_k + l] * ps_max_D) <= eri_threshold))
             {
                 break;
             }
@@ -5826,36 +5405,19 @@ computeExchangeHessianSPSS_JK_0(double*         hess_xy,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            double hess_jk_xy = -eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+
+            atomicAdd(
+                hess_xy + prim_cart_ao_to_atom_inds[s_prim_count + j_prim] * natoms + prim_cart_ao_to_atom_inds[k],
+                hess_jk_xy * ik_factor_D * frac_exact_exchange);
+
+            atomicAdd(
+                hess_yx + prim_cart_ao_to_atom_inds[k] * natoms + prim_cart_ao_to_atom_inds[s_prim_count + j_prim],
+                hess_jk_xy * ik_factor_D * frac_exact_exchange);
         }
     }
 
     __syncthreads();
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_ss))
-    {
-        double hess_jk_xy = 0.0;
-
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
-        {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
-            {
-                hess_jk_xy += ERIs[y][x];
-            }
-        }
-
-        atomicAdd(
-            hess_xy + atom_idx_j * natoms + prim_cart_ao_to_atom_inds[k],
-            hess_jk_xy * ik_factor_D * frac_exact_exchange);
-
-        atomicAdd(
-            hess_yx + prim_cart_ao_to_atom_inds[k] * natoms + atom_idx_j,
-            hess_jk_xy * ik_factor_D * frac_exact_exchange);
-    }
-
-    __syncthreads();
-
-    }
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -6882,9 +6444,6 @@ computeExchangeHessianSPSP_IJ_0(double*         hess_xy,
                                 const double*   pair_data_K_sp,
                                 const uint32_t* prim_cart_ao_to_atom_inds,
                                 const uint32_t  natoms,
-                                const uint32_t* atom_ids_j,
-                                const uint32_t* atom_ids_j_displs,
-                                const uint32_t* atom_ids_j_counts,
                                 const double*   boys_func_table,
                                 const double*   boys_func_ft,
                                 const double    omega,
@@ -6893,7 +6452,6 @@ computeExchangeHessianSPSP_IJ_0(double*         hess_xy,
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
     __shared__ double   delta[3][3];
@@ -6939,19 +6497,9 @@ computeExchangeHessianSPSP_IJ_0(double*         hess_xy,
 
     __syncthreads();
 
-    for (uint32_t atom_idx_j = 0; atom_idx_j < natoms; atom_idx_j++)
+    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
-
-    __syncthreads();
-
-    const auto atom_j_displ = atom_ids_j_displs[i * natoms + atom_idx_j];
-    const auto atom_j_count = atom_ids_j_counts[i * natoms + atom_idx_j];
-
-    for (uint32_t m = 0; m < (atom_j_count + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
-    {
-        const auto j_raw = m * TILE_DIM_Y_K + threadIdx.y;
+        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
@@ -6960,11 +6508,8 @@ computeExchangeHessianSPSP_IJ_0(double*         hess_xy,
         double PB_0, PA_x, PB_y;
         uint32_t j_prim, j_cgto, b0;
 
-        if (j_raw < atom_j_count)
+        if (j < count_i)
         {
-            // note non-coalesced read wrt j
-            const auto j = atom_ids_j[displ_i + atom_j_displ + j_raw];
-
             Q_ij   = Q_K_sp[displ_i + j];
 
             j_prim = D_inds_K_sp[displ_i + j];
@@ -6996,7 +6541,7 @@ computeExchangeHessianSPSP_IJ_0(double*         hess_xy,
             const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
             // Q_kl == Q_K_sp[displ_k + l]
-            if ((j_raw >= atom_j_count) || (l >= count_k) || (fabs(Q_ij * Q_K_sp[displ_k + l] * pp_max_D) <= eri_threshold))
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_sp[displ_k + l] * pp_max_D) <= eri_threshold))
             {
                 break;
             }
@@ -7178,32 +6723,15 @@ computeExchangeHessianSPSP_IJ_0(double*         hess_xy,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            double hess_ij_xy = -eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+
+            atomicAdd(
+                hess_xy + prim_cart_ao_to_atom_inds[i] * natoms + prim_cart_ao_to_atom_inds[s_prim_count + j_prim],
+                hess_ij_xy * ik_factor_D * 2.0 * frac_exact_exchange);
         }
     }
 
     __syncthreads();
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_ss))
-    {
-        double hess_ij_xy = 0.0;
-
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
-        {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
-            {
-                hess_ij_xy += ERIs[y][x];
-            }
-        }
-
-        atomicAdd(
-            hess_xy + prim_cart_ao_to_atom_inds[i] * natoms + atom_idx_j,
-            hess_ij_xy * ik_factor_D * 2.0 * frac_exact_exchange);
-    }
-
-    __syncthreads();
-
-    }
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -7232,9 +6760,6 @@ computeExchangeHessianSPSP_KL_0(double*         hess_xy,
                                 const double*   pair_data_K_sp,
                                 const uint32_t* prim_cart_ao_to_atom_inds,
                                 const uint32_t  natoms,
-                                const uint32_t* atom_ids_l,
-                                const uint32_t* atom_ids_l_displs,
-                                const uint32_t* atom_ids_l_counts,
                                 const double*   boys_func_table,
                                 const double*   boys_func_ft,
                                 const double    omega,
@@ -7243,7 +6768,6 @@ computeExchangeHessianSPSP_KL_0(double*         hess_xy,
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
     __shared__ double   delta[3][3];
@@ -7289,16 +6813,6 @@ computeExchangeHessianSPSP_KL_0(double*         hess_xy,
 
     __syncthreads();
 
-    for (uint32_t atom_idx_l = 0; atom_idx_l < natoms; atom_idx_l++)
-    {
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
-
-    __syncthreads();
-
-    const auto atom_l_displ = atom_ids_l_displs[k * natoms + atom_idx_l];
-    const auto atom_l_count = atom_ids_l_counts[k * natoms + atom_idx_l];
-
     for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
         const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
@@ -7336,25 +6850,17 @@ computeExchangeHessianSPSP_KL_0(double*         hess_xy,
 
         }
 
-        for (uint32_t n = 0; n < (atom_l_count + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const auto l_raw = n * TILE_DIM_X_K + threadIdx.x;
-
-            if ((j >= count_i) || (l_raw >= atom_l_count))
-            {
-                break;
-            }
-
-            // note non-coalesced read wrt l
-            const auto l = atom_ids_l[displ_k + atom_l_displ + l_raw];
-
-            // const auto Q_kl = Q_K_sp[displ_k + l];
+            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
             // Q_kl == Q_K_sp[displ_k + l]
-            if (fabs(Q_ij * Q_K_sp[displ_k + l] * pp_max_D) <= eri_threshold)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_sp[displ_k + l] * pp_max_D) <= eri_threshold))
             {
                 break;
             }
+
+            // const auto Q_kl = Q_K_sp[displ_k + l];
 
             const auto l_prim = D_inds_K_sp[displ_k + l];
 
@@ -7530,32 +7036,15 @@ computeExchangeHessianSPSP_KL_0(double*         hess_xy,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            double hess_kl_xy = -eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+
+            atomicAdd(
+                hess_xy + prim_cart_ao_to_atom_inds[k] * natoms + prim_cart_ao_to_atom_inds[s_prim_count + l_prim],
+                hess_kl_xy * ik_factor_D * 2.0 * frac_exact_exchange);
         }
     }
 
     __syncthreads();
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_ss))
-    {
-        double hess_kl_xy = 0.0;
-
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
-        {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
-            {
-                hess_kl_xy += ERIs[y][x];
-            }
-        }
-
-        atomicAdd(
-            hess_xy + prim_cart_ao_to_atom_inds[k] * natoms + atom_idx_l,
-            hess_kl_xy * ik_factor_D * 2.0 * frac_exact_exchange);
-    }
-
-    __syncthreads();
-
-    }
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -7584,9 +7073,6 @@ computeExchangeHessianSPSP_IL_0(double*         hess_xy,
                                 const double*   pair_data_K_sp,
                                 const uint32_t* prim_cart_ao_to_atom_inds,
                                 const uint32_t  natoms,
-                                const uint32_t* atom_ids_l,
-                                const uint32_t* atom_ids_l_displs,
-                                const uint32_t* atom_ids_l_counts,
                                 const double*   boys_func_table,
                                 const double*   boys_func_ft,
                                 const double    omega,
@@ -7595,7 +7081,6 @@ computeExchangeHessianSPSP_IL_0(double*         hess_xy,
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
     __shared__ double   delta[3][3];
@@ -7641,16 +7126,6 @@ computeExchangeHessianSPSP_IL_0(double*         hess_xy,
 
     __syncthreads();
 
-    for (uint32_t atom_idx_l = 0; atom_idx_l < natoms; atom_idx_l++)
-    {
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
-
-    __syncthreads();
-
-    const auto atom_l_displ = atom_ids_l_displs[k * natoms + atom_idx_l];
-    const auto atom_l_count = atom_ids_l_counts[k * natoms + atom_idx_l];
-
     for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
         const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
@@ -7689,25 +7164,17 @@ computeExchangeHessianSPSP_IL_0(double*         hess_xy,
 
         }
 
-        for (uint32_t n = 0; n < (atom_l_count + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const auto l_raw = n * TILE_DIM_X_K + threadIdx.x;
-
-            if ((j >= count_i) || (l_raw >= atom_l_count))
-            {
-                break;
-            }
-
-            // note non-coalesced read wrt l
-            const auto l = atom_ids_l[displ_k + atom_l_displ + l_raw];
-
-            // const auto Q_kl = Q_K_sp[displ_k + l];
+            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
             // Q_kl == Q_K_sp[displ_k + l]
-            if (fabs(Q_ij * Q_K_sp[displ_k + l] * pp_max_D) <= eri_threshold)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_sp[displ_k + l] * pp_max_D) <= eri_threshold))
             {
                 break;
             }
+
+            // const auto Q_kl = Q_K_sp[displ_k + l];
 
             const auto l_prim = D_inds_K_sp[displ_k + l];
 
@@ -7908,36 +7375,19 @@ computeExchangeHessianSPSP_IL_0(double*         hess_xy,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            double hess_il_xy = -eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+
+            atomicAdd(
+                hess_xy + prim_cart_ao_to_atom_inds[i] * natoms + prim_cart_ao_to_atom_inds[s_prim_count + l_prim],
+                hess_il_xy * ik_factor_D * frac_exact_exchange);
+
+            atomicAdd(
+                hess_yx + prim_cart_ao_to_atom_inds[s_prim_count + l_prim] * natoms + prim_cart_ao_to_atom_inds[i],
+                hess_il_xy * ik_factor_D * frac_exact_exchange);
         }
     }
 
     __syncthreads();
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_ss))
-    {
-        double hess_il_xy = 0.0;
-
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
-        {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
-            {
-                hess_il_xy += ERIs[y][x];
-            }
-        }
-
-        atomicAdd(
-            hess_xy + prim_cart_ao_to_atom_inds[i] * natoms + atom_idx_l,
-            hess_il_xy * ik_factor_D * frac_exact_exchange);
-
-        atomicAdd(
-            hess_yx + atom_idx_l * natoms + prim_cart_ao_to_atom_inds[i],
-            hess_il_xy * ik_factor_D * frac_exact_exchange);
-    }
-
-    __syncthreads();
-
-    }
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -7966,9 +7416,6 @@ computeExchangeHessianSPSP_JK_0(double*         hess_xy,
                                 const double*   pair_data_K_sp,
                                 const uint32_t* prim_cart_ao_to_atom_inds,
                                 const uint32_t  natoms,
-                                const uint32_t* atom_ids_j,
-                                const uint32_t* atom_ids_j_displs,
-                                const uint32_t* atom_ids_j_counts,
                                 const double*   boys_func_table,
                                 const double*   boys_func_ft,
                                 const double    omega,
@@ -7977,7 +7424,6 @@ computeExchangeHessianSPSP_JK_0(double*         hess_xy,
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
     __shared__ double   delta[3][3];
@@ -8023,19 +7469,9 @@ computeExchangeHessianSPSP_JK_0(double*         hess_xy,
 
     __syncthreads();
 
-    for (uint32_t atom_idx_j = 0; atom_idx_j < natoms; atom_idx_j++)
+    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-
-    ERIs[threadIdx.y][threadIdx.x] = 0.0;
-
-    __syncthreads();
-
-    const auto atom_j_displ = atom_ids_j_displs[i * natoms + atom_idx_j];
-    const auto atom_j_count = atom_ids_j_counts[i * natoms + atom_idx_j];
-
-    for (uint32_t m = 0; m < (atom_j_count + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
-    {
-        const auto j_raw = m * TILE_DIM_Y_K + threadIdx.y;
+        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
@@ -8044,11 +7480,8 @@ computeExchangeHessianSPSP_JK_0(double*         hess_xy,
         double PB_0, PB_x;
         uint32_t j_prim, j_cgto, b0;
 
-        if (j_raw < atom_j_count)
+        if (j < count_i)
         {
-            // note non-coalesced read wrt j
-            const auto j = atom_ids_j[displ_i + atom_j_displ + j_raw];
-
             Q_ij   = Q_K_sp[displ_i + j];
 
             j_prim = D_inds_K_sp[displ_i + j];
@@ -8079,7 +7512,7 @@ computeExchangeHessianSPSP_JK_0(double*         hess_xy,
             const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
             // Q_kl == Q_K_sp[displ_k + l]
-            if ((j_raw >= atom_j_count) || (l >= count_k) || (fabs(Q_ij * Q_K_sp[displ_k + l] * pp_max_D) <= eri_threshold))
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_sp[displ_k + l] * pp_max_D) <= eri_threshold))
             {
                 break;
             }
@@ -8287,36 +7720,19 @@ computeExchangeHessianSPSP_JK_0(double*         hess_xy,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            double hess_jk_xy = -eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+
+            atomicAdd(
+                hess_xy + prim_cart_ao_to_atom_inds[s_prim_count + j_prim] * natoms + prim_cart_ao_to_atom_inds[k],
+                hess_jk_xy * ik_factor_D * frac_exact_exchange);
+
+            atomicAdd(
+                hess_yx + prim_cart_ao_to_atom_inds[k] * natoms + prim_cart_ao_to_atom_inds[s_prim_count + j_prim],
+                hess_jk_xy * ik_factor_D * frac_exact_exchange);
         }
     }
 
     __syncthreads();
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_ss))
-    {
-        double hess_jk_xy = 0.0;
-
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
-        {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
-            {
-                hess_jk_xy += ERIs[y][x];
-            }
-        }
-
-        atomicAdd(
-            hess_xy + atom_idx_j * natoms + prim_cart_ao_to_atom_inds[k],
-            hess_jk_xy * ik_factor_D * frac_exact_exchange);
-
-        atomicAdd(
-            hess_yx + prim_cart_ao_to_atom_inds[k] * natoms + atom_idx_j,
-            hess_jk_xy * ik_factor_D * frac_exact_exchange);
-    }
-
-    __syncthreads();
-
-    }
 }
 
 }  // namespace gpu

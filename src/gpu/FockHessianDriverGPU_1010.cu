@@ -62195,38 +62195,6 @@ computeFockHessianOnGPU_1010(const              CMolecule& molecule,
         // K: (SS|SS)
         //     *  *
 
-        screening.update_j_or_l_vectors(static_cast<uint32_t>(natoms),
-                                        pair_displs_K_ss,
-                                        pair_counts_K_ss,
-                                        D_inds_K_ss,
-                                        static_cast<uint32_t>(s_prim_count),
-                                        std::string("s"),
-                                        s_prim_aoinds,
-                                        cart_ao_to_atom_inds,
-                                        atom_ids_j,
-                                        atom_ids_j_displs,
-                                        atom_ids_j_counts);
-
-        screening.update_j_or_l_vectors(static_cast<uint32_t>(natoms),
-                                        pair_displs_K_ss,
-                                        pair_counts_K_ss,
-                                        D_inds_K_ss,
-                                        static_cast<uint32_t>(s_prim_count),
-                                        std::string("s"),
-                                        s_prim_aoinds,
-                                        cart_ao_to_atom_inds,
-                                        atom_ids_l,
-                                        atom_ids_l_displs,
-                                        atom_ids_l_counts);
-
-        gpuSafe(gpuMemcpyAsync(d_atom_ids_j,        atom_ids_j.data(),        atom_ids_j.size()        * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-        gpuSafe(gpuMemcpyAsync(d_atom_ids_j_displs, atom_ids_j_displs.data(), atom_ids_j_displs.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-        gpuSafe(gpuMemcpyAsync(d_atom_ids_j_counts, atom_ids_j_counts.data(), atom_ids_j_counts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-
-        gpuSafe(gpuMemcpyAsync(d_atom_ids_l,        atom_ids_l.data(),        atom_ids_l.size()        * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-        gpuSafe(gpuMemcpyAsync(d_atom_ids_l_displs, atom_ids_l_displs.data(), atom_ids_l_displs.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-        gpuSafe(gpuMemcpyAsync(d_atom_ids_l_counts, atom_ids_l_counts.data(), atom_ids_l_counts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-
         for (int64_t grad_cart_ind_0 = 0; grad_cart_ind_0 < 3; grad_cart_ind_0++)
         for (int64_t grad_cart_ind_1 = 0; grad_cart_ind_1 < 3; grad_cart_ind_1++)
         {
@@ -62285,9 +62253,6 @@ computeFockHessianOnGPU_1010(const              CMolecule& molecule,
                                d_pair_data_K_ss,
                                d_prim_cart_ao_to_atom_inds,
                                static_cast<uint32_t>(natoms),
-                               d_atom_ids_l,
-                               d_atom_ids_l_displs,
-                               d_atom_ids_l_counts,
                                d_boys_func_table,
                                d_boys_func_ft,
                                omega,
@@ -62315,54 +62280,14 @@ computeFockHessianOnGPU_1010(const              CMolecule& molecule,
                                d_pair_data_K_ss,
                                d_prim_cart_ao_to_atom_inds,
                                static_cast<uint32_t>(natoms),
-                               d_atom_ids_j,
-                               d_atom_ids_j_displs,
-                               d_atom_ids_j_counts,
                                d_boys_func_table,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
         }
 
-        // Note: k and l vectors are reused in subsequent kernels
-        //       so we need to sync stream here
-        //       otherwise it may be overwritten
-        gpuSafe(gpuStreamSynchronize(stream));
-
         // K: (SS|SP)
         //     *  *
-
-        screening.update_j_or_l_vectors(static_cast<uint32_t>(natoms),
-                                        pair_displs_K_ss,
-                                        pair_counts_K_ss,
-                                        D_inds_K_ss,
-                                        static_cast<uint32_t>(s_prim_count),
-                                        std::string("s"),
-                                        s_prim_aoinds,
-                                        cart_ao_to_atom_inds,
-                                        atom_ids_j,
-                                        atom_ids_j_displs,
-                                        atom_ids_j_counts);
-
-        screening.update_j_or_l_vectors(static_cast<uint32_t>(natoms),
-                                        pair_displs_K_sp,
-                                        pair_counts_K_sp,
-                                        D_inds_K_sp,
-                                        static_cast<uint32_t>(p_prim_count),
-                                        std::string("p"),
-                                        p_prim_aoinds,
-                                        cart_ao_to_atom_inds,
-                                        atom_ids_l,
-                                        atom_ids_l_displs,
-                                        atom_ids_l_counts);
-
-        gpuSafe(gpuMemcpyAsync(d_atom_ids_j,        atom_ids_j.data(),        atom_ids_j.size()        * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-        gpuSafe(gpuMemcpyAsync(d_atom_ids_j_displs, atom_ids_j_displs.data(), atom_ids_j_displs.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-        gpuSafe(gpuMemcpyAsync(d_atom_ids_j_counts, atom_ids_j_counts.data(), atom_ids_j_counts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-
-        gpuSafe(gpuMemcpyAsync(d_atom_ids_l,        atom_ids_l.data(),        atom_ids_l.size()        * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-        gpuSafe(gpuMemcpyAsync(d_atom_ids_l_displs, atom_ids_l_displs.data(), atom_ids_l_displs.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-        gpuSafe(gpuMemcpyAsync(d_atom_ids_l_counts, atom_ids_l_counts.data(), atom_ids_l_counts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
         for (int64_t grad_cart_ind_0 = 0; grad_cart_ind_0 < 3; grad_cart_ind_0++)
         for (int64_t grad_cart_ind_1 = 0; grad_cart_ind_1 < 3; grad_cart_ind_1++)
@@ -62438,9 +62363,6 @@ computeFockHessianOnGPU_1010(const              CMolecule& molecule,
                                d_pair_data_K_sp,
                                d_prim_cart_ao_to_atom_inds,
                                static_cast<uint32_t>(natoms),
-                               d_atom_ids_l,
-                               d_atom_ids_l_displs,
-                               d_atom_ids_l_counts,
                                d_boys_func_table,
                                d_boys_func_ft,
                                omega,
@@ -62476,51 +62398,14 @@ computeFockHessianOnGPU_1010(const              CMolecule& molecule,
                                d_pair_data_K_sp,
                                d_prim_cart_ao_to_atom_inds,
                                static_cast<uint32_t>(natoms),
-                               d_atom_ids_j,
-                               d_atom_ids_j_displs,
-                               d_atom_ids_j_counts,
                                d_boys_func_table,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
         }
 
-        gpuSafe(gpuStreamSynchronize(stream));
-
         // K: (SP|SS)
         //     *  *
-
-        screening.update_j_or_l_vectors(static_cast<uint32_t>(natoms),
-                                        pair_displs_K_sp,
-                                        pair_counts_K_sp,
-                                        D_inds_K_sp,
-                                        static_cast<uint32_t>(p_prim_count),
-                                        std::string("p"),
-                                        p_prim_aoinds,
-                                        cart_ao_to_atom_inds,
-                                        atom_ids_j,
-                                        atom_ids_j_displs,
-                                        atom_ids_j_counts);
-
-        screening.update_j_or_l_vectors(static_cast<uint32_t>(natoms),
-                                        pair_displs_K_ss,
-                                        pair_counts_K_ss,
-                                        D_inds_K_ss,
-                                        static_cast<uint32_t>(s_prim_count),
-                                        std::string("s"),
-                                        s_prim_aoinds,
-                                        cart_ao_to_atom_inds,
-                                        atom_ids_l,
-                                        atom_ids_l_displs,
-                                        atom_ids_l_counts);
-
-        gpuSafe(gpuMemcpyAsync(d_atom_ids_j,        atom_ids_j.data(),        atom_ids_j.size()        * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-        gpuSafe(gpuMemcpyAsync(d_atom_ids_j_displs, atom_ids_j_displs.data(), atom_ids_j_displs.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-        gpuSafe(gpuMemcpyAsync(d_atom_ids_j_counts, atom_ids_j_counts.data(), atom_ids_j_counts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-
-        gpuSafe(gpuMemcpyAsync(d_atom_ids_l,        atom_ids_l.data(),        atom_ids_l.size()        * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-        gpuSafe(gpuMemcpyAsync(d_atom_ids_l_displs, atom_ids_l_displs.data(), atom_ids_l_displs.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-        gpuSafe(gpuMemcpyAsync(d_atom_ids_l_counts, atom_ids_l_counts.data(), atom_ids_l_counts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
         for (int64_t grad_cart_ind_0 = 0; grad_cart_ind_0 < 3; grad_cart_ind_0++)
         for (int64_t grad_cart_ind_1 = 0; grad_cart_ind_1 < 3; grad_cart_ind_1++)
@@ -62596,9 +62481,6 @@ computeFockHessianOnGPU_1010(const              CMolecule& molecule,
                                d_pair_data_K_ss,
                                d_prim_cart_ao_to_atom_inds,
                                static_cast<uint32_t>(natoms),
-                               d_atom_ids_l,
-                               d_atom_ids_l_displs,
-                               d_atom_ids_l_counts,
                                d_boys_func_table,
                                d_boys_func_ft,
                                omega,
@@ -62634,51 +62516,14 @@ computeFockHessianOnGPU_1010(const              CMolecule& molecule,
                                d_pair_data_K_ss,
                                d_prim_cart_ao_to_atom_inds,
                                static_cast<uint32_t>(natoms),
-                               d_atom_ids_j,
-                               d_atom_ids_j_displs,
-                               d_atom_ids_j_counts,
                                d_boys_func_table,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
         }
 
-        gpuSafe(gpuStreamSynchronize(stream));
-
         // K: (SP|SP)
         //     *  *
-
-        screening.update_j_or_l_vectors(static_cast<uint32_t>(natoms),
-                                        pair_displs_K_sp,
-                                        pair_counts_K_sp,
-                                        D_inds_K_sp,
-                                        static_cast<uint32_t>(p_prim_count),
-                                        std::string("p"),
-                                        p_prim_aoinds,
-                                        cart_ao_to_atom_inds,
-                                        atom_ids_j,
-                                        atom_ids_j_displs,
-                                        atom_ids_j_counts);
-
-        screening.update_j_or_l_vectors(static_cast<uint32_t>(natoms),
-                                        pair_displs_K_sp,
-                                        pair_counts_K_sp,
-                                        D_inds_K_sp,
-                                        static_cast<uint32_t>(p_prim_count),
-                                        std::string("p"),
-                                        p_prim_aoinds,
-                                        cart_ao_to_atom_inds,
-                                        atom_ids_l,
-                                        atom_ids_l_displs,
-                                        atom_ids_l_counts);
-
-        gpuSafe(gpuMemcpyAsync(d_atom_ids_j,        atom_ids_j.data(),        atom_ids_j.size()        * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-        gpuSafe(gpuMemcpyAsync(d_atom_ids_j_displs, atom_ids_j_displs.data(), atom_ids_j_displs.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-        gpuSafe(gpuMemcpyAsync(d_atom_ids_j_counts, atom_ids_j_counts.data(), atom_ids_j_counts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-
-        gpuSafe(gpuMemcpyAsync(d_atom_ids_l,        atom_ids_l.data(),        atom_ids_l.size()        * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-        gpuSafe(gpuMemcpyAsync(d_atom_ids_l_displs, atom_ids_l_displs.data(), atom_ids_l_displs.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-        gpuSafe(gpuMemcpyAsync(d_atom_ids_l_counts, atom_ids_l_counts.data(), atom_ids_l_counts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
         for (int64_t grad_cart_ind_0 = 0; grad_cart_ind_0 < 3; grad_cart_ind_0++)
         for (int64_t grad_cart_ind_1 = 0; grad_cart_ind_1 < 3; grad_cart_ind_1++)
@@ -62744,9 +62589,6 @@ computeFockHessianOnGPU_1010(const              CMolecule& molecule,
                                d_pair_data_K_sp,
                                d_prim_cart_ao_to_atom_inds,
                                static_cast<uint32_t>(natoms),
-                               d_atom_ids_l,
-                               d_atom_ids_l_displs,
-                               d_atom_ids_l_counts,
                                d_boys_func_table,
                                d_boys_func_ft,
                                omega,
@@ -62777,9 +62619,6 @@ computeFockHessianOnGPU_1010(const              CMolecule& molecule,
                                d_pair_data_K_sp,
                                d_prim_cart_ao_to_atom_inds,
                                static_cast<uint32_t>(natoms),
-                               d_atom_ids_j,
-                               d_atom_ids_j_displs,
-                               d_atom_ids_j_counts,
                                d_boys_func_table,
                                d_boys_func_ft,
                                omega,
