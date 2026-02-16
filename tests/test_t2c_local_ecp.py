@@ -37,9 +37,33 @@ class TestLocalECPDriver:
         here = Path(__file__).parent
         npyfile = str(here / 'data' / 'auh2.def2svp.au.ecp.only.ul.npy')
         ref_mat = np.load(npyfile)
+
+        print(ref_mat.shape)
         
-        print(ecp_mat.full_matrix().to_numpy()[5,5])
+         # dimension of molecular basis
+        indexes = np.triu_indices(4)
+        basdims = [0, 10, 25, 35, 42]
         
-        print(ref_mat[5, 5])
-        
-        assert False
+        # check individual overlap submatrices
+        for i, j in zip(indexes[0], indexes[1]):
+            # bra side
+            sbra = basdims[i]
+            ebra = basdims[i + 1]
+            # ket side
+            sket = basdims[j]
+            eket = basdims[j + 1]
+            # load computed submatrix
+            cmat = ecp_mat.submatrix((i, j))
+            # load reference submatrix
+            rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
+            rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra,
+                                                         sket:eket]))
+            # compare submatrices
+            assert cmat == rmat
+
+        # check full overlap matrix
+        fmat = ecp_mat.full_matrix()
+        fref = SubMatrix([0, 0, 42, 42])
+        fref.set_values(np.ascontiguousarray(ref_mat))
+        assert fmat == fref
+
