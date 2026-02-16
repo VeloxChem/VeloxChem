@@ -54,6 +54,7 @@
 #include "TwoCenterElectronRepulsionDriver.hpp"
 #include "TwoCenterElectronRepulsionGeomX00Driver.hpp"
 #include "LocalCorePotentialDriver.hpp"
+#include "ProjectedCorePotentialDriver.hpp"
 
 namespace vlx_t2cintegrals {
 
@@ -438,6 +439,21 @@ export_t2cintegrals(py::module& m)
                return ecp_drv.compute(basis, molecule, ecp_potential, iatom);
             },
              "Computes local ECP matrix for given molecule, basis, base core potential.");
+    
+    // CProjectedCorePotentialDriver class
+    PyClass<CProjectedCorePotentialDriver>(m, "ProjectedECPDriver")
+        .def(py::init<>())
+        .def(
+            "compute",
+            [](const CProjectedCorePotentialDriver& ecp_drv,
+               const CMolecule&                     molecule,
+               const CMolecularBasis&               basis,
+               const CBaseCorePotential&            ecp_potential,
+               const int                            ecp_momentum,
+               const int                            iatom) -> CMatrix {
+               return ecp_drv.compute(basis, molecule, ecp_potential, ecp_momentum, iatom);
+            },
+             "Computes projected ECP matrix for given molecule, basis, base core potential.");
     
 }
 

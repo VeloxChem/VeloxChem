@@ -45,6 +45,7 @@ VLX_LIBS_DIR += t2c_electric_dipole_momentum
 VLX_LIBS_DIR += t2c_nuclear_potential_geom_0X0
 VLX_LIBS_DIR += t2c_electron_repulsion
 VLX_LIBS_DIR += t2c_local_ecp
+VLX_LIBS_DIR += t2c_projected_ecp
 VLX_LIBS_DIR += t4c_func
 VLX_LIBS_DIR += t4c_electron_repulsion
 VLX_LIBS_DIR += t4c_geometrical_derivatives
