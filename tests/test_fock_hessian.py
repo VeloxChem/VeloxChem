@@ -969,5 +969,4 @@ class TestFockHessian:
             k_hess += fock_hess_1100.reshape(natoms, natoms, 3, 3)
             k_hess += fock_hess_1010.reshape(natoms, natoms, 3, 3)
 
-            print(np.max(np.abs(k_hess - ref_hessian)))
             assert np.max(np.abs(k_hess - ref_hessian)) < 1.0e-5
