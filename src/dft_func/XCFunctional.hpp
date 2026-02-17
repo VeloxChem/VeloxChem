@@ -591,6 +591,12 @@ class CXCFunctional
      */
     const int getDimensionOfDerivatives() const;
 
+    /** Sets fraction of exact exchange of a hybrid functional.
+     *
+     * @hyb_exx_coeff the value of the exact exchange parameter.
+     */
+    auto setFractionOfExactExchange(const double hyb_exx_coeff) -> void;
+
     /** Sets omega range-separation parameter of functional.
      *
      * @omega the value of omega parameter.

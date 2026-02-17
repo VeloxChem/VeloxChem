@@ -3167,6 +3167,17 @@ CXCFunctional::getDimensionOfDerivatives() const
 }
 
 auto
+CXCFunctional::setFractionOfExactExchange(const double hyb_exx_coeff) -> void
+{
+
+    errors::assertMsgCritical(isHybrid(), "XCFunctional.setFractionOfExactExchange: Only applicable to hybrid functionals");
+
+    errors::assertMsgCritical(!isRangeSeparated(), "XCFunctional.setFractionOfExactExchange: not applicable to range-separated functionals");
+
+    _fractionOfExactExchange = hyb_exx_coeff;
+}
+
+auto
 CXCFunctional::setRangeSeparatedParameterOmega(const double omega) -> void
 {
     errors::assertMsgCritical(isRangeSeparated(), "XCFunctional.setRangeSeparatedParameterOmega: Only applicable to range-separated functional");

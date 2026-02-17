@@ -911,6 +911,7 @@ export_dft(py::module& m)
         .def("get_rs_beta", &CXCFunctional::getRangeSeparationParameterBeta, "Gets range-separation parameter beta.")
         .def("get_rs_omega", &CXCFunctional::getRangeSeparationParameterOmega, "Gets range-separation parameter omega.")
         .def("get_dimension_of_derivatives", &CXCFunctional::getDimensionOfDerivatives, "Gets dimension of derivatives.")
+        .def("set_frac_of_exact_exchange", &CXCFunctional::setFractionOfExactExchange, "Sets amount of exact exchange.")
         .def("set_rs_omega", &CXCFunctional::setRangeSeparatedParameterOmega, "Sets range-separation parameter omega.");
 
     // XCPairDensityFunctional class
