@@ -90,6 +90,8 @@ class EnsembleDriver:
 
         # Other possible settings
         self.xcfun = None
+        self.potfile = None
+        self.embedding = None
         self.eri_thresh = None
         self.ri_coulomb = None
         self.grid_level = None
@@ -452,40 +454,14 @@ class EnsembleDriver:
               - scf_all: list of (frame, scf_results)
               - rsp_all: list of (frame, rsp_results)
         """
-        assert_msg_critical(
-            self.pe_model is None and self.npe_model is None,
-            "Models not set. Call set_env_models(pe_model=..., npe_model=...) first.")
+        if self.pe_model is None and self.npe_model is None:
+            raise RuntimeError(
+            "Models not set. Call set_env_models(pe_model=..., npe_model=...) first."
+            )
     
         if isinstance(snapshots, dict):
             snapshots = [snapshots]
 
-        # here starts the suggestion of how to handle 
-        # SCF under the hood
-        if self._is_restricted:
-            scf_driver = ScfRestrictedDriver()
-        else:
-            scf_driver = ScfUnrestrictedDriver()
-        
-        # update settings if necessary
-        if self.scf_dict is not None or self.method_dict is not None:
-            scf_driver.update_settings(self.scf_dict, self.method_dict)
-
-        # sanity check -- update settings in SCF according to
-        # which variables the user set.
-        # see routine in sanitychecks.py
-        # I changed the name to ensemble_driver_sanity_check
-        ensemble_driver_sanity_check(scf_driver, self)
-        
-        # IULIA's comment: END of suggested code block
-        # Something similar can be done for rsp_drv;
-        # a bit more complicated, but one could use the example
-        # of creating the right response driver with a routine
-        # similar to "select_rsp_property" from main.py
-        # For now, I set rsp_drv to None. A first implementation could
-        # be done with rsp_drv = LinearResponseEigensolver();
-        # other response drivers can be added later.
-        rsp_drv = None
-        
         potdir = Path(potdir)
 
         # Detect whether we actually need PE / NPE
@@ -501,6 +477,42 @@ class EnsembleDriver:
         if write_pe_potfiles and has_any_pe:
             self.write_pot_files(snapshots, outdir=potdir)
 
+        # Here starts the suggestion of how to handle 
+        # SCF under the hood
+        if self._is_restricted:
+            scf_driver = ScfRestrictedDriver()
+        else:
+            scf_driver = ScfUnrestrictedDriver()
+        
+        # update settings if necessary
+        if self.scf_dict is not None or self.method_dict is not None:
+            scf_driver.update_settings(self.scf_dict or {}, self.method_dict or {})
+
+        # Apply user-set high-level knobs (these should override dict defaults)
+        if self.xcfun is not None:
+            scf_driver.xcfun = self.xcfun
+        if self.eri_thresh is not None:
+            scf_driver.eri_thresh = self.eri_thresh
+        if self.ri_coulomb is not None: 
+            scf_driver.ri_coulomb = self.ri_coulomb
+        if self.grid_level is not None: 
+            scf_driver.grid_level = self.grid_level
+
+        # sanity check -- update settings in SCF according to
+        # which variables the user set.
+        # see routine in sanitychecks.py
+        # I changed the name to ensemble_driver_sanity_check
+        ensemble_driver_sanity_check(scf_driver, self)
+        
+        # IULIA's comment: END of suggested code block
+        # Something similar can be done for rsp_drv;
+        # a bit more complicated, but one could use the example
+        # of creating the right response driver with a routine
+        # similar to "select_rsp_property" from main.py
+        # For now, I set rsp_drv to None. A first implementation could
+        # be done with rsp_drv = LinearResponseEigensolver();
+        # other response drivers can be added later.
+        
         scf_all = []
 
         for snap in snapshots:
@@ -517,11 +529,12 @@ class EnsembleDriver:
             has_pe = pe_coords.size > 0
             has_npe = npe_coords.size > 0
 
-            scf_drv.potfile = ""
-            scf_drv.point_charges = None
+            # Reset embedding inputs every frame
+            scf_driver.potfile = None
+            scf_driver.point_charges = None
             
             if has_pe:
-                scf_drv.potfile = str(potdir / f"pe_frame_{frame:06d}.pot")
+                scf_driver.potfile = str(potdir / f"pe_frame_{frame:06d}.pot")
 
             if has_npe:
                 npe_atom_names = snap.get("npe_atom_names", [])
@@ -529,18 +542,12 @@ class EnsembleDriver:
                 if len(npe_atom_names) == 0:
                     raise ValueError("npe_atom_names missing in snapshots (required to read NPE charges from CSV)."
                     )
-                scf_drv.point_charges = self._build_point_charges(
+                scf_driver.point_charges = self._build_point_charges(
                     npe_coords, npe_atom_names, npe_resnames
                 )
 
-            scf_results = scf_drv.compute(molecule, basis)
+            scf_results = scf_driver.compute(molecule, basis)
             scf_all.append((frame, scf_results))
 
-            if rsp_drv is not None:
-                rsp_results = rsp_drv.compute(molecule, basis, scf_results)
-                rsp_all.append((frame, rsp_results))
-
         results = {"scf_all": scf_all}
-        if rsp_drv is not None:
-            results["rsp_all"] = rsp_all
         return results
