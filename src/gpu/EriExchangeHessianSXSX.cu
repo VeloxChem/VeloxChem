@@ -3536,6 +3536,2308 @@ computeExchangeHessianSSSP_JK_0(double*         hess_xy,
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
+computeExchangeHessianSSSD_II_0(double*         hess_xy,
+                                const uint32_t  hess_cart_ind_0,
+                                const uint32_t  hess_cart_ind_1,
+                                const double    frac_exact_exchange,
+                                const uint32_t* pair_inds_i_for_K_ss,
+                                const uint32_t* pair_inds_k_for_K_ss,
+                                const double*   D_ik_for_K_ss,
+                                const uint32_t  pair_inds_count_for_K_ss,
+                                const double*   s_prim_info,
+                                const uint32_t* s_prim_aoinds,
+                                const uint32_t  s_prim_count,
+                                const double*   d_prim_info,
+                                const uint32_t* d_prim_aoinds,
+                                const uint32_t  d_prim_count,
+                                const double    sd_max_D,
+                                const double*   mat_D_full_AO,
+                                const uint32_t  naos,
+                                const double*   Q_K_ss,
+                                const double*   Q_K_sd,
+                                const uint32_t* D_inds_K_ss,
+                                const uint32_t* D_inds_K_sd,
+                                const uint32_t* pair_displs_K_ss,
+                                const uint32_t* pair_displs_K_sd,
+                                const uint32_t* pair_counts_K_ss,
+                                const uint32_t* pair_counts_K_sd,
+                                const double*   pair_data_K_ss,
+                                const double*   pair_data_K_sd,
+                                const uint32_t* prim_cart_ao_to_atom_inds,
+                                const double*   boys_func_table,
+                                const double*   boys_func_ft,
+                                const double    omega,
+                                const double    eri_threshold)
+{
+    // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
+
+    __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
+    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ double   delta[3][3];
+    __shared__ uint32_t g0, g1;
+
+    const uint32_t ik = blockIdx.x;
+
+    // we make sure that ik < pair_inds_count_for_K_ss when calling the kernel
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+        g0 = hess_cart_ind_0;
+        g1 = hess_cart_ind_1;
+
+        i = pair_inds_i_for_K_ss[ik];
+        k = pair_inds_k_for_K_ss[ik];
+
+        count_i = pair_counts_K_ss[i];
+        count_k = pair_counts_K_sd[k];
+
+        displ_i = pair_displs_K_ss[i];
+        displ_k = pair_displs_K_sd[k];
+
+        a_i = s_prim_info[i + s_prim_count * 0];
+
+        r_i[0] = s_prim_info[i + s_prim_count * 2];
+        r_i[1] = s_prim_info[i + s_prim_count * 3];
+        r_i[2] = s_prim_info[i + s_prim_count * 4];
+
+        a_k = s_prim_info[k + s_prim_count * 0];
+
+        r_k[0] = s_prim_info[k + s_prim_count * 2];
+        r_k[1] = s_prim_info[k + s_prim_count * 3];
+        r_k[2] = s_prim_info[k + s_prim_count * 4];
+
+        ik_factor_D = (static_cast<double>(i != k) + 1.0) * D_ik_for_K_ss[ik];
+
+    }
+
+    __syncthreads();
+
+    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    {
+        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+
+        // sync threads before starting a new scan
+        __syncthreads();
+
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double PA_x, PA_y;
+        uint32_t j_prim, j_cgto;
+
+        if (j < count_i)
+        {
+            Q_ij   = Q_K_ss[displ_i + j];
+
+            j_prim = D_inds_K_ss[displ_i + j];
+
+            j_cgto = s_prim_aoinds[j_prim];
+
+            a_j = s_prim_info[j_prim + s_prim_count * 0];
+
+            r_j[0] = s_prim_info[j_prim + s_prim_count * 2];
+            r_j[1] = s_prim_info[j_prim + s_prim_count * 3];
+            r_j[2] = s_prim_info[j_prim + s_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = pair_data_K_ss[displ_i + j];
+
+            PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+            PA_y = (a_j  * inv_S1) * (r_j[g1] - r_i[g1]);
+
+
+
+        }
+
+        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        {
+            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+
+            // Q_kl == Q_K_sd[displ_k + l]
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_sd[displ_k + l] * sd_max_D) <= eri_threshold))
+            {
+                break;
+            }
+
+            // const auto Q_kl = Q_K_sd[displ_k + l];
+
+            const auto l_prim = D_inds_K_sd[displ_k + l];
+
+            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+
+            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+
+            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
+                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
+                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+
+            const auto S_kl_00 = pair_data_K_sd[displ_k + l];
+
+            const auto d0 = d_cart_inds[l_prim % 6][0];
+            const auto d1 = d_cart_inds[l_prim % 6][1];
+
+            // J. Chem. Phys. 84, 3963-3974 (1986)
+
+            const auto S2 = a_k + a_l;
+
+            const auto inv_S2 = 1.0 / S2;
+            const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
+
+            const auto rho = S1 * S2 * inv_S4;
+
+            double d2 = 1.0;
+
+            if (omega != 0.0) d2 = omega * omega / (rho + omega * omega);
+
+            const auto Lambda = sqrt(4.0 * rho * d2 * MATH_CONST_INV_PI);
+
+            double F4_t[5];
+
+            gpu::computeBoysFunction(F4_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
+
+            if (omega != 0.0)
+            {
+                F4_t[1] *= d2;
+                F4_t[2] *= d2 * d2;
+                F4_t[3] *= d2 * d2 * d2;
+                F4_t[4] *= d2 * d2 * d2 * d2;
+            }
+
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+
+            // i-i Hessian
+
+            const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
+                    + F4_t[0] * (
+
+                        2.0 * inv_S1 * a_i * a_i * (
+                            +QD_0*QD_1*delta[g0][g1]
+                        )
+
+                        + (-1.0) * inv_S2 * a_i * (
+                            +delta[d0][d1]*delta[g0][g1]
+                        )
+
+                        + 4.0 * a_i * a_i * (
+                            +PA_x*PA_y*QD_0*QD_1
+                        )
+
+                        + (-2.0) * a_i * (
+                            +QD_0*QD_1*delta[g0][g1]
+                        )
+
+                        + inv_S1 * inv_S2 * a_i * a_i * (
+                            +delta[d0][d1]*delta[g0][g1]
+                        )
+
+                        + 2.0 * inv_S2 * a_i * a_i * (
+                            +PA_x*PA_y*delta[d0][d1]
+                        )
+
+                    )
+
+                    + F4_t[1] * (
+
+                        (-1.0) * inv_S1 * inv_S4 * a_i * a_i * (
+                            +delta[d0][d1]*delta[g0][g1]
+                        )
+
+                        + (-1.0) * inv_S2 * inv_S4 * a_i * a_i * (
+                            +delta[d0][d1]*delta[g0][g1]
+                        )
+
+                        + (-2.0) * S1 * inv_S2 * inv_S4 * a_i * a_i * (
+                            +PA_x*PA_y*delta[d0][d1]
+                        )
+
+                        + (-2.0) * S2 * inv_S1 * inv_S4 * a_i * a_i * (
+                            +QD_0*QD_1*delta[g0][g1]
+                        )
+
+                        + 2.0 * inv_S4 * a_i * a_i * (
+                            +PA_x*QD_0*delta[d1][g1]
+
+                            +PA_y*QD_0*delta[d1][g0] + QD_1*(PA_x*delta[d0][g1] + PA_y*delta[d0][g0])
+
+                            -delta[g0][g1]*(PQ[d0]*QD_1 + PQ[d1]*QD_0)
+
+                            +delta[d0][d1]*(PA_x*PQ[g1] + PA_y*PQ[g0])
+                        )
+
+                        + 4.0 * S1 * inv_S4 * a_i * a_i * (
+                            -PA_x*PA_y*(PQ[d0]*QD_1 + PQ[d1]*QD_0)
+                        )
+
+                        + 2.0 * S1 * inv_S4 * a_i * (
+                            +delta[g0][g1]*(PQ[d0]*QD_1 + PQ[d1]*QD_0)
+                        )
+
+                        + 4.0 * S2 * inv_S4 * a_i * a_i * (
+                            +QD_0*QD_1*(PA_x*PQ[g1] + PA_y*PQ[g0])
+                        )
+
+                        + S1 * inv_S2 * inv_S4 * a_i * (
+                            +delta[d0][d1]*delta[g0][g1]
+                        )
+
+                    )
+
+                    + F4_t[2] * (
+
+                        2.0 * S1 * inv_S4 * inv_S4 * a_i * a_i * (
+                            -PA_x*PQ[d0]*delta[d1][g1]
+
+                            -PA_y*PQ[d0]*delta[d1][g0] - PQ[d1]*(PA_x*delta[d0][g1] + PA_y*delta[d0][g0])
+
+                            -delta[d0][d1]*(PA_x*PQ[g1] + PA_y*PQ[g0])
+
+                            +PQ[d0]*PQ[d1]*delta[g0][g1]
+                        )
+
+                        + 2.0 * S2 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +delta[g0][g1]*(PQ[d0]*QD_1 + PQ[d1]*QD_0)
+
+                            +PQ[g0]*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1]) + PQ[g1]*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0])
+
+                            +PQ[g0]*PQ[g1]*delta[d0][d1]
+                        )
+
+                        + (-2.0) * S1 * S1 * inv_S4 * inv_S4 * a_i * (
+                            +PQ[d0]*PQ[d1]*delta[g0][g1]
+                        )
+
+                        + 4.0 * S1 * S2 * inv_S4 * inv_S4 * a_i * a_i * (
+                            -(PA_x*PQ[g1] + PA_y*PQ[g0])*(PQ[d0]*QD_1 + PQ[d1]*QD_0)
+                        )
+
+                        + 4.0 * S2 * S2 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +PQ[g0]*PQ[g1]*QD_0*QD_1
+                        )
+
+                        + inv_S4 * inv_S4 * a_i * a_i * (
+                            +delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0]
+                        )
+
+                        + 4.0 * S1 * S1 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +PA_x*PA_y*PQ[d0]*PQ[d1]
+                        )
+
+                    )
+
+                    + F4_t[3] * (
+
+                        (-2.0) * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +PQ[d0]*PQ[d1]*delta[g0][g1]
+
+                            +PQ[g0]*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1]) + PQ[g1]*(PQ[d0]*delta[d1][g0] + PQ[d1]*delta[d0][g0])
+                        )
+
+                        + 4.0 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_i * (
+                            -PQ[g0]*PQ[g1]*(PQ[d0]*QD_1 + PQ[d1]*QD_0)
+                        )
+
+                        + 4.0 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +PA_x*PQ[d0]*PQ[d1]*PQ[g1]
+
+                            +PA_y*PQ[d0]*PQ[d1]*PQ[g0]
+                        )
+
+                    )
+
+                    + F4_t[4] * (
+
+                        4.0 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +PQ[d0]*PQ[d1]*PQ[g0]*PQ[g1]
+                        )
+
+                    )
+
+                    );
+
+            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+        }
+    }
+
+    __syncthreads();
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_ss))
+    {
+        double hess_ii_xy = 0.0;
+
+        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        {
+            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            {
+                hess_ii_xy += ERIs[y][x];
+            }
+        }
+
+        atomicAdd(hess_xy + prim_cart_ao_to_atom_inds[i], hess_ii_xy * ik_factor_D * 2.0 * frac_exact_exchange);
+    }
+}
+
+__global__ void __launch_bounds__(TILE_SIZE_K)
+computeExchangeHessianSSSD_KK_0(double*         hess_xy,
+                                const uint32_t  hess_cart_ind_0,
+                                const uint32_t  hess_cart_ind_1,
+                                const double    frac_exact_exchange,
+                                const uint32_t* pair_inds_i_for_K_ss,
+                                const uint32_t* pair_inds_k_for_K_ss,
+                                const double*   D_ik_for_K_ss,
+                                const uint32_t  pair_inds_count_for_K_ss,
+                                const double*   s_prim_info,
+                                const uint32_t* s_prim_aoinds,
+                                const uint32_t  s_prim_count,
+                                const double*   d_prim_info,
+                                const uint32_t* d_prim_aoinds,
+                                const uint32_t  d_prim_count,
+                                const double    sd_max_D,
+                                const double*   mat_D_full_AO,
+                                const uint32_t  naos,
+                                const double*   Q_K_ss,
+                                const double*   Q_K_sd,
+                                const uint32_t* D_inds_K_ss,
+                                const uint32_t* D_inds_K_sd,
+                                const uint32_t* pair_displs_K_ss,
+                                const uint32_t* pair_displs_K_sd,
+                                const uint32_t* pair_counts_K_ss,
+                                const uint32_t* pair_counts_K_sd,
+                                const double*   pair_data_K_ss,
+                                const double*   pair_data_K_sd,
+                                const uint32_t* prim_cart_ao_to_atom_inds,
+                                const double*   boys_func_table,
+                                const double*   boys_func_ft,
+                                const double    omega,
+                                const double    eri_threshold)
+{
+    // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
+
+    __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
+    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ double   delta[3][3];
+    __shared__ uint32_t g0, g1;
+
+    const uint32_t ik = blockIdx.x;
+
+    // we make sure that ik < pair_inds_count_for_K_ss when calling the kernel
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+        g0 = hess_cart_ind_0;
+        g1 = hess_cart_ind_1;
+
+        i = pair_inds_i_for_K_ss[ik];
+        k = pair_inds_k_for_K_ss[ik];
+
+        count_i = pair_counts_K_ss[i];
+        count_k = pair_counts_K_sd[k];
+
+        displ_i = pair_displs_K_ss[i];
+        displ_k = pair_displs_K_sd[k];
+
+        a_i = s_prim_info[i + s_prim_count * 0];
+
+        r_i[0] = s_prim_info[i + s_prim_count * 2];
+        r_i[1] = s_prim_info[i + s_prim_count * 3];
+        r_i[2] = s_prim_info[i + s_prim_count * 4];
+
+        a_k = s_prim_info[k + s_prim_count * 0];
+
+        r_k[0] = s_prim_info[k + s_prim_count * 2];
+        r_k[1] = s_prim_info[k + s_prim_count * 3];
+        r_k[2] = s_prim_info[k + s_prim_count * 4];
+
+        ik_factor_D = (static_cast<double>(i != k) + 1.0) * D_ik_for_K_ss[ik];
+
+    }
+
+    __syncthreads();
+
+    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    {
+        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+
+        // sync threads before starting a new scan
+        __syncthreads();
+
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        uint32_t j_prim, j_cgto;
+
+        if (j < count_i)
+        {
+            Q_ij   = Q_K_ss[displ_i + j];
+
+            j_prim = D_inds_K_ss[displ_i + j];
+
+            j_cgto = s_prim_aoinds[j_prim];
+
+            a_j = s_prim_info[j_prim + s_prim_count * 0];
+
+            r_j[0] = s_prim_info[j_prim + s_prim_count * 2];
+            r_j[1] = s_prim_info[j_prim + s_prim_count * 3];
+            r_j[2] = s_prim_info[j_prim + s_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = pair_data_K_ss[displ_i + j];
+
+
+
+
+        }
+
+        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        {
+            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+
+            // Q_kl == Q_K_sd[displ_k + l]
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_sd[displ_k + l] * sd_max_D) <= eri_threshold))
+            {
+                break;
+            }
+
+            // const auto Q_kl = Q_K_sd[displ_k + l];
+
+            const auto l_prim = D_inds_K_sd[displ_k + l];
+
+            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+
+            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+
+            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
+                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
+                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+
+            const auto S_kl_00 = pair_data_K_sd[displ_k + l];
+
+            const auto d0 = d_cart_inds[l_prim % 6][0];
+            const auto d1 = d_cart_inds[l_prim % 6][1];
+
+            // J. Chem. Phys. 84, 3963-3974 (1986)
+
+            const auto S2 = a_k + a_l;
+
+            const auto inv_S2 = 1.0 / S2;
+            const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
+
+            const auto rho = S1 * S2 * inv_S4;
+
+            double d2 = 1.0;
+
+            if (omega != 0.0) d2 = omega * omega / (rho + omega * omega);
+
+            const auto Lambda = sqrt(4.0 * rho * d2 * MATH_CONST_INV_PI);
+
+            double F4_t[5];
+
+            gpu::computeBoysFunction(F4_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
+
+            if (omega != 0.0)
+            {
+                F4_t[1] *= d2;
+                F4_t[2] *= d2 * d2;
+                F4_t[3] *= d2 * d2 * d2;
+                F4_t[4] *= d2 * d2 * d2 * d2;
+            }
+
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+
+            const auto QC_x = (a_l * inv_S2) * (r_l[g0] - r_k[g0]);
+            const auto QC_y = (a_l * inv_S2) * (r_l[g1] - r_k[g1]);
+
+            // k-k Hessian
+
+            const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
+                    + F4_t[0] * (
+
+                        2.0 * inv_S2 * a_k * a_k * (
+                            +QD_0*QD_1*delta[g0][g1]
+
+                            +QC_x*(QC_y*delta[d0][d1] + QD_0*delta[d1][g1] + QD_1*delta[d0][g1]) + QC_y*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0])
+                        )
+
+                        + (-1.0) * inv_S2 * a_k * (
+                            +delta[d0][d1]*delta[g0][g1]
+                        )
+
+                        + 4.0 * a_k * a_k * (
+                            +QC_x*QC_y*QD_0*QD_1
+                        )
+
+                        + (-2.0) * a_k * (
+                            +QD_0*QD_1*delta[g0][g1]
+                        )
+
+                        + inv_S2 * inv_S2 * a_k * a_k * (
+                            +delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0]
+                        )
+
+                    )
+
+                    + F4_t[1] * (
+
+                        (-2.0) * S1 * inv_S2 * inv_S2 * inv_S4 * a_k * a_k * (
+                            +delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0]
+                        )
+
+                        + (-2.0) * S1 * inv_S2 * inv_S4 * a_k * a_k * (
+                            +delta[g0][g1]*(PQ[d1]*QD_0 + QD_1*(PQ[d0] + QD_0))
+
+                            +PQ[g0]*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1]) + PQ[g1]*(QC_x*delta[d0][d1] + QD_0*delta[d1][g0] + QD_1*delta[d0][g0]) + QC_x*(delta[d0][g1]*(PQ[d1] + QD_1) + delta[d1][g1]*(PQ[d0] + QD_0)) + QC_y*(delta[d0][d1]*(PQ[g0] + QC_x) + delta[d0][g0]*(PQ[d1] + QD_1) + delta[d1][g0]*(PQ[d0] + QD_0))
+                        )
+
+                        + 4.0 * S1 * inv_S4 * a_k * a_k * (
+                            -QC_x*QC_y*(PQ[d0]*QD_1 + PQ[d1]*QD_0) - QD_0*QD_1*(PQ[g0]*QC_y + PQ[g1]*QC_x)
+                        )
+
+                        + 2.0 * S1 * inv_S4 * a_k * (
+                            +delta[g0][g1]*(PQ[d0]*QD_1 + PQ[d1]*QD_0)
+                        )
+
+                        + S1 * inv_S2 * inv_S4 * a_k * (
+                            +delta[d0][d1]*delta[g0][g1]
+                        )
+
+                    )
+
+                    + F4_t[2] * (
+
+                        2.0 * S1 * S1 * inv_S2 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +delta[g0][g1]*(PQ[d0]*(PQ[d1] + QD_1) + PQ[d1]*QD_0)
+
+                            +PQ[g1]*(QC_x*delta[d0][d1] + QD_0*delta[d1][g0] + QD_1*delta[d0][g0]) + delta[d0][g1]*(PQ[d1]*(PQ[g0] + QC_x) + PQ[g0]*QD_1) + delta[d1][g1]*(PQ[d0]*(PQ[g0] + QC_x) + PQ[g0]*QD_0) + (PQ[g1] + QC_y)*(PQ[d0]*delta[d1][g0] + PQ[d1]*delta[d0][g0] + PQ[g0]*delta[d0][d1])
+                        )
+
+                        + 4.0 * S1 * S1 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +PQ[d0]*QC_x*(PQ[d1]*QC_y + PQ[g1]*QD_1) + PQ[g0]*QC_y*(PQ[d0]*QD_1 + PQ[d1]*QD_0) + PQ[g1]*QD_0*(PQ[d1]*QC_x + PQ[g0]*QD_1)
+                        )
+
+                        + (-2.0) * S1 * S1 * inv_S4 * inv_S4 * a_k * (
+                            +PQ[d0]*PQ[d1]*delta[g0][g1]
+                        )
+
+                        + S1 * S1 * inv_S2 * inv_S2 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0]
+                        )
+
+                    )
+
+                    + F4_t[3] * (
+
+                        (-2.0) * S1 * S1 * S1 * inv_S2 * inv_S4 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +PQ[d0]*PQ[d1]*delta[g0][g1]
+
+                            +PQ[g0]*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1]) + PQ[g1]*(PQ[d0]*delta[d1][g0] + PQ[d1]*delta[d0][g0])
+                        )
+
+                        + (-4.0) * S1 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +PQ[d0]*PQ[d1]*PQ[g0]*QC_y
+
+                            +PQ[g1]*(PQ[d0]*(PQ[d1]*QC_x + PQ[g0]*QD_1) + PQ[d1]*PQ[g0]*QD_0)
+                        )
+
+                    )
+
+                    + F4_t[4] * (
+
+                        4.0 * S1 * S1 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +PQ[d0]*PQ[d1]*PQ[g0]*PQ[g1]
+                        )
+
+                    )
+
+                    );
+
+            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+        }
+    }
+
+    __syncthreads();
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_ss))
+    {
+        double hess_kk_xy = 0.0;
+
+        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        {
+            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            {
+                hess_kk_xy += ERIs[y][x];
+            }
+        }
+
+        atomicAdd(hess_xy + prim_cart_ao_to_atom_inds[k], hess_kk_xy * ik_factor_D * 2.0 * frac_exact_exchange);
+    }
+}
+
+__global__ void __launch_bounds__(TILE_SIZE_K)
+computeExchangeHessianSSSD_IK_0(double*         hess_xy,
+                                double*         hess_yx,
+                                const uint32_t  hess_cart_ind_0,
+                                const uint32_t  hess_cart_ind_1,
+                                const double    frac_exact_exchange,
+                                const uint32_t* pair_inds_i_for_K_ss,
+                                const uint32_t* pair_inds_k_for_K_ss,
+                                const double*   D_ik_for_K_ss,
+                                const uint32_t  pair_inds_count_for_K_ss,
+                                const double*   s_prim_info,
+                                const uint32_t* s_prim_aoinds,
+                                const uint32_t  s_prim_count,
+                                const double*   d_prim_info,
+                                const uint32_t* d_prim_aoinds,
+                                const uint32_t  d_prim_count,
+                                const double    sd_max_D,
+                                const double*   mat_D_full_AO,
+                                const uint32_t  naos,
+                                const double*   Q_K_ss,
+                                const double*   Q_K_sd,
+                                const uint32_t* D_inds_K_ss,
+                                const uint32_t* D_inds_K_sd,
+                                const uint32_t* pair_displs_K_ss,
+                                const uint32_t* pair_displs_K_sd,
+                                const uint32_t* pair_counts_K_ss,
+                                const uint32_t* pair_counts_K_sd,
+                                const double*   pair_data_K_ss,
+                                const double*   pair_data_K_sd,
+                                const uint32_t* prim_cart_ao_to_atom_inds,
+                                const uint32_t  natoms,
+                                const double*   boys_func_table,
+                                const double*   boys_func_ft,
+                                const double    omega,
+                                const double    eri_threshold)
+{
+    // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
+
+    __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
+    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ double   delta[3][3];
+    __shared__ uint32_t g0, g1;
+
+    const uint32_t ik = blockIdx.x;
+
+    // we make sure that ik < pair_inds_count_for_K_ss when calling the kernel
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+        g0 = hess_cart_ind_0;
+        g1 = hess_cart_ind_1;
+
+        i = pair_inds_i_for_K_ss[ik];
+        k = pair_inds_k_for_K_ss[ik];
+
+        count_i = pair_counts_K_ss[i];
+        count_k = pair_counts_K_sd[k];
+
+        displ_i = pair_displs_K_ss[i];
+        displ_k = pair_displs_K_sd[k];
+
+        a_i = s_prim_info[i + s_prim_count * 0];
+
+        r_i[0] = s_prim_info[i + s_prim_count * 2];
+        r_i[1] = s_prim_info[i + s_prim_count * 3];
+        r_i[2] = s_prim_info[i + s_prim_count * 4];
+
+        a_k = s_prim_info[k + s_prim_count * 0];
+
+        r_k[0] = s_prim_info[k + s_prim_count * 2];
+        r_k[1] = s_prim_info[k + s_prim_count * 3];
+        r_k[2] = s_prim_info[k + s_prim_count * 4];
+
+        ik_factor_D = (static_cast<double>(i != k) + 1.0) * D_ik_for_K_ss[ik];
+
+    }
+
+    __syncthreads();
+
+    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    {
+        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+
+        // sync threads before starting a new scan
+        __syncthreads();
+
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double PA_x;
+        uint32_t j_prim, j_cgto;
+
+        if (j < count_i)
+        {
+            Q_ij   = Q_K_ss[displ_i + j];
+
+            j_prim = D_inds_K_ss[displ_i + j];
+
+            j_cgto = s_prim_aoinds[j_prim];
+
+            a_j = s_prim_info[j_prim + s_prim_count * 0];
+
+            r_j[0] = s_prim_info[j_prim + s_prim_count * 2];
+            r_j[1] = s_prim_info[j_prim + s_prim_count * 3];
+            r_j[2] = s_prim_info[j_prim + s_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = pair_data_K_ss[displ_i + j];
+
+            PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+
+
+
+        }
+
+        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        {
+            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+
+            // Q_kl == Q_K_sd[displ_k + l]
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_sd[displ_k + l] * sd_max_D) <= eri_threshold))
+            {
+                break;
+            }
+
+            // const auto Q_kl = Q_K_sd[displ_k + l];
+
+            const auto l_prim = D_inds_K_sd[displ_k + l];
+
+            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+
+            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+
+            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
+                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
+                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+
+            const auto S_kl_00 = pair_data_K_sd[displ_k + l];
+
+            const auto d0 = d_cart_inds[l_prim % 6][0];
+            const auto d1 = d_cart_inds[l_prim % 6][1];
+
+            // J. Chem. Phys. 84, 3963-3974 (1986)
+
+            const auto S2 = a_k + a_l;
+
+            const auto inv_S2 = 1.0 / S2;
+            const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
+
+            const auto rho = S1 * S2 * inv_S4;
+
+            double d2 = 1.0;
+
+            if (omega != 0.0) d2 = omega * omega / (rho + omega * omega);
+
+            const auto Lambda = sqrt(4.0 * rho * d2 * MATH_CONST_INV_PI);
+
+            double F4_t[5];
+
+            gpu::computeBoysFunction(F4_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
+
+            if (omega != 0.0)
+            {
+                F4_t[1] *= d2;
+                F4_t[2] *= d2 * d2;
+                F4_t[3] *= d2 * d2 * d2;
+                F4_t[4] *= d2 * d2 * d2 * d2;
+            }
+
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+
+            const auto QC_y = (a_l * inv_S2) * (r_l[g1] - r_k[g1]);
+
+            // i-k Hessian
+
+            const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
+                    + F4_t[0] * (
+
+                        2.0 * inv_S2 * a_i * a_k * (
+                            +PA_x*QD_0*delta[d1][g1]
+
+                            +PA_x*(QC_y*delta[d0][d1] + QD_1*delta[d0][g1])
+                        )
+
+                        + 4.0 * a_i * a_k * (
+                            +PA_x*QC_y*QD_0*QD_1
+                        )
+
+                    )
+
+                    + F4_t[1] * (
+
+                        (-2.0) * S1 * inv_S2 * inv_S4 * a_i * a_k * (
+                            +PA_x*delta[d1][g1]*(PQ[d0] + QD_0)
+
+                            +PA_x*(delta[d0][d1]*(PQ[g1] + QC_y) + delta[d0][g1]*(PQ[d1] + QD_1))
+                        )
+
+                        + 2.0 * inv_S4 * a_i * a_k * (
+                            +QC_y*QD_1*delta[d0][g0] + QD_0*(PQ[g0]*delta[d1][g1] + QC_y*delta[d1][g0] + QD_1*delta[g0][g1])
+
+                            +PQ[g0]*(QC_y*delta[d0][d1] + QD_1*delta[d0][g1])
+                        )
+
+                        + 4.0 * S1 * inv_S4 * a_i * a_k * (
+                            -PA_x*(PQ[g1]*QD_0*QD_1 + QC_y*(PQ[d0]*QD_1 + PQ[d1]*QD_0))
+                        )
+
+                        + 4.0 * S2 * inv_S4 * a_i * a_k * (
+                            +PQ[g0]*QC_y*QD_0*QD_1
+                        )
+
+                        + inv_S2 * inv_S4 * a_i * a_k * (
+                            +delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0]
+                        )
+
+                    )
+
+                    + F4_t[2] * (
+
+                        (-1.0) * S1 * inv_S2 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0]
+                        )
+
+                        + (-2.0) * S1 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +PQ[d0]*(QC_y*delta[d1][g0] + QD_1*delta[g0][g1]) + PQ[d1]*(QC_y*delta[d0][g0] + QD_0*delta[g0][g1]) + PQ[g0]*delta[d1][g1]*(PQ[d0] + QD_0) + PQ[g1]*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0])
+
+                            +PQ[g0]*(delta[d0][d1]*(PQ[g1] + QC_y) + delta[d0][g1]*(PQ[d1] + QD_1))
+                        )
+
+                        + 4.0 * S1 * S1 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +PA_x*(PQ[d0]*(PQ[d1]*QC_y + PQ[g1]*QD_1) + PQ[d1]*PQ[g1]*QD_0)
+                        )
+
+                        + 4.0 * S1 * S2 * inv_S4 * inv_S4 * a_i * a_k * (
+                            -PQ[g0]*(PQ[g1]*QD_0*QD_1 + QC_y*(PQ[d0]*QD_1 + PQ[d1]*QD_0))
+                        )
+
+                        + 2.0 * S1 * S1 * inv_S2 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +PA_x*PQ[d0]*delta[d1][g1]
+
+                            +PA_x*(PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1])
+                        )
+
+                    )
+
+                    + F4_t[3] * (
+
+                        (-4.0) * S1 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +PA_x*PQ[d0]*PQ[d1]*PQ[g1]
+                        )
+
+                        + 4.0 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +PQ[g0]*(PQ[d0]*(PQ[d1]*QC_y + PQ[g1]*QD_1) + PQ[d1]*PQ[g1]*QD_0)
+                        )
+
+                        + 2.0 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +PQ[d0]*PQ[d1]*delta[g0][g1]
+
+                            +PQ[g0]*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1]) + PQ[g1]*(PQ[d0]*delta[d1][g0] + PQ[d1]*delta[d0][g0])
+                        )
+
+                    )
+
+                    + F4_t[4] * (
+
+                        (-4.0) * S1 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +PQ[d0]*PQ[d1]*PQ[g0]*PQ[g1]
+                        )
+
+                    )
+
+                    );
+
+            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+        }
+    }
+
+    __syncthreads();
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_ss))
+    {
+        double hess_ik_xy = 0.0;
+
+        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        {
+            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            {
+                hess_ik_xy += ERIs[y][x];
+            }
+        }
+
+        // Note factor of 2 due to IK<->JL symmetry for ground state Hessian
+
+        atomicAdd(
+            hess_xy + prim_cart_ao_to_atom_inds[i] * natoms + prim_cart_ao_to_atom_inds[k],
+            hess_ik_xy * ik_factor_D * 2.0 * frac_exact_exchange);
+
+        atomicAdd(
+            hess_yx + prim_cart_ao_to_atom_inds[k] * natoms + prim_cart_ao_to_atom_inds[i],
+            hess_ik_xy * ik_factor_D * 2.0 * frac_exact_exchange);
+    }
+}
+
+__global__ void __launch_bounds__(TILE_SIZE_K)
+computeExchangeHessianSSSD_IJ_0(double*         hess_xy,
+                                double*         hess_yx,
+                                const uint32_t  hess_cart_ind_0,
+                                const uint32_t  hess_cart_ind_1,
+                                const double    frac_exact_exchange,
+                                const uint32_t* pair_inds_i_for_K_ss,
+                                const uint32_t* pair_inds_k_for_K_ss,
+                                const double*   D_ik_for_K_ss,
+                                const uint32_t  pair_inds_count_for_K_ss,
+                                const double*   s_prim_info,
+                                const uint32_t* s_prim_aoinds,
+                                const uint32_t  s_prim_count,
+                                const double*   d_prim_info,
+                                const uint32_t* d_prim_aoinds,
+                                const uint32_t  d_prim_count,
+                                const double    sd_max_D,
+                                const double*   mat_D_full_AO,
+                                const uint32_t  naos,
+                                const double*   Q_K_ss,
+                                const double*   Q_K_sd,
+                                const uint32_t* D_inds_K_ss,
+                                const uint32_t* D_inds_K_sd,
+                                const uint32_t* pair_displs_K_ss,
+                                const uint32_t* pair_displs_K_sd,
+                                const uint32_t* pair_counts_K_ss,
+                                const uint32_t* pair_counts_K_sd,
+                                const double*   pair_data_K_ss,
+                                const double*   pair_data_K_sd,
+                                const uint32_t* prim_cart_ao_to_atom_inds,
+                                const uint32_t  natoms,
+                                const double*   boys_func_table,
+                                const double*   boys_func_ft,
+                                const double    omega,
+                                const double    eri_threshold)
+{
+    // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
+
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
+    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ double   delta[3][3];
+    __shared__ uint32_t g0, g1;
+
+    const uint32_t ik = blockIdx.x;
+
+    // we make sure that ik < pair_inds_count_for_K_ss when calling the kernel
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+        g0 = hess_cart_ind_0;
+        g1 = hess_cart_ind_1;
+
+        i = pair_inds_i_for_K_ss[ik];
+        k = pair_inds_k_for_K_ss[ik];
+
+        count_i = pair_counts_K_ss[i];
+        count_k = pair_counts_K_sd[k];
+
+        displ_i = pair_displs_K_ss[i];
+        displ_k = pair_displs_K_sd[k];
+
+        a_i = s_prim_info[i + s_prim_count * 0];
+
+        r_i[0] = s_prim_info[i + s_prim_count * 2];
+        r_i[1] = s_prim_info[i + s_prim_count * 3];
+        r_i[2] = s_prim_info[i + s_prim_count * 4];
+
+        a_k = s_prim_info[k + s_prim_count * 0];
+
+        r_k[0] = s_prim_info[k + s_prim_count * 2];
+        r_k[1] = s_prim_info[k + s_prim_count * 3];
+        r_k[2] = s_prim_info[k + s_prim_count * 4];
+
+        ik_factor_D = (static_cast<double>(i != k) + 1.0) * D_ik_for_K_ss[ik];
+
+    }
+
+    __syncthreads();
+
+    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    {
+        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+
+        // sync threads before starting a new scan
+        __syncthreads();
+
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double PA_x, PB_y;
+        uint32_t j_prim, j_cgto;
+
+        if (j < count_i)
+        {
+            Q_ij   = Q_K_ss[displ_i + j];
+
+            j_prim = D_inds_K_ss[displ_i + j];
+
+            j_cgto = s_prim_aoinds[j_prim];
+
+            a_j = s_prim_info[j_prim + s_prim_count * 0];
+
+            r_j[0] = s_prim_info[j_prim + s_prim_count * 2];
+            r_j[1] = s_prim_info[j_prim + s_prim_count * 3];
+            r_j[2] = s_prim_info[j_prim + s_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = pair_data_K_ss[displ_i + j];
+
+            PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+            PB_y = (-a_i * inv_S1) * (r_j[g1] - r_i[g1]);
+
+
+
+        }
+
+        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        {
+            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+
+            // Q_kl == Q_K_sd[displ_k + l]
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_sd[displ_k + l] * sd_max_D) <= eri_threshold))
+            {
+                break;
+            }
+
+            // const auto Q_kl = Q_K_sd[displ_k + l];
+
+            const auto l_prim = D_inds_K_sd[displ_k + l];
+
+            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+
+            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+
+            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
+                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
+                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+
+            const auto S_kl_00 = pair_data_K_sd[displ_k + l];
+
+            const auto d0 = d_cart_inds[l_prim % 6][0];
+            const auto d1 = d_cart_inds[l_prim % 6][1];
+
+            // J. Chem. Phys. 84, 3963-3974 (1986)
+
+            const auto S2 = a_k + a_l;
+
+            const auto inv_S2 = 1.0 / S2;
+            const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
+
+            const auto rho = S1 * S2 * inv_S4;
+
+            double d2 = 1.0;
+
+            if (omega != 0.0) d2 = omega * omega / (rho + omega * omega);
+
+            const auto Lambda = sqrt(4.0 * rho * d2 * MATH_CONST_INV_PI);
+
+            double F4_t[5];
+
+            gpu::computeBoysFunction(F4_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
+
+            if (omega != 0.0)
+            {
+                F4_t[1] *= d2;
+                F4_t[2] *= d2 * d2;
+                F4_t[3] *= d2 * d2 * d2;
+                F4_t[4] *= d2 * d2 * d2 * d2;
+            }
+
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+
+            // i-j Hessian
+
+            const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
+                    + F4_t[0] * (
+
+                        2.0 * inv_S1 * a_i * a_j * (
+                            +QD_0*QD_1*delta[g0][g1]
+                        )
+
+                        + 2.0 * inv_S2 * a_i * a_j * (
+                            +PA_x*PB_y*delta[d0][d1]
+                        )
+
+                        + 4.0 * a_i * a_j * (
+                            +PA_x*PB_y*QD_0*QD_1
+                        )
+
+                        + inv_S1 * inv_S2 * a_i * a_j * (
+                            +delta[d0][d1]*delta[g0][g1]
+                        )
+
+                    )
+
+                    + F4_t[1] * (
+
+                        (-1.0) * inv_S1 * inv_S4 * a_i * a_j * (
+                            +delta[d0][d1]*delta[g0][g1]
+                        )
+
+                        + (-1.0) * inv_S2 * inv_S4 * a_i * a_j * (
+                            +delta[d0][d1]*delta[g0][g1]
+                        )
+
+                        + (-2.0) * S1 * inv_S2 * inv_S4 * a_i * a_j * (
+                            +PA_x*PB_y*delta[d0][d1]
+                        )
+
+                        + (-2.0) * S2 * inv_S1 * inv_S4 * a_i * a_j * (
+                            +QD_0*QD_1*delta[g0][g1]
+                        )
+
+                        + 2.0 * inv_S4 * a_i * a_j * (
+                            +PA_x*QD_0*delta[d1][g1]
+
+                            +PB_y*QD_0*delta[d1][g0] + QD_1*(PA_x*delta[d0][g1] + PB_y*delta[d0][g0])
+
+                            +delta[d0][d1]*(PA_x*PQ[g1] + PB_y*PQ[g0])
+
+                            -delta[g0][g1]*(PQ[d0]*QD_1 + PQ[d1]*QD_0)
+                        )
+
+                        + 4.0 * S1 * inv_S4 * a_i * a_j * (
+                            -PA_x*PB_y*(PQ[d0]*QD_1 + PQ[d1]*QD_0)
+                        )
+
+                        + 4.0 * S2 * inv_S4 * a_i * a_j * (
+                            +QD_0*QD_1*(PA_x*PQ[g1] + PB_y*PQ[g0])
+                        )
+
+                    )
+
+                    + F4_t[2] * (
+
+                        2.0 * S1 * inv_S4 * inv_S4 * a_i * a_j * (
+                            -PA_x*PQ[d0]*delta[d1][g1]
+
+                            -PB_y*PQ[d0]*delta[d1][g0] - PQ[d1]*(PA_x*delta[d0][g1] + PB_y*delta[d0][g0])
+
+                            -delta[d0][d1]*(PA_x*PQ[g1] + PB_y*PQ[g0])
+
+                            +PQ[d0]*PQ[d1]*delta[g0][g1]
+                        )
+
+                        + 2.0 * S2 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +delta[g0][g1]*(PQ[d0]*QD_1 + PQ[d1]*QD_0)
+
+                            +PQ[g0]*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1]) + PQ[g1]*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0])
+
+                            +PQ[g0]*PQ[g1]*delta[d0][d1]
+                        )
+
+                        + 4.0 * S1 * S1 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +PA_x*PB_y*PQ[d0]*PQ[d1]
+                        )
+
+                        + 4.0 * S1 * S2 * inv_S4 * inv_S4 * a_i * a_j * (
+                            -(PA_x*PQ[g1] + PB_y*PQ[g0])*(PQ[d0]*QD_1 + PQ[d1]*QD_0)
+                        )
+
+                        + 4.0 * S2 * S2 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +PQ[g0]*PQ[g1]*QD_0*QD_1
+                        )
+
+                        + inv_S4 * inv_S4 * a_i * a_j * (
+                            +delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0]
+                        )
+
+                    )
+
+                    + F4_t[3] * (
+
+                        (-2.0) * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +PQ[d0]*PQ[d1]*delta[g0][g1]
+
+                            +PQ[g0]*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1]) + PQ[g1]*(PQ[d0]*delta[d1][g0] + PQ[d1]*delta[d0][g0])
+                        )
+
+                        + 4.0 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +PQ[d0]*PQ[d1]*(PA_x*PQ[g1] + PB_y*PQ[g0])
+                        )
+
+                        + 4.0 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_j * (
+                            -PQ[g0]*PQ[g1]*(PQ[d0]*QD_1 + PQ[d1]*QD_0)
+                        )
+
+                    )
+
+                    + F4_t[4] * (
+
+                        4.0 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +PQ[d0]*PQ[d1]*PQ[g0]*PQ[g1]
+                        )
+
+                    )
+
+                    );
+
+            double hess_ij_xy = -eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+
+            atomicAdd(
+                hess_xy + prim_cart_ao_to_atom_inds[i] * natoms + prim_cart_ao_to_atom_inds[j_prim],
+                hess_ij_xy * ik_factor_D * 2.0 * frac_exact_exchange);
+        }
+    }
+
+    __syncthreads();
+}
+
+__global__ void __launch_bounds__(TILE_SIZE_K)
+computeExchangeHessianSSSD_KL_0(double*         hess_xy,
+                                double*         hess_yx,
+                                const uint32_t  hess_cart_ind_0,
+                                const uint32_t  hess_cart_ind_1,
+                                const double    frac_exact_exchange,
+                                const uint32_t* pair_inds_i_for_K_ss,
+                                const uint32_t* pair_inds_k_for_K_ss,
+                                const double*   D_ik_for_K_ss,
+                                const uint32_t  pair_inds_count_for_K_ss,
+                                const double*   s_prim_info,
+                                const uint32_t* s_prim_aoinds,
+                                const uint32_t  s_prim_count,
+                                const double*   d_prim_info,
+                                const uint32_t* d_prim_aoinds,
+                                const uint32_t  d_prim_count,
+                                const double    sd_max_D,
+                                const double*   mat_D_full_AO,
+                                const uint32_t  naos,
+                                const double*   Q_K_ss,
+                                const double*   Q_K_sd,
+                                const uint32_t* D_inds_K_ss,
+                                const uint32_t* D_inds_K_sd,
+                                const uint32_t* pair_displs_K_ss,
+                                const uint32_t* pair_displs_K_sd,
+                                const uint32_t* pair_counts_K_ss,
+                                const uint32_t* pair_counts_K_sd,
+                                const double*   pair_data_K_ss,
+                                const double*   pair_data_K_sd,
+                                const uint32_t* prim_cart_ao_to_atom_inds,
+                                const uint32_t  natoms,
+                                const double*   boys_func_table,
+                                const double*   boys_func_ft,
+                                const double    omega,
+                                const double    eri_threshold)
+{
+    // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
+
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
+    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ double   delta[3][3];
+    __shared__ uint32_t g0, g1;
+
+    const uint32_t ik = blockIdx.x;
+
+    // we make sure that ik < pair_inds_count_for_K_ss when calling the kernel
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+        g0 = hess_cart_ind_0;
+        g1 = hess_cart_ind_1;
+
+        i = pair_inds_i_for_K_ss[ik];
+        k = pair_inds_k_for_K_ss[ik];
+
+        count_i = pair_counts_K_ss[i];
+        count_k = pair_counts_K_sd[k];
+
+        displ_i = pair_displs_K_ss[i];
+        displ_k = pair_displs_K_sd[k];
+
+        a_i = s_prim_info[i + s_prim_count * 0];
+
+        r_i[0] = s_prim_info[i + s_prim_count * 2];
+        r_i[1] = s_prim_info[i + s_prim_count * 3];
+        r_i[2] = s_prim_info[i + s_prim_count * 4];
+
+        a_k = s_prim_info[k + s_prim_count * 0];
+
+        r_k[0] = s_prim_info[k + s_prim_count * 2];
+        r_k[1] = s_prim_info[k + s_prim_count * 3];
+        r_k[2] = s_prim_info[k + s_prim_count * 4];
+
+        ik_factor_D = (static_cast<double>(i != k) + 1.0) * D_ik_for_K_ss[ik];
+
+    }
+
+    __syncthreads();
+
+    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    {
+        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+
+        // sync threads before starting a new scan
+        __syncthreads();
+
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        uint32_t j_prim, j_cgto;
+
+        if (j < count_i)
+        {
+            Q_ij   = Q_K_ss[displ_i + j];
+
+            j_prim = D_inds_K_ss[displ_i + j];
+
+            j_cgto = s_prim_aoinds[j_prim];
+
+            a_j = s_prim_info[j_prim + s_prim_count * 0];
+
+            r_j[0] = s_prim_info[j_prim + s_prim_count * 2];
+            r_j[1] = s_prim_info[j_prim + s_prim_count * 3];
+            r_j[2] = s_prim_info[j_prim + s_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = pair_data_K_ss[displ_i + j];
+
+
+
+
+        }
+
+        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        {
+            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+
+            // Q_kl == Q_K_sd[displ_k + l]
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_sd[displ_k + l] * sd_max_D) <= eri_threshold))
+            {
+                break;
+            }
+
+            // const auto Q_kl = Q_K_sd[displ_k + l];
+
+            const auto l_prim = D_inds_K_sd[displ_k + l];
+
+            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+
+            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+
+            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
+                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
+                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+
+            const auto S_kl_00 = pair_data_K_sd[displ_k + l];
+
+            const auto d0 = d_cart_inds[l_prim % 6][0];
+            const auto d1 = d_cart_inds[l_prim % 6][1];
+
+            // J. Chem. Phys. 84, 3963-3974 (1986)
+
+            const auto S2 = a_k + a_l;
+
+            const auto inv_S2 = 1.0 / S2;
+            const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
+
+            const auto rho = S1 * S2 * inv_S4;
+
+            double d2 = 1.0;
+
+            if (omega != 0.0) d2 = omega * omega / (rho + omega * omega);
+
+            const auto Lambda = sqrt(4.0 * rho * d2 * MATH_CONST_INV_PI);
+
+            double F4_t[5];
+
+            gpu::computeBoysFunction(F4_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
+
+            if (omega != 0.0)
+            {
+                F4_t[1] *= d2;
+                F4_t[2] *= d2 * d2;
+                F4_t[3] *= d2 * d2 * d2;
+                F4_t[4] *= d2 * d2 * d2 * d2;
+            }
+
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+
+            const auto QC_x = (a_l * inv_S2) * (r_l[g0] - r_k[g0]);
+            const auto QD_y = (-a_k * inv_S2) * (r_l[g1] - r_k[g1]);
+
+            // k-l Hessian
+
+            const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
+                    + F4_t[0] * (
+
+                        2.0 * inv_S2 * a_k * a_l * (
+                            +QD_0*QD_1*delta[g0][g1]
+
+                            +QC_x*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1] + QD_y*delta[d0][d1]) + QD_y*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0])
+                        )
+
+                        + (-1.0) * inv_S2 * a_k * (
+                            +delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0]
+                        )
+
+                        + 4.0 * a_k * a_l * (
+                            +QC_x*QD_0*QD_1*QD_y
+                        )
+
+                        + (-2.0) * a_k * (
+                            +QC_x*QD_0*delta[d1][g1]
+
+                            +QC_x*QD_1*delta[d0][g1]
+                        )
+
+                        + inv_S2 * inv_S2 * a_k * a_l * (
+                            +delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0]
+                        )
+
+                    )
+
+                    + F4_t[1] * (
+
+                        (-2.0) * S1 * inv_S2 * inv_S2 * inv_S4 * a_k * a_l * (
+                            +delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0]
+                        )
+
+                        + (-2.0) * S1 * inv_S2 * inv_S4 * a_k * a_l * (
+                            +delta[g0][g1]*(PQ[d1]*QD_0 + QD_1*(PQ[d0] + QD_0))
+
+                            +PQ[g0]*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1]) + PQ[g1]*(QC_x*delta[d0][d1] + QD_0*delta[d1][g0] + QD_1*delta[d0][g0]) + QC_x*(delta[d0][g1]*(PQ[d1] + QD_1) + delta[d1][g1]*(PQ[d0] + QD_0)) + QD_y*(delta[d0][d1]*(PQ[g0] + QC_x) + delta[d0][g0]*(PQ[d1] + QD_1) + delta[d1][g0]*(PQ[d0] + QD_0))
+                        )
+
+                        + 4.0 * S1 * inv_S4 * a_k * a_l * (
+                            -QC_x*QD_1*(PQ[d0]*QD_y + PQ[g1]*QD_0) - QD_0*QD_y*(PQ[d1]*QC_x + PQ[g0]*QD_1)
+                        )
+
+                        + 2.0 * S1 * inv_S4 * a_k * (
+                            +delta[d1][g1]*(PQ[d0]*QC_x + PQ[g0]*QD_0)
+
+                            +delta[d0][g1]*(PQ[d1]*QC_x + PQ[g0]*QD_1)
+                        )
+
+                        + S1 * inv_S2 * inv_S4 * a_k * (
+                            +delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0]
+                        )
+
+                    )
+
+                    + F4_t[2] * (
+
+                        2.0 * S1 * S1 * inv_S2 * inv_S4 * inv_S4 * a_k * a_l * (
+                            +delta[g0][g1]*(PQ[d0]*(PQ[d1] + QD_1) + PQ[d1]*QD_0)
+
+                            +PQ[g1]*(QC_x*delta[d0][d1] + QD_0*delta[d1][g0] + QD_1*delta[d0][g0]) + delta[d0][g1]*(PQ[d1]*(PQ[g0] + QC_x) + PQ[g0]*QD_1) + delta[d1][g1]*(PQ[d0]*(PQ[g0] + QC_x) + PQ[g0]*QD_0) + (PQ[g1] + QD_y)*(PQ[d0]*delta[d1][g0] + PQ[d1]*delta[d0][g0] + PQ[g0]*delta[d0][d1])
+                        )
+
+                        + 4.0 * S1 * S1 * inv_S4 * inv_S4 * a_k * a_l * (
+                            +PQ[d0]*QC_x*(PQ[d1]*QD_y + PQ[g1]*QD_1) + PQ[d1]*QD_0*(PQ[g0]*QD_y + PQ[g1]*QC_x) + PQ[g0]*QD_1*(PQ[d0]*QD_y + PQ[g1]*QD_0)
+                        )
+
+                        + (-2.0) * S1 * S1 * inv_S4 * inv_S4 * a_k * (
+                            +PQ[d0]*PQ[g0]*delta[d1][g1]
+
+                            +PQ[d1]*PQ[g0]*delta[d0][g1]
+                        )
+
+                        + S1 * S1 * inv_S2 * inv_S2 * inv_S4 * inv_S4 * a_k * a_l * (
+                            +delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0]
+                        )
+
+                    )
+
+                    + F4_t[3] * (
+
+                        (-2.0) * S1 * S1 * S1 * inv_S2 * inv_S4 * inv_S4 * inv_S4 * a_k * a_l * (
+                            +PQ[d0]*PQ[d1]*delta[g0][g1]
+
+                            +PQ[g0]*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1]) + PQ[g1]*(PQ[d0]*delta[d1][g0] + PQ[d1]*delta[d0][g0])
+                        )
+
+                        + 4.0 * S1 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * a_k * a_l * (
+                            -PQ[d0]*PQ[d1]*(PQ[g0]*QD_y + PQ[g1]*QC_x) - PQ[g0]*PQ[g1]*(PQ[d0]*QD_1 + PQ[d1]*QD_0)
+                        )
+
+                    )
+
+                    + F4_t[4] * (
+
+                        4.0 * S1 * S1 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * a_l * (
+                            +PQ[d0]*PQ[d1]*PQ[g0]*PQ[g1]
+                        )
+
+                    )
+
+                    );
+
+            double hess_kl_xy = -eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+
+            atomicAdd(
+                hess_xy + prim_cart_ao_to_atom_inds[k] * natoms + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + l_prim],
+                hess_kl_xy * ik_factor_D * 2.0 * frac_exact_exchange);
+        }
+    }
+
+    __syncthreads();
+}
+
+__global__ void __launch_bounds__(TILE_SIZE_K)
+computeExchangeHessianSSSD_IL_0(double*         hess_xy,
+                                double*         hess_yx,
+                                const uint32_t  hess_cart_ind_0,
+                                const uint32_t  hess_cart_ind_1,
+                                const double    frac_exact_exchange,
+                                const uint32_t* pair_inds_i_for_K_ss,
+                                const uint32_t* pair_inds_k_for_K_ss,
+                                const double*   D_ik_for_K_ss,
+                                const uint32_t  pair_inds_count_for_K_ss,
+                                const double*   s_prim_info,
+                                const uint32_t* s_prim_aoinds,
+                                const uint32_t  s_prim_count,
+                                const double*   d_prim_info,
+                                const uint32_t* d_prim_aoinds,
+                                const uint32_t  d_prim_count,
+                                const double    sd_max_D,
+                                const double*   mat_D_full_AO,
+                                const uint32_t  naos,
+                                const double*   Q_K_ss,
+                                const double*   Q_K_sd,
+                                const uint32_t* D_inds_K_ss,
+                                const uint32_t* D_inds_K_sd,
+                                const uint32_t* pair_displs_K_ss,
+                                const uint32_t* pair_displs_K_sd,
+                                const uint32_t* pair_counts_K_ss,
+                                const uint32_t* pair_counts_K_sd,
+                                const double*   pair_data_K_ss,
+                                const double*   pair_data_K_sd,
+                                const uint32_t* prim_cart_ao_to_atom_inds,
+                                const uint32_t  natoms,
+                                const double*   boys_func_table,
+                                const double*   boys_func_ft,
+                                const double    omega,
+                                const double    eri_threshold)
+{
+    // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
+
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
+    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ double   delta[3][3];
+    __shared__ uint32_t g0, g1;
+
+    const uint32_t ik = blockIdx.x;
+
+    // we make sure that ik < pair_inds_count_for_K_ss when calling the kernel
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+        g0 = hess_cart_ind_0;
+        g1 = hess_cart_ind_1;
+
+        i = pair_inds_i_for_K_ss[ik];
+        k = pair_inds_k_for_K_ss[ik];
+
+        count_i = pair_counts_K_ss[i];
+        count_k = pair_counts_K_sd[k];
+
+        displ_i = pair_displs_K_ss[i];
+        displ_k = pair_displs_K_sd[k];
+
+        a_i = s_prim_info[i + s_prim_count * 0];
+
+        r_i[0] = s_prim_info[i + s_prim_count * 2];
+        r_i[1] = s_prim_info[i + s_prim_count * 3];
+        r_i[2] = s_prim_info[i + s_prim_count * 4];
+
+        a_k = s_prim_info[k + s_prim_count * 0];
+
+        r_k[0] = s_prim_info[k + s_prim_count * 2];
+        r_k[1] = s_prim_info[k + s_prim_count * 3];
+        r_k[2] = s_prim_info[k + s_prim_count * 4];
+
+        ik_factor_D = (static_cast<double>(i != k) + 1.0) * D_ik_for_K_ss[ik];
+
+    }
+
+    __syncthreads();
+
+    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    {
+        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+
+        // sync threads before starting a new scan
+        __syncthreads();
+
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double PA_x;
+        uint32_t j_prim, j_cgto;
+
+        if (j < count_i)
+        {
+            Q_ij   = Q_K_ss[displ_i + j];
+
+            j_prim = D_inds_K_ss[displ_i + j];
+
+            j_cgto = s_prim_aoinds[j_prim];
+
+            a_j = s_prim_info[j_prim + s_prim_count * 0];
+
+            r_j[0] = s_prim_info[j_prim + s_prim_count * 2];
+            r_j[1] = s_prim_info[j_prim + s_prim_count * 3];
+            r_j[2] = s_prim_info[j_prim + s_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = pair_data_K_ss[displ_i + j];
+
+            PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+
+
+
+        }
+
+        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        {
+            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+
+            // Q_kl == Q_K_sd[displ_k + l]
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_sd[displ_k + l] * sd_max_D) <= eri_threshold))
+            {
+                break;
+            }
+
+            // const auto Q_kl = Q_K_sd[displ_k + l];
+
+            const auto l_prim = D_inds_K_sd[displ_k + l];
+
+            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+
+            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+
+            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
+                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
+                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+
+            const auto S_kl_00 = pair_data_K_sd[displ_k + l];
+
+            const auto d0 = d_cart_inds[l_prim % 6][0];
+            const auto d1 = d_cart_inds[l_prim % 6][1];
+
+            // J. Chem. Phys. 84, 3963-3974 (1986)
+
+            const auto S2 = a_k + a_l;
+
+            const auto inv_S2 = 1.0 / S2;
+            const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
+
+            const auto rho = S1 * S2 * inv_S4;
+
+            double d2 = 1.0;
+
+            if (omega != 0.0) d2 = omega * omega / (rho + omega * omega);
+
+            const auto Lambda = sqrt(4.0 * rho * d2 * MATH_CONST_INV_PI);
+
+            double F4_t[5];
+
+            gpu::computeBoysFunction(F4_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
+
+            if (omega != 0.0)
+            {
+                F4_t[1] *= d2;
+                F4_t[2] *= d2 * d2;
+                F4_t[3] *= d2 * d2 * d2;
+                F4_t[4] *= d2 * d2 * d2 * d2;
+            }
+
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+
+            const auto QD_y = (-a_k * inv_S2) * (r_l[g1] - r_k[g1]);
+
+            // i-l Hessian
+
+            const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
+                    + F4_t[0] * (
+
+                        2.0 * inv_S2 * a_i * a_l * (
+                            +PA_x*QD_0*delta[d1][g1]
+
+                            +PA_x*(QD_1*delta[d0][g1] + QD_y*delta[d0][d1])
+                        )
+
+                        + 4.0 * a_i * a_l * (
+                            +PA_x*QD_0*QD_1*QD_y
+                        )
+
+                        + (-2.0) * a_i * (
+                            +PA_x*QD_0*delta[d1][g1]
+
+                            +PA_x*QD_1*delta[d0][g1]
+                        )
+
+                    )
+
+                    + F4_t[1] * (
+
+                        (-2.0) * S1 * inv_S2 * inv_S4 * a_i * a_l * (
+                            +PA_x*delta[d1][g1]*(PQ[d0] + QD_0)
+
+                            +PA_x*(delta[d0][d1]*(PQ[g1] + QD_y) + delta[d0][g1]*(PQ[d1] + QD_1))
+                        )
+
+                        + 2.0 * inv_S4 * a_i * a_l * (
+                            +QD_0*(PQ[g0]*delta[d1][g1] + QD_1*delta[g0][g1] + QD_y*delta[d1][g0]) + QD_1*QD_y*delta[d0][g0]
+
+                            +PQ[g0]*(QD_1*delta[d0][g1] + QD_y*delta[d0][d1])
+                        )
+
+                        + (-1.0) * inv_S4 * a_i * (
+                            +delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0]
+                        )
+
+                        + 4.0 * S1 * inv_S4 * a_i * a_l * (
+                            -PA_x*(PQ[d1]*QD_0*QD_y + QD_1*(PQ[d0]*QD_y + PQ[g1]*QD_0))
+                        )
+
+                        + 4.0 * S2 * inv_S4 * a_i * a_l * (
+                            +PQ[g0]*QD_0*QD_1*QD_y
+                        )
+
+                        + (-2.0) * S2 * inv_S4 * a_i * (
+                            +PQ[g0]*QD_0*delta[d1][g1]
+
+                            +PQ[g0]*QD_1*delta[d0][g1]
+                        )
+
+                        + inv_S2 * inv_S4 * a_i * a_l * (
+                            +delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0]
+                        )
+
+                        + 2.0 * S1 * inv_S4 * a_i * (
+                            +PA_x*PQ[d0]*delta[d1][g1]
+
+                            +PA_x*PQ[d1]*delta[d0][g1]
+                        )
+
+                    )
+
+                    + F4_t[2] * (
+
+                        (-1.0) * S1 * inv_S2 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0]
+                        )
+
+                        + (-2.0) * S1 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +PQ[d0]*(QD_1*delta[g0][g1] + QD_y*delta[d1][g0]) + PQ[d1]*(QD_0*delta[g0][g1] + QD_y*delta[d0][g0]) + PQ[g0]*delta[d1][g1]*(PQ[d0] + QD_0) + PQ[g1]*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0])
+
+                            +PQ[g0]*(delta[d0][d1]*(PQ[g1] + QD_y) + delta[d0][g1]*(PQ[d1] + QD_1))
+                        )
+
+                        + 4.0 * S1 * S1 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +PA_x*(PQ[d0]*(PQ[d1]*QD_y + PQ[g1]*QD_1) + PQ[d1]*PQ[g1]*QD_0)
+                        )
+
+                        + 4.0 * S1 * S2 * inv_S4 * inv_S4 * a_i * a_l * (
+                            -PQ[g0]*(PQ[d1]*QD_0*QD_y + QD_1*(PQ[d0]*QD_y + PQ[g1]*QD_0))
+                        )
+
+                        + 2.0 * S1 * S1 * inv_S2 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +PA_x*PQ[d0]*delta[d1][g1]
+
+                            +PA_x*(PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1])
+                        )
+
+                        + 2.0 * S1 * S2 * inv_S4 * inv_S4 * a_i * (
+                            +PQ[d0]*PQ[g0]*delta[d1][g1]
+
+                            +PQ[d1]*PQ[g0]*delta[d0][g1]
+                        )
+
+                    )
+
+                    + F4_t[3] * (
+
+                        (-4.0) * S1 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +PA_x*PQ[d0]*PQ[d1]*PQ[g1]
+                        )
+
+                        + 4.0 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +PQ[g0]*(PQ[d0]*(PQ[d1]*QD_y + PQ[g1]*QD_1) + PQ[d1]*PQ[g1]*QD_0)
+                        )
+
+                        + 2.0 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +PQ[d0]*PQ[d1]*delta[g0][g1]
+
+                            +PQ[g0]*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1]) + PQ[g1]*(PQ[d0]*delta[d1][g0] + PQ[d1]*delta[d0][g0])
+                        )
+
+                    )
+
+                    + F4_t[4] * (
+
+                        (-4.0) * S1 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +PQ[d0]*PQ[d1]*PQ[g0]*PQ[g1]
+                        )
+
+                    )
+
+                    );
+
+            double hess_il_xy = -eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+
+            atomicAdd(
+                hess_xy + prim_cart_ao_to_atom_inds[i] * natoms + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + l_prim],
+                hess_il_xy * ik_factor_D * frac_exact_exchange);
+
+            atomicAdd(
+                hess_yx + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + l_prim] * natoms + prim_cart_ao_to_atom_inds[i],
+                hess_il_xy * ik_factor_D * frac_exact_exchange);
+        }
+    }
+
+    __syncthreads();
+}
+
+__global__ void __launch_bounds__(TILE_SIZE_K)
+computeExchangeHessianSSSD_JK_0(double*         hess_xy,
+                                double*         hess_yx,
+                                const uint32_t  hess_cart_ind_0,
+                                const uint32_t  hess_cart_ind_1,
+                                const double    frac_exact_exchange,
+                                const uint32_t* pair_inds_i_for_K_ss,
+                                const uint32_t* pair_inds_k_for_K_ss,
+                                const double*   D_ik_for_K_ss,
+                                const uint32_t  pair_inds_count_for_K_ss,
+                                const double*   s_prim_info,
+                                const uint32_t* s_prim_aoinds,
+                                const uint32_t  s_prim_count,
+                                const double*   d_prim_info,
+                                const uint32_t* d_prim_aoinds,
+                                const uint32_t  d_prim_count,
+                                const double    sd_max_D,
+                                const double*   mat_D_full_AO,
+                                const uint32_t  naos,
+                                const double*   Q_K_ss,
+                                const double*   Q_K_sd,
+                                const uint32_t* D_inds_K_ss,
+                                const uint32_t* D_inds_K_sd,
+                                const uint32_t* pair_displs_K_ss,
+                                const uint32_t* pair_displs_K_sd,
+                                const uint32_t* pair_counts_K_ss,
+                                const uint32_t* pair_counts_K_sd,
+                                const double*   pair_data_K_ss,
+                                const double*   pair_data_K_sd,
+                                const uint32_t* prim_cart_ao_to_atom_inds,
+                                const uint32_t  natoms,
+                                const double*   boys_func_table,
+                                const double*   boys_func_ft,
+                                const double    omega,
+                                const double    eri_threshold)
+{
+    // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
+
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
+    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ double   delta[3][3];
+    __shared__ uint32_t g0, g1;
+
+    const uint32_t ik = blockIdx.x;
+
+    // we make sure that ik < pair_inds_count_for_K_ss when calling the kernel
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+        g0 = hess_cart_ind_0;
+        g1 = hess_cart_ind_1;
+
+        i = pair_inds_i_for_K_ss[ik];
+        k = pair_inds_k_for_K_ss[ik];
+
+        count_i = pair_counts_K_ss[i];
+        count_k = pair_counts_K_sd[k];
+
+        displ_i = pair_displs_K_ss[i];
+        displ_k = pair_displs_K_sd[k];
+
+        a_i = s_prim_info[i + s_prim_count * 0];
+
+        r_i[0] = s_prim_info[i + s_prim_count * 2];
+        r_i[1] = s_prim_info[i + s_prim_count * 3];
+        r_i[2] = s_prim_info[i + s_prim_count * 4];
+
+        a_k = s_prim_info[k + s_prim_count * 0];
+
+        r_k[0] = s_prim_info[k + s_prim_count * 2];
+        r_k[1] = s_prim_info[k + s_prim_count * 3];
+        r_k[2] = s_prim_info[k + s_prim_count * 4];
+
+        ik_factor_D = (static_cast<double>(i != k) + 1.0) * D_ik_for_K_ss[ik];
+
+    }
+
+    __syncthreads();
+
+    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    {
+        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+
+        // sync threads before starting a new scan
+        __syncthreads();
+
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double PB_x;
+        uint32_t j_prim, j_cgto;
+
+        if (j < count_i)
+        {
+            Q_ij   = Q_K_ss[displ_i + j];
+
+            j_prim = D_inds_K_ss[displ_i + j];
+
+            j_cgto = s_prim_aoinds[j_prim];
+
+            a_j = s_prim_info[j_prim + s_prim_count * 0];
+
+            r_j[0] = s_prim_info[j_prim + s_prim_count * 2];
+            r_j[1] = s_prim_info[j_prim + s_prim_count * 3];
+            r_j[2] = s_prim_info[j_prim + s_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = pair_data_K_ss[displ_i + j];
+
+            PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+
+
+
+        }
+
+        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        {
+            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+
+            // Q_kl == Q_K_sd[displ_k + l]
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_sd[displ_k + l] * sd_max_D) <= eri_threshold))
+            {
+                break;
+            }
+
+            // const auto Q_kl = Q_K_sd[displ_k + l];
+
+            const auto l_prim = D_inds_K_sd[displ_k + l];
+
+            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+
+            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+
+            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
+                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
+                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+
+            const auto S_kl_00 = pair_data_K_sd[displ_k + l];
+
+            const auto d0 = d_cart_inds[l_prim % 6][0];
+            const auto d1 = d_cart_inds[l_prim % 6][1];
+
+            // J. Chem. Phys. 84, 3963-3974 (1986)
+
+            const auto S2 = a_k + a_l;
+
+            const auto inv_S2 = 1.0 / S2;
+            const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
+
+            const auto rho = S1 * S2 * inv_S4;
+
+            double d2 = 1.0;
+
+            if (omega != 0.0) d2 = omega * omega / (rho + omega * omega);
+
+            const auto Lambda = sqrt(4.0 * rho * d2 * MATH_CONST_INV_PI);
+
+            double F4_t[5];
+
+            gpu::computeBoysFunction(F4_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
+
+            if (omega != 0.0)
+            {
+                F4_t[1] *= d2;
+                F4_t[2] *= d2 * d2;
+                F4_t[3] *= d2 * d2 * d2;
+                F4_t[4] *= d2 * d2 * d2 * d2;
+            }
+
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+
+            const auto QC_y = (a_l * inv_S2) * (r_l[g1] - r_k[g1]);
+
+            // j-k Hessian
+
+            const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
+                    + F4_t[0] * (
+
+                        2.0 * inv_S2 * a_j * a_k * (
+                            +PB_x*QD_0*delta[d1][g1]
+
+                            +PB_x*(QC_y*delta[d0][d1] + QD_1*delta[d0][g1])
+                        )
+
+                        + 4.0 * a_j * a_k * (
+                            +PB_x*QC_y*QD_0*QD_1
+                        )
+
+                    )
+
+                    + F4_t[1] * (
+
+                        (-2.0) * S1 * inv_S2 * inv_S4 * a_j * a_k * (
+                            +PB_x*delta[d1][g1]*(PQ[d0] + QD_0)
+
+                            +PB_x*(delta[d0][d1]*(PQ[g1] + QC_y) + delta[d0][g1]*(PQ[d1] + QD_1))
+                        )
+
+                        + 2.0 * inv_S4 * a_j * a_k * (
+                            +QC_y*QD_1*delta[d0][g0] + QD_0*(PQ[g0]*delta[d1][g1] + QC_y*delta[d1][g0] + QD_1*delta[g0][g1])
+
+                            +PQ[g0]*(QC_y*delta[d0][d1] + QD_1*delta[d0][g1])
+                        )
+
+                        + 4.0 * S1 * inv_S4 * a_j * a_k * (
+                            -PB_x*(PQ[g1]*QD_0*QD_1 + QC_y*(PQ[d0]*QD_1 + PQ[d1]*QD_0))
+                        )
+
+                        + 4.0 * S2 * inv_S4 * a_j * a_k * (
+                            +PQ[g0]*QC_y*QD_0*QD_1
+                        )
+
+                        + inv_S2 * inv_S4 * a_j * a_k * (
+                            +delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0]
+                        )
+
+                    )
+
+                    + F4_t[2] * (
+
+                        (-1.0) * S1 * inv_S2 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0]
+                        )
+
+                        + 2.0 * S1 * S1 * inv_S2 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +PB_x*PQ[d0]*delta[d1][g1]
+
+                            +PB_x*(PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1])
+                        )
+
+                        + (-2.0) * S1 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +PQ[d0]*(QC_y*delta[d1][g0] + QD_1*delta[g0][g1]) + PQ[d1]*(QC_y*delta[d0][g0] + QD_0*delta[g0][g1]) + PQ[g0]*delta[d1][g1]*(PQ[d0] + QD_0) + PQ[g1]*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0])
+
+                            +PQ[g0]*(delta[d0][d1]*(PQ[g1] + QC_y) + delta[d0][g1]*(PQ[d1] + QD_1))
+                        )
+
+                        + 4.0 * S1 * S1 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +PB_x*(PQ[d0]*(PQ[d1]*QC_y + PQ[g1]*QD_1) + PQ[d1]*PQ[g1]*QD_0)
+                        )
+
+                        + 4.0 * S1 * S2 * inv_S4 * inv_S4 * a_j * a_k * (
+                            -PQ[g0]*(PQ[g1]*QD_0*QD_1 + QC_y*(PQ[d0]*QD_1 + PQ[d1]*QD_0))
+                        )
+
+                    )
+
+                    + F4_t[3] * (
+
+                        4.0 * S1 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * a_j * a_k * (
+                            -PB_x*PQ[d0]*PQ[d1]*PQ[g1]
+                        )
+
+                        + 4.0 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +PQ[g0]*(PQ[d0]*(PQ[d1]*QC_y + PQ[g1]*QD_1) + PQ[d1]*PQ[g1]*QD_0)
+                        )
+
+                        + 2.0 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +PQ[d0]*PQ[d1]*delta[g0][g1]
+
+                            +PQ[g0]*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1]) + PQ[g1]*(PQ[d0]*delta[d1][g0] + PQ[d1]*delta[d0][g0])
+                        )
+
+                    )
+
+                    + F4_t[4] * (
+
+                        (-4.0) * S1 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +PQ[d0]*PQ[d1]*PQ[g0]*PQ[g1]
+                        )
+
+                    )
+
+                    );
+
+            double hess_jk_xy = -eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+
+            atomicAdd(
+                hess_xy + prim_cart_ao_to_atom_inds[j_prim] * natoms + prim_cart_ao_to_atom_inds[k],
+                hess_jk_xy * ik_factor_D * frac_exact_exchange);
+
+            atomicAdd(
+                hess_yx + prim_cart_ao_to_atom_inds[k] * natoms + prim_cart_ao_to_atom_inds[j_prim],
+                hess_jk_xy * ik_factor_D * frac_exact_exchange);
+        }
+    }
+
+    __syncthreads();
+}
+
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeHessianSPSS_II_0(double*         hess_xy,
                                 const uint32_t  hess_cart_ind_0,
                                 const uint32_t  hess_cart_ind_1,
@@ -7728,6 +10030,12855 @@ computeExchangeHessianSPSP_JK_0(double*         hess_xy,
 
             atomicAdd(
                 hess_yx + prim_cart_ao_to_atom_inds[k] * natoms + prim_cart_ao_to_atom_inds[s_prim_count + j_prim],
+                hess_jk_xy * ik_factor_D * frac_exact_exchange);
+        }
+    }
+
+    __syncthreads();
+}
+
+__global__ void __launch_bounds__(TILE_SIZE_K)
+computeExchangeHessianSPSD_II_0(double*         hess_xy,
+                                const uint32_t  hess_cart_ind_0,
+                                const uint32_t  hess_cart_ind_1,
+                                const double    frac_exact_exchange,
+                                const uint32_t* pair_inds_i_for_K_ss,
+                                const uint32_t* pair_inds_k_for_K_ss,
+                                const double*   D_ik_for_K_ss,
+                                const uint32_t  pair_inds_count_for_K_ss,
+                                const double*   s_prim_info,
+                                const uint32_t* s_prim_aoinds,
+                                const uint32_t  s_prim_count,
+                                const double*   p_prim_info,
+                                const uint32_t* p_prim_aoinds,
+                                const uint32_t  p_prim_count,
+                                const double*   d_prim_info,
+                                const uint32_t* d_prim_aoinds,
+                                const uint32_t  d_prim_count,
+                                const double    pd_max_D,
+                                const double*   mat_D_full_AO,
+                                const uint32_t  naos,
+                                const double*   Q_K_sp,
+                                const double*   Q_K_sd,
+                                const uint32_t* D_inds_K_sp,
+                                const uint32_t* D_inds_K_sd,
+                                const uint32_t* pair_displs_K_sp,
+                                const uint32_t* pair_displs_K_sd,
+                                const uint32_t* pair_counts_K_sp,
+                                const uint32_t* pair_counts_K_sd,
+                                const double*   pair_data_K_sp,
+                                const double*   pair_data_K_sd,
+                                const uint32_t* prim_cart_ao_to_atom_inds,
+                                const double*   boys_func_table,
+                                const double*   boys_func_ft,
+                                const double    omega,
+                                const double    eri_threshold)
+{
+    // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
+
+    __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
+    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ double   delta[3][3];
+    __shared__ uint32_t g0, g1;
+
+    const uint32_t ik = blockIdx.x;
+
+    // we make sure that ik < pair_inds_count_for_K_ss when calling the kernel
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+        g0 = hess_cart_ind_0;
+        g1 = hess_cart_ind_1;
+
+        i = pair_inds_i_for_K_ss[ik];
+        k = pair_inds_k_for_K_ss[ik];
+
+        count_i = pair_counts_K_sp[i];
+        count_k = pair_counts_K_sd[k];
+
+        displ_i = pair_displs_K_sp[i];
+        displ_k = pair_displs_K_sd[k];
+
+        a_i = s_prim_info[i + s_prim_count * 0];
+
+        r_i[0] = s_prim_info[i + s_prim_count * 2];
+        r_i[1] = s_prim_info[i + s_prim_count * 3];
+        r_i[2] = s_prim_info[i + s_prim_count * 4];
+
+        a_k = s_prim_info[k + s_prim_count * 0];
+
+        r_k[0] = s_prim_info[k + s_prim_count * 2];
+        r_k[1] = s_prim_info[k + s_prim_count * 3];
+        r_k[2] = s_prim_info[k + s_prim_count * 4];
+
+        ik_factor_D = (static_cast<double>(i != k) + 1.0) * D_ik_for_K_ss[ik];
+
+    }
+
+    __syncthreads();
+
+    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    {
+        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+
+        // sync threads before starting a new scan
+        __syncthreads();
+
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double PB_0, PA_x, PA_y;
+        uint32_t j_prim, j_cgto, b0;
+
+        if (j < count_i)
+        {
+            Q_ij   = Q_K_sp[displ_i + j];
+
+            j_prim = D_inds_K_sp[displ_i + j];
+
+            j_cgto = p_prim_aoinds[(j_prim / 3) + p_prim_count * (j_prim % 3)];
+
+            a_j = p_prim_info[j_prim / 3 + p_prim_count * 0];
+
+            r_j[0] = p_prim_info[j_prim / 3 + p_prim_count * 2];
+            r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
+            r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = pair_data_K_sp[displ_i + j];
+
+            PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+            PA_y = (a_j  * inv_S1) * (r_j[g1] - r_i[g1]);
+
+            b0 = j_prim % 3;
+
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+
+        }
+
+        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        {
+            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+
+            // Q_kl == Q_K_sd[displ_k + l]
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_sd[displ_k + l] * pd_max_D) <= eri_threshold))
+            {
+                break;
+            }
+
+            // const auto Q_kl = Q_K_sd[displ_k + l];
+
+            const auto l_prim = D_inds_K_sd[displ_k + l];
+
+            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+
+            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+
+            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
+                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
+                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+
+            const auto S_kl_00 = pair_data_K_sd[displ_k + l];
+
+            const auto d0 = d_cart_inds[l_prim % 6][0];
+            const auto d1 = d_cart_inds[l_prim % 6][1];
+
+            // J. Chem. Phys. 84, 3963-3974 (1986)
+
+            const auto S2 = a_k + a_l;
+
+            const auto inv_S2 = 1.0 / S2;
+            const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
+
+            const auto rho = S1 * S2 * inv_S4;
+
+            double d2 = 1.0;
+
+            if (omega != 0.0) d2 = omega * omega / (rho + omega * omega);
+
+            const auto Lambda = sqrt(4.0 * rho * d2 * MATH_CONST_INV_PI);
+
+            double F5_t[6];
+
+            gpu::computeBoysFunction(F5_t, rho * d2 * r2_PQ, 5, boys_func_table, boys_func_ft);
+
+            if (omega != 0.0)
+            {
+                F5_t[1] *= d2;
+                F5_t[2] *= d2 * d2;
+                F5_t[3] *= d2 * d2 * d2;
+                F5_t[4] *= d2 * d2 * d2 * d2;
+                F5_t[5] *= d2 * d2 * d2 * d2 * d2;
+            }
+
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+
+            // i-i Hessian
+
+            const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
+                    + F5_t[0] * (
+
+                        inv_S1 * inv_S2 * a_i * a_i * (
+                            +PB_0*delta[d0][d1]*delta[g0][g1]
+
+                            +delta[d0][d1]*(PA_x*delta[b0][g1] + PA_y*delta[b0][g0])
+                        )
+
+                        + 2.0 * inv_S1 * a_i * a_i * (
+                            +PB_0*QD_0*QD_1*delta[g0][g1]
+
+                            +QD_0*QD_1*(PA_x*delta[b0][g1] + PA_y*delta[b0][g0])
+                        )
+
+                        + 2.0 * inv_S2 * a_i * a_i * (
+                            +PA_x*PA_y*PB_0*delta[d0][d1]
+                        )
+
+                        + (-1.0) * inv_S2 * a_i * (
+                            +PB_0*delta[d0][d1]*delta[g0][g1]
+                        )
+
+                        + 4.0 * a_i * a_i * (
+                            +PA_x*PA_y*PB_0*QD_0*QD_1
+                        )
+
+                        + (-2.0) * a_i * (
+                            +PB_0*QD_0*QD_1*delta[g0][g1]
+                        )
+
+                    )
+
+                    + F5_t[1] * (
+
+                        inv_S1 * inv_S4 * a_i * a_i * (
+                            +delta[d0][d1]*delta[g0][g1]*(-PB_0 + PQ[b0])
+
+                            +delta[d0][d1]*(delta[b0][g0]*(-PA_y + PQ[g1]) + delta[b0][g1]*(-PA_x + PQ[g0]))
+
+                            +QD_0*(delta[b0][d1]*delta[g0][g1] + delta[b0][g0]*delta[d1][g1] + delta[b0][g1]*delta[d1][g0]) + QD_1*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0])
+                        )
+
+                        + (-1.0) * inv_S2 * inv_S4 * a_i * a_i * (
+                            +PB_0*delta[d0][d1]*delta[g0][g1]
+
+                            +delta[d0][d1]*(PA_x*delta[b0][g1] + PA_y*delta[b0][g0])
+                        )
+
+                        + (-2.0) * S1 * inv_S2 * inv_S4 * a_i * a_i * (
+                            +PA_x*PA_y*PB_0*delta[d0][d1]
+                        )
+
+                        + S1 * inv_S2 * inv_S4 * a_i * (
+                            +PB_0*delta[d0][d1]*delta[g0][g1]
+                        )
+
+                        + 2.0 * S2 * inv_S1 * inv_S4 * a_i * a_i * (
+                            +QD_0*QD_1*delta[g0][g1]*(-PB_0 + PQ[b0])
+
+                            +QD_0*QD_1*(delta[b0][g0]*(-PA_y + PQ[g1]) + delta[b0][g1]*(-PA_x + PQ[g0]))
+                        )
+
+                        + 2.0 * inv_S4 * a_i * a_i * (
+                            +delta[d0][d1]*(PA_x*(PA_y*PQ[b0] + PB_0*PQ[g1]) + PA_y*PB_0*PQ[g0])
+
+                            +PA_x*(PA_y*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0]) + PB_0*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1])) + PA_y*PB_0*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0])
+
+                            -(PQ[d0]*QD_1 + PQ[d1]*QD_0)*(PA_x*delta[b0][g1] + PA_y*delta[b0][g0] + PB_0*delta[g0][g1])
+                        )
+
+                        + (-1.0) * inv_S4 * a_i * (
+                            +delta[g0][g1]*(PQ[b0]*delta[d0][d1] + QD_0*delta[b0][d1] + QD_1*delta[b0][d0])
+                        )
+
+                        + 4.0 * S1 * inv_S4 * a_i * a_i * (
+                            -PA_x*PA_y*PB_0*(PQ[d0]*QD_1 + PQ[d1]*QD_0)
+                        )
+
+                        + 2.0 * S1 * inv_S4 * a_i * (
+                            +PB_0*delta[g0][g1]*(PQ[d0]*QD_1 + PQ[d1]*QD_0)
+                        )
+
+                        + 4.0 * S2 * inv_S4 * a_i * a_i * (
+                            +QD_0*QD_1*(PA_x*(PA_y*PQ[b0] + PB_0*PQ[g1]) + PA_y*PB_0*PQ[g0])
+                        )
+
+                        + (-2.0) * S2 * inv_S4 * a_i * (
+                            +PQ[b0]*QD_0*QD_1*delta[g0][g1]
+                        )
+
+                    )
+
+                    + F5_t[2] * (
+
+                        (-1.0) * S2 * inv_S1 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +PQ[b0]*delta[d0][d1]*delta[g0][g1]
+
+                            +delta[d0][d1]*(PQ[g0]*delta[b0][g1] + PQ[g1]*delta[b0][g0])
+
+                            +QD_0*(delta[b0][d1]*delta[g0][g1] + delta[b0][g0]*delta[d1][g1] + delta[b0][g1]*delta[d1][g0]) + QD_1*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0])
+                        )
+
+                        + inv_S4 * inv_S4 * a_i * a_i * (
+                            +delta[d0][d1]*delta[g0][g1]*(PB_0 - PQ[b0])
+
+                            +PA_x*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1]) + PA_y*(delta[b0][d0]*delta[d1][g0] + delta[b0][d1]*delta[d0][g0]) + PB_0*(delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+
+                            -PQ[d0]*(delta[b0][d1]*delta[g0][g1] + delta[b0][g0]*delta[d1][g1] + delta[b0][g1]*delta[d1][g0]) - PQ[d1]*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0])
+
+                            +delta[d0][d1]*(delta[b0][g0]*(PA_y - PQ[g1]) + delta[b0][g1]*(PA_x - PQ[g0]))
+                        )
+
+                        + 2.0 * S1 * inv_S4 * inv_S4 * a_i * a_i * (
+                            -PA_x*PB_0*PQ[d0]*delta[d1][g1]
+
+                            -PA_y*(PA_x*(PQ[d0]*delta[b0][d1] + PQ[d1]*delta[b0][d0]) + PB_0*PQ[d0]*delta[d1][g0]) - PB_0*PQ[d1]*(PA_x*delta[d0][g1] + PA_y*delta[d0][g0])
+
+                            -delta[d0][d1]*(PA_x*(PA_y*PQ[b0] + PB_0*PQ[g1]) + PA_y*PB_0*PQ[g0])
+
+                            +PQ[d0]*PQ[d1]*(PA_x*delta[b0][g1] + PA_y*delta[b0][g0] + PB_0*delta[g0][g1])
+                        )
+
+                        + (-2.0) * S2 * S2 * inv_S1 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +PQ[b0]*QD_0*QD_1*delta[g0][g1]
+
+                            +QD_0*QD_1*(PQ[g0]*delta[b0][g1] + PQ[g1]*delta[b0][g0])
+                        )
+
+                        + 2.0 * S2 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +delta[g0][g1]*(PB_0 - PQ[b0])*(PQ[d0]*QD_1 + PQ[d1]*QD_0)
+
+                            +delta[d0][d1]*(PB_0*PQ[g0]*PQ[g1] + PQ[b0]*(PA_x*PQ[g1] + PA_y*PQ[g0]))
+
+                            +PA_x*(PQ[b0]*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1]) + PQ[g1]*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0])) + PA_y*(PQ[b0]*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0]) + PQ[g0]*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0])) + PB_0*(PQ[g0]*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1]) + PQ[g1]*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0]))
+
+                            +(PQ[d0]*QD_1 + PQ[d1]*QD_0)*(delta[b0][g0]*(PA_y - PQ[g1]) + delta[b0][g1]*(PA_x - PQ[g0]))
+                        )
+
+                        + 4.0 * S1 * S1 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +PA_x*PA_y*PB_0*PQ[d0]*PQ[d1]
+                        )
+
+                        + (-2.0) * S1 * S1 * inv_S4 * inv_S4 * a_i * (
+                            +PB_0*PQ[d0]*PQ[d1]*delta[g0][g1]
+                        )
+
+                        + 4.0 * S1 * S2 * inv_S4 * inv_S4 * a_i * a_i * (
+                            -(PA_x*(PA_y*PQ[b0] + PB_0*PQ[g1]) + PA_y*PB_0*PQ[g0])*(PQ[d0]*QD_1 + PQ[d1]*QD_0)
+                        )
+
+                        + 2.0 * S1 * S2 * inv_S4 * inv_S4 * a_i * (
+                            +PQ[b0]*delta[g0][g1]*(PQ[d0]*QD_1 + PQ[d1]*QD_0)
+                        )
+
+                        + 4.0 * S2 * S2 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +QD_0*QD_1*(PB_0*PQ[g0]*PQ[g1] + PQ[b0]*(PA_x*PQ[g1] + PA_y*PQ[g0]))
+                        )
+
+                        + S1 * inv_S4 * inv_S4 * a_i * (
+                            +PQ[b0]*delta[d0][d1]*delta[g0][g1]
+
+                            +delta[g0][g1]*(PQ[d0]*delta[b0][d1] + PQ[d1]*delta[b0][d0])
+                        )
+
+                    )
+
+                    + F5_t[3] * (
+
+                        2.0 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +PQ[d0]*PQ[d1]*delta[g0][g1]*(-PB_0 + PQ[b0])
+
+                            -PA_x*(PQ[b0]*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1]) + PQ[g1]*(PQ[d0]*delta[b0][d1] + PQ[d1]*delta[b0][d0])) - PA_y*(PQ[b0]*(PQ[d0]*delta[d1][g0] + PQ[d1]*delta[d0][g0]) + PQ[g0]*(PQ[d0]*delta[b0][d1] + PQ[d1]*delta[b0][d0])) - PB_0*(PQ[d0]*(PQ[g0]*delta[d1][g1] + PQ[g1]*delta[d1][g0]) + PQ[d1]*(PQ[g0]*delta[d0][g1] + PQ[g1]*delta[d0][g0]))
+
+                            -delta[d0][d1]*(PB_0*PQ[g0]*PQ[g1] + PQ[b0]*(PA_x*PQ[g1] + PA_y*PQ[g0]))
+
+                            +PQ[d0]*PQ[d1]*(delta[b0][g0]*(-PA_y + PQ[g1]) + delta[b0][g1]*(-PA_x + PQ[g0]))
+                        )
+
+                        + 2.0 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +PQ[b0]*delta[g0][g1]*(PQ[d0]*QD_1 + PQ[d1]*QD_0)
+
+                            +PQ[b0]*(PQ[g0]*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1]) + PQ[g1]*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0])) + PQ[g0]*PQ[g1]*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0])
+
+                            +(PQ[d0]*QD_1 + PQ[d1]*QD_0)*(PQ[g0]*delta[b0][g1] + PQ[g1]*delta[b0][g0])
+
+                            +PQ[b0]*PQ[g0]*PQ[g1]*delta[d0][d1]
+                        )
+
+                        + 4.0 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +PQ[d0]*PQ[d1]*(PA_x*(PA_y*PQ[b0] + PB_0*PQ[g1]) + PA_y*PB_0*PQ[g0])
+                        )
+
+                        + (-2.0) * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * (
+                            +PQ[b0]*PQ[d0]*PQ[d1]*delta[g0][g1]
+                        )
+
+                        + 4.0 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_i * (
+                            -(PQ[d0]*QD_1 + PQ[d1]*QD_0)*(PB_0*PQ[g0]*PQ[g1] + PQ[b0]*(PA_x*PQ[g1] + PA_y*PQ[g0]))
+                        )
+
+                        + 4.0 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +PQ[b0]*PQ[g0]*PQ[g1]*QD_0*QD_1
+                        )
+
+                        + S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +PQ[b0]*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+
+                            +PQ[d0]*(delta[b0][d1]*delta[g0][g1] + delta[b0][g0]*delta[d1][g1] + delta[b0][g1]*delta[d1][g0]) + PQ[d1]*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0]) + PQ[g0]*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1]) + PQ[g1]*(delta[b0][d0]*delta[d1][g0] + delta[b0][d1]*delta[d0][g0] + delta[b0][g0]*delta[d0][d1])
+                        )
+
+                    )
+
+                    + F5_t[4] * (
+
+                        (-2.0) * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +PQ[b0]*PQ[d0]*PQ[d1]*delta[g0][g1]
+
+                            +PQ[g0]*(PQ[b0]*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1]) + PQ[d0]*PQ[d1]*delta[b0][g1]) + PQ[g1]*(PQ[d0]*(PQ[b0]*delta[d1][g0] + PQ[d1]*delta[b0][g0] + PQ[g0]*delta[b0][d1]) + PQ[d1]*(PQ[b0]*delta[d0][g0] + PQ[g0]*delta[b0][d0]))
+                        )
+
+                        + 4.0 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +PQ[d0]*PQ[d1]*(PB_0*PQ[g0]*PQ[g1] + PQ[b0]*(PA_x*PQ[g1] + PA_y*PQ[g0]))
+                        )
+
+                        + 4.0 * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_i * (
+                            -PQ[b0]*PQ[g0]*PQ[g1]*(PQ[d0]*QD_1 + PQ[d1]*QD_0)
+                        )
+
+                    )
+
+                    + F5_t[5] * (
+
+                        4.0 * S1 * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +PQ[b0]*PQ[d0]*PQ[d1]*PQ[g0]*PQ[g1]
+                        )
+
+                    )
+
+                    );
+
+            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+        }
+    }
+
+    __syncthreads();
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_ss))
+    {
+        double hess_ii_xy = 0.0;
+
+        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        {
+            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            {
+                hess_ii_xy += ERIs[y][x];
+            }
+        }
+
+        atomicAdd(hess_xy + prim_cart_ao_to_atom_inds[i], hess_ii_xy * ik_factor_D * 2.0 * frac_exact_exchange);
+    }
+}
+
+__global__ void __launch_bounds__(TILE_SIZE_K)
+computeExchangeHessianSPSD_KK_0(double*         hess_xy,
+                                const uint32_t  hess_cart_ind_0,
+                                const uint32_t  hess_cart_ind_1,
+                                const double    frac_exact_exchange,
+                                const uint32_t* pair_inds_i_for_K_ss,
+                                const uint32_t* pair_inds_k_for_K_ss,
+                                const double*   D_ik_for_K_ss,
+                                const uint32_t  pair_inds_count_for_K_ss,
+                                const double*   s_prim_info,
+                                const uint32_t* s_prim_aoinds,
+                                const uint32_t  s_prim_count,
+                                const double*   p_prim_info,
+                                const uint32_t* p_prim_aoinds,
+                                const uint32_t  p_prim_count,
+                                const double*   d_prim_info,
+                                const uint32_t* d_prim_aoinds,
+                                const uint32_t  d_prim_count,
+                                const double    pd_max_D,
+                                const double*   mat_D_full_AO,
+                                const uint32_t  naos,
+                                const double*   Q_K_sp,
+                                const double*   Q_K_sd,
+                                const uint32_t* D_inds_K_sp,
+                                const uint32_t* D_inds_K_sd,
+                                const uint32_t* pair_displs_K_sp,
+                                const uint32_t* pair_displs_K_sd,
+                                const uint32_t* pair_counts_K_sp,
+                                const uint32_t* pair_counts_K_sd,
+                                const double*   pair_data_K_sp,
+                                const double*   pair_data_K_sd,
+                                const uint32_t* prim_cart_ao_to_atom_inds,
+                                const double*   boys_func_table,
+                                const double*   boys_func_ft,
+                                const double    omega,
+                                const double    eri_threshold)
+{
+    // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
+
+    __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
+    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ double   delta[3][3];
+    __shared__ uint32_t g0, g1;
+
+    const uint32_t ik = blockIdx.x;
+
+    // we make sure that ik < pair_inds_count_for_K_ss when calling the kernel
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+        g0 = hess_cart_ind_0;
+        g1 = hess_cart_ind_1;
+
+        i = pair_inds_i_for_K_ss[ik];
+        k = pair_inds_k_for_K_ss[ik];
+
+        count_i = pair_counts_K_sp[i];
+        count_k = pair_counts_K_sd[k];
+
+        displ_i = pair_displs_K_sp[i];
+        displ_k = pair_displs_K_sd[k];
+
+        a_i = s_prim_info[i + s_prim_count * 0];
+
+        r_i[0] = s_prim_info[i + s_prim_count * 2];
+        r_i[1] = s_prim_info[i + s_prim_count * 3];
+        r_i[2] = s_prim_info[i + s_prim_count * 4];
+
+        a_k = s_prim_info[k + s_prim_count * 0];
+
+        r_k[0] = s_prim_info[k + s_prim_count * 2];
+        r_k[1] = s_prim_info[k + s_prim_count * 3];
+        r_k[2] = s_prim_info[k + s_prim_count * 4];
+
+        ik_factor_D = (static_cast<double>(i != k) + 1.0) * D_ik_for_K_ss[ik];
+
+    }
+
+    __syncthreads();
+
+    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    {
+        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+
+        // sync threads before starting a new scan
+        __syncthreads();
+
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double PB_0;
+        uint32_t j_prim, j_cgto, b0;
+
+        if (j < count_i)
+        {
+            Q_ij   = Q_K_sp[displ_i + j];
+
+            j_prim = D_inds_K_sp[displ_i + j];
+
+            j_cgto = p_prim_aoinds[(j_prim / 3) + p_prim_count * (j_prim % 3)];
+
+            a_j = p_prim_info[j_prim / 3 + p_prim_count * 0];
+
+            r_j[0] = p_prim_info[j_prim / 3 + p_prim_count * 2];
+            r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
+            r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = pair_data_K_sp[displ_i + j];
+
+
+            b0 = j_prim % 3;
+
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+
+        }
+
+        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        {
+            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+
+            // Q_kl == Q_K_sd[displ_k + l]
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_sd[displ_k + l] * pd_max_D) <= eri_threshold))
+            {
+                break;
+            }
+
+            // const auto Q_kl = Q_K_sd[displ_k + l];
+
+            const auto l_prim = D_inds_K_sd[displ_k + l];
+
+            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+
+            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+
+            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
+                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
+                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+
+            const auto S_kl_00 = pair_data_K_sd[displ_k + l];
+
+            const auto d0 = d_cart_inds[l_prim % 6][0];
+            const auto d1 = d_cart_inds[l_prim % 6][1];
+
+            // J. Chem. Phys. 84, 3963-3974 (1986)
+
+            const auto S2 = a_k + a_l;
+
+            const auto inv_S2 = 1.0 / S2;
+            const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
+
+            const auto rho = S1 * S2 * inv_S4;
+
+            double d2 = 1.0;
+
+            if (omega != 0.0) d2 = omega * omega / (rho + omega * omega);
+
+            const auto Lambda = sqrt(4.0 * rho * d2 * MATH_CONST_INV_PI);
+
+            double F5_t[6];
+
+            gpu::computeBoysFunction(F5_t, rho * d2 * r2_PQ, 5, boys_func_table, boys_func_ft);
+
+            if (omega != 0.0)
+            {
+                F5_t[1] *= d2;
+                F5_t[2] *= d2 * d2;
+                F5_t[3] *= d2 * d2 * d2;
+                F5_t[4] *= d2 * d2 * d2 * d2;
+                F5_t[5] *= d2 * d2 * d2 * d2 * d2;
+            }
+
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+
+            const auto QC_x = (a_l * inv_S2) * (r_l[g0] - r_k[g0]);
+            const auto QC_y = (a_l * inv_S2) * (r_l[g1] - r_k[g1]);
+
+            // k-k Hessian
+
+            const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
+                    + F5_t[0] * (
+
+                        inv_S2 * inv_S2 * a_k * a_k * (
+                            +PB_0*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+                        )
+
+                        + 2.0 * inv_S2 * a_k * a_k * (
+                            +PB_0*QD_0*QD_1*delta[g0][g1]
+
+                            +PB_0*(QC_x*(QC_y*delta[d0][d1] + QD_0*delta[d1][g1] + QD_1*delta[d0][g1]) + QC_y*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0]))
+                        )
+
+                        + (-1.0) * inv_S2 * a_k * (
+                            +PB_0*delta[d0][d1]*delta[g0][g1]
+                        )
+
+                        + 4.0 * a_k * a_k * (
+                            +PB_0*QC_x*QC_y*QD_0*QD_1
+                        )
+
+                        + (-2.0) * a_k * (
+                            +PB_0*QD_0*QD_1*delta[g0][g1]
+                        )
+
+                    )
+
+                    + F5_t[1] * (
+
+                        (-2.0) * S1 * inv_S2 * inv_S2 * inv_S4 * a_k * a_k * (
+                            +PB_0*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+                        )
+
+                        + inv_S2 * inv_S4 * a_k * a_k * (
+                            +QD_0*(delta[b0][d1]*delta[g0][g1] + delta[b0][g0]*delta[d1][g1] + delta[b0][g1]*delta[d1][g0])
+
+                            +QC_x*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1]) + QC_y*(delta[b0][d0]*delta[d1][g0] + delta[b0][d1]*delta[d0][g0] + delta[b0][g0]*delta[d0][d1]) + QD_1*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0])
+
+                            +PQ[b0]*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+                        )
+
+                        + (-2.0) * S1 * inv_S2 * inv_S4 * a_k * a_k * (
+                            +PB_0*delta[g0][g1]*(PQ[d1]*QD_0 + QD_1*(PQ[d0] + QD_0))
+
+                            +PB_0*(PQ[g0]*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1]) + PQ[g1]*(QC_x*delta[d0][d1] + QD_0*delta[d1][g0] + QD_1*delta[d0][g0]) + QC_x*(delta[d0][g1]*(PQ[d1] + QD_1) + delta[d1][g1]*(PQ[d0] + QD_0)) + QC_y*(delta[d0][d1]*(PQ[g0] + QC_x) + delta[d0][g0]*(PQ[d1] + QD_1) + delta[d1][g0]*(PQ[d0] + QD_0)))
+                        )
+
+                        + S1 * inv_S2 * inv_S4 * a_k * (
+                            +PB_0*delta[d0][d1]*delta[g0][g1]
+                        )
+
+                        + 2.0 * inv_S4 * a_k * a_k * (
+                            +QC_x*QC_y*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0]) + QD_0*QD_1*(PQ[b0]*delta[g0][g1] + QC_x*delta[b0][g1] + QC_y*delta[b0][g0])
+
+                            +PQ[b0]*(QC_x*(QC_y*delta[d0][d1] + QD_0*delta[d1][g1] + QD_1*delta[d0][g1]) + QC_y*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0]))
+                        )
+
+                        + (-1.0) * inv_S4 * a_k * (
+                            +delta[g0][g1]*(PQ[b0]*delta[d0][d1] + QD_0*delta[b0][d1] + QD_1*delta[b0][d0])
+                        )
+
+                        + 4.0 * S1 * inv_S4 * a_k * a_k * (
+                            -PB_0*(QC_x*QC_y*(PQ[d0]*QD_1 + PQ[d1]*QD_0) + QD_0*QD_1*(PQ[g0]*QC_y + PQ[g1]*QC_x))
+                        )
+
+                        + 2.0 * S1 * inv_S4 * a_k * (
+                            +PB_0*delta[g0][g1]*(PQ[d0]*QD_1 + PQ[d1]*QD_0)
+                        )
+
+                        + 4.0 * S2 * inv_S4 * a_k * a_k * (
+                            +PQ[b0]*QC_x*QC_y*QD_0*QD_1
+                        )
+
+                        + (-2.0) * S2 * inv_S4 * a_k * (
+                            +PQ[b0]*QD_0*QD_1*delta[g0][g1]
+                        )
+
+                    )
+
+                    + F5_t[2] * (
+
+                        S1 * S1 * inv_S2 * inv_S2 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +PB_0*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+                        )
+
+                        + S1 * inv_S2 * inv_S4 * inv_S4 * a_k * a_k * (
+                            -2*PQ[b0]*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+
+                            +(-PQ[d0] - QD_0)*(delta[b0][d1]*delta[g0][g1] + delta[b0][g0]*delta[d1][g1] + delta[b0][g1]*delta[d1][g0]) + (-PQ[d1] - QD_1)*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0]) + (-PQ[g0] - QC_x)*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1]) + (-PQ[g1] - QC_y)*(delta[b0][d0]*delta[d1][g0] + delta[b0][d1]*delta[d0][g0] + delta[b0][g0]*delta[d0][d1])
+                        )
+
+                        + 2.0 * S1 * S1 * inv_S2 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +PB_0*delta[g0][g1]*(PQ[d0]*(PQ[d1] + QD_1) + PQ[d1]*QD_0)
+
+                            +PB_0*(PQ[g1]*(QC_x*delta[d0][d1] + QD_0*delta[d1][g0] + QD_1*delta[d0][g0]) + delta[d0][g1]*(PQ[d1]*(PQ[g0] + QC_x) + PQ[g0]*QD_1) + delta[d1][g1]*(PQ[d0]*(PQ[g0] + QC_x) + PQ[g0]*QD_0) + (PQ[g1] + QC_y)*(PQ[d0]*delta[d1][g0] + PQ[d1]*delta[d0][g0] + PQ[g0]*delta[d0][d1]))
+                        )
+
+                        + (-2.0) * S1 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +PQ[b0]*delta[g0][g1]*(PQ[d1]*QD_0 + QD_1*(PQ[d0] + QD_0))
+
+                            +PQ[b0]*(PQ[g0]*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1]) + PQ[g1]*(QC_x*delta[d0][d1] + QD_0*delta[d1][g0] + QD_1*delta[d0][g0]) + QC_x*(delta[d0][g1]*(PQ[d1] + QD_1) + delta[d1][g1]*(PQ[d0] + QD_0)) + QC_y*(delta[d0][d1]*(PQ[g0] + QC_x) + delta[d0][g0]*(PQ[d1] + QD_1) + delta[d1][g0]*(PQ[d0] + QD_0)))
+
+                            +QC_x*(PQ[d0]*(QC_y*delta[b0][d1] + QD_1*delta[b0][g1]) + PQ[d1]*(QC_y*delta[b0][d0] + QD_0*delta[b0][g1]) + PQ[g1]*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0])) + QC_y*(QD_0*(PQ[d1]*delta[b0][g0] + PQ[g0]*delta[b0][d1]) + QD_1*(PQ[d0]*delta[b0][g0] + PQ[g0]*delta[b0][d0])) + QD_0*QD_1*(PQ[g0]*delta[b0][g1] + PQ[g1]*delta[b0][g0])
+                        )
+
+                        + 4.0 * S1 * S1 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +PB_0*(PQ[d0]*QC_x*(PQ[d1]*QC_y + PQ[g1]*QD_1) + PQ[g0]*QC_y*(PQ[d0]*QD_1 + PQ[d1]*QD_0) + PQ[g1]*QD_0*(PQ[d1]*QC_x + PQ[g0]*QD_1))
+                        )
+
+                        + (-2.0) * S1 * S1 * inv_S4 * inv_S4 * a_k * (
+                            +PB_0*PQ[d0]*PQ[d1]*delta[g0][g1]
+                        )
+
+                        + 4.0 * S1 * S2 * inv_S4 * inv_S4 * a_k * a_k * (
+                            -PQ[b0]*(QC_x*QC_y*(PQ[d0]*QD_1 + PQ[d1]*QD_0) + QD_0*QD_1*(PQ[g0]*QC_y + PQ[g1]*QC_x))
+                        )
+
+                        + 2.0 * S1 * S2 * inv_S4 * inv_S4 * a_k * (
+                            +PQ[b0]*delta[g0][g1]*(PQ[d0]*QD_1 + PQ[d1]*QD_0)
+                        )
+
+                        + S1 * inv_S4 * inv_S4 * a_k * (
+                            +PQ[b0]*delta[d0][d1]*delta[g0][g1]
+
+                            +delta[g0][g1]*(PQ[d0]*delta[b0][d1] + PQ[d1]*delta[b0][d0])
+                        )
+
+                    )
+
+                    + F5_t[3] * (
+
+                        (-2.0) * S1 * S1 * S1 * inv_S2 * inv_S4 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +PB_0*PQ[d0]*PQ[d1]*delta[g0][g1]
+
+                            +PB_0*(PQ[g0]*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1]) + PQ[g1]*(PQ[d0]*delta[d1][g0] + PQ[d1]*delta[d0][g0]))
+                        )
+
+                        + 2.0 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +PQ[d0]*(PQ[b0]*delta[g0][g1]*(PQ[d1] + QD_1) + PQ[d1]*(QC_x*delta[b0][g1] + QC_y*delta[b0][g0]) + PQ[g0]*(QC_y*delta[b0][d1] + QD_1*delta[b0][g1]) + PQ[g1]*(QC_x*delta[b0][d1] + QD_1*delta[b0][g0])) + PQ[d1]*(QD_0*(PQ[b0]*delta[g0][g1] + PQ[g0]*delta[b0][g1] + PQ[g1]*delta[b0][g0]) + delta[b0][d0]*(PQ[g0]*QC_y + PQ[g1]*QC_x)) + PQ[g0]*PQ[g1]*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0])
+
+                            +PQ[b0]*(PQ[g1]*(QC_x*delta[d0][d1] + QD_0*delta[d1][g0] + QD_1*delta[d0][g0]) + delta[d0][g1]*(PQ[d1]*(PQ[g0] + QC_x) + PQ[g0]*QD_1) + delta[d1][g1]*(PQ[d0]*(PQ[g0] + QC_x) + PQ[g0]*QD_0) + (PQ[g1] + QC_y)*(PQ[d0]*delta[d1][g0] + PQ[d1]*delta[d0][g0] + PQ[g0]*delta[d0][d1]))
+                        )
+
+                        + 4.0 * S1 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * a_k * a_k * (
+                            -PB_0*(PQ[d0]*PQ[d1]*(PQ[g0]*QC_y + PQ[g1]*QC_x) + PQ[g0]*PQ[g1]*(PQ[d0]*QD_1 + PQ[d1]*QD_0))
+                        )
+
+                        + 4.0 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +PQ[b0]*(PQ[d0]*QC_x*(PQ[d1]*QC_y + PQ[g1]*QD_1) + PQ[g0]*QC_y*(PQ[d0]*QD_1 + PQ[d1]*QD_0) + PQ[g1]*QD_0*(PQ[d1]*QC_x + PQ[g0]*QD_1))
+                        )
+
+                        + (-2.0) * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_k * (
+                            +PQ[b0]*PQ[d0]*PQ[d1]*delta[g0][g1]
+                        )
+
+                        + S1 * S1 * inv_S2 * inv_S4 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +PQ[b0]*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+
+                            +PQ[d0]*(delta[b0][d1]*delta[g0][g1] + delta[b0][g0]*delta[d1][g1] + delta[b0][g1]*delta[d1][g0]) + PQ[d1]*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0]) + PQ[g0]*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1]) + PQ[g1]*(delta[b0][d0]*delta[d1][g0] + delta[b0][d1]*delta[d0][g0] + delta[b0][g0]*delta[d0][d1])
+                        )
+
+                    )
+
+                    + F5_t[4] * (
+
+                        (-2.0) * S1 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +PQ[b0]*PQ[d0]*PQ[d1]*delta[g0][g1]
+
+                            +PQ[g0]*(PQ[b0]*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1]) + PQ[d0]*PQ[d1]*delta[b0][g1]) + PQ[g1]*(PQ[d0]*(PQ[b0]*delta[d1][g0] + PQ[d1]*delta[b0][g0] + PQ[g0]*delta[b0][d1]) + PQ[d1]*(PQ[b0]*delta[d0][g0] + PQ[g0]*delta[b0][d0]))
+                        )
+
+                        + 4.0 * S1 * S1 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +PB_0*PQ[d0]*PQ[d1]*PQ[g0]*PQ[g1]
+                        )
+
+                        + (-4.0) * S1 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +PQ[b0]*PQ[d0]*PQ[d1]*PQ[g0]*QC_y
+
+                            +PQ[b0]*PQ[g1]*(PQ[d0]*(PQ[d1]*QC_x + PQ[g0]*QD_1) + PQ[d1]*PQ[g0]*QD_0)
+                        )
+
+                    )
+
+                    + F5_t[5] * (
+
+                        4.0 * S1 * S1 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +PQ[b0]*PQ[d0]*PQ[d1]*PQ[g0]*PQ[g1]
+                        )
+
+                    )
+
+                    );
+
+            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+        }
+    }
+
+    __syncthreads();
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_ss))
+    {
+        double hess_kk_xy = 0.0;
+
+        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        {
+            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            {
+                hess_kk_xy += ERIs[y][x];
+            }
+        }
+
+        atomicAdd(hess_xy + prim_cart_ao_to_atom_inds[k], hess_kk_xy * ik_factor_D * 2.0 * frac_exact_exchange);
+    }
+}
+
+__global__ void __launch_bounds__(TILE_SIZE_K)
+computeExchangeHessianSPSD_IK_0(double*         hess_xy,
+                                double*         hess_yx,
+                                const uint32_t  hess_cart_ind_0,
+                                const uint32_t  hess_cart_ind_1,
+                                const double    frac_exact_exchange,
+                                const uint32_t* pair_inds_i_for_K_ss,
+                                const uint32_t* pair_inds_k_for_K_ss,
+                                const double*   D_ik_for_K_ss,
+                                const uint32_t  pair_inds_count_for_K_ss,
+                                const double*   s_prim_info,
+                                const uint32_t* s_prim_aoinds,
+                                const uint32_t  s_prim_count,
+                                const double*   p_prim_info,
+                                const uint32_t* p_prim_aoinds,
+                                const uint32_t  p_prim_count,
+                                const double*   d_prim_info,
+                                const uint32_t* d_prim_aoinds,
+                                const uint32_t  d_prim_count,
+                                const double    pd_max_D,
+                                const double*   mat_D_full_AO,
+                                const uint32_t  naos,
+                                const double*   Q_K_sp,
+                                const double*   Q_K_sd,
+                                const uint32_t* D_inds_K_sp,
+                                const uint32_t* D_inds_K_sd,
+                                const uint32_t* pair_displs_K_sp,
+                                const uint32_t* pair_displs_K_sd,
+                                const uint32_t* pair_counts_K_sp,
+                                const uint32_t* pair_counts_K_sd,
+                                const double*   pair_data_K_sp,
+                                const double*   pair_data_K_sd,
+                                const uint32_t* prim_cart_ao_to_atom_inds,
+                                const uint32_t  natoms,
+                                const double*   boys_func_table,
+                                const double*   boys_func_ft,
+                                const double    omega,
+                                const double    eri_threshold)
+{
+    // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
+
+    __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
+    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ double   delta[3][3];
+    __shared__ uint32_t g0, g1;
+
+    const uint32_t ik = blockIdx.x;
+
+    // we make sure that ik < pair_inds_count_for_K_ss when calling the kernel
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+        g0 = hess_cart_ind_0;
+        g1 = hess_cart_ind_1;
+
+        i = pair_inds_i_for_K_ss[ik];
+        k = pair_inds_k_for_K_ss[ik];
+
+        count_i = pair_counts_K_sp[i];
+        count_k = pair_counts_K_sd[k];
+
+        displ_i = pair_displs_K_sp[i];
+        displ_k = pair_displs_K_sd[k];
+
+        a_i = s_prim_info[i + s_prim_count * 0];
+
+        r_i[0] = s_prim_info[i + s_prim_count * 2];
+        r_i[1] = s_prim_info[i + s_prim_count * 3];
+        r_i[2] = s_prim_info[i + s_prim_count * 4];
+
+        a_k = s_prim_info[k + s_prim_count * 0];
+
+        r_k[0] = s_prim_info[k + s_prim_count * 2];
+        r_k[1] = s_prim_info[k + s_prim_count * 3];
+        r_k[2] = s_prim_info[k + s_prim_count * 4];
+
+        ik_factor_D = (static_cast<double>(i != k) + 1.0) * D_ik_for_K_ss[ik];
+
+    }
+
+    __syncthreads();
+
+    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    {
+        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+
+        // sync threads before starting a new scan
+        __syncthreads();
+
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double PB_0, PA_x;
+        uint32_t j_prim, j_cgto, b0;
+
+        if (j < count_i)
+        {
+            Q_ij   = Q_K_sp[displ_i + j];
+
+            j_prim = D_inds_K_sp[displ_i + j];
+
+            j_cgto = p_prim_aoinds[(j_prim / 3) + p_prim_count * (j_prim % 3)];
+
+            a_j = p_prim_info[j_prim / 3 + p_prim_count * 0];
+
+            r_j[0] = p_prim_info[j_prim / 3 + p_prim_count * 2];
+            r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
+            r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = pair_data_K_sp[displ_i + j];
+
+            PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            b0 = j_prim % 3;
+
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+
+        }
+
+        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        {
+            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+
+            // Q_kl == Q_K_sd[displ_k + l]
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_sd[displ_k + l] * pd_max_D) <= eri_threshold))
+            {
+                break;
+            }
+
+            // const auto Q_kl = Q_K_sd[displ_k + l];
+
+            const auto l_prim = D_inds_K_sd[displ_k + l];
+
+            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+
+            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+
+            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
+                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
+                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+
+            const auto S_kl_00 = pair_data_K_sd[displ_k + l];
+
+            const auto d0 = d_cart_inds[l_prim % 6][0];
+            const auto d1 = d_cart_inds[l_prim % 6][1];
+
+            // J. Chem. Phys. 84, 3963-3974 (1986)
+
+            const auto S2 = a_k + a_l;
+
+            const auto inv_S2 = 1.0 / S2;
+            const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
+
+            const auto rho = S1 * S2 * inv_S4;
+
+            double d2 = 1.0;
+
+            if (omega != 0.0) d2 = omega * omega / (rho + omega * omega);
+
+            const auto Lambda = sqrt(4.0 * rho * d2 * MATH_CONST_INV_PI);
+
+            double F5_t[6];
+
+            gpu::computeBoysFunction(F5_t, rho * d2 * r2_PQ, 5, boys_func_table, boys_func_ft);
+
+            if (omega != 0.0)
+            {
+                F5_t[1] *= d2;
+                F5_t[2] *= d2 * d2;
+                F5_t[3] *= d2 * d2 * d2;
+                F5_t[4] *= d2 * d2 * d2 * d2;
+                F5_t[5] *= d2 * d2 * d2 * d2 * d2;
+            }
+
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+
+            const auto QC_y = (a_l * inv_S2) * (r_l[g1] - r_k[g1]);
+
+            // i-k Hessian
+
+            const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
+                    + F5_t[0] * (
+
+                        inv_S1 * inv_S2 * a_i * a_k * (
+                            +QD_0*delta[b0][g0]*delta[d1][g1]
+
+                            +delta[b0][g0]*(QC_y*delta[d0][d1] + QD_1*delta[d0][g1])
+                        )
+
+                        + 2.0 * inv_S1 * a_i * a_k * (
+                            +QC_y*QD_0*QD_1*delta[b0][g0]
+                        )
+
+                        + 2.0 * inv_S2 * a_i * a_k * (
+                            +PA_x*PB_0*QD_0*delta[d1][g1]
+
+                            +PA_x*PB_0*(QC_y*delta[d0][d1] + QD_1*delta[d0][g1])
+                        )
+
+                        + 4.0 * a_i * a_k * (
+                            +PA_x*PB_0*QC_y*QD_0*QD_1
+                        )
+
+                    )
+
+                    + F5_t[1] * (
+
+                        (-1.0) * inv_S1 * inv_S4 * a_i * a_k * (
+                            +QD_0*delta[b0][g0]*delta[d1][g1]
+
+                            +delta[b0][g0]*(QC_y*delta[d0][d1] + QD_1*delta[d0][g1])
+                        )
+
+                        + inv_S2 * inv_S4 * a_i * a_k * (
+                            +PB_0*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+
+                            -delta[b0][g0]*(delta[d0][d1]*(PQ[g1] + QC_y) + delta[d0][g1]*(PQ[d1] + QD_1) + delta[d1][g1]*(PQ[d0] + QD_0))
+
+                            +PA_x*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1])
+                        )
+
+                        + (-2.0) * S1 * inv_S2 * inv_S4 * a_i * a_k * (
+                            +PA_x*PB_0*delta[d1][g1]*(PQ[d0] + QD_0)
+
+                            +PA_x*PB_0*(delta[d0][d1]*(PQ[g1] + QC_y) + delta[d0][g1]*(PQ[d1] + QD_1))
+                        )
+
+                        + (-2.0) * S2 * inv_S1 * inv_S4 * a_i * a_k * (
+                            +QC_y*QD_0*QD_1*delta[b0][g0]
+                        )
+
+                        + 2.0 * inv_S4 * a_i * a_k * (
+                            +QD_0*delta[d1][g1]*(PA_x*PQ[b0] + PB_0*PQ[g0])
+
+                            +(PA_x*PQ[b0] + PB_0*PQ[g0])*(QC_y*delta[d0][d1] + QD_1*delta[d0][g1])
+
+                            +QC_y*(PA_x*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0]) + PB_0*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0])) + QD_0*QD_1*(PA_x*delta[b0][g1] + PB_0*delta[g0][g1])
+
+                            -delta[b0][g0]*(PQ[g1]*QD_0*QD_1 + QC_y*(PQ[d0]*QD_1 + PQ[d1]*QD_0))
+                        )
+
+                        + 4.0 * S1 * inv_S4 * a_i * a_k * (
+                            -PA_x*PB_0*(PQ[g1]*QD_0*QD_1 + QC_y*(PQ[d0]*QD_1 + PQ[d1]*QD_0))
+                        )
+
+                        + 4.0 * S2 * inv_S4 * a_i * a_k * (
+                            +QC_y*QD_0*QD_1*(PA_x*PQ[b0] + PB_0*PQ[g0])
+                        )
+
+                    )
+
+                    + F5_t[2] * (
+
+                        S1 * inv_S2 * inv_S4 * inv_S4 * a_i * a_k * (
+                            -PB_0*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+
+                            -PA_x*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1])
+
+                            +delta[b0][g0]*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1])
+                        )
+
+                        + inv_S4 * inv_S4 * a_i * a_k * (
+                            +QD_0*(delta[b0][d1]*delta[g0][g1] + delta[b0][g1]*delta[d1][g0])
+
+                            +delta[b0][g0]*(delta[d0][d1]*(PQ[g1] + QC_y) + delta[d0][g1]*(PQ[d1] + QD_1) + delta[d1][g1]*(PQ[d0] + QD_0))
+
+                            +QC_y*(delta[b0][d0]*delta[d1][g0] + delta[b0][d1]*delta[d0][g0]) + QD_1*(delta[b0][d0]*delta[g0][g1] + delta[b0][g1]*delta[d0][g0])
+
+                            +PQ[b0]*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0]) + PQ[g0]*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1])
+                        )
+
+                        + 2.0 * S1 * S1 * inv_S2 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +PA_x*PB_0*PQ[d0]*delta[d1][g1]
+
+                            +PA_x*PB_0*(PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1])
+                        )
+
+                        + 2.0 * S1 * inv_S4 * inv_S4 * a_i * a_k * (
+                            -delta[d1][g1]*(PQ[d0] + QD_0)*(PA_x*PQ[b0] + PB_0*PQ[g0])
+
+                            -PA_x*(PQ[d0]*(QC_y*delta[b0][d1] + QD_1*delta[b0][g1]) + PQ[d1]*(QC_y*delta[b0][d0] + QD_0*delta[b0][g1]) + PQ[g1]*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0])) - PB_0*(PQ[d0]*(QC_y*delta[d1][g0] + QD_1*delta[g0][g1]) + PQ[d1]*(QC_y*delta[d0][g0] + QD_0*delta[g0][g1]) + PQ[g1]*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0]))
+
+                            -(PA_x*PQ[b0] + PB_0*PQ[g0])*(delta[d0][d1]*(PQ[g1] + QC_y) + delta[d0][g1]*(PQ[d1] + QD_1))
+
+                            +delta[b0][g0]*(PQ[d0]*(PQ[d1]*QC_y + PQ[g1]*QD_1) + PQ[d1]*PQ[g1]*QD_0)
+                        )
+
+                        + 2.0 * S2 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +QC_y*QD_1*(PQ[b0]*delta[d0][g0] + PQ[g0]*delta[b0][d0]) + QD_0*(PQ[b0]*(PQ[g0]*delta[d1][g1] + QC_y*delta[d1][g0] + QD_1*delta[g0][g1]) + PQ[g0]*(QC_y*delta[b0][d1] + QD_1*delta[b0][g1]))
+
+                            +PQ[b0]*PQ[g0]*(QC_y*delta[d0][d1] + QD_1*delta[d0][g1])
+
+                            +delta[b0][g0]*(PQ[g1]*QD_0*QD_1 + QC_y*(PQ[d0]*QD_1 + PQ[d1]*QD_0))
+                        )
+
+                        + 4.0 * S1 * S1 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +PA_x*PB_0*(PQ[d0]*(PQ[d1]*QC_y + PQ[g1]*QD_1) + PQ[d1]*PQ[g1]*QD_0)
+                        )
+
+                        + 4.0 * S1 * S2 * inv_S4 * inv_S4 * a_i * a_k * (
+                            -(PA_x*PQ[b0] + PB_0*PQ[g0])*(PQ[g1]*QD_0*QD_1 + QC_y*(PQ[d0]*QD_1 + PQ[d1]*QD_0))
+                        )
+
+                        + 4.0 * S2 * S2 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +PQ[b0]*PQ[g0]*QC_y*QD_0*QD_1
+                        )
+
+                    )
+
+                    + F5_t[3] * (
+
+                        (-1.0) * S1 * inv_S4 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +PQ[b0]*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+
+                            +PQ[d0]*(delta[b0][d1]*delta[g0][g1] + delta[b0][g0]*delta[d1][g1] + delta[b0][g1]*delta[d1][g0]) + PQ[d1]*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0]) + PQ[g0]*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1]) + PQ[g1]*(delta[b0][d0]*delta[d1][g0] + delta[b0][d1]*delta[d0][g0] + delta[b0][g0]*delta[d0][d1])
+                        )
+
+                        + 2.0 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +PB_0*PQ[d0]*PQ[d1]*delta[g0][g1]
+
+                            +(PA_x*PQ[b0] + PB_0*PQ[g0])*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1])
+
+                            +PQ[d0]*(PA_x*(PQ[d1]*delta[b0][g1] + PQ[g1]*delta[b0][d1]) + PB_0*PQ[g1]*delta[d1][g0]) + PQ[d1]*PQ[g1]*(PA_x*delta[b0][d0] + PB_0*delta[d0][g0])
+
+                            -PQ[d0]*PQ[d1]*PQ[g1]*delta[b0][g0]
+                        )
+
+                        + (-2.0) * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +PQ[b0]*(PQ[d0]*(QC_y*delta[d1][g0] + QD_1*delta[g0][g1]) + PQ[d1]*(QC_y*delta[d0][g0] + QD_0*delta[g0][g1]) + PQ[g0]*delta[d1][g1]*(PQ[d0] + QD_0) + PQ[g1]*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0])) + PQ[g0]*(PQ[d0]*(QC_y*delta[b0][d1] + QD_1*delta[b0][g1]) + PQ[d1]*(QC_y*delta[b0][d0] + QD_0*delta[b0][g1]) + PQ[g1]*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0]))
+
+                            +PQ[b0]*PQ[g0]*(delta[d0][d1]*(PQ[g1] + QC_y) + delta[d0][g1]*(PQ[d1] + QD_1))
+
+                            +delta[b0][g0]*(PQ[d0]*(PQ[d1]*QC_y + PQ[g1]*QD_1) + PQ[d1]*PQ[g1]*QD_0)
+                        )
+
+                        + 4.0 * S1 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * a_i * a_k * (
+                            -PA_x*PB_0*PQ[d0]*PQ[d1]*PQ[g1]
+                        )
+
+                        + 4.0 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +(PA_x*PQ[b0] + PB_0*PQ[g0])*(PQ[d0]*(PQ[d1]*QC_y + PQ[g1]*QD_1) + PQ[d1]*PQ[g1]*QD_0)
+                        )
+
+                        + 4.0 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_k * (
+                            -PQ[b0]*PQ[g0]*(PQ[g1]*QD_0*QD_1 + QC_y*(PQ[d0]*QD_1 + PQ[d1]*QD_0))
+                        )
+
+                    )
+
+                    + F5_t[4] * (
+
+                        4.0 * S1 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_k * (
+                            -PQ[d0]*PQ[d1]*PQ[g1]*(PA_x*PQ[b0] + PB_0*PQ[g0])
+                        )
+
+                        + 4.0 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +PQ[b0]*PQ[g0]*(PQ[d0]*(PQ[d1]*QC_y + PQ[g1]*QD_1) + PQ[d1]*PQ[g1]*QD_0)
+                        )
+
+                        + 2.0 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +PQ[b0]*PQ[d0]*PQ[d1]*delta[g0][g1]
+
+                            +PQ[g0]*(PQ[b0]*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1]) + PQ[d0]*PQ[d1]*delta[b0][g1]) + PQ[g1]*(PQ[d0]*(PQ[b0]*delta[d1][g0] + PQ[d1]*delta[b0][g0] + PQ[g0]*delta[b0][d1]) + PQ[d1]*(PQ[b0]*delta[d0][g0] + PQ[g0]*delta[b0][d0]))
+                        )
+
+                    )
+
+                    + F5_t[5] * (
+
+                        (-4.0) * S1 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +PQ[b0]*PQ[d0]*PQ[d1]*PQ[g0]*PQ[g1]
+                        )
+
+                    )
+
+                    );
+
+            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+        }
+    }
+
+    __syncthreads();
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_ss))
+    {
+        double hess_ik_xy = 0.0;
+
+        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        {
+            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            {
+                hess_ik_xy += ERIs[y][x];
+            }
+        }
+
+        // Note factor of 2 due to IK<->JL symmetry for ground state Hessian
+
+        atomicAdd(
+            hess_xy + prim_cart_ao_to_atom_inds[i] * natoms + prim_cart_ao_to_atom_inds[k],
+            hess_ik_xy * ik_factor_D * 2.0 * frac_exact_exchange);
+
+        atomicAdd(
+            hess_yx + prim_cart_ao_to_atom_inds[k] * natoms + prim_cart_ao_to_atom_inds[i],
+            hess_ik_xy * ik_factor_D * 2.0 * frac_exact_exchange);
+    }
+}
+
+__global__ void __launch_bounds__(TILE_SIZE_K)
+computeExchangeHessianSPSD_IJ_0(double*         hess_xy,
+                                double*         hess_yx,
+                                const uint32_t  hess_cart_ind_0,
+                                const uint32_t  hess_cart_ind_1,
+                                const double    frac_exact_exchange,
+                                const uint32_t* pair_inds_i_for_K_ss,
+                                const uint32_t* pair_inds_k_for_K_ss,
+                                const double*   D_ik_for_K_ss,
+                                const uint32_t  pair_inds_count_for_K_ss,
+                                const double*   s_prim_info,
+                                const uint32_t* s_prim_aoinds,
+                                const uint32_t  s_prim_count,
+                                const double*   p_prim_info,
+                                const uint32_t* p_prim_aoinds,
+                                const uint32_t  p_prim_count,
+                                const double*   d_prim_info,
+                                const uint32_t* d_prim_aoinds,
+                                const uint32_t  d_prim_count,
+                                const double    pd_max_D,
+                                const double*   mat_D_full_AO,
+                                const uint32_t  naos,
+                                const double*   Q_K_sp,
+                                const double*   Q_K_sd,
+                                const uint32_t* D_inds_K_sp,
+                                const uint32_t* D_inds_K_sd,
+                                const uint32_t* pair_displs_K_sp,
+                                const uint32_t* pair_displs_K_sd,
+                                const uint32_t* pair_counts_K_sp,
+                                const uint32_t* pair_counts_K_sd,
+                                const double*   pair_data_K_sp,
+                                const double*   pair_data_K_sd,
+                                const uint32_t* prim_cart_ao_to_atom_inds,
+                                const uint32_t  natoms,
+                                const double*   boys_func_table,
+                                const double*   boys_func_ft,
+                                const double    omega,
+                                const double    eri_threshold)
+{
+    // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
+
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
+    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ double   delta[3][3];
+    __shared__ uint32_t g0, g1;
+
+    const uint32_t ik = blockIdx.x;
+
+    // we make sure that ik < pair_inds_count_for_K_ss when calling the kernel
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+        g0 = hess_cart_ind_0;
+        g1 = hess_cart_ind_1;
+
+        i = pair_inds_i_for_K_ss[ik];
+        k = pair_inds_k_for_K_ss[ik];
+
+        count_i = pair_counts_K_sp[i];
+        count_k = pair_counts_K_sd[k];
+
+        displ_i = pair_displs_K_sp[i];
+        displ_k = pair_displs_K_sd[k];
+
+        a_i = s_prim_info[i + s_prim_count * 0];
+
+        r_i[0] = s_prim_info[i + s_prim_count * 2];
+        r_i[1] = s_prim_info[i + s_prim_count * 3];
+        r_i[2] = s_prim_info[i + s_prim_count * 4];
+
+        a_k = s_prim_info[k + s_prim_count * 0];
+
+        r_k[0] = s_prim_info[k + s_prim_count * 2];
+        r_k[1] = s_prim_info[k + s_prim_count * 3];
+        r_k[2] = s_prim_info[k + s_prim_count * 4];
+
+        ik_factor_D = (static_cast<double>(i != k) + 1.0) * D_ik_for_K_ss[ik];
+
+    }
+
+    __syncthreads();
+
+    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    {
+        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+
+        // sync threads before starting a new scan
+        __syncthreads();
+
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double PB_0, PA_x, PB_y;
+        uint32_t j_prim, j_cgto, b0;
+
+        if (j < count_i)
+        {
+            Q_ij   = Q_K_sp[displ_i + j];
+
+            j_prim = D_inds_K_sp[displ_i + j];
+
+            j_cgto = p_prim_aoinds[(j_prim / 3) + p_prim_count * (j_prim % 3)];
+
+            a_j = p_prim_info[j_prim / 3 + p_prim_count * 0];
+
+            r_j[0] = p_prim_info[j_prim / 3 + p_prim_count * 2];
+            r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
+            r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = pair_data_K_sp[displ_i + j];
+
+            PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+            PB_y = (-a_i * inv_S1) * (r_j[g1] - r_i[g1]);
+
+            b0 = j_prim % 3;
+
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+
+        }
+
+        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        {
+            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+
+            // Q_kl == Q_K_sd[displ_k + l]
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_sd[displ_k + l] * pd_max_D) <= eri_threshold))
+            {
+                break;
+            }
+
+            // const auto Q_kl = Q_K_sd[displ_k + l];
+
+            const auto l_prim = D_inds_K_sd[displ_k + l];
+
+            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+
+            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+
+            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
+                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
+                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+
+            const auto S_kl_00 = pair_data_K_sd[displ_k + l];
+
+            const auto d0 = d_cart_inds[l_prim % 6][0];
+            const auto d1 = d_cart_inds[l_prim % 6][1];
+
+            // J. Chem. Phys. 84, 3963-3974 (1986)
+
+            const auto S2 = a_k + a_l;
+
+            const auto inv_S2 = 1.0 / S2;
+            const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
+
+            const auto rho = S1 * S2 * inv_S4;
+
+            double d2 = 1.0;
+
+            if (omega != 0.0) d2 = omega * omega / (rho + omega * omega);
+
+            const auto Lambda = sqrt(4.0 * rho * d2 * MATH_CONST_INV_PI);
+
+            double F5_t[6];
+
+            gpu::computeBoysFunction(F5_t, rho * d2 * r2_PQ, 5, boys_func_table, boys_func_ft);
+
+            if (omega != 0.0)
+            {
+                F5_t[1] *= d2;
+                F5_t[2] *= d2 * d2;
+                F5_t[3] *= d2 * d2 * d2;
+                F5_t[4] *= d2 * d2 * d2 * d2;
+                F5_t[5] *= d2 * d2 * d2 * d2 * d2;
+            }
+
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+
+            // i-j Hessian
+
+            const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
+                    + F5_t[0] * (
+
+                        inv_S1 * inv_S2 * a_i * a_j * (
+                            +PB_0*delta[d0][d1]*delta[g0][g1]
+
+                            +delta[d0][d1]*(PA_x*delta[b0][g1] + PB_y*delta[b0][g0])
+                        )
+
+                        + 2.0 * inv_S1 * a_i * a_j * (
+                            +PB_0*QD_0*QD_1*delta[g0][g1]
+
+                            +QD_0*QD_1*(PA_x*delta[b0][g1] + PB_y*delta[b0][g0])
+                        )
+
+                        + 2.0 * inv_S2 * a_i * a_j * (
+                            +PA_x*PB_0*PB_y*delta[d0][d1]
+                        )
+
+                        + (-1.0) * inv_S2 * a_i * (
+                            +PA_x*delta[b0][g1]*delta[d0][d1]
+                        )
+
+                        + 4.0 * a_i * a_j * (
+                            +PA_x*PB_0*PB_y*QD_0*QD_1
+                        )
+
+                        + (-2.0) * a_i * (
+                            +PA_x*QD_0*QD_1*delta[b0][g1]
+                        )
+
+                    )
+
+                    + F5_t[1] * (
+
+                        inv_S1 * inv_S4 * a_i * a_j * (
+                            +delta[d0][d1]*delta[g0][g1]*(-PB_0 + PQ[b0])
+
+                            +delta[d0][d1]*(delta[b0][g0]*(-PB_y + PQ[g1]) + delta[b0][g1]*(-PA_x + PQ[g0]))
+
+                            +QD_0*(delta[b0][d1]*delta[g0][g1] + delta[b0][g0]*delta[d1][g1] + delta[b0][g1]*delta[d1][g0]) + QD_1*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0])
+                        )
+
+                        + (-1.0) * inv_S2 * inv_S4 * a_i * a_j * (
+                            +PB_0*delta[d0][d1]*delta[g0][g1]
+
+                            +delta[d0][d1]*(PA_x*delta[b0][g1] + PB_y*delta[b0][g0])
+                        )
+
+                        + (-2.0) * S1 * inv_S2 * inv_S4 * a_i * a_j * (
+                            +PA_x*PB_0*PB_y*delta[d0][d1]
+                        )
+
+                        + 2.0 * S2 * inv_S1 * inv_S4 * a_i * a_j * (
+                            +QD_0*QD_1*delta[g0][g1]*(-PB_0 + PQ[b0])
+
+                            +QD_0*QD_1*(delta[b0][g0]*(-PB_y + PQ[g1]) + delta[b0][g1]*(-PA_x + PQ[g0]))
+                        )
+
+                        + 2.0 * inv_S4 * a_i * a_j * (
+                            +delta[d0][d1]*(PA_x*(PB_0*PQ[g1] + PB_y*PQ[b0]) + PB_0*PB_y*PQ[g0])
+
+                            +PA_x*(PB_0*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1]) + PB_y*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0])) + PB_0*PB_y*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0])
+
+                            -(PQ[d0]*QD_1 + PQ[d1]*QD_0)*(PA_x*delta[b0][g1] + PB_0*delta[g0][g1] + PB_y*delta[b0][g0])
+                        )
+
+                        + (-1.0) * inv_S4 * a_i * (
+                            +delta[b0][g1]*(PQ[g0]*delta[d0][d1] + QD_0*delta[d1][g0] + QD_1*delta[d0][g0])
+                        )
+
+                        + 4.0 * S1 * inv_S4 * a_i * a_j * (
+                            -PA_x*PB_0*PB_y*(PQ[d0]*QD_1 + PQ[d1]*QD_0)
+                        )
+
+                        + 2.0 * S1 * inv_S4 * a_i * (
+                            +PA_x*delta[b0][g1]*(PQ[d0]*QD_1 + PQ[d1]*QD_0)
+                        )
+
+                        + 4.0 * S2 * inv_S4 * a_i * a_j * (
+                            +QD_0*QD_1*(PA_x*(PB_0*PQ[g1] + PB_y*PQ[b0]) + PB_0*PB_y*PQ[g0])
+                        )
+
+                        + (-2.0) * S2 * inv_S4 * a_i * (
+                            +PQ[g0]*QD_0*QD_1*delta[b0][g1]
+                        )
+
+                        + S1 * inv_S2 * inv_S4 * a_i * (
+                            +PA_x*delta[b0][g1]*delta[d0][d1]
+                        )
+
+                    )
+
+                    + F5_t[2] * (
+
+                        (-1.0) * S2 * inv_S1 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +PQ[b0]*delta[d0][d1]*delta[g0][g1]
+
+                            +delta[d0][d1]*(PQ[g0]*delta[b0][g1] + PQ[g1]*delta[b0][g0])
+
+                            +QD_0*(delta[b0][d1]*delta[g0][g1] + delta[b0][g0]*delta[d1][g1] + delta[b0][g1]*delta[d1][g0]) + QD_1*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0])
+                        )
+
+                        + inv_S4 * inv_S4 * a_i * a_j * (
+                            +delta[d0][d1]*delta[g0][g1]*(PB_0 - PQ[b0])
+
+                            +PA_x*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1]) + PB_0*(delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0]) + PB_y*(delta[b0][d0]*delta[d1][g0] + delta[b0][d1]*delta[d0][g0])
+
+                            +delta[d0][d1]*(delta[b0][g0]*(PB_y - PQ[g1]) + delta[b0][g1]*(PA_x - PQ[g0]))
+
+                            -PQ[d0]*(delta[b0][d1]*delta[g0][g1] + delta[b0][g0]*delta[d1][g1] + delta[b0][g1]*delta[d1][g0]) - PQ[d1]*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0])
+                        )
+
+                        + 2.0 * S1 * inv_S4 * inv_S4 * a_i * a_j * (
+                            -PA_x*PB_0*PQ[d0]*delta[d1][g1]
+
+                            -PB_y*PQ[d0]*(PA_x*delta[b0][d1] + PB_0*delta[d1][g0]) - PQ[d1]*(PA_x*(PB_0*delta[d0][g1] + PB_y*delta[b0][d0]) + PB_0*PB_y*delta[d0][g0])
+
+                            -delta[d0][d1]*(PA_x*(PB_0*PQ[g1] + PB_y*PQ[b0]) + PB_0*PB_y*PQ[g0])
+
+                            +PQ[d0]*PQ[d1]*(PA_x*delta[b0][g1] + PB_0*delta[g0][g1] + PB_y*delta[b0][g0])
+                        )
+
+                        + (-2.0) * S2 * S2 * inv_S1 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +PQ[b0]*QD_0*QD_1*delta[g0][g1]
+
+                            +QD_0*QD_1*(PQ[g0]*delta[b0][g1] + PQ[g1]*delta[b0][g0])
+                        )
+
+                        + 2.0 * S2 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +delta[g0][g1]*(PB_0 - PQ[b0])*(PQ[d0]*QD_1 + PQ[d1]*QD_0)
+
+                            +delta[d0][d1]*(PB_0*PQ[g0]*PQ[g1] + PQ[b0]*(PA_x*PQ[g1] + PB_y*PQ[g0]))
+
+                            +PA_x*(PQ[b0]*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1]) + PQ[g1]*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0])) + PB_0*(PQ[g0]*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1]) + PQ[g1]*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0])) + PB_y*(PQ[b0]*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0]) + PQ[g0]*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0]))
+
+                            +(PQ[d0]*QD_1 + PQ[d1]*QD_0)*(delta[b0][g0]*(PB_y - PQ[g1]) + delta[b0][g1]*(PA_x - PQ[g0]))
+                        )
+
+                        + 4.0 * S1 * S1 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +PA_x*PB_0*PB_y*PQ[d0]*PQ[d1]
+                        )
+
+                        + (-2.0) * S1 * S1 * inv_S4 * inv_S4 * a_i * (
+                            +PA_x*PQ[d0]*PQ[d1]*delta[b0][g1]
+                        )
+
+                        + 4.0 * S1 * S2 * inv_S4 * inv_S4 * a_i * a_j * (
+                            -(PA_x*(PB_0*PQ[g1] + PB_y*PQ[b0]) + PB_0*PB_y*PQ[g0])*(PQ[d0]*QD_1 + PQ[d1]*QD_0)
+                        )
+
+                        + 2.0 * S1 * S2 * inv_S4 * inv_S4 * a_i * (
+                            +PQ[g0]*delta[b0][g1]*(PQ[d0]*QD_1 + PQ[d1]*QD_0)
+                        )
+
+                        + 4.0 * S2 * S2 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +QD_0*QD_1*(PB_0*PQ[g0]*PQ[g1] + PQ[b0]*(PA_x*PQ[g1] + PB_y*PQ[g0]))
+                        )
+
+                        + S1 * inv_S4 * inv_S4 * a_i * (
+                            +PQ[d0]*delta[b0][g1]*delta[d1][g0]
+
+                            +delta[b0][g1]*(PQ[d1]*delta[d0][g0] + PQ[g0]*delta[d0][d1])
+                        )
+
+                    )
+
+                    + F5_t[3] * (
+
+                        2.0 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +PQ[d0]*PQ[d1]*delta[g0][g1]*(-PB_0 + PQ[b0])
+
+                            -PA_x*(PQ[b0]*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1]) + PQ[g1]*(PQ[d0]*delta[b0][d1] + PQ[d1]*delta[b0][d0])) - PB_0*(PQ[d0]*(PQ[g0]*delta[d1][g1] + PQ[g1]*delta[d1][g0]) + PQ[d1]*(PQ[g0]*delta[d0][g1] + PQ[g1]*delta[d0][g0])) - PB_y*(PQ[b0]*(PQ[d0]*delta[d1][g0] + PQ[d1]*delta[d0][g0]) + PQ[g0]*(PQ[d0]*delta[b0][d1] + PQ[d1]*delta[b0][d0]))
+
+                            -delta[d0][d1]*(PB_0*PQ[g0]*PQ[g1] + PQ[b0]*(PA_x*PQ[g1] + PB_y*PQ[g0]))
+
+                            +PQ[d0]*PQ[d1]*(delta[b0][g0]*(-PB_y + PQ[g1]) + delta[b0][g1]*(-PA_x + PQ[g0]))
+                        )
+
+                        + 2.0 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +PQ[b0]*delta[g0][g1]*(PQ[d0]*QD_1 + PQ[d1]*QD_0)
+
+                            +PQ[b0]*(PQ[g0]*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1]) + PQ[g1]*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0])) + PQ[g0]*PQ[g1]*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0])
+
+                            +(PQ[d0]*QD_1 + PQ[d1]*QD_0)*(PQ[g0]*delta[b0][g1] + PQ[g1]*delta[b0][g0])
+
+                            +PQ[b0]*PQ[g0]*PQ[g1]*delta[d0][d1]
+                        )
+
+                        + 4.0 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +PQ[d0]*PQ[d1]*(PA_x*(PB_0*PQ[g1] + PB_y*PQ[b0]) + PB_0*PB_y*PQ[g0])
+                        )
+
+                        + (-2.0) * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * (
+                            +PQ[d0]*PQ[d1]*PQ[g0]*delta[b0][g1]
+                        )
+
+                        + 4.0 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_j * (
+                            -(PQ[d0]*QD_1 + PQ[d1]*QD_0)*(PB_0*PQ[g0]*PQ[g1] + PQ[b0]*(PA_x*PQ[g1] + PB_y*PQ[g0]))
+                        )
+
+                        + 4.0 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +PQ[b0]*PQ[g0]*PQ[g1]*QD_0*QD_1
+                        )
+
+                        + S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +PQ[b0]*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+
+                            +PQ[d0]*(delta[b0][d1]*delta[g0][g1] + delta[b0][g0]*delta[d1][g1] + delta[b0][g1]*delta[d1][g0]) + PQ[d1]*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0]) + PQ[g0]*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1]) + PQ[g1]*(delta[b0][d0]*delta[d1][g0] + delta[b0][d1]*delta[d0][g0] + delta[b0][g0]*delta[d0][d1])
+                        )
+
+                    )
+
+                    + F5_t[4] * (
+
+                        (-2.0) * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +PQ[b0]*PQ[d0]*PQ[d1]*delta[g0][g1]
+
+                            +PQ[g0]*(PQ[b0]*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1]) + PQ[d0]*PQ[d1]*delta[b0][g1]) + PQ[g1]*(PQ[d0]*(PQ[b0]*delta[d1][g0] + PQ[d1]*delta[b0][g0] + PQ[g0]*delta[b0][d1]) + PQ[d1]*(PQ[b0]*delta[d0][g0] + PQ[g0]*delta[b0][d0]))
+                        )
+
+                        + 4.0 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +PQ[d0]*PQ[d1]*(PB_0*PQ[g0]*PQ[g1] + PQ[b0]*(PA_x*PQ[g1] + PB_y*PQ[g0]))
+                        )
+
+                        + 4.0 * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_j * (
+                            -PQ[b0]*PQ[g0]*PQ[g1]*(PQ[d0]*QD_1 + PQ[d1]*QD_0)
+                        )
+
+                    )
+
+                    + F5_t[5] * (
+
+                        4.0 * S1 * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +PQ[b0]*PQ[d0]*PQ[d1]*PQ[g0]*PQ[g1]
+                        )
+
+                    )
+
+                    );
+
+            double hess_ij_xy = -eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+
+            atomicAdd(
+                hess_xy + prim_cart_ao_to_atom_inds[i] * natoms + prim_cart_ao_to_atom_inds[s_prim_count + j_prim],
+                hess_ij_xy * ik_factor_D * 2.0 * frac_exact_exchange);
+        }
+    }
+
+    __syncthreads();
+}
+
+__global__ void __launch_bounds__(TILE_SIZE_K)
+computeExchangeHessianSPSD_KL_0(double*         hess_xy,
+                                double*         hess_yx,
+                                const uint32_t  hess_cart_ind_0,
+                                const uint32_t  hess_cart_ind_1,
+                                const double    frac_exact_exchange,
+                                const uint32_t* pair_inds_i_for_K_ss,
+                                const uint32_t* pair_inds_k_for_K_ss,
+                                const double*   D_ik_for_K_ss,
+                                const uint32_t  pair_inds_count_for_K_ss,
+                                const double*   s_prim_info,
+                                const uint32_t* s_prim_aoinds,
+                                const uint32_t  s_prim_count,
+                                const double*   p_prim_info,
+                                const uint32_t* p_prim_aoinds,
+                                const uint32_t  p_prim_count,
+                                const double*   d_prim_info,
+                                const uint32_t* d_prim_aoinds,
+                                const uint32_t  d_prim_count,
+                                const double    pd_max_D,
+                                const double*   mat_D_full_AO,
+                                const uint32_t  naos,
+                                const double*   Q_K_sp,
+                                const double*   Q_K_sd,
+                                const uint32_t* D_inds_K_sp,
+                                const uint32_t* D_inds_K_sd,
+                                const uint32_t* pair_displs_K_sp,
+                                const uint32_t* pair_displs_K_sd,
+                                const uint32_t* pair_counts_K_sp,
+                                const uint32_t* pair_counts_K_sd,
+                                const double*   pair_data_K_sp,
+                                const double*   pair_data_K_sd,
+                                const uint32_t* prim_cart_ao_to_atom_inds,
+                                const uint32_t  natoms,
+                                const double*   boys_func_table,
+                                const double*   boys_func_ft,
+                                const double    omega,
+                                const double    eri_threshold)
+{
+    // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
+
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
+    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ double   delta[3][3];
+    __shared__ uint32_t g0, g1;
+
+    const uint32_t ik = blockIdx.x;
+
+    // we make sure that ik < pair_inds_count_for_K_ss when calling the kernel
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+        g0 = hess_cart_ind_0;
+        g1 = hess_cart_ind_1;
+
+        i = pair_inds_i_for_K_ss[ik];
+        k = pair_inds_k_for_K_ss[ik];
+
+        count_i = pair_counts_K_sp[i];
+        count_k = pair_counts_K_sd[k];
+
+        displ_i = pair_displs_K_sp[i];
+        displ_k = pair_displs_K_sd[k];
+
+        a_i = s_prim_info[i + s_prim_count * 0];
+
+        r_i[0] = s_prim_info[i + s_prim_count * 2];
+        r_i[1] = s_prim_info[i + s_prim_count * 3];
+        r_i[2] = s_prim_info[i + s_prim_count * 4];
+
+        a_k = s_prim_info[k + s_prim_count * 0];
+
+        r_k[0] = s_prim_info[k + s_prim_count * 2];
+        r_k[1] = s_prim_info[k + s_prim_count * 3];
+        r_k[2] = s_prim_info[k + s_prim_count * 4];
+
+        ik_factor_D = (static_cast<double>(i != k) + 1.0) * D_ik_for_K_ss[ik];
+
+    }
+
+    __syncthreads();
+
+    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    {
+        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+
+        // sync threads before starting a new scan
+        __syncthreads();
+
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double PB_0;
+        uint32_t j_prim, j_cgto, b0;
+
+        if (j < count_i)
+        {
+            Q_ij   = Q_K_sp[displ_i + j];
+
+            j_prim = D_inds_K_sp[displ_i + j];
+
+            j_cgto = p_prim_aoinds[(j_prim / 3) + p_prim_count * (j_prim % 3)];
+
+            a_j = p_prim_info[j_prim / 3 + p_prim_count * 0];
+
+            r_j[0] = p_prim_info[j_prim / 3 + p_prim_count * 2];
+            r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
+            r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = pair_data_K_sp[displ_i + j];
+
+
+            b0 = j_prim % 3;
+
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+
+        }
+
+        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        {
+            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+
+            // Q_kl == Q_K_sd[displ_k + l]
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_sd[displ_k + l] * pd_max_D) <= eri_threshold))
+            {
+                break;
+            }
+
+            // const auto Q_kl = Q_K_sd[displ_k + l];
+
+            const auto l_prim = D_inds_K_sd[displ_k + l];
+
+            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+
+            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+
+            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
+                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
+                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+
+            const auto S_kl_00 = pair_data_K_sd[displ_k + l];
+
+            const auto d0 = d_cart_inds[l_prim % 6][0];
+            const auto d1 = d_cart_inds[l_prim % 6][1];
+
+            // J. Chem. Phys. 84, 3963-3974 (1986)
+
+            const auto S2 = a_k + a_l;
+
+            const auto inv_S2 = 1.0 / S2;
+            const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
+
+            const auto rho = S1 * S2 * inv_S4;
+
+            double d2 = 1.0;
+
+            if (omega != 0.0) d2 = omega * omega / (rho + omega * omega);
+
+            const auto Lambda = sqrt(4.0 * rho * d2 * MATH_CONST_INV_PI);
+
+            double F5_t[6];
+
+            gpu::computeBoysFunction(F5_t, rho * d2 * r2_PQ, 5, boys_func_table, boys_func_ft);
+
+            if (omega != 0.0)
+            {
+                F5_t[1] *= d2;
+                F5_t[2] *= d2 * d2;
+                F5_t[3] *= d2 * d2 * d2;
+                F5_t[4] *= d2 * d2 * d2 * d2;
+                F5_t[5] *= d2 * d2 * d2 * d2 * d2;
+            }
+
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+
+            const auto QC_x = (a_l * inv_S2) * (r_l[g0] - r_k[g0]);
+            const auto QD_y = (-a_k * inv_S2) * (r_l[g1] - r_k[g1]);
+
+            // k-l Hessian
+
+            const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
+                    + F5_t[0] * (
+
+                        inv_S2 * inv_S2 * a_k * a_l * (
+                            +PB_0*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+                        )
+
+                        + 2.0 * inv_S2 * a_k * a_l * (
+                            +PB_0*QD_0*QD_1*delta[g0][g1]
+
+                            +PB_0*(QC_x*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1] + QD_y*delta[d0][d1]) + QD_y*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0]))
+                        )
+
+                        + (-1.0) * inv_S2 * a_k * (
+                            +PB_0*(delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+                        )
+
+                        + 4.0 * a_k * a_l * (
+                            +PB_0*QC_x*QD_0*QD_1*QD_y
+                        )
+
+                        + (-2.0) * a_k * (
+                            +PB_0*QC_x*QD_0*delta[d1][g1]
+
+                            +PB_0*QC_x*QD_1*delta[d0][g1]
+                        )
+
+                    )
+
+                    + F5_t[1] * (
+
+                        (-2.0) * S1 * inv_S2 * inv_S2 * inv_S4 * a_k * a_l * (
+                            +PB_0*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+                        )
+
+                        + inv_S2 * inv_S4 * a_k * a_l * (
+                            +QD_0*(delta[b0][d1]*delta[g0][g1] + delta[b0][g0]*delta[d1][g1] + delta[b0][g1]*delta[d1][g0])
+
+                            +QC_x*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1]) + QD_1*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0]) + QD_y*(delta[b0][d0]*delta[d1][g0] + delta[b0][d1]*delta[d0][g0] + delta[b0][g0]*delta[d0][d1])
+
+                            +PQ[b0]*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+                        )
+
+                        + (-2.0) * S1 * inv_S2 * inv_S4 * a_k * a_l * (
+                            +PB_0*delta[g0][g1]*(PQ[d1]*QD_0 + QD_1*(PQ[d0] + QD_0))
+
+                            +PB_0*(PQ[g0]*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1]) + PQ[g1]*(QC_x*delta[d0][d1] + QD_0*delta[d1][g0] + QD_1*delta[d0][g0]) + QC_x*(delta[d0][g1]*(PQ[d1] + QD_1) + delta[d1][g1]*(PQ[d0] + QD_0)) + QD_y*(delta[d0][d1]*(PQ[g0] + QC_x) + delta[d0][g0]*(PQ[d1] + QD_1) + delta[d1][g0]*(PQ[d0] + QD_0)))
+                        )
+
+                        + S1 * inv_S2 * inv_S4 * a_k * (
+                            +PB_0*(delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+                        )
+
+                        + 2.0 * inv_S4 * a_k * a_l * (
+                            +QC_x*QD_y*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0]) + QD_0*QD_1*(PQ[b0]*delta[g0][g1] + QC_x*delta[b0][g1] + QD_y*delta[b0][g0])
+
+                            +PQ[b0]*(QC_x*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1] + QD_y*delta[d0][d1]) + QD_y*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0]))
+                        )
+
+                        + (-1.0) * inv_S4 * a_k * (
+                            +PQ[b0]*(delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0]) + QC_x*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1])
+
+                            +delta[b0][g0]*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1])
+                        )
+
+                        + 4.0 * S1 * inv_S4 * a_k * a_l * (
+                            -PB_0*(QC_x*QD_1*(PQ[d0]*QD_y + PQ[g1]*QD_0) + QD_0*QD_y*(PQ[d1]*QC_x + PQ[g0]*QD_1))
+                        )
+
+                        + 2.0 * S1 * inv_S4 * a_k * (
+                            +PB_0*delta[d1][g1]*(PQ[d0]*QC_x + PQ[g0]*QD_0)
+
+                            +PB_0*delta[d0][g1]*(PQ[d1]*QC_x + PQ[g0]*QD_1)
+                        )
+
+                        + 4.0 * S2 * inv_S4 * a_k * a_l * (
+                            +PQ[b0]*QC_x*QD_0*QD_1*QD_y
+                        )
+
+                        + (-2.0) * S2 * inv_S4 * a_k * (
+                            +PQ[b0]*QC_x*QD_0*delta[d1][g1]
+
+                            +PQ[b0]*QC_x*QD_1*delta[d0][g1]
+                        )
+
+                    )
+
+                    + F5_t[2] * (
+
+                        S1 * S1 * inv_S2 * inv_S2 * inv_S4 * inv_S4 * a_k * a_l * (
+                            +PB_0*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+                        )
+
+                        + S1 * inv_S2 * inv_S4 * inv_S4 * a_k * a_l * (
+                            -2*PQ[b0]*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+
+                            +(-PQ[d0] - QD_0)*(delta[b0][d1]*delta[g0][g1] + delta[b0][g0]*delta[d1][g1] + delta[b0][g1]*delta[d1][g0]) + (-PQ[d1] - QD_1)*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0]) + (-PQ[g0] - QC_x)*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1]) + (-PQ[g1] - QD_y)*(delta[b0][d0]*delta[d1][g0] + delta[b0][d1]*delta[d0][g0] + delta[b0][g0]*delta[d0][d1])
+                        )
+
+                        + 2.0 * S1 * S1 * inv_S2 * inv_S4 * inv_S4 * a_k * a_l * (
+                            +PB_0*delta[g0][g1]*(PQ[d0]*(PQ[d1] + QD_1) + PQ[d1]*QD_0)
+
+                            +PB_0*(PQ[g1]*(QC_x*delta[d0][d1] + QD_0*delta[d1][g0] + QD_1*delta[d0][g0]) + delta[d0][g1]*(PQ[d1]*(PQ[g0] + QC_x) + PQ[g0]*QD_1) + delta[d1][g1]*(PQ[d0]*(PQ[g0] + QC_x) + PQ[g0]*QD_0) + (PQ[g1] + QD_y)*(PQ[d0]*delta[d1][g0] + PQ[d1]*delta[d0][g0] + PQ[g0]*delta[d0][d1]))
+                        )
+
+                        + (-2.0) * S1 * inv_S4 * inv_S4 * a_k * a_l * (
+                            +PQ[b0]*delta[g0][g1]*(PQ[d1]*QD_0 + QD_1*(PQ[d0] + QD_0))
+
+                            +PQ[b0]*(PQ[g0]*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1]) + PQ[g1]*(QC_x*delta[d0][d1] + QD_0*delta[d1][g0] + QD_1*delta[d0][g0]) + QC_x*(delta[d0][g1]*(PQ[d1] + QD_1) + delta[d1][g1]*(PQ[d0] + QD_0)) + QD_y*(delta[d0][d1]*(PQ[g0] + QC_x) + delta[d0][g0]*(PQ[d1] + QD_1) + delta[d1][g0]*(PQ[d0] + QD_0)))
+
+                            +QC_x*(PQ[d0]*(QD_1*delta[b0][g1] + QD_y*delta[b0][d1]) + PQ[d1]*(QD_0*delta[b0][g1] + QD_y*delta[b0][d0]) + PQ[g1]*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0])) + QD_0*(QD_1*(PQ[g0]*delta[b0][g1] + PQ[g1]*delta[b0][g0]) + QD_y*(PQ[d1]*delta[b0][g0] + PQ[g0]*delta[b0][d1])) + QD_1*QD_y*(PQ[d0]*delta[b0][g0] + PQ[g0]*delta[b0][d0])
+                        )
+
+                        + 4.0 * S1 * S1 * inv_S4 * inv_S4 * a_k * a_l * (
+                            +PB_0*(PQ[d0]*QC_x*(PQ[d1]*QD_y + PQ[g1]*QD_1) + PQ[d1]*QD_0*(PQ[g0]*QD_y + PQ[g1]*QC_x) + PQ[g0]*QD_1*(PQ[d0]*QD_y + PQ[g1]*QD_0))
+                        )
+
+                        + (-2.0) * S1 * S1 * inv_S4 * inv_S4 * a_k * (
+                            +PB_0*PQ[d0]*PQ[g0]*delta[d1][g1]
+
+                            +PB_0*PQ[d1]*PQ[g0]*delta[d0][g1]
+                        )
+
+                        + 4.0 * S1 * S2 * inv_S4 * inv_S4 * a_k * a_l * (
+                            -PQ[b0]*(QC_x*QD_1*(PQ[d0]*QD_y + PQ[g1]*QD_0) + QD_0*QD_y*(PQ[d1]*QC_x + PQ[g0]*QD_1))
+                        )
+
+                        + 2.0 * S1 * S2 * inv_S4 * inv_S4 * a_k * (
+                            +PQ[b0]*delta[d1][g1]*(PQ[d0]*QC_x + PQ[g0]*QD_0)
+
+                            +PQ[b0]*delta[d0][g1]*(PQ[d1]*QC_x + PQ[g0]*QD_1)
+                        )
+
+                        + S1 * inv_S4 * inv_S4 * a_k * (
+                            +PQ[b0]*(delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+
+                            +delta[b0][g0]*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1])
+
+                            +PQ[g0]*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1])
+                        )
+
+                    )
+
+                    + F5_t[3] * (
+
+                        (-2.0) * S1 * S1 * S1 * inv_S2 * inv_S4 * inv_S4 * inv_S4 * a_k * a_l * (
+                            +PB_0*PQ[d0]*PQ[d1]*delta[g0][g1]
+
+                            +PB_0*(PQ[g0]*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1]) + PQ[g1]*(PQ[d0]*delta[d1][g0] + PQ[d1]*delta[d0][g0]))
+                        )
+
+                        + 2.0 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * a_k * a_l * (
+                            +PQ[d0]*(PQ[b0]*delta[g0][g1]*(PQ[d1] + QD_1) + PQ[d1]*(QC_x*delta[b0][g1] + QD_y*delta[b0][g0]) + PQ[g0]*(QD_1*delta[b0][g1] + QD_y*delta[b0][d1]) + PQ[g1]*(QC_x*delta[b0][d1] + QD_1*delta[b0][g0])) + PQ[d1]*(QD_0*(PQ[b0]*delta[g0][g1] + PQ[g0]*delta[b0][g1] + PQ[g1]*delta[b0][g0]) + delta[b0][d0]*(PQ[g0]*QD_y + PQ[g1]*QC_x)) + PQ[g0]*PQ[g1]*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0])
+
+                            +PQ[b0]*(PQ[g1]*(QC_x*delta[d0][d1] + QD_0*delta[d1][g0] + QD_1*delta[d0][g0]) + delta[d0][g1]*(PQ[d1]*(PQ[g0] + QC_x) + PQ[g0]*QD_1) + delta[d1][g1]*(PQ[d0]*(PQ[g0] + QC_x) + PQ[g0]*QD_0) + (PQ[g1] + QD_y)*(PQ[d0]*delta[d1][g0] + PQ[d1]*delta[d0][g0] + PQ[g0]*delta[d0][d1]))
+                        )
+
+                        + 4.0 * S1 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * a_k * a_l * (
+                            -PB_0*(PQ[d0]*PQ[d1]*(PQ[g0]*QD_y + PQ[g1]*QC_x) + PQ[g0]*PQ[g1]*(PQ[d0]*QD_1 + PQ[d1]*QD_0))
+                        )
+
+                        + 4.0 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_k * a_l * (
+                            +PQ[b0]*(PQ[d0]*QC_x*(PQ[d1]*QD_y + PQ[g1]*QD_1) + PQ[d1]*QD_0*(PQ[g0]*QD_y + PQ[g1]*QC_x) + PQ[g0]*QD_1*(PQ[d0]*QD_y + PQ[g1]*QD_0))
+                        )
+
+                        + (-2.0) * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_k * (
+                            +PQ[b0]*PQ[d0]*PQ[g0]*delta[d1][g1]
+
+                            +PQ[b0]*PQ[d1]*PQ[g0]*delta[d0][g1]
+                        )
+
+                        + S1 * S1 * inv_S2 * inv_S4 * inv_S4 * inv_S4 * a_k * a_l * (
+                            +PQ[b0]*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+
+                            +PQ[d0]*(delta[b0][d1]*delta[g0][g1] + delta[b0][g0]*delta[d1][g1] + delta[b0][g1]*delta[d1][g0]) + PQ[d1]*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0]) + PQ[g0]*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1]) + PQ[g1]*(delta[b0][d0]*delta[d1][g0] + delta[b0][d1]*delta[d0][g0] + delta[b0][g0]*delta[d0][d1])
+                        )
+
+                    )
+
+                    + F5_t[4] * (
+
+                        (-2.0) * S1 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * a_l * (
+                            +PQ[b0]*PQ[d0]*PQ[d1]*delta[g0][g1]
+
+                            +PQ[g0]*(PQ[b0]*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1]) + PQ[d0]*PQ[d1]*delta[b0][g1]) + PQ[g1]*(PQ[d0]*(PQ[b0]*delta[d1][g0] + PQ[d1]*delta[b0][g0] + PQ[g0]*delta[b0][d1]) + PQ[d1]*(PQ[b0]*delta[d0][g0] + PQ[g0]*delta[b0][d0]))
+                        )
+
+                        + 4.0 * S1 * S1 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * a_l * (
+                            +PB_0*PQ[d0]*PQ[d1]*PQ[g0]*PQ[g1]
+                        )
+
+                        + 4.0 * S1 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * a_l * (
+                            -PQ[b0]*(PQ[d0]*PQ[d1]*(PQ[g0]*QD_y + PQ[g1]*QC_x) + PQ[g0]*PQ[g1]*(PQ[d0]*QD_1 + PQ[d1]*QD_0))
+                        )
+
+                    )
+
+                    + F5_t[5] * (
+
+                        4.0 * S1 * S1 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * a_l * (
+                            +PQ[b0]*PQ[d0]*PQ[d1]*PQ[g0]*PQ[g1]
+                        )
+
+                    )
+
+                    );
+
+            double hess_kl_xy = -eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+
+            atomicAdd(
+                hess_xy + prim_cart_ao_to_atom_inds[k] * natoms + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + l_prim],
+                hess_kl_xy * ik_factor_D * 2.0 * frac_exact_exchange);
+        }
+    }
+
+    __syncthreads();
+}
+
+__global__ void __launch_bounds__(TILE_SIZE_K)
+computeExchangeHessianSPSD_IL_0(double*         hess_xy,
+                                double*         hess_yx,
+                                const uint32_t  hess_cart_ind_0,
+                                const uint32_t  hess_cart_ind_1,
+                                const double    frac_exact_exchange,
+                                const uint32_t* pair_inds_i_for_K_ss,
+                                const uint32_t* pair_inds_k_for_K_ss,
+                                const double*   D_ik_for_K_ss,
+                                const uint32_t  pair_inds_count_for_K_ss,
+                                const double*   s_prim_info,
+                                const uint32_t* s_prim_aoinds,
+                                const uint32_t  s_prim_count,
+                                const double*   p_prim_info,
+                                const uint32_t* p_prim_aoinds,
+                                const uint32_t  p_prim_count,
+                                const double*   d_prim_info,
+                                const uint32_t* d_prim_aoinds,
+                                const uint32_t  d_prim_count,
+                                const double    pd_max_D,
+                                const double*   mat_D_full_AO,
+                                const uint32_t  naos,
+                                const double*   Q_K_sp,
+                                const double*   Q_K_sd,
+                                const uint32_t* D_inds_K_sp,
+                                const uint32_t* D_inds_K_sd,
+                                const uint32_t* pair_displs_K_sp,
+                                const uint32_t* pair_displs_K_sd,
+                                const uint32_t* pair_counts_K_sp,
+                                const uint32_t* pair_counts_K_sd,
+                                const double*   pair_data_K_sp,
+                                const double*   pair_data_K_sd,
+                                const uint32_t* prim_cart_ao_to_atom_inds,
+                                const uint32_t  natoms,
+                                const double*   boys_func_table,
+                                const double*   boys_func_ft,
+                                const double    omega,
+                                const double    eri_threshold)
+{
+    // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
+
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
+    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ double   delta[3][3];
+    __shared__ uint32_t g0, g1;
+
+    const uint32_t ik = blockIdx.x;
+
+    // we make sure that ik < pair_inds_count_for_K_ss when calling the kernel
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+        g0 = hess_cart_ind_0;
+        g1 = hess_cart_ind_1;
+
+        i = pair_inds_i_for_K_ss[ik];
+        k = pair_inds_k_for_K_ss[ik];
+
+        count_i = pair_counts_K_sp[i];
+        count_k = pair_counts_K_sd[k];
+
+        displ_i = pair_displs_K_sp[i];
+        displ_k = pair_displs_K_sd[k];
+
+        a_i = s_prim_info[i + s_prim_count * 0];
+
+        r_i[0] = s_prim_info[i + s_prim_count * 2];
+        r_i[1] = s_prim_info[i + s_prim_count * 3];
+        r_i[2] = s_prim_info[i + s_prim_count * 4];
+
+        a_k = s_prim_info[k + s_prim_count * 0];
+
+        r_k[0] = s_prim_info[k + s_prim_count * 2];
+        r_k[1] = s_prim_info[k + s_prim_count * 3];
+        r_k[2] = s_prim_info[k + s_prim_count * 4];
+
+        ik_factor_D = (static_cast<double>(i != k) + 1.0) * D_ik_for_K_ss[ik];
+
+    }
+
+    __syncthreads();
+
+    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    {
+        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+
+        // sync threads before starting a new scan
+        __syncthreads();
+
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double PB_0, PA_x;
+        uint32_t j_prim, j_cgto, b0;
+
+        if (j < count_i)
+        {
+            Q_ij   = Q_K_sp[displ_i + j];
+
+            j_prim = D_inds_K_sp[displ_i + j];
+
+            j_cgto = p_prim_aoinds[(j_prim / 3) + p_prim_count * (j_prim % 3)];
+
+            a_j = p_prim_info[j_prim / 3 + p_prim_count * 0];
+
+            r_j[0] = p_prim_info[j_prim / 3 + p_prim_count * 2];
+            r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
+            r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = pair_data_K_sp[displ_i + j];
+
+            PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            b0 = j_prim % 3;
+
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+
+        }
+
+        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        {
+            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+
+            // Q_kl == Q_K_sd[displ_k + l]
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_sd[displ_k + l] * pd_max_D) <= eri_threshold))
+            {
+                break;
+            }
+
+            // const auto Q_kl = Q_K_sd[displ_k + l];
+
+            const auto l_prim = D_inds_K_sd[displ_k + l];
+
+            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+
+            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+
+            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
+                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
+                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+
+            const auto S_kl_00 = pair_data_K_sd[displ_k + l];
+
+            const auto d0 = d_cart_inds[l_prim % 6][0];
+            const auto d1 = d_cart_inds[l_prim % 6][1];
+
+            // J. Chem. Phys. 84, 3963-3974 (1986)
+
+            const auto S2 = a_k + a_l;
+
+            const auto inv_S2 = 1.0 / S2;
+            const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
+
+            const auto rho = S1 * S2 * inv_S4;
+
+            double d2 = 1.0;
+
+            if (omega != 0.0) d2 = omega * omega / (rho + omega * omega);
+
+            const auto Lambda = sqrt(4.0 * rho * d2 * MATH_CONST_INV_PI);
+
+            double F5_t[6];
+
+            gpu::computeBoysFunction(F5_t, rho * d2 * r2_PQ, 5, boys_func_table, boys_func_ft);
+
+            if (omega != 0.0)
+            {
+                F5_t[1] *= d2;
+                F5_t[2] *= d2 * d2;
+                F5_t[3] *= d2 * d2 * d2;
+                F5_t[4] *= d2 * d2 * d2 * d2;
+                F5_t[5] *= d2 * d2 * d2 * d2 * d2;
+            }
+
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+
+            const auto QD_y = (-a_k * inv_S2) * (r_l[g1] - r_k[g1]);
+
+            // i-l Hessian
+
+            const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
+                    + F5_t[0] * (
+
+                        inv_S1 * inv_S2 * a_i * a_l * (
+                            +QD_0*delta[b0][g0]*delta[d1][g1]
+
+                            +delta[b0][g0]*(QD_1*delta[d0][g1] + QD_y*delta[d0][d1])
+                        )
+
+                        + 2.0 * inv_S1 * a_i * a_l * (
+                            +QD_0*QD_1*QD_y*delta[b0][g0]
+                        )
+
+                        + (-1.0) * inv_S1 * a_i * (
+                            +QD_0*delta[b0][g0]*delta[d1][g1]
+
+                            +QD_1*delta[b0][g0]*delta[d0][g1]
+                        )
+
+                        + 2.0 * inv_S2 * a_i * a_l * (
+                            +PA_x*PB_0*QD_0*delta[d1][g1]
+
+                            +PA_x*PB_0*(QD_1*delta[d0][g1] + QD_y*delta[d0][d1])
+                        )
+
+                        + 4.0 * a_i * a_l * (
+                            +PA_x*PB_0*QD_0*QD_1*QD_y
+                        )
+
+                        + (-2.0) * a_i * (
+                            +PA_x*PB_0*QD_0*delta[d1][g1]
+
+                            +PA_x*PB_0*QD_1*delta[d0][g1]
+                        )
+
+                    )
+
+                    + F5_t[1] * (
+
+                        (-1.0) * inv_S1 * inv_S4 * a_i * a_l * (
+                            +QD_0*delta[b0][g0]*delta[d1][g1]
+
+                            +delta[b0][g0]*(QD_1*delta[d0][g1] + QD_y*delta[d0][d1])
+                        )
+
+                        + inv_S2 * inv_S4 * a_i * a_l * (
+                            +PB_0*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+
+                            -delta[b0][g0]*(delta[d0][d1]*(PQ[g1] + QD_y) + delta[d0][g1]*(PQ[d1] + QD_1) + delta[d1][g1]*(PQ[d0] + QD_0))
+
+                            +PA_x*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1])
+                        )
+
+                        + (-2.0) * S1 * inv_S2 * inv_S4 * a_i * a_l * (
+                            +PA_x*PB_0*delta[d1][g1]*(PQ[d0] + QD_0)
+
+                            +PA_x*PB_0*(delta[d0][d1]*(PQ[g1] + QD_y) + delta[d0][g1]*(PQ[d1] + QD_1))
+                        )
+
+                        + (-2.0) * S2 * inv_S1 * inv_S4 * a_i * a_l * (
+                            +QD_0*QD_1*QD_y*delta[b0][g0]
+                        )
+
+                        + S2 * inv_S1 * inv_S4 * a_i * (
+                            +QD_0*delta[b0][g0]*delta[d1][g1]
+
+                            +QD_1*delta[b0][g0]*delta[d0][g1]
+                        )
+
+                        + 2.0 * inv_S4 * a_i * a_l * (
+                            +QD_0*delta[d1][g1]*(PA_x*PQ[b0] + PB_0*PQ[g0])
+
+                            +(PA_x*PQ[b0] + PB_0*PQ[g0])*(QD_1*delta[d0][g1] + QD_y*delta[d0][d1])
+
+                            +QD_0*(PA_x*(QD_1*delta[b0][g1] + QD_y*delta[b0][d1]) + PB_0*(QD_1*delta[g0][g1] + QD_y*delta[d1][g0])) + QD_1*QD_y*(PA_x*delta[b0][d0] + PB_0*delta[d0][g0])
+
+                            -delta[b0][g0]*(PQ[d1]*QD_0*QD_y + QD_1*(PQ[d0]*QD_y + PQ[g1]*QD_0))
+                        )
+
+                        + inv_S4 * a_i * (
+                            -PB_0*(delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+
+                            -PA_x*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1])
+
+                            +delta[b0][g0]*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1])
+                        )
+
+                        + 4.0 * S1 * inv_S4 * a_i * a_l * (
+                            -PA_x*PB_0*(PQ[d1]*QD_0*QD_y + QD_1*(PQ[d0]*QD_y + PQ[g1]*QD_0))
+                        )
+
+                        + 2.0 * S1 * inv_S4 * a_i * (
+                            +PA_x*PB_0*PQ[d0]*delta[d1][g1]
+
+                            +PA_x*PB_0*PQ[d1]*delta[d0][g1]
+                        )
+
+                        + 4.0 * S2 * inv_S4 * a_i * a_l * (
+                            +QD_0*QD_1*QD_y*(PA_x*PQ[b0] + PB_0*PQ[g0])
+                        )
+
+                        + (-2.0) * S2 * inv_S4 * a_i * (
+                            +QD_0*delta[d1][g1]*(PA_x*PQ[b0] + PB_0*PQ[g0])
+
+                            +QD_1*delta[d0][g1]*(PA_x*PQ[b0] + PB_0*PQ[g0])
+                        )
+
+                    )
+
+                    + F5_t[2] * (
+
+                        S1 * inv_S2 * inv_S4 * inv_S4 * a_i * a_l * (
+                            -PB_0*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+
+                            -PA_x*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1])
+
+                            +delta[b0][g0]*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1])
+                        )
+
+                        + inv_S4 * inv_S4 * a_i * a_l * (
+                            +QD_0*(delta[b0][d1]*delta[g0][g1] + delta[b0][g1]*delta[d1][g0])
+
+                            +delta[b0][g0]*(delta[d0][d1]*(PQ[g1] + QD_y) + delta[d0][g1]*(PQ[d1] + QD_1) + delta[d1][g1]*(PQ[d0] + QD_0))
+
+                            +QD_1*(delta[b0][d0]*delta[g0][g1] + delta[b0][g1]*delta[d0][g0]) + QD_y*(delta[b0][d0]*delta[d1][g0] + delta[b0][d1]*delta[d0][g0])
+
+                            +PQ[b0]*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0]) + PQ[g0]*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1])
+                        )
+
+                        + 2.0 * S1 * S1 * inv_S2 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +PA_x*PB_0*PQ[d0]*delta[d1][g1]
+
+                            +PA_x*PB_0*(PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1])
+                        )
+
+                        + 2.0 * S1 * inv_S4 * inv_S4 * a_i * a_l * (
+                            -delta[d1][g1]*(PQ[d0] + QD_0)*(PA_x*PQ[b0] + PB_0*PQ[g0])
+
+                            -PA_x*(PQ[d0]*(QD_1*delta[b0][g1] + QD_y*delta[b0][d1]) + PQ[d1]*(QD_0*delta[b0][g1] + QD_y*delta[b0][d0]) + PQ[g1]*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0])) - PB_0*(PQ[d0]*(QD_1*delta[g0][g1] + QD_y*delta[d1][g0]) + PQ[d1]*(QD_0*delta[g0][g1] + QD_y*delta[d0][g0]) + PQ[g1]*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0]))
+
+                            -(PA_x*PQ[b0] + PB_0*PQ[g0])*(delta[d0][d1]*(PQ[g1] + QD_y) + delta[d0][g1]*(PQ[d1] + QD_1))
+
+                            +delta[b0][g0]*(PQ[d0]*(PQ[d1]*QD_y + PQ[g1]*QD_1) + PQ[d1]*PQ[g1]*QD_0)
+                        )
+
+                        + 2.0 * S2 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +QD_0*(PQ[b0]*(PQ[g0]*delta[d1][g1] + QD_1*delta[g0][g1] + QD_y*delta[d1][g0]) + PQ[g0]*(QD_1*delta[b0][g1] + QD_y*delta[b0][d1])) + QD_1*QD_y*(PQ[b0]*delta[d0][g0] + PQ[g0]*delta[b0][d0])
+
+                            +PQ[b0]*PQ[g0]*(QD_1*delta[d0][g1] + QD_y*delta[d0][d1])
+
+                            +delta[b0][g0]*(PQ[d1]*QD_0*QD_y + QD_1*(PQ[d0]*QD_y + PQ[g1]*QD_0))
+                        )
+
+                        + (-1.0) * S2 * inv_S4 * inv_S4 * a_i * (
+                            +PQ[b0]*(delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+
+                            +delta[b0][g0]*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1])
+
+                            +PQ[g0]*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1])
+                        )
+
+                        + 4.0 * S1 * S1 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +PA_x*PB_0*(PQ[d0]*(PQ[d1]*QD_y + PQ[g1]*QD_1) + PQ[d1]*PQ[g1]*QD_0)
+                        )
+
+                        + 4.0 * S1 * S2 * inv_S4 * inv_S4 * a_i * a_l * (
+                            -(PA_x*PQ[b0] + PB_0*PQ[g0])*(PQ[d1]*QD_0*QD_y + QD_1*(PQ[d0]*QD_y + PQ[g1]*QD_0))
+                        )
+
+                        + 2.0 * S1 * S2 * inv_S4 * inv_S4 * a_i * (
+                            +PQ[d0]*delta[d1][g1]*(PA_x*PQ[b0] + PB_0*PQ[g0])
+
+                            +PQ[d1]*delta[d0][g1]*(PA_x*PQ[b0] + PB_0*PQ[g0])
+                        )
+
+                        + 4.0 * S2 * S2 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +PQ[b0]*PQ[g0]*QD_0*QD_1*QD_y
+                        )
+
+                        + (-2.0) * S2 * S2 * inv_S4 * inv_S4 * a_i * (
+                            +PQ[b0]*PQ[g0]*QD_0*delta[d1][g1]
+
+                            +PQ[b0]*PQ[g0]*QD_1*delta[d0][g1]
+                        )
+
+                    )
+
+                    + F5_t[3] * (
+
+                        (-1.0) * S1 * inv_S4 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +PQ[b0]*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+
+                            +PQ[d0]*(delta[b0][d1]*delta[g0][g1] + delta[b0][g0]*delta[d1][g1] + delta[b0][g1]*delta[d1][g0]) + PQ[d1]*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0]) + PQ[g0]*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1]) + PQ[g1]*(delta[b0][d0]*delta[d1][g0] + delta[b0][d1]*delta[d0][g0] + delta[b0][g0]*delta[d0][d1])
+                        )
+
+                        + 2.0 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +PB_0*PQ[d0]*PQ[d1]*delta[g0][g1]
+
+                            +(PA_x*PQ[b0] + PB_0*PQ[g0])*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1])
+
+                            +PQ[d0]*(PA_x*(PQ[d1]*delta[b0][g1] + PQ[g1]*delta[b0][d1]) + PB_0*PQ[g1]*delta[d1][g0]) + PQ[d1]*PQ[g1]*(PA_x*delta[b0][d0] + PB_0*delta[d0][g0])
+
+                            -PQ[d0]*PQ[d1]*PQ[g1]*delta[b0][g0]
+                        )
+
+                        + (-2.0) * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +PQ[b0]*(PQ[d0]*(QD_1*delta[g0][g1] + QD_y*delta[d1][g0]) + PQ[d1]*(QD_0*delta[g0][g1] + QD_y*delta[d0][g0]) + PQ[g0]*delta[d1][g1]*(PQ[d0] + QD_0) + PQ[g1]*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0])) + PQ[g0]*(PQ[d0]*(QD_1*delta[b0][g1] + QD_y*delta[b0][d1]) + PQ[d1]*(QD_0*delta[b0][g1] + QD_y*delta[b0][d0]) + PQ[g1]*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0]))
+
+                            +PQ[b0]*PQ[g0]*(delta[d0][d1]*(PQ[g1] + QD_y) + delta[d0][g1]*(PQ[d1] + QD_1))
+
+                            +delta[b0][g0]*(PQ[d0]*(PQ[d1]*QD_y + PQ[g1]*QD_1) + PQ[d1]*PQ[g1]*QD_0)
+                        )
+
+                        + 4.0 * S1 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * a_i * a_l * (
+                            -PA_x*PB_0*PQ[d0]*PQ[d1]*PQ[g1]
+                        )
+
+                        + 4.0 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +(PA_x*PQ[b0] + PB_0*PQ[g0])*(PQ[d0]*(PQ[d1]*QD_y + PQ[g1]*QD_1) + PQ[d1]*PQ[g1]*QD_0)
+                        )
+
+                        + 4.0 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_l * (
+                            -PQ[b0]*PQ[g0]*(PQ[d1]*QD_0*QD_y + QD_1*(PQ[d0]*QD_y + PQ[g1]*QD_0))
+                        )
+
+                        + 2.0 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * (
+                            +PQ[b0]*PQ[d0]*PQ[g0]*delta[d1][g1]
+
+                            +PQ[b0]*PQ[d1]*PQ[g0]*delta[d0][g1]
+                        )
+
+                    )
+
+                    + F5_t[4] * (
+
+                        4.0 * S1 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_l * (
+                            -PQ[d0]*PQ[d1]*PQ[g1]*(PA_x*PQ[b0] + PB_0*PQ[g0])
+                        )
+
+                        + 4.0 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +PQ[b0]*PQ[g0]*(PQ[d0]*(PQ[d1]*QD_y + PQ[g1]*QD_1) + PQ[d1]*PQ[g1]*QD_0)
+                        )
+
+                        + 2.0 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +PQ[b0]*PQ[d0]*PQ[d1]*delta[g0][g1]
+
+                            +PQ[g0]*(PQ[b0]*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1]) + PQ[d0]*PQ[d1]*delta[b0][g1]) + PQ[g1]*(PQ[d0]*(PQ[b0]*delta[d1][g0] + PQ[d1]*delta[b0][g0] + PQ[g0]*delta[b0][d1]) + PQ[d1]*(PQ[b0]*delta[d0][g0] + PQ[g0]*delta[b0][d0]))
+                        )
+
+                    )
+
+                    + F5_t[5] * (
+
+                        (-4.0) * S1 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +PQ[b0]*PQ[d0]*PQ[d1]*PQ[g0]*PQ[g1]
+                        )
+
+                    )
+
+                    );
+
+            double hess_il_xy = -eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+
+            atomicAdd(
+                hess_xy + prim_cart_ao_to_atom_inds[i] * natoms + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + l_prim],
+                hess_il_xy * ik_factor_D * frac_exact_exchange);
+
+            atomicAdd(
+                hess_yx + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + l_prim] * natoms + prim_cart_ao_to_atom_inds[i],
+                hess_il_xy * ik_factor_D * frac_exact_exchange);
+        }
+    }
+
+    __syncthreads();
+}
+
+__global__ void __launch_bounds__(TILE_SIZE_K)
+computeExchangeHessianSPSD_JK_0(double*         hess_xy,
+                                double*         hess_yx,
+                                const uint32_t  hess_cart_ind_0,
+                                const uint32_t  hess_cart_ind_1,
+                                const double    frac_exact_exchange,
+                                const uint32_t* pair_inds_i_for_K_ss,
+                                const uint32_t* pair_inds_k_for_K_ss,
+                                const double*   D_ik_for_K_ss,
+                                const uint32_t  pair_inds_count_for_K_ss,
+                                const double*   s_prim_info,
+                                const uint32_t* s_prim_aoinds,
+                                const uint32_t  s_prim_count,
+                                const double*   p_prim_info,
+                                const uint32_t* p_prim_aoinds,
+                                const uint32_t  p_prim_count,
+                                const double*   d_prim_info,
+                                const uint32_t* d_prim_aoinds,
+                                const uint32_t  d_prim_count,
+                                const double    pd_max_D,
+                                const double*   mat_D_full_AO,
+                                const uint32_t  naos,
+                                const double*   Q_K_sp,
+                                const double*   Q_K_sd,
+                                const uint32_t* D_inds_K_sp,
+                                const uint32_t* D_inds_K_sd,
+                                const uint32_t* pair_displs_K_sp,
+                                const uint32_t* pair_displs_K_sd,
+                                const uint32_t* pair_counts_K_sp,
+                                const uint32_t* pair_counts_K_sd,
+                                const double*   pair_data_K_sp,
+                                const double*   pair_data_K_sd,
+                                const uint32_t* prim_cart_ao_to_atom_inds,
+                                const uint32_t  natoms,
+                                const double*   boys_func_table,
+                                const double*   boys_func_ft,
+                                const double    omega,
+                                const double    eri_threshold)
+{
+    // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
+
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
+    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ double   delta[3][3];
+    __shared__ uint32_t g0, g1;
+
+    const uint32_t ik = blockIdx.x;
+
+    // we make sure that ik < pair_inds_count_for_K_ss when calling the kernel
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+        g0 = hess_cart_ind_0;
+        g1 = hess_cart_ind_1;
+
+        i = pair_inds_i_for_K_ss[ik];
+        k = pair_inds_k_for_K_ss[ik];
+
+        count_i = pair_counts_K_sp[i];
+        count_k = pair_counts_K_sd[k];
+
+        displ_i = pair_displs_K_sp[i];
+        displ_k = pair_displs_K_sd[k];
+
+        a_i = s_prim_info[i + s_prim_count * 0];
+
+        r_i[0] = s_prim_info[i + s_prim_count * 2];
+        r_i[1] = s_prim_info[i + s_prim_count * 3];
+        r_i[2] = s_prim_info[i + s_prim_count * 4];
+
+        a_k = s_prim_info[k + s_prim_count * 0];
+
+        r_k[0] = s_prim_info[k + s_prim_count * 2];
+        r_k[1] = s_prim_info[k + s_prim_count * 3];
+        r_k[2] = s_prim_info[k + s_prim_count * 4];
+
+        ik_factor_D = (static_cast<double>(i != k) + 1.0) * D_ik_for_K_ss[ik];
+
+    }
+
+    __syncthreads();
+
+    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    {
+        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+
+        // sync threads before starting a new scan
+        __syncthreads();
+
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double PB_0, PB_x;
+        uint32_t j_prim, j_cgto, b0;
+
+        if (j < count_i)
+        {
+            Q_ij   = Q_K_sp[displ_i + j];
+
+            j_prim = D_inds_K_sp[displ_i + j];
+
+            j_cgto = p_prim_aoinds[(j_prim / 3) + p_prim_count * (j_prim % 3)];
+
+            a_j = p_prim_info[j_prim / 3 + p_prim_count * 0];
+
+            r_j[0] = p_prim_info[j_prim / 3 + p_prim_count * 2];
+            r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
+            r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = pair_data_K_sp[displ_i + j];
+
+            PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            b0 = j_prim % 3;
+
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+
+        }
+
+        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        {
+            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+
+            // Q_kl == Q_K_sd[displ_k + l]
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_sd[displ_k + l] * pd_max_D) <= eri_threshold))
+            {
+                break;
+            }
+
+            // const auto Q_kl = Q_K_sd[displ_k + l];
+
+            const auto l_prim = D_inds_K_sd[displ_k + l];
+
+            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+
+            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+
+            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
+                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
+                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+
+            const auto S_kl_00 = pair_data_K_sd[displ_k + l];
+
+            const auto d0 = d_cart_inds[l_prim % 6][0];
+            const auto d1 = d_cart_inds[l_prim % 6][1];
+
+            // J. Chem. Phys. 84, 3963-3974 (1986)
+
+            const auto S2 = a_k + a_l;
+
+            const auto inv_S2 = 1.0 / S2;
+            const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
+
+            const auto rho = S1 * S2 * inv_S4;
+
+            double d2 = 1.0;
+
+            if (omega != 0.0) d2 = omega * omega / (rho + omega * omega);
+
+            const auto Lambda = sqrt(4.0 * rho * d2 * MATH_CONST_INV_PI);
+
+            double F5_t[6];
+
+            gpu::computeBoysFunction(F5_t, rho * d2 * r2_PQ, 5, boys_func_table, boys_func_ft);
+
+            if (omega != 0.0)
+            {
+                F5_t[1] *= d2;
+                F5_t[2] *= d2 * d2;
+                F5_t[3] *= d2 * d2 * d2;
+                F5_t[4] *= d2 * d2 * d2 * d2;
+                F5_t[5] *= d2 * d2 * d2 * d2 * d2;
+            }
+
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+
+            const auto QC_y = (a_l * inv_S2) * (r_l[g1] - r_k[g1]);
+
+            // j-k Hessian
+
+            const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
+                    + F5_t[0] * (
+
+                        inv_S1 * inv_S2 * a_j * a_k * (
+                            +QD_0*delta[b0][g0]*delta[d1][g1]
+
+                            +delta[b0][g0]*(QC_y*delta[d0][d1] + QD_1*delta[d0][g1])
+                        )
+
+                        + 2.0 * inv_S1 * a_j * a_k * (
+                            +QC_y*QD_0*QD_1*delta[b0][g0]
+                        )
+
+                        + 2.0 * inv_S2 * a_j * a_k * (
+                            +PB_0*PB_x*QD_0*delta[d1][g1]
+
+                            +PB_0*PB_x*(QC_y*delta[d0][d1] + QD_1*delta[d0][g1])
+                        )
+
+                        + (-1.0) * inv_S2 * a_k * (
+                            +QD_0*delta[b0][g0]*delta[d1][g1]
+
+                            +delta[b0][g0]*(QC_y*delta[d0][d1] + QD_1*delta[d0][g1])
+                        )
+
+                        + 4.0 * a_j * a_k * (
+                            +PB_0*PB_x*QC_y*QD_0*QD_1
+                        )
+
+                        + (-2.0) * a_k * (
+                            +QC_y*QD_0*QD_1*delta[b0][g0]
+                        )
+
+                    )
+
+                    + F5_t[1] * (
+
+                        (-1.0) * inv_S1 * inv_S4 * a_j * a_k * (
+                            +QD_0*delta[b0][g0]*delta[d1][g1]
+
+                            +delta[b0][g0]*(QC_y*delta[d0][d1] + QD_1*delta[d0][g1])
+                        )
+
+                        + inv_S2 * inv_S4 * a_j * a_k * (
+                            +PB_0*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+
+                            +PB_x*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1])
+
+                            -delta[b0][g0]*(delta[d0][d1]*(PQ[g1] + QC_y) + delta[d0][g1]*(PQ[d1] + QD_1) + delta[d1][g1]*(PQ[d0] + QD_0))
+                        )
+
+                        + (-2.0) * S1 * inv_S2 * inv_S4 * a_j * a_k * (
+                            +PB_0*PB_x*delta[d1][g1]*(PQ[d0] + QD_0)
+
+                            +PB_0*PB_x*(delta[d0][d1]*(PQ[g1] + QC_y) + delta[d0][g1]*(PQ[d1] + QD_1))
+                        )
+
+                        + S1 * inv_S2 * inv_S4 * a_k * (
+                            +delta[b0][g0]*delta[d1][g1]*(PQ[d0] + QD_0)
+
+                            +delta[b0][g0]*(delta[d0][d1]*(PQ[g1] + QC_y) + delta[d0][g1]*(PQ[d1] + QD_1))
+                        )
+
+                        + (-2.0) * S2 * inv_S1 * inv_S4 * a_j * a_k * (
+                            +QC_y*QD_0*QD_1*delta[b0][g0]
+                        )
+
+                        + 2.0 * inv_S4 * a_j * a_k * (
+                            +QD_0*delta[d1][g1]*(PB_0*PQ[g0] + PB_x*PQ[b0])
+
+                            +(PB_0*PQ[g0] + PB_x*PQ[b0])*(QC_y*delta[d0][d1] + QD_1*delta[d0][g1])
+
+                            +QC_y*(PB_0*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0]) + PB_x*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0])) + QD_0*QD_1*(PB_0*delta[g0][g1] + PB_x*delta[b0][g1])
+
+                            -delta[b0][g0]*(PQ[g1]*QD_0*QD_1 + QC_y*(PQ[d0]*QD_1 + PQ[d1]*QD_0))
+                        )
+
+                        + 4.0 * S1 * inv_S4 * a_j * a_k * (
+                            -PB_0*PB_x*(PQ[g1]*QD_0*QD_1 + QC_y*(PQ[d0]*QD_1 + PQ[d1]*QD_0))
+                        )
+
+                        + 2.0 * S1 * inv_S4 * a_k * (
+                            +delta[b0][g0]*(PQ[g1]*QD_0*QD_1 + QC_y*(PQ[d0]*QD_1 + PQ[d1]*QD_0))
+                        )
+
+                        + 4.0 * S2 * inv_S4 * a_j * a_k * (
+                            +QC_y*QD_0*QD_1*(PB_0*PQ[g0] + PB_x*PQ[b0])
+                        )
+
+                    )
+
+                    + F5_t[2] * (
+
+                        S1 * inv_S2 * inv_S4 * inv_S4 * a_j * a_k * (
+                            -PB_0*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+
+                            -PB_x*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1])
+
+                            +delta[b0][g0]*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1])
+                        )
+
+                        + inv_S4 * inv_S4 * a_j * a_k * (
+                            +QD_0*(delta[b0][d1]*delta[g0][g1] + delta[b0][g1]*delta[d1][g0])
+
+                            +delta[b0][g0]*(delta[d0][d1]*(PQ[g1] + QC_y) + delta[d0][g1]*(PQ[d1] + QD_1) + delta[d1][g1]*(PQ[d0] + QD_0))
+
+                            +QC_y*(delta[b0][d0]*delta[d1][g0] + delta[b0][d1]*delta[d0][g0]) + QD_1*(delta[b0][d0]*delta[g0][g1] + delta[b0][g1]*delta[d0][g0])
+
+                            +PQ[b0]*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0]) + PQ[g0]*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1])
+                        )
+
+                        + 2.0 * S1 * S1 * inv_S2 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +PB_0*PB_x*PQ[d0]*delta[d1][g1]
+
+                            +PB_0*PB_x*(PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1])
+                        )
+
+                        + (-1.0) * S1 * S1 * inv_S2 * inv_S4 * inv_S4 * a_k * (
+                            +PQ[d0]*delta[b0][g0]*delta[d1][g1]
+
+                            +delta[b0][g0]*(PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1])
+                        )
+
+                        + 2.0 * S1 * inv_S4 * inv_S4 * a_j * a_k * (
+                            -delta[d1][g1]*(PQ[d0] + QD_0)*(PB_0*PQ[g0] + PB_x*PQ[b0])
+
+                            -PB_0*(PQ[d0]*(QC_y*delta[d1][g0] + QD_1*delta[g0][g1]) + PQ[d1]*(QC_y*delta[d0][g0] + QD_0*delta[g0][g1]) + PQ[g1]*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0])) - PB_x*(PQ[d0]*(QC_y*delta[b0][d1] + QD_1*delta[b0][g1]) + PQ[d1]*(QC_y*delta[b0][d0] + QD_0*delta[b0][g1]) + PQ[g1]*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0]))
+
+                            -(PB_0*PQ[g0] + PB_x*PQ[b0])*(delta[d0][d1]*(PQ[g1] + QC_y) + delta[d0][g1]*(PQ[d1] + QD_1))
+
+                            +delta[b0][g0]*(PQ[d0]*(PQ[d1]*QC_y + PQ[g1]*QD_1) + PQ[d1]*PQ[g1]*QD_0)
+                        )
+
+                        + 2.0 * S2 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +QC_y*QD_1*(PQ[b0]*delta[d0][g0] + PQ[g0]*delta[b0][d0]) + QD_0*(PQ[b0]*(PQ[g0]*delta[d1][g1] + QC_y*delta[d1][g0] + QD_1*delta[g0][g1]) + PQ[g0]*(QC_y*delta[b0][d1] + QD_1*delta[b0][g1]))
+
+                            +PQ[b0]*PQ[g0]*(QC_y*delta[d0][d1] + QD_1*delta[d0][g1])
+
+                            +delta[b0][g0]*(PQ[g1]*QD_0*QD_1 + QC_y*(PQ[d0]*QD_1 + PQ[d1]*QD_0))
+                        )
+
+                        + 4.0 * S1 * S1 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +PB_0*PB_x*(PQ[d0]*(PQ[d1]*QC_y + PQ[g1]*QD_1) + PQ[d1]*PQ[g1]*QD_0)
+                        )
+
+                        + (-2.0) * S1 * S1 * inv_S4 * inv_S4 * a_k * (
+                            +delta[b0][g0]*(PQ[d0]*(PQ[d1]*QC_y + PQ[g1]*QD_1) + PQ[d1]*PQ[g1]*QD_0)
+                        )
+
+                        + 4.0 * S1 * S2 * inv_S4 * inv_S4 * a_j * a_k * (
+                            -(PB_0*PQ[g0] + PB_x*PQ[b0])*(PQ[g1]*QD_0*QD_1 + QC_y*(PQ[d0]*QD_1 + PQ[d1]*QD_0))
+                        )
+
+                        + 4.0 * S2 * S2 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +PQ[b0]*PQ[g0]*QC_y*QD_0*QD_1
+                        )
+
+                    )
+
+                    + F5_t[3] * (
+
+                        (-1.0) * S1 * inv_S4 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +PQ[b0]*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+
+                            +PQ[d0]*(delta[b0][d1]*delta[g0][g1] + delta[b0][g0]*delta[d1][g1] + delta[b0][g1]*delta[d1][g0]) + PQ[d1]*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0]) + PQ[g0]*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1]) + PQ[g1]*(delta[b0][d0]*delta[d1][g0] + delta[b0][d1]*delta[d0][g0] + delta[b0][g0]*delta[d0][d1])
+                        )
+
+                        + 2.0 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +PB_0*PQ[d0]*PQ[d1]*delta[g0][g1]
+
+                            +(PB_0*PQ[g0] + PB_x*PQ[b0])*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1])
+
+                            +PB_x*PQ[d0]*(PQ[d1]*delta[b0][g1] + PQ[g1]*delta[b0][d1]) + PQ[g1]*(PB_0*(PQ[d0]*delta[d1][g0] + PQ[d1]*delta[d0][g0]) + PB_x*PQ[d1]*delta[b0][d0])
+
+                            -PQ[d0]*PQ[d1]*PQ[g1]*delta[b0][g0]
+                        )
+
+                        + (-2.0) * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +PQ[b0]*(PQ[d0]*(QC_y*delta[d1][g0] + QD_1*delta[g0][g1]) + PQ[d1]*(QC_y*delta[d0][g0] + QD_0*delta[g0][g1]) + PQ[g0]*delta[d1][g1]*(PQ[d0] + QD_0) + PQ[g1]*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0])) + PQ[g0]*(PQ[d0]*(QC_y*delta[b0][d1] + QD_1*delta[b0][g1]) + PQ[d1]*(QC_y*delta[b0][d0] + QD_0*delta[b0][g1]) + PQ[g1]*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0]))
+
+                            +PQ[b0]*PQ[g0]*(delta[d0][d1]*(PQ[g1] + QC_y) + delta[d0][g1]*(PQ[d1] + QD_1))
+
+                            +delta[b0][g0]*(PQ[d0]*(PQ[d1]*QC_y + PQ[g1]*QD_1) + PQ[d1]*PQ[g1]*QD_0)
+                        )
+
+                        + 4.0 * S1 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * a_j * a_k * (
+                            -PB_0*PB_x*PQ[d0]*PQ[d1]*PQ[g1]
+                        )
+
+                        + 4.0 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +(PB_0*PQ[g0] + PB_x*PQ[b0])*(PQ[d0]*(PQ[d1]*QC_y + PQ[g1]*QD_1) + PQ[d1]*PQ[g1]*QD_0)
+                        )
+
+                        + 4.0 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_j * a_k * (
+                            -PQ[b0]*PQ[g0]*(PQ[g1]*QD_0*QD_1 + QC_y*(PQ[d0]*QD_1 + PQ[d1]*QD_0))
+                        )
+
+                        + 2.0 * S1 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * a_k * (
+                            +PQ[d0]*PQ[d1]*PQ[g1]*delta[b0][g0]
+                        )
+
+                    )
+
+                    + F5_t[4] * (
+
+                        4.0 * S1 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_j * a_k * (
+                            -PQ[d0]*PQ[d1]*PQ[g1]*(PB_0*PQ[g0] + PB_x*PQ[b0])
+                        )
+
+                        + 4.0 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +PQ[b0]*PQ[g0]*(PQ[d0]*(PQ[d1]*QC_y + PQ[g1]*QD_1) + PQ[d1]*PQ[g1]*QD_0)
+                        )
+
+                        + 2.0 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +PQ[b0]*PQ[d0]*PQ[d1]*delta[g0][g1]
+
+                            +PQ[g0]*(PQ[b0]*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1]) + PQ[d0]*PQ[d1]*delta[b0][g1]) + PQ[g1]*(PQ[d0]*(PQ[b0]*delta[d1][g0] + PQ[d1]*delta[b0][g0] + PQ[g0]*delta[b0][d1]) + PQ[d1]*(PQ[b0]*delta[d0][g0] + PQ[g0]*delta[b0][d0]))
+                        )
+
+                    )
+
+                    + F5_t[5] * (
+
+                        (-4.0) * S1 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +PQ[b0]*PQ[d0]*PQ[d1]*PQ[g0]*PQ[g1]
+                        )
+
+                    )
+
+                    );
+
+            double hess_jk_xy = -eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+
+            atomicAdd(
+                hess_xy + prim_cart_ao_to_atom_inds[s_prim_count + j_prim] * natoms + prim_cart_ao_to_atom_inds[k],
+                hess_jk_xy * ik_factor_D * frac_exact_exchange);
+
+            atomicAdd(
+                hess_yx + prim_cart_ao_to_atom_inds[k] * natoms + prim_cart_ao_to_atom_inds[s_prim_count + j_prim],
+                hess_jk_xy * ik_factor_D * frac_exact_exchange);
+        }
+    }
+
+    __syncthreads();
+}
+
+__global__ void __launch_bounds__(TILE_SIZE_K)
+computeExchangeHessianSDSS_II_0(double*         hess_xy,
+                                const uint32_t  hess_cart_ind_0,
+                                const uint32_t  hess_cart_ind_1,
+                                const double    frac_exact_exchange,
+                                const uint32_t* pair_inds_i_for_K_ss,
+                                const uint32_t* pair_inds_k_for_K_ss,
+                                const double*   D_ik_for_K_ss,
+                                const uint32_t  pair_inds_count_for_K_ss,
+                                const double*   s_prim_info,
+                                const uint32_t* s_prim_aoinds,
+                                const uint32_t  s_prim_count,
+                                const double*   d_prim_info,
+                                const uint32_t* d_prim_aoinds,
+                                const uint32_t  d_prim_count,
+                                const double    ds_max_D,
+                                const double*   mat_D_full_AO,
+                                const uint32_t  naos,
+                                const double*   Q_K_sd,
+                                const double*   Q_K_ss,
+                                const uint32_t* D_inds_K_sd,
+                                const uint32_t* D_inds_K_ss,
+                                const uint32_t* pair_displs_K_sd,
+                                const uint32_t* pair_displs_K_ss,
+                                const uint32_t* pair_counts_K_sd,
+                                const uint32_t* pair_counts_K_ss,
+                                const double*   pair_data_K_sd,
+                                const double*   pair_data_K_ss,
+                                const uint32_t* prim_cart_ao_to_atom_inds,
+                                const double*   boys_func_table,
+                                const double*   boys_func_ft,
+                                const double    omega,
+                                const double    eri_threshold)
+{
+    // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
+
+    __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
+    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ double   delta[3][3];
+    __shared__ uint32_t g0, g1;
+
+    const uint32_t ik = blockIdx.x;
+
+    // we make sure that ik < pair_inds_count_for_K_ss when calling the kernel
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+        g0 = hess_cart_ind_0;
+        g1 = hess_cart_ind_1;
+
+        i = pair_inds_i_for_K_ss[ik];
+        k = pair_inds_k_for_K_ss[ik];
+
+        count_i = pair_counts_K_sd[i];
+        count_k = pair_counts_K_ss[k];
+
+        displ_i = pair_displs_K_sd[i];
+        displ_k = pair_displs_K_ss[k];
+
+        a_i = s_prim_info[i + s_prim_count * 0];
+
+        r_i[0] = s_prim_info[i + s_prim_count * 2];
+        r_i[1] = s_prim_info[i + s_prim_count * 3];
+        r_i[2] = s_prim_info[i + s_prim_count * 4];
+
+        a_k = s_prim_info[k + s_prim_count * 0];
+
+        r_k[0] = s_prim_info[k + s_prim_count * 2];
+        r_k[1] = s_prim_info[k + s_prim_count * 3];
+        r_k[2] = s_prim_info[k + s_prim_count * 4];
+
+        ik_factor_D = (static_cast<double>(i != k) + 1.0) * D_ik_for_K_ss[ik];
+
+    }
+
+    __syncthreads();
+
+    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    {
+        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+
+        // sync threads before starting a new scan
+        __syncthreads();
+
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double PB_0, PB_1, PA_x, PA_y;
+        uint32_t j_prim, j_cgto, b0, b1;
+
+        if (j < count_i)
+        {
+            Q_ij   = Q_K_sd[displ_i + j];
+
+            j_prim = D_inds_K_sd[displ_i + j];
+
+            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+
+            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = pair_data_K_sd[displ_i + j];
+
+            PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+            PA_y = (a_j  * inv_S1) * (r_j[g1] - r_i[g1]);
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
+
+        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        {
+            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+
+            // Q_kl == Q_K_ss[displ_k + l]
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_ss[displ_k + l] * ds_max_D) <= eri_threshold))
+            {
+                break;
+            }
+
+            // const auto Q_kl = Q_K_ss[displ_k + l];
+
+            const auto l_prim = D_inds_K_ss[displ_k + l];
+
+            const auto l_cgto = s_prim_aoinds[l_prim];
+
+            const auto a_l = s_prim_info[l_prim + s_prim_count * 0];
+
+            const double r_l[3] = {s_prim_info[l_prim + s_prim_count * 2],
+                                   s_prim_info[l_prim + s_prim_count * 3],
+                                   s_prim_info[l_prim + s_prim_count * 4]};
+
+            const auto S_kl_00 = pair_data_K_ss[displ_k + l];
+
+
+            // J. Chem. Phys. 84, 3963-3974 (1986)
+
+            const auto S2 = a_k + a_l;
+
+            const auto inv_S2 = 1.0 / S2;
+            const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
+
+            const auto rho = S1 * S2 * inv_S4;
+
+            double d2 = 1.0;
+
+            if (omega != 0.0) d2 = omega * omega / (rho + omega * omega);
+
+            const auto Lambda = sqrt(4.0 * rho * d2 * MATH_CONST_INV_PI);
+
+            double F4_t[5];
+
+            gpu::computeBoysFunction(F4_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
+
+            if (omega != 0.0)
+            {
+                F4_t[1] *= d2;
+                F4_t[2] *= d2 * d2;
+                F4_t[3] *= d2 * d2 * d2;
+                F4_t[4] *= d2 * d2 * d2 * d2;
+            }
+
+
+            // i-i Hessian
+
+            const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
+                    + F4_t[0] * (
+
+                        2.0 * inv_S1 * a_i * a_i * (
+                            +PB_0*PB_1*delta[g0][g1]
+
+                            +PA_x*(PA_y*delta[b0][b1] + PB_0*delta[b1][g1] + PB_1*delta[b0][g1]) + PA_y*(PB_0*delta[b1][g0] + PB_1*delta[b0][g0])
+                        )
+
+                        + (-1.0) * inv_S1 * a_i * (
+                            +delta[b0][b1]*delta[g0][g1]
+                        )
+
+                        + 4.0 * a_i * a_i * (
+                            +PA_x*PA_y*PB_0*PB_1
+                        )
+
+                        + (-2.0) * a_i * (
+                            +PB_0*PB_1*delta[g0][g1]
+                        )
+
+                        + inv_S1 * inv_S1 * a_i * a_i * (
+                            +delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0]
+                        )
+
+                    )
+
+                    + F4_t[1] * (
+
+                        (-2.0) * S2 * inv_S1 * inv_S1 * inv_S4 * a_i * a_i * (
+                            +delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0]
+                        )
+
+                        + 2.0 * S2 * inv_S1 * inv_S4 * a_i * a_i * (
+                            +delta[g0][g1]*(PB_0*(-PB_1 + PQ[b1]) + PB_1*PQ[b0])
+
+                            +PA_x*(-PA_y*delta[b0][b1] - PB_0*delta[b1][g1] - PB_1*delta[b0][g1] + PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1] + PQ[g1]*delta[b0][b1]) + PA_y*(PQ[g0]*delta[b0][b1] + delta[b0][g0]*(-PB_1 + PQ[b1]) + delta[b1][g0]*(-PB_0 + PQ[b0])) + PB_0*(PQ[g0]*delta[b1][g1] + PQ[g1]*delta[b1][g0]) + PB_1*(PQ[g0]*delta[b0][g1] + PQ[g1]*delta[b0][g0])
+                        )
+
+                        + 4.0 * S2 * inv_S4 * a_i * a_i * (
+                            +PA_x*PA_y*(PB_0*PQ[b1] + PB_1*PQ[b0]) + PB_0*PB_1*(PA_x*PQ[g1] + PA_y*PQ[g0])
+                        )
+
+                        + (-2.0) * S2 * inv_S4 * a_i * (
+                            +delta[g0][g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])
+                        )
+
+                        + S2 * inv_S1 * inv_S4 * a_i * (
+                            +delta[b0][b1]*delta[g0][g1]
+                        )
+
+                    )
+
+                    + F4_t[2] * (
+
+                        2.0 * S2 * S2 * inv_S1 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +delta[g0][g1]*(-PB_0*PQ[b1] + PQ[b0]*(-PB_1 + PQ[b1]))
+
+                            -PA_x*(PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1] + PQ[g1]*delta[b0][b1]) - PA_y*(PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0] + PQ[g0]*delta[b0][b1]) + PQ[g0]*(PQ[g1]*delta[b0][b1] + delta[b0][g1]*(-PB_1 + PQ[b1]) + delta[b1][g1]*(-PB_0 + PQ[b0])) + PQ[g1]*delta[b0][g0]*(-PB_1 + PQ[b1]) + PQ[g1]*delta[b1][g0]*(-PB_0 + PQ[b0])
+                        )
+
+                        + 4.0 * S2 * S2 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +PA_x*PQ[b0]*(PA_y*PQ[b1] + PB_1*PQ[g1]) + PB_0*PQ[b1]*(PA_x*PQ[g1] + PA_y*PQ[g0]) + PB_1*PQ[g0]*(PA_y*PQ[b0] + PB_0*PQ[g1])
+                        )
+
+                        + (-2.0) * S2 * S2 * inv_S4 * inv_S4 * a_i * (
+                            +PQ[b0]*PQ[b1]*delta[g0][g1]
+                        )
+
+                        + S2 * S2 * inv_S1 * inv_S1 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0]
+                        )
+
+                    )
+
+                    + F4_t[3] * (
+
+                        (-2.0) * S2 * S2 * S2 * inv_S1 * inv_S4 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +PQ[b0]*PQ[b1]*delta[g0][g1]
+
+                            +PQ[g0]*(PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1] + PQ[g1]*delta[b0][b1]) + PQ[g1]*(PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0])
+                        )
+
+                        + 4.0 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +PQ[b0]*PQ[b1]*(PA_x*PQ[g1] + PA_y*PQ[g0]) + PQ[g0]*PQ[g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])
+                        )
+
+                    )
+
+                    + F4_t[4] * (
+
+                        4.0 * S2 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +PQ[b0]*PQ[b1]*PQ[g0]*PQ[g1]
+                        )
+
+                    )
+
+                    );
+
+            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+        }
+    }
+
+    __syncthreads();
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_ss))
+    {
+        double hess_ii_xy = 0.0;
+
+        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        {
+            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            {
+                hess_ii_xy += ERIs[y][x];
+            }
+        }
+
+        atomicAdd(hess_xy + prim_cart_ao_to_atom_inds[i], hess_ii_xy * ik_factor_D * 2.0 * frac_exact_exchange);
+    }
+}
+
+__global__ void __launch_bounds__(TILE_SIZE_K)
+computeExchangeHessianSDSS_KK_0(double*         hess_xy,
+                                const uint32_t  hess_cart_ind_0,
+                                const uint32_t  hess_cart_ind_1,
+                                const double    frac_exact_exchange,
+                                const uint32_t* pair_inds_i_for_K_ss,
+                                const uint32_t* pair_inds_k_for_K_ss,
+                                const double*   D_ik_for_K_ss,
+                                const uint32_t  pair_inds_count_for_K_ss,
+                                const double*   s_prim_info,
+                                const uint32_t* s_prim_aoinds,
+                                const uint32_t  s_prim_count,
+                                const double*   d_prim_info,
+                                const uint32_t* d_prim_aoinds,
+                                const uint32_t  d_prim_count,
+                                const double    ds_max_D,
+                                const double*   mat_D_full_AO,
+                                const uint32_t  naos,
+                                const double*   Q_K_sd,
+                                const double*   Q_K_ss,
+                                const uint32_t* D_inds_K_sd,
+                                const uint32_t* D_inds_K_ss,
+                                const uint32_t* pair_displs_K_sd,
+                                const uint32_t* pair_displs_K_ss,
+                                const uint32_t* pair_counts_K_sd,
+                                const uint32_t* pair_counts_K_ss,
+                                const double*   pair_data_K_sd,
+                                const double*   pair_data_K_ss,
+                                const uint32_t* prim_cart_ao_to_atom_inds,
+                                const double*   boys_func_table,
+                                const double*   boys_func_ft,
+                                const double    omega,
+                                const double    eri_threshold)
+{
+    // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
+
+    __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
+    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ double   delta[3][3];
+    __shared__ uint32_t g0, g1;
+
+    const uint32_t ik = blockIdx.x;
+
+    // we make sure that ik < pair_inds_count_for_K_ss when calling the kernel
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+        g0 = hess_cart_ind_0;
+        g1 = hess_cart_ind_1;
+
+        i = pair_inds_i_for_K_ss[ik];
+        k = pair_inds_k_for_K_ss[ik];
+
+        count_i = pair_counts_K_sd[i];
+        count_k = pair_counts_K_ss[k];
+
+        displ_i = pair_displs_K_sd[i];
+        displ_k = pair_displs_K_ss[k];
+
+        a_i = s_prim_info[i + s_prim_count * 0];
+
+        r_i[0] = s_prim_info[i + s_prim_count * 2];
+        r_i[1] = s_prim_info[i + s_prim_count * 3];
+        r_i[2] = s_prim_info[i + s_prim_count * 4];
+
+        a_k = s_prim_info[k + s_prim_count * 0];
+
+        r_k[0] = s_prim_info[k + s_prim_count * 2];
+        r_k[1] = s_prim_info[k + s_prim_count * 3];
+        r_k[2] = s_prim_info[k + s_prim_count * 4];
+
+        ik_factor_D = (static_cast<double>(i != k) + 1.0) * D_ik_for_K_ss[ik];
+
+    }
+
+    __syncthreads();
+
+    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    {
+        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+
+        // sync threads before starting a new scan
+        __syncthreads();
+
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
+
+        if (j < count_i)
+        {
+            Q_ij   = Q_K_sd[displ_i + j];
+
+            j_prim = D_inds_K_sd[displ_i + j];
+
+            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+
+            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = pair_data_K_sd[displ_i + j];
+
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
+
+        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        {
+            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+
+            // Q_kl == Q_K_ss[displ_k + l]
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_ss[displ_k + l] * ds_max_D) <= eri_threshold))
+            {
+                break;
+            }
+
+            // const auto Q_kl = Q_K_ss[displ_k + l];
+
+            const auto l_prim = D_inds_K_ss[displ_k + l];
+
+            const auto l_cgto = s_prim_aoinds[l_prim];
+
+            const auto a_l = s_prim_info[l_prim + s_prim_count * 0];
+
+            const double r_l[3] = {s_prim_info[l_prim + s_prim_count * 2],
+                                   s_prim_info[l_prim + s_prim_count * 3],
+                                   s_prim_info[l_prim + s_prim_count * 4]};
+
+            const auto S_kl_00 = pair_data_K_ss[displ_k + l];
+
+
+            // J. Chem. Phys. 84, 3963-3974 (1986)
+
+            const auto S2 = a_k + a_l;
+
+            const auto inv_S2 = 1.0 / S2;
+            const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
+
+            const auto rho = S1 * S2 * inv_S4;
+
+            double d2 = 1.0;
+
+            if (omega != 0.0) d2 = omega * omega / (rho + omega * omega);
+
+            const auto Lambda = sqrt(4.0 * rho * d2 * MATH_CONST_INV_PI);
+
+            double F4_t[5];
+
+            gpu::computeBoysFunction(F4_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
+
+            if (omega != 0.0)
+            {
+                F4_t[1] *= d2;
+                F4_t[2] *= d2 * d2;
+                F4_t[3] *= d2 * d2 * d2;
+                F4_t[4] *= d2 * d2 * d2 * d2;
+            }
+
+
+            const auto QC_x = (a_l * inv_S2) * (r_l[g0] - r_k[g0]);
+            const auto QC_y = (a_l * inv_S2) * (r_l[g1] - r_k[g1]);
+
+            // k-k Hessian
+
+            const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
+                    + F4_t[0] * (
+
+                        (-1.0) * inv_S1 * a_k * (
+                            +delta[b0][b1]*delta[g0][g1]
+                        )
+
+                        + 2.0 * inv_S2 * a_k * a_k * (
+                            +PB_0*PB_1*delta[g0][g1]
+                        )
+
+                        + 4.0 * a_k * a_k * (
+                            +PB_0*PB_1*QC_x*QC_y
+                        )
+
+                        + (-2.0) * a_k * (
+                            +PB_0*PB_1*delta[g0][g1]
+                        )
+
+                        + inv_S1 * inv_S2 * a_k * a_k * (
+                            +delta[b0][b1]*delta[g0][g1]
+                        )
+
+                        + 2.0 * inv_S1 * a_k * a_k * (
+                            +QC_x*QC_y*delta[b0][b1]
+                        )
+
+                    )
+
+                    + F4_t[1] * (
+
+                        (-1.0) * inv_S1 * inv_S4 * a_k * a_k * (
+                            +delta[b0][b1]*delta[g0][g1]
+                        )
+
+                        + (-1.0) * inv_S2 * inv_S4 * a_k * a_k * (
+                            +delta[b0][b1]*delta[g0][g1]
+                        )
+
+                        + (-2.0) * S1 * inv_S2 * inv_S4 * a_k * a_k * (
+                            +PB_0*PB_1*delta[g0][g1]
+                        )
+
+                        + (-2.0) * S2 * inv_S1 * inv_S4 * a_k * a_k * (
+                            +QC_x*QC_y*delta[b0][b1]
+                        )
+
+                        + 2.0 * inv_S4 * a_k * a_k * (
+                            +delta[g0][g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])
+
+                            +PB_0*(QC_x*delta[b1][g1] + QC_y*delta[b1][g0]) + PB_1*(QC_x*delta[b0][g1] + QC_y*delta[b0][g0])
+
+                            -delta[b0][b1]*(PQ[g0]*QC_y + PQ[g1]*QC_x)
+                        )
+
+                        + 4.0 * S1 * inv_S4 * a_k * a_k * (
+                            -PB_0*PB_1*(PQ[g0]*QC_y + PQ[g1]*QC_x)
+                        )
+
+                        + 4.0 * S2 * inv_S4 * a_k * a_k * (
+                            +QC_x*QC_y*(PB_0*PQ[b1] + PB_1*PQ[b0])
+                        )
+
+                        + (-2.0) * S2 * inv_S4 * a_k * (
+                            +delta[g0][g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])
+                        )
+
+                        + S2 * inv_S1 * inv_S4 * a_k * (
+                            +delta[b0][b1]*delta[g0][g1]
+                        )
+
+                    )
+
+                    + F4_t[2] * (
+
+                        2.0 * S1 * inv_S4 * inv_S4 * a_k * a_k * (
+                            -delta[g0][g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])
+
+                            -PB_0*(PQ[g0]*delta[b1][g1] + PQ[g1]*delta[b1][g0]) - PB_1*(PQ[g0]*delta[b0][g1] + PQ[g1]*delta[b0][g0])
+
+                            +PQ[g0]*PQ[g1]*delta[b0][b1]
+                        )
+
+                        + 4.0 * S1 * S1 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +PB_0*PB_1*PQ[g0]*PQ[g1]
+                        )
+
+                        + 4.0 * S1 * S2 * inv_S4 * inv_S4 * a_k * a_k * (
+                            -(PB_0*PQ[b1] + PB_1*PQ[b0])*(PQ[g0]*QC_y + PQ[g1]*QC_x)
+                        )
+
+                        + (-2.0) * S2 * S2 * inv_S4 * inv_S4 * a_k * (
+                            +PQ[b0]*PQ[b1]*delta[g0][g1]
+                        )
+
+                        + inv_S4 * inv_S4 * a_k * a_k * (
+                            +delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0]
+                        )
+
+                        + 2.0 * S2 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +PQ[b0]*(PQ[b1]*delta[g0][g1] + QC_x*delta[b1][g1] + QC_y*delta[b1][g0]) + PQ[b1]*(QC_x*delta[b0][g1] + QC_y*delta[b0][g0])
+
+                            +delta[b0][b1]*(PQ[g0]*QC_y + PQ[g1]*QC_x)
+                        )
+
+                        + 4.0 * S2 * S2 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +PQ[b0]*PQ[b1]*QC_x*QC_y
+                        )
+
+                    )
+
+                    + F4_t[3] * (
+
+                        (-2.0) * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +PQ[b0]*PQ[b1]*delta[g0][g1]
+
+                            +PQ[g0]*(PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1] + PQ[g1]*delta[b0][b1]) + PQ[g1]*(PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0])
+                        )
+
+                        + 4.0 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +PQ[g0]*PQ[g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])
+                        )
+
+                        + (-4.0) * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +PQ[b0]*PQ[b1]*PQ[g0]*QC_y
+
+                            +PQ[b0]*PQ[b1]*PQ[g1]*QC_x
+                        )
+
+                    )
+
+                    + F4_t[4] * (
+
+                        4.0 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +PQ[b0]*PQ[b1]*PQ[g0]*PQ[g1]
+                        )
+
+                    )
+
+                    );
+
+            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+        }
+    }
+
+    __syncthreads();
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_ss))
+    {
+        double hess_kk_xy = 0.0;
+
+        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        {
+            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            {
+                hess_kk_xy += ERIs[y][x];
+            }
+        }
+
+        atomicAdd(hess_xy + prim_cart_ao_to_atom_inds[k], hess_kk_xy * ik_factor_D * 2.0 * frac_exact_exchange);
+    }
+}
+
+__global__ void __launch_bounds__(TILE_SIZE_K)
+computeExchangeHessianSDSS_IK_0(double*         hess_xy,
+                                double*         hess_yx,
+                                const uint32_t  hess_cart_ind_0,
+                                const uint32_t  hess_cart_ind_1,
+                                const double    frac_exact_exchange,
+                                const uint32_t* pair_inds_i_for_K_ss,
+                                const uint32_t* pair_inds_k_for_K_ss,
+                                const double*   D_ik_for_K_ss,
+                                const uint32_t  pair_inds_count_for_K_ss,
+                                const double*   s_prim_info,
+                                const uint32_t* s_prim_aoinds,
+                                const uint32_t  s_prim_count,
+                                const double*   d_prim_info,
+                                const uint32_t* d_prim_aoinds,
+                                const uint32_t  d_prim_count,
+                                const double    ds_max_D,
+                                const double*   mat_D_full_AO,
+                                const uint32_t  naos,
+                                const double*   Q_K_sd,
+                                const double*   Q_K_ss,
+                                const uint32_t* D_inds_K_sd,
+                                const uint32_t* D_inds_K_ss,
+                                const uint32_t* pair_displs_K_sd,
+                                const uint32_t* pair_displs_K_ss,
+                                const uint32_t* pair_counts_K_sd,
+                                const uint32_t* pair_counts_K_ss,
+                                const double*   pair_data_K_sd,
+                                const double*   pair_data_K_ss,
+                                const uint32_t* prim_cart_ao_to_atom_inds,
+                                const uint32_t  natoms,
+                                const double*   boys_func_table,
+                                const double*   boys_func_ft,
+                                const double    omega,
+                                const double    eri_threshold)
+{
+    // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
+
+    __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
+    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ double   delta[3][3];
+    __shared__ uint32_t g0, g1;
+
+    const uint32_t ik = blockIdx.x;
+
+    // we make sure that ik < pair_inds_count_for_K_ss when calling the kernel
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+        g0 = hess_cart_ind_0;
+        g1 = hess_cart_ind_1;
+
+        i = pair_inds_i_for_K_ss[ik];
+        k = pair_inds_k_for_K_ss[ik];
+
+        count_i = pair_counts_K_sd[i];
+        count_k = pair_counts_K_ss[k];
+
+        displ_i = pair_displs_K_sd[i];
+        displ_k = pair_displs_K_ss[k];
+
+        a_i = s_prim_info[i + s_prim_count * 0];
+
+        r_i[0] = s_prim_info[i + s_prim_count * 2];
+        r_i[1] = s_prim_info[i + s_prim_count * 3];
+        r_i[2] = s_prim_info[i + s_prim_count * 4];
+
+        a_k = s_prim_info[k + s_prim_count * 0];
+
+        r_k[0] = s_prim_info[k + s_prim_count * 2];
+        r_k[1] = s_prim_info[k + s_prim_count * 3];
+        r_k[2] = s_prim_info[k + s_prim_count * 4];
+
+        ik_factor_D = (static_cast<double>(i != k) + 1.0) * D_ik_for_K_ss[ik];
+
+    }
+
+    __syncthreads();
+
+    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    {
+        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+
+        // sync threads before starting a new scan
+        __syncthreads();
+
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double PB_0, PB_1, PA_x;
+        uint32_t j_prim, j_cgto, b0, b1;
+
+        if (j < count_i)
+        {
+            Q_ij   = Q_K_sd[displ_i + j];
+
+            j_prim = D_inds_K_sd[displ_i + j];
+
+            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+
+            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = pair_data_K_sd[displ_i + j];
+
+            PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
+
+        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        {
+            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+
+            // Q_kl == Q_K_ss[displ_k + l]
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_ss[displ_k + l] * ds_max_D) <= eri_threshold))
+            {
+                break;
+            }
+
+            // const auto Q_kl = Q_K_ss[displ_k + l];
+
+            const auto l_prim = D_inds_K_ss[displ_k + l];
+
+            const auto l_cgto = s_prim_aoinds[l_prim];
+
+            const auto a_l = s_prim_info[l_prim + s_prim_count * 0];
+
+            const double r_l[3] = {s_prim_info[l_prim + s_prim_count * 2],
+                                   s_prim_info[l_prim + s_prim_count * 3],
+                                   s_prim_info[l_prim + s_prim_count * 4]};
+
+            const auto S_kl_00 = pair_data_K_ss[displ_k + l];
+
+
+            // J. Chem. Phys. 84, 3963-3974 (1986)
+
+            const auto S2 = a_k + a_l;
+
+            const auto inv_S2 = 1.0 / S2;
+            const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
+
+            const auto rho = S1 * S2 * inv_S4;
+
+            double d2 = 1.0;
+
+            if (omega != 0.0) d2 = omega * omega / (rho + omega * omega);
+
+            const auto Lambda = sqrt(4.0 * rho * d2 * MATH_CONST_INV_PI);
+
+            double F4_t[5];
+
+            gpu::computeBoysFunction(F4_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
+
+            if (omega != 0.0)
+            {
+                F4_t[1] *= d2;
+                F4_t[2] *= d2 * d2;
+                F4_t[3] *= d2 * d2 * d2;
+                F4_t[4] *= d2 * d2 * d2 * d2;
+            }
+
+
+            const auto QC_y = (a_l * inv_S2) * (r_l[g1] - r_k[g1]);
+
+            // i-k Hessian
+
+            const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
+                    + F4_t[0] * (
+
+                        2.0 * inv_S1 * a_i * a_k * (
+                            +PB_0*QC_y*delta[b1][g0]
+
+                            +QC_y*(PA_x*delta[b0][b1] + PB_1*delta[b0][g0])
+                        )
+
+                        + 4.0 * a_i * a_k * (
+                            +PA_x*PB_0*PB_1*QC_y
+                        )
+
+                    )
+
+                    + F4_t[1] * (
+
+                        2.0 * S2 * inv_S1 * inv_S4 * a_i * a_k * (
+                            +QC_y*delta[b1][g0]*(-PB_0 + PQ[b0])
+
+                            +QC_y*(delta[b0][b1]*(-PA_x + PQ[g0]) + delta[b0][g0]*(-PB_1 + PQ[b1]))
+                        )
+
+                        + 2.0 * inv_S4 * a_i * a_k * (
+                            +PB_0*PB_1*delta[g0][g1]
+
+                            +PA_x*(PB_0*delta[b1][g1] + PB_1*delta[b0][g1])
+
+                            -PQ[g1]*(PA_x*delta[b0][b1] + PB_0*delta[b1][g0] + PB_1*delta[b0][g0])
+                        )
+
+                        + 4.0 * S1 * inv_S4 * a_i * a_k * (
+                            -PA_x*PB_0*PB_1*PQ[g1]
+                        )
+
+                        + 4.0 * S2 * inv_S4 * a_i * a_k * (
+                            +QC_y*(PA_x*(PB_0*PQ[b1] + PB_1*PQ[b0]) + PB_0*PB_1*PQ[g0])
+                        )
+
+                        + inv_S1 * inv_S4 * a_i * a_k * (
+                            +delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0]
+                        )
+
+                    )
+
+                    + F4_t[2] * (
+
+                        (-1.0) * S2 * inv_S1 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0]
+                        )
+
+                        + (-2.0) * S2 * S2 * inv_S1 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +PQ[b0]*QC_y*delta[b1][g0]
+
+                            +QC_y*(PQ[b1]*delta[b0][g0] + PQ[g0]*delta[b0][b1])
+                        )
+
+                        + 2.0 * S2 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +delta[g0][g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])
+
+                            +PA_x*(PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1]) + PQ[g0]*(PB_0*delta[b1][g1] + PB_1*delta[b0][g1])
+
+                            +PQ[g1]*(PA_x*delta[b0][b1] + PB_0*delta[b1][g0] + PB_1*delta[b0][g0] - PQ[b0]*delta[b1][g0] - PQ[b1]*delta[b0][g0] - PQ[g0]*delta[b0][b1])
+                        )
+
+                        + 4.0 * S1 * S2 * inv_S4 * inv_S4 * a_i * a_k * (
+                            -PQ[g1]*(PA_x*(PB_0*PQ[b1] + PB_1*PQ[b0]) + PB_0*PB_1*PQ[g0])
+                        )
+
+                        + 4.0 * S2 * S2 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +QC_y*(PB_0*PQ[b1]*PQ[g0] + PQ[b0]*(PA_x*PQ[b1] + PB_1*PQ[g0]))
+                        )
+
+                    )
+
+                    + F4_t[3] * (
+
+                        4.0 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_k * (
+                            -PQ[g1]*(PB_0*PQ[b1]*PQ[g0] + PQ[b0]*(PA_x*PQ[b1] + PB_1*PQ[g0]))
+                        )
+
+                        + 2.0 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +PQ[b0]*PQ[b1]*delta[g0][g1]
+
+                            +PQ[g0]*(PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1] + PQ[g1]*delta[b0][b1]) + PQ[g1]*(PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0])
+                        )
+
+                        + 4.0 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +PQ[b0]*PQ[b1]*PQ[g0]*QC_y
+                        )
+
+                    )
+
+                    + F4_t[4] * (
+
+                        (-4.0) * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +PQ[b0]*PQ[b1]*PQ[g0]*PQ[g1]
+                        )
+
+                    )
+
+                    );
+
+            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+        }
+    }
+
+    __syncthreads();
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_ss))
+    {
+        double hess_ik_xy = 0.0;
+
+        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        {
+            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            {
+                hess_ik_xy += ERIs[y][x];
+            }
+        }
+
+        // Note factor of 2 due to IK<->JL symmetry for ground state Hessian
+
+        atomicAdd(
+            hess_xy + prim_cart_ao_to_atom_inds[i] * natoms + prim_cart_ao_to_atom_inds[k],
+            hess_ik_xy * ik_factor_D * 2.0 * frac_exact_exchange);
+
+        atomicAdd(
+            hess_yx + prim_cart_ao_to_atom_inds[k] * natoms + prim_cart_ao_to_atom_inds[i],
+            hess_ik_xy * ik_factor_D * 2.0 * frac_exact_exchange);
+    }
+}
+
+__global__ void __launch_bounds__(TILE_SIZE_K)
+computeExchangeHessianSDSS_IJ_0(double*         hess_xy,
+                                double*         hess_yx,
+                                const uint32_t  hess_cart_ind_0,
+                                const uint32_t  hess_cart_ind_1,
+                                const double    frac_exact_exchange,
+                                const uint32_t* pair_inds_i_for_K_ss,
+                                const uint32_t* pair_inds_k_for_K_ss,
+                                const double*   D_ik_for_K_ss,
+                                const uint32_t  pair_inds_count_for_K_ss,
+                                const double*   s_prim_info,
+                                const uint32_t* s_prim_aoinds,
+                                const uint32_t  s_prim_count,
+                                const double*   d_prim_info,
+                                const uint32_t* d_prim_aoinds,
+                                const uint32_t  d_prim_count,
+                                const double    ds_max_D,
+                                const double*   mat_D_full_AO,
+                                const uint32_t  naos,
+                                const double*   Q_K_sd,
+                                const double*   Q_K_ss,
+                                const uint32_t* D_inds_K_sd,
+                                const uint32_t* D_inds_K_ss,
+                                const uint32_t* pair_displs_K_sd,
+                                const uint32_t* pair_displs_K_ss,
+                                const uint32_t* pair_counts_K_sd,
+                                const uint32_t* pair_counts_K_ss,
+                                const double*   pair_data_K_sd,
+                                const double*   pair_data_K_ss,
+                                const uint32_t* prim_cart_ao_to_atom_inds,
+                                const uint32_t  natoms,
+                                const double*   boys_func_table,
+                                const double*   boys_func_ft,
+                                const double    omega,
+                                const double    eri_threshold)
+{
+    // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
+
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
+    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ double   delta[3][3];
+    __shared__ uint32_t g0, g1;
+
+    const uint32_t ik = blockIdx.x;
+
+    // we make sure that ik < pair_inds_count_for_K_ss when calling the kernel
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+        g0 = hess_cart_ind_0;
+        g1 = hess_cart_ind_1;
+
+        i = pair_inds_i_for_K_ss[ik];
+        k = pair_inds_k_for_K_ss[ik];
+
+        count_i = pair_counts_K_sd[i];
+        count_k = pair_counts_K_ss[k];
+
+        displ_i = pair_displs_K_sd[i];
+        displ_k = pair_displs_K_ss[k];
+
+        a_i = s_prim_info[i + s_prim_count * 0];
+
+        r_i[0] = s_prim_info[i + s_prim_count * 2];
+        r_i[1] = s_prim_info[i + s_prim_count * 3];
+        r_i[2] = s_prim_info[i + s_prim_count * 4];
+
+        a_k = s_prim_info[k + s_prim_count * 0];
+
+        r_k[0] = s_prim_info[k + s_prim_count * 2];
+        r_k[1] = s_prim_info[k + s_prim_count * 3];
+        r_k[2] = s_prim_info[k + s_prim_count * 4];
+
+        ik_factor_D = (static_cast<double>(i != k) + 1.0) * D_ik_for_K_ss[ik];
+
+    }
+
+    __syncthreads();
+
+    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    {
+        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+
+        // sync threads before starting a new scan
+        __syncthreads();
+
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double PB_0, PB_1, PA_x, PB_y;
+        uint32_t j_prim, j_cgto, b0, b1;
+
+        if (j < count_i)
+        {
+            Q_ij   = Q_K_sd[displ_i + j];
+
+            j_prim = D_inds_K_sd[displ_i + j];
+
+            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+
+            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = pair_data_K_sd[displ_i + j];
+
+            PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+            PB_y = (-a_i * inv_S1) * (r_j[g1] - r_i[g1]);
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
+
+        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        {
+            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+
+            // Q_kl == Q_K_ss[displ_k + l]
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_ss[displ_k + l] * ds_max_D) <= eri_threshold))
+            {
+                break;
+            }
+
+            // const auto Q_kl = Q_K_ss[displ_k + l];
+
+            const auto l_prim = D_inds_K_ss[displ_k + l];
+
+            const auto l_cgto = s_prim_aoinds[l_prim];
+
+            const auto a_l = s_prim_info[l_prim + s_prim_count * 0];
+
+            const double r_l[3] = {s_prim_info[l_prim + s_prim_count * 2],
+                                   s_prim_info[l_prim + s_prim_count * 3],
+                                   s_prim_info[l_prim + s_prim_count * 4]};
+
+            const auto S_kl_00 = pair_data_K_ss[displ_k + l];
+
+
+            // J. Chem. Phys. 84, 3963-3974 (1986)
+
+            const auto S2 = a_k + a_l;
+
+            const auto inv_S2 = 1.0 / S2;
+            const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
+
+            const auto rho = S1 * S2 * inv_S4;
+
+            double d2 = 1.0;
+
+            if (omega != 0.0) d2 = omega * omega / (rho + omega * omega);
+
+            const auto Lambda = sqrt(4.0 * rho * d2 * MATH_CONST_INV_PI);
+
+            double F4_t[5];
+
+            gpu::computeBoysFunction(F4_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
+
+            if (omega != 0.0)
+            {
+                F4_t[1] *= d2;
+                F4_t[2] *= d2 * d2;
+                F4_t[3] *= d2 * d2 * d2;
+                F4_t[4] *= d2 * d2 * d2 * d2;
+            }
+
+
+            // i-j Hessian
+
+            const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
+                    + F4_t[0] * (
+
+                        2.0 * inv_S1 * a_i * a_j * (
+                            +PB_0*PB_1*delta[g0][g1]
+
+                            +PA_x*(PB_0*delta[b1][g1] + PB_1*delta[b0][g1] + PB_y*delta[b0][b1]) + PB_y*(PB_0*delta[b1][g0] + PB_1*delta[b0][g0])
+                        )
+
+                        + (-1.0) * inv_S1 * a_i * (
+                            +delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0]
+                        )
+
+                        + 4.0 * a_i * a_j * (
+                            +PA_x*PB_0*PB_1*PB_y
+                        )
+
+                        + (-2.0) * a_i * (
+                            +PA_x*PB_0*delta[b1][g1]
+
+                            +PA_x*PB_1*delta[b0][g1]
+                        )
+
+                        + inv_S1 * inv_S1 * a_i * a_j * (
+                            +delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0]
+                        )
+
+                    )
+
+                    + F4_t[1] * (
+
+                        (-2.0) * S2 * inv_S1 * inv_S1 * inv_S4 * a_i * a_j * (
+                            +delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0]
+                        )
+
+                        + 2.0 * S2 * inv_S1 * inv_S4 * a_i * a_j * (
+                            +delta[g0][g1]*(PB_0*(-PB_1 + PQ[b1]) + PB_1*PQ[b0])
+
+                            +PA_x*(-PB_0*delta[b1][g1] - PB_1*delta[b0][g1] - PB_y*delta[b0][b1] + PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1] + PQ[g1]*delta[b0][b1]) + PQ[g0]*(PB_0*delta[b1][g1] + PB_1*delta[b0][g1] + PB_y*delta[b0][b1]) + delta[b0][g0]*(PB_1*(-PB_y + PQ[g1]) + PB_y*PQ[b1]) + delta[b1][g0]*(PB_0*(-PB_y + PQ[g1]) + PB_y*PQ[b0])
+                        )
+
+                        + 4.0 * S2 * inv_S4 * a_i * a_j * (
+                            +PA_x*PB_0*(PB_1*PQ[g1] + PB_y*PQ[b1]) + PB_1*PB_y*(PA_x*PQ[b0] + PB_0*PQ[g0])
+                        )
+
+                        + (-2.0) * S2 * inv_S4 * a_i * (
+                            +delta[b1][g1]*(PA_x*PQ[b0] + PB_0*PQ[g0])
+
+                            +delta[b0][g1]*(PA_x*PQ[b1] + PB_1*PQ[g0])
+                        )
+
+                        + S2 * inv_S1 * inv_S4 * a_i * (
+                            +delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0]
+                        )
+
+                    )
+
+                    + F4_t[2] * (
+
+                        2.0 * S2 * S2 * inv_S1 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +delta[g0][g1]*(-PB_0*PQ[b1] + PQ[b0]*(-PB_1 + PQ[b1]))
+
+                            -PA_x*(PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1] + PQ[g1]*delta[b0][b1]) + PQ[g0]*(-PB_0*delta[b1][g1] - PB_1*delta[b0][g1] - PB_y*delta[b0][b1] + PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1] + PQ[g1]*delta[b0][b1]) - PQ[g1]*(PB_0*delta[b1][g0] + PB_1*delta[b0][g0]) + (-PB_y + PQ[g1])*(PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0])
+                        )
+
+                        + 4.0 * S2 * S2 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +PA_x*PQ[b1]*(PB_0*PQ[g1] + PB_y*PQ[b0]) + PB_0*PQ[g0]*(PB_1*PQ[g1] + PB_y*PQ[b1]) + PB_1*PQ[b0]*(PA_x*PQ[g1] + PB_y*PQ[g0])
+                        )
+
+                        + (-2.0) * S2 * S2 * inv_S4 * inv_S4 * a_i * (
+                            +PQ[b0]*PQ[g0]*delta[b1][g1]
+
+                            +PQ[b1]*PQ[g0]*delta[b0][g1]
+                        )
+
+                        + S2 * S2 * inv_S1 * inv_S1 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0]
+                        )
+
+                    )
+
+                    + F4_t[3] * (
+
+                        (-2.0) * S2 * S2 * S2 * inv_S1 * inv_S4 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +PQ[b0]*PQ[b1]*delta[g0][g1]
+
+                            +PQ[g0]*(PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1] + PQ[g1]*delta[b0][b1]) + PQ[g1]*(PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0])
+                        )
+
+                        + 4.0 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +PQ[b0]*PQ[b1]*(PA_x*PQ[g1] + PB_y*PQ[g0]) + PQ[g0]*PQ[g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])
+                        )
+
+                    )
+
+                    + F4_t[4] * (
+
+                        4.0 * S2 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +PQ[b0]*PQ[b1]*PQ[g0]*PQ[g1]
+                        )
+
+                    )
+
+                    );
+
+            double hess_ij_xy = -eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+
+            atomicAdd(
+                hess_xy + prim_cart_ao_to_atom_inds[i] * natoms + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + j_prim],
+                hess_ij_xy * ik_factor_D * 2.0 * frac_exact_exchange);
+        }
+    }
+
+    __syncthreads();
+}
+
+__global__ void __launch_bounds__(TILE_SIZE_K)
+computeExchangeHessianSDSS_KL_0(double*         hess_xy,
+                                double*         hess_yx,
+                                const uint32_t  hess_cart_ind_0,
+                                const uint32_t  hess_cart_ind_1,
+                                const double    frac_exact_exchange,
+                                const uint32_t* pair_inds_i_for_K_ss,
+                                const uint32_t* pair_inds_k_for_K_ss,
+                                const double*   D_ik_for_K_ss,
+                                const uint32_t  pair_inds_count_for_K_ss,
+                                const double*   s_prim_info,
+                                const uint32_t* s_prim_aoinds,
+                                const uint32_t  s_prim_count,
+                                const double*   d_prim_info,
+                                const uint32_t* d_prim_aoinds,
+                                const uint32_t  d_prim_count,
+                                const double    ds_max_D,
+                                const double*   mat_D_full_AO,
+                                const uint32_t  naos,
+                                const double*   Q_K_sd,
+                                const double*   Q_K_ss,
+                                const uint32_t* D_inds_K_sd,
+                                const uint32_t* D_inds_K_ss,
+                                const uint32_t* pair_displs_K_sd,
+                                const uint32_t* pair_displs_K_ss,
+                                const uint32_t* pair_counts_K_sd,
+                                const uint32_t* pair_counts_K_ss,
+                                const double*   pair_data_K_sd,
+                                const double*   pair_data_K_ss,
+                                const uint32_t* prim_cart_ao_to_atom_inds,
+                                const uint32_t  natoms,
+                                const double*   boys_func_table,
+                                const double*   boys_func_ft,
+                                const double    omega,
+                                const double    eri_threshold)
+{
+    // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
+
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
+    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ double   delta[3][3];
+    __shared__ uint32_t g0, g1;
+
+    const uint32_t ik = blockIdx.x;
+
+    // we make sure that ik < pair_inds_count_for_K_ss when calling the kernel
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+        g0 = hess_cart_ind_0;
+        g1 = hess_cart_ind_1;
+
+        i = pair_inds_i_for_K_ss[ik];
+        k = pair_inds_k_for_K_ss[ik];
+
+        count_i = pair_counts_K_sd[i];
+        count_k = pair_counts_K_ss[k];
+
+        displ_i = pair_displs_K_sd[i];
+        displ_k = pair_displs_K_ss[k];
+
+        a_i = s_prim_info[i + s_prim_count * 0];
+
+        r_i[0] = s_prim_info[i + s_prim_count * 2];
+        r_i[1] = s_prim_info[i + s_prim_count * 3];
+        r_i[2] = s_prim_info[i + s_prim_count * 4];
+
+        a_k = s_prim_info[k + s_prim_count * 0];
+
+        r_k[0] = s_prim_info[k + s_prim_count * 2];
+        r_k[1] = s_prim_info[k + s_prim_count * 3];
+        r_k[2] = s_prim_info[k + s_prim_count * 4];
+
+        ik_factor_D = (static_cast<double>(i != k) + 1.0) * D_ik_for_K_ss[ik];
+
+    }
+
+    __syncthreads();
+
+    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    {
+        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+
+        // sync threads before starting a new scan
+        __syncthreads();
+
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
+
+        if (j < count_i)
+        {
+            Q_ij   = Q_K_sd[displ_i + j];
+
+            j_prim = D_inds_K_sd[displ_i + j];
+
+            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+
+            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = pair_data_K_sd[displ_i + j];
+
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
+
+        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        {
+            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+
+            // Q_kl == Q_K_ss[displ_k + l]
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_ss[displ_k + l] * ds_max_D) <= eri_threshold))
+            {
+                break;
+            }
+
+            // const auto Q_kl = Q_K_ss[displ_k + l];
+
+            const auto l_prim = D_inds_K_ss[displ_k + l];
+
+            const auto l_cgto = s_prim_aoinds[l_prim];
+
+            const auto a_l = s_prim_info[l_prim + s_prim_count * 0];
+
+            const double r_l[3] = {s_prim_info[l_prim + s_prim_count * 2],
+                                   s_prim_info[l_prim + s_prim_count * 3],
+                                   s_prim_info[l_prim + s_prim_count * 4]};
+
+            const auto S_kl_00 = pair_data_K_ss[displ_k + l];
+
+
+            // J. Chem. Phys. 84, 3963-3974 (1986)
+
+            const auto S2 = a_k + a_l;
+
+            const auto inv_S2 = 1.0 / S2;
+            const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
+
+            const auto rho = S1 * S2 * inv_S4;
+
+            double d2 = 1.0;
+
+            if (omega != 0.0) d2 = omega * omega / (rho + omega * omega);
+
+            const auto Lambda = sqrt(4.0 * rho * d2 * MATH_CONST_INV_PI);
+
+            double F4_t[5];
+
+            gpu::computeBoysFunction(F4_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
+
+            if (omega != 0.0)
+            {
+                F4_t[1] *= d2;
+                F4_t[2] *= d2 * d2;
+                F4_t[3] *= d2 * d2 * d2;
+                F4_t[4] *= d2 * d2 * d2 * d2;
+            }
+
+
+            const auto QC_x = (a_l * inv_S2) * (r_l[g0] - r_k[g0]);
+            const auto QD_y = (-a_k * inv_S2) * (r_l[g1] - r_k[g1]);
+
+            // k-l Hessian
+
+            const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
+                    + F4_t[0] * (
+
+                        2.0 * inv_S1 * a_k * a_l * (
+                            +QC_x*QD_y*delta[b0][b1]
+                        )
+
+                        + 2.0 * inv_S2 * a_k * a_l * (
+                            +PB_0*PB_1*delta[g0][g1]
+                        )
+
+                        + 4.0 * a_k * a_l * (
+                            +PB_0*PB_1*QC_x*QD_y
+                        )
+
+                        + inv_S1 * inv_S2 * a_k * a_l * (
+                            +delta[b0][b1]*delta[g0][g1]
+                        )
+
+                    )
+
+                    + F4_t[1] * (
+
+                        (-1.0) * inv_S1 * inv_S4 * a_k * a_l * (
+                            +delta[b0][b1]*delta[g0][g1]
+                        )
+
+                        + (-1.0) * inv_S2 * inv_S4 * a_k * a_l * (
+                            +delta[b0][b1]*delta[g0][g1]
+                        )
+
+                        + (-2.0) * S1 * inv_S2 * inv_S4 * a_k * a_l * (
+                            +PB_0*PB_1*delta[g0][g1]
+                        )
+
+                        + (-2.0) * S2 * inv_S1 * inv_S4 * a_k * a_l * (
+                            +QC_x*QD_y*delta[b0][b1]
+                        )
+
+                        + 2.0 * inv_S4 * a_k * a_l * (
+                            +delta[g0][g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])
+
+                            +PB_0*(QC_x*delta[b1][g1] + QD_y*delta[b1][g0]) + PB_1*(QC_x*delta[b0][g1] + QD_y*delta[b0][g0])
+
+                            -delta[b0][b1]*(PQ[g0]*QD_y + PQ[g1]*QC_x)
+                        )
+
+                        + 4.0 * S1 * inv_S4 * a_k * a_l * (
+                            -PB_0*PB_1*(PQ[g0]*QD_y + PQ[g1]*QC_x)
+                        )
+
+                        + 4.0 * S2 * inv_S4 * a_k * a_l * (
+                            +QC_x*QD_y*(PB_0*PQ[b1] + PB_1*PQ[b0])
+                        )
+
+                    )
+
+                    + F4_t[2] * (
+
+                        2.0 * S1 * inv_S4 * inv_S4 * a_k * a_l * (
+                            -delta[g0][g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])
+
+                            -PB_0*(PQ[g0]*delta[b1][g1] + PQ[g1]*delta[b1][g0]) - PB_1*(PQ[g0]*delta[b0][g1] + PQ[g1]*delta[b0][g0])
+
+                            +PQ[g0]*PQ[g1]*delta[b0][b1]
+                        )
+
+                        + 2.0 * S2 * inv_S4 * inv_S4 * a_k * a_l * (
+                            +PQ[b0]*QD_y*delta[b1][g0]
+
+                            +PQ[b1]*QD_y*delta[b0][g0] + QC_x*(PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1])
+
+                            +delta[b0][b1]*(PQ[g0]*QD_y + PQ[g1]*QC_x)
+
+                            +PQ[b0]*PQ[b1]*delta[g0][g1]
+                        )
+
+                        + 4.0 * S1 * S1 * inv_S4 * inv_S4 * a_k * a_l * (
+                            +PB_0*PB_1*PQ[g0]*PQ[g1]
+                        )
+
+                        + 4.0 * S1 * S2 * inv_S4 * inv_S4 * a_k * a_l * (
+                            -(PB_0*PQ[b1] + PB_1*PQ[b0])*(PQ[g0]*QD_y + PQ[g1]*QC_x)
+                        )
+
+                        + 4.0 * S2 * S2 * inv_S4 * inv_S4 * a_k * a_l * (
+                            +PQ[b0]*PQ[b1]*QC_x*QD_y
+                        )
+
+                        + inv_S4 * inv_S4 * a_k * a_l * (
+                            +delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0]
+                        )
+
+                    )
+
+                    + F4_t[3] * (
+
+                        (-2.0) * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_k * a_l * (
+                            +PQ[b0]*PQ[b1]*delta[g0][g1]
+
+                            +PQ[g0]*(PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1] + PQ[g1]*delta[b0][b1]) + PQ[g1]*(PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0])
+                        )
+
+                        + 4.0 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_k * a_l * (
+                            +PQ[g0]*PQ[g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])
+                        )
+
+                        + 4.0 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_k * a_l * (
+                            -PQ[b0]*PQ[b1]*(PQ[g0]*QD_y + PQ[g1]*QC_x)
+                        )
+
+                    )
+
+                    + F4_t[4] * (
+
+                        4.0 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * a_l * (
+                            +PQ[b0]*PQ[b1]*PQ[g0]*PQ[g1]
+                        )
+
+                    )
+
+                    );
+
+            double hess_kl_xy = -eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+
+            atomicAdd(
+                hess_xy + prim_cart_ao_to_atom_inds[k] * natoms + prim_cart_ao_to_atom_inds[l_prim],
+                hess_kl_xy * ik_factor_D * 2.0 * frac_exact_exchange);
+        }
+    }
+
+    __syncthreads();
+}
+
+__global__ void __launch_bounds__(TILE_SIZE_K)
+computeExchangeHessianSDSS_IL_0(double*         hess_xy,
+                                double*         hess_yx,
+                                const uint32_t  hess_cart_ind_0,
+                                const uint32_t  hess_cart_ind_1,
+                                const double    frac_exact_exchange,
+                                const uint32_t* pair_inds_i_for_K_ss,
+                                const uint32_t* pair_inds_k_for_K_ss,
+                                const double*   D_ik_for_K_ss,
+                                const uint32_t  pair_inds_count_for_K_ss,
+                                const double*   s_prim_info,
+                                const uint32_t* s_prim_aoinds,
+                                const uint32_t  s_prim_count,
+                                const double*   d_prim_info,
+                                const uint32_t* d_prim_aoinds,
+                                const uint32_t  d_prim_count,
+                                const double    ds_max_D,
+                                const double*   mat_D_full_AO,
+                                const uint32_t  naos,
+                                const double*   Q_K_sd,
+                                const double*   Q_K_ss,
+                                const uint32_t* D_inds_K_sd,
+                                const uint32_t* D_inds_K_ss,
+                                const uint32_t* pair_displs_K_sd,
+                                const uint32_t* pair_displs_K_ss,
+                                const uint32_t* pair_counts_K_sd,
+                                const uint32_t* pair_counts_K_ss,
+                                const double*   pair_data_K_sd,
+                                const double*   pair_data_K_ss,
+                                const uint32_t* prim_cart_ao_to_atom_inds,
+                                const uint32_t  natoms,
+                                const double*   boys_func_table,
+                                const double*   boys_func_ft,
+                                const double    omega,
+                                const double    eri_threshold)
+{
+    // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
+
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
+    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ double   delta[3][3];
+    __shared__ uint32_t g0, g1;
+
+    const uint32_t ik = blockIdx.x;
+
+    // we make sure that ik < pair_inds_count_for_K_ss when calling the kernel
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+        g0 = hess_cart_ind_0;
+        g1 = hess_cart_ind_1;
+
+        i = pair_inds_i_for_K_ss[ik];
+        k = pair_inds_k_for_K_ss[ik];
+
+        count_i = pair_counts_K_sd[i];
+        count_k = pair_counts_K_ss[k];
+
+        displ_i = pair_displs_K_sd[i];
+        displ_k = pair_displs_K_ss[k];
+
+        a_i = s_prim_info[i + s_prim_count * 0];
+
+        r_i[0] = s_prim_info[i + s_prim_count * 2];
+        r_i[1] = s_prim_info[i + s_prim_count * 3];
+        r_i[2] = s_prim_info[i + s_prim_count * 4];
+
+        a_k = s_prim_info[k + s_prim_count * 0];
+
+        r_k[0] = s_prim_info[k + s_prim_count * 2];
+        r_k[1] = s_prim_info[k + s_prim_count * 3];
+        r_k[2] = s_prim_info[k + s_prim_count * 4];
+
+        ik_factor_D = (static_cast<double>(i != k) + 1.0) * D_ik_for_K_ss[ik];
+
+    }
+
+    __syncthreads();
+
+    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    {
+        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+
+        // sync threads before starting a new scan
+        __syncthreads();
+
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double PB_0, PB_1, PA_x;
+        uint32_t j_prim, j_cgto, b0, b1;
+
+        if (j < count_i)
+        {
+            Q_ij   = Q_K_sd[displ_i + j];
+
+            j_prim = D_inds_K_sd[displ_i + j];
+
+            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+
+            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = pair_data_K_sd[displ_i + j];
+
+            PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
+
+        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        {
+            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+
+            // Q_kl == Q_K_ss[displ_k + l]
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_ss[displ_k + l] * ds_max_D) <= eri_threshold))
+            {
+                break;
+            }
+
+            // const auto Q_kl = Q_K_ss[displ_k + l];
+
+            const auto l_prim = D_inds_K_ss[displ_k + l];
+
+            const auto l_cgto = s_prim_aoinds[l_prim];
+
+            const auto a_l = s_prim_info[l_prim + s_prim_count * 0];
+
+            const double r_l[3] = {s_prim_info[l_prim + s_prim_count * 2],
+                                   s_prim_info[l_prim + s_prim_count * 3],
+                                   s_prim_info[l_prim + s_prim_count * 4]};
+
+            const auto S_kl_00 = pair_data_K_ss[displ_k + l];
+
+
+            // J. Chem. Phys. 84, 3963-3974 (1986)
+
+            const auto S2 = a_k + a_l;
+
+            const auto inv_S2 = 1.0 / S2;
+            const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
+
+            const auto rho = S1 * S2 * inv_S4;
+
+            double d2 = 1.0;
+
+            if (omega != 0.0) d2 = omega * omega / (rho + omega * omega);
+
+            const auto Lambda = sqrt(4.0 * rho * d2 * MATH_CONST_INV_PI);
+
+            double F4_t[5];
+
+            gpu::computeBoysFunction(F4_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
+
+            if (omega != 0.0)
+            {
+                F4_t[1] *= d2;
+                F4_t[2] *= d2 * d2;
+                F4_t[3] *= d2 * d2 * d2;
+                F4_t[4] *= d2 * d2 * d2 * d2;
+            }
+
+
+            const auto QD_y = (-a_k * inv_S2) * (r_l[g1] - r_k[g1]);
+
+            // i-l Hessian
+
+            const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
+                    + F4_t[0] * (
+
+                        2.0 * inv_S1 * a_i * a_l * (
+                            +PB_0*QD_y*delta[b1][g0]
+
+                            +QD_y*(PA_x*delta[b0][b1] + PB_1*delta[b0][g0])
+                        )
+
+                        + 4.0 * a_i * a_l * (
+                            +PA_x*PB_0*PB_1*QD_y
+                        )
+
+                    )
+
+                    + F4_t[1] * (
+
+                        2.0 * S2 * inv_S1 * inv_S4 * a_i * a_l * (
+                            +QD_y*delta[b1][g0]*(-PB_0 + PQ[b0])
+
+                            +QD_y*(delta[b0][b1]*(-PA_x + PQ[g0]) + delta[b0][g0]*(-PB_1 + PQ[b1]))
+                        )
+
+                        + 2.0 * inv_S4 * a_i * a_l * (
+                            +PB_0*PB_1*delta[g0][g1]
+
+                            +PA_x*(PB_0*delta[b1][g1] + PB_1*delta[b0][g1])
+
+                            -PQ[g1]*(PA_x*delta[b0][b1] + PB_0*delta[b1][g0] + PB_1*delta[b0][g0])
+                        )
+
+                        + 4.0 * S1 * inv_S4 * a_i * a_l * (
+                            -PA_x*PB_0*PB_1*PQ[g1]
+                        )
+
+                        + 4.0 * S2 * inv_S4 * a_i * a_l * (
+                            +QD_y*(PA_x*(PB_0*PQ[b1] + PB_1*PQ[b0]) + PB_0*PB_1*PQ[g0])
+                        )
+
+                        + inv_S1 * inv_S4 * a_i * a_l * (
+                            +delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0]
+                        )
+
+                    )
+
+                    + F4_t[2] * (
+
+                        (-1.0) * S2 * inv_S1 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0]
+                        )
+
+                        + (-2.0) * S2 * S2 * inv_S1 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +PQ[b0]*QD_y*delta[b1][g0]
+
+                            +QD_y*(PQ[b1]*delta[b0][g0] + PQ[g0]*delta[b0][b1])
+                        )
+
+                        + 2.0 * S2 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +delta[g0][g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])
+
+                            +PA_x*(PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1]) + PQ[g0]*(PB_0*delta[b1][g1] + PB_1*delta[b0][g1])
+
+                            +PQ[g1]*(PA_x*delta[b0][b1] + PB_0*delta[b1][g0] + PB_1*delta[b0][g0] - PQ[b0]*delta[b1][g0] - PQ[b1]*delta[b0][g0] - PQ[g0]*delta[b0][b1])
+                        )
+
+                        + 4.0 * S1 * S2 * inv_S4 * inv_S4 * a_i * a_l * (
+                            -PQ[g1]*(PA_x*(PB_0*PQ[b1] + PB_1*PQ[b0]) + PB_0*PB_1*PQ[g0])
+                        )
+
+                        + 4.0 * S2 * S2 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +QD_y*(PB_0*PQ[b1]*PQ[g0] + PQ[b0]*(PA_x*PQ[b1] + PB_1*PQ[g0]))
+                        )
+
+                    )
+
+                    + F4_t[3] * (
+
+                        4.0 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_l * (
+                            -PQ[g1]*(PB_0*PQ[b1]*PQ[g0] + PQ[b0]*(PA_x*PQ[b1] + PB_1*PQ[g0]))
+                        )
+
+                        + 4.0 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +PQ[b0]*PQ[b1]*PQ[g0]*QD_y
+                        )
+
+                        + 2.0 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +PQ[b0]*PQ[b1]*delta[g0][g1]
+
+                            +PQ[g0]*(PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1] + PQ[g1]*delta[b0][b1]) + PQ[g1]*(PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0])
+                        )
+
+                    )
+
+                    + F4_t[4] * (
+
+                        (-4.0) * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +PQ[b0]*PQ[b1]*PQ[g0]*PQ[g1]
+                        )
+
+                    )
+
+                    );
+
+            double hess_il_xy = -eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+
+            atomicAdd(
+                hess_xy + prim_cart_ao_to_atom_inds[i] * natoms + prim_cart_ao_to_atom_inds[l_prim],
+                hess_il_xy * ik_factor_D * frac_exact_exchange);
+
+            atomicAdd(
+                hess_yx + prim_cart_ao_to_atom_inds[l_prim] * natoms + prim_cart_ao_to_atom_inds[i],
+                hess_il_xy * ik_factor_D * frac_exact_exchange);
+        }
+    }
+
+    __syncthreads();
+}
+
+__global__ void __launch_bounds__(TILE_SIZE_K)
+computeExchangeHessianSDSS_JK_0(double*         hess_xy,
+                                double*         hess_yx,
+                                const uint32_t  hess_cart_ind_0,
+                                const uint32_t  hess_cart_ind_1,
+                                const double    frac_exact_exchange,
+                                const uint32_t* pair_inds_i_for_K_ss,
+                                const uint32_t* pair_inds_k_for_K_ss,
+                                const double*   D_ik_for_K_ss,
+                                const uint32_t  pair_inds_count_for_K_ss,
+                                const double*   s_prim_info,
+                                const uint32_t* s_prim_aoinds,
+                                const uint32_t  s_prim_count,
+                                const double*   d_prim_info,
+                                const uint32_t* d_prim_aoinds,
+                                const uint32_t  d_prim_count,
+                                const double    ds_max_D,
+                                const double*   mat_D_full_AO,
+                                const uint32_t  naos,
+                                const double*   Q_K_sd,
+                                const double*   Q_K_ss,
+                                const uint32_t* D_inds_K_sd,
+                                const uint32_t* D_inds_K_ss,
+                                const uint32_t* pair_displs_K_sd,
+                                const uint32_t* pair_displs_K_ss,
+                                const uint32_t* pair_counts_K_sd,
+                                const uint32_t* pair_counts_K_ss,
+                                const double*   pair_data_K_sd,
+                                const double*   pair_data_K_ss,
+                                const uint32_t* prim_cart_ao_to_atom_inds,
+                                const uint32_t  natoms,
+                                const double*   boys_func_table,
+                                const double*   boys_func_ft,
+                                const double    omega,
+                                const double    eri_threshold)
+{
+    // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
+
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
+    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ double   delta[3][3];
+    __shared__ uint32_t g0, g1;
+
+    const uint32_t ik = blockIdx.x;
+
+    // we make sure that ik < pair_inds_count_for_K_ss when calling the kernel
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+        g0 = hess_cart_ind_0;
+        g1 = hess_cart_ind_1;
+
+        i = pair_inds_i_for_K_ss[ik];
+        k = pair_inds_k_for_K_ss[ik];
+
+        count_i = pair_counts_K_sd[i];
+        count_k = pair_counts_K_ss[k];
+
+        displ_i = pair_displs_K_sd[i];
+        displ_k = pair_displs_K_ss[k];
+
+        a_i = s_prim_info[i + s_prim_count * 0];
+
+        r_i[0] = s_prim_info[i + s_prim_count * 2];
+        r_i[1] = s_prim_info[i + s_prim_count * 3];
+        r_i[2] = s_prim_info[i + s_prim_count * 4];
+
+        a_k = s_prim_info[k + s_prim_count * 0];
+
+        r_k[0] = s_prim_info[k + s_prim_count * 2];
+        r_k[1] = s_prim_info[k + s_prim_count * 3];
+        r_k[2] = s_prim_info[k + s_prim_count * 4];
+
+        ik_factor_D = (static_cast<double>(i != k) + 1.0) * D_ik_for_K_ss[ik];
+
+    }
+
+    __syncthreads();
+
+    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    {
+        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+
+        // sync threads before starting a new scan
+        __syncthreads();
+
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double PB_0, PB_1, PB_x;
+        uint32_t j_prim, j_cgto, b0, b1;
+
+        if (j < count_i)
+        {
+            Q_ij   = Q_K_sd[displ_i + j];
+
+            j_prim = D_inds_K_sd[displ_i + j];
+
+            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+
+            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = pair_data_K_sd[displ_i + j];
+
+            PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
+
+        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        {
+            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+
+            // Q_kl == Q_K_ss[displ_k + l]
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_ss[displ_k + l] * ds_max_D) <= eri_threshold))
+            {
+                break;
+            }
+
+            // const auto Q_kl = Q_K_ss[displ_k + l];
+
+            const auto l_prim = D_inds_K_ss[displ_k + l];
+
+            const auto l_cgto = s_prim_aoinds[l_prim];
+
+            const auto a_l = s_prim_info[l_prim + s_prim_count * 0];
+
+            const double r_l[3] = {s_prim_info[l_prim + s_prim_count * 2],
+                                   s_prim_info[l_prim + s_prim_count * 3],
+                                   s_prim_info[l_prim + s_prim_count * 4]};
+
+            const auto S_kl_00 = pair_data_K_ss[displ_k + l];
+
+
+            // J. Chem. Phys. 84, 3963-3974 (1986)
+
+            const auto S2 = a_k + a_l;
+
+            const auto inv_S2 = 1.0 / S2;
+            const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
+
+            const auto rho = S1 * S2 * inv_S4;
+
+            double d2 = 1.0;
+
+            if (omega != 0.0) d2 = omega * omega / (rho + omega * omega);
+
+            const auto Lambda = sqrt(4.0 * rho * d2 * MATH_CONST_INV_PI);
+
+            double F4_t[5];
+
+            gpu::computeBoysFunction(F4_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
+
+            if (omega != 0.0)
+            {
+                F4_t[1] *= d2;
+                F4_t[2] *= d2 * d2;
+                F4_t[3] *= d2 * d2 * d2;
+                F4_t[4] *= d2 * d2 * d2 * d2;
+            }
+
+
+            const auto QC_y = (a_l * inv_S2) * (r_l[g1] - r_k[g1]);
+
+            // j-k Hessian
+
+            const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
+                    + F4_t[0] * (
+
+                        2.0 * inv_S1 * a_j * a_k * (
+                            +PB_0*QC_y*delta[b1][g0]
+
+                            +QC_y*(PB_1*delta[b0][g0] + PB_x*delta[b0][b1])
+                        )
+
+                        + 4.0 * a_j * a_k * (
+                            +PB_0*PB_1*PB_x*QC_y
+                        )
+
+                        + (-2.0) * a_k * (
+                            +PB_0*QC_y*delta[b1][g0]
+
+                            +PB_1*QC_y*delta[b0][g0]
+                        )
+
+                    )
+
+                    + F4_t[1] * (
+
+                        2.0 * S2 * inv_S1 * inv_S4 * a_j * a_k * (
+                            +QC_y*delta[b1][g0]*(-PB_0 + PQ[b0])
+
+                            +QC_y*(delta[b0][b1]*(-PB_x + PQ[g0]) + delta[b0][g0]*(-PB_1 + PQ[b1]))
+                        )
+
+                        + 2.0 * inv_S4 * a_j * a_k * (
+                            +PB_0*PB_1*delta[g0][g1]
+
+                            +PB_x*(PB_0*delta[b1][g1] + PB_1*delta[b0][g1])
+
+                            -PQ[g1]*(PB_0*delta[b1][g0] + PB_1*delta[b0][g0] + PB_x*delta[b0][b1])
+                        )
+
+                        + (-1.0) * inv_S4 * a_k * (
+                            +delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0]
+                        )
+
+                        + 4.0 * S1 * inv_S4 * a_j * a_k * (
+                            -PB_0*PB_1*PB_x*PQ[g1]
+                        )
+
+                        + 2.0 * S1 * inv_S4 * a_k * (
+                            +PB_0*PQ[g1]*delta[b1][g0]
+
+                            +PB_1*PQ[g1]*delta[b0][g0]
+                        )
+
+                        + 4.0 * S2 * inv_S4 * a_j * a_k * (
+                            +QC_y*(PB_0*(PB_1*PQ[g0] + PB_x*PQ[b1]) + PB_1*PB_x*PQ[b0])
+                        )
+
+                        + (-2.0) * S2 * inv_S4 * a_k * (
+                            +PQ[b0]*QC_y*delta[b1][g0]
+
+                            +PQ[b1]*QC_y*delta[b0][g0]
+                        )
+
+                        + inv_S1 * inv_S4 * a_j * a_k * (
+                            +delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0]
+                        )
+
+                    )
+
+                    + F4_t[2] * (
+
+                        (-1.0) * S2 * inv_S1 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0]
+                        )
+
+                        + (-2.0) * S2 * S2 * inv_S1 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +PQ[b0]*QC_y*delta[b1][g0]
+
+                            +QC_y*(PQ[b1]*delta[b0][g0] + PQ[g0]*delta[b0][b1])
+                        )
+
+                        + 2.0 * S2 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +delta[g0][g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])
+
+                            +PB_x*(PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1]) + PQ[g0]*(PB_0*delta[b1][g1] + PB_1*delta[b0][g1])
+
+                            +PQ[g1]*(PB_0*delta[b1][g0] + PB_1*delta[b0][g0] + PB_x*delta[b0][b1] - PQ[b0]*delta[b1][g0] - PQ[b1]*delta[b0][g0] - PQ[g0]*delta[b0][b1])
+                        )
+
+                        + 4.0 * S1 * S2 * inv_S4 * inv_S4 * a_j * a_k * (
+                            -PQ[g1]*(PB_0*(PB_1*PQ[g0] + PB_x*PQ[b1]) + PB_1*PB_x*PQ[b0])
+                        )
+
+                        + 4.0 * S2 * S2 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +QC_y*(PB_1*PQ[b0]*PQ[g0] + PQ[b1]*(PB_0*PQ[g0] + PB_x*PQ[b0]))
+                        )
+
+                        + 2.0 * S1 * S2 * inv_S4 * inv_S4 * a_k * (
+                            +PQ[b0]*PQ[g1]*delta[b1][g0]
+
+                            +PQ[b1]*PQ[g1]*delta[b0][g0]
+                        )
+
+                    )
+
+                    + F4_t[3] * (
+
+                        4.0 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_j * a_k * (
+                            -PQ[g1]*(PB_1*PQ[b0]*PQ[g0] + PQ[b1]*(PB_0*PQ[g0] + PB_x*PQ[b0]))
+                        )
+
+                        + 2.0 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +PQ[b0]*PQ[b1]*delta[g0][g1]
+
+                            +PQ[g0]*(PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1] + PQ[g1]*delta[b0][b1]) + PQ[g1]*(PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0])
+                        )
+
+                        + 4.0 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +PQ[b0]*PQ[b1]*PQ[g0]*QC_y
+                        )
+
+                    )
+
+                    + F4_t[4] * (
+
+                        (-4.0) * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +PQ[b0]*PQ[b1]*PQ[g0]*PQ[g1]
+                        )
+
+                    )
+
+                    );
+
+            double hess_jk_xy = -eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+
+            atomicAdd(
+                hess_xy + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + j_prim] * natoms + prim_cart_ao_to_atom_inds[k],
+                hess_jk_xy * ik_factor_D * frac_exact_exchange);
+
+            atomicAdd(
+                hess_yx + prim_cart_ao_to_atom_inds[k] * natoms + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + j_prim],
+                hess_jk_xy * ik_factor_D * frac_exact_exchange);
+        }
+    }
+
+    __syncthreads();
+}
+
+__global__ void __launch_bounds__(TILE_SIZE_K)
+computeExchangeHessianSDSP_II_0(double*         hess_xy,
+                                const uint32_t  hess_cart_ind_0,
+                                const uint32_t  hess_cart_ind_1,
+                                const double    frac_exact_exchange,
+                                const uint32_t* pair_inds_i_for_K_ss,
+                                const uint32_t* pair_inds_k_for_K_ss,
+                                const double*   D_ik_for_K_ss,
+                                const uint32_t  pair_inds_count_for_K_ss,
+                                const double*   s_prim_info,
+                                const uint32_t* s_prim_aoinds,
+                                const uint32_t  s_prim_count,
+                                const double*   p_prim_info,
+                                const uint32_t* p_prim_aoinds,
+                                const uint32_t  p_prim_count,
+                                const double*   d_prim_info,
+                                const uint32_t* d_prim_aoinds,
+                                const uint32_t  d_prim_count,
+                                const double    dp_max_D,
+                                const double*   mat_D_full_AO,
+                                const uint32_t  naos,
+                                const double*   Q_K_sd,
+                                const double*   Q_K_sp,
+                                const uint32_t* D_inds_K_sd,
+                                const uint32_t* D_inds_K_sp,
+                                const uint32_t* pair_displs_K_sd,
+                                const uint32_t* pair_displs_K_sp,
+                                const uint32_t* pair_counts_K_sd,
+                                const uint32_t* pair_counts_K_sp,
+                                const double*   pair_data_K_sd,
+                                const double*   pair_data_K_sp,
+                                const uint32_t* prim_cart_ao_to_atom_inds,
+                                const double*   boys_func_table,
+                                const double*   boys_func_ft,
+                                const double    omega,
+                                const double    eri_threshold)
+{
+    // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
+
+    __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
+    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ double   delta[3][3];
+    __shared__ uint32_t g0, g1;
+
+    const uint32_t ik = blockIdx.x;
+
+    // we make sure that ik < pair_inds_count_for_K_ss when calling the kernel
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+        g0 = hess_cart_ind_0;
+        g1 = hess_cart_ind_1;
+
+        i = pair_inds_i_for_K_ss[ik];
+        k = pair_inds_k_for_K_ss[ik];
+
+        count_i = pair_counts_K_sd[i];
+        count_k = pair_counts_K_sp[k];
+
+        displ_i = pair_displs_K_sd[i];
+        displ_k = pair_displs_K_sp[k];
+
+        a_i = s_prim_info[i + s_prim_count * 0];
+
+        r_i[0] = s_prim_info[i + s_prim_count * 2];
+        r_i[1] = s_prim_info[i + s_prim_count * 3];
+        r_i[2] = s_prim_info[i + s_prim_count * 4];
+
+        a_k = s_prim_info[k + s_prim_count * 0];
+
+        r_k[0] = s_prim_info[k + s_prim_count * 2];
+        r_k[1] = s_prim_info[k + s_prim_count * 3];
+        r_k[2] = s_prim_info[k + s_prim_count * 4];
+
+        ik_factor_D = (static_cast<double>(i != k) + 1.0) * D_ik_for_K_ss[ik];
+
+    }
+
+    __syncthreads();
+
+    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    {
+        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+
+        // sync threads before starting a new scan
+        __syncthreads();
+
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double PB_0, PB_1, PA_x, PA_y;
+        uint32_t j_prim, j_cgto, b0, b1;
+
+        if (j < count_i)
+        {
+            Q_ij   = Q_K_sd[displ_i + j];
+
+            j_prim = D_inds_K_sd[displ_i + j];
+
+            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+
+            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = pair_data_K_sd[displ_i + j];
+
+            PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+            PA_y = (a_j  * inv_S1) * (r_j[g1] - r_i[g1]);
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
+
+        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        {
+            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+
+            // Q_kl == Q_K_sp[displ_k + l]
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_sp[displ_k + l] * dp_max_D) <= eri_threshold))
+            {
+                break;
+            }
+
+            // const auto Q_kl = Q_K_sp[displ_k + l];
+
+            const auto l_prim = D_inds_K_sp[displ_k + l];
+
+            const auto l_cgto = p_prim_aoinds[(l_prim / 3) + p_prim_count * (l_prim % 3)];
+
+            const auto a_l = p_prim_info[l_prim / 3 + p_prim_count * 0];
+
+            const double r_l[3] = {p_prim_info[l_prim / 3 + p_prim_count * 2],
+                                   p_prim_info[l_prim / 3 + p_prim_count * 3],
+                                   p_prim_info[l_prim / 3 + p_prim_count * 4]};
+
+            const auto S_kl_00 = pair_data_K_sp[displ_k + l];
+
+            const auto d0 = l_prim % 3;
+
+            // J. Chem. Phys. 84, 3963-3974 (1986)
+
+            const auto S2 = a_k + a_l;
+
+            const auto inv_S2 = 1.0 / S2;
+            const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
+
+            const auto rho = S1 * S2 * inv_S4;
+
+            double d2 = 1.0;
+
+            if (omega != 0.0) d2 = omega * omega / (rho + omega * omega);
+
+            const auto Lambda = sqrt(4.0 * rho * d2 * MATH_CONST_INV_PI);
+
+            double F5_t[6];
+
+            gpu::computeBoysFunction(F5_t, rho * d2 * r2_PQ, 5, boys_func_table, boys_func_ft);
+
+            if (omega != 0.0)
+            {
+                F5_t[1] *= d2;
+                F5_t[2] *= d2 * d2;
+                F5_t[3] *= d2 * d2 * d2;
+                F5_t[4] *= d2 * d2 * d2 * d2;
+                F5_t[5] *= d2 * d2 * d2 * d2 * d2;
+            }
+
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+
+            // i-i Hessian
+
+            const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
+                    + F5_t[0] * (
+
+                        inv_S1 * inv_S1 * a_i * a_i * (
+                            +QD_0*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+                        )
+
+                        + 2.0 * inv_S1 * a_i * a_i * (
+                            +PB_0*PB_1*QD_0*delta[g0][g1]
+
+                            +QD_0*(PA_x*(PA_y*delta[b0][b1] + PB_0*delta[b1][g1] + PB_1*delta[b0][g1]) + PA_y*(PB_0*delta[b1][g0] + PB_1*delta[b0][g0]))
+                        )
+
+                        + (-1.0) * inv_S1 * a_i * (
+                            +QD_0*delta[b0][b1]*delta[g0][g1]
+                        )
+
+                        + 4.0 * a_i * a_i * (
+                            +PA_x*PA_y*PB_0*PB_1*QD_0
+                        )
+
+                        + (-2.0) * a_i * (
+                            +PB_0*PB_1*QD_0*delta[g0][g1]
+                        )
+
+                    )
+
+                    + F5_t[1] * (
+
+                        (-2.0) * S2 * inv_S1 * inv_S1 * inv_S4 * a_i * a_i * (
+                            +QD_0*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+                        )
+
+                        + inv_S1 * inv_S4 * a_i * a_i * (
+                            +PB_0*(delta[b1][d0]*delta[g0][g1] + delta[b1][g0]*delta[d0][g1] + delta[b1][g1]*delta[d0][g0])
+
+                            +PA_x*(delta[b0][b1]*delta[d0][g1] + delta[b0][d0]*delta[b1][g1] + delta[b0][g1]*delta[b1][d0]) + PA_y*(delta[b0][b1]*delta[d0][g0] + delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0]) + PB_1*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0])
+
+                            -PQ[d0]*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+                        )
+
+                        + 2.0 * S2 * inv_S1 * inv_S4 * a_i * a_i * (
+                            +QD_0*delta[g0][g1]*(PB_0*(-PB_1 + PQ[b1]) + PB_1*PQ[b0])
+
+                            +QD_0*(PA_x*(-PA_y*delta[b0][b1] - PB_0*delta[b1][g1] - PB_1*delta[b0][g1] + PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1] + PQ[g1]*delta[b0][b1]) + PA_y*(PQ[g0]*delta[b0][b1] + delta[b0][g0]*(-PB_1 + PQ[b1]) + delta[b1][g0]*(-PB_0 + PQ[b0])) + PB_0*(PQ[g0]*delta[b1][g1] + PQ[g1]*delta[b1][g0]) + PB_1*(PQ[g0]*delta[b0][g1] + PQ[g1]*delta[b0][g0]))
+                        )
+
+                        + S2 * inv_S1 * inv_S4 * a_i * (
+                            +QD_0*delta[b0][b1]*delta[g0][g1]
+                        )
+
+                        + 2.0 * inv_S4 * a_i * a_i * (
+                            +PA_x*PB_0*PB_1*delta[d0][g1]
+
+                            +PA_y*(PA_x*(PB_0*delta[b1][d0] + PB_1*delta[b0][d0]) + PB_0*PB_1*delta[d0][g0])
+
+                            -PQ[d0]*(PA_x*(PA_y*delta[b0][b1] + PB_0*delta[b1][g1] + PB_1*delta[b0][g1]) + PA_y*(PB_0*delta[b1][g0] + PB_1*delta[b0][g0]) + PB_0*PB_1*delta[g0][g1])
+                        )
+
+                        + inv_S4 * a_i * (
+                            -PB_0*delta[b1][d0]*delta[g0][g1]
+
+                            -PB_1*delta[b0][d0]*delta[g0][g1]
+
+                            +PQ[d0]*delta[b0][b1]*delta[g0][g1]
+                        )
+
+                        + 4.0 * S1 * inv_S4 * a_i * a_i * (
+                            -PA_x*PA_y*PB_0*PB_1*PQ[d0]
+                        )
+
+                        + 2.0 * S1 * inv_S4 * a_i * (
+                            +PB_0*PB_1*PQ[d0]*delta[g0][g1]
+                        )
+
+                        + 4.0 * S2 * inv_S4 * a_i * a_i * (
+                            +QD_0*(PA_x*PA_y*(PB_0*PQ[b1] + PB_1*PQ[b0]) + PB_0*PB_1*(PA_x*PQ[g1] + PA_y*PQ[g0]))
+                        )
+
+                        + (-2.0) * S2 * inv_S4 * a_i * (
+                            +QD_0*delta[g0][g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])
+                        )
+
+                    )
+
+                    + F5_t[2] * (
+
+                        S2 * S2 * inv_S1 * inv_S1 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +QD_0*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+                        )
+
+                        + S2 * inv_S1 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +(-PB_0 + PQ[b0])*(delta[b1][d0]*delta[g0][g1] + delta[b1][g0]*delta[d0][g1] + delta[b1][g1]*delta[d0][g0])
+
+                            +(-PA_x + PQ[g0])*(delta[b0][b1]*delta[d0][g1] + delta[b0][d0]*delta[b1][g1] + delta[b0][g1]*delta[b1][d0]) + (-PA_y + PQ[g1])*(delta[b0][b1]*delta[d0][g0] + delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0]) + (-PB_1 + PQ[b1])*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0])
+
+                            +2.0*PQ[d0]*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+                        )
+
+                        + 2.0 * S2 * S2 * inv_S1 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +QD_0*delta[g0][g1]*(-PB_0*PQ[b1] + PQ[b0]*(-PB_1 + PQ[b1]))
+
+                            +QD_0*(-PA_x*(PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1] + PQ[g1]*delta[b0][b1]) - PA_y*(PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0] + PQ[g0]*delta[b0][b1]) + PQ[g0]*(PQ[g1]*delta[b0][b1] + delta[b0][g1]*(-PB_1 + PQ[b1]) + delta[b1][g1]*(-PB_0 + PQ[b0])) + PQ[g1]*delta[b0][g0]*(-PB_1 + PQ[b1]) + PQ[g1]*delta[b1][g0]*(-PB_0 + PQ[b0]))
+                        )
+
+                        + 2.0 * S2 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +PQ[d0]*delta[g0][g1]*(PB_0*(PB_1 - PQ[b1]) - PB_1*PQ[b0])
+
+                            +PA_x*(PA_y*(PQ[b0]*delta[b1][d0] + PQ[b1]*delta[b0][d0]) + PB_0*(PQ[b1]*delta[d0][g1] + PQ[g1]*delta[b1][d0]) + PB_1*(PQ[b0]*delta[d0][g1] + PQ[g1]*delta[b0][d0])) + PA_y*(PB_0*(PQ[b1]*delta[d0][g0] + PQ[g0]*delta[b1][d0]) + PB_1*(PQ[b0]*delta[d0][g0] + PQ[g0]*delta[b0][d0])) + PB_0*PB_1*(PQ[g0]*delta[d0][g1] + PQ[g1]*delta[d0][g0])
+
+                            +PQ[d0]*(PA_x*PA_y*delta[b0][b1] - PA_x*(PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1] + PQ[g1]*delta[b0][b1]) - PA_y*(PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0] + PQ[g0]*delta[b0][b1]) + PB_0*delta[b1][g0]*(PA_y - PQ[g1]) + PB_0*delta[b1][g1]*(PA_x - PQ[g0]) + PB_1*delta[b0][g0]*(PA_y - PQ[g1]) + PB_1*delta[b0][g1]*(PA_x - PQ[g0]))
+                        )
+
+                        + (-1.0) * S2 * inv_S4 * inv_S4 * a_i * (
+                            +PQ[b0]*delta[b1][d0]*delta[g0][g1]
+
+                            +delta[g0][g1]*(PQ[b1]*delta[b0][d0] + PQ[d0]*delta[b0][b1])
+                        )
+
+                        + 4.0 * S1 * S2 * inv_S4 * inv_S4 * a_i * a_i * (
+                            -PQ[d0]*(PA_x*PA_y*(PB_0*PQ[b1] + PB_1*PQ[b0]) + PB_0*PB_1*(PA_x*PQ[g1] + PA_y*PQ[g0]))
+                        )
+
+                        + 2.0 * S1 * S2 * inv_S4 * inv_S4 * a_i * (
+                            +PQ[d0]*delta[g0][g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])
+                        )
+
+                        + 4.0 * S2 * S2 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +QD_0*(PA_x*PQ[b0]*(PA_y*PQ[b1] + PB_1*PQ[g1]) + PB_0*PQ[b1]*(PA_x*PQ[g1] + PA_y*PQ[g0]) + PB_1*PQ[g0]*(PA_y*PQ[b0] + PB_0*PQ[g1]))
+                        )
+
+                        + (-2.0) * S2 * S2 * inv_S4 * inv_S4 * a_i * (
+                            +PQ[b0]*PQ[b1]*QD_0*delta[g0][g1]
+                        )
+
+                    )
+
+                    + F5_t[3] * (
+
+                        (-1.0) * S2 * S2 * inv_S1 * inv_S4 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +PQ[b0]*(delta[b1][d0]*delta[g0][g1] + delta[b1][g0]*delta[d0][g1] + delta[b1][g1]*delta[d0][g0])
+
+                            +PQ[b1]*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0]) + PQ[d0]*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0]) + PQ[g0]*(delta[b0][b1]*delta[d0][g1] + delta[b0][d0]*delta[b1][g1] + delta[b0][g1]*delta[b1][d0]) + PQ[g1]*(delta[b0][b1]*delta[d0][g0] + delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0])
+                        )
+
+                        + (-2.0) * S2 * S2 * S2 * inv_S1 * inv_S4 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +PQ[b0]*PQ[b1]*QD_0*delta[g0][g1]
+
+                            +QD_0*(PQ[g0]*(PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1] + PQ[g1]*delta[b0][b1]) + PQ[g1]*(PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0]))
+                        )
+
+                        + 2.0 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +PQ[d0]*delta[g0][g1]*(PB_1*PQ[b0] + PQ[b1]*(PB_0 - PQ[b0]))
+
+                            +PQ[b0]*(PA_x*(PQ[b1]*delta[d0][g1] + PQ[g1]*delta[b1][d0]) + PA_y*(PQ[b1]*delta[d0][g0] + PQ[g0]*delta[b1][d0]) + PB_1*(PQ[g0]*delta[d0][g1] + PQ[g1]*delta[d0][g0])) + PQ[b1]*(PQ[g0]*(PA_y*delta[b0][d0] + PB_0*delta[d0][g1]) + PQ[g1]*(PA_x*delta[b0][d0] + PB_0*delta[d0][g0])) + PQ[g0]*PQ[g1]*(PB_0*delta[b1][d0] + PB_1*delta[b0][d0])
+
+                            +PQ[d0]*(PA_x*(PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1] + PQ[g1]*delta[b0][b1]) + PQ[g0]*(PA_y*delta[b0][b1] + PB_0*delta[b1][g1] + PB_1*delta[b0][g1] - PQ[b0]*delta[b1][g1] - PQ[b1]*delta[b0][g1] - PQ[g1]*delta[b0][b1]) + PQ[g1]*(PB_0*delta[b1][g0] + PB_1*delta[b0][g0]) + (PA_y - PQ[g1])*(PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0]))
+                        )
+
+                        + 4.0 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_i * (
+                            -PQ[d0]*(PA_x*PQ[b0]*(PA_y*PQ[b1] + PB_1*PQ[g1]) + PB_0*PQ[b1]*(PA_x*PQ[g1] + PA_y*PQ[g0]) + PB_1*PQ[g0]*(PA_y*PQ[b0] + PB_0*PQ[g1]))
+                        )
+
+                        + 4.0 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +QD_0*(PQ[b0]*PQ[b1]*(PA_x*PQ[g1] + PA_y*PQ[g0]) + PQ[g0]*PQ[g1]*(PB_0*PQ[b1] + PB_1*PQ[b0]))
+                        )
+
+                        + 2.0 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * (
+                            +PQ[b0]*PQ[b1]*PQ[d0]*delta[g0][g1]
+                        )
+
+                    )
+
+                    + F5_t[4] * (
+
+                        4.0 * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_i * (
+                            -PQ[d0]*(PQ[b0]*PQ[b1]*(PA_x*PQ[g1] + PA_y*PQ[g0]) + PQ[g0]*PQ[g1]*(PB_0*PQ[b1] + PB_1*PQ[b0]))
+                        )
+
+                        + 4.0 * S2 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +PQ[b0]*PQ[b1]*PQ[g0]*PQ[g1]*QD_0
+                        )
+
+                        + 2.0 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +PQ[b0]*PQ[b1]*PQ[d0]*delta[g0][g1]
+
+                            +PQ[g0]*(PQ[b0]*(PQ[b1]*delta[d0][g1] + PQ[d0]*delta[b1][g1] + PQ[g1]*delta[b1][d0]) + PQ[b1]*PQ[d0]*delta[b0][g1]) + PQ[g1]*(PQ[b1]*(PQ[b0]*delta[d0][g0] + PQ[d0]*delta[b0][g0] + PQ[g0]*delta[b0][d0]) + PQ[d0]*(PQ[b0]*delta[b1][g0] + PQ[g0]*delta[b0][b1]))
+                        )
+
+                    )
+
+                    + F5_t[5] * (
+
+                        (-4.0) * S1 * S2 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +PQ[b0]*PQ[b1]*PQ[d0]*PQ[g0]*PQ[g1]
+                        )
+
+                    )
+
+                    );
+
+            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+        }
+    }
+
+    __syncthreads();
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_ss))
+    {
+        double hess_ii_xy = 0.0;
+
+        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        {
+            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            {
+                hess_ii_xy += ERIs[y][x];
+            }
+        }
+
+        atomicAdd(hess_xy + prim_cart_ao_to_atom_inds[i], hess_ii_xy * ik_factor_D * 2.0 * frac_exact_exchange);
+    }
+}
+
+__global__ void __launch_bounds__(TILE_SIZE_K)
+computeExchangeHessianSDSP_KK_0(double*         hess_xy,
+                                const uint32_t  hess_cart_ind_0,
+                                const uint32_t  hess_cart_ind_1,
+                                const double    frac_exact_exchange,
+                                const uint32_t* pair_inds_i_for_K_ss,
+                                const uint32_t* pair_inds_k_for_K_ss,
+                                const double*   D_ik_for_K_ss,
+                                const uint32_t  pair_inds_count_for_K_ss,
+                                const double*   s_prim_info,
+                                const uint32_t* s_prim_aoinds,
+                                const uint32_t  s_prim_count,
+                                const double*   p_prim_info,
+                                const uint32_t* p_prim_aoinds,
+                                const uint32_t  p_prim_count,
+                                const double*   d_prim_info,
+                                const uint32_t* d_prim_aoinds,
+                                const uint32_t  d_prim_count,
+                                const double    dp_max_D,
+                                const double*   mat_D_full_AO,
+                                const uint32_t  naos,
+                                const double*   Q_K_sd,
+                                const double*   Q_K_sp,
+                                const uint32_t* D_inds_K_sd,
+                                const uint32_t* D_inds_K_sp,
+                                const uint32_t* pair_displs_K_sd,
+                                const uint32_t* pair_displs_K_sp,
+                                const uint32_t* pair_counts_K_sd,
+                                const uint32_t* pair_counts_K_sp,
+                                const double*   pair_data_K_sd,
+                                const double*   pair_data_K_sp,
+                                const uint32_t* prim_cart_ao_to_atom_inds,
+                                const double*   boys_func_table,
+                                const double*   boys_func_ft,
+                                const double    omega,
+                                const double    eri_threshold)
+{
+    // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
+
+    __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
+    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ double   delta[3][3];
+    __shared__ uint32_t g0, g1;
+
+    const uint32_t ik = blockIdx.x;
+
+    // we make sure that ik < pair_inds_count_for_K_ss when calling the kernel
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+        g0 = hess_cart_ind_0;
+        g1 = hess_cart_ind_1;
+
+        i = pair_inds_i_for_K_ss[ik];
+        k = pair_inds_k_for_K_ss[ik];
+
+        count_i = pair_counts_K_sd[i];
+        count_k = pair_counts_K_sp[k];
+
+        displ_i = pair_displs_K_sd[i];
+        displ_k = pair_displs_K_sp[k];
+
+        a_i = s_prim_info[i + s_prim_count * 0];
+
+        r_i[0] = s_prim_info[i + s_prim_count * 2];
+        r_i[1] = s_prim_info[i + s_prim_count * 3];
+        r_i[2] = s_prim_info[i + s_prim_count * 4];
+
+        a_k = s_prim_info[k + s_prim_count * 0];
+
+        r_k[0] = s_prim_info[k + s_prim_count * 2];
+        r_k[1] = s_prim_info[k + s_prim_count * 3];
+        r_k[2] = s_prim_info[k + s_prim_count * 4];
+
+        ik_factor_D = (static_cast<double>(i != k) + 1.0) * D_ik_for_K_ss[ik];
+
+    }
+
+    __syncthreads();
+
+    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    {
+        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+
+        // sync threads before starting a new scan
+        __syncthreads();
+
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
+
+        if (j < count_i)
+        {
+            Q_ij   = Q_K_sd[displ_i + j];
+
+            j_prim = D_inds_K_sd[displ_i + j];
+
+            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+
+            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = pair_data_K_sd[displ_i + j];
+
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
+
+        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        {
+            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+
+            // Q_kl == Q_K_sp[displ_k + l]
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_sp[displ_k + l] * dp_max_D) <= eri_threshold))
+            {
+                break;
+            }
+
+            // const auto Q_kl = Q_K_sp[displ_k + l];
+
+            const auto l_prim = D_inds_K_sp[displ_k + l];
+
+            const auto l_cgto = p_prim_aoinds[(l_prim / 3) + p_prim_count * (l_prim % 3)];
+
+            const auto a_l = p_prim_info[l_prim / 3 + p_prim_count * 0];
+
+            const double r_l[3] = {p_prim_info[l_prim / 3 + p_prim_count * 2],
+                                   p_prim_info[l_prim / 3 + p_prim_count * 3],
+                                   p_prim_info[l_prim / 3 + p_prim_count * 4]};
+
+            const auto S_kl_00 = pair_data_K_sp[displ_k + l];
+
+            const auto d0 = l_prim % 3;
+
+            // J. Chem. Phys. 84, 3963-3974 (1986)
+
+            const auto S2 = a_k + a_l;
+
+            const auto inv_S2 = 1.0 / S2;
+            const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
+
+            const auto rho = S1 * S2 * inv_S4;
+
+            double d2 = 1.0;
+
+            if (omega != 0.0) d2 = omega * omega / (rho + omega * omega);
+
+            const auto Lambda = sqrt(4.0 * rho * d2 * MATH_CONST_INV_PI);
+
+            double F5_t[6];
+
+            gpu::computeBoysFunction(F5_t, rho * d2 * r2_PQ, 5, boys_func_table, boys_func_ft);
+
+            if (omega != 0.0)
+            {
+                F5_t[1] *= d2;
+                F5_t[2] *= d2 * d2;
+                F5_t[3] *= d2 * d2 * d2;
+                F5_t[4] *= d2 * d2 * d2 * d2;
+                F5_t[5] *= d2 * d2 * d2 * d2 * d2;
+            }
+
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+
+            const auto QC_x = (a_l * inv_S2) * (r_l[g0] - r_k[g0]);
+            const auto QC_y = (a_l * inv_S2) * (r_l[g1] - r_k[g1]);
+
+            // k-k Hessian
+
+            const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
+                    + F5_t[0] * (
+
+                        inv_S1 * inv_S2 * a_k * a_k * (
+                            +QD_0*delta[b0][b1]*delta[g0][g1]
+
+                            +delta[b0][b1]*(QC_x*delta[d0][g1] + QC_y*delta[d0][g0])
+                        )
+
+                        + 2.0 * inv_S1 * a_k * a_k * (
+                            +QC_x*QC_y*QD_0*delta[b0][b1]
+                        )
+
+                        + (-1.0) * inv_S1 * a_k * (
+                            +QD_0*delta[b0][b1]*delta[g0][g1]
+                        )
+
+                        + 2.0 * inv_S2 * a_k * a_k * (
+                            +PB_0*PB_1*QD_0*delta[g0][g1]
+
+                            +PB_0*PB_1*(QC_x*delta[d0][g1] + QC_y*delta[d0][g0])
+                        )
+
+                        + 4.0 * a_k * a_k * (
+                            +PB_0*PB_1*QC_x*QC_y*QD_0
+                        )
+
+                        + (-2.0) * a_k * (
+                            +PB_0*PB_1*QD_0*delta[g0][g1]
+                        )
+
+                    )
+
+                    + F5_t[1] * (
+
+                        (-1.0) * inv_S1 * inv_S4 * a_k * a_k * (
+                            +QD_0*delta[b0][b1]*delta[g0][g1]
+
+                            +delta[b0][b1]*(QC_x*delta[d0][g1] + QC_y*delta[d0][g0])
+                        )
+
+                        + inv_S2 * inv_S4 * a_k * a_k * (
+                            +PB_0*(delta[b1][d0]*delta[g0][g1] + delta[b1][g0]*delta[d0][g1] + delta[b1][g1]*delta[d0][g0])
+
+                            +PB_1*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0])
+
+                            -delta[b0][b1]*(delta[d0][g0]*(PQ[g1] + QC_y) + delta[d0][g1]*(PQ[g0] + QC_x) + delta[g0][g1]*(PQ[d0] + QD_0))
+                        )
+
+                        + (-2.0) * S1 * inv_S2 * inv_S4 * a_k * a_k * (
+                            +PB_0*PB_1*delta[g0][g1]*(PQ[d0] + QD_0)
+
+                            +PB_0*PB_1*(delta[d0][g0]*(PQ[g1] + QC_y) + delta[d0][g1]*(PQ[g0] + QC_x))
+                        )
+
+                        + (-2.0) * S2 * inv_S1 * inv_S4 * a_k * a_k * (
+                            +QC_x*QC_y*QD_0*delta[b0][b1]
+                        )
+
+                        + S2 * inv_S1 * inv_S4 * a_k * (
+                            +QD_0*delta[b0][b1]*delta[g0][g1]
+                        )
+
+                        + 2.0 * inv_S4 * a_k * a_k * (
+                            +QD_0*delta[g0][g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])
+
+                            +(PB_0*PQ[b1] + PB_1*PQ[b0])*(QC_x*delta[d0][g1] + QC_y*delta[d0][g0])
+
+                            +QC_x*(PB_0*(QC_y*delta[b1][d0] + QD_0*delta[b1][g1]) + PB_1*(QC_y*delta[b0][d0] + QD_0*delta[b0][g1])) + QC_y*QD_0*(PB_0*delta[b1][g0] + PB_1*delta[b0][g0])
+
+                            -delta[b0][b1]*(PQ[g0]*QC_y*QD_0 + QC_x*(PQ[d0]*QC_y + PQ[g1]*QD_0))
+                        )
+
+                        + inv_S4 * a_k * (
+                            -PB_0*delta[b1][d0]*delta[g0][g1]
+
+                            -PB_1*delta[b0][d0]*delta[g0][g1]
+
+                            +PQ[d0]*delta[b0][b1]*delta[g0][g1]
+                        )
+
+                        + 4.0 * S1 * inv_S4 * a_k * a_k * (
+                            -PB_0*PB_1*(PQ[g0]*QC_y*QD_0 + QC_x*(PQ[d0]*QC_y + PQ[g1]*QD_0))
+                        )
+
+                        + 2.0 * S1 * inv_S4 * a_k * (
+                            +PB_0*PB_1*PQ[d0]*delta[g0][g1]
+                        )
+
+                        + 4.0 * S2 * inv_S4 * a_k * a_k * (
+                            +QC_x*QC_y*QD_0*(PB_0*PQ[b1] + PB_1*PQ[b0])
+                        )
+
+                        + (-2.0) * S2 * inv_S4 * a_k * (
+                            +QD_0*delta[g0][g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])
+                        )
+
+                    )
+
+                    + F5_t[2] * (
+
+                        S1 * inv_S2 * inv_S4 * inv_S4 * a_k * a_k * (
+                            -PB_0*(delta[b1][d0]*delta[g0][g1] + delta[b1][g0]*delta[d0][g1] + delta[b1][g1]*delta[d0][g0])
+
+                            -PB_1*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0])
+
+                            +delta[b0][b1]*(PQ[d0]*delta[g0][g1] + PQ[g0]*delta[d0][g1] + PQ[g1]*delta[d0][g0])
+                        )
+
+                        + inv_S4 * inv_S4 * a_k * a_k * (
+                            +delta[b0][b1]*delta[g0][g1]*(PQ[d0] + QD_0)
+
+                            +QC_x*(delta[b0][d0]*delta[b1][g1] + delta[b0][g1]*delta[b1][d0]) + QC_y*(delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0]) + QD_0*(delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+
+                            +PQ[b0]*(delta[b1][d0]*delta[g0][g1] + delta[b1][g0]*delta[d0][g1] + delta[b1][g1]*delta[d0][g0]) + PQ[b1]*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0])
+
+                            +delta[b0][b1]*(delta[d0][g0]*(PQ[g1] + QC_y) + delta[d0][g1]*(PQ[g0] + QC_x))
+                        )
+
+                        + 2.0 * S1 * S1 * inv_S2 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +PB_0*PB_1*PQ[d0]*delta[g0][g1]
+
+                            +PB_0*PB_1*(PQ[g0]*delta[d0][g1] + PQ[g1]*delta[d0][g0])
+                        )
+
+                        + 2.0 * S1 * inv_S4 * inv_S4 * a_k * a_k * (
+                            -delta[g0][g1]*(PQ[d0] + QD_0)*(PB_0*PQ[b1] + PB_1*PQ[b0])
+
+                            -(PB_0*PQ[b1] + PB_1*PQ[b0])*(delta[d0][g0]*(PQ[g1] + QC_y) + delta[d0][g1]*(PQ[g0] + QC_x))
+
+                            -PB_0*(PQ[d0]*(QC_x*delta[b1][g1] + QC_y*delta[b1][g0]) + PQ[g0]*(QC_y*delta[b1][d0] + QD_0*delta[b1][g1]) + PQ[g1]*(QC_x*delta[b1][d0] + QD_0*delta[b1][g0])) - PB_1*(PQ[d0]*(QC_x*delta[b0][g1] + QC_y*delta[b0][g0]) + PQ[g0]*(QC_y*delta[b0][d0] + QD_0*delta[b0][g1]) + PQ[g1]*(QC_x*delta[b0][d0] + QD_0*delta[b0][g0]))
+
+                            +delta[b0][b1]*(PQ[d0]*(PQ[g0]*QC_y + PQ[g1]*QC_x) + PQ[g0]*PQ[g1]*QD_0)
+                        )
+
+                        + 2.0 * S2 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +QC_x*QC_y*(PQ[b0]*delta[b1][d0] + PQ[b1]*delta[b0][d0]) + QD_0*(PQ[b0]*(PQ[b1]*delta[g0][g1] + QC_x*delta[b1][g1] + QC_y*delta[b1][g0]) + PQ[b1]*(QC_x*delta[b0][g1] + QC_y*delta[b0][g0]))
+
+                            +delta[b0][b1]*(PQ[g0]*QC_y*QD_0 + QC_x*(PQ[d0]*QC_y + PQ[g1]*QD_0))
+
+                            +PQ[b0]*PQ[b1]*(QC_x*delta[d0][g1] + QC_y*delta[d0][g0])
+                        )
+
+                        + (-1.0) * S2 * inv_S4 * inv_S4 * a_k * (
+                            +PQ[b0]*delta[b1][d0]*delta[g0][g1]
+
+                            +delta[g0][g1]*(PQ[b1]*delta[b0][d0] + PQ[d0]*delta[b0][b1])
+                        )
+
+                        + 4.0 * S1 * S1 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +PB_0*PB_1*(PQ[d0]*(PQ[g0]*QC_y + PQ[g1]*QC_x) + PQ[g0]*PQ[g1]*QD_0)
+                        )
+
+                        + 4.0 * S1 * S2 * inv_S4 * inv_S4 * a_k * a_k * (
+                            -(PB_0*PQ[b1] + PB_1*PQ[b0])*(PQ[g0]*QC_y*QD_0 + QC_x*(PQ[d0]*QC_y + PQ[g1]*QD_0))
+                        )
+
+                        + 2.0 * S1 * S2 * inv_S4 * inv_S4 * a_k * (
+                            +PQ[d0]*delta[g0][g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])
+                        )
+
+                        + 4.0 * S2 * S2 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +PQ[b0]*PQ[b1]*QC_x*QC_y*QD_0
+                        )
+
+                        + (-2.0) * S2 * S2 * inv_S4 * inv_S4 * a_k * (
+                            +PQ[b0]*PQ[b1]*QD_0*delta[g0][g1]
+                        )
+
+                    )
+
+                    + F5_t[3] * (
+
+                        (-1.0) * S1 * inv_S4 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +PQ[b0]*(delta[b1][d0]*delta[g0][g1] + delta[b1][g0]*delta[d0][g1] + delta[b1][g1]*delta[d0][g0])
+
+                            +PQ[b1]*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0]) + PQ[d0]*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0]) + PQ[g0]*(delta[b0][b1]*delta[d0][g1] + delta[b0][d0]*delta[b1][g1] + delta[b0][g1]*delta[b1][d0]) + PQ[g1]*(delta[b0][b1]*delta[d0][g0] + delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0])
+                        )
+
+                        + 2.0 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +PQ[d0]*delta[g0][g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])
+
+                            +(PB_0*PQ[b1] + PB_1*PQ[b0])*(PQ[g0]*delta[d0][g1] + PQ[g1]*delta[d0][g0])
+
+                            +PQ[d0]*(PB_0*(PQ[g0]*delta[b1][g1] + PQ[g1]*delta[b1][g0]) + PB_1*(PQ[g0]*delta[b0][g1] + PQ[g1]*delta[b0][g0])) + PQ[g0]*PQ[g1]*(PB_0*delta[b1][d0] + PB_1*delta[b0][d0])
+
+                            -PQ[d0]*PQ[g0]*PQ[g1]*delta[b0][b1]
+                        )
+
+                        + (-2.0) * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +PQ[b0]*(PQ[b1]*delta[g0][g1]*(PQ[d0] + QD_0) + PQ[d0]*(QC_x*delta[b1][g1] + QC_y*delta[b1][g0]) + PQ[g0]*(QC_y*delta[b1][d0] + QD_0*delta[b1][g1]) + PQ[g1]*(QC_x*delta[b1][d0] + QD_0*delta[b1][g0])) + PQ[b1]*(PQ[d0]*(QC_x*delta[b0][g1] + QC_y*delta[b0][g0]) + PQ[g0]*(QC_y*delta[b0][d0] + QD_0*delta[b0][g1]) + PQ[g1]*(QC_x*delta[b0][d0] + QD_0*delta[b0][g0]))
+
+                            +PQ[b0]*PQ[b1]*(delta[d0][g0]*(PQ[g1] + QC_y) + delta[d0][g1]*(PQ[g0] + QC_x))
+
+                            +delta[b0][b1]*(PQ[d0]*(PQ[g0]*QC_y + PQ[g1]*QC_x) + PQ[g0]*PQ[g1]*QD_0)
+                        )
+
+                        + 4.0 * S1 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * a_k * a_k * (
+                            -PB_0*PB_1*PQ[d0]*PQ[g0]*PQ[g1]
+                        )
+
+                        + 4.0 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +(PB_0*PQ[b1] + PB_1*PQ[b0])*(PQ[d0]*(PQ[g0]*QC_y + PQ[g1]*QC_x) + PQ[g0]*PQ[g1]*QD_0)
+                        )
+
+                        + (-4.0) * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +PQ[b0]*PQ[b1]*PQ[d0]*QC_x*QC_y
+
+                            +PQ[b0]*PQ[b1]*QD_0*(PQ[g0]*QC_y + PQ[g1]*QC_x)
+                        )
+
+                        + 2.0 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_k * (
+                            +PQ[b0]*PQ[b1]*PQ[d0]*delta[g0][g1]
+                        )
+
+                    )
+
+                    + F5_t[4] * (
+
+                        4.0 * S1 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * a_k * (
+                            -PQ[d0]*PQ[g0]*PQ[g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])
+                        )
+
+                        + 4.0 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +PQ[b0]*PQ[b1]*(PQ[d0]*(PQ[g0]*QC_y + PQ[g1]*QC_x) + PQ[g0]*PQ[g1]*QD_0)
+                        )
+
+                        + 2.0 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +PQ[b0]*PQ[b1]*PQ[d0]*delta[g0][g1]
+
+                            +PQ[g0]*(PQ[b0]*(PQ[b1]*delta[d0][g1] + PQ[d0]*delta[b1][g1] + PQ[g1]*delta[b1][d0]) + PQ[b1]*PQ[d0]*delta[b0][g1]) + PQ[g1]*(PQ[b1]*(PQ[b0]*delta[d0][g0] + PQ[d0]*delta[b0][g0] + PQ[g0]*delta[b0][d0]) + PQ[d0]*(PQ[b0]*delta[b1][g0] + PQ[g0]*delta[b0][b1]))
+                        )
+
+                    )
+
+                    + F5_t[5] * (
+
+                        (-4.0) * S1 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +PQ[b0]*PQ[b1]*PQ[d0]*PQ[g0]*PQ[g1]
+                        )
+
+                    )
+
+                    );
+
+            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+        }
+    }
+
+    __syncthreads();
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_ss))
+    {
+        double hess_kk_xy = 0.0;
+
+        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        {
+            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            {
+                hess_kk_xy += ERIs[y][x];
+            }
+        }
+
+        atomicAdd(hess_xy + prim_cart_ao_to_atom_inds[k], hess_kk_xy * ik_factor_D * 2.0 * frac_exact_exchange);
+    }
+}
+
+__global__ void __launch_bounds__(TILE_SIZE_K)
+computeExchangeHessianSDSP_IK_0(double*         hess_xy,
+                                double*         hess_yx,
+                                const uint32_t  hess_cart_ind_0,
+                                const uint32_t  hess_cart_ind_1,
+                                const double    frac_exact_exchange,
+                                const uint32_t* pair_inds_i_for_K_ss,
+                                const uint32_t* pair_inds_k_for_K_ss,
+                                const double*   D_ik_for_K_ss,
+                                const uint32_t  pair_inds_count_for_K_ss,
+                                const double*   s_prim_info,
+                                const uint32_t* s_prim_aoinds,
+                                const uint32_t  s_prim_count,
+                                const double*   p_prim_info,
+                                const uint32_t* p_prim_aoinds,
+                                const uint32_t  p_prim_count,
+                                const double*   d_prim_info,
+                                const uint32_t* d_prim_aoinds,
+                                const uint32_t  d_prim_count,
+                                const double    dp_max_D,
+                                const double*   mat_D_full_AO,
+                                const uint32_t  naos,
+                                const double*   Q_K_sd,
+                                const double*   Q_K_sp,
+                                const uint32_t* D_inds_K_sd,
+                                const uint32_t* D_inds_K_sp,
+                                const uint32_t* pair_displs_K_sd,
+                                const uint32_t* pair_displs_K_sp,
+                                const uint32_t* pair_counts_K_sd,
+                                const uint32_t* pair_counts_K_sp,
+                                const double*   pair_data_K_sd,
+                                const double*   pair_data_K_sp,
+                                const uint32_t* prim_cart_ao_to_atom_inds,
+                                const uint32_t  natoms,
+                                const double*   boys_func_table,
+                                const double*   boys_func_ft,
+                                const double    omega,
+                                const double    eri_threshold)
+{
+    // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
+
+    __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
+    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ double   delta[3][3];
+    __shared__ uint32_t g0, g1;
+
+    const uint32_t ik = blockIdx.x;
+
+    // we make sure that ik < pair_inds_count_for_K_ss when calling the kernel
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+        g0 = hess_cart_ind_0;
+        g1 = hess_cart_ind_1;
+
+        i = pair_inds_i_for_K_ss[ik];
+        k = pair_inds_k_for_K_ss[ik];
+
+        count_i = pair_counts_K_sd[i];
+        count_k = pair_counts_K_sp[k];
+
+        displ_i = pair_displs_K_sd[i];
+        displ_k = pair_displs_K_sp[k];
+
+        a_i = s_prim_info[i + s_prim_count * 0];
+
+        r_i[0] = s_prim_info[i + s_prim_count * 2];
+        r_i[1] = s_prim_info[i + s_prim_count * 3];
+        r_i[2] = s_prim_info[i + s_prim_count * 4];
+
+        a_k = s_prim_info[k + s_prim_count * 0];
+
+        r_k[0] = s_prim_info[k + s_prim_count * 2];
+        r_k[1] = s_prim_info[k + s_prim_count * 3];
+        r_k[2] = s_prim_info[k + s_prim_count * 4];
+
+        ik_factor_D = (static_cast<double>(i != k) + 1.0) * D_ik_for_K_ss[ik];
+
+    }
+
+    __syncthreads();
+
+    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    {
+        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+
+        // sync threads before starting a new scan
+        __syncthreads();
+
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double PB_0, PB_1, PA_x;
+        uint32_t j_prim, j_cgto, b0, b1;
+
+        if (j < count_i)
+        {
+            Q_ij   = Q_K_sd[displ_i + j];
+
+            j_prim = D_inds_K_sd[displ_i + j];
+
+            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+
+            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = pair_data_K_sd[displ_i + j];
+
+            PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
+
+        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        {
+            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+
+            // Q_kl == Q_K_sp[displ_k + l]
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_sp[displ_k + l] * dp_max_D) <= eri_threshold))
+            {
+                break;
+            }
+
+            // const auto Q_kl = Q_K_sp[displ_k + l];
+
+            const auto l_prim = D_inds_K_sp[displ_k + l];
+
+            const auto l_cgto = p_prim_aoinds[(l_prim / 3) + p_prim_count * (l_prim % 3)];
+
+            const auto a_l = p_prim_info[l_prim / 3 + p_prim_count * 0];
+
+            const double r_l[3] = {p_prim_info[l_prim / 3 + p_prim_count * 2],
+                                   p_prim_info[l_prim / 3 + p_prim_count * 3],
+                                   p_prim_info[l_prim / 3 + p_prim_count * 4]};
+
+            const auto S_kl_00 = pair_data_K_sp[displ_k + l];
+
+            const auto d0 = l_prim % 3;
+
+            // J. Chem. Phys. 84, 3963-3974 (1986)
+
+            const auto S2 = a_k + a_l;
+
+            const auto inv_S2 = 1.0 / S2;
+            const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
+
+            const auto rho = S1 * S2 * inv_S4;
+
+            double d2 = 1.0;
+
+            if (omega != 0.0) d2 = omega * omega / (rho + omega * omega);
+
+            const auto Lambda = sqrt(4.0 * rho * d2 * MATH_CONST_INV_PI);
+
+            double F5_t[6];
+
+            gpu::computeBoysFunction(F5_t, rho * d2 * r2_PQ, 5, boys_func_table, boys_func_ft);
+
+            if (omega != 0.0)
+            {
+                F5_t[1] *= d2;
+                F5_t[2] *= d2 * d2;
+                F5_t[3] *= d2 * d2 * d2;
+                F5_t[4] *= d2 * d2 * d2 * d2;
+                F5_t[5] *= d2 * d2 * d2 * d2 * d2;
+            }
+
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+
+            const auto QC_y = (a_l * inv_S2) * (r_l[g1] - r_k[g1]);
+
+            // i-k Hessian
+
+            const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
+                    + F5_t[0] * (
+
+                        inv_S1 * inv_S2 * a_i * a_k * (
+                            +PB_0*delta[b1][g0]*delta[d0][g1]
+
+                            +delta[d0][g1]*(PA_x*delta[b0][b1] + PB_1*delta[b0][g0])
+                        )
+
+                        + 2.0 * inv_S1 * a_i * a_k * (
+                            +PB_0*QC_y*QD_0*delta[b1][g0]
+
+                            +QC_y*QD_0*(PA_x*delta[b0][b1] + PB_1*delta[b0][g0])
+                        )
+
+                        + 2.0 * inv_S2 * a_i * a_k * (
+                            +PA_x*PB_0*PB_1*delta[d0][g1]
+                        )
+
+                        + 4.0 * a_i * a_k * (
+                            +PA_x*PB_0*PB_1*QC_y*QD_0
+                        )
+
+                    )
+
+                    + F5_t[1] * (
+
+                        inv_S1 * inv_S4 * a_i * a_k * (
+                            +delta[b1][g0]*delta[d0][g1]*(-PB_0 + PQ[b0])
+
+                            +delta[d0][g1]*(delta[b0][b1]*(-PA_x + PQ[g0]) + delta[b0][g0]*(-PB_1 + PQ[b1]))
+
+                            +QC_y*(delta[b0][b1]*delta[d0][g0] + delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0]) + QD_0*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+                        )
+
+                        + (-1.0) * inv_S2 * inv_S4 * a_i * a_k * (
+                            +PB_0*delta[b1][g0]*delta[d0][g1]
+
+                            +delta[d0][g1]*(PA_x*delta[b0][b1] + PB_1*delta[b0][g0])
+                        )
+
+                        + (-2.0) * S1 * inv_S2 * inv_S4 * a_i * a_k * (
+                            +PA_x*PB_0*PB_1*delta[d0][g1]
+                        )
+
+                        + 2.0 * S2 * inv_S1 * inv_S4 * a_i * a_k * (
+                            +QC_y*QD_0*delta[b1][g0]*(-PB_0 + PQ[b0])
+
+                            +QC_y*QD_0*(delta[b0][b1]*(-PA_x + PQ[g0]) + delta[b0][g0]*(-PB_1 + PQ[b1]))
+                        )
+
+                        + 2.0 * inv_S4 * a_i * a_k * (
+                            +delta[d0][g1]*(PA_x*(PB_0*PQ[b1] + PB_1*PQ[b0]) + PB_0*PB_1*PQ[g0])
+
+                            +PA_x*(PB_0*(QC_y*delta[b1][d0] + QD_0*delta[b1][g1]) + PB_1*(QC_y*delta[b0][d0] + QD_0*delta[b0][g1])) + PB_0*PB_1*(QC_y*delta[d0][g0] + QD_0*delta[g0][g1])
+
+                            -(PQ[d0]*QC_y + PQ[g1]*QD_0)*(PA_x*delta[b0][b1] + PB_0*delta[b1][g0] + PB_1*delta[b0][g0])
+                        )
+
+                        + 4.0 * S1 * inv_S4 * a_i * a_k * (
+                            -PA_x*PB_0*PB_1*(PQ[d0]*QC_y + PQ[g1]*QD_0)
+                        )
+
+                        + 4.0 * S2 * inv_S4 * a_i * a_k * (
+                            +QC_y*QD_0*(PA_x*(PB_0*PQ[b1] + PB_1*PQ[b0]) + PB_0*PB_1*PQ[g0])
+                        )
+
+                    )
+
+                    + F5_t[2] * (
+
+                        (-1.0) * S2 * inv_S1 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +PQ[b0]*delta[b1][g0]*delta[d0][g1]
+
+                            +delta[d0][g1]*(PQ[b1]*delta[b0][g0] + PQ[g0]*delta[b0][b1])
+
+                            +QC_y*(delta[b0][b1]*delta[d0][g0] + delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0]) + QD_0*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+                        )
+
+                        + inv_S4 * inv_S4 * a_i * a_k * (
+                            +PB_0*(delta[b1][d0]*delta[g0][g1] + delta[b1][g1]*delta[d0][g0])
+
+                            +delta[b0][b1]*delta[d0][g1]*(PA_x - PQ[g0]) + delta[b0][g0]*delta[d0][g1]*(PB_1 - PQ[b1]) + delta[b1][g0]*delta[d0][g1]*(PB_0 - PQ[b0])
+
+                            +PA_x*(delta[b0][d0]*delta[b1][g1] + delta[b0][g1]*delta[b1][d0]) + PB_1*(delta[b0][d0]*delta[g0][g1] + delta[b0][g1]*delta[d0][g0])
+
+                            -PQ[d0]*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0]) - PQ[g1]*(delta[b0][b1]*delta[d0][g0] + delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0])
+                        )
+
+                        + 2.0 * S1 * inv_S4 * inv_S4 * a_i * a_k * (
+                            -PB_0*PB_1*PQ[d0]*delta[g0][g1]
+
+                            -delta[d0][g1]*(PA_x*(PB_0*PQ[b1] + PB_1*PQ[b0]) + PB_0*PB_1*PQ[g0])
+
+                            -PA_x*(PB_0*(PQ[d0]*delta[b1][g1] + PQ[g1]*delta[b1][d0]) + PB_1*(PQ[d0]*delta[b0][g1] + PQ[g1]*delta[b0][d0])) - PB_0*PB_1*PQ[g1]*delta[d0][g0]
+
+                            +PQ[d0]*PQ[g1]*(PA_x*delta[b0][b1] + PB_0*delta[b1][g0] + PB_1*delta[b0][g0])
+                        )
+
+                        + (-2.0) * S2 * S2 * inv_S1 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +PQ[b0]*QC_y*QD_0*delta[b1][g0]
+
+                            +QC_y*QD_0*(PQ[b1]*delta[b0][g0] + PQ[g0]*delta[b0][b1])
+                        )
+
+                        + 2.0 * S2 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +delta[d0][g1]*(PB_0*PQ[b1]*PQ[g0] + PQ[b0]*(PA_x*PQ[b1] + PB_1*PQ[g0]))
+
+                            +PA_x*(PQ[b0]*(QC_y*delta[b1][d0] + QD_0*delta[b1][g1]) + PQ[b1]*(QC_y*delta[b0][d0] + QD_0*delta[b0][g1])) + PB_0*(PQ[b1]*(QC_y*delta[d0][g0] + QD_0*delta[g0][g1]) + PQ[g0]*(QC_y*delta[b1][d0] + QD_0*delta[b1][g1])) + PB_1*(PQ[b0]*(QC_y*delta[d0][g0] + QD_0*delta[g0][g1]) + PQ[g0]*(QC_y*delta[b0][d0] + QD_0*delta[b0][g1]))
+
+                            +(PQ[d0]*QC_y + PQ[g1]*QD_0)*(PA_x*delta[b0][b1] + PB_0*delta[b1][g0] + PB_1*delta[b0][g0] - PQ[b0]*delta[b1][g0] - PQ[b1]*delta[b0][g0] - PQ[g0]*delta[b0][b1])
+                        )
+
+                        + 4.0 * S1 * S1 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +PA_x*PB_0*PB_1*PQ[d0]*PQ[g1]
+                        )
+
+                        + 4.0 * S1 * S2 * inv_S4 * inv_S4 * a_i * a_k * (
+                            -(PA_x*(PB_0*PQ[b1] + PB_1*PQ[b0]) + PB_0*PB_1*PQ[g0])*(PQ[d0]*QC_y + PQ[g1]*QD_0)
+                        )
+
+                        + 4.0 * S2 * S2 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +QC_y*QD_0*(PB_0*PQ[b1]*PQ[g0] + PQ[b0]*(PA_x*PQ[b1] + PB_1*PQ[g0]))
+                        )
+
+                    )
+
+                    + F5_t[3] * (
+
+                        2.0 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_k * (
+                            -PQ[d0]*delta[g0][g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])
+
+                            -delta[d0][g1]*(PB_0*PQ[b1]*PQ[g0] + PQ[b0]*(PA_x*PQ[b1] + PB_1*PQ[g0]))
+
+                            -PA_x*(PQ[b0]*(PQ[d0]*delta[b1][g1] + PQ[g1]*delta[b1][d0]) + PQ[b1]*(PQ[d0]*delta[b0][g1] + PQ[g1]*delta[b0][d0])) - PQ[d0]*PQ[g0]*(PB_0*delta[b1][g1] + PB_1*delta[b0][g1]) - PQ[g1]*(PB_0*(PQ[b1]*delta[d0][g0] + PQ[g0]*delta[b1][d0]) + PB_1*(PQ[b0]*delta[d0][g0] + PQ[g0]*delta[b0][d0]))
+
+                            +PQ[d0]*PQ[g1]*(-PA_x*delta[b0][b1] - PB_0*delta[b1][g0] - PB_1*delta[b0][g0] + PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0] + PQ[g0]*delta[b0][b1])
+                        )
+
+                        + 2.0 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +PQ[b0]*PQ[b1]*QD_0*delta[g0][g1]
+
+                            +PQ[g0]*QD_0*(PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1]) + QC_y*(PQ[b0]*(PQ[b1]*delta[d0][g0] + PQ[g0]*delta[b1][d0]) + PQ[b1]*PQ[g0]*delta[b0][d0])
+
+                            +(PQ[d0]*QC_y + PQ[g1]*QD_0)*(PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0] + PQ[g0]*delta[b0][b1])
+
+                            +PQ[b0]*PQ[b1]*PQ[g0]*delta[d0][g1]
+                        )
+
+                        + 4.0 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +PQ[d0]*PQ[g1]*(PA_x*(PB_0*PQ[b1] + PB_1*PQ[b0]) + PB_0*PB_1*PQ[g0])
+                        )
+
+                        + 4.0 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_k * (
+                            -(PQ[d0]*QC_y + PQ[g1]*QD_0)*(PB_0*PQ[b1]*PQ[g0] + PQ[b0]*(PA_x*PQ[b1] + PB_1*PQ[g0]))
+                        )
+
+                        + 4.0 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +PQ[b0]*PQ[b1]*PQ[g0]*QC_y*QD_0
+                        )
+
+                        + S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +PQ[b0]*(delta[b1][d0]*delta[g0][g1] + delta[b1][g0]*delta[d0][g1] + delta[b1][g1]*delta[d0][g0])
+
+                            +PQ[b1]*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0]) + PQ[d0]*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0]) + PQ[g0]*(delta[b0][b1]*delta[d0][g1] + delta[b0][d0]*delta[b1][g1] + delta[b0][g1]*delta[b1][d0]) + PQ[g1]*(delta[b0][b1]*delta[d0][g0] + delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0])
+                        )
+
+                    )
+
+                    + F5_t[4] * (
+
+                        (-2.0) * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +PQ[b0]*PQ[b1]*PQ[d0]*delta[g0][g1]
+
+                            +PQ[g0]*(PQ[b0]*(PQ[b1]*delta[d0][g1] + PQ[d0]*delta[b1][g1] + PQ[g1]*delta[b1][d0]) + PQ[b1]*PQ[d0]*delta[b0][g1]) + PQ[g1]*(PQ[b1]*(PQ[b0]*delta[d0][g0] + PQ[d0]*delta[b0][g0] + PQ[g0]*delta[b0][d0]) + PQ[d0]*(PQ[b0]*delta[b1][g0] + PQ[g0]*delta[b0][b1]))
+                        )
+
+                        + 4.0 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +PQ[d0]*PQ[g1]*(PB_0*PQ[b1]*PQ[g0] + PQ[b0]*(PA_x*PQ[b1] + PB_1*PQ[g0]))
+                        )
+
+                        + (-4.0) * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +PQ[b0]*PQ[b1]*PQ[d0]*PQ[g0]*QC_y
+
+                            +PQ[b0]*PQ[b1]*PQ[g0]*PQ[g1]*QD_0
+                        )
+
+                    )
+
+                    + F5_t[5] * (
+
+                        4.0 * S1 * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +PQ[b0]*PQ[b1]*PQ[d0]*PQ[g0]*PQ[g1]
+                        )
+
+                    )
+
+                    );
+
+            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+        }
+    }
+
+    __syncthreads();
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_ss))
+    {
+        double hess_ik_xy = 0.0;
+
+        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        {
+            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            {
+                hess_ik_xy += ERIs[y][x];
+            }
+        }
+
+        // Note factor of 2 due to IK<->JL symmetry for ground state Hessian
+
+        atomicAdd(
+            hess_xy + prim_cart_ao_to_atom_inds[i] * natoms + prim_cart_ao_to_atom_inds[k],
+            hess_ik_xy * ik_factor_D * 2.0 * frac_exact_exchange);
+
+        atomicAdd(
+            hess_yx + prim_cart_ao_to_atom_inds[k] * natoms + prim_cart_ao_to_atom_inds[i],
+            hess_ik_xy * ik_factor_D * 2.0 * frac_exact_exchange);
+    }
+}
+
+__global__ void __launch_bounds__(TILE_SIZE_K)
+computeExchangeHessianSDSP_IJ_0(double*         hess_xy,
+                                double*         hess_yx,
+                                const uint32_t  hess_cart_ind_0,
+                                const uint32_t  hess_cart_ind_1,
+                                const double    frac_exact_exchange,
+                                const uint32_t* pair_inds_i_for_K_ss,
+                                const uint32_t* pair_inds_k_for_K_ss,
+                                const double*   D_ik_for_K_ss,
+                                const uint32_t  pair_inds_count_for_K_ss,
+                                const double*   s_prim_info,
+                                const uint32_t* s_prim_aoinds,
+                                const uint32_t  s_prim_count,
+                                const double*   p_prim_info,
+                                const uint32_t* p_prim_aoinds,
+                                const uint32_t  p_prim_count,
+                                const double*   d_prim_info,
+                                const uint32_t* d_prim_aoinds,
+                                const uint32_t  d_prim_count,
+                                const double    dp_max_D,
+                                const double*   mat_D_full_AO,
+                                const uint32_t  naos,
+                                const double*   Q_K_sd,
+                                const double*   Q_K_sp,
+                                const uint32_t* D_inds_K_sd,
+                                const uint32_t* D_inds_K_sp,
+                                const uint32_t* pair_displs_K_sd,
+                                const uint32_t* pair_displs_K_sp,
+                                const uint32_t* pair_counts_K_sd,
+                                const uint32_t* pair_counts_K_sp,
+                                const double*   pair_data_K_sd,
+                                const double*   pair_data_K_sp,
+                                const uint32_t* prim_cart_ao_to_atom_inds,
+                                const uint32_t  natoms,
+                                const double*   boys_func_table,
+                                const double*   boys_func_ft,
+                                const double    omega,
+                                const double    eri_threshold)
+{
+    // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
+
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
+    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ double   delta[3][3];
+    __shared__ uint32_t g0, g1;
+
+    const uint32_t ik = blockIdx.x;
+
+    // we make sure that ik < pair_inds_count_for_K_ss when calling the kernel
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+        g0 = hess_cart_ind_0;
+        g1 = hess_cart_ind_1;
+
+        i = pair_inds_i_for_K_ss[ik];
+        k = pair_inds_k_for_K_ss[ik];
+
+        count_i = pair_counts_K_sd[i];
+        count_k = pair_counts_K_sp[k];
+
+        displ_i = pair_displs_K_sd[i];
+        displ_k = pair_displs_K_sp[k];
+
+        a_i = s_prim_info[i + s_prim_count * 0];
+
+        r_i[0] = s_prim_info[i + s_prim_count * 2];
+        r_i[1] = s_prim_info[i + s_prim_count * 3];
+        r_i[2] = s_prim_info[i + s_prim_count * 4];
+
+        a_k = s_prim_info[k + s_prim_count * 0];
+
+        r_k[0] = s_prim_info[k + s_prim_count * 2];
+        r_k[1] = s_prim_info[k + s_prim_count * 3];
+        r_k[2] = s_prim_info[k + s_prim_count * 4];
+
+        ik_factor_D = (static_cast<double>(i != k) + 1.0) * D_ik_for_K_ss[ik];
+
+    }
+
+    __syncthreads();
+
+    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    {
+        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+
+        // sync threads before starting a new scan
+        __syncthreads();
+
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double PB_0, PB_1, PA_x, PB_y;
+        uint32_t j_prim, j_cgto, b0, b1;
+
+        if (j < count_i)
+        {
+            Q_ij   = Q_K_sd[displ_i + j];
+
+            j_prim = D_inds_K_sd[displ_i + j];
+
+            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+
+            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = pair_data_K_sd[displ_i + j];
+
+            PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+            PB_y = (-a_i * inv_S1) * (r_j[g1] - r_i[g1]);
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
+
+        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        {
+            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+
+            // Q_kl == Q_K_sp[displ_k + l]
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_sp[displ_k + l] * dp_max_D) <= eri_threshold))
+            {
+                break;
+            }
+
+            // const auto Q_kl = Q_K_sp[displ_k + l];
+
+            const auto l_prim = D_inds_K_sp[displ_k + l];
+
+            const auto l_cgto = p_prim_aoinds[(l_prim / 3) + p_prim_count * (l_prim % 3)];
+
+            const auto a_l = p_prim_info[l_prim / 3 + p_prim_count * 0];
+
+            const double r_l[3] = {p_prim_info[l_prim / 3 + p_prim_count * 2],
+                                   p_prim_info[l_prim / 3 + p_prim_count * 3],
+                                   p_prim_info[l_prim / 3 + p_prim_count * 4]};
+
+            const auto S_kl_00 = pair_data_K_sp[displ_k + l];
+
+            const auto d0 = l_prim % 3;
+
+            // J. Chem. Phys. 84, 3963-3974 (1986)
+
+            const auto S2 = a_k + a_l;
+
+            const auto inv_S2 = 1.0 / S2;
+            const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
+
+            const auto rho = S1 * S2 * inv_S4;
+
+            double d2 = 1.0;
+
+            if (omega != 0.0) d2 = omega * omega / (rho + omega * omega);
+
+            const auto Lambda = sqrt(4.0 * rho * d2 * MATH_CONST_INV_PI);
+
+            double F5_t[6];
+
+            gpu::computeBoysFunction(F5_t, rho * d2 * r2_PQ, 5, boys_func_table, boys_func_ft);
+
+            if (omega != 0.0)
+            {
+                F5_t[1] *= d2;
+                F5_t[2] *= d2 * d2;
+                F5_t[3] *= d2 * d2 * d2;
+                F5_t[4] *= d2 * d2 * d2 * d2;
+                F5_t[5] *= d2 * d2 * d2 * d2 * d2;
+            }
+
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+
+            // i-j Hessian
+
+            const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
+                    + F5_t[0] * (
+
+                        inv_S1 * inv_S1 * a_i * a_j * (
+                            +QD_0*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+                        )
+
+                        + 2.0 * inv_S1 * a_i * a_j * (
+                            +PB_0*PB_1*QD_0*delta[g0][g1]
+
+                            +QD_0*(PA_x*(PB_0*delta[b1][g1] + PB_1*delta[b0][g1] + PB_y*delta[b0][b1]) + PB_y*(PB_0*delta[b1][g0] + PB_1*delta[b0][g0]))
+                        )
+
+                        + (-1.0) * inv_S1 * a_i * (
+                            +QD_0*(delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+                        )
+
+                        + 4.0 * a_i * a_j * (
+                            +PA_x*PB_0*PB_1*PB_y*QD_0
+                        )
+
+                        + (-2.0) * a_i * (
+                            +PA_x*PB_0*QD_0*delta[b1][g1]
+
+                            +PA_x*PB_1*QD_0*delta[b0][g1]
+                        )
+
+                    )
+
+                    + F5_t[1] * (
+
+                        (-2.0) * S2 * inv_S1 * inv_S1 * inv_S4 * a_i * a_j * (
+                            +QD_0*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+                        )
+
+                        + inv_S1 * inv_S4 * a_i * a_j * (
+                            +PB_0*(delta[b1][d0]*delta[g0][g1] + delta[b1][g0]*delta[d0][g1] + delta[b1][g1]*delta[d0][g0])
+
+                            +PA_x*(delta[b0][b1]*delta[d0][g1] + delta[b0][d0]*delta[b1][g1] + delta[b0][g1]*delta[b1][d0]) + PB_1*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0]) + PB_y*(delta[b0][b1]*delta[d0][g0] + delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0])
+
+                            -PQ[d0]*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+                        )
+
+                        + 2.0 * S2 * inv_S1 * inv_S4 * a_i * a_j * (
+                            +QD_0*delta[g0][g1]*(PB_0*(-PB_1 + PQ[b1]) + PB_1*PQ[b0])
+
+                            +QD_0*(PA_x*(-PB_0*delta[b1][g1] - PB_1*delta[b0][g1] - PB_y*delta[b0][b1] + PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1] + PQ[g1]*delta[b0][b1]) + PQ[g0]*(PB_0*delta[b1][g1] + PB_1*delta[b0][g1] + PB_y*delta[b0][b1]) + delta[b0][g0]*(PB_1*(-PB_y + PQ[g1]) + PB_y*PQ[b1]) + delta[b1][g0]*(PB_0*(-PB_y + PQ[g1]) + PB_y*PQ[b0]))
+                        )
+
+                        + S2 * inv_S1 * inv_S4 * a_i * (
+                            +QD_0*(delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+                        )
+
+                        + 2.0 * inv_S4 * a_i * a_j * (
+                            +PA_x*PB_0*PB_1*delta[d0][g1]
+
+                            +PB_y*(PA_x*(PB_0*delta[b1][d0] + PB_1*delta[b0][d0]) + PB_0*PB_1*delta[d0][g0])
+
+                            -PQ[d0]*(PA_x*(PB_0*delta[b1][g1] + PB_1*delta[b0][g1] + PB_y*delta[b0][b1]) + PB_0*(PB_1*delta[g0][g1] + PB_y*delta[b1][g0]) + PB_1*PB_y*delta[b0][g0])
+                        )
+
+                        + inv_S4 * a_i * (
+                            -PB_0*delta[b1][g1]*delta[d0][g0]
+
+                            -PB_1*delta[b0][g1]*delta[d0][g0]
+
+                            -PA_x*(delta[b0][d0]*delta[b1][g1] + delta[b0][g1]*delta[b1][d0])
+
+                            +PQ[d0]*(delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+                        )
+
+                        + 4.0 * S1 * inv_S4 * a_i * a_j * (
+                            -PA_x*PB_0*PB_1*PB_y*PQ[d0]
+                        )
+
+                        + 2.0 * S1 * inv_S4 * a_i * (
+                            +PA_x*PB_0*PQ[d0]*delta[b1][g1]
+
+                            +PA_x*PB_1*PQ[d0]*delta[b0][g1]
+                        )
+
+                        + 4.0 * S2 * inv_S4 * a_i * a_j * (
+                            +QD_0*(PA_x*PB_0*(PB_1*PQ[g1] + PB_y*PQ[b1]) + PB_1*PB_y*(PA_x*PQ[b0] + PB_0*PQ[g0]))
+                        )
+
+                        + (-2.0) * S2 * inv_S4 * a_i * (
+                            +QD_0*delta[b1][g1]*(PA_x*PQ[b0] + PB_0*PQ[g0])
+
+                            +QD_0*delta[b0][g1]*(PA_x*PQ[b1] + PB_1*PQ[g0])
+                        )
+
+                    )
+
+                    + F5_t[2] * (
+
+                        S2 * S2 * inv_S1 * inv_S1 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +QD_0*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+                        )
+
+                        + S2 * inv_S1 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +(-PB_0 + PQ[b0])*(delta[b1][d0]*delta[g0][g1] + delta[b1][g0]*delta[d0][g1] + delta[b1][g1]*delta[d0][g0])
+
+                            +(-PA_x + PQ[g0])*(delta[b0][b1]*delta[d0][g1] + delta[b0][d0]*delta[b1][g1] + delta[b0][g1]*delta[b1][d0]) + (-PB_1 + PQ[b1])*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0]) + (-PB_y + PQ[g1])*(delta[b0][b1]*delta[d0][g0] + delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0])
+
+                            +2.0*PQ[d0]*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+                        )
+
+                        + 2.0 * S2 * S2 * inv_S1 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +QD_0*delta[g0][g1]*(-PB_0*PQ[b1] + PQ[b0]*(-PB_1 + PQ[b1]))
+
+                            +QD_0*(-PA_x*(PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1] + PQ[g1]*delta[b0][b1]) + PQ[g0]*(-PB_0*delta[b1][g1] - PB_1*delta[b0][g1] - PB_y*delta[b0][b1] + PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1]) + PQ[g1]*(-PB_0*delta[b1][g0] - PB_1*delta[b0][g0] + PQ[g0]*delta[b0][b1]) + (-PB_y + PQ[g1])*(PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0]))
+                        )
+
+                        + 2.0 * S2 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +PQ[d0]*delta[g0][g1]*(PB_0*(PB_1 - PQ[b1]) - PB_1*PQ[b0])
+
+                            +PA_x*(PB_0*(PQ[b1]*delta[d0][g1] + PQ[g1]*delta[b1][d0]) + PB_1*(PQ[b0]*delta[d0][g1] + PQ[g1]*delta[b0][d0]) + PB_y*(PQ[b0]*delta[b1][d0] + PQ[b1]*delta[b0][d0])) + PB_0*(PB_1*(PQ[g0]*delta[d0][g1] + PQ[g1]*delta[d0][g0]) + PB_y*(PQ[b1]*delta[d0][g0] + PQ[g0]*delta[b1][d0])) + PB_1*PB_y*(PQ[b0]*delta[d0][g0] + PQ[g0]*delta[b0][d0])
+
+                            +PQ[d0]*(PA_x*(PB_0*delta[b1][g1] + PB_1*delta[b0][g1] - PQ[b0]*delta[b1][g1] - PQ[b1]*delta[b0][g1] - PQ[g1]*delta[b0][b1]) + PB_y*(PA_x*delta[b0][b1] - PQ[b0]*delta[b1][g0] - PQ[b1]*delta[b0][g0]) - PQ[g0]*(PB_0*delta[b1][g1] + PB_1*delta[b0][g1] + PB_y*delta[b0][b1]) + (PB_y - PQ[g1])*(PB_0*delta[b1][g0] + PB_1*delta[b0][g0]))
+                        )
+
+                        + (-1.0) * S2 * inv_S4 * inv_S4 * a_i * (
+                            +PQ[b0]*delta[b1][g1]*delta[d0][g0]
+
+                            +PQ[b1]*delta[b0][g1]*delta[d0][g0]
+
+                            +PQ[d0]*(delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0]) + PQ[g0]*(delta[b0][d0]*delta[b1][g1] + delta[b0][g1]*delta[b1][d0])
+                        )
+
+                        + 4.0 * S1 * S2 * inv_S4 * inv_S4 * a_i * a_j * (
+                            -PQ[d0]*(PA_x*PB_0*(PB_1*PQ[g1] + PB_y*PQ[b1]) + PB_1*PB_y*(PA_x*PQ[b0] + PB_0*PQ[g0]))
+                        )
+
+                        + 2.0 * S1 * S2 * inv_S4 * inv_S4 * a_i * (
+                            +PQ[d0]*delta[b1][g1]*(PA_x*PQ[b0] + PB_0*PQ[g0])
+
+                            +PQ[d0]*delta[b0][g1]*(PA_x*PQ[b1] + PB_1*PQ[g0])
+                        )
+
+                        + 4.0 * S2 * S2 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +QD_0*(PA_x*PQ[b1]*(PB_0*PQ[g1] + PB_y*PQ[b0]) + PB_0*PQ[g0]*(PB_1*PQ[g1] + PB_y*PQ[b1]) + PB_1*PQ[b0]*(PA_x*PQ[g1] + PB_y*PQ[g0]))
+                        )
+
+                        + (-2.0) * S2 * S2 * inv_S4 * inv_S4 * a_i * (
+                            +PQ[b0]*PQ[g0]*QD_0*delta[b1][g1]
+
+                            +PQ[b1]*PQ[g0]*QD_0*delta[b0][g1]
+                        )
+
+                    )
+
+                    + F5_t[3] * (
+
+                        (-1.0) * S2 * S2 * inv_S1 * inv_S4 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +PQ[b0]*(delta[b1][d0]*delta[g0][g1] + delta[b1][g0]*delta[d0][g1] + delta[b1][g1]*delta[d0][g0])
+
+                            +PQ[b1]*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0]) + PQ[d0]*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0]) + PQ[g0]*(delta[b0][b1]*delta[d0][g1] + delta[b0][d0]*delta[b1][g1] + delta[b0][g1]*delta[b1][d0]) + PQ[g1]*(delta[b0][b1]*delta[d0][g0] + delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0])
+                        )
+
+                        + (-2.0) * S2 * S2 * S2 * inv_S1 * inv_S4 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +PQ[b0]*PQ[b1]*QD_0*delta[g0][g1]
+
+                            +QD_0*(PQ[g0]*(PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1] + PQ[g1]*delta[b0][b1]) + PQ[g1]*(PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0]))
+                        )
+
+                        + 2.0 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +PQ[d0]*delta[g0][g1]*(PB_1*PQ[b0] + PQ[b1]*(PB_0 - PQ[b0]))
+
+                            +PQ[b0]*(PA_x*(PQ[b1]*delta[d0][g1] + PQ[g1]*delta[b1][d0]) + PB_1*(PQ[g0]*delta[d0][g1] + PQ[g1]*delta[d0][g0]) + PB_y*(PQ[b1]*delta[d0][g0] + PQ[g0]*delta[b1][d0])) + PQ[b1]*PQ[g1]*(PA_x*delta[b0][d0] + PB_0*delta[d0][g0]) + PQ[g0]*(PB_0*(PQ[b1]*delta[d0][g1] + PQ[g1]*delta[b1][d0]) + delta[b0][d0]*(PB_1*PQ[g1] + PB_y*PQ[b1]))
+
+                            +PQ[d0]*(PA_x*(PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1] + PQ[g1]*delta[b0][b1]) + PB_y*(PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0]) + PQ[g0]*(PB_0*delta[b1][g1] + PB_1*delta[b0][g1] + PB_y*delta[b0][b1] - PQ[b0]*delta[b1][g1] - PQ[b1]*delta[b0][g1] - PQ[g1]*delta[b0][b1]) + PQ[g1]*(delta[b0][g0]*(PB_1 - PQ[b1]) + delta[b1][g0]*(PB_0 - PQ[b0])))
+                        )
+
+                        + 4.0 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_j * (
+                            -PQ[d0]*(PA_x*PQ[b1]*(PB_0*PQ[g1] + PB_y*PQ[b0]) + PB_0*PQ[g0]*(PB_1*PQ[g1] + PB_y*PQ[b1]) + PB_1*PQ[b0]*(PA_x*PQ[g1] + PB_y*PQ[g0]))
+                        )
+
+                        + 4.0 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +QD_0*(PQ[b0]*PQ[b1]*(PA_x*PQ[g1] + PB_y*PQ[g0]) + PQ[g0]*PQ[g1]*(PB_0*PQ[b1] + PB_1*PQ[b0]))
+                        )
+
+                        + 2.0 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * (
+                            +PQ[b0]*PQ[d0]*PQ[g0]*delta[b1][g1]
+
+                            +PQ[b1]*PQ[d0]*PQ[g0]*delta[b0][g1]
+                        )
+
+                    )
+
+                    + F5_t[4] * (
+
+                        4.0 * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_j * (
+                            -PQ[d0]*(PQ[b0]*PQ[b1]*(PA_x*PQ[g1] + PB_y*PQ[g0]) + PQ[g0]*PQ[g1]*(PB_0*PQ[b1] + PB_1*PQ[b0]))
+                        )
+
+                        + 4.0 * S2 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +PQ[b0]*PQ[b1]*PQ[g0]*PQ[g1]*QD_0
+                        )
+
+                        + 2.0 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +PQ[b0]*PQ[b1]*PQ[d0]*delta[g0][g1]
+
+                            +PQ[g0]*(PQ[b0]*(PQ[b1]*delta[d0][g1] + PQ[d0]*delta[b1][g1] + PQ[g1]*delta[b1][d0]) + PQ[b1]*PQ[d0]*delta[b0][g1]) + PQ[g1]*(PQ[b1]*(PQ[b0]*delta[d0][g0] + PQ[d0]*delta[b0][g0] + PQ[g0]*delta[b0][d0]) + PQ[d0]*(PQ[b0]*delta[b1][g0] + PQ[g0]*delta[b0][b1]))
+                        )
+
+                    )
+
+                    + F5_t[5] * (
+
+                        (-4.0) * S1 * S2 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +PQ[b0]*PQ[b1]*PQ[d0]*PQ[g0]*PQ[g1]
+                        )
+
+                    )
+
+                    );
+
+            double hess_ij_xy = -eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+
+            atomicAdd(
+                hess_xy + prim_cart_ao_to_atom_inds[i] * natoms + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + j_prim],
+                hess_ij_xy * ik_factor_D * 2.0 * frac_exact_exchange);
+        }
+    }
+
+    __syncthreads();
+}
+
+__global__ void __launch_bounds__(TILE_SIZE_K)
+computeExchangeHessianSDSP_KL_0(double*         hess_xy,
+                                double*         hess_yx,
+                                const uint32_t  hess_cart_ind_0,
+                                const uint32_t  hess_cart_ind_1,
+                                const double    frac_exact_exchange,
+                                const uint32_t* pair_inds_i_for_K_ss,
+                                const uint32_t* pair_inds_k_for_K_ss,
+                                const double*   D_ik_for_K_ss,
+                                const uint32_t  pair_inds_count_for_K_ss,
+                                const double*   s_prim_info,
+                                const uint32_t* s_prim_aoinds,
+                                const uint32_t  s_prim_count,
+                                const double*   p_prim_info,
+                                const uint32_t* p_prim_aoinds,
+                                const uint32_t  p_prim_count,
+                                const double*   d_prim_info,
+                                const uint32_t* d_prim_aoinds,
+                                const uint32_t  d_prim_count,
+                                const double    dp_max_D,
+                                const double*   mat_D_full_AO,
+                                const uint32_t  naos,
+                                const double*   Q_K_sd,
+                                const double*   Q_K_sp,
+                                const uint32_t* D_inds_K_sd,
+                                const uint32_t* D_inds_K_sp,
+                                const uint32_t* pair_displs_K_sd,
+                                const uint32_t* pair_displs_K_sp,
+                                const uint32_t* pair_counts_K_sd,
+                                const uint32_t* pair_counts_K_sp,
+                                const double*   pair_data_K_sd,
+                                const double*   pair_data_K_sp,
+                                const uint32_t* prim_cart_ao_to_atom_inds,
+                                const uint32_t  natoms,
+                                const double*   boys_func_table,
+                                const double*   boys_func_ft,
+                                const double    omega,
+                                const double    eri_threshold)
+{
+    // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
+
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
+    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ double   delta[3][3];
+    __shared__ uint32_t g0, g1;
+
+    const uint32_t ik = blockIdx.x;
+
+    // we make sure that ik < pair_inds_count_for_K_ss when calling the kernel
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+        g0 = hess_cart_ind_0;
+        g1 = hess_cart_ind_1;
+
+        i = pair_inds_i_for_K_ss[ik];
+        k = pair_inds_k_for_K_ss[ik];
+
+        count_i = pair_counts_K_sd[i];
+        count_k = pair_counts_K_sp[k];
+
+        displ_i = pair_displs_K_sd[i];
+        displ_k = pair_displs_K_sp[k];
+
+        a_i = s_prim_info[i + s_prim_count * 0];
+
+        r_i[0] = s_prim_info[i + s_prim_count * 2];
+        r_i[1] = s_prim_info[i + s_prim_count * 3];
+        r_i[2] = s_prim_info[i + s_prim_count * 4];
+
+        a_k = s_prim_info[k + s_prim_count * 0];
+
+        r_k[0] = s_prim_info[k + s_prim_count * 2];
+        r_k[1] = s_prim_info[k + s_prim_count * 3];
+        r_k[2] = s_prim_info[k + s_prim_count * 4];
+
+        ik_factor_D = (static_cast<double>(i != k) + 1.0) * D_ik_for_K_ss[ik];
+
+    }
+
+    __syncthreads();
+
+    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    {
+        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+
+        // sync threads before starting a new scan
+        __syncthreads();
+
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
+
+        if (j < count_i)
+        {
+            Q_ij   = Q_K_sd[displ_i + j];
+
+            j_prim = D_inds_K_sd[displ_i + j];
+
+            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+
+            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = pair_data_K_sd[displ_i + j];
+
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
+
+        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        {
+            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+
+            // Q_kl == Q_K_sp[displ_k + l]
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_sp[displ_k + l] * dp_max_D) <= eri_threshold))
+            {
+                break;
+            }
+
+            // const auto Q_kl = Q_K_sp[displ_k + l];
+
+            const auto l_prim = D_inds_K_sp[displ_k + l];
+
+            const auto l_cgto = p_prim_aoinds[(l_prim / 3) + p_prim_count * (l_prim % 3)];
+
+            const auto a_l = p_prim_info[l_prim / 3 + p_prim_count * 0];
+
+            const double r_l[3] = {p_prim_info[l_prim / 3 + p_prim_count * 2],
+                                   p_prim_info[l_prim / 3 + p_prim_count * 3],
+                                   p_prim_info[l_prim / 3 + p_prim_count * 4]};
+
+            const auto S_kl_00 = pair_data_K_sp[displ_k + l];
+
+            const auto d0 = l_prim % 3;
+
+            // J. Chem. Phys. 84, 3963-3974 (1986)
+
+            const auto S2 = a_k + a_l;
+
+            const auto inv_S2 = 1.0 / S2;
+            const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
+
+            const auto rho = S1 * S2 * inv_S4;
+
+            double d2 = 1.0;
+
+            if (omega != 0.0) d2 = omega * omega / (rho + omega * omega);
+
+            const auto Lambda = sqrt(4.0 * rho * d2 * MATH_CONST_INV_PI);
+
+            double F5_t[6];
+
+            gpu::computeBoysFunction(F5_t, rho * d2 * r2_PQ, 5, boys_func_table, boys_func_ft);
+
+            if (omega != 0.0)
+            {
+                F5_t[1] *= d2;
+                F5_t[2] *= d2 * d2;
+                F5_t[3] *= d2 * d2 * d2;
+                F5_t[4] *= d2 * d2 * d2 * d2;
+                F5_t[5] *= d2 * d2 * d2 * d2 * d2;
+            }
+
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+
+            const auto QC_x = (a_l * inv_S2) * (r_l[g0] - r_k[g0]);
+            const auto QD_y = (-a_k * inv_S2) * (r_l[g1] - r_k[g1]);
+
+            // k-l Hessian
+
+            const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
+                    + F5_t[0] * (
+
+                        inv_S1 * inv_S2 * a_k * a_l * (
+                            +QD_0*delta[b0][b1]*delta[g0][g1]
+
+                            +delta[b0][b1]*(QC_x*delta[d0][g1] + QD_y*delta[d0][g0])
+                        )
+
+                        + 2.0 * inv_S1 * a_k * a_l * (
+                            +QC_x*QD_0*QD_y*delta[b0][b1]
+                        )
+
+                        + (-1.0) * inv_S1 * a_k * (
+                            +QC_x*delta[b0][b1]*delta[d0][g1]
+                        )
+
+                        + 2.0 * inv_S2 * a_k * a_l * (
+                            +PB_0*PB_1*QD_0*delta[g0][g1]
+
+                            +PB_0*PB_1*(QC_x*delta[d0][g1] + QD_y*delta[d0][g0])
+                        )
+
+                        + 4.0 * a_k * a_l * (
+                            +PB_0*PB_1*QC_x*QD_0*QD_y
+                        )
+
+                        + (-2.0) * a_k * (
+                            +PB_0*PB_1*QC_x*delta[d0][g1]
+                        )
+
+                    )
+
+                    + F5_t[1] * (
+
+                        (-1.0) * inv_S1 * inv_S4 * a_k * a_l * (
+                            +QD_0*delta[b0][b1]*delta[g0][g1]
+
+                            +delta[b0][b1]*(QC_x*delta[d0][g1] + QD_y*delta[d0][g0])
+                        )
+
+                        + inv_S2 * inv_S4 * a_k * a_l * (
+                            +PB_0*(delta[b1][d0]*delta[g0][g1] + delta[b1][g0]*delta[d0][g1] + delta[b1][g1]*delta[d0][g0])
+
+                            +PB_1*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0])
+
+                            -delta[b0][b1]*(delta[d0][g0]*(PQ[g1] + QD_y) + delta[d0][g1]*(PQ[g0] + QC_x) + delta[g0][g1]*(PQ[d0] + QD_0))
+                        )
+
+                        + (-2.0) * S1 * inv_S2 * inv_S4 * a_k * a_l * (
+                            +PB_0*PB_1*delta[g0][g1]*(PQ[d0] + QD_0)
+
+                            +PB_0*PB_1*(delta[d0][g0]*(PQ[g1] + QD_y) + delta[d0][g1]*(PQ[g0] + QC_x))
+                        )
+
+                        + (-2.0) * S2 * inv_S1 * inv_S4 * a_k * a_l * (
+                            +QC_x*QD_0*QD_y*delta[b0][b1]
+                        )
+
+                        + 2.0 * inv_S4 * a_k * a_l * (
+                            +QD_0*delta[g0][g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])
+
+                            +(PB_0*PQ[b1] + PB_1*PQ[b0])*(QC_x*delta[d0][g1] + QD_y*delta[d0][g0])
+
+                            +QC_x*(PB_0*(QD_0*delta[b1][g1] + QD_y*delta[b1][d0]) + PB_1*(QD_0*delta[b0][g1] + QD_y*delta[b0][d0])) + QD_0*QD_y*(PB_0*delta[b1][g0] + PB_1*delta[b0][g0])
+
+                            -delta[b0][b1]*(PQ[g0]*QD_0*QD_y + QC_x*(PQ[d0]*QD_y + PQ[g1]*QD_0))
+                        )
+
+                        + inv_S4 * a_k * (
+                            -PB_0*delta[b1][g0]*delta[d0][g1]
+
+                            -PB_1*delta[b0][g0]*delta[d0][g1]
+
+                            +PQ[g0]*delta[b0][b1]*delta[d0][g1]
+                        )
+
+                        + 4.0 * S1 * inv_S4 * a_k * a_l * (
+                            -PB_0*PB_1*(PQ[g0]*QD_0*QD_y + QC_x*(PQ[d0]*QD_y + PQ[g1]*QD_0))
+                        )
+
+                        + 2.0 * S1 * inv_S4 * a_k * (
+                            +PB_0*PB_1*PQ[g0]*delta[d0][g1]
+                        )
+
+                        + 4.0 * S2 * inv_S4 * a_k * a_l * (
+                            +QC_x*QD_0*QD_y*(PB_0*PQ[b1] + PB_1*PQ[b0])
+                        )
+
+                        + (-2.0) * S2 * inv_S4 * a_k * (
+                            +QC_x*delta[d0][g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])
+                        )
+
+                        + S2 * inv_S1 * inv_S4 * a_k * (
+                            +QC_x*delta[b0][b1]*delta[d0][g1]
+                        )
+
+                    )
+
+                    + F5_t[2] * (
+
+                        S1 * inv_S2 * inv_S4 * inv_S4 * a_k * a_l * (
+                            -PB_0*(delta[b1][d0]*delta[g0][g1] + delta[b1][g0]*delta[d0][g1] + delta[b1][g1]*delta[d0][g0])
+
+                            -PB_1*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0])
+
+                            +delta[b0][b1]*(PQ[d0]*delta[g0][g1] + PQ[g0]*delta[d0][g1] + PQ[g1]*delta[d0][g0])
+                        )
+
+                        + inv_S4 * inv_S4 * a_k * a_l * (
+                            +delta[b0][b1]*delta[g0][g1]*(PQ[d0] + QD_0)
+
+                            +QC_x*(delta[b0][d0]*delta[b1][g1] + delta[b0][g1]*delta[b1][d0]) + QD_0*(delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0]) + QD_y*(delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0])
+
+                            +delta[b0][b1]*(delta[d0][g0]*(PQ[g1] + QD_y) + delta[d0][g1]*(PQ[g0] + QC_x))
+
+                            +PQ[b0]*(delta[b1][d0]*delta[g0][g1] + delta[b1][g0]*delta[d0][g1] + delta[b1][g1]*delta[d0][g0]) + PQ[b1]*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0])
+                        )
+
+                        + 2.0 * S1 * S1 * inv_S2 * inv_S4 * inv_S4 * a_k * a_l * (
+                            +PB_0*PB_1*PQ[d0]*delta[g0][g1]
+
+                            +PB_0*PB_1*(PQ[g0]*delta[d0][g1] + PQ[g1]*delta[d0][g0])
+                        )
+
+                        + 2.0 * S1 * inv_S4 * inv_S4 * a_k * a_l * (
+                            -delta[g0][g1]*(PQ[d0] + QD_0)*(PB_0*PQ[b1] + PB_1*PQ[b0])
+
+                            -(PB_0*PQ[b1] + PB_1*PQ[b0])*(delta[d0][g0]*(PQ[g1] + QD_y) + delta[d0][g1]*(PQ[g0] + QC_x))
+
+                            -PB_0*(PQ[d0]*(QC_x*delta[b1][g1] + QD_y*delta[b1][g0]) + PQ[g0]*(QD_0*delta[b1][g1] + QD_y*delta[b1][d0]) + PQ[g1]*(QC_x*delta[b1][d0] + QD_0*delta[b1][g0])) - PB_1*(PQ[d0]*(QC_x*delta[b0][g1] + QD_y*delta[b0][g0]) + PQ[g0]*(QD_0*delta[b0][g1] + QD_y*delta[b0][d0]) + PQ[g1]*(QC_x*delta[b0][d0] + QD_0*delta[b0][g0]))
+
+                            +delta[b0][b1]*(PQ[d0]*(PQ[g0]*QD_y + PQ[g1]*QC_x) + PQ[g0]*PQ[g1]*QD_0)
+                        )
+
+                        + 2.0 * S2 * inv_S4 * inv_S4 * a_k * a_l * (
+                            +QC_x*QD_y*(PQ[b0]*delta[b1][d0] + PQ[b1]*delta[b0][d0]) + QD_0*(PQ[b0]*(PQ[b1]*delta[g0][g1] + QC_x*delta[b1][g1] + QD_y*delta[b1][g0]) + PQ[b1]*(QC_x*delta[b0][g1] + QD_y*delta[b0][g0]))
+
+                            +PQ[b0]*PQ[b1]*(QC_x*delta[d0][g1] + QD_y*delta[d0][g0])
+
+                            +delta[b0][b1]*(PQ[g0]*QD_0*QD_y + QC_x*(PQ[d0]*QD_y + PQ[g1]*QD_0))
+                        )
+
+                        + (-1.0) * S2 * inv_S4 * inv_S4 * a_k * (
+                            +PQ[b0]*delta[b1][g0]*delta[d0][g1]
+
+                            +delta[d0][g1]*(PQ[b1]*delta[b0][g0] + PQ[g0]*delta[b0][b1])
+                        )
+
+                        + 4.0 * S1 * S1 * inv_S4 * inv_S4 * a_k * a_l * (
+                            +PB_0*PB_1*(PQ[d0]*(PQ[g0]*QD_y + PQ[g1]*QC_x) + PQ[g0]*PQ[g1]*QD_0)
+                        )
+
+                        + 4.0 * S1 * S2 * inv_S4 * inv_S4 * a_k * a_l * (
+                            -(PB_0*PQ[b1] + PB_1*PQ[b0])*(PQ[g0]*QD_0*QD_y + QC_x*(PQ[d0]*QD_y + PQ[g1]*QD_0))
+                        )
+
+                        + 2.0 * S1 * S2 * inv_S4 * inv_S4 * a_k * (
+                            +PQ[g0]*delta[d0][g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])
+                        )
+
+                        + 4.0 * S2 * S2 * inv_S4 * inv_S4 * a_k * a_l * (
+                            +PQ[b0]*PQ[b1]*QC_x*QD_0*QD_y
+                        )
+
+                        + (-2.0) * S2 * S2 * inv_S4 * inv_S4 * a_k * (
+                            +PQ[b0]*PQ[b1]*QC_x*delta[d0][g1]
+                        )
+
+                    )
+
+                    + F5_t[3] * (
+
+                        (-1.0) * S1 * inv_S4 * inv_S4 * inv_S4 * a_k * a_l * (
+                            +PQ[b0]*(delta[b1][d0]*delta[g0][g1] + delta[b1][g0]*delta[d0][g1] + delta[b1][g1]*delta[d0][g0])
+
+                            +PQ[b1]*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0]) + PQ[d0]*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0]) + PQ[g0]*(delta[b0][b1]*delta[d0][g1] + delta[b0][d0]*delta[b1][g1] + delta[b0][g1]*delta[b1][d0]) + PQ[g1]*(delta[b0][b1]*delta[d0][g0] + delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0])
+                        )
+
+                        + 2.0 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * a_k * a_l * (
+                            +PQ[d0]*delta[g0][g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])
+
+                            +(PB_0*PQ[b1] + PB_1*PQ[b0])*(PQ[g0]*delta[d0][g1] + PQ[g1]*delta[d0][g0])
+
+                            +PQ[d0]*(PB_0*(PQ[g0]*delta[b1][g1] + PQ[g1]*delta[b1][g0]) + PB_1*(PQ[g0]*delta[b0][g1] + PQ[g1]*delta[b0][g0])) + PQ[g0]*PQ[g1]*(PB_0*delta[b1][d0] + PB_1*delta[b0][d0])
+
+                            -PQ[d0]*PQ[g0]*PQ[g1]*delta[b0][b1]
+                        )
+
+                        + (-2.0) * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_k * a_l * (
+                            +PQ[b0]*(PQ[b1]*delta[g0][g1]*(PQ[d0] + QD_0) + PQ[d0]*(QC_x*delta[b1][g1] + QD_y*delta[b1][g0]) + PQ[g0]*(QD_0*delta[b1][g1] + QD_y*delta[b1][d0]) + PQ[g1]*(QC_x*delta[b1][d0] + QD_0*delta[b1][g0])) + PQ[b1]*(PQ[d0]*(QC_x*delta[b0][g1] + QD_y*delta[b0][g0]) + PQ[g0]*(QD_0*delta[b0][g1] + QD_y*delta[b0][d0]) + PQ[g1]*(QC_x*delta[b0][d0] + QD_0*delta[b0][g0]))
+
+                            +PQ[b0]*PQ[b1]*(delta[d0][g0]*(PQ[g1] + QD_y) + delta[d0][g1]*(PQ[g0] + QC_x))
+
+                            +delta[b0][b1]*(PQ[d0]*(PQ[g0]*QD_y + PQ[g1]*QC_x) + PQ[g0]*PQ[g1]*QD_0)
+                        )
+
+                        + 4.0 * S1 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * a_k * a_l * (
+                            -PB_0*PB_1*PQ[d0]*PQ[g0]*PQ[g1]
+                        )
+
+                        + 4.0 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_k * a_l * (
+                            +(PB_0*PQ[b1] + PB_1*PQ[b0])*(PQ[d0]*(PQ[g0]*QD_y + PQ[g1]*QC_x) + PQ[g0]*PQ[g1]*QD_0)
+                        )
+
+                        + 4.0 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_k * a_l * (
+                            -PQ[b0]*PQ[b1]*(PQ[g0]*QD_0*QD_y + QC_x*(PQ[d0]*QD_y + PQ[g1]*QD_0))
+                        )
+
+                        + 2.0 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_k * (
+                            +PQ[b0]*PQ[b1]*PQ[g0]*delta[d0][g1]
+                        )
+
+                    )
+
+                    + F5_t[4] * (
+
+                        4.0 * S1 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * a_l * (
+                            -PQ[d0]*PQ[g0]*PQ[g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])
+                        )
+
+                        + 4.0 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * a_l * (
+                            +PQ[b0]*PQ[b1]*(PQ[d0]*(PQ[g0]*QD_y + PQ[g1]*QC_x) + PQ[g0]*PQ[g1]*QD_0)
+                        )
+
+                        + 2.0 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * a_l * (
+                            +PQ[b0]*PQ[b1]*PQ[d0]*delta[g0][g1]
+
+                            +PQ[g0]*(PQ[b0]*(PQ[b1]*delta[d0][g1] + PQ[d0]*delta[b1][g1] + PQ[g1]*delta[b1][d0]) + PQ[b1]*PQ[d0]*delta[b0][g1]) + PQ[g1]*(PQ[b1]*(PQ[b0]*delta[d0][g0] + PQ[d0]*delta[b0][g0] + PQ[g0]*delta[b0][d0]) + PQ[d0]*(PQ[b0]*delta[b1][g0] + PQ[g0]*delta[b0][b1]))
+                        )
+
+                    )
+
+                    + F5_t[5] * (
+
+                        (-4.0) * S1 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * a_l * (
+                            +PQ[b0]*PQ[b1]*PQ[d0]*PQ[g0]*PQ[g1]
+                        )
+
+                    )
+
+                    );
+
+            double hess_kl_xy = -eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+
+            atomicAdd(
+                hess_xy + prim_cart_ao_to_atom_inds[k] * natoms + prim_cart_ao_to_atom_inds[s_prim_count + l_prim],
+                hess_kl_xy * ik_factor_D * 2.0 * frac_exact_exchange);
+        }
+    }
+
+    __syncthreads();
+}
+
+__global__ void __launch_bounds__(TILE_SIZE_K)
+computeExchangeHessianSDSP_IL_0(double*         hess_xy,
+                                double*         hess_yx,
+                                const uint32_t  hess_cart_ind_0,
+                                const uint32_t  hess_cart_ind_1,
+                                const double    frac_exact_exchange,
+                                const uint32_t* pair_inds_i_for_K_ss,
+                                const uint32_t* pair_inds_k_for_K_ss,
+                                const double*   D_ik_for_K_ss,
+                                const uint32_t  pair_inds_count_for_K_ss,
+                                const double*   s_prim_info,
+                                const uint32_t* s_prim_aoinds,
+                                const uint32_t  s_prim_count,
+                                const double*   p_prim_info,
+                                const uint32_t* p_prim_aoinds,
+                                const uint32_t  p_prim_count,
+                                const double*   d_prim_info,
+                                const uint32_t* d_prim_aoinds,
+                                const uint32_t  d_prim_count,
+                                const double    dp_max_D,
+                                const double*   mat_D_full_AO,
+                                const uint32_t  naos,
+                                const double*   Q_K_sd,
+                                const double*   Q_K_sp,
+                                const uint32_t* D_inds_K_sd,
+                                const uint32_t* D_inds_K_sp,
+                                const uint32_t* pair_displs_K_sd,
+                                const uint32_t* pair_displs_K_sp,
+                                const uint32_t* pair_counts_K_sd,
+                                const uint32_t* pair_counts_K_sp,
+                                const double*   pair_data_K_sd,
+                                const double*   pair_data_K_sp,
+                                const uint32_t* prim_cart_ao_to_atom_inds,
+                                const uint32_t  natoms,
+                                const double*   boys_func_table,
+                                const double*   boys_func_ft,
+                                const double    omega,
+                                const double    eri_threshold)
+{
+    // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
+
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
+    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ double   delta[3][3];
+    __shared__ uint32_t g0, g1;
+
+    const uint32_t ik = blockIdx.x;
+
+    // we make sure that ik < pair_inds_count_for_K_ss when calling the kernel
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+        g0 = hess_cart_ind_0;
+        g1 = hess_cart_ind_1;
+
+        i = pair_inds_i_for_K_ss[ik];
+        k = pair_inds_k_for_K_ss[ik];
+
+        count_i = pair_counts_K_sd[i];
+        count_k = pair_counts_K_sp[k];
+
+        displ_i = pair_displs_K_sd[i];
+        displ_k = pair_displs_K_sp[k];
+
+        a_i = s_prim_info[i + s_prim_count * 0];
+
+        r_i[0] = s_prim_info[i + s_prim_count * 2];
+        r_i[1] = s_prim_info[i + s_prim_count * 3];
+        r_i[2] = s_prim_info[i + s_prim_count * 4];
+
+        a_k = s_prim_info[k + s_prim_count * 0];
+
+        r_k[0] = s_prim_info[k + s_prim_count * 2];
+        r_k[1] = s_prim_info[k + s_prim_count * 3];
+        r_k[2] = s_prim_info[k + s_prim_count * 4];
+
+        ik_factor_D = (static_cast<double>(i != k) + 1.0) * D_ik_for_K_ss[ik];
+
+    }
+
+    __syncthreads();
+
+    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    {
+        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+
+        // sync threads before starting a new scan
+        __syncthreads();
+
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double PB_0, PB_1, PA_x;
+        uint32_t j_prim, j_cgto, b0, b1;
+
+        if (j < count_i)
+        {
+            Q_ij   = Q_K_sd[displ_i + j];
+
+            j_prim = D_inds_K_sd[displ_i + j];
+
+            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+
+            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = pair_data_K_sd[displ_i + j];
+
+            PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
+
+        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        {
+            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+
+            // Q_kl == Q_K_sp[displ_k + l]
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_sp[displ_k + l] * dp_max_D) <= eri_threshold))
+            {
+                break;
+            }
+
+            // const auto Q_kl = Q_K_sp[displ_k + l];
+
+            const auto l_prim = D_inds_K_sp[displ_k + l];
+
+            const auto l_cgto = p_prim_aoinds[(l_prim / 3) + p_prim_count * (l_prim % 3)];
+
+            const auto a_l = p_prim_info[l_prim / 3 + p_prim_count * 0];
+
+            const double r_l[3] = {p_prim_info[l_prim / 3 + p_prim_count * 2],
+                                   p_prim_info[l_prim / 3 + p_prim_count * 3],
+                                   p_prim_info[l_prim / 3 + p_prim_count * 4]};
+
+            const auto S_kl_00 = pair_data_K_sp[displ_k + l];
+
+            const auto d0 = l_prim % 3;
+
+            // J. Chem. Phys. 84, 3963-3974 (1986)
+
+            const auto S2 = a_k + a_l;
+
+            const auto inv_S2 = 1.0 / S2;
+            const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
+
+            const auto rho = S1 * S2 * inv_S4;
+
+            double d2 = 1.0;
+
+            if (omega != 0.0) d2 = omega * omega / (rho + omega * omega);
+
+            const auto Lambda = sqrt(4.0 * rho * d2 * MATH_CONST_INV_PI);
+
+            double F5_t[6];
+
+            gpu::computeBoysFunction(F5_t, rho * d2 * r2_PQ, 5, boys_func_table, boys_func_ft);
+
+            if (omega != 0.0)
+            {
+                F5_t[1] *= d2;
+                F5_t[2] *= d2 * d2;
+                F5_t[3] *= d2 * d2 * d2;
+                F5_t[4] *= d2 * d2 * d2 * d2;
+                F5_t[5] *= d2 * d2 * d2 * d2 * d2;
+            }
+
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+
+            const auto QD_y = (-a_k * inv_S2) * (r_l[g1] - r_k[g1]);
+
+            // i-l Hessian
+
+            const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
+                    + F5_t[0] * (
+
+                        inv_S1 * inv_S2 * a_i * a_l * (
+                            +PB_0*delta[b1][g0]*delta[d0][g1]
+
+                            +delta[d0][g1]*(PA_x*delta[b0][b1] + PB_1*delta[b0][g0])
+                        )
+
+                        + 2.0 * inv_S1 * a_i * a_l * (
+                            +PB_0*QD_0*QD_y*delta[b1][g0]
+
+                            +QD_0*QD_y*(PA_x*delta[b0][b1] + PB_1*delta[b0][g0])
+                        )
+
+                        + (-1.0) * inv_S1 * a_i * (
+                            +PB_0*delta[b1][g0]*delta[d0][g1]
+
+                            +delta[d0][g1]*(PA_x*delta[b0][b1] + PB_1*delta[b0][g0])
+                        )
+
+                        + 2.0 * inv_S2 * a_i * a_l * (
+                            +PA_x*PB_0*PB_1*delta[d0][g1]
+                        )
+
+                        + 4.0 * a_i * a_l * (
+                            +PA_x*PB_0*PB_1*QD_0*QD_y
+                        )
+
+                        + (-2.0) * a_i * (
+                            +PA_x*PB_0*PB_1*delta[d0][g1]
+                        )
+
+                    )
+
+                    + F5_t[1] * (
+
+                        inv_S1 * inv_S4 * a_i * a_l * (
+                            +delta[b1][g0]*delta[d0][g1]*(-PB_0 + PQ[b0])
+
+                            +delta[d0][g1]*(delta[b0][b1]*(-PA_x + PQ[g0]) + delta[b0][g0]*(-PB_1 + PQ[b1]))
+
+                            +QD_0*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0]) + QD_y*(delta[b0][b1]*delta[d0][g0] + delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0])
+                        )
+
+                        + (-1.0) * inv_S2 * inv_S4 * a_i * a_l * (
+                            +PB_0*delta[b1][g0]*delta[d0][g1]
+
+                            +delta[d0][g1]*(PA_x*delta[b0][b1] + PB_1*delta[b0][g0])
+                        )
+
+                        + (-2.0) * S1 * inv_S2 * inv_S4 * a_i * a_l * (
+                            +PA_x*PB_0*PB_1*delta[d0][g1]
+                        )
+
+                        + 2.0 * S2 * inv_S1 * inv_S4 * a_i * a_l * (
+                            +QD_0*QD_y*delta[b1][g0]*(-PB_0 + PQ[b0])
+
+                            +QD_0*QD_y*(delta[b0][b1]*(-PA_x + PQ[g0]) + delta[b0][g0]*(-PB_1 + PQ[b1]))
+                        )
+
+                        + S2 * inv_S1 * inv_S4 * a_i * (
+                            +delta[b1][g0]*delta[d0][g1]*(PB_0 - PQ[b0])
+
+                            +delta[d0][g1]*(delta[b0][b1]*(PA_x - PQ[g0]) + delta[b0][g0]*(PB_1 - PQ[b1]))
+                        )
+
+                        + 2.0 * inv_S4 * a_i * a_l * (
+                            +delta[d0][g1]*(PA_x*(PB_0*PQ[b1] + PB_1*PQ[b0]) + PB_0*PB_1*PQ[g0])
+
+                            +PA_x*(PB_0*(QD_0*delta[b1][g1] + QD_y*delta[b1][d0]) + PB_1*(QD_0*delta[b0][g1] + QD_y*delta[b0][d0])) + PB_0*PB_1*(QD_0*delta[g0][g1] + QD_y*delta[d0][g0])
+
+                            -(PQ[d0]*QD_y + PQ[g1]*QD_0)*(PA_x*delta[b0][b1] + PB_0*delta[b1][g0] + PB_1*delta[b0][g0])
+                        )
+
+                        + 4.0 * S1 * inv_S4 * a_i * a_l * (
+                            -PA_x*PB_0*PB_1*(PQ[d0]*QD_y + PQ[g1]*QD_0)
+                        )
+
+                        + 4.0 * S2 * inv_S4 * a_i * a_l * (
+                            +QD_0*QD_y*(PA_x*(PB_0*PQ[b1] + PB_1*PQ[b0]) + PB_0*PB_1*PQ[g0])
+                        )
+
+                        + (-2.0) * S2 * inv_S4 * a_i * (
+                            +delta[d0][g1]*(PA_x*(PB_0*PQ[b1] + PB_1*PQ[b0]) + PB_0*PB_1*PQ[g0])
+                        )
+
+                    )
+
+                    + F5_t[2] * (
+
+                        (-1.0) * S2 * inv_S1 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +PQ[b0]*delta[b1][g0]*delta[d0][g1]
+
+                            +delta[d0][g1]*(PQ[b1]*delta[b0][g0] + PQ[g0]*delta[b0][b1])
+
+                            +QD_0*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0]) + QD_y*(delta[b0][b1]*delta[d0][g0] + delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0])
+                        )
+
+                        + inv_S4 * inv_S4 * a_i * a_l * (
+                            +PB_0*(delta[b1][d0]*delta[g0][g1] + delta[b1][g1]*delta[d0][g0])
+
+                            +delta[b0][b1]*delta[d0][g1]*(PA_x - PQ[g0]) + delta[b0][g0]*delta[d0][g1]*(PB_1 - PQ[b1]) + delta[b1][g0]*delta[d0][g1]*(PB_0 - PQ[b0])
+
+                            +PA_x*(delta[b0][d0]*delta[b1][g1] + delta[b0][g1]*delta[b1][d0]) + PB_1*(delta[b0][d0]*delta[g0][g1] + delta[b0][g1]*delta[d0][g0])
+
+                            -PQ[d0]*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0]) - PQ[g1]*(delta[b0][b1]*delta[d0][g0] + delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0])
+                        )
+
+                        + 2.0 * S1 * inv_S4 * inv_S4 * a_i * a_l * (
+                            -PB_0*PB_1*PQ[d0]*delta[g0][g1]
+
+                            -delta[d0][g1]*(PA_x*(PB_0*PQ[b1] + PB_1*PQ[b0]) + PB_0*PB_1*PQ[g0])
+
+                            -PA_x*(PB_0*(PQ[d0]*delta[b1][g1] + PQ[g1]*delta[b1][d0]) + PB_1*(PQ[d0]*delta[b0][g1] + PQ[g1]*delta[b0][d0])) - PB_0*PB_1*PQ[g1]*delta[d0][g0]
+
+                            +PQ[d0]*PQ[g1]*(PA_x*delta[b0][b1] + PB_0*delta[b1][g0] + PB_1*delta[b0][g0])
+                        )
+
+                        + (-2.0) * S2 * S2 * inv_S1 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +PQ[b0]*QD_0*QD_y*delta[b1][g0]
+
+                            +QD_0*QD_y*(PQ[b1]*delta[b0][g0] + PQ[g0]*delta[b0][b1])
+                        )
+
+                        + 2.0 * S2 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +delta[d0][g1]*(PB_0*PQ[b1]*PQ[g0] + PQ[b0]*(PA_x*PQ[b1] + PB_1*PQ[g0]))
+
+                            +PA_x*(PQ[b0]*(QD_0*delta[b1][g1] + QD_y*delta[b1][d0]) + PQ[b1]*(QD_0*delta[b0][g1] + QD_y*delta[b0][d0])) + PB_0*(PQ[b1]*(QD_0*delta[g0][g1] + QD_y*delta[d0][g0]) + PQ[g0]*(QD_0*delta[b1][g1] + QD_y*delta[b1][d0])) + PB_1*(PQ[b0]*(QD_0*delta[g0][g1] + QD_y*delta[d0][g0]) + PQ[g0]*(QD_0*delta[b0][g1] + QD_y*delta[b0][d0]))
+
+                            +(PQ[d0]*QD_y + PQ[g1]*QD_0)*(PA_x*delta[b0][b1] + PB_0*delta[b1][g0] + PB_1*delta[b0][g0] - PQ[b0]*delta[b1][g0] - PQ[b1]*delta[b0][g0] - PQ[g0]*delta[b0][b1])
+                        )
+
+                        + 4.0 * S1 * S1 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +PA_x*PB_0*PB_1*PQ[d0]*PQ[g1]
+                        )
+
+                        + 4.0 * S1 * S2 * inv_S4 * inv_S4 * a_i * a_l * (
+                            -(PA_x*(PB_0*PQ[b1] + PB_1*PQ[b0]) + PB_0*PB_1*PQ[g0])*(PQ[d0]*QD_y + PQ[g1]*QD_0)
+                        )
+
+                        + 4.0 * S2 * S2 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +QD_0*QD_y*(PB_0*PQ[b1]*PQ[g0] + PQ[b0]*(PA_x*PQ[b1] + PB_1*PQ[g0]))
+                        )
+
+                        + (-2.0) * S2 * S2 * inv_S4 * inv_S4 * a_i * (
+                            +delta[d0][g1]*(PB_0*PQ[b1]*PQ[g0] + PQ[b0]*(PA_x*PQ[b1] + PB_1*PQ[g0]))
+                        )
+
+                        + S2 * S2 * inv_S1 * inv_S4 * inv_S4 * a_i * (
+                            +PQ[b0]*delta[b1][g0]*delta[d0][g1]
+
+                            +delta[d0][g1]*(PQ[b1]*delta[b0][g0] + PQ[g0]*delta[b0][b1])
+                        )
+
+                    )
+
+                    + F5_t[3] * (
+
+                        2.0 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_l * (
+                            -PQ[d0]*delta[g0][g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])
+
+                            -delta[d0][g1]*(PB_0*PQ[b1]*PQ[g0] + PQ[b0]*(PA_x*PQ[b1] + PB_1*PQ[g0]))
+
+                            -PA_x*(PQ[b0]*(PQ[d0]*delta[b1][g1] + PQ[g1]*delta[b1][d0]) + PQ[b1]*(PQ[d0]*delta[b0][g1] + PQ[g1]*delta[b0][d0])) - PQ[d0]*PQ[g0]*(PB_0*delta[b1][g1] + PB_1*delta[b0][g1]) - PQ[g1]*(PB_0*(PQ[b1]*delta[d0][g0] + PQ[g0]*delta[b1][d0]) + PB_1*(PQ[b0]*delta[d0][g0] + PQ[g0]*delta[b0][d0]))
+
+                            +PQ[d0]*PQ[g1]*(-PA_x*delta[b0][b1] - PB_0*delta[b1][g0] - PB_1*delta[b0][g0] + PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0] + PQ[g0]*delta[b0][b1])
+                        )
+
+                        + 2.0 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +PQ[b0]*PQ[b1]*QD_0*delta[g0][g1]
+
+                            +PQ[g0]*QD_0*(PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1]) + QD_y*(PQ[b0]*(PQ[b1]*delta[d0][g0] + PQ[g0]*delta[b1][d0]) + PQ[b1]*PQ[g0]*delta[b0][d0])
+
+                            +(PQ[d0]*QD_y + PQ[g1]*QD_0)*(PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0] + PQ[g0]*delta[b0][b1])
+
+                            +PQ[b0]*PQ[b1]*PQ[g0]*delta[d0][g1]
+                        )
+
+                        + 4.0 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +PQ[d0]*PQ[g1]*(PA_x*(PB_0*PQ[b1] + PB_1*PQ[b0]) + PB_0*PB_1*PQ[g0])
+                        )
+
+                        + 4.0 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_l * (
+                            -(PQ[d0]*QD_y + PQ[g1]*QD_0)*(PB_0*PQ[b1]*PQ[g0] + PQ[b0]*(PA_x*PQ[b1] + PB_1*PQ[g0]))
+                        )
+
+                        + 4.0 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +PQ[b0]*PQ[b1]*PQ[g0]*QD_0*QD_y
+                        )
+
+                        + (-2.0) * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * (
+                            +PQ[b0]*PQ[b1]*PQ[g0]*delta[d0][g1]
+                        )
+
+                        + S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +PQ[b0]*(delta[b1][d0]*delta[g0][g1] + delta[b1][g0]*delta[d0][g1] + delta[b1][g1]*delta[d0][g0])
+
+                            +PQ[b1]*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0]) + PQ[d0]*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0]) + PQ[g0]*(delta[b0][b1]*delta[d0][g1] + delta[b0][d0]*delta[b1][g1] + delta[b0][g1]*delta[b1][d0]) + PQ[g1]*(delta[b0][b1]*delta[d0][g0] + delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0])
+                        )
+
+                    )
+
+                    + F5_t[4] * (
+
+                        (-2.0) * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +PQ[b0]*PQ[b1]*PQ[d0]*delta[g0][g1]
+
+                            +PQ[g0]*(PQ[b0]*(PQ[b1]*delta[d0][g1] + PQ[d0]*delta[b1][g1] + PQ[g1]*delta[b1][d0]) + PQ[b1]*PQ[d0]*delta[b0][g1]) + PQ[g1]*(PQ[b1]*(PQ[b0]*delta[d0][g0] + PQ[d0]*delta[b0][g0] + PQ[g0]*delta[b0][d0]) + PQ[d0]*(PQ[b0]*delta[b1][g0] + PQ[g0]*delta[b0][b1]))
+                        )
+
+                        + 4.0 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +PQ[d0]*PQ[g1]*(PB_0*PQ[b1]*PQ[g0] + PQ[b0]*(PA_x*PQ[b1] + PB_1*PQ[g0]))
+                        )
+
+                        + 4.0 * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_l * (
+                            -PQ[b0]*PQ[b1]*PQ[g0]*(PQ[d0]*QD_y + PQ[g1]*QD_0)
+                        )
+
+                    )
+
+                    + F5_t[5] * (
+
+                        4.0 * S1 * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +PQ[b0]*PQ[b1]*PQ[d0]*PQ[g0]*PQ[g1]
+                        )
+
+                    )
+
+                    );
+
+            double hess_il_xy = -eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+
+            atomicAdd(
+                hess_xy + prim_cart_ao_to_atom_inds[i] * natoms + prim_cart_ao_to_atom_inds[s_prim_count + l_prim],
+                hess_il_xy * ik_factor_D * frac_exact_exchange);
+
+            atomicAdd(
+                hess_yx + prim_cart_ao_to_atom_inds[s_prim_count + l_prim] * natoms + prim_cart_ao_to_atom_inds[i],
+                hess_il_xy * ik_factor_D * frac_exact_exchange);
+        }
+    }
+
+    __syncthreads();
+}
+
+__global__ void __launch_bounds__(TILE_SIZE_K)
+computeExchangeHessianSDSP_JK_0(double*         hess_xy,
+                                double*         hess_yx,
+                                const uint32_t  hess_cart_ind_0,
+                                const uint32_t  hess_cart_ind_1,
+                                const double    frac_exact_exchange,
+                                const uint32_t* pair_inds_i_for_K_ss,
+                                const uint32_t* pair_inds_k_for_K_ss,
+                                const double*   D_ik_for_K_ss,
+                                const uint32_t  pair_inds_count_for_K_ss,
+                                const double*   s_prim_info,
+                                const uint32_t* s_prim_aoinds,
+                                const uint32_t  s_prim_count,
+                                const double*   p_prim_info,
+                                const uint32_t* p_prim_aoinds,
+                                const uint32_t  p_prim_count,
+                                const double*   d_prim_info,
+                                const uint32_t* d_prim_aoinds,
+                                const uint32_t  d_prim_count,
+                                const double    dp_max_D,
+                                const double*   mat_D_full_AO,
+                                const uint32_t  naos,
+                                const double*   Q_K_sd,
+                                const double*   Q_K_sp,
+                                const uint32_t* D_inds_K_sd,
+                                const uint32_t* D_inds_K_sp,
+                                const uint32_t* pair_displs_K_sd,
+                                const uint32_t* pair_displs_K_sp,
+                                const uint32_t* pair_counts_K_sd,
+                                const uint32_t* pair_counts_K_sp,
+                                const double*   pair_data_K_sd,
+                                const double*   pair_data_K_sp,
+                                const uint32_t* prim_cart_ao_to_atom_inds,
+                                const uint32_t  natoms,
+                                const double*   boys_func_table,
+                                const double*   boys_func_ft,
+                                const double    omega,
+                                const double    eri_threshold)
+{
+    // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
+
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
+    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ double   delta[3][3];
+    __shared__ uint32_t g0, g1;
+
+    const uint32_t ik = blockIdx.x;
+
+    // we make sure that ik < pair_inds_count_for_K_ss when calling the kernel
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+        g0 = hess_cart_ind_0;
+        g1 = hess_cart_ind_1;
+
+        i = pair_inds_i_for_K_ss[ik];
+        k = pair_inds_k_for_K_ss[ik];
+
+        count_i = pair_counts_K_sd[i];
+        count_k = pair_counts_K_sp[k];
+
+        displ_i = pair_displs_K_sd[i];
+        displ_k = pair_displs_K_sp[k];
+
+        a_i = s_prim_info[i + s_prim_count * 0];
+
+        r_i[0] = s_prim_info[i + s_prim_count * 2];
+        r_i[1] = s_prim_info[i + s_prim_count * 3];
+        r_i[2] = s_prim_info[i + s_prim_count * 4];
+
+        a_k = s_prim_info[k + s_prim_count * 0];
+
+        r_k[0] = s_prim_info[k + s_prim_count * 2];
+        r_k[1] = s_prim_info[k + s_prim_count * 3];
+        r_k[2] = s_prim_info[k + s_prim_count * 4];
+
+        ik_factor_D = (static_cast<double>(i != k) + 1.0) * D_ik_for_K_ss[ik];
+
+    }
+
+    __syncthreads();
+
+    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    {
+        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+
+        // sync threads before starting a new scan
+        __syncthreads();
+
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double PB_0, PB_1, PB_x;
+        uint32_t j_prim, j_cgto, b0, b1;
+
+        if (j < count_i)
+        {
+            Q_ij   = Q_K_sd[displ_i + j];
+
+            j_prim = D_inds_K_sd[displ_i + j];
+
+            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+
+            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = pair_data_K_sd[displ_i + j];
+
+            PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
+
+        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        {
+            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+
+            // Q_kl == Q_K_sp[displ_k + l]
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_sp[displ_k + l] * dp_max_D) <= eri_threshold))
+            {
+                break;
+            }
+
+            // const auto Q_kl = Q_K_sp[displ_k + l];
+
+            const auto l_prim = D_inds_K_sp[displ_k + l];
+
+            const auto l_cgto = p_prim_aoinds[(l_prim / 3) + p_prim_count * (l_prim % 3)];
+
+            const auto a_l = p_prim_info[l_prim / 3 + p_prim_count * 0];
+
+            const double r_l[3] = {p_prim_info[l_prim / 3 + p_prim_count * 2],
+                                   p_prim_info[l_prim / 3 + p_prim_count * 3],
+                                   p_prim_info[l_prim / 3 + p_prim_count * 4]};
+
+            const auto S_kl_00 = pair_data_K_sp[displ_k + l];
+
+            const auto d0 = l_prim % 3;
+
+            // J. Chem. Phys. 84, 3963-3974 (1986)
+
+            const auto S2 = a_k + a_l;
+
+            const auto inv_S2 = 1.0 / S2;
+            const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
+
+            const auto rho = S1 * S2 * inv_S4;
+
+            double d2 = 1.0;
+
+            if (omega != 0.0) d2 = omega * omega / (rho + omega * omega);
+
+            const auto Lambda = sqrt(4.0 * rho * d2 * MATH_CONST_INV_PI);
+
+            double F5_t[6];
+
+            gpu::computeBoysFunction(F5_t, rho * d2 * r2_PQ, 5, boys_func_table, boys_func_ft);
+
+            if (omega != 0.0)
+            {
+                F5_t[1] *= d2;
+                F5_t[2] *= d2 * d2;
+                F5_t[3] *= d2 * d2 * d2;
+                F5_t[4] *= d2 * d2 * d2 * d2;
+                F5_t[5] *= d2 * d2 * d2 * d2 * d2;
+            }
+
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+
+            const auto QC_y = (a_l * inv_S2) * (r_l[g1] - r_k[g1]);
+
+            // j-k Hessian
+
+            const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
+                    + F5_t[0] * (
+
+                        inv_S1 * inv_S2 * a_j * a_k * (
+                            +PB_0*delta[b1][g0]*delta[d0][g1]
+
+                            +delta[d0][g1]*(PB_1*delta[b0][g0] + PB_x*delta[b0][b1])
+                        )
+
+                        + 2.0 * inv_S1 * a_j * a_k * (
+                            +PB_0*QC_y*QD_0*delta[b1][g0]
+
+                            +QC_y*QD_0*(PB_1*delta[b0][g0] + PB_x*delta[b0][b1])
+                        )
+
+                        + 2.0 * inv_S2 * a_j * a_k * (
+                            +PB_0*PB_1*PB_x*delta[d0][g1]
+                        )
+
+                        + (-1.0) * inv_S2 * a_k * (
+                            +PB_0*delta[b1][g0]*delta[d0][g1]
+
+                            +PB_1*delta[b0][g0]*delta[d0][g1]
+                        )
+
+                        + 4.0 * a_j * a_k * (
+                            +PB_0*PB_1*PB_x*QC_y*QD_0
+                        )
+
+                        + (-2.0) * a_k * (
+                            +PB_0*QC_y*QD_0*delta[b1][g0]
+
+                            +PB_1*QC_y*QD_0*delta[b0][g0]
+                        )
+
+                    )
+
+                    + F5_t[1] * (
+
+                        inv_S1 * inv_S4 * a_j * a_k * (
+                            +delta[b1][g0]*delta[d0][g1]*(-PB_0 + PQ[b0])
+
+                            +delta[d0][g1]*(delta[b0][b1]*(-PB_x + PQ[g0]) + delta[b0][g0]*(-PB_1 + PQ[b1]))
+
+                            +QC_y*(delta[b0][b1]*delta[d0][g0] + delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0]) + QD_0*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+                        )
+
+                        + (-1.0) * inv_S2 * inv_S4 * a_j * a_k * (
+                            +PB_0*delta[b1][g0]*delta[d0][g1]
+
+                            +delta[d0][g1]*(PB_1*delta[b0][g0] + PB_x*delta[b0][b1])
+                        )
+
+                        + (-2.0) * S1 * inv_S2 * inv_S4 * a_j * a_k * (
+                            +PB_0*PB_1*PB_x*delta[d0][g1]
+                        )
+
+                        + S1 * inv_S2 * inv_S4 * a_k * (
+                            +PB_0*delta[b1][g0]*delta[d0][g1]
+
+                            +PB_1*delta[b0][g0]*delta[d0][g1]
+                        )
+
+                        + 2.0 * S2 * inv_S1 * inv_S4 * a_j * a_k * (
+                            +QC_y*QD_0*delta[b1][g0]*(-PB_0 + PQ[b0])
+
+                            +QC_y*QD_0*(delta[b0][b1]*(-PB_x + PQ[g0]) + delta[b0][g0]*(-PB_1 + PQ[b1]))
+                        )
+
+                        + 2.0 * inv_S4 * a_j * a_k * (
+                            +delta[d0][g1]*(PB_0*(PB_1*PQ[g0] + PB_x*PQ[b1]) + PB_1*PB_x*PQ[b0])
+
+                            +PB_0*(PB_1*(QC_y*delta[d0][g0] + QD_0*delta[g0][g1]) + PB_x*(QC_y*delta[b1][d0] + QD_0*delta[b1][g1])) + PB_1*PB_x*(QC_y*delta[b0][d0] + QD_0*delta[b0][g1])
+
+                            -(PQ[d0]*QC_y + PQ[g1]*QD_0)*(PB_0*delta[b1][g0] + PB_1*delta[b0][g0] + PB_x*delta[b0][b1])
+                        )
+
+                        + (-1.0) * inv_S4 * a_k * (
+                            +PQ[b0]*delta[b1][g0]*delta[d0][g1]
+
+                            +PQ[b1]*delta[b0][g0]*delta[d0][g1]
+
+                            +QC_y*(delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0]) + QD_0*(delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+                        )
+
+                        + 4.0 * S1 * inv_S4 * a_j * a_k * (
+                            -PB_0*PB_1*PB_x*(PQ[d0]*QC_y + PQ[g1]*QD_0)
+                        )
+
+                        + 2.0 * S1 * inv_S4 * a_k * (
+                            +PB_0*delta[b1][g0]*(PQ[d0]*QC_y + PQ[g1]*QD_0)
+
+                            +PB_1*delta[b0][g0]*(PQ[d0]*QC_y + PQ[g1]*QD_0)
+                        )
+
+                        + 4.0 * S2 * inv_S4 * a_j * a_k * (
+                            +QC_y*QD_0*(PB_0*(PB_1*PQ[g0] + PB_x*PQ[b1]) + PB_1*PB_x*PQ[b0])
+                        )
+
+                        + (-2.0) * S2 * inv_S4 * a_k * (
+                            +PQ[b0]*QC_y*QD_0*delta[b1][g0]
+
+                            +PQ[b1]*QC_y*QD_0*delta[b0][g0]
+                        )
+
+                    )
+
+                    + F5_t[2] * (
+
+                        (-1.0) * S2 * inv_S1 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +PQ[b0]*delta[b1][g0]*delta[d0][g1]
+
+                            +delta[d0][g1]*(PQ[b1]*delta[b0][g0] + PQ[g0]*delta[b0][b1])
+
+                            +QC_y*(delta[b0][b1]*delta[d0][g0] + delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0]) + QD_0*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+                        )
+
+                        + inv_S4 * inv_S4 * a_j * a_k * (
+                            +PB_0*(delta[b1][d0]*delta[g0][g1] + delta[b1][g1]*delta[d0][g0])
+
+                            +delta[b0][b1]*delta[d0][g1]*(PB_x - PQ[g0]) + delta[b0][g0]*delta[d0][g1]*(PB_1 - PQ[b1]) + delta[b1][g0]*delta[d0][g1]*(PB_0 - PQ[b0])
+
+                            +PB_1*(delta[b0][d0]*delta[g0][g1] + delta[b0][g1]*delta[d0][g0]) + PB_x*(delta[b0][d0]*delta[b1][g1] + delta[b0][g1]*delta[b1][d0])
+
+                            -PQ[d0]*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0]) - PQ[g1]*(delta[b0][b1]*delta[d0][g0] + delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0])
+                        )
+
+                        + 2.0 * S1 * inv_S4 * inv_S4 * a_j * a_k * (
+                            -PB_0*PB_1*PQ[d0]*delta[g0][g1]
+
+                            -delta[d0][g1]*(PB_0*(PB_1*PQ[g0] + PB_x*PQ[b1]) + PB_1*PB_x*PQ[b0])
+
+                            -PB_x*PQ[d0]*(PB_0*delta[b1][g1] + PB_1*delta[b0][g1]) - PQ[g1]*(PB_0*(PB_1*delta[d0][g0] + PB_x*delta[b1][d0]) + PB_1*PB_x*delta[b0][d0])
+
+                            +PQ[d0]*PQ[g1]*(PB_0*delta[b1][g0] + PB_1*delta[b0][g0] + PB_x*delta[b0][b1])
+                        )
+
+                        + (-2.0) * S2 * S2 * inv_S1 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +PQ[b0]*QC_y*QD_0*delta[b1][g0]
+
+                            +QC_y*QD_0*(PQ[b1]*delta[b0][g0] + PQ[g0]*delta[b0][b1])
+                        )
+
+                        + 2.0 * S2 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +delta[d0][g1]*(PB_1*PQ[b0]*PQ[g0] + PQ[b1]*(PB_0*PQ[g0] + PB_x*PQ[b0]))
+
+                            +PB_0*(PQ[b1]*(QC_y*delta[d0][g0] + QD_0*delta[g0][g1]) + PQ[g0]*(QC_y*delta[b1][d0] + QD_0*delta[b1][g1])) + PB_1*(PQ[b0]*(QC_y*delta[d0][g0] + QD_0*delta[g0][g1]) + PQ[g0]*(QC_y*delta[b0][d0] + QD_0*delta[b0][g1])) + PB_x*(PQ[b0]*(QC_y*delta[b1][d0] + QD_0*delta[b1][g1]) + PQ[b1]*(QC_y*delta[b0][d0] + QD_0*delta[b0][g1]))
+
+                            +(PQ[d0]*QC_y + PQ[g1]*QD_0)*(PB_0*delta[b1][g0] + PB_1*delta[b0][g0] + PB_x*delta[b0][b1] - PQ[b0]*delta[b1][g0] - PQ[b1]*delta[b0][g0] - PQ[g0]*delta[b0][b1])
+                        )
+
+                        + 4.0 * S1 * S1 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +PB_0*PB_1*PB_x*PQ[d0]*PQ[g1]
+                        )
+
+                        + (-2.0) * S1 * S1 * inv_S4 * inv_S4 * a_k * (
+                            +PB_0*PQ[d0]*PQ[g1]*delta[b1][g0]
+
+                            +PB_1*PQ[d0]*PQ[g1]*delta[b0][g0]
+                        )
+
+                        + 4.0 * S1 * S2 * inv_S4 * inv_S4 * a_j * a_k * (
+                            -(PB_0*(PB_1*PQ[g0] + PB_x*PQ[b1]) + PB_1*PB_x*PQ[b0])*(PQ[d0]*QC_y + PQ[g1]*QD_0)
+                        )
+
+                        + 2.0 * S1 * S2 * inv_S4 * inv_S4 * a_k * (
+                            +PQ[b0]*delta[b1][g0]*(PQ[d0]*QC_y + PQ[g1]*QD_0)
+
+                            +PQ[b1]*delta[b0][g0]*(PQ[d0]*QC_y + PQ[g1]*QD_0)
+                        )
+
+                        + 4.0 * S2 * S2 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +QC_y*QD_0*(PB_1*PQ[b0]*PQ[g0] + PQ[b1]*(PB_0*PQ[g0] + PB_x*PQ[b0]))
+                        )
+
+                        + S1 * inv_S4 * inv_S4 * a_k * (
+                            +PQ[b0]*delta[b1][g0]*delta[d0][g1]
+
+                            +PQ[b1]*delta[b0][g0]*delta[d0][g1]
+
+                            +PQ[d0]*(delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0]) + PQ[g1]*(delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0])
+                        )
+
+                    )
+
+                    + F5_t[3] * (
+
+                        2.0 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_j * a_k * (
+                            -PQ[d0]*delta[g0][g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])
+
+                            -delta[d0][g1]*(PB_1*PQ[b0]*PQ[g0] + PQ[b1]*(PB_0*PQ[g0] + PB_x*PQ[b0]))
+
+                            -PB_x*(PQ[b0]*(PQ[d0]*delta[b1][g1] + PQ[g1]*delta[b1][d0]) + PQ[b1]*(PQ[d0]*delta[b0][g1] + PQ[g1]*delta[b0][d0])) - PQ[d0]*PQ[g0]*(PB_0*delta[b1][g1] + PB_1*delta[b0][g1]) - PQ[g1]*(PB_0*(PQ[b1]*delta[d0][g0] + PQ[g0]*delta[b1][d0]) + PB_1*(PQ[b0]*delta[d0][g0] + PQ[g0]*delta[b0][d0]))
+
+                            +PQ[d0]*PQ[g1]*(-PB_0*delta[b1][g0] - PB_1*delta[b0][g0] - PB_x*delta[b0][b1] + PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0] + PQ[g0]*delta[b0][b1])
+                        )
+
+                        + 2.0 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +PQ[b0]*PQ[b1]*QD_0*delta[g0][g1]
+
+                            +PQ[g0]*QD_0*(PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1]) + QC_y*(PQ[b0]*(PQ[b1]*delta[d0][g0] + PQ[g0]*delta[b1][d0]) + PQ[b1]*PQ[g0]*delta[b0][d0])
+
+                            +(PQ[d0]*QC_y + PQ[g1]*QD_0)*(PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0] + PQ[g0]*delta[b0][b1])
+
+                            +PQ[b0]*PQ[b1]*PQ[g0]*delta[d0][g1]
+                        )
+
+                        + 4.0 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +PQ[d0]*PQ[g1]*(PB_0*(PB_1*PQ[g0] + PB_x*PQ[b1]) + PB_1*PB_x*PQ[b0])
+                        )
+
+                        + (-2.0) * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_k * (
+                            +PQ[b0]*PQ[d0]*PQ[g1]*delta[b1][g0]
+
+                            +PQ[b1]*PQ[d0]*PQ[g1]*delta[b0][g0]
+                        )
+
+                        + 4.0 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_j * a_k * (
+                            -(PQ[d0]*QC_y + PQ[g1]*QD_0)*(PB_1*PQ[b0]*PQ[g0] + PQ[b1]*(PB_0*PQ[g0] + PB_x*PQ[b0]))
+                        )
+
+                        + 4.0 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +PQ[b0]*PQ[b1]*PQ[g0]*QC_y*QD_0
+                        )
+
+                        + S2 * inv_S4 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +PQ[b0]*(delta[b1][d0]*delta[g0][g1] + delta[b1][g0]*delta[d0][g1] + delta[b1][g1]*delta[d0][g0])
+
+                            +PQ[b1]*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0]) + PQ[d0]*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0]) + PQ[g0]*(delta[b0][b1]*delta[d0][g1] + delta[b0][d0]*delta[b1][g1] + delta[b0][g1]*delta[b1][d0]) + PQ[g1]*(delta[b0][b1]*delta[d0][g0] + delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0])
+                        )
+
+                    )
+
+                    + F5_t[4] * (
+
+                        (-2.0) * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +PQ[b0]*PQ[b1]*PQ[d0]*delta[g0][g1]
+
+                            +PQ[g0]*(PQ[b0]*(PQ[b1]*delta[d0][g1] + PQ[d0]*delta[b1][g1] + PQ[g1]*delta[b1][d0]) + PQ[b1]*PQ[d0]*delta[b0][g1]) + PQ[g1]*(PQ[b1]*(PQ[b0]*delta[d0][g0] + PQ[d0]*delta[b0][g0] + PQ[g0]*delta[b0][d0]) + PQ[d0]*(PQ[b0]*delta[b1][g0] + PQ[g0]*delta[b0][b1]))
+                        )
+
+                        + 4.0 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +PQ[d0]*PQ[g1]*(PB_1*PQ[b0]*PQ[g0] + PQ[b1]*(PB_0*PQ[g0] + PB_x*PQ[b0]))
+                        )
+
+                        + (-4.0) * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +PQ[b0]*PQ[b1]*PQ[d0]*PQ[g0]*QC_y
+
+                            +PQ[b0]*PQ[b1]*PQ[g0]*PQ[g1]*QD_0
+                        )
+
+                    )
+
+                    + F5_t[5] * (
+
+                        4.0 * S1 * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +PQ[b0]*PQ[b1]*PQ[d0]*PQ[g0]*PQ[g1]
+                        )
+
+                    )
+
+                    );
+
+            double hess_jk_xy = -eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+
+            atomicAdd(
+                hess_xy + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + j_prim] * natoms + prim_cart_ao_to_atom_inds[k],
+                hess_jk_xy * ik_factor_D * frac_exact_exchange);
+
+            atomicAdd(
+                hess_yx + prim_cart_ao_to_atom_inds[k] * natoms + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + j_prim],
+                hess_jk_xy * ik_factor_D * frac_exact_exchange);
+        }
+    }
+
+    __syncthreads();
+}
+
+__global__ void __launch_bounds__(TILE_SIZE_K)
+computeExchangeHessianSDSD_II_0(double*         hess_xy,
+                                const uint32_t  hess_cart_ind_0,
+                                const uint32_t  hess_cart_ind_1,
+                                const double    frac_exact_exchange,
+                                const uint32_t* pair_inds_i_for_K_ss,
+                                const uint32_t* pair_inds_k_for_K_ss,
+                                const double*   D_ik_for_K_ss,
+                                const uint32_t  pair_inds_count_for_K_ss,
+                                const double*   s_prim_info,
+                                const uint32_t* s_prim_aoinds,
+                                const uint32_t  s_prim_count,
+                                const double*   d_prim_info,
+                                const uint32_t* d_prim_aoinds,
+                                const uint32_t  d_prim_count,
+                                const double    dd_max_D,
+                                const double*   mat_D_full_AO,
+                                const uint32_t  naos,
+                                const double*   Q_K_sd,
+                                const uint32_t* D_inds_K_sd,
+                                const uint32_t* pair_displs_K_sd,
+                                const uint32_t* pair_counts_K_sd,
+                                const double*   pair_data_K_sd,
+                                const uint32_t* prim_cart_ao_to_atom_inds,
+                                const double*   boys_func_table,
+                                const double*   boys_func_ft,
+                                const double    omega,
+                                const double    eri_threshold)
+{
+    // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
+
+    __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
+    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ double   delta[3][3];
+    __shared__ uint32_t g0, g1;
+
+    const uint32_t ik = blockIdx.x;
+
+    // we make sure that ik < pair_inds_count_for_K_ss when calling the kernel
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+        g0 = hess_cart_ind_0;
+        g1 = hess_cart_ind_1;
+
+        i = pair_inds_i_for_K_ss[ik];
+        k = pair_inds_k_for_K_ss[ik];
+
+        count_i = pair_counts_K_sd[i];
+        count_k = pair_counts_K_sd[k];
+
+        displ_i = pair_displs_K_sd[i];
+        displ_k = pair_displs_K_sd[k];
+
+        a_i = s_prim_info[i + s_prim_count * 0];
+
+        r_i[0] = s_prim_info[i + s_prim_count * 2];
+        r_i[1] = s_prim_info[i + s_prim_count * 3];
+        r_i[2] = s_prim_info[i + s_prim_count * 4];
+
+        a_k = s_prim_info[k + s_prim_count * 0];
+
+        r_k[0] = s_prim_info[k + s_prim_count * 2];
+        r_k[1] = s_prim_info[k + s_prim_count * 3];
+        r_k[2] = s_prim_info[k + s_prim_count * 4];
+
+        ik_factor_D = (static_cast<double>(i != k) + 1.0) * D_ik_for_K_ss[ik];
+
+    }
+
+    __syncthreads();
+
+    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    {
+        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+
+        // sync threads before starting a new scan
+        __syncthreads();
+
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double PB_0, PB_1, PA_x, PA_y;
+        uint32_t j_prim, j_cgto, b0, b1;
+
+        if (j < count_i)
+        {
+            Q_ij   = Q_K_sd[displ_i + j];
+
+            j_prim = D_inds_K_sd[displ_i + j];
+
+            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+
+            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = pair_data_K_sd[displ_i + j];
+
+            PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+            PA_y = (a_j  * inv_S1) * (r_j[g1] - r_i[g1]);
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
+
+        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        {
+            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+
+            // Q_kl == Q_K_sd[displ_k + l]
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_sd[displ_k + l] * dd_max_D) <= eri_threshold))
+            {
+                break;
+            }
+
+            // const auto Q_kl = Q_K_sd[displ_k + l];
+
+            const auto l_prim = D_inds_K_sd[displ_k + l];
+
+            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+
+            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+
+            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
+                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
+                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+
+            const auto S_kl_00 = pair_data_K_sd[displ_k + l];
+
+            const auto d0 = d_cart_inds[l_prim % 6][0];
+            const auto d1 = d_cart_inds[l_prim % 6][1];
+
+            // J. Chem. Phys. 84, 3963-3974 (1986)
+
+            const auto S2 = a_k + a_l;
+
+            const auto inv_S2 = 1.0 / S2;
+            const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
+
+            const auto rho = S1 * S2 * inv_S4;
+
+            double d2 = 1.0;
+
+            if (omega != 0.0) d2 = omega * omega / (rho + omega * omega);
+
+            const auto Lambda = sqrt(4.0 * rho * d2 * MATH_CONST_INV_PI);
+
+            double F6_t[7];
+
+            gpu::computeBoysFunction(F6_t, rho * d2 * r2_PQ, 6, boys_func_table, boys_func_ft);
+
+            if (omega != 0.0)
+            {
+                F6_t[1] *= d2;
+                F6_t[2] *= d2 * d2;
+                F6_t[3] *= d2 * d2 * d2;
+                F6_t[4] *= d2 * d2 * d2 * d2;
+                F6_t[5] *= d2 * d2 * d2 * d2 * d2;
+                F6_t[6] *= d2 * d2 * d2 * d2 * d2 * d2;
+            }
+
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+
+            // i-i Hessian
+
+            const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
+                    + F6_t[0] * (
+
+                        inv_S1 * inv_S1 * a_i * a_i * (
+                            +QD_0*QD_1*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+                        )
+
+                        + inv_S1 * inv_S2 * a_i * a_i * (
+                            +PB_0*PB_1*delta[d0][d1]*delta[g0][g1]
+
+                            +delta[d0][d1]*(PA_x*(PA_y*delta[b0][b1] + PB_0*delta[b1][g1] + PB_1*delta[b0][g1]) + PA_y*(PB_0*delta[b1][g0] + PB_1*delta[b0][g0]))
+                        )
+
+                        + (-0.5) * inv_S1 * inv_S2 * a_i * (
+                            +delta[b0][b1]*delta[d0][d1]*delta[g0][g1]
+                        )
+
+                        + 2.0 * inv_S1 * a_i * a_i * (
+                            +PB_0*PB_1*QD_0*QD_1*delta[g0][g1]
+
+                            +QD_0*QD_1*(PA_x*(PA_y*delta[b0][b1] + PB_0*delta[b1][g1] + PB_1*delta[b0][g1]) + PA_y*(PB_0*delta[b1][g0] + PB_1*delta[b0][g0]))
+                        )
+
+                        + (-1.0) * inv_S1 * a_i * (
+                            +QD_0*QD_1*delta[b0][b1]*delta[g0][g1]
+                        )
+
+                        + 2.0 * inv_S2 * a_i * a_i * (
+                            +PA_x*PA_y*PB_0*PB_1*delta[d0][d1]
+                        )
+
+                        + (-1.0) * inv_S2 * a_i * (
+                            +PB_0*PB_1*delta[d0][d1]*delta[g0][g1]
+                        )
+
+                        + 4.0 * a_i * a_i * (
+                            +PA_x*PA_y*PB_0*PB_1*QD_0*QD_1
+                        )
+
+                        + (-2.0) * a_i * (
+                            +PB_0*PB_1*QD_0*QD_1*delta[g0][g1]
+                        )
+
+                        + 0.5 * inv_S1 * inv_S1 * inv_S2 * a_i * a_i * (
+                            +delta[d0][d1]*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+                        )
+
+                    )
+
+                    + F6_t[1] * (
+
+                        (-1.0) * inv_S1 * inv_S1 * inv_S4 * a_i * a_i * (
+                            +delta[d0][d1]*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+                        )
+
+                        + (-0.5) * inv_S1 * inv_S2 * inv_S4 * a_i * a_i * (
+                            +delta[d0][d1]*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+                        )
+
+                        + (-2.0) * S2 * inv_S1 * inv_S1 * inv_S4 * a_i * a_i * (
+                            +QD_0*QD_1*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+                        )
+
+                        + inv_S1 * inv_S4 * a_i * a_i * (
+                            +delta[d0][d1]*delta[g0][g1]*(PB_0*(-PB_1 + PQ[b1]) + PB_1*PQ[b0])
+
+                            +delta[d0][d1]*(PA_x*(-PA_y*delta[b0][b1] - PB_0*delta[b1][g1] - PB_1*delta[b0][g1] + PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1] + PQ[g1]*delta[b0][b1]) + PA_y*(PQ[g0]*delta[b0][b1] + delta[b0][g0]*(-PB_1 + PQ[b1]) + delta[b1][g0]*(-PB_0 + PQ[b0])) + PB_0*(PQ[g0]*delta[b1][g1] + PQ[g1]*delta[b1][g0]) + PB_1*(PQ[g0]*delta[b0][g1] + PQ[g1]*delta[b0][g0]))
+
+                            +QD_0*(PA_x*(delta[b0][b1]*delta[d1][g1] + delta[b0][d1]*delta[b1][g1] + delta[b0][g1]*delta[b1][d1]) + PA_y*(delta[b0][b1]*delta[d1][g0] + delta[b0][d1]*delta[b1][g0] + delta[b0][g0]*delta[b1][d1]) + PB_0*(delta[b1][d1]*delta[g0][g1] + delta[b1][g0]*delta[d1][g1] + delta[b1][g1]*delta[d1][g0]) + PB_1*(delta[b0][d1]*delta[g0][g1] + delta[b0][g0]*delta[d1][g1] + delta[b0][g1]*delta[d1][g0])) + QD_1*(PA_x*(delta[b0][b1]*delta[d0][g1] + delta[b0][d0]*delta[b1][g1] + delta[b0][g1]*delta[b1][d0]) + PA_y*(delta[b0][b1]*delta[d0][g0] + delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0]) + PB_0*(delta[b1][d0]*delta[g0][g1] + delta[b1][g0]*delta[d0][g1] + delta[b1][g1]*delta[d0][g0]) + PB_1*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0]))
+
+                            -(PQ[d0]*QD_1 + PQ[d1]*QD_0)*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+                        )
+
+                        + (-1.0) * inv_S2 * inv_S4 * a_i * a_i * (
+                            +PB_0*PB_1*delta[d0][d1]*delta[g0][g1]
+
+                            +delta[d0][d1]*(PA_x*(PA_y*delta[b0][b1] + PB_0*delta[b1][g1] + PB_1*delta[b0][g1]) + PA_y*(PB_0*delta[b1][g0] + PB_1*delta[b0][g0]))
+                        )
+
+                        + (-2.0) * S1 * inv_S2 * inv_S4 * a_i * a_i * (
+                            +PA_x*PA_y*PB_0*PB_1*delta[d0][d1]
+                        )
+
+                        + S1 * inv_S2 * inv_S4 * a_i * (
+                            +PB_0*PB_1*delta[d0][d1]*delta[g0][g1]
+                        )
+
+                        + 2.0 * S2 * inv_S1 * inv_S4 * a_i * a_i * (
+                            +QD_0*QD_1*delta[g0][g1]*(PB_0*(-PB_1 + PQ[b1]) + PB_1*PQ[b0])
+
+                            +QD_0*QD_1*(PA_x*(-PA_y*delta[b0][b1] - PB_0*delta[b1][g1] - PB_1*delta[b0][g1] + PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1] + PQ[g1]*delta[b0][b1]) + PA_y*(PQ[g0]*delta[b0][b1] + delta[b0][g0]*(-PB_1 + PQ[b1]) + delta[b1][g0]*(-PB_0 + PQ[b0])) + PB_0*(PQ[g0]*delta[b1][g1] + PQ[g1]*delta[b1][g0]) + PB_1*(PQ[g0]*delta[b0][g1] + PQ[g1]*delta[b0][g0]))
+                        )
+
+                        + S2 * inv_S1 * inv_S4 * a_i * (
+                            +QD_0*QD_1*delta[b0][b1]*delta[g0][g1]
+                        )
+
+                        + 2.0 * inv_S4 * a_i * a_i * (
+                            +delta[d0][d1]*(PA_x*PA_y*(PB_0*PQ[b1] + PB_1*PQ[b0]) + PB_0*PB_1*(PA_x*PQ[g1] + PA_y*PQ[g0]))
+
+                            +PA_x*PA_y*(PB_0*(QD_0*delta[b1][d1] + QD_1*delta[b1][d0]) + PB_1*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0])) + PB_0*PB_1*(PA_x*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1]) + PA_y*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0]))
+
+                            -(PQ[d0]*QD_1 + PQ[d1]*QD_0)*(PA_x*(PA_y*delta[b0][b1] + PB_0*delta[b1][g1] + PB_1*delta[b0][g1]) + PA_y*(PB_0*delta[b1][g0] + PB_1*delta[b0][g0]) + PB_0*PB_1*delta[g0][g1])
+                        )
+
+                        + inv_S4 * a_i * (
+                            -delta[d0][d1]*delta[g0][g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])
+
+                            -delta[g0][g1]*(PB_0*(QD_0*delta[b1][d1] + QD_1*delta[b1][d0]) + PB_1*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0]))
+
+                            +delta[b0][b1]*delta[g0][g1]*(PQ[d0]*QD_1 + PQ[d1]*QD_0)
+                        )
+
+                        + 4.0 * S1 * inv_S4 * a_i * a_i * (
+                            -PA_x*PA_y*PB_0*PB_1*(PQ[d0]*QD_1 + PQ[d1]*QD_0)
+                        )
+
+                        + 2.0 * S1 * inv_S4 * a_i * (
+                            +PB_0*PB_1*delta[g0][g1]*(PQ[d0]*QD_1 + PQ[d1]*QD_0)
+                        )
+
+                        + 4.0 * S2 * inv_S4 * a_i * a_i * (
+                            +QD_0*QD_1*(PA_x*PA_y*(PB_0*PQ[b1] + PB_1*PQ[b0]) + PB_0*PB_1*(PA_x*PQ[g1] + PA_y*PQ[g0]))
+                        )
+
+                        + (-2.0) * S2 * inv_S4 * a_i * (
+                            +QD_0*QD_1*delta[g0][g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])
+                        )
+
+                        + 0.5 * inv_S1 * inv_S4 * a_i * (
+                            +delta[b0][b1]*delta[d0][d1]*delta[g0][g1]
+                        )
+
+                        + 0.5 * inv_S2 * inv_S4 * a_i * (
+                            +delta[b0][b1]*delta[d0][d1]*delta[g0][g1]
+                        )
+
+                    )
+
+                    + F6_t[2] * (
+
+                        S2 * S2 * inv_S1 * inv_S1 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +QD_0*QD_1*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+                        )
+
+                        + S2 * inv_S1 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +delta[d0][d1]*delta[g0][g1]*(-PB_0*PQ[b1] + PQ[b0]*(-PB_1 + PQ[b1]))
+
+                            +delta[d0][d1]*(-PA_x*(PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1] + PQ[g1]*delta[b0][b1]) - PA_y*(PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0] + PQ[g0]*delta[b0][b1]) + PQ[g0]*(PQ[g1]*delta[b0][b1] + delta[b0][g1]*(-PB_1 + PQ[b1]) + delta[b1][g1]*(-PB_0 + PQ[b0])) + PQ[g1]*delta[b0][g0]*(-PB_1 + PQ[b1]) + PQ[g1]*delta[b1][g0]*(-PB_0 + PQ[b0]))
+
+                            +(-PA_x*QD_0 + PQ[g0]*QD_0)*(delta[b0][b1]*delta[d1][g1] + delta[b0][d1]*delta[b1][g1] + delta[b0][g1]*delta[b1][d1]) + (-PA_x*QD_1 + PQ[g0]*QD_1)*(delta[b0][b1]*delta[d0][g1] + delta[b0][d0]*delta[b1][g1] + delta[b0][g1]*delta[b1][d0]) + (-PA_y*QD_0 + PQ[g1]*QD_0)*(delta[b0][b1]*delta[d1][g0] + delta[b0][d1]*delta[b1][g0] + delta[b0][g0]*delta[b1][d1]) + (-PA_y*QD_1 + PQ[g1]*QD_1)*(delta[b0][b1]*delta[d0][g0] + delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0]) + (-PB_0*QD_0 + PQ[b0]*QD_0)*(delta[b1][d1]*delta[g0][g1] + delta[b1][g0]*delta[d1][g1] + delta[b1][g1]*delta[d1][g0]) + (-PB_0*QD_1 + PQ[b0]*QD_1)*(delta[b1][d0]*delta[g0][g1] + delta[b1][g0]*delta[d0][g1] + delta[b1][g1]*delta[d0][g0]) + (-PB_1*QD_0 + PQ[b1]*QD_0)*(delta[b0][d1]*delta[g0][g1] + delta[b0][g0]*delta[d1][g1] + delta[b0][g1]*delta[d1][g0]) + (-PB_1*QD_1 + PQ[b1]*QD_1)*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0])
+
+                            +2.0*(PQ[d0]*QD_1 + PQ[d1]*QD_0)*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+                        )
+
+                        + inv_S4 * inv_S4 * a_i * a_i * (
+                            +delta[d0][d1]*delta[g0][g1]*(PB_0*(PB_1 - PQ[b1]) - PB_1*PQ[b0])
+
+                            +PA_x*(PA_y*(delta[b0][d0]*delta[b1][d1] + delta[b0][d1]*delta[b1][d0]) + PB_0*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1]) + PB_1*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1])) + PA_y*(PB_0*(delta[b1][d0]*delta[d1][g0] + delta[b1][d1]*delta[d0][g0]) + PB_1*(delta[b0][d0]*delta[d1][g0] + delta[b0][d1]*delta[d0][g0])) + PB_0*PB_1*(delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+
+                            +delta[d0][d1]*(PA_x*PA_y*delta[b0][b1] - PA_x*(PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1] + PQ[g1]*delta[b0][b1]) - PA_y*(PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0] + PQ[g0]*delta[b0][b1]) + PB_0*delta[b1][g0]*(PA_y - PQ[g1]) + PB_0*delta[b1][g1]*(PA_x - PQ[g0]) + PB_1*delta[b0][g0]*(PA_y - PQ[g1]) + PB_1*delta[b0][g1]*(PA_x - PQ[g0]))
+
+                            -PQ[d0]*(PA_x*(delta[b0][b1]*delta[d1][g1] + delta[b0][d1]*delta[b1][g1] + delta[b0][g1]*delta[b1][d1]) + PA_y*(delta[b0][b1]*delta[d1][g0] + delta[b0][d1]*delta[b1][g0] + delta[b0][g0]*delta[b1][d1]) + PB_0*(delta[b1][d1]*delta[g0][g1] + delta[b1][g0]*delta[d1][g1] + delta[b1][g1]*delta[d1][g0]) + PB_1*(delta[b0][d1]*delta[g0][g1] + delta[b0][g0]*delta[d1][g1] + delta[b0][g1]*delta[d1][g0])) - PQ[d1]*(PA_x*(delta[b0][b1]*delta[d0][g1] + delta[b0][d0]*delta[b1][g1] + delta[b0][g1]*delta[b1][d0]) + PA_y*(delta[b0][b1]*delta[d0][g0] + delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0]) + PB_0*(delta[b1][d0]*delta[g0][g1] + delta[b1][g0]*delta[d0][g1] + delta[b1][g1]*delta[d0][g0]) + PB_1*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0]))
+
+                            +PQ[d0]*PQ[d1]*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+                        )
+
+                        + (-0.5) * inv_S4 * inv_S4 * a_i * (
+                            +delta[g0][g1]*(delta[b0][b1]*delta[d0][d1] + delta[b0][d0]*delta[b1][d1] + delta[b0][d1]*delta[b1][d0])
+                        )
+
+                        + 2.0 * S1 * inv_S4 * inv_S4 * a_i * a_i * (
+                            -PA_x*PB_0*PB_1*PQ[d0]*delta[d1][g1]
+
+                            -PA_x*PA_y*(PB_0*(PQ[d0]*delta[b1][d1] + PQ[d1]*delta[b1][d0]) + PB_1*(PQ[d0]*delta[b0][d1] + PQ[d1]*delta[b0][d0])) - PB_0*PB_1*(PA_y*PQ[d0]*delta[d1][g0] + PQ[d1]*(PA_x*delta[d0][g1] + PA_y*delta[d0][g0]))
+
+                            -delta[d0][d1]*(PA_x*PA_y*(PB_0*PQ[b1] + PB_1*PQ[b0]) + PB_0*PB_1*(PA_x*PQ[g1] + PA_y*PQ[g0]))
+
+                            +PQ[d0]*PQ[d1]*(PA_x*(PA_y*delta[b0][b1] + PB_0*delta[b1][g1] + PB_1*delta[b0][g1]) + PA_y*(PB_0*delta[b1][g0] + PB_1*delta[b0][g0]) + PB_0*PB_1*delta[g0][g1])
+                        )
+
+                        + S1 * inv_S4 * inv_S4 * a_i * (
+                            +delta[d0][d1]*delta[g0][g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])
+
+                            +delta[g0][g1]*(PB_0*(PQ[d0]*delta[b1][d1] + PQ[d1]*delta[b1][d0]) + PB_1*(PQ[d0]*delta[b0][d1] + PQ[d1]*delta[b0][d0]))
+
+                            -PQ[d0]*PQ[d1]*delta[b0][b1]*delta[g0][g1]
+                        )
+
+                        + 2.0 * S2 * S2 * inv_S1 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +QD_0*QD_1*delta[g0][g1]*(-PB_0*PQ[b1] + PQ[b0]*(-PB_1 + PQ[b1]))
+
+                            +QD_0*QD_1*(-PA_x*(PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1] + PQ[g1]*delta[b0][b1]) - PA_y*(PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0] + PQ[g0]*delta[b0][b1]) + PQ[g0]*(PQ[g1]*delta[b0][b1] + delta[b0][g1]*(-PB_1 + PQ[b1]) + delta[b1][g1]*(-PB_0 + PQ[b0])) + PQ[g1]*delta[b0][g0]*(-PB_1 + PQ[b1]) + PQ[g1]*delta[b1][g0]*(-PB_0 + PQ[b0]))
+                        )
+
+                        + 2.0 * S2 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +delta[g0][g1]*(PB_0*(PB_1 - PQ[b1]) - PB_1*PQ[b0])*(PQ[d0]*QD_1 + PQ[d1]*QD_0)
+
+                            +delta[d0][d1]*(PA_x*PQ[b0]*(PA_y*PQ[b1] + PB_1*PQ[g1]) + PB_0*PQ[b1]*(PA_x*PQ[g1] + PA_y*PQ[g0]) + PB_1*PQ[g0]*(PA_y*PQ[b0] + PB_0*PQ[g1]))
+
+                            +PA_x*(PA_y*(PQ[b0]*(QD_0*delta[b1][d1] + QD_1*delta[b1][d0]) + PQ[b1]*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0])) + PB_0*(PQ[b1]*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1]) + PQ[g1]*(QD_0*delta[b1][d1] + QD_1*delta[b1][d0])) + PB_1*(PQ[b0]*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1]) + PQ[g1]*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0]))) + PA_y*(PB_0*(PQ[b1]*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0]) + PQ[g0]*(QD_0*delta[b1][d1] + QD_1*delta[b1][d0])) + PB_1*(PQ[b0]*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0]) + PQ[g0]*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0]))) + PB_0*PB_1*(PQ[g0]*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1]) + PQ[g1]*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0]))
+
+                            +(PQ[d0]*QD_1 + PQ[d1]*QD_0)*(PA_x*(PA_y*delta[b0][b1] - PQ[b0]*delta[b1][g1] - PQ[b1]*delta[b0][g1] - PQ[g1]*delta[b0][b1]) - PA_y*(PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0] + PQ[g0]*delta[b0][b1]) + PB_0*(delta[b1][g0]*(PA_y - PQ[g1]) + delta[b1][g1]*(PA_x - PQ[g0])) + PB_1*(delta[b0][g0]*(PA_y - PQ[g1]) + delta[b0][g1]*(PA_x - PQ[g0])))
+                        )
+
+                        + (-1.0) * S2 * inv_S4 * inv_S4 * a_i * (
+                            +delta[g0][g1]*(PQ[b0]*(PQ[b1]*delta[d0][d1] + QD_0*delta[b1][d1] + QD_1*delta[b1][d0]) + PQ[b1]*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0]))
+
+                            +delta[b0][b1]*delta[g0][g1]*(PQ[d0]*QD_1 + PQ[d1]*QD_0)
+                        )
+
+                        + 4.0 * S1 * S1 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +PA_x*PA_y*PB_0*PB_1*PQ[d0]*PQ[d1]
+                        )
+
+                        + (-2.0) * S1 * S1 * inv_S4 * inv_S4 * a_i * (
+                            +PB_0*PB_1*PQ[d0]*PQ[d1]*delta[g0][g1]
+                        )
+
+                        + 4.0 * S1 * S2 * inv_S4 * inv_S4 * a_i * a_i * (
+                            -(PQ[d0]*QD_1 + PQ[d1]*QD_0)*(PA_x*PA_y*(PB_0*PQ[b1] + PB_1*PQ[b0]) + PB_0*PB_1*(PA_x*PQ[g1] + PA_y*PQ[g0]))
+                        )
+
+                        + 2.0 * S1 * S2 * inv_S4 * inv_S4 * a_i * (
+                            +delta[g0][g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])*(PQ[d0]*QD_1 + PQ[d1]*QD_0)
+                        )
+
+                        + 4.0 * S2 * S2 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +QD_0*QD_1*(PA_x*PQ[b0]*(PA_y*PQ[b1] + PB_1*PQ[g1]) + PB_0*PQ[b1]*(PA_x*PQ[g1] + PA_y*PQ[g0]) + PB_1*PQ[g0]*(PA_y*PQ[b0] + PB_0*PQ[g1]))
+                        )
+
+                        + (-2.0) * S2 * S2 * inv_S4 * inv_S4 * a_i * (
+                            +PQ[b0]*PQ[b1]*QD_0*QD_1*delta[g0][g1]
+                        )
+
+                        + 0.5 * S2 * inv_S1 * inv_S1 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +delta[d0][d1]*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+                        )
+
+                        + 0.5 * inv_S1 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +2.0*delta[d0][d1]*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+
+                            +delta[b0][d0]*(delta[b1][d1]*delta[g0][g1] + delta[b1][g0]*delta[d1][g1] + delta[b1][g1]*delta[d1][g0]) + delta[b1][d0]*(delta[b0][d1]*delta[g0][g1] + delta[b0][g0]*delta[d1][g1] + delta[b0][g1]*delta[d1][g0]) + delta[d0][g0]*(delta[b0][b1]*delta[d1][g1] + delta[b0][d1]*delta[b1][g1] + delta[b0][g1]*delta[b1][d1]) + delta[d0][g1]*(delta[b0][b1]*delta[d1][g0] + delta[b0][d1]*delta[b1][g0] + delta[b0][g0]*delta[b1][d1])
+                        )
+
+                    )
+
+                    + F6_t[3] * (
+
+                        (-0.5) * S2 * inv_S1 * inv_S4 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +delta[b0][b1]*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0]) + delta[b0][d0]*(delta[b1][d1]*delta[g0][g1] + delta[b1][g0]*delta[d1][g1] + delta[b1][g1]*delta[d1][g0]) + delta[b0][d1]*(delta[b1][d0]*delta[g0][g1] + delta[b1][g0]*delta[d0][g1] + delta[b1][g1]*delta[d0][g0]) + delta[b0][g0]*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1] + delta[b1][g1]*delta[d0][d1]) + delta[b0][g1]*(delta[b1][d0]*delta[d1][g0] + delta[b1][d1]*delta[d0][g0] + delta[b1][g0]*delta[d0][d1])
+                        )
+
+                        + (-1.0) * S2 * S2 * inv_S1 * inv_S4 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +PQ[b0]*PQ[b1]*delta[d0][d1]*delta[g0][g1]
+
+                            +delta[d0][d1]*(PQ[g0]*(PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1] + PQ[g1]*delta[b0][b1]) + PQ[g1]*(PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0]))
+
+                            +QD_0*(PQ[b0]*(delta[b1][d1]*delta[g0][g1] + delta[b1][g0]*delta[d1][g1] + delta[b1][g1]*delta[d1][g0]) + PQ[b1]*(delta[b0][d1]*delta[g0][g1] + delta[b0][g0]*delta[d1][g1] + delta[b0][g1]*delta[d1][g0]) + PQ[g0]*(delta[b0][b1]*delta[d1][g1] + delta[b0][d1]*delta[b1][g1] + delta[b0][g1]*delta[b1][d1]) + PQ[g1]*(delta[b0][b1]*delta[d1][g0] + delta[b0][d1]*delta[b1][g0] + delta[b0][g0]*delta[b1][d1])) + QD_1*(PQ[b0]*(delta[b1][d0]*delta[g0][g1] + delta[b1][g0]*delta[d0][g1] + delta[b1][g1]*delta[d0][g0]) + PQ[b1]*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0]) + PQ[g0]*(delta[b0][b1]*delta[d0][g1] + delta[b0][d0]*delta[b1][g1] + delta[b0][g1]*delta[b1][d0]) + PQ[g1]*(delta[b0][b1]*delta[d0][g0] + delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0]))
+
+                            +(PQ[d0]*QD_1 + PQ[d1]*QD_0)*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+                        )
+
+                        + S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +delta[d0][d1]*delta[g0][g1]*(PB_1*PQ[b0] + PQ[b1]*(PB_0 - PQ[b0]))
+
+                            +(PA_x*PQ[b0] + PB_0*PQ[g0])*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1]) + (PA_x*PQ[b1] + PB_1*PQ[g0])*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1]) + (PA_x*PQ[g1] + PA_y*PQ[g0])*(delta[b0][d0]*delta[b1][d1] + delta[b0][d1]*delta[b1][d0]) + (PA_y*PQ[b0] + PB_0*PQ[g1])*(delta[b1][d0]*delta[d1][g0] + delta[b1][d1]*delta[d0][g0]) + (PA_y*PQ[b1] + PB_1*PQ[g1])*(delta[b0][d0]*delta[d1][g0] + delta[b0][d1]*delta[d0][g0]) + (PB_0*PQ[b1] + PB_1*PQ[b0])*(delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+
+                            +(PA_x*PQ[d0] - PQ[d0]*PQ[g0])*(delta[b0][b1]*delta[d1][g1] + delta[b0][d1]*delta[b1][g1] + delta[b0][g1]*delta[b1][d1]) + (PA_x*PQ[d1] - PQ[d1]*PQ[g0])*(delta[b0][b1]*delta[d0][g1] + delta[b0][d0]*delta[b1][g1] + delta[b0][g1]*delta[b1][d0]) + (PA_y*PQ[d0] - PQ[d0]*PQ[g1])*(delta[b0][b1]*delta[d1][g0] + delta[b0][d1]*delta[b1][g0] + delta[b0][g0]*delta[b1][d1]) + (PA_y*PQ[d1] - PQ[d1]*PQ[g1])*(delta[b0][b1]*delta[d0][g0] + delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0]) + (PB_0*PQ[d0] - PQ[b0]*PQ[d0])*(delta[b1][d1]*delta[g0][g1] + delta[b1][g0]*delta[d1][g1] + delta[b1][g1]*delta[d1][g0]) + (PB_0*PQ[d1] - PQ[b0]*PQ[d1])*(delta[b1][d0]*delta[g0][g1] + delta[b1][g0]*delta[d0][g1] + delta[b1][g1]*delta[d0][g0]) + (PB_1*PQ[d0] - PQ[b1]*PQ[d0])*(delta[b0][d1]*delta[g0][g1] + delta[b0][g0]*delta[d1][g1] + delta[b0][g1]*delta[d1][g0]) + (PB_1*PQ[d1] - PQ[b1]*PQ[d1])*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0])
+
+                            +delta[d0][d1]*(PA_x*(PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1] + PQ[g1]*delta[b0][b1]) + PQ[g0]*(PA_y*delta[b0][b1] + PB_0*delta[b1][g1] + PB_1*delta[b0][g1] - PQ[b0]*delta[b1][g1] - PQ[b1]*delta[b0][g1] - PQ[g1]*delta[b0][b1]) + PQ[g1]*(PB_0*delta[b1][g0] + PB_1*delta[b0][g0]) + (PA_y - PQ[g1])*(PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0]))
+
+                            -2*PQ[d0]*PQ[d1]*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+                        )
+
+                        + 2.0 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +PQ[d0]*PQ[d1]*delta[g0][g1]*(PB_0*(-PB_1 + PQ[b1]) + PB_1*PQ[b0])
+
+                            -PA_x*(PA_y*(PQ[b0]*(PQ[d0]*delta[b1][d1] + PQ[d1]*delta[b1][d0]) + PQ[b1]*(PQ[d0]*delta[b0][d1] + PQ[d1]*delta[b0][d0])) + PB_0*(PQ[b1]*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1]) + PQ[g1]*(PQ[d0]*delta[b1][d1] + PQ[d1]*delta[b1][d0])) + PB_1*(PQ[b0]*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1]) + PQ[g1]*(PQ[d0]*delta[b0][d1] + PQ[d1]*delta[b0][d0]))) - PA_y*(PB_0*(PQ[b1]*(PQ[d0]*delta[d1][g0] + PQ[d1]*delta[d0][g0]) + PQ[g0]*(PQ[d0]*delta[b1][d1] + PQ[d1]*delta[b1][d0])) + PB_1*(PQ[b0]*(PQ[d0]*delta[d1][g0] + PQ[d1]*delta[d0][g0]) + PQ[g0]*(PQ[d0]*delta[b0][d1] + PQ[d1]*delta[b0][d0]))) - PB_0*PB_1*(PQ[d0]*(PQ[g0]*delta[d1][g1] + PQ[g1]*delta[d1][g0]) + PQ[d1]*(PQ[g0]*delta[d0][g1] + PQ[g1]*delta[d0][g0]))
+
+                            -delta[d0][d1]*(PA_x*PQ[b0]*(PA_y*PQ[b1] + PB_1*PQ[g1]) + PB_0*PQ[b1]*(PA_x*PQ[g1] + PA_y*PQ[g0]) + PB_1*PQ[g0]*(PA_y*PQ[b0] + PB_0*PQ[g1]))
+
+                            +PQ[d0]*PQ[d1]*(PA_x*(-PA_y*delta[b0][b1] - PB_0*delta[b1][g1] - PB_1*delta[b0][g1] + PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1] + PQ[g1]*delta[b0][b1]) + PA_y*(PQ[g0]*delta[b0][b1] + delta[b0][g0]*(-PB_1 + PQ[b1]) + delta[b1][g0]*(-PB_0 + PQ[b0])) + PB_0*(PQ[g0]*delta[b1][g1] + PQ[g1]*delta[b1][g0]) + PB_1*(PQ[g0]*delta[b0][g1] + PQ[g1]*delta[b0][g0]))
+                        )
+
+                        + (-2.0) * S2 * S2 * S2 * inv_S1 * inv_S4 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +PQ[b0]*PQ[b1]*QD_0*QD_1*delta[g0][g1]
+
+                            +QD_0*QD_1*(PQ[g0]*(PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1] + PQ[g1]*delta[b0][b1]) + PQ[g1]*(PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0]))
+                        )
+
+                        + 2.0 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +delta[g0][g1]*(PB_1*PQ[b0] + PQ[b1]*(PB_0 - PQ[b0]))*(PQ[d0]*QD_1 + PQ[d1]*QD_0)
+
+                            +delta[d0][d1]*(PQ[b0]*PQ[b1]*(PA_x*PQ[g1] + PA_y*PQ[g0]) + PQ[g0]*PQ[g1]*(PB_0*PQ[b1] + PB_1*PQ[b0]))
+
+                            +PQ[b0]*(PA_x*(PQ[b1]*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1]) + PQ[g1]*(QD_0*delta[b1][d1] + QD_1*delta[b1][d0])) + PA_y*(PQ[b1]*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0]) + PQ[g0]*(QD_0*delta[b1][d1] + QD_1*delta[b1][d0])) + PB_1*(PQ[g0]*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1]) + PQ[g1]*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0]))) + PQ[b1]*(PQ[g0]*(PA_y*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0]) + PB_0*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1])) + PQ[g1]*(PA_x*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0]) + PB_0*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0]))) + PQ[g0]*PQ[g1]*(PB_0*(QD_0*delta[b1][d1] + QD_1*delta[b1][d0]) + PB_1*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0]))
+
+                            +(PQ[d0]*QD_1 + PQ[d1]*QD_0)*(PA_x*(PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1] + PQ[g1]*delta[b0][b1]) + PQ[g0]*(PA_y*delta[b0][b1] + PB_0*delta[b1][g1] + PB_1*delta[b0][g1] - PQ[b0]*delta[b1][g1] - PQ[b1]*delta[b0][g1] - PQ[g1]*delta[b0][b1]) + PQ[g1]*(PB_0*delta[b1][g0] + PB_1*delta[b0][g0]) + (PA_y - PQ[g1])*(PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0]))
+                        )
+
+                        + 4.0 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +PQ[d0]*PQ[d1]*(PA_x*PA_y*(PB_0*PQ[b1] + PB_1*PQ[b0]) + PB_0*PB_1*(PA_x*PQ[g1] + PA_y*PQ[g0]))
+                        )
+
+                        + (-2.0) * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * (
+                            +PQ[d0]*PQ[d1]*delta[g0][g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])
+                        )
+
+                        + 4.0 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_i * (
+                            -(PQ[d0]*QD_1 + PQ[d1]*QD_0)*(PA_x*PQ[b0]*(PA_y*PQ[b1] + PB_1*PQ[g1]) + PB_0*PQ[b1]*(PA_x*PQ[g1] + PA_y*PQ[g0]) + PB_1*PQ[g0]*(PA_y*PQ[b0] + PB_0*PQ[g1]))
+                        )
+
+                        + 2.0 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * (
+                            +PQ[b0]*PQ[b1]*delta[g0][g1]*(PQ[d0]*QD_1 + PQ[d1]*QD_0)
+                        )
+
+                        + 4.0 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +QD_0*QD_1*(PQ[b0]*PQ[b1]*(PA_x*PQ[g1] + PA_y*PQ[g0]) + PQ[g0]*PQ[g1]*(PB_0*PQ[b1] + PB_1*PQ[b0]))
+                        )
+
+                        + S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * (
+                            +PQ[b0]*PQ[b1]*delta[d0][d1]*delta[g0][g1]
+
+                            +delta[g0][g1]*(PQ[d0]*(PQ[b0]*delta[b1][d1] + PQ[b1]*delta[b0][d1] + PQ[d1]*delta[b0][b1]) + PQ[d1]*(PQ[b0]*delta[b1][d0] + PQ[b1]*delta[b0][d0]))
+                        )
+
+                    )
+
+                    + F6_t[4] * (
+
+                        2.0 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +PQ[d0]*PQ[d1]*delta[g0][g1]*(-PB_0*PQ[b1] + PQ[b0]*(-PB_1 + PQ[b1]))
+
+                            -PQ[b0]*(PA_x*(PQ[b1]*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1]) + PQ[g1]*(PQ[d0]*delta[b1][d1] + PQ[d1]*delta[b1][d0])) + PA_y*(PQ[b1]*(PQ[d0]*delta[d1][g0] + PQ[d1]*delta[d0][g0]) + PQ[g0]*(PQ[d0]*delta[b1][d1] + PQ[d1]*delta[b1][d0])) + PB_1*(PQ[d0]*(PQ[g0]*delta[d1][g1] + PQ[g1]*delta[d1][g0]) + PQ[d1]*(PQ[g0]*delta[d0][g1] + PQ[g1]*delta[d0][g0]))) - PQ[b1]*(PB_0*(PQ[d0]*(PQ[g0]*delta[d1][g1] + PQ[g1]*delta[d1][g0]) + PQ[d1]*(PQ[g0]*delta[d0][g1] + PQ[g1]*delta[d0][g0])) + (PA_x*PQ[g1] + PA_y*PQ[g0])*(PQ[d0]*delta[b0][d1] + PQ[d1]*delta[b0][d0])) - PQ[g0]*PQ[g1]*(PB_0*(PQ[d0]*delta[b1][d1] + PQ[d1]*delta[b1][d0]) + PB_1*(PQ[d0]*delta[b0][d1] + PQ[d1]*delta[b0][d0]))
+
+                            -delta[d0][d1]*(PQ[b0]*PQ[b1]*(PA_x*PQ[g1] + PA_y*PQ[g0]) + PQ[g0]*PQ[g1]*(PB_0*PQ[b1] + PB_1*PQ[b0]))
+
+                            +PQ[d0]*PQ[d1]*(-PA_x*(PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1] + PQ[g1]*delta[b0][b1]) - PA_y*(PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0] + PQ[g0]*delta[b0][b1]) + PQ[g0]*(PQ[g1]*delta[b0][b1] + delta[b0][g1]*(-PB_1 + PQ[b1]) + delta[b1][g1]*(-PB_0 + PQ[b0])) + PQ[g1]*delta[b0][g0]*(-PB_1 + PQ[b1]) + PQ[g1]*delta[b1][g0]*(-PB_0 + PQ[b0]))
+                        )
+
+                        + 2.0 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +PQ[b0]*PQ[b1]*delta[g0][g1]*(PQ[d0]*QD_1 + PQ[d1]*QD_0)
+
+                            +PQ[b0]*PQ[b1]*(PQ[g0]*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1]) + PQ[g1]*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0])) + PQ[g0]*PQ[g1]*(PQ[b0]*(QD_0*delta[b1][d1] + QD_1*delta[b1][d0]) + PQ[b1]*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0]))
+
+                            +(PQ[d0]*QD_1 + PQ[d1]*QD_0)*(PQ[g0]*(PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1] + PQ[g1]*delta[b0][b1]) + PQ[g1]*(PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0]))
+
+                            +PQ[b0]*PQ[b1]*PQ[g0]*PQ[g1]*delta[d0][d1]
+                        )
+
+                        + 4.0 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +PQ[d0]*PQ[d1]*(PA_x*PQ[b0]*(PA_y*PQ[b1] + PB_1*PQ[g1]) + PB_0*PQ[b1]*(PA_x*PQ[g1] + PA_y*PQ[g0]) + PB_1*PQ[g0]*(PA_y*PQ[b0] + PB_0*PQ[g1]))
+                        )
+
+                        + (-2.0) * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * (
+                            +PQ[b0]*PQ[b1]*PQ[d0]*PQ[d1]*delta[g0][g1]
+                        )
+
+                        + 4.0 * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_i * (
+                            -(PQ[d0]*QD_1 + PQ[d1]*QD_0)*(PQ[b0]*PQ[b1]*(PA_x*PQ[g1] + PA_y*PQ[g0]) + PQ[g0]*PQ[g1]*(PB_0*PQ[b1] + PB_1*PQ[b0]))
+                        )
+
+                        + 4.0 * S2 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +PQ[b0]*PQ[b1]*PQ[g0]*PQ[g1]*QD_0*QD_1
+                        )
+
+                        + S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +PQ[b0]*PQ[b1]*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+
+                            +PQ[d0]*(PQ[b0]*(delta[b1][d1]*delta[g0][g1] + delta[b1][g0]*delta[d1][g1] + delta[b1][g1]*delta[d1][g0]) + PQ[b1]*(delta[b0][d1]*delta[g0][g1] + delta[b0][g0]*delta[d1][g1] + delta[b0][g1]*delta[d1][g0]) + PQ[d1]*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0]) + PQ[g0]*(delta[b0][b1]*delta[d1][g1] + delta[b0][d1]*delta[b1][g1] + delta[b0][g1]*delta[b1][d1]) + PQ[g1]*(delta[b0][b1]*delta[d1][g0] + delta[b0][d1]*delta[b1][g0] + delta[b0][g0]*delta[b1][d1])) + PQ[d1]*(PQ[b0]*(delta[b1][d0]*delta[g0][g1] + delta[b1][g0]*delta[d0][g1] + delta[b1][g1]*delta[d0][g0]) + PQ[b1]*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0]) + PQ[g0]*(delta[b0][b1]*delta[d0][g1] + delta[b0][d0]*delta[b1][g1] + delta[b0][g1]*delta[b1][d0]) + PQ[g1]*(delta[b0][b1]*delta[d0][g0] + delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0])) + PQ[g0]*(PQ[b0]*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1] + delta[b1][g1]*delta[d0][d1]) + PQ[b1]*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1]) + PQ[g1]*(delta[b0][b1]*delta[d0][d1] + delta[b0][d0]*delta[b1][d1] + delta[b0][d1]*delta[b1][d0])) + PQ[g1]*(PQ[b0]*(delta[b1][d0]*delta[d1][g0] + delta[b1][d1]*delta[d0][g0] + delta[b1][g0]*delta[d0][d1]) + PQ[b1]*(delta[b0][d0]*delta[d1][g0] + delta[b0][d1]*delta[d0][g0] + delta[b0][g0]*delta[d0][d1]))
+                        )
+
+                    )
+
+                    + F6_t[5] * (
+
+                        (-2.0) * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +PQ[b0]*PQ[b1]*PQ[d0]*PQ[d1]*delta[g0][g1]
+
+                            +PQ[g0]*(PQ[b0]*(PQ[b1]*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1]) + PQ[d1]*PQ[g1]*delta[b1][d0]) + PQ[d0]*PQ[d1]*(PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1] + PQ[g1]*delta[b0][b1])) + PQ[g1]*(PQ[b1]*PQ[d1]*(PQ[b0]*delta[d0][g0] + PQ[d0]*delta[b0][g0] + PQ[g0]*delta[b0][d0]) + PQ[d0]*(PQ[b0]*(PQ[b1]*delta[d1][g0] + PQ[d1]*delta[b1][g0] + PQ[g0]*delta[b1][d1]) + PQ[b1]*PQ[g0]*delta[b0][d1]))
+                        )
+
+                        + 4.0 * S1 * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +PQ[d0]*PQ[d1]*(PQ[b0]*PQ[b1]*(PA_x*PQ[g1] + PA_y*PQ[g0]) + PQ[g0]*PQ[g1]*(PB_0*PQ[b1] + PB_1*PQ[b0]))
+                        )
+
+                        + 4.0 * S1 * S2 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_i * (
+                            -PQ[b0]*PQ[b1]*PQ[g0]*PQ[g1]*(PQ[d0]*QD_1 + PQ[d1]*QD_0)
+                        )
+
+                    )
+
+                    + F6_t[6] * (
+
+                        4.0 * S1 * S1 * S2 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_i * (
+                            +PQ[b0]*PQ[b1]*PQ[d0]*PQ[d1]*PQ[g0]*PQ[g1]
+                        )
+
+                    )
+
+                    );
+
+            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+        }
+    }
+
+    __syncthreads();
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_ss))
+    {
+        double hess_ii_xy = 0.0;
+
+        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        {
+            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            {
+                hess_ii_xy += ERIs[y][x];
+            }
+        }
+
+        atomicAdd(hess_xy + prim_cart_ao_to_atom_inds[i], hess_ii_xy * ik_factor_D * 2.0 * frac_exact_exchange);
+    }
+}
+
+__global__ void __launch_bounds__(TILE_SIZE_K)
+computeExchangeHessianSDSD_KK_0(double*         hess_xy,
+                                const uint32_t  hess_cart_ind_0,
+                                const uint32_t  hess_cart_ind_1,
+                                const double    frac_exact_exchange,
+                                const uint32_t* pair_inds_i_for_K_ss,
+                                const uint32_t* pair_inds_k_for_K_ss,
+                                const double*   D_ik_for_K_ss,
+                                const uint32_t  pair_inds_count_for_K_ss,
+                                const double*   s_prim_info,
+                                const uint32_t* s_prim_aoinds,
+                                const uint32_t  s_prim_count,
+                                const double*   d_prim_info,
+                                const uint32_t* d_prim_aoinds,
+                                const uint32_t  d_prim_count,
+                                const double    dd_max_D,
+                                const double*   mat_D_full_AO,
+                                const uint32_t  naos,
+                                const double*   Q_K_sd,
+                                const uint32_t* D_inds_K_sd,
+                                const uint32_t* pair_displs_K_sd,
+                                const uint32_t* pair_counts_K_sd,
+                                const double*   pair_data_K_sd,
+                                const uint32_t* prim_cart_ao_to_atom_inds,
+                                const double*   boys_func_table,
+                                const double*   boys_func_ft,
+                                const double    omega,
+                                const double    eri_threshold)
+{
+    // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
+
+    __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
+    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ double   delta[3][3];
+    __shared__ uint32_t g0, g1;
+
+    const uint32_t ik = blockIdx.x;
+
+    // we make sure that ik < pair_inds_count_for_K_ss when calling the kernel
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+        g0 = hess_cart_ind_0;
+        g1 = hess_cart_ind_1;
+
+        i = pair_inds_i_for_K_ss[ik];
+        k = pair_inds_k_for_K_ss[ik];
+
+        count_i = pair_counts_K_sd[i];
+        count_k = pair_counts_K_sd[k];
+
+        displ_i = pair_displs_K_sd[i];
+        displ_k = pair_displs_K_sd[k];
+
+        a_i = s_prim_info[i + s_prim_count * 0];
+
+        r_i[0] = s_prim_info[i + s_prim_count * 2];
+        r_i[1] = s_prim_info[i + s_prim_count * 3];
+        r_i[2] = s_prim_info[i + s_prim_count * 4];
+
+        a_k = s_prim_info[k + s_prim_count * 0];
+
+        r_k[0] = s_prim_info[k + s_prim_count * 2];
+        r_k[1] = s_prim_info[k + s_prim_count * 3];
+        r_k[2] = s_prim_info[k + s_prim_count * 4];
+
+        ik_factor_D = (static_cast<double>(i != k) + 1.0) * D_ik_for_K_ss[ik];
+
+    }
+
+    __syncthreads();
+
+    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    {
+        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+
+        // sync threads before starting a new scan
+        __syncthreads();
+
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
+
+        if (j < count_i)
+        {
+            Q_ij   = Q_K_sd[displ_i + j];
+
+            j_prim = D_inds_K_sd[displ_i + j];
+
+            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+
+            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = pair_data_K_sd[displ_i + j];
+
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
+
+        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        {
+            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+
+            // Q_kl == Q_K_sd[displ_k + l]
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_sd[displ_k + l] * dd_max_D) <= eri_threshold))
+            {
+                break;
+            }
+
+            // const auto Q_kl = Q_K_sd[displ_k + l];
+
+            const auto l_prim = D_inds_K_sd[displ_k + l];
+
+            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+
+            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+
+            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
+                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
+                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+
+            const auto S_kl_00 = pair_data_K_sd[displ_k + l];
+
+            const auto d0 = d_cart_inds[l_prim % 6][0];
+            const auto d1 = d_cart_inds[l_prim % 6][1];
+
+            // J. Chem. Phys. 84, 3963-3974 (1986)
+
+            const auto S2 = a_k + a_l;
+
+            const auto inv_S2 = 1.0 / S2;
+            const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
+
+            const auto rho = S1 * S2 * inv_S4;
+
+            double d2 = 1.0;
+
+            if (omega != 0.0) d2 = omega * omega / (rho + omega * omega);
+
+            const auto Lambda = sqrt(4.0 * rho * d2 * MATH_CONST_INV_PI);
+
+            double F6_t[7];
+
+            gpu::computeBoysFunction(F6_t, rho * d2 * r2_PQ, 6, boys_func_table, boys_func_ft);
+
+            if (omega != 0.0)
+            {
+                F6_t[1] *= d2;
+                F6_t[2] *= d2 * d2;
+                F6_t[3] *= d2 * d2 * d2;
+                F6_t[4] *= d2 * d2 * d2 * d2;
+                F6_t[5] *= d2 * d2 * d2 * d2 * d2;
+                F6_t[6] *= d2 * d2 * d2 * d2 * d2 * d2;
+            }
+
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+
+            const auto QC_x = (a_l * inv_S2) * (r_l[g0] - r_k[g0]);
+            const auto QC_y = (a_l * inv_S2) * (r_l[g1] - r_k[g1]);
+
+            // k-k Hessian
+
+            const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
+                    + F6_t[0] * (
+
+                        inv_S1 * inv_S2 * a_k * a_k * (
+                            +QD_0*QD_1*delta[b0][b1]*delta[g0][g1]
+
+                            +delta[b0][b1]*(QC_x*(QC_y*delta[d0][d1] + QD_0*delta[d1][g1] + QD_1*delta[d0][g1]) + QC_y*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0]))
+                        )
+
+                        + (-0.5) * inv_S1 * inv_S2 * a_k * (
+                            +delta[b0][b1]*delta[d0][d1]*delta[g0][g1]
+                        )
+
+                        + inv_S2 * inv_S2 * a_k * a_k * (
+                            +PB_0*PB_1*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+                        )
+
+                        + 2.0 * inv_S1 * a_k * a_k * (
+                            +QC_x*QC_y*QD_0*QD_1*delta[b0][b1]
+                        )
+
+                        + (-1.0) * inv_S1 * a_k * (
+                            +QD_0*QD_1*delta[b0][b1]*delta[g0][g1]
+                        )
+
+                        + 2.0 * inv_S2 * a_k * a_k * (
+                            +PB_0*PB_1*QD_0*QD_1*delta[g0][g1]
+
+                            +PB_0*PB_1*(QC_x*(QC_y*delta[d0][d1] + QD_0*delta[d1][g1] + QD_1*delta[d0][g1]) + QC_y*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0]))
+                        )
+
+                        + (-1.0) * inv_S2 * a_k * (
+                            +PB_0*PB_1*delta[d0][d1]*delta[g0][g1]
+                        )
+
+                        + 4.0 * a_k * a_k * (
+                            +PB_0*PB_1*QC_x*QC_y*QD_0*QD_1
+                        )
+
+                        + (-2.0) * a_k * (
+                            +PB_0*PB_1*QD_0*QD_1*delta[g0][g1]
+                        )
+
+                        + 0.5 * inv_S1 * inv_S2 * inv_S2 * a_k * a_k * (
+                            +delta[b0][b1]*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+                        )
+
+                    )
+
+                    + F6_t[1] * (
+
+                        (-0.5) * inv_S1 * inv_S2 * inv_S4 * a_k * a_k * (
+                            +delta[b0][b1]*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+                        )
+
+                        + (-1.0) * inv_S2 * inv_S2 * inv_S4 * a_k * a_k * (
+                            +delta[b0][b1]*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+                        )
+
+                        + (-2.0) * S1 * inv_S2 * inv_S2 * inv_S4 * a_k * a_k * (
+                            +PB_0*PB_1*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+                        )
+
+                        + (-1.0) * inv_S1 * inv_S4 * a_k * a_k * (
+                            +QD_0*QD_1*delta[b0][b1]*delta[g0][g1]
+
+                            +delta[b0][b1]*(QC_x*(QC_y*delta[d0][d1] + QD_0*delta[d1][g1] + QD_1*delta[d0][g1]) + QC_y*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0]))
+                        )
+
+                        + inv_S2 * inv_S4 * a_k * a_k * (
+                            +(PB_0*PQ[b1] + PB_1*PQ[b0])*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+
+                            +PB_0*(QC_x*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1] + delta[b1][g1]*delta[d0][d1]) + QC_y*(delta[b1][d0]*delta[d1][g0] + delta[b1][d1]*delta[d0][g0] + delta[b1][g0]*delta[d0][d1]) + QD_0*(delta[b1][d1]*delta[g0][g1] + delta[b1][g0]*delta[d1][g1] + delta[b1][g1]*delta[d1][g0]) + QD_1*(delta[b1][d0]*delta[g0][g1] + delta[b1][g0]*delta[d0][g1] + delta[b1][g1]*delta[d0][g0])) + PB_1*(QC_x*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1]) + QC_y*(delta[b0][d0]*delta[d1][g0] + delta[b0][d1]*delta[d0][g0] + delta[b0][g0]*delta[d0][d1]) + QD_0*(delta[b0][d1]*delta[g0][g1] + delta[b0][g0]*delta[d1][g1] + delta[b0][g1]*delta[d1][g0]) + QD_1*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0]))
+
+                            -delta[b0][b1]*(QC_x*(PQ[g1]*delta[d0][d1] + delta[d0][g1]*(PQ[d1] + QD_1) + delta[d1][g1]*(PQ[d0] + QD_0)) + QC_y*(delta[d0][d1]*(PQ[g0] + QC_x) + delta[d0][g0]*(PQ[d1] + QD_1) + delta[d1][g0]*(PQ[d0] + QD_0)) + QD_0*(PQ[d1]*delta[g0][g1] + PQ[g0]*delta[d1][g1] + PQ[g1]*delta[d1][g0]) + QD_1*(PQ[g0]*delta[d0][g1] + PQ[g1]*delta[d0][g0] + delta[g0][g1]*(PQ[d0] + QD_0)))
+                        )
+
+                        + (-2.0) * S1 * inv_S2 * inv_S4 * a_k * a_k * (
+                            +PB_0*PB_1*delta[g0][g1]*(PQ[d1]*QD_0 + QD_1*(PQ[d0] + QD_0))
+
+                            +PB_0*PB_1*(PQ[g0]*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1]) + PQ[g1]*(QC_x*delta[d0][d1] + QD_0*delta[d1][g0] + QD_1*delta[d0][g0]) + QC_x*(delta[d0][g1]*(PQ[d1] + QD_1) + delta[d1][g1]*(PQ[d0] + QD_0)) + QC_y*(delta[d0][d1]*(PQ[g0] + QC_x) + delta[d0][g0]*(PQ[d1] + QD_1) + delta[d1][g0]*(PQ[d0] + QD_0)))
+                        )
+
+                        + S1 * inv_S2 * inv_S4 * a_k * (
+                            +PB_0*PB_1*delta[d0][d1]*delta[g0][g1]
+                        )
+
+                        + (-2.0) * S2 * inv_S1 * inv_S4 * a_k * a_k * (
+                            +QC_x*QC_y*QD_0*QD_1*delta[b0][b1]
+                        )
+
+                        + S2 * inv_S1 * inv_S4 * a_k * (
+                            +QD_0*QD_1*delta[b0][b1]*delta[g0][g1]
+                        )
+
+                        + 2.0 * inv_S4 * a_k * a_k * (
+                            +QD_0*QD_1*delta[g0][g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])
+
+                            +(PB_0*PQ[b1] + PB_1*PQ[b0])*(QC_x*(QC_y*delta[d0][d1] + QD_0*delta[d1][g1] + QD_1*delta[d0][g1]) + QC_y*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0]))
+
+                            +QC_x*QC_y*(PB_0*(QD_0*delta[b1][d1] + QD_1*delta[b1][d0]) + PB_1*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0])) + QD_0*QD_1*(PB_0*(QC_x*delta[b1][g1] + QC_y*delta[b1][g0]) + PB_1*(QC_x*delta[b0][g1] + QC_y*delta[b0][g0]))
+
+                            -delta[b0][b1]*(QC_x*QC_y*(PQ[d0]*QD_1 + PQ[d1]*QD_0) + QD_0*QD_1*(PQ[g0]*QC_y + PQ[g1]*QC_x))
+                        )
+
+                        + inv_S4 * a_k * (
+                            -delta[d0][d1]*delta[g0][g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])
+
+                            -delta[g0][g1]*(PB_0*(QD_0*delta[b1][d1] + QD_1*delta[b1][d0]) + PB_1*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0]))
+
+                            +delta[b0][b1]*delta[g0][g1]*(PQ[d0]*QD_1 + PQ[d1]*QD_0)
+                        )
+
+                        + 4.0 * S1 * inv_S4 * a_k * a_k * (
+                            -PB_0*PB_1*(QC_x*QC_y*(PQ[d0]*QD_1 + PQ[d1]*QD_0) + QD_0*QD_1*(PQ[g0]*QC_y + PQ[g1]*QC_x))
+                        )
+
+                        + 2.0 * S1 * inv_S4 * a_k * (
+                            +PB_0*PB_1*delta[g0][g1]*(PQ[d0]*QD_1 + PQ[d1]*QD_0)
+                        )
+
+                        + 4.0 * S2 * inv_S4 * a_k * a_k * (
+                            +QC_x*QC_y*QD_0*QD_1*(PB_0*PQ[b1] + PB_1*PQ[b0])
+                        )
+
+                        + (-2.0) * S2 * inv_S4 * a_k * (
+                            +QD_0*QD_1*delta[g0][g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])
+                        )
+
+                        + 0.5 * inv_S1 * inv_S4 * a_k * (
+                            +delta[b0][b1]*delta[d0][d1]*delta[g0][g1]
+                        )
+
+                        + 0.5 * inv_S2 * inv_S4 * a_k * (
+                            +delta[b0][b1]*delta[d0][d1]*delta[g0][g1]
+                        )
+
+                    )
+
+                    + F6_t[2] * (
+
+                        S1 * S1 * inv_S2 * inv_S2 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +PB_0*PB_1*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+                        )
+
+                        + S1 * inv_S2 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +(-2*PB_0*PQ[b1] - 2*PB_1*PQ[b0])*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0]) + (-PB_0*PQ[d0] - PB_0*QD_0)*(delta[b1][d1]*delta[g0][g1] + delta[b1][g0]*delta[d1][g1] + delta[b1][g1]*delta[d1][g0]) + (-PB_0*PQ[d1] - PB_0*QD_1)*(delta[b1][d0]*delta[g0][g1] + delta[b1][g0]*delta[d0][g1] + delta[b1][g1]*delta[d0][g0]) + (-PB_0*PQ[g0] - PB_0*QC_x)*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1] + delta[b1][g1]*delta[d0][d1]) + (-PB_0*PQ[g1] - PB_0*QC_y)*(delta[b1][d0]*delta[d1][g0] + delta[b1][d1]*delta[d0][g0] + delta[b1][g0]*delta[d0][d1]) + (-PB_1*PQ[d0] - PB_1*QD_0)*(delta[b0][d1]*delta[g0][g1] + delta[b0][g0]*delta[d1][g1] + delta[b0][g1]*delta[d1][g0]) + (-PB_1*PQ[d1] - PB_1*QD_1)*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0]) + (-PB_1*PQ[g0] - PB_1*QC_x)*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1]) + (-PB_1*PQ[g1] - PB_1*QC_y)*(delta[b0][d0]*delta[d1][g0] + delta[b0][d1]*delta[d0][g0] + delta[b0][g0]*delta[d0][d1])
+
+                            +delta[b0][b1]*(PQ[d0]*(delta[d1][g0]*(PQ[g1] + QC_y) + delta[d1][g1]*(PQ[g0] + QC_x) + delta[g0][g1]*(PQ[d1] + QD_1)) + PQ[d1]*(QD_0*delta[g0][g1] + delta[d0][g0]*(PQ[g1] + QC_y) + delta[d0][g1]*(PQ[g0] + QC_x)) + PQ[g0]*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1] + delta[d0][d1]*(PQ[g1] + QC_y)) + PQ[g1]*(QC_x*delta[d0][d1] + QD_0*delta[d1][g0] + QD_1*delta[d0][g0]))
+                        )
+
+                        + inv_S4 * inv_S4 * a_k * a_k * (
+                            +PQ[b0]*QD_0*(delta[b1][d1]*delta[g0][g1] + delta[b1][g0]*delta[d1][g1] + delta[b1][g1]*delta[d1][g0])
+
+                            +PQ[b0]*(QC_x*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1] + delta[b1][g1]*delta[d0][d1]) + QC_y*(delta[b1][d0]*delta[d1][g0] + delta[b1][d1]*delta[d0][g0] + delta[b1][g0]*delta[d0][d1]) + QD_1*(delta[b1][d0]*delta[g0][g1] + delta[b1][g0]*delta[d0][g1] + delta[b1][g1]*delta[d0][g0])) + PQ[b1]*(QC_x*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1]) + QC_y*(delta[b0][d0]*delta[d1][g0] + delta[b0][d1]*delta[d0][g0] + delta[b0][g0]*delta[d0][d1]) + QD_0*(delta[b0][d1]*delta[g0][g1] + delta[b0][g0]*delta[d1][g1] + delta[b0][g1]*delta[d1][g0]) + QD_1*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0]))
+
+                            +delta[b0][b1]*(QC_x*(PQ[g1]*delta[d0][d1] + delta[d0][g1]*(PQ[d1] + QD_1) + delta[d1][g1]*(PQ[d0] + QD_0)) + QC_y*(delta[d0][d1]*(PQ[g0] + QC_x) + delta[d0][g0]*(PQ[d1] + QD_1) + delta[d1][g0]*(PQ[d0] + QD_0)) + QD_0*(PQ[d1]*delta[g0][g1] + PQ[g0]*delta[d1][g1] + PQ[g1]*delta[d1][g0]) + QD_1*(PQ[g0]*delta[d0][g1] + PQ[g1]*delta[d0][g0] + delta[g0][g1]*(PQ[d0] + QD_0)))
+
+                            +QC_x*(QC_y*(delta[b0][d0]*delta[b1][d1] + delta[b0][d1]*delta[b1][d0]) + QD_0*(delta[b0][d1]*delta[b1][g1] + delta[b0][g1]*delta[b1][d1]) + QD_1*(delta[b0][d0]*delta[b1][g1] + delta[b0][g1]*delta[b1][d0])) + QC_y*(QD_0*(delta[b0][d1]*delta[b1][g0] + delta[b0][g0]*delta[b1][d1]) + QD_1*(delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0])) + QD_0*QD_1*(delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+
+                            +PQ[b0]*PQ[b1]*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+                        )
+
+                        + (-0.5) * inv_S4 * inv_S4 * a_k * (
+                            +delta[g0][g1]*(delta[b0][b1]*delta[d0][d1] + delta[b0][d0]*delta[b1][d1] + delta[b0][d1]*delta[b1][d0])
+                        )
+
+                        + 2.0 * S1 * S1 * inv_S2 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +PB_0*PB_1*delta[g0][g1]*(PQ[d0]*(PQ[d1] + QD_1) + PQ[d1]*QD_0)
+
+                            +PB_0*PB_1*(PQ[g1]*(QC_x*delta[d0][d1] + QD_0*delta[d1][g0] + QD_1*delta[d0][g0]) + delta[d0][g1]*(PQ[d1]*(PQ[g0] + QC_x) + PQ[g0]*QD_1) + delta[d1][g1]*(PQ[d0]*(PQ[g0] + QC_x) + PQ[g0]*QD_0) + (PQ[g1] + QC_y)*(PQ[d0]*delta[d1][g0] + PQ[d1]*delta[d0][g0] + PQ[g0]*delta[d0][d1]))
+                        )
+
+                        + 2.0 * S1 * inv_S4 * inv_S4 * a_k * a_k * (
+                            -delta[g0][g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])*(PQ[d1]*QD_0 + QD_1*(PQ[d0] + QD_0))
+
+                            -(PB_0*PQ[b1] + PB_1*PQ[b0])*(PQ[g0]*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1]) + PQ[g1]*(QC_x*delta[d0][d1] + QD_0*delta[d1][g0] + QD_1*delta[d0][g0]) + QC_x*(delta[d0][g1]*(PQ[d1] + QD_1) + delta[d1][g1]*(PQ[d0] + QD_0)) + QC_y*(delta[d0][d1]*(PQ[g0] + QC_x) + delta[d0][g0]*(PQ[d1] + QD_1) + delta[d1][g0]*(PQ[d0] + QD_0)))
+
+                            -PB_0*(QC_x*(PQ[d0]*(QC_y*delta[b1][d1] + QD_1*delta[b1][g1]) + PQ[d1]*(QC_y*delta[b1][d0] + QD_0*delta[b1][g1]) + PQ[g1]*(QD_0*delta[b1][d1] + QD_1*delta[b1][d0])) + QC_y*(QD_0*(PQ[d1]*delta[b1][g0] + PQ[g0]*delta[b1][d1]) + QD_1*(PQ[d0]*delta[b1][g0] + PQ[g0]*delta[b1][d0]))) - PB_1*(QC_x*(PQ[d0]*(QC_y*delta[b0][d1] + QD_1*delta[b0][g1]) + PQ[d1]*(QC_y*delta[b0][d0] + QD_0*delta[b0][g1]) + PQ[g1]*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0])) + QC_y*(QD_0*(PQ[d1]*delta[b0][g0] + PQ[g0]*delta[b0][d1]) + QD_1*(PQ[d0]*delta[b0][g0] + PQ[g0]*delta[b0][d0]))) - QD_0*QD_1*(PB_0*(PQ[g0]*delta[b1][g1] + PQ[g1]*delta[b1][g0]) + PB_1*(PQ[g0]*delta[b0][g1] + PQ[g1]*delta[b0][g0]))
+
+                            +delta[b0][b1]*(PQ[d0]*QC_x*(PQ[d1]*QC_y + PQ[g1]*QD_1) + PQ[g0]*QC_y*(PQ[d0]*QD_1 + PQ[d1]*QD_0) + PQ[g1]*QD_0*(PQ[d1]*QC_x + PQ[g0]*QD_1))
+                        )
+
+                        + S1 * inv_S4 * inv_S4 * a_k * (
+                            +delta[d0][d1]*delta[g0][g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])
+
+                            +delta[g0][g1]*(PB_0*(PQ[d0]*delta[b1][d1] + PQ[d1]*delta[b1][d0]) + PB_1*(PQ[d0]*delta[b0][d1] + PQ[d1]*delta[b0][d0]))
+
+                            -PQ[d0]*PQ[d1]*delta[b0][b1]*delta[g0][g1]
+                        )
+
+                        + 2.0 * S2 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +QC_x*QC_y*(PQ[b0]*(QD_0*delta[b1][d1] + QD_1*delta[b1][d0]) + PQ[b1]*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0])) + QD_0*QD_1*(PQ[b0]*(PQ[b1]*delta[g0][g1] + QC_x*delta[b1][g1] + QC_y*delta[b1][g0]) + PQ[b1]*(QC_x*delta[b0][g1] + QC_y*delta[b0][g0]))
+
+                            +PQ[b0]*PQ[b1]*(QC_x*(QC_y*delta[d0][d1] + QD_0*delta[d1][g1] + QD_1*delta[d0][g1]) + QC_y*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0]))
+
+                            +delta[b0][b1]*(QC_x*QC_y*(PQ[d0]*QD_1 + PQ[d1]*QD_0) + QD_0*QD_1*(PQ[g0]*QC_y + PQ[g1]*QC_x))
+                        )
+
+                        + (-1.0) * S2 * inv_S4 * inv_S4 * a_k * (
+                            +delta[g0][g1]*(PQ[b0]*(PQ[b1]*delta[d0][d1] + QD_0*delta[b1][d1] + QD_1*delta[b1][d0]) + PQ[b1]*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0]))
+
+                            +delta[b0][b1]*delta[g0][g1]*(PQ[d0]*QD_1 + PQ[d1]*QD_0)
+                        )
+
+                        + 4.0 * S1 * S1 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +PB_0*PB_1*(PQ[d0]*QC_x*(PQ[d1]*QC_y + PQ[g1]*QD_1) + PQ[g0]*QC_y*(PQ[d0]*QD_1 + PQ[d1]*QD_0) + PQ[g1]*QD_0*(PQ[d1]*QC_x + PQ[g0]*QD_1))
+                        )
+
+                        + (-2.0) * S1 * S1 * inv_S4 * inv_S4 * a_k * (
+                            +PB_0*PB_1*PQ[d0]*PQ[d1]*delta[g0][g1]
+                        )
+
+                        + 4.0 * S1 * S2 * inv_S4 * inv_S4 * a_k * a_k * (
+                            -(PB_0*PQ[b1] + PB_1*PQ[b0])*(QC_x*QC_y*(PQ[d0]*QD_1 + PQ[d1]*QD_0) + QD_0*QD_1*(PQ[g0]*QC_y + PQ[g1]*QC_x))
+                        )
+
+                        + 2.0 * S1 * S2 * inv_S4 * inv_S4 * a_k * (
+                            +delta[g0][g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])*(PQ[d0]*QD_1 + PQ[d1]*QD_0)
+                        )
+
+                        + 4.0 * S2 * S2 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +PQ[b0]*PQ[b1]*QC_x*QC_y*QD_0*QD_1
+                        )
+
+                        + (-2.0) * S2 * S2 * inv_S4 * inv_S4 * a_k * (
+                            +PQ[b0]*PQ[b1]*QD_0*QD_1*delta[g0][g1]
+                        )
+
+                        + 0.5 * S1 * inv_S2 * inv_S2 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +delta[b0][b1]*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+                        )
+
+                        + 0.5 * inv_S2 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +2.0*delta[b0][b1]*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+
+                            +delta[b0][d0]*(delta[b1][d1]*delta[g0][g1] + delta[b1][g0]*delta[d1][g1] + delta[b1][g1]*delta[d1][g0]) + delta[b0][d1]*(delta[b1][d0]*delta[g0][g1] + delta[b1][g0]*delta[d0][g1] + delta[b1][g1]*delta[d0][g0]) + delta[b0][g0]*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1] + delta[b1][g1]*delta[d0][d1]) + delta[b0][g1]*(delta[b1][d0]*delta[d1][g0] + delta[b1][d1]*delta[d0][g0] + delta[b1][g0]*delta[d0][d1])
+                        )
+
+                    )
+
+                    + F6_t[3] * (
+
+                        (-0.5) * S1 * inv_S2 * inv_S4 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +delta[b0][b1]*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0]) + delta[b0][d0]*(delta[b1][d1]*delta[g0][g1] + delta[b1][g0]*delta[d1][g1] + delta[b1][g1]*delta[d1][g0]) + delta[b0][d1]*(delta[b1][d0]*delta[g0][g1] + delta[b1][g0]*delta[d0][g1] + delta[b1][g1]*delta[d0][g0]) + delta[b0][g0]*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1] + delta[b1][g1]*delta[d0][d1]) + delta[b0][g1]*(delta[b1][d0]*delta[d1][g0] + delta[b1][d1]*delta[d0][g0] + delta[b1][g0]*delta[d0][d1])
+                        )
+
+                        + S1 * S1 * inv_S2 * inv_S4 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +(PB_0*PQ[b1] + PB_1*PQ[b0])*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+
+                            +PB_0*(PQ[d0]*(delta[b1][d1]*delta[g0][g1] + delta[b1][g0]*delta[d1][g1] + delta[b1][g1]*delta[d1][g0]) + PQ[d1]*(delta[b1][d0]*delta[g0][g1] + delta[b1][g0]*delta[d0][g1] + delta[b1][g1]*delta[d0][g0]) + PQ[g0]*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1] + delta[b1][g1]*delta[d0][d1]) + PQ[g1]*(delta[b1][d0]*delta[d1][g0] + delta[b1][d1]*delta[d0][g0] + delta[b1][g0]*delta[d0][d1])) + PB_1*(PQ[d0]*(delta[b0][d1]*delta[g0][g1] + delta[b0][g0]*delta[d1][g1] + delta[b0][g1]*delta[d1][g0]) + PQ[d1]*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0]) + PQ[g0]*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1]) + PQ[g1]*(delta[b0][d0]*delta[d1][g0] + delta[b0][d1]*delta[d0][g0] + delta[b0][g0]*delta[d0][d1]))
+
+                            -delta[b0][b1]*(PQ[d0]*(PQ[d1]*delta[g0][g1] + PQ[g0]*delta[d1][g1] + PQ[g1]*delta[d1][g0]) + PQ[d1]*(PQ[g0]*delta[d0][g1] + PQ[g1]*delta[d0][g0]) + PQ[g0]*PQ[g1]*delta[d0][d1])
+                        )
+
+                        + S1 * inv_S4 * inv_S4 * inv_S4 * a_k * a_k * (
+                            -2*PQ[b0]*PQ[b1]*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+
+                            -PQ[b0]*(delta[b1][d0]*(delta[d1][g0]*(PQ[g1] + QC_y) + delta[d1][g1]*(PQ[g0] + QC_x) + delta[g0][g1]*(PQ[d1] + QD_1)) + delta[b1][d1]*(delta[d0][g0]*(PQ[g1] + QC_y) + delta[d0][g1]*(PQ[g0] + QC_x) + delta[g0][g1]*(PQ[d0] + QD_0)) + delta[b1][g0]*(delta[d0][d1]*(PQ[g1] + QC_y) + delta[d0][g1]*(PQ[d1] + QD_1) + delta[d1][g1]*(PQ[d0] + QD_0)) + delta[b1][g1]*(delta[d0][d1]*(PQ[g0] + QC_x) + delta[d0][g0]*(PQ[d1] + QD_1) + delta[d1][g0]*(PQ[d0] + QD_0))) - PQ[b1]*(delta[b0][d0]*(delta[d1][g0]*(PQ[g1] + QC_y) + delta[d1][g1]*(PQ[g0] + QC_x) + delta[g0][g1]*(PQ[d1] + QD_1)) + delta[b0][d1]*(delta[d0][g0]*(PQ[g1] + QC_y) + delta[d0][g1]*(PQ[g0] + QC_x) + delta[g0][g1]*(PQ[d0] + QD_0)) + delta[b0][g0]*(delta[d0][d1]*(PQ[g1] + QC_y) + delta[d0][g1]*(PQ[d1] + QD_1) + delta[d1][g1]*(PQ[d0] + QD_0)) + delta[b0][g1]*(delta[d0][d1]*(PQ[g0] + QC_x) + delta[d0][g0]*(PQ[d1] + QD_1) + delta[d1][g0]*(PQ[d0] + QD_0)))
+
+                            -delta[b0][b1]*(PQ[d0]*(delta[d1][g0]*(PQ[g1] + QC_y) + delta[d1][g1]*(PQ[g0] + QC_x) + delta[g0][g1]*(PQ[d1] + QD_1)) + PQ[d1]*(QD_0*delta[g0][g1] + delta[d0][g0]*(PQ[g1] + QC_y) + delta[d0][g1]*(PQ[g0] + QC_x)) + PQ[g0]*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1] + delta[d0][d1]*(PQ[g1] + QC_y)) + PQ[g1]*(QC_x*delta[d0][d1] + QD_0*delta[d1][g0] + QD_1*delta[d0][g0]))
+
+                            +(-PQ[d0]*QC_x - PQ[g0]*QD_0)*(delta[b0][d1]*delta[b1][g1] + delta[b0][g1]*delta[b1][d1]) + (-PQ[d0]*QC_y - PQ[g1]*QD_0)*(delta[b0][d1]*delta[b1][g0] + delta[b0][g0]*delta[b1][d1]) + (-PQ[d0]*QD_1 - PQ[d1]*QD_0)*(delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0]) + (-PQ[d1]*QC_x - PQ[g0]*QD_1)*(delta[b0][d0]*delta[b1][g1] + delta[b0][g1]*delta[b1][d0]) + (-PQ[d1]*QC_y - PQ[g1]*QD_1)*(delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0]) + (-PQ[g0]*QC_y - PQ[g1]*QC_x)*(delta[b0][d0]*delta[b1][d1] + delta[b0][d1]*delta[b1][d0])
+                        )
+
+                        + (-2.0) * S1 * S1 * S1 * inv_S2 * inv_S4 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +PB_0*PB_1*PQ[d0]*PQ[d1]*delta[g0][g1]
+
+                            +PB_0*PB_1*(PQ[g0]*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1]) + PQ[g1]*(PQ[d0]*delta[d1][g0] + PQ[d1]*delta[d0][g0]))
+                        )
+
+                        + 2.0 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +delta[g0][g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])*(PQ[d0]*(PQ[d1] + QD_1) + PQ[d1]*QD_0)
+
+                            +(PB_0*PQ[b1] + PB_1*PQ[b0])*(PQ[g1]*(QC_x*delta[d0][d1] + QD_0*delta[d1][g0] + QD_1*delta[d0][g0]) + delta[d0][g1]*(PQ[d1]*(PQ[g0] + QC_x) + PQ[g0]*QD_1) + delta[d1][g1]*(PQ[d0]*(PQ[g0] + QC_x) + PQ[g0]*QD_0) + (PQ[g1] + QC_y)*(PQ[d0]*delta[d1][g0] + PQ[d1]*delta[d0][g0] + PQ[g0]*delta[d0][d1]))
+
+                            +PB_0*(PQ[d0]*(PQ[d1]*(QC_x*delta[b1][g1] + QC_y*delta[b1][g0]) + PQ[g0]*(QC_y*delta[b1][d1] + QD_1*delta[b1][g1]) + PQ[g1]*(QC_x*delta[b1][d1] + QD_1*delta[b1][g0])) + PQ[d1]*(PQ[g0]*(QC_y*delta[b1][d0] + QD_0*delta[b1][g1]) + PQ[g1]*(QC_x*delta[b1][d0] + QD_0*delta[b1][g0]))) + PB_1*(PQ[d0]*(PQ[d1]*(QC_x*delta[b0][g1] + QC_y*delta[b0][g0]) + PQ[g0]*(QC_y*delta[b0][d1] + QD_1*delta[b0][g1]) + PQ[g1]*(QC_x*delta[b0][d1] + QD_1*delta[b0][g0])) + PQ[d1]*(PQ[g0]*(QC_y*delta[b0][d0] + QD_0*delta[b0][g1]) + PQ[g1]*(QC_x*delta[b0][d0] + QD_0*delta[b0][g0]))) + PQ[g0]*PQ[g1]*(PB_0*(QD_0*delta[b1][d1] + QD_1*delta[b1][d0]) + PB_1*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0]))
+
+                            -delta[b0][b1]*(PQ[d0]*PQ[d1]*(PQ[g0]*QC_y + PQ[g1]*QC_x) + PQ[g0]*PQ[g1]*(PQ[d0]*QD_1 + PQ[d1]*QD_0))
+                        )
+
+                        + (-2.0) * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +PQ[b0]*PQ[b1]*delta[g0][g1]*(PQ[d1]*QD_0 + QD_1*(PQ[d0] + QD_0))
+
+                            +PQ[b0]*PQ[b1]*(PQ[g0]*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1]) + PQ[g1]*(QC_x*delta[d0][d1] + QD_0*delta[d1][g0] + QD_1*delta[d0][g0]) + QC_x*(delta[d0][g1]*(PQ[d1] + QD_1) + delta[d1][g1]*(PQ[d0] + QD_0)) + QC_y*(delta[d0][d1]*(PQ[g0] + QC_x) + delta[d0][g0]*(PQ[d1] + QD_1) + delta[d1][g0]*(PQ[d0] + QD_0)))
+
+                            +PQ[b0]*(QC_x*(PQ[d0]*(QC_y*delta[b1][d1] + QD_1*delta[b1][g1]) + PQ[d1]*(QC_y*delta[b1][d0] + QD_0*delta[b1][g1]) + PQ[g1]*(QD_0*delta[b1][d1] + QD_1*delta[b1][d0])) + QC_y*(QD_0*(PQ[d1]*delta[b1][g0] + PQ[g0]*delta[b1][d1]) + QD_1*(PQ[d0]*delta[b1][g0] + PQ[g0]*delta[b1][d0]))) + PQ[b1]*(QC_x*(PQ[d0]*(QC_y*delta[b0][d1] + QD_1*delta[b0][g1]) + PQ[d1]*(QC_y*delta[b0][d0] + QD_0*delta[b0][g1]) + PQ[g1]*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0])) + QC_y*(QD_0*(PQ[d1]*delta[b0][g0] + PQ[g0]*delta[b0][d1]) + QD_1*(PQ[d0]*delta[b0][g0] + PQ[g0]*delta[b0][d0]))) + QD_0*QD_1*(PQ[b0]*(PQ[g0]*delta[b1][g1] + PQ[g1]*delta[b1][g0]) + PQ[b1]*(PQ[g0]*delta[b0][g1] + PQ[g1]*delta[b0][g0]))
+
+                            +delta[b0][b1]*(PQ[d0]*QC_x*(PQ[d1]*QC_y + PQ[g1]*QD_1) + PQ[g0]*QC_y*(PQ[d0]*QD_1 + PQ[d1]*QD_0) + PQ[g1]*QD_0*(PQ[d1]*QC_x + PQ[g0]*QD_1))
+                        )
+
+                        + 4.0 * S1 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * a_k * a_k * (
+                            -PB_0*PB_1*(PQ[d0]*PQ[d1]*(PQ[g0]*QC_y + PQ[g1]*QC_x) + PQ[g0]*PQ[g1]*(PQ[d0]*QD_1 + PQ[d1]*QD_0))
+                        )
+
+                        + 4.0 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +(PB_0*PQ[b1] + PB_1*PQ[b0])*(PQ[d0]*QC_x*(PQ[d1]*QC_y + PQ[g1]*QD_1) + PQ[g0]*QC_y*(PQ[d0]*QD_1 + PQ[d1]*QD_0) + PQ[g1]*QD_0*(PQ[d1]*QC_x + PQ[g0]*QD_1))
+                        )
+
+                        + (-2.0) * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_k * (
+                            +PQ[d0]*PQ[d1]*delta[g0][g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])
+                        )
+
+                        + 4.0 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_k * a_k * (
+                            -PQ[b0]*PQ[b1]*(QC_x*QC_y*(PQ[d0]*QD_1 + PQ[d1]*QD_0) + QD_0*QD_1*(PQ[g0]*QC_y + PQ[g1]*QC_x))
+                        )
+
+                        + 2.0 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_k * (
+                            +PQ[b0]*PQ[b1]*delta[g0][g1]*(PQ[d0]*QD_1 + PQ[d1]*QD_0)
+                        )
+
+                        + S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_k * (
+                            +PQ[b0]*PQ[b1]*delta[d0][d1]*delta[g0][g1]
+
+                            +delta[g0][g1]*(PQ[d0]*(PQ[b0]*delta[b1][d1] + PQ[b1]*delta[b0][d1] + PQ[d1]*delta[b0][b1]) + PQ[d1]*(PQ[b0]*delta[b1][d0] + PQ[b1]*delta[b0][d0]))
+                        )
+
+                    )
+
+                    + F6_t[4] * (
+
+                        2.0 * S1 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * a_k * (
+                            -PQ[d0]*PQ[d1]*delta[g0][g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])
+
+                            -(PB_0*PQ[b1] + PB_1*PQ[b0])*(PQ[g0]*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1]) + PQ[g1]*(PQ[d0]*delta[d1][g0] + PQ[d1]*delta[d0][g0]))
+
+                            -PQ[d0]*PQ[d1]*(PB_0*(PQ[g0]*delta[b1][g1] + PQ[g1]*delta[b1][g0]) + PB_1*(PQ[g0]*delta[b0][g1] + PQ[g1]*delta[b0][g0])) - PQ[g0]*PQ[g1]*(PB_0*(PQ[d0]*delta[b1][d1] + PQ[d1]*delta[b1][d0]) + PB_1*(PQ[d0]*delta[b0][d1] + PQ[d1]*delta[b0][d0]))
+
+                            +PQ[d0]*PQ[d1]*PQ[g0]*PQ[g1]*delta[b0][b1]
+                        )
+
+                        + 2.0 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +PQ[b0]*(PQ[d0]*(PQ[b1]*delta[g0][g1]*(PQ[d1] + QD_1) + PQ[d1]*(QC_x*delta[b1][g1] + QC_y*delta[b1][g0]) + PQ[g0]*(QC_y*delta[b1][d1] + QD_1*delta[b1][g1]) + PQ[g1]*(QC_x*delta[b1][d1] + QD_1*delta[b1][g0])) + PQ[d1]*(QD_0*(PQ[b1]*delta[g0][g1] + PQ[g0]*delta[b1][g1] + PQ[g1]*delta[b1][g0]) + delta[b1][d0]*(PQ[g0]*QC_y + PQ[g1]*QC_x))) + PQ[b1]*(PQ[d0]*(PQ[d1]*(QC_x*delta[b0][g1] + QC_y*delta[b0][g0]) + PQ[g0]*(QC_y*delta[b0][d1] + QD_1*delta[b0][g1]) + PQ[g1]*(QC_x*delta[b0][d1] + QD_1*delta[b0][g0])) + PQ[d1]*(PQ[g0]*(QC_y*delta[b0][d0] + QD_0*delta[b0][g1]) + PQ[g1]*(QC_x*delta[b0][d0] + QD_0*delta[b0][g0]))) + PQ[g0]*PQ[g1]*(PQ[b0]*(QD_0*delta[b1][d1] + QD_1*delta[b1][d0]) + PQ[b1]*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0]))
+
+                            +PQ[b0]*PQ[b1]*(PQ[g1]*(QC_x*delta[d0][d1] + QD_0*delta[d1][g0] + QD_1*delta[d0][g0]) + delta[d0][g1]*(PQ[d1]*(PQ[g0] + QC_x) + PQ[g0]*QD_1) + delta[d1][g1]*(PQ[d0]*(PQ[g0] + QC_x) + PQ[g0]*QD_0) + (PQ[g1] + QC_y)*(PQ[d0]*delta[d1][g0] + PQ[d1]*delta[d0][g0] + PQ[g0]*delta[d0][d1]))
+
+                            +delta[b0][b1]*(PQ[d0]*PQ[d1]*(PQ[g0]*QC_y + PQ[g1]*QC_x) + PQ[g0]*PQ[g1]*(PQ[d0]*QD_1 + PQ[d1]*QD_0))
+                        )
+
+                        + 4.0 * S1 * S1 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +PB_0*PB_1*PQ[d0]*PQ[d1]*PQ[g0]*PQ[g1]
+                        )
+
+                        + 4.0 * S1 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * a_k * (
+                            -(PB_0*PQ[b1] + PB_1*PQ[b0])*(PQ[d0]*PQ[d1]*(PQ[g0]*QC_y + PQ[g1]*QC_x) + PQ[g0]*PQ[g1]*(PQ[d0]*QD_1 + PQ[d1]*QD_0))
+                        )
+
+                        + 4.0 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +PQ[b0]*PQ[b1]*(PQ[d0]*QC_x*(PQ[d1]*QC_y + PQ[g1]*QD_1) + PQ[g0]*QC_y*(PQ[d0]*QD_1 + PQ[d1]*QD_0) + PQ[g1]*QD_0*(PQ[d1]*QC_x + PQ[g0]*QD_1))
+                        )
+
+                        + (-2.0) * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * (
+                            +PQ[b0]*PQ[b1]*PQ[d0]*PQ[d1]*delta[g0][g1]
+                        )
+
+                        + S1 * S1 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +PQ[b0]*PQ[b1]*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+
+                            +PQ[d0]*(PQ[b0]*(delta[b1][d1]*delta[g0][g1] + delta[b1][g0]*delta[d1][g1] + delta[b1][g1]*delta[d1][g0]) + PQ[b1]*(delta[b0][d1]*delta[g0][g1] + delta[b0][g0]*delta[d1][g1] + delta[b0][g1]*delta[d1][g0]) + PQ[d1]*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0]) + PQ[g0]*(delta[b0][b1]*delta[d1][g1] + delta[b0][d1]*delta[b1][g1] + delta[b0][g1]*delta[b1][d1]) + PQ[g1]*(delta[b0][b1]*delta[d1][g0] + delta[b0][d1]*delta[b1][g0] + delta[b0][g0]*delta[b1][d1])) + PQ[d1]*(PQ[b0]*(delta[b1][d0]*delta[g0][g1] + delta[b1][g0]*delta[d0][g1] + delta[b1][g1]*delta[d0][g0]) + PQ[b1]*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0]) + PQ[g0]*(delta[b0][b1]*delta[d0][g1] + delta[b0][d0]*delta[b1][g1] + delta[b0][g1]*delta[b1][d0]) + PQ[g1]*(delta[b0][b1]*delta[d0][g0] + delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0])) + PQ[g0]*(PQ[b0]*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1] + delta[b1][g1]*delta[d0][d1]) + PQ[b1]*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1]) + PQ[g1]*(delta[b0][b1]*delta[d0][d1] + delta[b0][d0]*delta[b1][d1] + delta[b0][d1]*delta[b1][d0])) + PQ[g1]*(PQ[b0]*(delta[b1][d0]*delta[d1][g0] + delta[b1][d1]*delta[d0][g0] + delta[b1][g0]*delta[d0][d1]) + PQ[b1]*(delta[b0][d0]*delta[d1][g0] + delta[b0][d1]*delta[d0][g0] + delta[b0][g0]*delta[d0][d1]))
+                        )
+
+                    )
+
+                    + F6_t[5] * (
+
+                        (-2.0) * S1 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +PQ[b0]*PQ[b1]*PQ[d0]*PQ[d1]*delta[g0][g1]
+
+                            +PQ[g0]*(PQ[b0]*(PQ[b1]*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1]) + PQ[d1]*PQ[g1]*delta[b1][d0]) + PQ[d0]*PQ[d1]*(PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1] + PQ[g1]*delta[b0][b1])) + PQ[g1]*(PQ[b1]*PQ[d1]*(PQ[b0]*delta[d0][g0] + PQ[d0]*delta[b0][g0] + PQ[g0]*delta[b0][d0]) + PQ[d0]*(PQ[b0]*(PQ[b1]*delta[d1][g0] + PQ[d1]*delta[b1][g0] + PQ[g0]*delta[b1][d1]) + PQ[b1]*PQ[g0]*delta[b0][d1]))
+                        )
+
+                        + 4.0 * S1 * S1 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +PQ[d0]*PQ[d1]*PQ[g0]*PQ[g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])
+                        )
+
+                        + (-4.0) * S1 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +PQ[b0]*PQ[b1]*PQ[d0]*PQ[d1]*PQ[g0]*QC_y
+
+                            +PQ[b0]*PQ[b1]*PQ[g1]*(PQ[d0]*(PQ[d1]*QC_x + PQ[g0]*QD_1) + PQ[d1]*PQ[g0]*QD_0)
+                        )
+
+                    )
+
+                    + F6_t[6] * (
+
+                        4.0 * S1 * S1 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * a_k * (
+                            +PQ[b0]*PQ[b1]*PQ[d0]*PQ[d1]*PQ[g0]*PQ[g1]
+                        )
+
+                    )
+
+                    );
+
+            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+        }
+    }
+
+    __syncthreads();
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_ss))
+    {
+        double hess_kk_xy = 0.0;
+
+        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        {
+            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            {
+                hess_kk_xy += ERIs[y][x];
+            }
+        }
+
+        atomicAdd(hess_xy + prim_cart_ao_to_atom_inds[k], hess_kk_xy * ik_factor_D * 2.0 * frac_exact_exchange);
+    }
+}
+
+__global__ void __launch_bounds__(TILE_SIZE_K)
+computeExchangeHessianSDSD_IK_0(double*         hess_xy,
+                                double*         hess_yx,
+                                const uint32_t  hess_cart_ind_0,
+                                const uint32_t  hess_cart_ind_1,
+                                const double    frac_exact_exchange,
+                                const uint32_t* pair_inds_i_for_K_ss,
+                                const uint32_t* pair_inds_k_for_K_ss,
+                                const double*   D_ik_for_K_ss,
+                                const uint32_t  pair_inds_count_for_K_ss,
+                                const double*   s_prim_info,
+                                const uint32_t* s_prim_aoinds,
+                                const uint32_t  s_prim_count,
+                                const double*   d_prim_info,
+                                const uint32_t* d_prim_aoinds,
+                                const uint32_t  d_prim_count,
+                                const double    dd_max_D,
+                                const double*   mat_D_full_AO,
+                                const uint32_t  naos,
+                                const double*   Q_K_sd,
+                                const uint32_t* D_inds_K_sd,
+                                const uint32_t* pair_displs_K_sd,
+                                const uint32_t* pair_counts_K_sd,
+                                const double*   pair_data_K_sd,
+                                const uint32_t* prim_cart_ao_to_atom_inds,
+                                const uint32_t  natoms,
+                                const double*   boys_func_table,
+                                const double*   boys_func_ft,
+                                const double    omega,
+                                const double    eri_threshold)
+{
+    // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
+
+    __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
+    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ double   delta[3][3];
+    __shared__ uint32_t g0, g1;
+
+    const uint32_t ik = blockIdx.x;
+
+    // we make sure that ik < pair_inds_count_for_K_ss when calling the kernel
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+        g0 = hess_cart_ind_0;
+        g1 = hess_cart_ind_1;
+
+        i = pair_inds_i_for_K_ss[ik];
+        k = pair_inds_k_for_K_ss[ik];
+
+        count_i = pair_counts_K_sd[i];
+        count_k = pair_counts_K_sd[k];
+
+        displ_i = pair_displs_K_sd[i];
+        displ_k = pair_displs_K_sd[k];
+
+        a_i = s_prim_info[i + s_prim_count * 0];
+
+        r_i[0] = s_prim_info[i + s_prim_count * 2];
+        r_i[1] = s_prim_info[i + s_prim_count * 3];
+        r_i[2] = s_prim_info[i + s_prim_count * 4];
+
+        a_k = s_prim_info[k + s_prim_count * 0];
+
+        r_k[0] = s_prim_info[k + s_prim_count * 2];
+        r_k[1] = s_prim_info[k + s_prim_count * 3];
+        r_k[2] = s_prim_info[k + s_prim_count * 4];
+
+        ik_factor_D = (static_cast<double>(i != k) + 1.0) * D_ik_for_K_ss[ik];
+
+    }
+
+    __syncthreads();
+
+    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    {
+        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+
+        // sync threads before starting a new scan
+        __syncthreads();
+
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double PB_0, PB_1, PA_x;
+        uint32_t j_prim, j_cgto, b0, b1;
+
+        if (j < count_i)
+        {
+            Q_ij   = Q_K_sd[displ_i + j];
+
+            j_prim = D_inds_K_sd[displ_i + j];
+
+            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+
+            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = pair_data_K_sd[displ_i + j];
+
+            PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
+
+        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        {
+            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+
+            // Q_kl == Q_K_sd[displ_k + l]
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_sd[displ_k + l] * dd_max_D) <= eri_threshold))
+            {
+                break;
+            }
+
+            // const auto Q_kl = Q_K_sd[displ_k + l];
+
+            const auto l_prim = D_inds_K_sd[displ_k + l];
+
+            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+
+            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+
+            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
+                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
+                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+
+            const auto S_kl_00 = pair_data_K_sd[displ_k + l];
+
+            const auto d0 = d_cart_inds[l_prim % 6][0];
+            const auto d1 = d_cart_inds[l_prim % 6][1];
+
+            // J. Chem. Phys. 84, 3963-3974 (1986)
+
+            const auto S2 = a_k + a_l;
+
+            const auto inv_S2 = 1.0 / S2;
+            const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
+
+            const auto rho = S1 * S2 * inv_S4;
+
+            double d2 = 1.0;
+
+            if (omega != 0.0) d2 = omega * omega / (rho + omega * omega);
+
+            const auto Lambda = sqrt(4.0 * rho * d2 * MATH_CONST_INV_PI);
+
+            double F6_t[7];
+
+            gpu::computeBoysFunction(F6_t, rho * d2 * r2_PQ, 6, boys_func_table, boys_func_ft);
+
+            if (omega != 0.0)
+            {
+                F6_t[1] *= d2;
+                F6_t[2] *= d2 * d2;
+                F6_t[3] *= d2 * d2 * d2;
+                F6_t[4] *= d2 * d2 * d2 * d2;
+                F6_t[5] *= d2 * d2 * d2 * d2 * d2;
+                F6_t[6] *= d2 * d2 * d2 * d2 * d2 * d2;
+            }
+
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+
+            const auto QC_y = (a_l * inv_S2) * (r_l[g1] - r_k[g1]);
+
+            // i-k Hessian
+
+            const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
+                    + F6_t[0] * (
+
+                        inv_S1 * inv_S2 * a_i * a_k * (
+                            +PB_0*QD_0*delta[b1][g0]*delta[d1][g1]
+
+                            +PB_0*delta[b1][g0]*(QC_y*delta[d0][d1] + QD_1*delta[d0][g1]) + (PA_x*delta[b0][b1] + PB_1*delta[b0][g0])*(QC_y*delta[d0][d1] + QD_0*delta[d1][g1] + QD_1*delta[d0][g1])
+                        )
+
+                        + 2.0 * inv_S1 * a_i * a_k * (
+                            +PB_0*QC_y*QD_0*QD_1*delta[b1][g0]
+
+                            +QC_y*QD_0*QD_1*(PA_x*delta[b0][b1] + PB_1*delta[b0][g0])
+                        )
+
+                        + 2.0 * inv_S2 * a_i * a_k * (
+                            +PA_x*PB_0*PB_1*QD_0*delta[d1][g1]
+
+                            +PA_x*PB_0*PB_1*(QC_y*delta[d0][d1] + QD_1*delta[d0][g1])
+                        )
+
+                        + 4.0 * a_i * a_k * (
+                            +PA_x*PB_0*PB_1*QC_y*QD_0*QD_1
+                        )
+
+                    )
+
+                    + F6_t[1] * (
+
+                        inv_S1 * inv_S4 * a_i * a_k * (
+                            +QD_0*delta[b1][g0]*delta[d1][g1]*(-PB_0 + PQ[b0])
+
+                            +delta[b1][g0]*(-PB_0 + PQ[b0])*(QC_y*delta[d0][d1] + QD_1*delta[d0][g1]) + (delta[b0][b1]*(-PA_x + PQ[g0]) + delta[b0][g0]*(-PB_1 + PQ[b1]))*(QC_y*delta[d0][d1] + QD_0*delta[d1][g1] + QD_1*delta[d0][g1])
+
+                            +QC_y*(QD_0*(delta[b0][b1]*delta[d1][g0] + delta[b0][d1]*delta[b1][g0] + delta[b0][g0]*delta[b1][d1]) + QD_1*(delta[b0][b1]*delta[d0][g0] + delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0])) + QD_0*QD_1*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+                        )
+
+                        + inv_S2 * inv_S4 * a_i * a_k * (
+                            +PB_0*PB_1*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+
+                            +PA_x*(PB_0*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1] + delta[b1][g1]*delta[d0][d1]) + PB_1*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1]))
+
+                            -(PA_x*delta[b0][b1] + PB_0*delta[b1][g0] + PB_1*delta[b0][g0])*(delta[d0][d1]*(PQ[g1] + QC_y) + delta[d0][g1]*(PQ[d1] + QD_1) + delta[d1][g1]*(PQ[d0] + QD_0))
+                        )
+
+                        + (-2.0) * S1 * inv_S2 * inv_S4 * a_i * a_k * (
+                            +PA_x*PB_0*PB_1*delta[d1][g1]*(PQ[d0] + QD_0)
+
+                            +PA_x*PB_0*PB_1*(delta[d0][d1]*(PQ[g1] + QC_y) + delta[d0][g1]*(PQ[d1] + QD_1))
+                        )
+
+                        + 2.0 * S2 * inv_S1 * inv_S4 * a_i * a_k * (
+                            +QC_y*QD_0*QD_1*delta[b1][g0]*(-PB_0 + PQ[b0])
+
+                            +QC_y*QD_0*QD_1*(delta[b0][b1]*(-PA_x + PQ[g0]) + delta[b0][g0]*(-PB_1 + PQ[b1]))
+                        )
+
+                        + 2.0 * inv_S4 * a_i * a_k * (
+                            +QD_0*delta[d1][g1]*(PA_x*(PB_0*PQ[b1] + PB_1*PQ[b0]) + PB_0*PB_1*PQ[g0])
+
+                            +(PA_x*(PB_0*PQ[b1] + PB_1*PQ[b0]) + PB_0*PB_1*PQ[g0])*(QC_y*delta[d0][d1] + QD_1*delta[d0][g1])
+
+                            +QC_y*(PA_x*(PB_0*(QD_0*delta[b1][d1] + QD_1*delta[b1][d0]) + PB_1*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0])) + PB_0*PB_1*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0])) + QD_0*QD_1*(PA_x*(PB_0*delta[b1][g1] + PB_1*delta[b0][g1]) + PB_0*PB_1*delta[g0][g1])
+
+                            -(PQ[g1]*QD_0*QD_1 + QC_y*(PQ[d0]*QD_1 + PQ[d1]*QD_0))*(PA_x*delta[b0][b1] + PB_0*delta[b1][g0] + PB_1*delta[b0][g0])
+                        )
+
+                        + 4.0 * S1 * inv_S4 * a_i * a_k * (
+                            -PA_x*PB_0*PB_1*(PQ[g1]*QD_0*QD_1 + QC_y*(PQ[d0]*QD_1 + PQ[d1]*QD_0))
+                        )
+
+                        + 4.0 * S2 * inv_S4 * a_i * a_k * (
+                            +QC_y*QD_0*QD_1*(PA_x*(PB_0*PQ[b1] + PB_1*PQ[b0]) + PB_0*PB_1*PQ[g0])
+                        )
+
+                        + 0.5 * inv_S1 * inv_S2 * inv_S4 * a_i * a_k * (
+                            +delta[b0][b1]*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0]) + delta[b0][g0]*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1] + delta[b1][g1]*delta[d0][d1]) + delta[b1][g0]*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1])
+                        )
+
+                    )
+
+                    + F6_t[2] * (
+
+                        (-0.5) * inv_S1 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +delta[b0][b1]*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0]) + delta[b0][g0]*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1] + delta[b1][g1]*delta[d0][d1]) + delta[b1][g0]*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1])
+                        )
+
+                        + (-0.5) * inv_S2 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +delta[b0][b1]*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0]) + delta[b0][g0]*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1] + delta[b1][g1]*delta[d0][d1]) + delta[b1][g0]*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1])
+                        )
+
+                        + S1 * inv_S2 * inv_S4 * inv_S4 * a_i * a_k * (
+                            -PB_0*PB_1*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+
+                            -PA_x*(PB_0*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1] + delta[b1][g1]*delta[d0][d1]) + PB_1*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1]))
+
+                            +(PA_x*delta[b0][b1] + PB_0*delta[b1][g0] + PB_1*delta[b0][g0])*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1])
+                        )
+
+                        + (-1.0) * S2 * inv_S1 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +PQ[b0]*QD_0*delta[b1][g0]*delta[d1][g1]
+
+                            +QD_0*delta[d1][g1]*(PQ[b1]*delta[b0][g0] + PQ[g0]*delta[b0][b1]) + (QC_y*delta[d0][d1] + QD_1*delta[d0][g1])*(PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0] + PQ[g0]*delta[b0][b1])
+
+                            +QC_y*(QD_0*(delta[b0][b1]*delta[d1][g0] + delta[b0][d1]*delta[b1][g0] + delta[b0][g0]*delta[b1][d1]) + QD_1*(delta[b0][b1]*delta[d0][g0] + delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0])) + QD_0*QD_1*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+                        )
+
+                        + inv_S4 * inv_S4 * a_i * a_k * (
+                            +(PB_0*PQ[b1] + PB_1*PQ[b0])*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+
+                            +(delta[d0][d1]*(PQ[g1] + QC_y) + delta[d0][g1]*(PQ[d1] + QD_1) + delta[d1][g1]*(PQ[d0] + QD_0))*(PA_x*delta[b0][b1] + PB_0*delta[b1][g0] + PB_1*delta[b0][g0] - PQ[b0]*delta[b1][g0] - PQ[b1]*delta[b0][g0] - PQ[g0]*delta[b0][b1])
+
+                            +(PA_x*PQ[b0] + PB_0*PQ[g0])*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1] + delta[b1][g1]*delta[d0][d1]) + (PA_x*PQ[b1] + PB_1*PQ[g0])*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1])
+
+                            +PA_x*(QC_y*(delta[b0][d0]*delta[b1][d1] + delta[b0][d1]*delta[b1][d0]) + QD_0*(delta[b0][d1]*delta[b1][g1] + delta[b0][g1]*delta[b1][d1]) + QD_1*(delta[b0][d0]*delta[b1][g1] + delta[b0][g1]*delta[b1][d0])) + PB_0*(QC_y*(delta[b1][d0]*delta[d1][g0] + delta[b1][d1]*delta[d0][g0]) + QD_0*(delta[b1][d1]*delta[g0][g1] + delta[b1][g1]*delta[d1][g0]) + QD_1*(delta[b1][d0]*delta[g0][g1] + delta[b1][g1]*delta[d0][g0])) + PB_1*(QC_y*(delta[b0][d0]*delta[d1][g0] + delta[b0][d1]*delta[d0][g0]) + QD_0*(delta[b0][d1]*delta[g0][g1] + delta[b0][g1]*delta[d1][g0]) + QD_1*(delta[b0][d0]*delta[g0][g1] + delta[b0][g1]*delta[d0][g0]))
+
+                            +(-PQ[d0]*QC_y - PQ[g1]*QD_0)*(delta[b0][b1]*delta[d1][g0] + delta[b0][d1]*delta[b1][g0] + delta[b0][g0]*delta[b1][d1]) + (-PQ[d0]*QD_1 - PQ[d1]*QD_0)*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0]) + (-PQ[d1]*QC_y - PQ[g1]*QD_1)*(delta[b0][b1]*delta[d0][g0] + delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0])
+                        )
+
+                        + 2.0 * S1 * S1 * inv_S2 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +PA_x*PB_0*PB_1*PQ[d0]*delta[d1][g1]
+
+                            +PA_x*PB_0*PB_1*(PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1])
+                        )
+
+                        + 2.0 * S1 * inv_S4 * inv_S4 * a_i * a_k * (
+                            -delta[d1][g1]*(PQ[d0] + QD_0)*(PA_x*(PB_0*PQ[b1] + PB_1*PQ[b0]) + PB_0*PB_1*PQ[g0])
+
+                            -PA_x*(PB_0*(PQ[d0]*(QC_y*delta[b1][d1] + QD_1*delta[b1][g1]) + PQ[d1]*(QC_y*delta[b1][d0] + QD_0*delta[b1][g1]) + PQ[g1]*(QD_0*delta[b1][d1] + QD_1*delta[b1][d0])) + PB_1*(PQ[d0]*(QC_y*delta[b0][d1] + QD_1*delta[b0][g1]) + PQ[d1]*(QC_y*delta[b0][d0] + QD_0*delta[b0][g1]) + PQ[g1]*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0]))) - PB_0*PB_1*(PQ[d0]*(QC_y*delta[d1][g0] + QD_1*delta[g0][g1]) + PQ[d1]*(QC_y*delta[d0][g0] + QD_0*delta[g0][g1]) + PQ[g1]*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0]))
+
+                            -(PA_x*(PB_0*PQ[b1] + PB_1*PQ[b0]) + PB_0*PB_1*PQ[g0])*(delta[d0][d1]*(PQ[g1] + QC_y) + delta[d0][g1]*(PQ[d1] + QD_1))
+
+                            +(PQ[d0]*(PQ[d1]*QC_y + PQ[g1]*QD_1) + PQ[d1]*PQ[g1]*QD_0)*(PA_x*delta[b0][b1] + PB_0*delta[b1][g0] + PB_1*delta[b0][g0])
+                        )
+
+                        + (-2.0) * S2 * S2 * inv_S1 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +PQ[b0]*QC_y*QD_0*QD_1*delta[b1][g0]
+
+                            +QC_y*QD_0*QD_1*(PQ[b1]*delta[b0][g0] + PQ[g0]*delta[b0][b1])
+                        )
+
+                        + 2.0 * S2 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +QD_0*delta[d1][g1]*(PB_0*PQ[b1]*PQ[g0] + PQ[b0]*(PA_x*PQ[b1] + PB_1*PQ[g0]))
+
+                            +(QC_y*delta[d0][d1] + QD_1*delta[d0][g1])*(PB_0*PQ[b1]*PQ[g0] + PQ[b0]*(PA_x*PQ[b1] + PB_1*PQ[g0]))
+
+                            +QC_y*(PA_x*(PQ[b0]*(QD_0*delta[b1][d1] + QD_1*delta[b1][d0]) + PQ[b1]*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0])) + PB_0*(PQ[b1]*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0]) + PQ[g0]*(QD_0*delta[b1][d1] + QD_1*delta[b1][d0])) + PB_1*(PQ[b0]*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0]) + PQ[g0]*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0]))) + QD_0*QD_1*(PA_x*(PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1]) + PB_0*(PQ[b1]*delta[g0][g1] + PQ[g0]*delta[b1][g1]) + PB_1*(PQ[b0]*delta[g0][g1] + PQ[g0]*delta[b0][g1]))
+
+                            +(PQ[g1]*QD_0*QD_1 + QC_y*(PQ[d0]*QD_1 + PQ[d1]*QD_0))*(PA_x*delta[b0][b1] + PB_0*delta[b1][g0] + PB_1*delta[b0][g0] - PQ[b0]*delta[b1][g0] - PQ[b1]*delta[b0][g0] - PQ[g0]*delta[b0][b1])
+                        )
+
+                        + 4.0 * S1 * S1 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +PA_x*PB_0*PB_1*(PQ[d0]*(PQ[d1]*QC_y + PQ[g1]*QD_1) + PQ[d1]*PQ[g1]*QD_0)
+                        )
+
+                        + 4.0 * S1 * S2 * inv_S4 * inv_S4 * a_i * a_k * (
+                            -(PA_x*(PB_0*PQ[b1] + PB_1*PQ[b0]) + PB_0*PB_1*PQ[g0])*(PQ[g1]*QD_0*QD_1 + QC_y*(PQ[d0]*QD_1 + PQ[d1]*QD_0))
+                        )
+
+                        + 4.0 * S2 * S2 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +QC_y*QD_0*QD_1*(PB_0*PQ[b1]*PQ[g0] + PQ[b0]*(PA_x*PQ[b1] + PB_1*PQ[g0]))
+                        )
+
+                    )
+
+                    + F6_t[3] * (
+
+                        S1 * inv_S4 * inv_S4 * inv_S4 * a_i * a_k * (
+                            -(PB_0*PQ[b1] + PB_1*PQ[b0])*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+
+                            -PA_x*(PQ[d0]*(delta[b0][d1]*delta[b1][g1] + delta[b0][g1]*delta[b1][d1]) + PQ[d1]*(delta[b0][d0]*delta[b1][g1] + delta[b0][g1]*delta[b1][d0]) + PQ[g1]*(delta[b0][d0]*delta[b1][d1] + delta[b0][d1]*delta[b1][d0])) - PB_0*(PQ[d0]*(delta[b1][d1]*delta[g0][g1] + delta[b1][g1]*delta[d1][g0]) + PQ[d1]*(delta[b1][d0]*delta[g0][g1] + delta[b1][g1]*delta[d0][g0]) + PQ[g1]*(delta[b1][d0]*delta[d1][g0] + delta[b1][d1]*delta[d0][g0])) - PB_1*(PQ[d0]*(delta[b0][d1]*delta[g0][g1] + delta[b0][g1]*delta[d1][g0]) + PQ[d1]*(delta[b0][d0]*delta[g0][g1] + delta[b0][g1]*delta[d0][g0]) + PQ[g1]*(delta[b0][d0]*delta[d1][g0] + delta[b0][d1]*delta[d0][g0]))
+
+                            +(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1])*(-PA_x*delta[b0][b1] - PB_0*delta[b1][g0] - PB_1*delta[b0][g0] + PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0] + PQ[g0]*delta[b0][b1])
+
+                            +(-PA_x*PQ[b0] - PB_0*PQ[g0])*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1] + delta[b1][g1]*delta[d0][d1]) + (-PA_x*PQ[b1] - PB_1*PQ[g0])*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1])
+
+                            +PQ[d0]*(PQ[d1]*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0]) + PQ[g1]*(delta[b0][b1]*delta[d1][g0] + delta[b0][d1]*delta[b1][g0] + delta[b0][g0]*delta[b1][d1])) + PQ[d1]*PQ[g1]*(delta[b0][b1]*delta[d0][g0] + delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0])
+                        )
+
+                        + S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +PQ[b0]*QD_0*(delta[b1][d1]*delta[g0][g1] + delta[b1][g1]*delta[d1][g0])
+
+                            +(PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0] + PQ[g0]*delta[b0][b1])*(delta[d0][d1]*(PQ[g1] + QC_y) + delta[d0][g1]*(PQ[d1] + QD_1) + delta[d1][g1]*(PQ[d0] + QD_0))
+
+                            +QC_y*(PQ[b0]*(delta[b1][d0]*delta[d1][g0] + delta[b1][d1]*delta[d0][g0]) + PQ[b1]*(delta[b0][d0]*delta[d1][g0] + delta[b0][d1]*delta[d0][g0]) + PQ[g0]*(delta[b0][d0]*delta[b1][d1] + delta[b0][d1]*delta[b1][d0])) + QD_0*(PQ[b1]*(delta[b0][d1]*delta[g0][g1] + delta[b0][g1]*delta[d1][g0]) + PQ[g0]*(delta[b0][d1]*delta[b1][g1] + delta[b0][g1]*delta[b1][d1])) + QD_1*(PQ[b0]*(delta[b1][d0]*delta[g0][g1] + delta[b1][g1]*delta[d0][g0]) + PQ[b1]*(delta[b0][d0]*delta[g0][g1] + delta[b0][g1]*delta[d0][g0]) + PQ[g0]*(delta[b0][d0]*delta[b1][g1] + delta[b0][g1]*delta[b1][d0]))
+
+                            +(PQ[d0]*QC_y + PQ[g1]*QD_0)*(delta[b0][b1]*delta[d1][g0] + delta[b0][d1]*delta[b1][g0] + delta[b0][g0]*delta[b1][d1]) + (PQ[d0]*QD_1 + PQ[d1]*QD_0)*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0]) + (PQ[d1]*QC_y + PQ[g1]*QD_1)*(delta[b0][b1]*delta[d0][g0] + delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0])
+
+                            +PQ[b0]*(PQ[b1]*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0]) + PQ[g0]*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1] + delta[b1][g1]*delta[d0][d1])) + PQ[b1]*PQ[g0]*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1])
+                        )
+
+                        + 2.0 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +PB_0*PB_1*PQ[d0]*PQ[d1]*delta[g0][g1]
+
+                            +(PA_x*(PB_0*PQ[b1] + PB_1*PQ[b0]) + PB_0*PB_1*PQ[g0])*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1])
+
+                            +PA_x*(PQ[d0]*(PB_0*(PQ[d1]*delta[b1][g1] + PQ[g1]*delta[b1][d1]) + PB_1*(PQ[d1]*delta[b0][g1] + PQ[g1]*delta[b0][d1])) + PQ[d1]*PQ[g1]*(PB_0*delta[b1][d0] + PB_1*delta[b0][d0])) + PB_0*PB_1*PQ[g1]*(PQ[d0]*delta[d1][g0] + PQ[d1]*delta[d0][g0])
+
+                            -PQ[d0]*PQ[d1]*PQ[g1]*(PA_x*delta[b0][b1] + PB_0*delta[b1][g0] + PB_1*delta[b0][g0])
+                        )
+
+                        + 2.0 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_k * (
+                            -delta[d1][g1]*(PQ[d0] + QD_0)*(PB_0*PQ[b1]*PQ[g0] + PQ[b0]*(PA_x*PQ[b1] + PB_1*PQ[g0]))
+
+                            -PA_x*(PQ[b0]*(PQ[d0]*(QC_y*delta[b1][d1] + QD_1*delta[b1][g1]) + PQ[d1]*(QC_y*delta[b1][d0] + QD_0*delta[b1][g1]) + PQ[g1]*(QD_0*delta[b1][d1] + QD_1*delta[b1][d0])) + PQ[b1]*(PQ[d0]*(QC_y*delta[b0][d1] + QD_1*delta[b0][g1]) + PQ[d1]*(QC_y*delta[b0][d0] + QD_0*delta[b0][g1]) + PQ[g1]*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0]))) - PB_0*(PQ[b1]*(PQ[d0]*(QC_y*delta[d1][g0] + QD_1*delta[g0][g1]) + PQ[d1]*(QC_y*delta[d0][g0] + QD_0*delta[g0][g1]) + PQ[g1]*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0])) + PQ[g0]*(PQ[d0]*(QC_y*delta[b1][d1] + QD_1*delta[b1][g1]) + PQ[d1]*(QC_y*delta[b1][d0] + QD_0*delta[b1][g1]) + PQ[g1]*(QD_0*delta[b1][d1] + QD_1*delta[b1][d0]))) - PB_1*(PQ[b0]*(PQ[d0]*(QC_y*delta[d1][g0] + QD_1*delta[g0][g1]) + PQ[d1]*(QC_y*delta[d0][g0] + QD_0*delta[g0][g1]) + PQ[g1]*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0])) + PQ[g0]*(PQ[d0]*(QC_y*delta[b0][d1] + QD_1*delta[b0][g1]) + PQ[d1]*(QC_y*delta[b0][d0] + QD_0*delta[b0][g1]) + PQ[g1]*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0])))
+
+                            -(delta[d0][d1]*(PQ[g1] + QC_y) + delta[d0][g1]*(PQ[d1] + QD_1))*(PB_0*PQ[b1]*PQ[g0] + PQ[b0]*(PA_x*PQ[b1] + PB_1*PQ[g0]))
+
+                            +(PQ[d0]*(PQ[d1]*QC_y + PQ[g1]*QD_1) + PQ[d1]*PQ[g1]*QD_0)*(-PA_x*delta[b0][b1] - PB_0*delta[b1][g0] - PB_1*delta[b0][g0] + PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0] + PQ[g0]*delta[b0][b1])
+                        )
+
+                        + 2.0 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +PQ[b0]*(QC_y*QD_1*(PQ[b1]*delta[d0][g0] + PQ[g0]*delta[b1][d0]) + QD_0*(PQ[b1]*(PQ[g0]*delta[d1][g1] + QC_y*delta[d1][g0] + QD_1*delta[g0][g1]) + PQ[g0]*(QC_y*delta[b1][d1] + QD_1*delta[b1][g1]))) + PQ[b1]*PQ[g0]*(QC_y*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0]) + QD_0*QD_1*delta[b0][g1])
+
+                            +PQ[b0]*PQ[b1]*PQ[g0]*(QC_y*delta[d0][d1] + QD_1*delta[d0][g1])
+
+                            +(PQ[g1]*QD_0*QD_1 + QC_y*(PQ[d0]*QD_1 + PQ[d1]*QD_0))*(PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0] + PQ[g0]*delta[b0][b1])
+                        )
+
+                        + 4.0 * S1 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * a_i * a_k * (
+                            -PA_x*PB_0*PB_1*PQ[d0]*PQ[d1]*PQ[g1]
+                        )
+
+                        + 4.0 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +(PA_x*(PB_0*PQ[b1] + PB_1*PQ[b0]) + PB_0*PB_1*PQ[g0])*(PQ[d0]*(PQ[d1]*QC_y + PQ[g1]*QD_1) + PQ[d1]*PQ[g1]*QD_0)
+                        )
+
+                        + 4.0 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_k * (
+                            -(PB_0*PQ[b1]*PQ[g0] + PQ[b0]*(PA_x*PQ[b1] + PB_1*PQ[g0]))*(PQ[g1]*QD_0*QD_1 + QC_y*(PQ[d0]*QD_1 + PQ[d1]*QD_0))
+                        )
+
+                        + 4.0 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +PQ[b0]*PQ[b1]*PQ[g0]*QC_y*QD_0*QD_1
+                        )
+
+                        + 0.5 * inv_S4 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +delta[b0][b1]*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0]) + delta[b0][d0]*(delta[b1][d1]*delta[g0][g1] + delta[b1][g0]*delta[d1][g1] + delta[b1][g1]*delta[d1][g0]) + delta[b0][d1]*(delta[b1][d0]*delta[g0][g1] + delta[b1][g0]*delta[d0][g1] + delta[b1][g1]*delta[d0][g0]) + delta[b0][g0]*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1] + delta[b1][g1]*delta[d0][d1]) + delta[b0][g1]*(delta[b1][d0]*delta[d1][g0] + delta[b1][d1]*delta[d0][g0] + delta[b1][g0]*delta[d0][d1])
+                        )
+
+                    )
+
+                    + F6_t[4] * (
+
+                        (-1.0) * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +PQ[b0]*PQ[b1]*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+
+                            +PQ[d0]*(PQ[b0]*(delta[b1][d1]*delta[g0][g1] + delta[b1][g0]*delta[d1][g1] + delta[b1][g1]*delta[d1][g0]) + PQ[b1]*(delta[b0][d1]*delta[g0][g1] + delta[b0][g0]*delta[d1][g1] + delta[b0][g1]*delta[d1][g0]) + PQ[d1]*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0]) + PQ[g0]*(delta[b0][b1]*delta[d1][g1] + delta[b0][d1]*delta[b1][g1] + delta[b0][g1]*delta[b1][d1]) + PQ[g1]*(delta[b0][b1]*delta[d1][g0] + delta[b0][d1]*delta[b1][g0] + delta[b0][g0]*delta[b1][d1])) + PQ[d1]*(PQ[b0]*(delta[b1][d0]*delta[g0][g1] + delta[b1][g0]*delta[d0][g1] + delta[b1][g1]*delta[d0][g0]) + PQ[b1]*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0]) + PQ[g0]*(delta[b0][b1]*delta[d0][g1] + delta[b0][d0]*delta[b1][g1] + delta[b0][g1]*delta[b1][d0]) + PQ[g1]*(delta[b0][b1]*delta[d0][g0] + delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0])) + PQ[g0]*(PQ[b0]*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1] + delta[b1][g1]*delta[d0][d1]) + PQ[b1]*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1]) + PQ[g1]*(delta[b0][b1]*delta[d0][d1] + delta[b0][d0]*delta[b1][d1] + delta[b0][d1]*delta[b1][d0])) + PQ[g1]*(PQ[b0]*(delta[b1][d0]*delta[d1][g0] + delta[b1][d1]*delta[d0][g0] + delta[b1][g0]*delta[d0][d1]) + PQ[b1]*(delta[b0][d0]*delta[d1][g0] + delta[b0][d1]*delta[d0][g0] + delta[b0][g0]*delta[d0][d1]))
+                        )
+
+                        + 2.0 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +PQ[d0]*PQ[d1]*delta[g0][g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])
+
+                            +(PB_0*PQ[b1]*PQ[g0] + PQ[b0]*(PA_x*PQ[b1] + PB_1*PQ[g0]))*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1])
+
+                            +PQ[d0]*(PA_x*(PQ[b0]*(PQ[d1]*delta[b1][g1] + PQ[g1]*delta[b1][d1]) + PQ[b1]*(PQ[d1]*delta[b0][g1] + PQ[g1]*delta[b0][d1])) + PQ[g0]*(PB_0*(PQ[d1]*delta[b1][g1] + PQ[g1]*delta[b1][d1]) + PB_1*(PQ[d1]*delta[b0][g1] + PQ[g1]*delta[b0][d1]))) + PQ[g1]*(PQ[d1]*(PA_x*(PQ[b0]*delta[b1][d0] + PQ[b1]*delta[b0][d0]) + PQ[g0]*(PB_0*delta[b1][d0] + PB_1*delta[b0][d0])) + (PB_0*PQ[b1] + PB_1*PQ[b0])*(PQ[d0]*delta[d1][g0] + PQ[d1]*delta[d0][g0]))
+
+                            +PQ[d0]*PQ[d1]*PQ[g1]*(PA_x*delta[b0][b1] + PB_0*delta[b1][g0] + PB_1*delta[b0][g0] - PQ[b0]*delta[b1][g0] - PQ[b1]*delta[b0][g0] - PQ[g0]*delta[b0][b1])
+                        )
+
+                        + (-2.0) * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +PQ[b0]*(PQ[b1]*(PQ[d0]*(QC_y*delta[d1][g0] + QD_1*delta[g0][g1]) + PQ[d1]*(QC_y*delta[d0][g0] + QD_0*delta[g0][g1]) + PQ[g0]*delta[d1][g1]*(PQ[d0] + QD_0) + PQ[g1]*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0])) + PQ[g0]*(PQ[d0]*(QC_y*delta[b1][d1] + QD_1*delta[b1][g1]) + PQ[d1]*(QC_y*delta[b1][d0] + QD_0*delta[b1][g1]) + PQ[g1]*(QD_0*delta[b1][d1] + QD_1*delta[b1][d0]))) + PQ[b1]*PQ[g0]*(PQ[d0]*(QC_y*delta[b0][d1] + QD_1*delta[b0][g1]) + PQ[d1]*(QC_y*delta[b0][d0] + QD_0*delta[b0][g1]) + PQ[g1]*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0]))
+
+                            +PQ[b0]*PQ[b1]*PQ[g0]*(delta[d0][d1]*(PQ[g1] + QC_y) + delta[d0][g1]*(PQ[d1] + QD_1))
+
+                            +(PQ[d0]*(PQ[d1]*QC_y + PQ[g1]*QD_1) + PQ[d1]*PQ[g1]*QD_0)*(PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0] + PQ[g0]*delta[b0][b1])
+                        )
+
+                        + 4.0 * S1 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_k * (
+                            -PQ[d0]*PQ[d1]*PQ[g1]*(PA_x*(PB_0*PQ[b1] + PB_1*PQ[b0]) + PB_0*PB_1*PQ[g0])
+                        )
+
+                        + 4.0 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +(PQ[d0]*(PQ[d1]*QC_y + PQ[g1]*QD_1) + PQ[d1]*PQ[g1]*QD_0)*(PB_0*PQ[b1]*PQ[g0] + PQ[b0]*(PA_x*PQ[b1] + PB_1*PQ[g0]))
+                        )
+
+                        + 4.0 * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_k * (
+                            -PQ[b0]*PQ[b1]*PQ[g0]*(PQ[g1]*QD_0*QD_1 + QC_y*(PQ[d0]*QD_1 + PQ[d1]*QD_0))
+                        )
+
+                    )
+
+                    + F6_t[5] * (
+
+                        4.0 * S1 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_k * (
+                            -PQ[d0]*PQ[d1]*PQ[g1]*(PB_0*PQ[b1]*PQ[g0] + PQ[b0]*(PA_x*PQ[b1] + PB_1*PQ[g0]))
+                        )
+
+                        + 4.0 * S1 * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +PQ[b0]*PQ[b1]*PQ[g0]*(PQ[d0]*(PQ[d1]*QC_y + PQ[g1]*QD_1) + PQ[d1]*PQ[g1]*QD_0)
+                        )
+
+                        + 2.0 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +PQ[b0]*PQ[b1]*PQ[d0]*PQ[d1]*delta[g0][g1]
+
+                            +PQ[g0]*(PQ[b0]*(PQ[b1]*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1]) + PQ[d1]*PQ[g1]*delta[b1][d0]) + PQ[d0]*PQ[d1]*(PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1] + PQ[g1]*delta[b0][b1])) + PQ[g1]*(PQ[b1]*PQ[d1]*(PQ[b0]*delta[d0][g0] + PQ[d0]*delta[b0][g0] + PQ[g0]*delta[b0][d0]) + PQ[d0]*(PQ[b0]*(PQ[b1]*delta[d1][g0] + PQ[d1]*delta[b1][g0] + PQ[g0]*delta[b1][d1]) + PQ[b1]*PQ[g0]*delta[b0][d1]))
+                        )
+
+                    )
+
+                    + F6_t[6] * (
+
+                        (-4.0) * S1 * S1 * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_k * (
+                            +PQ[b0]*PQ[b1]*PQ[d0]*PQ[d1]*PQ[g0]*PQ[g1]
+                        )
+
+                    )
+
+                    );
+
+            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+        }
+    }
+
+    __syncthreads();
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_ss))
+    {
+        double hess_ik_xy = 0.0;
+
+        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        {
+            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            {
+                hess_ik_xy += ERIs[y][x];
+            }
+        }
+
+        // Note factor of 2 due to IK<->JL symmetry for ground state Hessian
+
+        atomicAdd(
+            hess_xy + prim_cart_ao_to_atom_inds[i] * natoms + prim_cart_ao_to_atom_inds[k],
+            hess_ik_xy * ik_factor_D * 2.0 * frac_exact_exchange);
+
+        atomicAdd(
+            hess_yx + prim_cart_ao_to_atom_inds[k] * natoms + prim_cart_ao_to_atom_inds[i],
+            hess_ik_xy * ik_factor_D * 2.0 * frac_exact_exchange);
+    }
+}
+
+__global__ void __launch_bounds__(TILE_SIZE_K)
+computeExchangeHessianSDSD_IJ_0(double*         hess_xy,
+                                double*         hess_yx,
+                                const uint32_t  hess_cart_ind_0,
+                                const uint32_t  hess_cart_ind_1,
+                                const double    frac_exact_exchange,
+                                const uint32_t* pair_inds_i_for_K_ss,
+                                const uint32_t* pair_inds_k_for_K_ss,
+                                const double*   D_ik_for_K_ss,
+                                const uint32_t  pair_inds_count_for_K_ss,
+                                const double*   s_prim_info,
+                                const uint32_t* s_prim_aoinds,
+                                const uint32_t  s_prim_count,
+                                const double*   d_prim_info,
+                                const uint32_t* d_prim_aoinds,
+                                const uint32_t  d_prim_count,
+                                const double    dd_max_D,
+                                const double*   mat_D_full_AO,
+                                const uint32_t  naos,
+                                const double*   Q_K_sd,
+                                const uint32_t* D_inds_K_sd,
+                                const uint32_t* pair_displs_K_sd,
+                                const uint32_t* pair_counts_K_sd,
+                                const double*   pair_data_K_sd,
+                                const uint32_t* prim_cart_ao_to_atom_inds,
+                                const uint32_t  natoms,
+                                const double*   boys_func_table,
+                                const double*   boys_func_ft,
+                                const double    omega,
+                                const double    eri_threshold)
+{
+    // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
+
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
+    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ double   delta[3][3];
+    __shared__ uint32_t g0, g1;
+
+    const uint32_t ik = blockIdx.x;
+
+    // we make sure that ik < pair_inds_count_for_K_ss when calling the kernel
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+        g0 = hess_cart_ind_0;
+        g1 = hess_cart_ind_1;
+
+        i = pair_inds_i_for_K_ss[ik];
+        k = pair_inds_k_for_K_ss[ik];
+
+        count_i = pair_counts_K_sd[i];
+        count_k = pair_counts_K_sd[k];
+
+        displ_i = pair_displs_K_sd[i];
+        displ_k = pair_displs_K_sd[k];
+
+        a_i = s_prim_info[i + s_prim_count * 0];
+
+        r_i[0] = s_prim_info[i + s_prim_count * 2];
+        r_i[1] = s_prim_info[i + s_prim_count * 3];
+        r_i[2] = s_prim_info[i + s_prim_count * 4];
+
+        a_k = s_prim_info[k + s_prim_count * 0];
+
+        r_k[0] = s_prim_info[k + s_prim_count * 2];
+        r_k[1] = s_prim_info[k + s_prim_count * 3];
+        r_k[2] = s_prim_info[k + s_prim_count * 4];
+
+        ik_factor_D = (static_cast<double>(i != k) + 1.0) * D_ik_for_K_ss[ik];
+
+    }
+
+    __syncthreads();
+
+    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    {
+        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+
+        // sync threads before starting a new scan
+        __syncthreads();
+
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double PB_0, PB_1, PA_x, PB_y;
+        uint32_t j_prim, j_cgto, b0, b1;
+
+        if (j < count_i)
+        {
+            Q_ij   = Q_K_sd[displ_i + j];
+
+            j_prim = D_inds_K_sd[displ_i + j];
+
+            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+
+            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = pair_data_K_sd[displ_i + j];
+
+            PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+            PB_y = (-a_i * inv_S1) * (r_j[g1] - r_i[g1]);
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
+
+        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        {
+            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+
+            // Q_kl == Q_K_sd[displ_k + l]
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_sd[displ_k + l] * dd_max_D) <= eri_threshold))
+            {
+                break;
+            }
+
+            // const auto Q_kl = Q_K_sd[displ_k + l];
+
+            const auto l_prim = D_inds_K_sd[displ_k + l];
+
+            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+
+            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+
+            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
+                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
+                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+
+            const auto S_kl_00 = pair_data_K_sd[displ_k + l];
+
+            const auto d0 = d_cart_inds[l_prim % 6][0];
+            const auto d1 = d_cart_inds[l_prim % 6][1];
+
+            // J. Chem. Phys. 84, 3963-3974 (1986)
+
+            const auto S2 = a_k + a_l;
+
+            const auto inv_S2 = 1.0 / S2;
+            const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
+
+            const auto rho = S1 * S2 * inv_S4;
+
+            double d2 = 1.0;
+
+            if (omega != 0.0) d2 = omega * omega / (rho + omega * omega);
+
+            const auto Lambda = sqrt(4.0 * rho * d2 * MATH_CONST_INV_PI);
+
+            double F6_t[7];
+
+            gpu::computeBoysFunction(F6_t, rho * d2 * r2_PQ, 6, boys_func_table, boys_func_ft);
+
+            if (omega != 0.0)
+            {
+                F6_t[1] *= d2;
+                F6_t[2] *= d2 * d2;
+                F6_t[3] *= d2 * d2 * d2;
+                F6_t[4] *= d2 * d2 * d2 * d2;
+                F6_t[5] *= d2 * d2 * d2 * d2 * d2;
+                F6_t[6] *= d2 * d2 * d2 * d2 * d2 * d2;
+            }
+
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+
+            // i-j Hessian
+
+            const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
+                    + F6_t[0] * (
+
+                        inv_S1 * inv_S1 * a_i * a_j * (
+                            +QD_0*QD_1*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+                        )
+
+                        + inv_S1 * inv_S2 * a_i * a_j * (
+                            +PB_0*PB_1*delta[d0][d1]*delta[g0][g1]
+
+                            +delta[d0][d1]*(PA_x*(PB_0*delta[b1][g1] + PB_1*delta[b0][g1] + PB_y*delta[b0][b1]) + PB_y*(PB_0*delta[b1][g0] + PB_1*delta[b0][g0]))
+                        )
+
+                        + (-0.5) * inv_S1 * inv_S2 * a_i * (
+                            +delta[d0][d1]*(delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+                        )
+
+                        + 2.0 * inv_S1 * a_i * a_j * (
+                            +PB_0*PB_1*QD_0*QD_1*delta[g0][g1]
+
+                            +QD_0*QD_1*(PA_x*(PB_0*delta[b1][g1] + PB_1*delta[b0][g1] + PB_y*delta[b0][b1]) + PB_y*(PB_0*delta[b1][g0] + PB_1*delta[b0][g0]))
+                        )
+
+                        + (-1.0) * inv_S1 * a_i * (
+                            +QD_0*QD_1*(delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+                        )
+
+                        + 2.0 * inv_S2 * a_i * a_j * (
+                            +PA_x*PB_0*PB_1*PB_y*delta[d0][d1]
+                        )
+
+                        + (-1.0) * inv_S2 * a_i * (
+                            +PA_x*PB_0*delta[b1][g1]*delta[d0][d1]
+
+                            +PA_x*PB_1*delta[b0][g1]*delta[d0][d1]
+                        )
+
+                        + 4.0 * a_i * a_j * (
+                            +PA_x*PB_0*PB_1*PB_y*QD_0*QD_1
+                        )
+
+                        + (-2.0) * a_i * (
+                            +PA_x*PB_0*QD_0*QD_1*delta[b1][g1]
+
+                            +PA_x*PB_1*QD_0*QD_1*delta[b0][g1]
+                        )
+
+                        + 0.5 * inv_S1 * inv_S1 * inv_S2 * a_i * a_j * (
+                            +delta[d0][d1]*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+                        )
+
+                    )
+
+                    + F6_t[1] * (
+
+                        (-1.0) * inv_S1 * inv_S1 * inv_S4 * a_i * a_j * (
+                            +delta[d0][d1]*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+                        )
+
+                        + (-0.5) * inv_S1 * inv_S2 * inv_S4 * a_i * a_j * (
+                            +delta[d0][d1]*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+                        )
+
+                        + (-2.0) * S2 * inv_S1 * inv_S1 * inv_S4 * a_i * a_j * (
+                            +QD_0*QD_1*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+                        )
+
+                        + inv_S1 * inv_S4 * a_i * a_j * (
+                            +delta[d0][d1]*delta[g0][g1]*(PB_0*(-PB_1 + PQ[b1]) + PB_1*PQ[b0])
+
+                            +delta[d0][d1]*(PA_x*(-PB_0*delta[b1][g1] - PB_1*delta[b0][g1] - PB_y*delta[b0][b1] + PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1] + PQ[g1]*delta[b0][b1]) + PQ[g0]*(PB_0*delta[b1][g1] + PB_1*delta[b0][g1] + PB_y*delta[b0][b1]) + delta[b0][g0]*(PB_1*(-PB_y + PQ[g1]) + PB_y*PQ[b1]) + delta[b1][g0]*(PB_0*(-PB_y + PQ[g1]) + PB_y*PQ[b0]))
+
+                            +QD_0*(PA_x*(delta[b0][b1]*delta[d1][g1] + delta[b0][d1]*delta[b1][g1] + delta[b0][g1]*delta[b1][d1]) + PB_0*(delta[b1][d1]*delta[g0][g1] + delta[b1][g0]*delta[d1][g1] + delta[b1][g1]*delta[d1][g0]) + PB_1*(delta[b0][d1]*delta[g0][g1] + delta[b0][g0]*delta[d1][g1] + delta[b0][g1]*delta[d1][g0]) + PB_y*(delta[b0][b1]*delta[d1][g0] + delta[b0][d1]*delta[b1][g0] + delta[b0][g0]*delta[b1][d1])) + QD_1*(PA_x*(delta[b0][b1]*delta[d0][g1] + delta[b0][d0]*delta[b1][g1] + delta[b0][g1]*delta[b1][d0]) + PB_0*(delta[b1][d0]*delta[g0][g1] + delta[b1][g0]*delta[d0][g1] + delta[b1][g1]*delta[d0][g0]) + PB_1*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0]) + PB_y*(delta[b0][b1]*delta[d0][g0] + delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0]))
+
+                            -(PQ[d0]*QD_1 + PQ[d1]*QD_0)*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+                        )
+
+                        + (-1.0) * inv_S2 * inv_S4 * a_i * a_j * (
+                            +PB_0*PB_1*delta[d0][d1]*delta[g0][g1]
+
+                            +delta[d0][d1]*(PA_x*(PB_0*delta[b1][g1] + PB_1*delta[b0][g1] + PB_y*delta[b0][b1]) + PB_y*(PB_0*delta[b1][g0] + PB_1*delta[b0][g0]))
+                        )
+
+                        + (-2.0) * S1 * inv_S2 * inv_S4 * a_i * a_j * (
+                            +PA_x*PB_0*PB_1*PB_y*delta[d0][d1]
+                        )
+
+                        + S1 * inv_S2 * inv_S4 * a_i * (
+                            +PA_x*PB_0*delta[b1][g1]*delta[d0][d1]
+
+                            +PA_x*PB_1*delta[b0][g1]*delta[d0][d1]
+                        )
+
+                        + 2.0 * S2 * inv_S1 * inv_S4 * a_i * a_j * (
+                            +QD_0*QD_1*delta[g0][g1]*(PB_0*(-PB_1 + PQ[b1]) + PB_1*PQ[b0])
+
+                            +QD_0*QD_1*(PA_x*(-PB_0*delta[b1][g1] - PB_1*delta[b0][g1] - PB_y*delta[b0][b1] + PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1] + PQ[g1]*delta[b0][b1]) + PQ[g0]*(PB_0*delta[b1][g1] + PB_1*delta[b0][g1] + PB_y*delta[b0][b1]) + delta[b0][g0]*(PB_1*(-PB_y + PQ[g1]) + PB_y*PQ[b1]) + delta[b1][g0]*(PB_0*(-PB_y + PQ[g1]) + PB_y*PQ[b0]))
+                        )
+
+                        + S2 * inv_S1 * inv_S4 * a_i * (
+                            +QD_0*QD_1*(delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+                        )
+
+                        + 2.0 * inv_S4 * a_i * a_j * (
+                            +delta[d0][d1]*(PA_x*PB_0*(PB_1*PQ[g1] + PB_y*PQ[b1]) + PB_1*PB_y*(PA_x*PQ[b0] + PB_0*PQ[g0]))
+
+                            +PA_x*PB_0*(PB_1*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1]) + PB_y*(QD_0*delta[b1][d1] + QD_1*delta[b1][d0])) + PB_1*PB_y*(PA_x*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0]) + PB_0*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0]))
+
+                            -(PQ[d0]*QD_1 + PQ[d1]*QD_0)*(PA_x*(PB_0*delta[b1][g1] + PB_1*delta[b0][g1] + PB_y*delta[b0][b1]) + PB_0*(PB_1*delta[g0][g1] + PB_y*delta[b1][g0]) + PB_1*PB_y*delta[b0][g0])
+                        )
+
+                        + inv_S4 * a_i * (
+                            -delta[b1][g1]*delta[d0][d1]*(PA_x*PQ[b0] + PB_0*PQ[g0])
+
+                            -(PB_0*delta[b1][g1] + PB_1*delta[b0][g1])*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0])
+
+                            -delta[b0][g1]*delta[d0][d1]*(PA_x*PQ[b1] + PB_1*PQ[g0])
+
+                            -PA_x*(QD_0*(delta[b0][d1]*delta[b1][g1] + delta[b0][g1]*delta[b1][d1]) + QD_1*(delta[b0][d0]*delta[b1][g1] + delta[b0][g1]*delta[b1][d0]))
+
+                            +(PQ[d0]*QD_1 + PQ[d1]*QD_0)*(delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+                        )
+
+                        + 4.0 * S1 * inv_S4 * a_i * a_j * (
+                            -PA_x*PB_0*PB_1*PB_y*(PQ[d0]*QD_1 + PQ[d1]*QD_0)
+                        )
+
+                        + 2.0 * S1 * inv_S4 * a_i * (
+                            +PA_x*PB_0*delta[b1][g1]*(PQ[d0]*QD_1 + PQ[d1]*QD_0)
+
+                            +PA_x*PB_1*delta[b0][g1]*(PQ[d0]*QD_1 + PQ[d1]*QD_0)
+                        )
+
+                        + 4.0 * S2 * inv_S4 * a_i * a_j * (
+                            +QD_0*QD_1*(PA_x*PB_0*(PB_1*PQ[g1] + PB_y*PQ[b1]) + PB_1*PB_y*(PA_x*PQ[b0] + PB_0*PQ[g0]))
+                        )
+
+                        + (-2.0) * S2 * inv_S4 * a_i * (
+                            +QD_0*QD_1*delta[b1][g1]*(PA_x*PQ[b0] + PB_0*PQ[g0])
+
+                            +QD_0*QD_1*delta[b0][g1]*(PA_x*PQ[b1] + PB_1*PQ[g0])
+                        )
+
+                        + 0.5 * inv_S1 * inv_S4 * a_i * (
+                            +delta[d0][d1]*(delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+                        )
+
+                        + 0.5 * inv_S2 * inv_S4 * a_i * (
+                            +delta[d0][d1]*(delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+                        )
+
+                    )
+
+                    + F6_t[2] * (
+
+                        S2 * S2 * inv_S1 * inv_S1 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +QD_0*QD_1*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+                        )
+
+                        + S2 * inv_S1 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +delta[d0][d1]*delta[g0][g1]*(-PB_0*PQ[b1] + PQ[b0]*(-PB_1 + PQ[b1]))
+
+                            +delta[d0][d1]*(-PA_x*(PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1] + PQ[g1]*delta[b0][b1]) + PQ[g0]*(-PB_0*delta[b1][g1] - PB_1*delta[b0][g1] - PB_y*delta[b0][b1] + PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1]) + PQ[g1]*(-PB_0*delta[b1][g0] - PB_1*delta[b0][g0] + PQ[g0]*delta[b0][b1]) + (-PB_y + PQ[g1])*(PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0]))
+
+                            +(-PA_x*QD_0 + PQ[g0]*QD_0)*(delta[b0][b1]*delta[d1][g1] + delta[b0][d1]*delta[b1][g1] + delta[b0][g1]*delta[b1][d1]) + (-PA_x*QD_1 + PQ[g0]*QD_1)*(delta[b0][b1]*delta[d0][g1] + delta[b0][d0]*delta[b1][g1] + delta[b0][g1]*delta[b1][d0]) + (-PB_0*QD_0 + PQ[b0]*QD_0)*(delta[b1][d1]*delta[g0][g1] + delta[b1][g0]*delta[d1][g1] + delta[b1][g1]*delta[d1][g0]) + (-PB_0*QD_1 + PQ[b0]*QD_1)*(delta[b1][d0]*delta[g0][g1] + delta[b1][g0]*delta[d0][g1] + delta[b1][g1]*delta[d0][g0]) + (-PB_1*QD_0 + PQ[b1]*QD_0)*(delta[b0][d1]*delta[g0][g1] + delta[b0][g0]*delta[d1][g1] + delta[b0][g1]*delta[d1][g0]) + (-PB_1*QD_1 + PQ[b1]*QD_1)*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0]) + (-PB_y*QD_0 + PQ[g1]*QD_0)*(delta[b0][b1]*delta[d1][g0] + delta[b0][d1]*delta[b1][g0] + delta[b0][g0]*delta[b1][d1]) + (-PB_y*QD_1 + PQ[g1]*QD_1)*(delta[b0][b1]*delta[d0][g0] + delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0])
+
+                            +2.0*(PQ[d0]*QD_1 + PQ[d1]*QD_0)*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+                        )
+
+                        + inv_S4 * inv_S4 * a_i * a_j * (
+                            +delta[d0][d1]*delta[g0][g1]*(PB_0*(PB_1 - PQ[b1]) - PB_1*PQ[b0])
+
+                            +PA_x*(PB_0*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1]) + PB_1*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1]) + PB_y*(delta[b0][d0]*delta[b1][d1] + delta[b0][d1]*delta[b1][d0])) + PB_0*(PB_1*(delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0]) + PB_y*(delta[b1][d0]*delta[d1][g0] + delta[b1][d1]*delta[d0][g0])) + PB_1*PB_y*(delta[b0][d0]*delta[d1][g0] + delta[b0][d1]*delta[d0][g0])
+
+                            +delta[d0][d1]*(PA_x*(PB_0*delta[b1][g1] + PB_1*delta[b0][g1] - PQ[b0]*delta[b1][g1] - PQ[b1]*delta[b0][g1] - PQ[g1]*delta[b0][b1]) + PB_y*(PA_x*delta[b0][b1] - PQ[b0]*delta[b1][g0] - PQ[b1]*delta[b0][g0]) - PQ[g0]*(PB_0*delta[b1][g1] + PB_1*delta[b0][g1] + PB_y*delta[b0][b1]) + (PB_y - PQ[g1])*(PB_0*delta[b1][g0] + PB_1*delta[b0][g0]))
+
+                            -PQ[d0]*(PA_x*(delta[b0][b1]*delta[d1][g1] + delta[b0][d1]*delta[b1][g1] + delta[b0][g1]*delta[b1][d1]) + PB_0*(delta[b1][d1]*delta[g0][g1] + delta[b1][g0]*delta[d1][g1] + delta[b1][g1]*delta[d1][g0]) + PB_1*(delta[b0][d1]*delta[g0][g1] + delta[b0][g0]*delta[d1][g1] + delta[b0][g1]*delta[d1][g0]) + PB_y*(delta[b0][b1]*delta[d1][g0] + delta[b0][d1]*delta[b1][g0] + delta[b0][g0]*delta[b1][d1])) - PQ[d1]*(PA_x*(delta[b0][b1]*delta[d0][g1] + delta[b0][d0]*delta[b1][g1] + delta[b0][g1]*delta[b1][d0]) + PB_0*(delta[b1][d0]*delta[g0][g1] + delta[b1][g0]*delta[d0][g1] + delta[b1][g1]*delta[d0][g0]) + PB_1*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0]) + PB_y*(delta[b0][b1]*delta[d0][g0] + delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0]))
+
+                            +PQ[d0]*PQ[d1]*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+                        )
+
+                        + (-0.5) * inv_S4 * inv_S4 * a_i * (
+                            +delta[b0][g1]*(delta[b1][d0]*delta[d1][g0] + delta[b1][d1]*delta[d0][g0] + delta[b1][g0]*delta[d0][d1]) + delta[b1][g1]*(delta[b0][d0]*delta[d1][g0] + delta[b0][d1]*delta[d0][g0] + delta[b0][g0]*delta[d0][d1])
+                        )
+
+                        + 2.0 * S1 * inv_S4 * inv_S4 * a_i * a_j * (
+                            -PA_x*PB_0*PB_1*PQ[d0]*delta[d1][g1]
+
+                            -PA_x*PB_0*PQ[d1]*(PB_1*delta[d0][g1] + PB_y*delta[b1][d0]) - PB_y*(PB_1*PQ[d1]*(PA_x*delta[b0][d0] + PB_0*delta[d0][g0]) + PQ[d0]*(PA_x*(PB_0*delta[b1][d1] + PB_1*delta[b0][d1]) + PB_0*PB_1*delta[d1][g0]))
+
+                            -delta[d0][d1]*(PA_x*PB_0*(PB_1*PQ[g1] + PB_y*PQ[b1]) + PB_1*PB_y*(PA_x*PQ[b0] + PB_0*PQ[g0]))
+
+                            +PQ[d0]*PQ[d1]*(PA_x*(PB_0*delta[b1][g1] + PB_1*delta[b0][g1] + PB_y*delta[b0][b1]) + PB_0*(PB_1*delta[g0][g1] + PB_y*delta[b1][g0]) + PB_1*PB_y*delta[b0][g0])
+                        )
+
+                        + S1 * inv_S4 * inv_S4 * a_i * (
+                            +PB_0*PQ[d0]*delta[b1][g1]*delta[d1][g0]
+
+                            +PB_1*PQ[d0]*delta[b0][g1]*delta[d1][g0] + PQ[d1]*delta[d0][g0]*(PB_0*delta[b1][g1] + PB_1*delta[b0][g1])
+
+                            +delta[d0][d1]*(PA_x*(PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1]) + PQ[g0]*(PB_0*delta[b1][g1] + PB_1*delta[b0][g1]))
+
+                            -PQ[d0]*PQ[d1]*(delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+
+                            +PA_x*(PQ[d0]*(delta[b0][d1]*delta[b1][g1] + delta[b0][g1]*delta[b1][d1]) + PQ[d1]*(delta[b0][d0]*delta[b1][g1] + delta[b0][g1]*delta[b1][d0]))
+                        )
+
+                        + 2.0 * S2 * S2 * inv_S1 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +QD_0*QD_1*delta[g0][g1]*(-PB_0*PQ[b1] + PQ[b0]*(-PB_1 + PQ[b1]))
+
+                            +QD_0*QD_1*(-PA_x*(PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1] + PQ[g1]*delta[b0][b1]) + PQ[g0]*(-PB_0*delta[b1][g1] - PB_1*delta[b0][g1] - PB_y*delta[b0][b1] + PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1]) + PQ[g1]*(-PB_0*delta[b1][g0] - PB_1*delta[b0][g0] + PQ[g0]*delta[b0][b1]) + (-PB_y + PQ[g1])*(PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0]))
+                        )
+
+                        + 2.0 * S2 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +delta[g0][g1]*(PB_0*(PB_1 - PQ[b1]) - PB_1*PQ[b0])*(PQ[d0]*QD_1 + PQ[d1]*QD_0)
+
+                            +delta[d0][d1]*(PA_x*PQ[b1]*(PB_0*PQ[g1] + PB_y*PQ[b0]) + PB_0*PQ[g0]*(PB_1*PQ[g1] + PB_y*PQ[b1]) + PB_1*PQ[b0]*(PA_x*PQ[g1] + PB_y*PQ[g0]))
+
+                            +PA_x*(PB_0*(PQ[b1]*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1]) + PQ[g1]*(QD_0*delta[b1][d1] + QD_1*delta[b1][d0])) + PB_1*(PQ[b0]*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1]) + PQ[g1]*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0])) + PB_y*(PQ[b0]*(QD_0*delta[b1][d1] + QD_1*delta[b1][d0]) + PQ[b1]*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0]))) + PB_0*(PB_1*(PQ[g0]*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1]) + PQ[g1]*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0])) + PB_y*(PQ[b1]*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0]) + PQ[g0]*(QD_0*delta[b1][d1] + QD_1*delta[b1][d0]))) + PB_1*PB_y*(PQ[b0]*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0]) + PQ[g0]*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0]))
+
+                            +(PQ[d0]*QD_1 + PQ[d1]*QD_0)*(PA_x*(PB_0*delta[b1][g1] + PB_1*delta[b0][g1] + PB_y*delta[b0][b1] - PQ[b0]*delta[b1][g1] - PQ[b1]*delta[b0][g1] - PQ[g1]*delta[b0][b1]) - PB_y*(PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0]) - PQ[g0]*(PB_0*delta[b1][g1] + PB_1*delta[b0][g1] + PB_y*delta[b0][b1]) + (PB_y - PQ[g1])*(PB_0*delta[b1][g0] + PB_1*delta[b0][g0]))
+                        )
+
+                        + (-1.0) * S2 * inv_S4 * inv_S4 * a_i * (
+                            +PQ[b0]*delta[b1][g1]*(PQ[g0]*delta[d0][d1] + QD_0*delta[d1][g0] + QD_1*delta[d0][g0]) + PQ[b1]*delta[b0][g1]*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0])
+
+                            +PQ[b1]*PQ[g0]*delta[b0][g1]*delta[d0][d1]
+
+                            +(PQ[d0]*QD_1 + PQ[d1]*QD_0)*(delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+
+                            +PQ[g0]*(QD_0*(delta[b0][d1]*delta[b1][g1] + delta[b0][g1]*delta[b1][d1]) + QD_1*(delta[b0][d0]*delta[b1][g1] + delta[b0][g1]*delta[b1][d0]))
+                        )
+
+                        + 4.0 * S1 * S1 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +PA_x*PB_0*PB_1*PB_y*PQ[d0]*PQ[d1]
+                        )
+
+                        + (-2.0) * S1 * S1 * inv_S4 * inv_S4 * a_i * (
+                            +PA_x*PB_0*PQ[d0]*PQ[d1]*delta[b1][g1]
+
+                            +PA_x*PB_1*PQ[d0]*PQ[d1]*delta[b0][g1]
+                        )
+
+                        + 4.0 * S1 * S2 * inv_S4 * inv_S4 * a_i * a_j * (
+                            -(PQ[d0]*QD_1 + PQ[d1]*QD_0)*(PA_x*PB_0*(PB_1*PQ[g1] + PB_y*PQ[b1]) + PB_1*PB_y*(PA_x*PQ[b0] + PB_0*PQ[g0]))
+                        )
+
+                        + 2.0 * S1 * S2 * inv_S4 * inv_S4 * a_i * (
+                            +delta[b1][g1]*(PA_x*PQ[b0] + PB_0*PQ[g0])*(PQ[d0]*QD_1 + PQ[d1]*QD_0)
+
+                            +delta[b0][g1]*(PA_x*PQ[b1] + PB_1*PQ[g0])*(PQ[d0]*QD_1 + PQ[d1]*QD_0)
+                        )
+
+                        + 4.0 * S2 * S2 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +QD_0*QD_1*(PA_x*PQ[b1]*(PB_0*PQ[g1] + PB_y*PQ[b0]) + PB_0*PQ[g0]*(PB_1*PQ[g1] + PB_y*PQ[b1]) + PB_1*PQ[b0]*(PA_x*PQ[g1] + PB_y*PQ[g0]))
+                        )
+
+                        + (-2.0) * S2 * S2 * inv_S4 * inv_S4 * a_i * (
+                            +PQ[b0]*PQ[g0]*QD_0*QD_1*delta[b1][g1]
+
+                            +PQ[b1]*PQ[g0]*QD_0*QD_1*delta[b0][g1]
+                        )
+
+                        + 0.5 * S2 * inv_S1 * inv_S1 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +delta[d0][d1]*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+                        )
+
+                        + 0.5 * inv_S1 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +2.0*delta[d0][d1]*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+
+                            +delta[b0][d0]*(delta[b1][d1]*delta[g0][g1] + delta[b1][g0]*delta[d1][g1] + delta[b1][g1]*delta[d1][g0]) + delta[b1][d0]*(delta[b0][d1]*delta[g0][g1] + delta[b0][g0]*delta[d1][g1] + delta[b0][g1]*delta[d1][g0]) + delta[d0][g0]*(delta[b0][b1]*delta[d1][g1] + delta[b0][d1]*delta[b1][g1] + delta[b0][g1]*delta[b1][d1]) + delta[d0][g1]*(delta[b0][b1]*delta[d1][g0] + delta[b0][d1]*delta[b1][g0] + delta[b0][g0]*delta[b1][d1])
+                        )
+
+                    )
+
+                    + F6_t[3] * (
+
+                        (-0.5) * S2 * inv_S1 * inv_S4 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +delta[b0][b1]*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0]) + delta[b0][d0]*(delta[b1][d1]*delta[g0][g1] + delta[b1][g0]*delta[d1][g1] + delta[b1][g1]*delta[d1][g0]) + delta[b0][d1]*(delta[b1][d0]*delta[g0][g1] + delta[b1][g0]*delta[d0][g1] + delta[b1][g1]*delta[d0][g0]) + delta[b0][g0]*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1] + delta[b1][g1]*delta[d0][d1]) + delta[b0][g1]*(delta[b1][d0]*delta[d1][g0] + delta[b1][d1]*delta[d0][g0] + delta[b1][g0]*delta[d0][d1])
+                        )
+
+                        + (-1.0) * S2 * S2 * inv_S1 * inv_S4 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +PQ[b0]*PQ[b1]*delta[d0][d1]*delta[g0][g1]
+
+                            +delta[d0][d1]*(PQ[g0]*(PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1] + PQ[g1]*delta[b0][b1]) + PQ[g1]*(PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0]))
+
+                            +QD_0*(PQ[b0]*(delta[b1][d1]*delta[g0][g1] + delta[b1][g0]*delta[d1][g1] + delta[b1][g1]*delta[d1][g0]) + PQ[b1]*(delta[b0][d1]*delta[g0][g1] + delta[b0][g0]*delta[d1][g1] + delta[b0][g1]*delta[d1][g0]) + PQ[g0]*(delta[b0][b1]*delta[d1][g1] + delta[b0][d1]*delta[b1][g1] + delta[b0][g1]*delta[b1][d1]) + PQ[g1]*(delta[b0][b1]*delta[d1][g0] + delta[b0][d1]*delta[b1][g0] + delta[b0][g0]*delta[b1][d1])) + QD_1*(PQ[b0]*(delta[b1][d0]*delta[g0][g1] + delta[b1][g0]*delta[d0][g1] + delta[b1][g1]*delta[d0][g0]) + PQ[b1]*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0]) + PQ[g0]*(delta[b0][b1]*delta[d0][g1] + delta[b0][d0]*delta[b1][g1] + delta[b0][g1]*delta[b1][d0]) + PQ[g1]*(delta[b0][b1]*delta[d0][g0] + delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0]))
+
+                            +(PQ[d0]*QD_1 + PQ[d1]*QD_0)*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+                        )
+
+                        + S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +delta[d0][d1]*delta[g0][g1]*(PB_1*PQ[b0] + PQ[b1]*(PB_0 - PQ[b0]))
+
+                            +(PA_x*PQ[b0] + PB_0*PQ[g0])*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1]) + (PA_x*PQ[b1] + PB_1*PQ[g0])*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1]) + (PA_x*PQ[g1] + PB_y*PQ[g0])*(delta[b0][d0]*delta[b1][d1] + delta[b0][d1]*delta[b1][d0]) + (PB_0*PQ[b1] + PB_1*PQ[b0])*(delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0]) + (PB_0*PQ[g1] + PB_y*PQ[b0])*(delta[b1][d0]*delta[d1][g0] + delta[b1][d1]*delta[d0][g0]) + (PB_1*PQ[g1] + PB_y*PQ[b1])*(delta[b0][d0]*delta[d1][g0] + delta[b0][d1]*delta[d0][g0])
+
+                            +(PA_x*PQ[d0] - PQ[d0]*PQ[g0])*(delta[b0][b1]*delta[d1][g1] + delta[b0][d1]*delta[b1][g1] + delta[b0][g1]*delta[b1][d1]) + (PA_x*PQ[d1] - PQ[d1]*PQ[g0])*(delta[b0][b1]*delta[d0][g1] + delta[b0][d0]*delta[b1][g1] + delta[b0][g1]*delta[b1][d0]) + (PB_0*PQ[d0] - PQ[b0]*PQ[d0])*(delta[b1][d1]*delta[g0][g1] + delta[b1][g0]*delta[d1][g1] + delta[b1][g1]*delta[d1][g0]) + (PB_0*PQ[d1] - PQ[b0]*PQ[d1])*(delta[b1][d0]*delta[g0][g1] + delta[b1][g0]*delta[d0][g1] + delta[b1][g1]*delta[d0][g0]) + (PB_1*PQ[d0] - PQ[b1]*PQ[d0])*(delta[b0][d1]*delta[g0][g1] + delta[b0][g0]*delta[d1][g1] + delta[b0][g1]*delta[d1][g0]) + (PB_1*PQ[d1] - PQ[b1]*PQ[d1])*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0]) + (PB_y*PQ[d0] - PQ[d0]*PQ[g1])*(delta[b0][b1]*delta[d1][g0] + delta[b0][d1]*delta[b1][g0] + delta[b0][g0]*delta[b1][d1]) + (PB_y*PQ[d1] - PQ[d1]*PQ[g1])*(delta[b0][b1]*delta[d0][g0] + delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0])
+
+                            +delta[d0][d1]*(PA_x*(PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1] + PQ[g1]*delta[b0][b1]) + PB_y*(PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0]) + PQ[g0]*(PB_0*delta[b1][g1] + PB_1*delta[b0][g1] + PB_y*delta[b0][b1] - PQ[b0]*delta[b1][g1] - PQ[b1]*delta[b0][g1] - PQ[g1]*delta[b0][b1]) + PQ[g1]*(delta[b0][g0]*(PB_1 - PQ[b1]) + delta[b1][g0]*(PB_0 - PQ[b0])))
+
+                            -2*PQ[d0]*PQ[d1]*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+                        )
+
+                        + 2.0 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +PQ[d0]*PQ[d1]*delta[g0][g1]*(PB_0*(-PB_1 + PQ[b1]) + PB_1*PQ[b0])
+
+                            -PA_x*(PB_0*(PQ[b1]*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1]) + PQ[g1]*(PQ[d0]*delta[b1][d1] + PQ[d1]*delta[b1][d0])) + PB_1*(PQ[b0]*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1]) + PQ[g1]*(PQ[d0]*delta[b0][d1] + PQ[d1]*delta[b0][d0])) + PB_y*(PQ[b0]*(PQ[d0]*delta[b1][d1] + PQ[d1]*delta[b1][d0]) + PQ[b1]*(PQ[d0]*delta[b0][d1] + PQ[d1]*delta[b0][d0]))) - PB_0*(PB_1*(PQ[d0]*(PQ[g0]*delta[d1][g1] + PQ[g1]*delta[d1][g0]) + PQ[d1]*(PQ[g0]*delta[d0][g1] + PQ[g1]*delta[d0][g0])) + PB_y*(PQ[b1]*(PQ[d0]*delta[d1][g0] + PQ[d1]*delta[d0][g0]) + PQ[g0]*(PQ[d0]*delta[b1][d1] + PQ[d1]*delta[b1][d0]))) - PB_1*PB_y*(PQ[b0]*(PQ[d0]*delta[d1][g0] + PQ[d1]*delta[d0][g0]) + PQ[g0]*(PQ[d0]*delta[b0][d1] + PQ[d1]*delta[b0][d0]))
+
+                            -delta[d0][d1]*(PA_x*PQ[b1]*(PB_0*PQ[g1] + PB_y*PQ[b0]) + PB_0*PQ[g0]*(PB_1*PQ[g1] + PB_y*PQ[b1]) + PB_1*PQ[b0]*(PA_x*PQ[g1] + PB_y*PQ[g0]))
+
+                            +PQ[d0]*PQ[d1]*(PA_x*(-PB_0*delta[b1][g1] - PB_1*delta[b0][g1] - PB_y*delta[b0][b1] + PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1] + PQ[g1]*delta[b0][b1]) + PQ[g0]*(PB_0*delta[b1][g1] + PB_1*delta[b0][g1] + PB_y*delta[b0][b1]) + delta[b0][g0]*(PB_1*(-PB_y + PQ[g1]) + PB_y*PQ[b1]) + delta[b1][g0]*(PB_0*(-PB_y + PQ[g1]) + PB_y*PQ[b0]))
+                        )
+
+                        + (-2.0) * S2 * S2 * S2 * inv_S1 * inv_S4 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +PQ[b0]*PQ[b1]*QD_0*QD_1*delta[g0][g1]
+
+                            +QD_0*QD_1*(PQ[g0]*(PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1] + PQ[g1]*delta[b0][b1]) + PQ[g1]*(PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0]))
+                        )
+
+                        + 2.0 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +delta[g0][g1]*(PB_1*PQ[b0] + PQ[b1]*(PB_0 - PQ[b0]))*(PQ[d0]*QD_1 + PQ[d1]*QD_0)
+
+                            +delta[d0][d1]*(PQ[b0]*PQ[b1]*(PA_x*PQ[g1] + PB_y*PQ[g0]) + PQ[g0]*PQ[g1]*(PB_0*PQ[b1] + PB_1*PQ[b0]))
+
+                            +PQ[b0]*(PA_x*(PQ[b1]*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1]) + PQ[g1]*(QD_0*delta[b1][d1] + QD_1*delta[b1][d0])) + PB_1*(PQ[g0]*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1]) + PQ[g1]*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0])) + PB_y*(PQ[b1]*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0]) + PQ[g0]*(QD_0*delta[b1][d1] + QD_1*delta[b1][d0]))) + PQ[b1]*PQ[g1]*(PA_x*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0]) + PB_0*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0])) + PQ[g0]*(PB_0*(PQ[b1]*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1]) + PQ[g1]*(QD_0*delta[b1][d1] + QD_1*delta[b1][d0])) + (PB_1*PQ[g1] + PB_y*PQ[b1])*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0]))
+
+                            +(PQ[d0]*QD_1 + PQ[d1]*QD_0)*(PA_x*(PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1] + PQ[g1]*delta[b0][b1]) + PB_y*(PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0]) + PQ[g0]*(PB_0*delta[b1][g1] + PB_1*delta[b0][g1] + PB_y*delta[b0][b1] - PQ[b0]*delta[b1][g1] - PQ[b1]*delta[b0][g1] - PQ[g1]*delta[b0][b1]) + PQ[g1]*(delta[b0][g0]*(PB_1 - PQ[b1]) + delta[b1][g0]*(PB_0 - PQ[b0])))
+                        )
+
+                        + 4.0 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +PQ[d0]*PQ[d1]*(PA_x*PB_0*(PB_1*PQ[g1] + PB_y*PQ[b1]) + PB_1*PB_y*(PA_x*PQ[b0] + PB_0*PQ[g0]))
+                        )
+
+                        + (-2.0) * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * (
+                            +PQ[d0]*PQ[d1]*delta[b1][g1]*(PA_x*PQ[b0] + PB_0*PQ[g0])
+
+                            +PQ[d0]*PQ[d1]*delta[b0][g1]*(PA_x*PQ[b1] + PB_1*PQ[g0])
+                        )
+
+                        + 4.0 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_j * (
+                            -(PQ[d0]*QD_1 + PQ[d1]*QD_0)*(PA_x*PQ[b1]*(PB_0*PQ[g1] + PB_y*PQ[b0]) + PB_0*PQ[g0]*(PB_1*PQ[g1] + PB_y*PQ[b1]) + PB_1*PQ[b0]*(PA_x*PQ[g1] + PB_y*PQ[g0]))
+                        )
+
+                        + 2.0 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * (
+                            +PQ[b0]*PQ[g0]*delta[b1][g1]*(PQ[d0]*QD_1 + PQ[d1]*QD_0)
+
+                            +PQ[b1]*PQ[g0]*delta[b0][g1]*(PQ[d0]*QD_1 + PQ[d1]*QD_0)
+                        )
+
+                        + 4.0 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +QD_0*QD_1*(PQ[b0]*PQ[b1]*(PA_x*PQ[g1] + PB_y*PQ[g0]) + PQ[g0]*PQ[g1]*(PB_0*PQ[b1] + PB_1*PQ[b0]))
+                        )
+
+                        + S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * (
+                            +PQ[b0]*PQ[d0]*delta[b1][g1]*delta[d1][g0]
+
+                            +PQ[b0]*delta[b1][g1]*(PQ[d1]*delta[d0][g0] + PQ[g0]*delta[d0][d1]) + PQ[b1]*delta[b0][g1]*(PQ[d0]*delta[d1][g0] + PQ[d1]*delta[d0][g0] + PQ[g0]*delta[d0][d1])
+
+                            +PQ[d0]*(PQ[d1]*(delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0]) + PQ[g0]*(delta[b0][d1]*delta[b1][g1] + delta[b0][g1]*delta[b1][d1])) + PQ[d1]*PQ[g0]*(delta[b0][d0]*delta[b1][g1] + delta[b0][g1]*delta[b1][d0])
+                        )
+
+                    )
+
+                    + F6_t[4] * (
+
+                        2.0 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +PQ[d0]*PQ[d1]*delta[g0][g1]*(-PB_0*PQ[b1] + PQ[b0]*(-PB_1 + PQ[b1]))
+
+                            -PQ[b0]*(PA_x*(PQ[b1]*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1]) + PQ[g1]*(PQ[d0]*delta[b1][d1] + PQ[d1]*delta[b1][d0])) + PB_1*(PQ[d0]*(PQ[g0]*delta[d1][g1] + PQ[g1]*delta[d1][g0]) + PQ[d1]*(PQ[g0]*delta[d0][g1] + PQ[g1]*delta[d0][g0])) + PB_y*(PQ[b1]*(PQ[d0]*delta[d1][g0] + PQ[d1]*delta[d0][g0]) + PQ[g0]*(PQ[d0]*delta[b1][d1] + PQ[d1]*delta[b1][d0]))) - PQ[b1]*(PB_0*(PQ[d0]*(PQ[g0]*delta[d1][g1] + PQ[g1]*delta[d1][g0]) + PQ[d1]*(PQ[g0]*delta[d0][g1] + PQ[g1]*delta[d0][g0])) + (PA_x*PQ[g1] + PB_y*PQ[g0])*(PQ[d0]*delta[b0][d1] + PQ[d1]*delta[b0][d0])) - PQ[g0]*PQ[g1]*(PB_0*(PQ[d0]*delta[b1][d1] + PQ[d1]*delta[b1][d0]) + PB_1*(PQ[d0]*delta[b0][d1] + PQ[d1]*delta[b0][d0]))
+
+                            -delta[d0][d1]*(PQ[b0]*PQ[b1]*(PA_x*PQ[g1] + PB_y*PQ[g0]) + PQ[g0]*PQ[g1]*(PB_0*PQ[b1] + PB_1*PQ[b0]))
+
+                            +PQ[d0]*PQ[d1]*(-PA_x*(PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1] + PQ[g1]*delta[b0][b1]) + PQ[g0]*(-PB_0*delta[b1][g1] - PB_1*delta[b0][g1] - PB_y*delta[b0][b1] + PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1]) + PQ[g1]*(-PB_0*delta[b1][g0] - PB_1*delta[b0][g0] + PQ[g0]*delta[b0][b1]) + (-PB_y + PQ[g1])*(PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0]))
+                        )
+
+                        + 2.0 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +PQ[b0]*PQ[b1]*delta[g0][g1]*(PQ[d0]*QD_1 + PQ[d1]*QD_0)
+
+                            +PQ[b0]*PQ[b1]*(PQ[g0]*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1]) + PQ[g1]*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0])) + PQ[g0]*PQ[g1]*(PQ[b0]*(QD_0*delta[b1][d1] + QD_1*delta[b1][d0]) + PQ[b1]*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0]))
+
+                            +(PQ[d0]*QD_1 + PQ[d1]*QD_0)*(PQ[g0]*(PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1] + PQ[g1]*delta[b0][b1]) + PQ[g1]*(PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0]))
+
+                            +PQ[b0]*PQ[b1]*PQ[g0]*PQ[g1]*delta[d0][d1]
+                        )
+
+                        + 4.0 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +PQ[d0]*PQ[d1]*(PA_x*PQ[b1]*(PB_0*PQ[g1] + PB_y*PQ[b0]) + PB_0*PQ[g0]*(PB_1*PQ[g1] + PB_y*PQ[b1]) + PB_1*PQ[b0]*(PA_x*PQ[g1] + PB_y*PQ[g0]))
+                        )
+
+                        + (-2.0) * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * (
+                            +PQ[b0]*PQ[d0]*PQ[d1]*PQ[g0]*delta[b1][g1]
+
+                            +PQ[b1]*PQ[d0]*PQ[d1]*PQ[g0]*delta[b0][g1]
+                        )
+
+                        + 4.0 * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_j * (
+                            -(PQ[d0]*QD_1 + PQ[d1]*QD_0)*(PQ[b0]*PQ[b1]*(PA_x*PQ[g1] + PB_y*PQ[g0]) + PQ[g0]*PQ[g1]*(PB_0*PQ[b1] + PB_1*PQ[b0]))
+                        )
+
+                        + 4.0 * S2 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +PQ[b0]*PQ[b1]*PQ[g0]*PQ[g1]*QD_0*QD_1
+                        )
+
+                        + S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +PQ[b0]*PQ[b1]*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+
+                            +PQ[d0]*(PQ[b0]*(delta[b1][d1]*delta[g0][g1] + delta[b1][g0]*delta[d1][g1] + delta[b1][g1]*delta[d1][g0]) + PQ[b1]*(delta[b0][d1]*delta[g0][g1] + delta[b0][g0]*delta[d1][g1] + delta[b0][g1]*delta[d1][g0]) + PQ[d1]*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0]) + PQ[g0]*(delta[b0][b1]*delta[d1][g1] + delta[b0][d1]*delta[b1][g1] + delta[b0][g1]*delta[b1][d1]) + PQ[g1]*(delta[b0][b1]*delta[d1][g0] + delta[b0][d1]*delta[b1][g0] + delta[b0][g0]*delta[b1][d1])) + PQ[d1]*(PQ[b0]*(delta[b1][d0]*delta[g0][g1] + delta[b1][g0]*delta[d0][g1] + delta[b1][g1]*delta[d0][g0]) + PQ[b1]*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0]) + PQ[g0]*(delta[b0][b1]*delta[d0][g1] + delta[b0][d0]*delta[b1][g1] + delta[b0][g1]*delta[b1][d0]) + PQ[g1]*(delta[b0][b1]*delta[d0][g0] + delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0])) + PQ[g0]*(PQ[b0]*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1] + delta[b1][g1]*delta[d0][d1]) + PQ[b1]*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1]) + PQ[g1]*(delta[b0][b1]*delta[d0][d1] + delta[b0][d0]*delta[b1][d1] + delta[b0][d1]*delta[b1][d0])) + PQ[g1]*(PQ[b0]*(delta[b1][d0]*delta[d1][g0] + delta[b1][d1]*delta[d0][g0] + delta[b1][g0]*delta[d0][d1]) + PQ[b1]*(delta[b0][d0]*delta[d1][g0] + delta[b0][d1]*delta[d0][g0] + delta[b0][g0]*delta[d0][d1]))
+                        )
+
+                    )
+
+                    + F6_t[5] * (
+
+                        (-2.0) * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +PQ[b0]*PQ[b1]*PQ[d0]*PQ[d1]*delta[g0][g1]
+
+                            +PQ[g0]*(PQ[b0]*(PQ[b1]*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1]) + PQ[d1]*PQ[g1]*delta[b1][d0]) + PQ[d0]*PQ[d1]*(PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1] + PQ[g1]*delta[b0][b1])) + PQ[g1]*(PQ[b1]*PQ[d1]*(PQ[b0]*delta[d0][g0] + PQ[d0]*delta[b0][g0] + PQ[g0]*delta[b0][d0]) + PQ[d0]*(PQ[b0]*(PQ[b1]*delta[d1][g0] + PQ[d1]*delta[b1][g0] + PQ[g0]*delta[b1][d1]) + PQ[b1]*PQ[g0]*delta[b0][d1]))
+                        )
+
+                        + 4.0 * S1 * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +PQ[d0]*PQ[d1]*(PQ[b0]*PQ[b1]*(PA_x*PQ[g1] + PB_y*PQ[g0]) + PQ[g0]*PQ[g1]*(PB_0*PQ[b1] + PB_1*PQ[b0]))
+                        )
+
+                        + 4.0 * S1 * S2 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_j * (
+                            -PQ[b0]*PQ[b1]*PQ[g0]*PQ[g1]*(PQ[d0]*QD_1 + PQ[d1]*QD_0)
+                        )
+
+                    )
+
+                    + F6_t[6] * (
+
+                        4.0 * S1 * S1 * S2 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_j * (
+                            +PQ[b0]*PQ[b1]*PQ[d0]*PQ[d1]*PQ[g0]*PQ[g1]
+                        )
+
+                    )
+
+                    );
+
+            double hess_ij_xy = -eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+
+            atomicAdd(
+                hess_xy + prim_cart_ao_to_atom_inds[i] * natoms + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + j_prim],
+                hess_ij_xy * ik_factor_D * 2.0 * frac_exact_exchange);
+        }
+    }
+
+    __syncthreads();
+}
+
+__global__ void __launch_bounds__(TILE_SIZE_K)
+computeExchangeHessianSDSD_KL_0(double*         hess_xy,
+                                double*         hess_yx,
+                                const uint32_t  hess_cart_ind_0,
+                                const uint32_t  hess_cart_ind_1,
+                                const double    frac_exact_exchange,
+                                const uint32_t* pair_inds_i_for_K_ss,
+                                const uint32_t* pair_inds_k_for_K_ss,
+                                const double*   D_ik_for_K_ss,
+                                const uint32_t  pair_inds_count_for_K_ss,
+                                const double*   s_prim_info,
+                                const uint32_t* s_prim_aoinds,
+                                const uint32_t  s_prim_count,
+                                const double*   d_prim_info,
+                                const uint32_t* d_prim_aoinds,
+                                const uint32_t  d_prim_count,
+                                const double    dd_max_D,
+                                const double*   mat_D_full_AO,
+                                const uint32_t  naos,
+                                const double*   Q_K_sd,
+                                const uint32_t* D_inds_K_sd,
+                                const uint32_t* pair_displs_K_sd,
+                                const uint32_t* pair_counts_K_sd,
+                                const double*   pair_data_K_sd,
+                                const uint32_t* prim_cart_ao_to_atom_inds,
+                                const uint32_t  natoms,
+                                const double*   boys_func_table,
+                                const double*   boys_func_ft,
+                                const double    omega,
+                                const double    eri_threshold)
+{
+    // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
+
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
+    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ double   delta[3][3];
+    __shared__ uint32_t g0, g1;
+
+    const uint32_t ik = blockIdx.x;
+
+    // we make sure that ik < pair_inds_count_for_K_ss when calling the kernel
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+        g0 = hess_cart_ind_0;
+        g1 = hess_cart_ind_1;
+
+        i = pair_inds_i_for_K_ss[ik];
+        k = pair_inds_k_for_K_ss[ik];
+
+        count_i = pair_counts_K_sd[i];
+        count_k = pair_counts_K_sd[k];
+
+        displ_i = pair_displs_K_sd[i];
+        displ_k = pair_displs_K_sd[k];
+
+        a_i = s_prim_info[i + s_prim_count * 0];
+
+        r_i[0] = s_prim_info[i + s_prim_count * 2];
+        r_i[1] = s_prim_info[i + s_prim_count * 3];
+        r_i[2] = s_prim_info[i + s_prim_count * 4];
+
+        a_k = s_prim_info[k + s_prim_count * 0];
+
+        r_k[0] = s_prim_info[k + s_prim_count * 2];
+        r_k[1] = s_prim_info[k + s_prim_count * 3];
+        r_k[2] = s_prim_info[k + s_prim_count * 4];
+
+        ik_factor_D = (static_cast<double>(i != k) + 1.0) * D_ik_for_K_ss[ik];
+
+    }
+
+    __syncthreads();
+
+    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    {
+        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+
+        // sync threads before starting a new scan
+        __syncthreads();
+
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
+
+        if (j < count_i)
+        {
+            Q_ij   = Q_K_sd[displ_i + j];
+
+            j_prim = D_inds_K_sd[displ_i + j];
+
+            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+
+            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = pair_data_K_sd[displ_i + j];
+
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
+
+        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        {
+            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+
+            // Q_kl == Q_K_sd[displ_k + l]
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_sd[displ_k + l] * dd_max_D) <= eri_threshold))
+            {
+                break;
+            }
+
+            // const auto Q_kl = Q_K_sd[displ_k + l];
+
+            const auto l_prim = D_inds_K_sd[displ_k + l];
+
+            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+
+            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+
+            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
+                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
+                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+
+            const auto S_kl_00 = pair_data_K_sd[displ_k + l];
+
+            const auto d0 = d_cart_inds[l_prim % 6][0];
+            const auto d1 = d_cart_inds[l_prim % 6][1];
+
+            // J. Chem. Phys. 84, 3963-3974 (1986)
+
+            const auto S2 = a_k + a_l;
+
+            const auto inv_S2 = 1.0 / S2;
+            const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
+
+            const auto rho = S1 * S2 * inv_S4;
+
+            double d2 = 1.0;
+
+            if (omega != 0.0) d2 = omega * omega / (rho + omega * omega);
+
+            const auto Lambda = sqrt(4.0 * rho * d2 * MATH_CONST_INV_PI);
+
+            double F6_t[7];
+
+            gpu::computeBoysFunction(F6_t, rho * d2 * r2_PQ, 6, boys_func_table, boys_func_ft);
+
+            if (omega != 0.0)
+            {
+                F6_t[1] *= d2;
+                F6_t[2] *= d2 * d2;
+                F6_t[3] *= d2 * d2 * d2;
+                F6_t[4] *= d2 * d2 * d2 * d2;
+                F6_t[5] *= d2 * d2 * d2 * d2 * d2;
+                F6_t[6] *= d2 * d2 * d2 * d2 * d2 * d2;
+            }
+
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+
+            const auto QC_x = (a_l * inv_S2) * (r_l[g0] - r_k[g0]);
+            const auto QD_y = (-a_k * inv_S2) * (r_l[g1] - r_k[g1]);
+
+            // k-l Hessian
+
+            const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
+                    + F6_t[0] * (
+
+                        inv_S1 * inv_S2 * a_k * a_l * (
+                            +QD_0*QD_1*delta[b0][b1]*delta[g0][g1]
+
+                            +delta[b0][b1]*(QC_x*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1] + QD_y*delta[d0][d1]) + QD_y*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0]))
+                        )
+
+                        + (-0.5) * inv_S1 * inv_S2 * a_k * (
+                            +delta[b0][b1]*(delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+                        )
+
+                        + inv_S2 * inv_S2 * a_k * a_l * (
+                            +PB_0*PB_1*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+                        )
+
+                        + 2.0 * inv_S1 * a_k * a_l * (
+                            +QC_x*QD_0*QD_1*QD_y*delta[b0][b1]
+                        )
+
+                        + (-1.0) * inv_S1 * a_k * (
+                            +QC_x*QD_0*delta[b0][b1]*delta[d1][g1]
+
+                            +QC_x*QD_1*delta[b0][b1]*delta[d0][g1]
+                        )
+
+                        + 2.0 * inv_S2 * a_k * a_l * (
+                            +PB_0*PB_1*QD_0*QD_1*delta[g0][g1]
+
+                            +PB_0*PB_1*(QC_x*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1] + QD_y*delta[d0][d1]) + QD_y*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0]))
+                        )
+
+                        + (-1.0) * inv_S2 * a_k * (
+                            +PB_0*PB_1*(delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+                        )
+
+                        + 4.0 * a_k * a_l * (
+                            +PB_0*PB_1*QC_x*QD_0*QD_1*QD_y
+                        )
+
+                        + (-2.0) * a_k * (
+                            +PB_0*PB_1*QC_x*QD_0*delta[d1][g1]
+
+                            +PB_0*PB_1*QC_x*QD_1*delta[d0][g1]
+                        )
+
+                        + 0.5 * inv_S1 * inv_S2 * inv_S2 * a_k * a_l * (
+                            +delta[b0][b1]*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+                        )
+
+                    )
+
+                    + F6_t[1] * (
+
+                        (-0.5) * inv_S1 * inv_S2 * inv_S4 * a_k * a_l * (
+                            +delta[b0][b1]*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+                        )
+
+                        + (-1.0) * inv_S2 * inv_S2 * inv_S4 * a_k * a_l * (
+                            +delta[b0][b1]*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+                        )
+
+                        + (-2.0) * S1 * inv_S2 * inv_S2 * inv_S4 * a_k * a_l * (
+                            +PB_0*PB_1*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+                        )
+
+                        + (-1.0) * inv_S1 * inv_S4 * a_k * a_l * (
+                            +QD_0*QD_1*delta[b0][b1]*delta[g0][g1]
+
+                            +delta[b0][b1]*(QC_x*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1] + QD_y*delta[d0][d1]) + QD_y*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0]))
+                        )
+
+                        + inv_S2 * inv_S4 * a_k * a_l * (
+                            +(PB_0*PQ[b1] + PB_1*PQ[b0])*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+
+                            +PB_0*(QC_x*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1] + delta[b1][g1]*delta[d0][d1]) + QD_0*(delta[b1][d1]*delta[g0][g1] + delta[b1][g0]*delta[d1][g1] + delta[b1][g1]*delta[d1][g0]) + QD_1*(delta[b1][d0]*delta[g0][g1] + delta[b1][g0]*delta[d0][g1] + delta[b1][g1]*delta[d0][g0]) + QD_y*(delta[b1][d0]*delta[d1][g0] + delta[b1][d1]*delta[d0][g0] + delta[b1][g0]*delta[d0][d1])) + PB_1*(QC_x*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1]) + QD_0*(delta[b0][d1]*delta[g0][g1] + delta[b0][g0]*delta[d1][g1] + delta[b0][g1]*delta[d1][g0]) + QD_1*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0]) + QD_y*(delta[b0][d0]*delta[d1][g0] + delta[b0][d1]*delta[d0][g0] + delta[b0][g0]*delta[d0][d1]))
+
+                            -delta[b0][b1]*(QC_x*(PQ[g1]*delta[d0][d1] + delta[d0][g1]*(PQ[d1] + QD_1) + delta[d1][g1]*(PQ[d0] + QD_0)) + QD_0*(PQ[d1]*delta[g0][g1] + PQ[g0]*delta[d1][g1] + PQ[g1]*delta[d1][g0]) + QD_1*(PQ[g0]*delta[d0][g1] + PQ[g1]*delta[d0][g0] + delta[g0][g1]*(PQ[d0] + QD_0)) + QD_y*(delta[d0][d1]*(PQ[g0] + QC_x) + delta[d0][g0]*(PQ[d1] + QD_1) + delta[d1][g0]*(PQ[d0] + QD_0)))
+                        )
+
+                        + (-2.0) * S1 * inv_S2 * inv_S4 * a_k * a_l * (
+                            +PB_0*PB_1*delta[g0][g1]*(PQ[d1]*QD_0 + QD_1*(PQ[d0] + QD_0))
+
+                            +PB_0*PB_1*(PQ[g0]*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1]) + PQ[g1]*(QC_x*delta[d0][d1] + QD_0*delta[d1][g0] + QD_1*delta[d0][g0]) + QC_x*(delta[d0][g1]*(PQ[d1] + QD_1) + delta[d1][g1]*(PQ[d0] + QD_0)) + QD_y*(delta[d0][d1]*(PQ[g0] + QC_x) + delta[d0][g0]*(PQ[d1] + QD_1) + delta[d1][g0]*(PQ[d0] + QD_0)))
+                        )
+
+                        + S1 * inv_S2 * inv_S4 * a_k * (
+                            +PB_0*PB_1*(delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+                        )
+
+                        + (-2.0) * S2 * inv_S1 * inv_S4 * a_k * a_l * (
+                            +QC_x*QD_0*QD_1*QD_y*delta[b0][b1]
+                        )
+
+                        + S2 * inv_S1 * inv_S4 * a_k * (
+                            +QC_x*QD_0*delta[b0][b1]*delta[d1][g1]
+
+                            +QC_x*QD_1*delta[b0][b1]*delta[d0][g1]
+                        )
+
+                        + 2.0 * inv_S4 * a_k * a_l * (
+                            +QD_0*QD_1*delta[g0][g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])
+
+                            +(PB_0*PQ[b1] + PB_1*PQ[b0])*(QC_x*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1] + QD_y*delta[d0][d1]) + QD_y*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0]))
+
+                            +QC_x*QD_0*(PB_0*(QD_1*delta[b1][g1] + QD_y*delta[b1][d1]) + PB_1*(QD_1*delta[b0][g1] + QD_y*delta[b0][d1])) + QD_1*QD_y*(PB_0*(QC_x*delta[b1][d0] + QD_0*delta[b1][g0]) + PB_1*(QC_x*delta[b0][d0] + QD_0*delta[b0][g0]))
+
+                            -delta[b0][b1]*(QC_x*QD_1*(PQ[d0]*QD_y + PQ[g1]*QD_0) + QD_0*QD_y*(PQ[d1]*QC_x + PQ[g0]*QD_1))
+                        )
+
+                        + inv_S4 * a_k * (
+                            -(PB_0*PQ[b1] + PB_1*PQ[b0])*(delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+
+                            -(PB_0*delta[b1][g0] + PB_1*delta[b0][g0])*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1])
+
+                            -QC_x*(PB_0*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1]) + PB_1*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1]))
+
+                            +delta[b0][b1]*(PQ[g0]*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1]) + QC_x*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1]))
+                        )
+
+                        + 4.0 * S1 * inv_S4 * a_k * a_l * (
+                            -PB_0*PB_1*(QC_x*QD_1*(PQ[d0]*QD_y + PQ[g1]*QD_0) + QD_0*QD_y*(PQ[d1]*QC_x + PQ[g0]*QD_1))
+                        )
+
+                        + 2.0 * S1 * inv_S4 * a_k * (
+                            +PB_0*PB_1*delta[d1][g1]*(PQ[d0]*QC_x + PQ[g0]*QD_0)
+
+                            +PB_0*PB_1*delta[d0][g1]*(PQ[d1]*QC_x + PQ[g0]*QD_1)
+                        )
+
+                        + 4.0 * S2 * inv_S4 * a_k * a_l * (
+                            +QC_x*QD_0*QD_1*QD_y*(PB_0*PQ[b1] + PB_1*PQ[b0])
+                        )
+
+                        + (-2.0) * S2 * inv_S4 * a_k * (
+                            +QC_x*QD_0*delta[d1][g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])
+
+                            +QC_x*QD_1*delta[d0][g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])
+                        )
+
+                        + 0.5 * inv_S1 * inv_S4 * a_k * (
+                            +delta[b0][b1]*(delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+                        )
+
+                        + 0.5 * inv_S2 * inv_S4 * a_k * (
+                            +delta[b0][b1]*(delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+                        )
+
+                    )
+
+                    + F6_t[2] * (
+
+                        S1 * S1 * inv_S2 * inv_S2 * inv_S4 * inv_S4 * a_k * a_l * (
+                            +PB_0*PB_1*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+                        )
+
+                        + S1 * inv_S2 * inv_S4 * inv_S4 * a_k * a_l * (
+                            +(-2*PB_0*PQ[b1] - 2*PB_1*PQ[b0])*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0]) + (-PB_0*PQ[d0] - PB_0*QD_0)*(delta[b1][d1]*delta[g0][g1] + delta[b1][g0]*delta[d1][g1] + delta[b1][g1]*delta[d1][g0]) + (-PB_0*PQ[d1] - PB_0*QD_1)*(delta[b1][d0]*delta[g0][g1] + delta[b1][g0]*delta[d0][g1] + delta[b1][g1]*delta[d0][g0]) + (-PB_0*PQ[g0] - PB_0*QC_x)*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1] + delta[b1][g1]*delta[d0][d1]) + (-PB_0*PQ[g1] - PB_0*QD_y)*(delta[b1][d0]*delta[d1][g0] + delta[b1][d1]*delta[d0][g0] + delta[b1][g0]*delta[d0][d1]) + (-PB_1*PQ[d0] - PB_1*QD_0)*(delta[b0][d1]*delta[g0][g1] + delta[b0][g0]*delta[d1][g1] + delta[b0][g1]*delta[d1][g0]) + (-PB_1*PQ[d1] - PB_1*QD_1)*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0]) + (-PB_1*PQ[g0] - PB_1*QC_x)*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1]) + (-PB_1*PQ[g1] - PB_1*QD_y)*(delta[b0][d0]*delta[d1][g0] + delta[b0][d1]*delta[d0][g0] + delta[b0][g0]*delta[d0][d1])
+
+                            +delta[b0][b1]*(PQ[d0]*(delta[d1][g0]*(PQ[g1] + QD_y) + delta[d1][g1]*(PQ[g0] + QC_x) + delta[g0][g1]*(PQ[d1] + QD_1)) + PQ[d1]*(QD_0*delta[g0][g1] + delta[d0][g0]*(PQ[g1] + QD_y) + delta[d0][g1]*(PQ[g0] + QC_x)) + PQ[g0]*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1] + delta[d0][d1]*(PQ[g1] + QD_y)) + PQ[g1]*(QC_x*delta[d0][d1] + QD_0*delta[d1][g0] + QD_1*delta[d0][g0]))
+                        )
+
+                        + inv_S4 * inv_S4 * a_k * a_l * (
+                            +PQ[b0]*QD_0*(delta[b1][d1]*delta[g0][g1] + delta[b1][g0]*delta[d1][g1] + delta[b1][g1]*delta[d1][g0])
+
+                            +PQ[b0]*(QC_x*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1] + delta[b1][g1]*delta[d0][d1]) + QD_1*(delta[b1][d0]*delta[g0][g1] + delta[b1][g0]*delta[d0][g1] + delta[b1][g1]*delta[d0][g0]) + QD_y*(delta[b1][d0]*delta[d1][g0] + delta[b1][d1]*delta[d0][g0] + delta[b1][g0]*delta[d0][d1])) + PQ[b1]*(QC_x*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1]) + QD_0*(delta[b0][d1]*delta[g0][g1] + delta[b0][g0]*delta[d1][g1] + delta[b0][g1]*delta[d1][g0]) + QD_1*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0]) + QD_y*(delta[b0][d0]*delta[d1][g0] + delta[b0][d1]*delta[d0][g0] + delta[b0][g0]*delta[d0][d1]))
+
+                            +delta[b0][b1]*(QC_x*(PQ[g1]*delta[d0][d1] + delta[d0][g1]*(PQ[d1] + QD_1) + delta[d1][g1]*(PQ[d0] + QD_0)) + QD_0*(PQ[d1]*delta[g0][g1] + PQ[g0]*delta[d1][g1] + PQ[g1]*delta[d1][g0]) + QD_1*(PQ[g0]*delta[d0][g1] + PQ[g1]*delta[d0][g0] + delta[g0][g1]*(PQ[d0] + QD_0)) + QD_y*(delta[d0][d1]*(PQ[g0] + QC_x) + delta[d0][g0]*(PQ[d1] + QD_1) + delta[d1][g0]*(PQ[d0] + QD_0)))
+
+                            +QC_x*(QD_0*(delta[b0][d1]*delta[b1][g1] + delta[b0][g1]*delta[b1][d1]) + QD_1*(delta[b0][d0]*delta[b1][g1] + delta[b0][g1]*delta[b1][d0]) + QD_y*(delta[b0][d0]*delta[b1][d1] + delta[b0][d1]*delta[b1][d0])) + QD_0*(QD_1*(delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0]) + QD_y*(delta[b0][d1]*delta[b1][g0] + delta[b0][g0]*delta[b1][d1])) + QD_1*QD_y*(delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0])
+
+                            +PQ[b0]*PQ[b1]*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+                        )
+
+                        + (-0.5) * inv_S4 * inv_S4 * a_k * (
+                            +delta[d0][g1]*(delta[b0][b1]*delta[d1][g0] + delta[b0][d1]*delta[b1][g0] + delta[b0][g0]*delta[b1][d1]) + delta[d1][g1]*(delta[b0][b1]*delta[d0][g0] + delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0])
+                        )
+
+                        + 2.0 * S1 * S1 * inv_S2 * inv_S4 * inv_S4 * a_k * a_l * (
+                            +PB_0*PB_1*delta[g0][g1]*(PQ[d0]*(PQ[d1] + QD_1) + PQ[d1]*QD_0)
+
+                            +PB_0*PB_1*(PQ[g1]*(QC_x*delta[d0][d1] + QD_0*delta[d1][g0] + QD_1*delta[d0][g0]) + delta[d0][g1]*(PQ[d1]*(PQ[g0] + QC_x) + PQ[g0]*QD_1) + delta[d1][g1]*(PQ[d0]*(PQ[g0] + QC_x) + PQ[g0]*QD_0) + (PQ[g1] + QD_y)*(PQ[d0]*delta[d1][g0] + PQ[d1]*delta[d0][g0] + PQ[g0]*delta[d0][d1]))
+                        )
+
+                        + 2.0 * S1 * inv_S4 * inv_S4 * a_k * a_l * (
+                            -delta[g0][g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])*(PQ[d1]*QD_0 + QD_1*(PQ[d0] + QD_0))
+
+                            -(PB_0*PQ[b1] + PB_1*PQ[b0])*(PQ[g0]*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1]) + PQ[g1]*(QC_x*delta[d0][d1] + QD_0*delta[d1][g0] + QD_1*delta[d0][g0]) + QC_x*(delta[d0][g1]*(PQ[d1] + QD_1) + delta[d1][g1]*(PQ[d0] + QD_0)) + QD_y*(delta[d0][d1]*(PQ[g0] + QC_x) + delta[d0][g0]*(PQ[d1] + QD_1) + delta[d1][g0]*(PQ[d0] + QD_0)))
+
+                            -PB_0*(QC_x*(PQ[d0]*(QD_1*delta[b1][g1] + QD_y*delta[b1][d1]) + PQ[d1]*(QD_0*delta[b1][g1] + QD_y*delta[b1][d0]) + PQ[g1]*(QD_0*delta[b1][d1] + QD_1*delta[b1][d0])) + QD_0*(QD_1*(PQ[g0]*delta[b1][g1] + PQ[g1]*delta[b1][g0]) + QD_y*(PQ[d1]*delta[b1][g0] + PQ[g0]*delta[b1][d1]))) - PB_1*(QC_x*(PQ[d0]*(QD_1*delta[b0][g1] + QD_y*delta[b0][d1]) + PQ[d1]*(QD_0*delta[b0][g1] + QD_y*delta[b0][d0]) + PQ[g1]*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0])) + QD_0*(QD_1*(PQ[g0]*delta[b0][g1] + PQ[g1]*delta[b0][g0]) + QD_y*(PQ[d1]*delta[b0][g0] + PQ[g0]*delta[b0][d1]))) - QD_1*QD_y*(PB_0*(PQ[d0]*delta[b1][g0] + PQ[g0]*delta[b1][d0]) + PB_1*(PQ[d0]*delta[b0][g0] + PQ[g0]*delta[b0][d0]))
+
+                            +delta[b0][b1]*(PQ[d0]*QC_x*(PQ[d1]*QD_y + PQ[g1]*QD_1) + PQ[d1]*QD_0*(PQ[g0]*QD_y + PQ[g1]*QC_x) + PQ[g0]*QD_1*(PQ[d0]*QD_y + PQ[g1]*QD_0))
+                        )
+
+                        + S1 * inv_S4 * inv_S4 * a_k * (
+                            +(PB_0*PQ[b1] + PB_1*PQ[b0])*(delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+
+                            +(PB_0*delta[b1][g0] + PB_1*delta[b0][g0])*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1])
+
+                            +PQ[g0]*(PB_0*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1]) + PB_1*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1]))
+
+                            -PQ[g0]*delta[b0][b1]*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1])
+                        )
+
+                        + 2.0 * S2 * inv_S4 * inv_S4 * a_k * a_l * (
+                            +PQ[b0]*(QC_x*QD_y*(QD_0*delta[b1][d1] + QD_1*delta[b1][d0]) + QD_0*QD_1*(PQ[b1]*delta[g0][g1] + QC_x*delta[b1][g1] + QD_y*delta[b1][g0])) + PQ[b1]*(QC_x*QD_0*(QD_1*delta[b0][g1] + QD_y*delta[b0][d1]) + QD_1*QD_y*(QC_x*delta[b0][d0] + QD_0*delta[b0][g0]))
+
+                            +PQ[b0]*PQ[b1]*(QC_x*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1] + QD_y*delta[d0][d1]) + QD_y*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0]))
+
+                            +delta[b0][b1]*(QC_x*QD_1*(PQ[d0]*QD_y + PQ[g1]*QD_0) + QD_0*QD_y*(PQ[d1]*QC_x + PQ[g0]*QD_1))
+                        )
+
+                        + (-1.0) * S2 * inv_S4 * inv_S4 * a_k * (
+                            +PQ[b0]*(PQ[b1]*(delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0]) + QC_x*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1])) + PQ[b1]*QC_x*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1])
+
+                            +(PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0])*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1])
+
+                            +delta[b0][b1]*(PQ[g0]*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1]) + QC_x*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1]))
+                        )
+
+                        + 4.0 * S1 * S1 * inv_S4 * inv_S4 * a_k * a_l * (
+                            +PB_0*PB_1*(PQ[d0]*QC_x*(PQ[d1]*QD_y + PQ[g1]*QD_1) + PQ[d1]*QD_0*(PQ[g0]*QD_y + PQ[g1]*QC_x) + PQ[g0]*QD_1*(PQ[d0]*QD_y + PQ[g1]*QD_0))
+                        )
+
+                        + (-2.0) * S1 * S1 * inv_S4 * inv_S4 * a_k * (
+                            +PB_0*PB_1*PQ[d0]*PQ[g0]*delta[d1][g1]
+
+                            +PB_0*PB_1*PQ[d1]*PQ[g0]*delta[d0][g1]
+                        )
+
+                        + 4.0 * S1 * S2 * inv_S4 * inv_S4 * a_k * a_l * (
+                            -(PB_0*PQ[b1] + PB_1*PQ[b0])*(QC_x*QD_1*(PQ[d0]*QD_y + PQ[g1]*QD_0) + QD_0*QD_y*(PQ[d1]*QC_x + PQ[g0]*QD_1))
+                        )
+
+                        + 2.0 * S1 * S2 * inv_S4 * inv_S4 * a_k * (
+                            +delta[d1][g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])*(PQ[d0]*QC_x + PQ[g0]*QD_0)
+
+                            +delta[d0][g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])*(PQ[d1]*QC_x + PQ[g0]*QD_1)
+                        )
+
+                        + 4.0 * S2 * S2 * inv_S4 * inv_S4 * a_k * a_l * (
+                            +PQ[b0]*PQ[b1]*QC_x*QD_0*QD_1*QD_y
+                        )
+
+                        + (-2.0) * S2 * S2 * inv_S4 * inv_S4 * a_k * (
+                            +PQ[b0]*PQ[b1]*QC_x*QD_0*delta[d1][g1]
+
+                            +PQ[b0]*PQ[b1]*QC_x*QD_1*delta[d0][g1]
+                        )
+
+                        + 0.5 * S1 * inv_S2 * inv_S2 * inv_S4 * inv_S4 * a_k * a_l * (
+                            +delta[b0][b1]*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+                        )
+
+                        + 0.5 * inv_S2 * inv_S4 * inv_S4 * a_k * a_l * (
+                            +2.0*delta[b0][b1]*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+
+                            +delta[b0][d0]*(delta[b1][d1]*delta[g0][g1] + delta[b1][g0]*delta[d1][g1] + delta[b1][g1]*delta[d1][g0]) + delta[b0][d1]*(delta[b1][d0]*delta[g0][g1] + delta[b1][g0]*delta[d0][g1] + delta[b1][g1]*delta[d0][g0]) + delta[b0][g0]*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1] + delta[b1][g1]*delta[d0][d1]) + delta[b0][g1]*(delta[b1][d0]*delta[d1][g0] + delta[b1][d1]*delta[d0][g0] + delta[b1][g0]*delta[d0][d1])
+                        )
+
+                    )
+
+                    + F6_t[3] * (
+
+                        (-0.5) * S1 * inv_S2 * inv_S4 * inv_S4 * inv_S4 * a_k * a_l * (
+                            +delta[b0][b1]*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0]) + delta[b0][d0]*(delta[b1][d1]*delta[g0][g1] + delta[b1][g0]*delta[d1][g1] + delta[b1][g1]*delta[d1][g0]) + delta[b0][d1]*(delta[b1][d0]*delta[g0][g1] + delta[b1][g0]*delta[d0][g1] + delta[b1][g1]*delta[d0][g0]) + delta[b0][g0]*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1] + delta[b1][g1]*delta[d0][d1]) + delta[b0][g1]*(delta[b1][d0]*delta[d1][g0] + delta[b1][d1]*delta[d0][g0] + delta[b1][g0]*delta[d0][d1])
+                        )
+
+                        + S1 * S1 * inv_S2 * inv_S4 * inv_S4 * inv_S4 * a_k * a_l * (
+                            +(PB_0*PQ[b1] + PB_1*PQ[b0])*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+
+                            +PB_0*(PQ[d0]*(delta[b1][d1]*delta[g0][g1] + delta[b1][g0]*delta[d1][g1] + delta[b1][g1]*delta[d1][g0]) + PQ[d1]*(delta[b1][d0]*delta[g0][g1] + delta[b1][g0]*delta[d0][g1] + delta[b1][g1]*delta[d0][g0]) + PQ[g0]*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1] + delta[b1][g1]*delta[d0][d1]) + PQ[g1]*(delta[b1][d0]*delta[d1][g0] + delta[b1][d1]*delta[d0][g0] + delta[b1][g0]*delta[d0][d1])) + PB_1*(PQ[d0]*(delta[b0][d1]*delta[g0][g1] + delta[b0][g0]*delta[d1][g1] + delta[b0][g1]*delta[d1][g0]) + PQ[d1]*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0]) + PQ[g0]*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1]) + PQ[g1]*(delta[b0][d0]*delta[d1][g0] + delta[b0][d1]*delta[d0][g0] + delta[b0][g0]*delta[d0][d1]))
+
+                            -delta[b0][b1]*(PQ[d0]*(PQ[d1]*delta[g0][g1] + PQ[g0]*delta[d1][g1] + PQ[g1]*delta[d1][g0]) + PQ[d1]*(PQ[g0]*delta[d0][g1] + PQ[g1]*delta[d0][g0]) + PQ[g0]*PQ[g1]*delta[d0][d1])
+                        )
+
+                        + S1 * inv_S4 * inv_S4 * inv_S4 * a_k * a_l * (
+                            -2*PQ[b0]*PQ[b1]*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+
+                            -PQ[b0]*(delta[b1][d0]*(delta[d1][g0]*(PQ[g1] + QD_y) + delta[d1][g1]*(PQ[g0] + QC_x) + delta[g0][g1]*(PQ[d1] + QD_1)) + delta[b1][d1]*(delta[d0][g0]*(PQ[g1] + QD_y) + delta[d0][g1]*(PQ[g0] + QC_x) + delta[g0][g1]*(PQ[d0] + QD_0)) + delta[b1][g0]*(delta[d0][d1]*(PQ[g1] + QD_y) + delta[d0][g1]*(PQ[d1] + QD_1) + delta[d1][g1]*(PQ[d0] + QD_0)) + delta[b1][g1]*(delta[d0][d1]*(PQ[g0] + QC_x) + delta[d0][g0]*(PQ[d1] + QD_1) + delta[d1][g0]*(PQ[d0] + QD_0))) - PQ[b1]*(delta[b0][d0]*(delta[d1][g0]*(PQ[g1] + QD_y) + delta[d1][g1]*(PQ[g0] + QC_x) + delta[g0][g1]*(PQ[d1] + QD_1)) + delta[b0][d1]*(delta[d0][g0]*(PQ[g1] + QD_y) + delta[d0][g1]*(PQ[g0] + QC_x) + delta[g0][g1]*(PQ[d0] + QD_0)) + delta[b0][g0]*(delta[d0][d1]*(PQ[g1] + QD_y) + delta[d0][g1]*(PQ[d1] + QD_1) + delta[d1][g1]*(PQ[d0] + QD_0)) + delta[b0][g1]*(delta[d0][d1]*(PQ[g0] + QC_x) + delta[d0][g0]*(PQ[d1] + QD_1) + delta[d1][g0]*(PQ[d0] + QD_0)))
+
+                            -delta[b0][b1]*(PQ[d0]*(delta[d1][g0]*(PQ[g1] + QD_y) + delta[d1][g1]*(PQ[g0] + QC_x) + delta[g0][g1]*(PQ[d1] + QD_1)) + PQ[d1]*(QD_0*delta[g0][g1] + delta[d0][g0]*(PQ[g1] + QD_y) + delta[d0][g1]*(PQ[g0] + QC_x)) + PQ[g0]*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1] + delta[d0][d1]*(PQ[g1] + QD_y)) + PQ[g1]*(QC_x*delta[d0][d1] + QD_0*delta[d1][g0] + QD_1*delta[d0][g0]))
+
+                            +(-PQ[d0]*QC_x - PQ[g0]*QD_0)*(delta[b0][d1]*delta[b1][g1] + delta[b0][g1]*delta[b1][d1]) + (-PQ[d0]*QD_1 - PQ[d1]*QD_0)*(delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0]) + (-PQ[d0]*QD_y - PQ[g1]*QD_0)*(delta[b0][d1]*delta[b1][g0] + delta[b0][g0]*delta[b1][d1]) + (-PQ[d1]*QC_x - PQ[g0]*QD_1)*(delta[b0][d0]*delta[b1][g1] + delta[b0][g1]*delta[b1][d0]) + (-PQ[d1]*QD_y - PQ[g1]*QD_1)*(delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0]) + (-PQ[g0]*QD_y - PQ[g1]*QC_x)*(delta[b0][d0]*delta[b1][d1] + delta[b0][d1]*delta[b1][d0])
+                        )
+
+                        + (-2.0) * S1 * S1 * S1 * inv_S2 * inv_S4 * inv_S4 * inv_S4 * a_k * a_l * (
+                            +PB_0*PB_1*PQ[d0]*PQ[d1]*delta[g0][g1]
+
+                            +PB_0*PB_1*(PQ[g0]*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1]) + PQ[g1]*(PQ[d0]*delta[d1][g0] + PQ[d1]*delta[d0][g0]))
+                        )
+
+                        + 2.0 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * a_k * a_l * (
+                            +delta[g0][g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])*(PQ[d0]*(PQ[d1] + QD_1) + PQ[d1]*QD_0)
+
+                            +(PB_0*PQ[b1] + PB_1*PQ[b0])*(PQ[g1]*(QC_x*delta[d0][d1] + QD_0*delta[d1][g0] + QD_1*delta[d0][g0]) + delta[d0][g1]*(PQ[d1]*(PQ[g0] + QC_x) + PQ[g0]*QD_1) + delta[d1][g1]*(PQ[d0]*(PQ[g0] + QC_x) + PQ[g0]*QD_0) + (PQ[g1] + QD_y)*(PQ[d0]*delta[d1][g0] + PQ[d1]*delta[d0][g0] + PQ[g0]*delta[d0][d1]))
+
+                            +PB_0*(PQ[d0]*(PQ[d1]*(QC_x*delta[b1][g1] + QD_y*delta[b1][g0]) + PQ[g0]*(QD_1*delta[b1][g1] + QD_y*delta[b1][d1]) + PQ[g1]*(QC_x*delta[b1][d1] + QD_1*delta[b1][g0])) + PQ[d1]*(PQ[g0]*(QD_0*delta[b1][g1] + QD_y*delta[b1][d0]) + PQ[g1]*(QC_x*delta[b1][d0] + QD_0*delta[b1][g0]))) + PB_1*(PQ[d0]*(PQ[d1]*(QC_x*delta[b0][g1] + QD_y*delta[b0][g0]) + PQ[g0]*(QD_1*delta[b0][g1] + QD_y*delta[b0][d1]) + PQ[g1]*(QC_x*delta[b0][d1] + QD_1*delta[b0][g0])) + PQ[d1]*(PQ[g0]*(QD_0*delta[b0][g1] + QD_y*delta[b0][d0]) + PQ[g1]*(QC_x*delta[b0][d0] + QD_0*delta[b0][g0]))) + PQ[g0]*PQ[g1]*(PB_0*(QD_0*delta[b1][d1] + QD_1*delta[b1][d0]) + PB_1*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0]))
+
+                            -delta[b0][b1]*(PQ[d0]*PQ[d1]*(PQ[g0]*QD_y + PQ[g1]*QC_x) + PQ[g0]*PQ[g1]*(PQ[d0]*QD_1 + PQ[d1]*QD_0))
+                        )
+
+                        + (-2.0) * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_k * a_l * (
+                            +PQ[b0]*PQ[b1]*delta[g0][g1]*(PQ[d1]*QD_0 + QD_1*(PQ[d0] + QD_0))
+
+                            +PQ[b0]*PQ[b1]*(PQ[g0]*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1]) + PQ[g1]*(QC_x*delta[d0][d1] + QD_0*delta[d1][g0] + QD_1*delta[d0][g0]) + QC_x*(delta[d0][g1]*(PQ[d1] + QD_1) + delta[d1][g1]*(PQ[d0] + QD_0)) + QD_y*(delta[d0][d1]*(PQ[g0] + QC_x) + delta[d0][g0]*(PQ[d1] + QD_1) + delta[d1][g0]*(PQ[d0] + QD_0)))
+
+                            +PQ[b0]*(QC_x*(PQ[d0]*(QD_1*delta[b1][g1] + QD_y*delta[b1][d1]) + PQ[d1]*(QD_0*delta[b1][g1] + QD_y*delta[b1][d0]) + PQ[g1]*(QD_0*delta[b1][d1] + QD_1*delta[b1][d0])) + QD_0*(QD_1*(PQ[g0]*delta[b1][g1] + PQ[g1]*delta[b1][g0]) + QD_y*(PQ[d1]*delta[b1][g0] + PQ[g0]*delta[b1][d1]))) + PQ[b1]*(QC_x*(PQ[d0]*(QD_1*delta[b0][g1] + QD_y*delta[b0][d1]) + PQ[d1]*(QD_0*delta[b0][g1] + QD_y*delta[b0][d0]) + PQ[g1]*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0])) + QD_0*(QD_1*(PQ[g0]*delta[b0][g1] + PQ[g1]*delta[b0][g0]) + QD_y*(PQ[d1]*delta[b0][g0] + PQ[g0]*delta[b0][d1]))) + QD_1*QD_y*(PQ[b0]*(PQ[d0]*delta[b1][g0] + PQ[g0]*delta[b1][d0]) + PQ[b1]*(PQ[d0]*delta[b0][g0] + PQ[g0]*delta[b0][d0]))
+
+                            +delta[b0][b1]*(PQ[d0]*QC_x*(PQ[d1]*QD_y + PQ[g1]*QD_1) + PQ[d1]*QD_0*(PQ[g0]*QD_y + PQ[g1]*QC_x) + PQ[g0]*QD_1*(PQ[d0]*QD_y + PQ[g1]*QD_0))
+                        )
+
+                        + 4.0 * S1 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * a_k * a_l * (
+                            -PB_0*PB_1*(PQ[d0]*PQ[d1]*(PQ[g0]*QD_y + PQ[g1]*QC_x) + PQ[g0]*PQ[g1]*(PQ[d0]*QD_1 + PQ[d1]*QD_0))
+                        )
+
+                        + 4.0 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_k * a_l * (
+                            +(PB_0*PQ[b1] + PB_1*PQ[b0])*(PQ[d0]*QC_x*(PQ[d1]*QD_y + PQ[g1]*QD_1) + PQ[d1]*QD_0*(PQ[g0]*QD_y + PQ[g1]*QC_x) + PQ[g0]*QD_1*(PQ[d0]*QD_y + PQ[g1]*QD_0))
+                        )
+
+                        + (-2.0) * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_k * (
+                            +PQ[d0]*PQ[g0]*delta[d1][g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])
+
+                            +PQ[d1]*PQ[g0]*delta[d0][g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])
+                        )
+
+                        + 4.0 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_k * a_l * (
+                            -PQ[b0]*PQ[b1]*(QC_x*QD_1*(PQ[d0]*QD_y + PQ[g1]*QD_0) + QD_0*QD_y*(PQ[d1]*QC_x + PQ[g0]*QD_1))
+                        )
+
+                        + 2.0 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_k * (
+                            +PQ[b0]*PQ[b1]*delta[d1][g1]*(PQ[d0]*QC_x + PQ[g0]*QD_0)
+
+                            +PQ[b0]*PQ[b1]*delta[d0][g1]*(PQ[d1]*QC_x + PQ[g0]*QD_1)
+                        )
+
+                        + S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_k * (
+                            +PQ[b0]*PQ[b1]*(delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+
+                            +(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1])*(PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0] + PQ[g0]*delta[b0][b1])
+
+                            +PQ[g0]*(PQ[b0]*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1]) + PQ[b1]*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1]))
+                        )
+
+                    )
+
+                    + F6_t[4] * (
+
+                        2.0 * S1 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * a_l * (
+                            -PQ[d0]*PQ[d1]*delta[g0][g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])
+
+                            -(PB_0*PQ[b1] + PB_1*PQ[b0])*(PQ[g0]*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1]) + PQ[g1]*(PQ[d0]*delta[d1][g0] + PQ[d1]*delta[d0][g0]))
+
+                            -PQ[d0]*PQ[d1]*(PB_0*(PQ[g0]*delta[b1][g1] + PQ[g1]*delta[b1][g0]) + PB_1*(PQ[g0]*delta[b0][g1] + PQ[g1]*delta[b0][g0])) - PQ[g0]*PQ[g1]*(PB_0*(PQ[d0]*delta[b1][d1] + PQ[d1]*delta[b1][d0]) + PB_1*(PQ[d0]*delta[b0][d1] + PQ[d1]*delta[b0][d0]))
+
+                            +PQ[d0]*PQ[d1]*PQ[g0]*PQ[g1]*delta[b0][b1]
+                        )
+
+                        + 2.0 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * a_l * (
+                            +PQ[b0]*(PQ[d0]*(PQ[b1]*delta[g0][g1]*(PQ[d1] + QD_1) + PQ[d1]*(QC_x*delta[b1][g1] + QD_y*delta[b1][g0]) + PQ[g0]*(QD_1*delta[b1][g1] + QD_y*delta[b1][d1]) + PQ[g1]*(QC_x*delta[b1][d1] + QD_1*delta[b1][g0])) + PQ[d1]*(QD_0*(PQ[b1]*delta[g0][g1] + PQ[g0]*delta[b1][g1] + PQ[g1]*delta[b1][g0]) + delta[b1][d0]*(PQ[g0]*QD_y + PQ[g1]*QC_x))) + PQ[b1]*(PQ[d0]*(PQ[d1]*(QC_x*delta[b0][g1] + QD_y*delta[b0][g0]) + PQ[g0]*(QD_1*delta[b0][g1] + QD_y*delta[b0][d1]) + PQ[g1]*(QC_x*delta[b0][d1] + QD_1*delta[b0][g0])) + PQ[d1]*(PQ[g0]*(QD_0*delta[b0][g1] + QD_y*delta[b0][d0]) + PQ[g1]*(QC_x*delta[b0][d0] + QD_0*delta[b0][g0]))) + PQ[g0]*PQ[g1]*(PQ[b0]*(QD_0*delta[b1][d1] + QD_1*delta[b1][d0]) + PQ[b1]*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0]))
+
+                            +PQ[b0]*PQ[b1]*(PQ[g1]*(QC_x*delta[d0][d1] + QD_0*delta[d1][g0] + QD_1*delta[d0][g0]) + delta[d0][g1]*(PQ[d1]*(PQ[g0] + QC_x) + PQ[g0]*QD_1) + delta[d1][g1]*(PQ[d0]*(PQ[g0] + QC_x) + PQ[g0]*QD_0) + (PQ[g1] + QD_y)*(PQ[d0]*delta[d1][g0] + PQ[d1]*delta[d0][g0] + PQ[g0]*delta[d0][d1]))
+
+                            +delta[b0][b1]*(PQ[d0]*PQ[d1]*(PQ[g0]*QD_y + PQ[g1]*QC_x) + PQ[g0]*PQ[g1]*(PQ[d0]*QD_1 + PQ[d1]*QD_0))
+                        )
+
+                        + 4.0 * S1 * S1 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * a_l * (
+                            +PB_0*PB_1*PQ[d0]*PQ[d1]*PQ[g0]*PQ[g1]
+                        )
+
+                        + 4.0 * S1 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * a_l * (
+                            -(PB_0*PQ[b1] + PB_1*PQ[b0])*(PQ[d0]*PQ[d1]*(PQ[g0]*QD_y + PQ[g1]*QC_x) + PQ[g0]*PQ[g1]*(PQ[d0]*QD_1 + PQ[d1]*QD_0))
+                        )
+
+                        + 4.0 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * a_l * (
+                            +PQ[b0]*PQ[b1]*(PQ[d0]*QC_x*(PQ[d1]*QD_y + PQ[g1]*QD_1) + PQ[d1]*QD_0*(PQ[g0]*QD_y + PQ[g1]*QC_x) + PQ[g0]*QD_1*(PQ[d0]*QD_y + PQ[g1]*QD_0))
+                        )
+
+                        + (-2.0) * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * (
+                            +PQ[b0]*PQ[b1]*PQ[d0]*PQ[g0]*delta[d1][g1]
+
+                            +PQ[b0]*PQ[b1]*PQ[d1]*PQ[g0]*delta[d0][g1]
+                        )
+
+                        + S1 * S1 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * a_l * (
+                            +PQ[b0]*PQ[b1]*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+
+                            +PQ[d0]*(PQ[b0]*(delta[b1][d1]*delta[g0][g1] + delta[b1][g0]*delta[d1][g1] + delta[b1][g1]*delta[d1][g0]) + PQ[b1]*(delta[b0][d1]*delta[g0][g1] + delta[b0][g0]*delta[d1][g1] + delta[b0][g1]*delta[d1][g0]) + PQ[d1]*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0]) + PQ[g0]*(delta[b0][b1]*delta[d1][g1] + delta[b0][d1]*delta[b1][g1] + delta[b0][g1]*delta[b1][d1]) + PQ[g1]*(delta[b0][b1]*delta[d1][g0] + delta[b0][d1]*delta[b1][g0] + delta[b0][g0]*delta[b1][d1])) + PQ[d1]*(PQ[b0]*(delta[b1][d0]*delta[g0][g1] + delta[b1][g0]*delta[d0][g1] + delta[b1][g1]*delta[d0][g0]) + PQ[b1]*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0]) + PQ[g0]*(delta[b0][b1]*delta[d0][g1] + delta[b0][d0]*delta[b1][g1] + delta[b0][g1]*delta[b1][d0]) + PQ[g1]*(delta[b0][b1]*delta[d0][g0] + delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0])) + PQ[g0]*(PQ[b0]*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1] + delta[b1][g1]*delta[d0][d1]) + PQ[b1]*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1]) + PQ[g1]*(delta[b0][b1]*delta[d0][d1] + delta[b0][d0]*delta[b1][d1] + delta[b0][d1]*delta[b1][d0])) + PQ[g1]*(PQ[b0]*(delta[b1][d0]*delta[d1][g0] + delta[b1][d1]*delta[d0][g0] + delta[b1][g0]*delta[d0][d1]) + PQ[b1]*(delta[b0][d0]*delta[d1][g0] + delta[b0][d1]*delta[d0][g0] + delta[b0][g0]*delta[d0][d1]))
+                        )
+
+                    )
+
+                    + F6_t[5] * (
+
+                        (-2.0) * S1 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * a_l * (
+                            +PQ[b0]*PQ[b1]*PQ[d0]*PQ[d1]*delta[g0][g1]
+
+                            +PQ[g0]*(PQ[b0]*(PQ[b1]*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1]) + PQ[d1]*PQ[g1]*delta[b1][d0]) + PQ[d0]*PQ[d1]*(PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1] + PQ[g1]*delta[b0][b1])) + PQ[g1]*(PQ[b1]*PQ[d1]*(PQ[b0]*delta[d0][g0] + PQ[d0]*delta[b0][g0] + PQ[g0]*delta[b0][d0]) + PQ[d0]*(PQ[b0]*(PQ[b1]*delta[d1][g0] + PQ[d1]*delta[b1][g0] + PQ[g0]*delta[b1][d1]) + PQ[b1]*PQ[g0]*delta[b0][d1]))
+                        )
+
+                        + 4.0 * S1 * S1 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * a_l * (
+                            +PQ[d0]*PQ[d1]*PQ[g0]*PQ[g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])
+                        )
+
+                        + 4.0 * S1 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * a_l * (
+                            -PQ[b0]*PQ[b1]*(PQ[d0]*PQ[d1]*(PQ[g0]*QD_y + PQ[g1]*QC_x) + PQ[g0]*PQ[g1]*(PQ[d0]*QD_1 + PQ[d1]*QD_0))
+                        )
+
+                    )
+
+                    + F6_t[6] * (
+
+                        4.0 * S1 * S1 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * a_l * (
+                            +PQ[b0]*PQ[b1]*PQ[d0]*PQ[d1]*PQ[g0]*PQ[g1]
+                        )
+
+                    )
+
+                    );
+
+            double hess_kl_xy = -eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+
+            atomicAdd(
+                hess_xy + prim_cart_ao_to_atom_inds[k] * natoms + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + l_prim],
+                hess_kl_xy * ik_factor_D * 2.0 * frac_exact_exchange);
+        }
+    }
+
+    __syncthreads();
+}
+
+__global__ void __launch_bounds__(TILE_SIZE_K)
+computeExchangeHessianSDSD_IL_0(double*         hess_xy,
+                                double*         hess_yx,
+                                const uint32_t  hess_cart_ind_0,
+                                const uint32_t  hess_cart_ind_1,
+                                const double    frac_exact_exchange,
+                                const uint32_t* pair_inds_i_for_K_ss,
+                                const uint32_t* pair_inds_k_for_K_ss,
+                                const double*   D_ik_for_K_ss,
+                                const uint32_t  pair_inds_count_for_K_ss,
+                                const double*   s_prim_info,
+                                const uint32_t* s_prim_aoinds,
+                                const uint32_t  s_prim_count,
+                                const double*   d_prim_info,
+                                const uint32_t* d_prim_aoinds,
+                                const uint32_t  d_prim_count,
+                                const double    dd_max_D,
+                                const double*   mat_D_full_AO,
+                                const uint32_t  naos,
+                                const double*   Q_K_sd,
+                                const uint32_t* D_inds_K_sd,
+                                const uint32_t* pair_displs_K_sd,
+                                const uint32_t* pair_counts_K_sd,
+                                const double*   pair_data_K_sd,
+                                const uint32_t* prim_cart_ao_to_atom_inds,
+                                const uint32_t  natoms,
+                                const double*   boys_func_table,
+                                const double*   boys_func_ft,
+                                const double    omega,
+                                const double    eri_threshold)
+{
+    // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
+
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
+    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ double   delta[3][3];
+    __shared__ uint32_t g0, g1;
+
+    const uint32_t ik = blockIdx.x;
+
+    // we make sure that ik < pair_inds_count_for_K_ss when calling the kernel
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+        g0 = hess_cart_ind_0;
+        g1 = hess_cart_ind_1;
+
+        i = pair_inds_i_for_K_ss[ik];
+        k = pair_inds_k_for_K_ss[ik];
+
+        count_i = pair_counts_K_sd[i];
+        count_k = pair_counts_K_sd[k];
+
+        displ_i = pair_displs_K_sd[i];
+        displ_k = pair_displs_K_sd[k];
+
+        a_i = s_prim_info[i + s_prim_count * 0];
+
+        r_i[0] = s_prim_info[i + s_prim_count * 2];
+        r_i[1] = s_prim_info[i + s_prim_count * 3];
+        r_i[2] = s_prim_info[i + s_prim_count * 4];
+
+        a_k = s_prim_info[k + s_prim_count * 0];
+
+        r_k[0] = s_prim_info[k + s_prim_count * 2];
+        r_k[1] = s_prim_info[k + s_prim_count * 3];
+        r_k[2] = s_prim_info[k + s_prim_count * 4];
+
+        ik_factor_D = (static_cast<double>(i != k) + 1.0) * D_ik_for_K_ss[ik];
+
+    }
+
+    __syncthreads();
+
+    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    {
+        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+
+        // sync threads before starting a new scan
+        __syncthreads();
+
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double PB_0, PB_1, PA_x;
+        uint32_t j_prim, j_cgto, b0, b1;
+
+        if (j < count_i)
+        {
+            Q_ij   = Q_K_sd[displ_i + j];
+
+            j_prim = D_inds_K_sd[displ_i + j];
+
+            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+
+            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = pair_data_K_sd[displ_i + j];
+
+            PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
+
+        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        {
+            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+
+            // Q_kl == Q_K_sd[displ_k + l]
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_sd[displ_k + l] * dd_max_D) <= eri_threshold))
+            {
+                break;
+            }
+
+            // const auto Q_kl = Q_K_sd[displ_k + l];
+
+            const auto l_prim = D_inds_K_sd[displ_k + l];
+
+            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+
+            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+
+            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
+                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
+                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+
+            const auto S_kl_00 = pair_data_K_sd[displ_k + l];
+
+            const auto d0 = d_cart_inds[l_prim % 6][0];
+            const auto d1 = d_cart_inds[l_prim % 6][1];
+
+            // J. Chem. Phys. 84, 3963-3974 (1986)
+
+            const auto S2 = a_k + a_l;
+
+            const auto inv_S2 = 1.0 / S2;
+            const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
+
+            const auto rho = S1 * S2 * inv_S4;
+
+            double d2 = 1.0;
+
+            if (omega != 0.0) d2 = omega * omega / (rho + omega * omega);
+
+            const auto Lambda = sqrt(4.0 * rho * d2 * MATH_CONST_INV_PI);
+
+            double F6_t[7];
+
+            gpu::computeBoysFunction(F6_t, rho * d2 * r2_PQ, 6, boys_func_table, boys_func_ft);
+
+            if (omega != 0.0)
+            {
+                F6_t[1] *= d2;
+                F6_t[2] *= d2 * d2;
+                F6_t[3] *= d2 * d2 * d2;
+                F6_t[4] *= d2 * d2 * d2 * d2;
+                F6_t[5] *= d2 * d2 * d2 * d2 * d2;
+                F6_t[6] *= d2 * d2 * d2 * d2 * d2 * d2;
+            }
+
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+
+            const auto QD_y = (-a_k * inv_S2) * (r_l[g1] - r_k[g1]);
+
+            // i-l Hessian
+
+            const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
+                    + F6_t[0] * (
+
+                        inv_S1 * inv_S2 * a_i * a_l * (
+                            +PB_0*QD_0*delta[b1][g0]*delta[d1][g1]
+
+                            +PB_0*delta[b1][g0]*(QD_1*delta[d0][g1] + QD_y*delta[d0][d1]) + (PA_x*delta[b0][b1] + PB_1*delta[b0][g0])*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1] + QD_y*delta[d0][d1])
+                        )
+
+                        + 2.0 * inv_S1 * a_i * a_l * (
+                            +PB_0*QD_0*QD_1*QD_y*delta[b1][g0]
+
+                            +QD_0*QD_1*QD_y*(PA_x*delta[b0][b1] + PB_1*delta[b0][g0])
+                        )
+
+                        + (-1.0) * inv_S1 * a_i * (
+                            +PB_0*QD_0*delta[b1][g0]*delta[d1][g1]
+
+                            +QD_0*delta[d1][g1]*(PA_x*delta[b0][b1] + PB_1*delta[b0][g0]) + QD_1*delta[d0][g1]*(PA_x*delta[b0][b1] + PB_0*delta[b1][g0] + PB_1*delta[b0][g0])
+                        )
+
+                        + 2.0 * inv_S2 * a_i * a_l * (
+                            +PA_x*PB_0*PB_1*QD_0*delta[d1][g1]
+
+                            +PA_x*PB_0*PB_1*(QD_1*delta[d0][g1] + QD_y*delta[d0][d1])
+                        )
+
+                        + 4.0 * a_i * a_l * (
+                            +PA_x*PB_0*PB_1*QD_0*QD_1*QD_y
+                        )
+
+                        + (-2.0) * a_i * (
+                            +PA_x*PB_0*PB_1*QD_0*delta[d1][g1]
+
+                            +PA_x*PB_0*PB_1*QD_1*delta[d0][g1]
+                        )
+
+                    )
+
+                    + F6_t[1] * (
+
+                        inv_S1 * inv_S4 * a_i * a_l * (
+                            +QD_0*delta[b1][g0]*delta[d1][g1]*(-PB_0 + PQ[b0])
+
+                            +delta[b1][g0]*(-PB_0 + PQ[b0])*(QD_1*delta[d0][g1] + QD_y*delta[d0][d1]) + (delta[b0][b1]*(-PA_x + PQ[g0]) + delta[b0][g0]*(-PB_1 + PQ[b1]))*(QD_0*delta[d1][g1] + QD_1*delta[d0][g1] + QD_y*delta[d0][d1])
+
+                            +QD_0*(QD_1*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0]) + QD_y*(delta[b0][b1]*delta[d1][g0] + delta[b0][d1]*delta[b1][g0] + delta[b0][g0]*delta[b1][d1])) + QD_1*QD_y*(delta[b0][b1]*delta[d0][g0] + delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0])
+                        )
+
+                        + (-0.5) * inv_S1 * inv_S4 * a_i * (
+                            +delta[d0][g1]*(delta[b0][b1]*delta[d1][g0] + delta[b0][d1]*delta[b1][g0] + delta[b0][g0]*delta[b1][d1]) + delta[d1][g1]*(delta[b0][b1]*delta[d0][g0] + delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0])
+                        )
+
+                        + inv_S2 * inv_S4 * a_i * a_l * (
+                            +PB_0*PB_1*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+
+                            +PA_x*(PB_0*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1] + delta[b1][g1]*delta[d0][d1]) + PB_1*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1]))
+
+                            -(PA_x*delta[b0][b1] + PB_0*delta[b1][g0] + PB_1*delta[b0][g0])*(delta[d0][d1]*(PQ[g1] + QD_y) + delta[d0][g1]*(PQ[d1] + QD_1) + delta[d1][g1]*(PQ[d0] + QD_0))
+                        )
+
+                        + (-2.0) * S1 * inv_S2 * inv_S4 * a_i * a_l * (
+                            +PA_x*PB_0*PB_1*delta[d1][g1]*(PQ[d0] + QD_0)
+
+                            +PA_x*PB_0*PB_1*(delta[d0][d1]*(PQ[g1] + QD_y) + delta[d0][g1]*(PQ[d1] + QD_1))
+                        )
+
+                        + 2.0 * S2 * inv_S1 * inv_S4 * a_i * a_l * (
+                            +QD_0*QD_1*QD_y*delta[b1][g0]*(-PB_0 + PQ[b0])
+
+                            +QD_0*QD_1*QD_y*(delta[b0][b1]*(-PA_x + PQ[g0]) + delta[b0][g0]*(-PB_1 + PQ[b1]))
+                        )
+
+                        + S2 * inv_S1 * inv_S4 * a_i * (
+                            +QD_0*delta[b1][g0]*delta[d1][g1]*(PB_0 - PQ[b0])
+
+                            +QD_0*delta[d1][g1]*(delta[b0][b1]*(PA_x - PQ[g0]) + delta[b0][g0]*(PB_1 - PQ[b1])) + QD_1*delta[d0][g1]*(PA_x*delta[b0][b1] + PB_0*delta[b1][g0] + PB_1*delta[b0][g0] - PQ[b0]*delta[b1][g0] - PQ[b1]*delta[b0][g0] - PQ[g0]*delta[b0][b1])
+                        )
+
+                        + 2.0 * inv_S4 * a_i * a_l * (
+                            +QD_0*delta[d1][g1]*(PA_x*(PB_0*PQ[b1] + PB_1*PQ[b0]) + PB_0*PB_1*PQ[g0])
+
+                            +(PA_x*(PB_0*PQ[b1] + PB_1*PQ[b0]) + PB_0*PB_1*PQ[g0])*(QD_1*delta[d0][g1] + QD_y*delta[d0][d1])
+
+                            +QD_0*(PA_x*(PB_0*(QD_1*delta[b1][g1] + QD_y*delta[b1][d1]) + PB_1*(QD_1*delta[b0][g1] + QD_y*delta[b0][d1])) + PB_0*PB_1*(QD_1*delta[g0][g1] + QD_y*delta[d1][g0])) + QD_1*QD_y*(PA_x*(PB_0*delta[b1][d0] + PB_1*delta[b0][d0]) + PB_0*PB_1*delta[d0][g0])
+
+                            -(PQ[d1]*QD_0*QD_y + QD_1*(PQ[d0]*QD_y + PQ[g1]*QD_0))*(PA_x*delta[b0][b1] + PB_0*delta[b1][g0] + PB_1*delta[b0][g0])
+                        )
+
+                        + inv_S4 * a_i * (
+                            -PB_0*PB_1*(delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+
+                            -PA_x*(PB_0*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1]) + PB_1*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1]))
+
+                            +(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1])*(PA_x*delta[b0][b1] + PB_0*delta[b1][g0] + PB_1*delta[b0][g0])
+                        )
+
+                        + 4.0 * S1 * inv_S4 * a_i * a_l * (
+                            -PA_x*PB_0*PB_1*(PQ[d1]*QD_0*QD_y + QD_1*(PQ[d0]*QD_y + PQ[g1]*QD_0))
+                        )
+
+                        + 2.0 * S1 * inv_S4 * a_i * (
+                            +PA_x*PB_0*PB_1*PQ[d0]*delta[d1][g1]
+
+                            +PA_x*PB_0*PB_1*PQ[d1]*delta[d0][g1]
+                        )
+
+                        + 4.0 * S2 * inv_S4 * a_i * a_l * (
+                            +QD_0*QD_1*QD_y*(PA_x*(PB_0*PQ[b1] + PB_1*PQ[b0]) + PB_0*PB_1*PQ[g0])
+                        )
+
+                        + (-2.0) * S2 * inv_S4 * a_i * (
+                            +QD_0*delta[d1][g1]*(PA_x*(PB_0*PQ[b1] + PB_1*PQ[b0]) + PB_0*PB_1*PQ[g0])
+
+                            +QD_1*delta[d0][g1]*(PA_x*(PB_0*PQ[b1] + PB_1*PQ[b0]) + PB_0*PB_1*PQ[g0])
+                        )
+
+                        + 0.5 * inv_S1 * inv_S2 * inv_S4 * a_i * a_l * (
+                            +delta[b0][b1]*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0]) + delta[b0][g0]*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1] + delta[b1][g1]*delta[d0][d1]) + delta[b1][g0]*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1])
+                        )
+
+                    )
+
+                    + F6_t[2] * (
+
+                        (-0.5) * inv_S1 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +delta[b0][b1]*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0]) + delta[b0][g0]*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1] + delta[b1][g1]*delta[d0][d1]) + delta[b1][g0]*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1])
+                        )
+
+                        + (-0.5) * inv_S2 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +delta[b0][b1]*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0]) + delta[b0][g0]*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1] + delta[b1][g1]*delta[d0][d1]) + delta[b1][g0]*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1])
+                        )
+
+                        + S1 * inv_S2 * inv_S4 * inv_S4 * a_i * a_l * (
+                            -PB_0*PB_1*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+
+                            -PA_x*(PB_0*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1] + delta[b1][g1]*delta[d0][d1]) + PB_1*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1]))
+
+                            +(PA_x*delta[b0][b1] + PB_0*delta[b1][g0] + PB_1*delta[b0][g0])*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1])
+                        )
+
+                        + (-1.0) * S2 * inv_S1 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +PQ[b0]*QD_0*delta[b1][g0]*delta[d1][g1]
+
+                            +QD_0*delta[d1][g1]*(PQ[b1]*delta[b0][g0] + PQ[g0]*delta[b0][b1]) + (QD_1*delta[d0][g1] + QD_y*delta[d0][d1])*(PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0] + PQ[g0]*delta[b0][b1])
+
+                            +QD_0*(QD_1*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0]) + QD_y*(delta[b0][b1]*delta[d1][g0] + delta[b0][d1]*delta[b1][g0] + delta[b0][g0]*delta[b1][d1])) + QD_1*QD_y*(delta[b0][b1]*delta[d0][g0] + delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0])
+                        )
+
+                        + inv_S4 * inv_S4 * a_i * a_l * (
+                            +(PB_0*PQ[b1] + PB_1*PQ[b0])*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+
+                            +(delta[d0][d1]*(PQ[g1] + QD_y) + delta[d0][g1]*(PQ[d1] + QD_1) + delta[d1][g1]*(PQ[d0] + QD_0))*(PA_x*delta[b0][b1] + PB_0*delta[b1][g0] + PB_1*delta[b0][g0] - PQ[b0]*delta[b1][g0] - PQ[b1]*delta[b0][g0] - PQ[g0]*delta[b0][b1])
+
+                            +(PA_x*PQ[b0] + PB_0*PQ[g0])*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1] + delta[b1][g1]*delta[d0][d1]) + (PA_x*PQ[b1] + PB_1*PQ[g0])*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1])
+
+                            +PA_x*(QD_0*(delta[b0][d1]*delta[b1][g1] + delta[b0][g1]*delta[b1][d1]) + QD_1*(delta[b0][d0]*delta[b1][g1] + delta[b0][g1]*delta[b1][d0]) + QD_y*(delta[b0][d0]*delta[b1][d1] + delta[b0][d1]*delta[b1][d0])) + PB_0*(QD_0*(delta[b1][d1]*delta[g0][g1] + delta[b1][g1]*delta[d1][g0]) + QD_1*(delta[b1][d0]*delta[g0][g1] + delta[b1][g1]*delta[d0][g0]) + QD_y*(delta[b1][d0]*delta[d1][g0] + delta[b1][d1]*delta[d0][g0])) + PB_1*(QD_0*(delta[b0][d1]*delta[g0][g1] + delta[b0][g1]*delta[d1][g0]) + QD_1*(delta[b0][d0]*delta[g0][g1] + delta[b0][g1]*delta[d0][g0]) + QD_y*(delta[b0][d0]*delta[d1][g0] + delta[b0][d1]*delta[d0][g0]))
+
+                            +(-PQ[d0]*QD_1 - PQ[d1]*QD_0)*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0]) + (-PQ[d0]*QD_y - PQ[g1]*QD_0)*(delta[b0][b1]*delta[d1][g0] + delta[b0][d1]*delta[b1][g0] + delta[b0][g0]*delta[b1][d1]) + (-PQ[d1]*QD_y - PQ[g1]*QD_1)*(delta[b0][b1]*delta[d0][g0] + delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0])
+                        )
+
+                        + 2.0 * S1 * S1 * inv_S2 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +PA_x*PB_0*PB_1*PQ[d0]*delta[d1][g1]
+
+                            +PA_x*PB_0*PB_1*(PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1])
+                        )
+
+                        + 2.0 * S1 * inv_S4 * inv_S4 * a_i * a_l * (
+                            -delta[d1][g1]*(PQ[d0] + QD_0)*(PA_x*(PB_0*PQ[b1] + PB_1*PQ[b0]) + PB_0*PB_1*PQ[g0])
+
+                            -PA_x*(PB_0*(PQ[d0]*(QD_1*delta[b1][g1] + QD_y*delta[b1][d1]) + PQ[d1]*(QD_0*delta[b1][g1] + QD_y*delta[b1][d0]) + PQ[g1]*(QD_0*delta[b1][d1] + QD_1*delta[b1][d0])) + PB_1*(PQ[d0]*(QD_1*delta[b0][g1] + QD_y*delta[b0][d1]) + PQ[d1]*(QD_0*delta[b0][g1] + QD_y*delta[b0][d0]) + PQ[g1]*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0]))) - PB_0*PB_1*(PQ[d0]*(QD_1*delta[g0][g1] + QD_y*delta[d1][g0]) + PQ[d1]*(QD_0*delta[g0][g1] + QD_y*delta[d0][g0]) + PQ[g1]*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0]))
+
+                            -(PA_x*(PB_0*PQ[b1] + PB_1*PQ[b0]) + PB_0*PB_1*PQ[g0])*(delta[d0][d1]*(PQ[g1] + QD_y) + delta[d0][g1]*(PQ[d1] + QD_1))
+
+                            +(PQ[d0]*(PQ[d1]*QD_y + PQ[g1]*QD_1) + PQ[d1]*PQ[g1]*QD_0)*(PA_x*delta[b0][b1] + PB_0*delta[b1][g0] + PB_1*delta[b0][g0])
+                        )
+
+                        + (-2.0) * S2 * S2 * inv_S1 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +PQ[b0]*QD_0*QD_1*QD_y*delta[b1][g0]
+
+                            +QD_0*QD_1*QD_y*(PQ[b1]*delta[b0][g0] + PQ[g0]*delta[b0][b1])
+                        )
+
+                        + S2 * S2 * inv_S1 * inv_S4 * inv_S4 * a_i * (
+                            +PQ[b0]*QD_0*delta[b1][g0]*delta[d1][g1]
+
+                            +QD_0*delta[d1][g1]*(PQ[b1]*delta[b0][g0] + PQ[g0]*delta[b0][b1]) + QD_1*delta[d0][g1]*(PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0] + PQ[g0]*delta[b0][b1])
+                        )
+
+                        + 2.0 * S2 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +QD_0*delta[d1][g1]*(PB_0*PQ[b1]*PQ[g0] + PQ[b0]*(PA_x*PQ[b1] + PB_1*PQ[g0]))
+
+                            +(QD_1*delta[d0][g1] + QD_y*delta[d0][d1])*(PB_0*PQ[b1]*PQ[g0] + PQ[b0]*(PA_x*PQ[b1] + PB_1*PQ[g0]))
+
+                            +QD_0*(PA_x*(PQ[b0]*(QD_1*delta[b1][g1] + QD_y*delta[b1][d1]) + PQ[b1]*(QD_1*delta[b0][g1] + QD_y*delta[b0][d1])) + PB_0*(PQ[b1]*(QD_1*delta[g0][g1] + QD_y*delta[d1][g0]) + PQ[g0]*(QD_1*delta[b1][g1] + QD_y*delta[b1][d1])) + PB_1*(PQ[b0]*(QD_1*delta[g0][g1] + QD_y*delta[d1][g0]) + PQ[g0]*(QD_1*delta[b0][g1] + QD_y*delta[b0][d1]))) + QD_1*QD_y*(PA_x*(PQ[b0]*delta[b1][d0] + PQ[b1]*delta[b0][d0]) + PB_0*(PQ[b1]*delta[d0][g0] + PQ[g0]*delta[b1][d0]) + PB_1*(PQ[b0]*delta[d0][g0] + PQ[g0]*delta[b0][d0]))
+
+                            +(PQ[d1]*QD_0*QD_y + QD_1*(PQ[d0]*QD_y + PQ[g1]*QD_0))*(PA_x*delta[b0][b1] + PB_0*delta[b1][g0] + PB_1*delta[b0][g0] - PQ[b0]*delta[b1][g0] - PQ[b1]*delta[b0][g0] - PQ[g0]*delta[b0][b1])
+                        )
+
+                        + S2 * inv_S4 * inv_S4 * a_i * (
+                            -(PB_0*PQ[b1] + PB_1*PQ[b0])*(delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+
+                            +(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1])*(-PA_x*delta[b0][b1] - PB_0*delta[b1][g0] - PB_1*delta[b0][g0] + PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0] + PQ[g0]*delta[b0][b1])
+
+                            +(-PA_x*PQ[b0] - PB_0*PQ[g0])*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1]) + (-PA_x*PQ[b1] - PB_1*PQ[g0])*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1])
+                        )
+
+                        + 4.0 * S1 * S1 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +PA_x*PB_0*PB_1*(PQ[d0]*(PQ[d1]*QD_y + PQ[g1]*QD_1) + PQ[d1]*PQ[g1]*QD_0)
+                        )
+
+                        + 4.0 * S1 * S2 * inv_S4 * inv_S4 * a_i * a_l * (
+                            -(PA_x*(PB_0*PQ[b1] + PB_1*PQ[b0]) + PB_0*PB_1*PQ[g0])*(PQ[d1]*QD_0*QD_y + QD_1*(PQ[d0]*QD_y + PQ[g1]*QD_0))
+                        )
+
+                        + 2.0 * S1 * S2 * inv_S4 * inv_S4 * a_i * (
+                            +PQ[d0]*delta[d1][g1]*(PA_x*(PB_0*PQ[b1] + PB_1*PQ[b0]) + PB_0*PB_1*PQ[g0])
+
+                            +PQ[d1]*delta[d0][g1]*(PA_x*(PB_0*PQ[b1] + PB_1*PQ[b0]) + PB_0*PB_1*PQ[g0])
+                        )
+
+                        + 4.0 * S2 * S2 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +QD_0*QD_1*QD_y*(PB_0*PQ[b1]*PQ[g0] + PQ[b0]*(PA_x*PQ[b1] + PB_1*PQ[g0]))
+                        )
+
+                        + (-2.0) * S2 * S2 * inv_S4 * inv_S4 * a_i * (
+                            +QD_0*delta[d1][g1]*(PB_0*PQ[b1]*PQ[g0] + PQ[b0]*(PA_x*PQ[b1] + PB_1*PQ[g0]))
+
+                            +QD_1*delta[d0][g1]*(PB_0*PQ[b1]*PQ[g0] + PQ[b0]*(PA_x*PQ[b1] + PB_1*PQ[g0]))
+                        )
+
+                        + 0.5 * S2 * inv_S1 * inv_S4 * inv_S4 * a_i * (
+                            +delta[d0][g1]*(delta[b0][b1]*delta[d1][g0] + delta[b0][d1]*delta[b1][g0] + delta[b0][g0]*delta[b1][d1]) + delta[d1][g1]*(delta[b0][b1]*delta[d0][g0] + delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0])
+                        )
+
+                    )
+
+                    + F6_t[3] * (
+
+                        S1 * inv_S4 * inv_S4 * inv_S4 * a_i * a_l * (
+                            -(PB_0*PQ[b1] + PB_1*PQ[b0])*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+
+                            -PA_x*(PQ[d0]*(delta[b0][d1]*delta[b1][g1] + delta[b0][g1]*delta[b1][d1]) + PQ[d1]*(delta[b0][d0]*delta[b1][g1] + delta[b0][g1]*delta[b1][d0]) + PQ[g1]*(delta[b0][d0]*delta[b1][d1] + delta[b0][d1]*delta[b1][d0])) - PB_0*(PQ[d0]*(delta[b1][d1]*delta[g0][g1] + delta[b1][g1]*delta[d1][g0]) + PQ[d1]*(delta[b1][d0]*delta[g0][g1] + delta[b1][g1]*delta[d0][g0]) + PQ[g1]*(delta[b1][d0]*delta[d1][g0] + delta[b1][d1]*delta[d0][g0])) - PB_1*(PQ[d0]*(delta[b0][d1]*delta[g0][g1] + delta[b0][g1]*delta[d1][g0]) + PQ[d1]*(delta[b0][d0]*delta[g0][g1] + delta[b0][g1]*delta[d0][g0]) + PQ[g1]*(delta[b0][d0]*delta[d1][g0] + delta[b0][d1]*delta[d0][g0]))
+
+                            +(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1])*(-PA_x*delta[b0][b1] - PB_0*delta[b1][g0] - PB_1*delta[b0][g0] + PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0] + PQ[g0]*delta[b0][b1])
+
+                            +(-PA_x*PQ[b0] - PB_0*PQ[g0])*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1] + delta[b1][g1]*delta[d0][d1]) + (-PA_x*PQ[b1] - PB_1*PQ[g0])*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1])
+
+                            +PQ[d0]*(PQ[d1]*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0]) + PQ[g1]*(delta[b0][b1]*delta[d1][g0] + delta[b0][d1]*delta[b1][g0] + delta[b0][g0]*delta[b1][d1])) + PQ[d1]*PQ[g1]*(delta[b0][b1]*delta[d0][g0] + delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0])
+                        )
+
+                        + S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +PQ[b0]*QD_0*(delta[b1][d1]*delta[g0][g1] + delta[b1][g1]*delta[d1][g0])
+
+                            +(PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0] + PQ[g0]*delta[b0][b1])*(delta[d0][d1]*(PQ[g1] + QD_y) + delta[d0][g1]*(PQ[d1] + QD_1) + delta[d1][g1]*(PQ[d0] + QD_0))
+
+                            +QD_0*(PQ[b1]*(delta[b0][d1]*delta[g0][g1] + delta[b0][g1]*delta[d1][g0]) + PQ[g0]*(delta[b0][d1]*delta[b1][g1] + delta[b0][g1]*delta[b1][d1])) + QD_1*(PQ[b0]*(delta[b1][d0]*delta[g0][g1] + delta[b1][g1]*delta[d0][g0]) + PQ[b1]*(delta[b0][d0]*delta[g0][g1] + delta[b0][g1]*delta[d0][g0]) + PQ[g0]*(delta[b0][d0]*delta[b1][g1] + delta[b0][g1]*delta[b1][d0])) + QD_y*(PQ[b0]*(delta[b1][d0]*delta[d1][g0] + delta[b1][d1]*delta[d0][g0]) + PQ[b1]*(delta[b0][d0]*delta[d1][g0] + delta[b0][d1]*delta[d0][g0]) + PQ[g0]*(delta[b0][d0]*delta[b1][d1] + delta[b0][d1]*delta[b1][d0]))
+
+                            +(PQ[d0]*QD_1 + PQ[d1]*QD_0)*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0]) + (PQ[d0]*QD_y + PQ[g1]*QD_0)*(delta[b0][b1]*delta[d1][g0] + delta[b0][d1]*delta[b1][g0] + delta[b0][g0]*delta[b1][d1]) + (PQ[d1]*QD_y + PQ[g1]*QD_1)*(delta[b0][b1]*delta[d0][g0] + delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0])
+
+                            +PQ[b0]*(PQ[b1]*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0]) + PQ[g0]*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1] + delta[b1][g1]*delta[d0][d1])) + PQ[b1]*PQ[g0]*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1])
+                        )
+
+                        + 2.0 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +PB_0*PB_1*PQ[d0]*PQ[d1]*delta[g0][g1]
+
+                            +(PA_x*(PB_0*PQ[b1] + PB_1*PQ[b0]) + PB_0*PB_1*PQ[g0])*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1])
+
+                            +PA_x*(PQ[d0]*(PB_0*(PQ[d1]*delta[b1][g1] + PQ[g1]*delta[b1][d1]) + PB_1*(PQ[d1]*delta[b0][g1] + PQ[g1]*delta[b0][d1])) + PQ[d1]*PQ[g1]*(PB_0*delta[b1][d0] + PB_1*delta[b0][d0])) + PB_0*PB_1*PQ[g1]*(PQ[d0]*delta[d1][g0] + PQ[d1]*delta[d0][g0])
+
+                            -PQ[d0]*PQ[d1]*PQ[g1]*(PA_x*delta[b0][b1] + PB_0*delta[b1][g0] + PB_1*delta[b0][g0])
+                        )
+
+                        + 2.0 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_l * (
+                            -delta[d1][g1]*(PQ[d0] + QD_0)*(PB_0*PQ[b1]*PQ[g0] + PQ[b0]*(PA_x*PQ[b1] + PB_1*PQ[g0]))
+
+                            -PA_x*(PQ[b0]*(PQ[d0]*(QD_1*delta[b1][g1] + QD_y*delta[b1][d1]) + PQ[d1]*(QD_0*delta[b1][g1] + QD_y*delta[b1][d0]) + PQ[g1]*(QD_0*delta[b1][d1] + QD_1*delta[b1][d0])) + PQ[b1]*(PQ[d0]*(QD_1*delta[b0][g1] + QD_y*delta[b0][d1]) + PQ[d1]*(QD_0*delta[b0][g1] + QD_y*delta[b0][d0]) + PQ[g1]*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0]))) - PB_0*(PQ[b1]*(PQ[d0]*(QD_1*delta[g0][g1] + QD_y*delta[d1][g0]) + PQ[d1]*(QD_0*delta[g0][g1] + QD_y*delta[d0][g0]) + PQ[g1]*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0])) + PQ[g0]*(PQ[d0]*(QD_1*delta[b1][g1] + QD_y*delta[b1][d1]) + PQ[d1]*(QD_0*delta[b1][g1] + QD_y*delta[b1][d0]) + PQ[g1]*(QD_0*delta[b1][d1] + QD_1*delta[b1][d0]))) - PB_1*(PQ[b0]*(PQ[d0]*(QD_1*delta[g0][g1] + QD_y*delta[d1][g0]) + PQ[d1]*(QD_0*delta[g0][g1] + QD_y*delta[d0][g0]) + PQ[g1]*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0])) + PQ[g0]*(PQ[d0]*(QD_1*delta[b0][g1] + QD_y*delta[b0][d1]) + PQ[d1]*(QD_0*delta[b0][g1] + QD_y*delta[b0][d0]) + PQ[g1]*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0])))
+
+                            -(delta[d0][d1]*(PQ[g1] + QD_y) + delta[d0][g1]*(PQ[d1] + QD_1))*(PB_0*PQ[b1]*PQ[g0] + PQ[b0]*(PA_x*PQ[b1] + PB_1*PQ[g0]))
+
+                            +(PQ[d0]*(PQ[d1]*QD_y + PQ[g1]*QD_1) + PQ[d1]*PQ[g1]*QD_0)*(-PA_x*delta[b0][b1] - PB_0*delta[b1][g0] - PB_1*delta[b0][g0] + PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0] + PQ[g0]*delta[b0][b1])
+                        )
+
+                        + 2.0 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +QD_0*(PQ[b0]*(PQ[b1]*(PQ[g0]*delta[d1][g1] + QD_1*delta[g0][g1] + QD_y*delta[d1][g0]) + PQ[g0]*(QD_1*delta[b1][g1] + QD_y*delta[b1][d1])) + PQ[b1]*PQ[g0]*(QD_1*delta[b0][g1] + QD_y*delta[b0][d1])) + QD_1*QD_y*(PQ[b0]*(PQ[b1]*delta[d0][g0] + PQ[g0]*delta[b1][d0]) + PQ[b1]*PQ[g0]*delta[b0][d0])
+
+                            +PQ[b0]*PQ[b1]*PQ[g0]*(QD_1*delta[d0][g1] + QD_y*delta[d0][d1])
+
+                            +(PQ[d1]*QD_0*QD_y + QD_1*(PQ[d0]*QD_y + PQ[g1]*QD_0))*(PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0] + PQ[g0]*delta[b0][b1])
+                        )
+
+                        + (-1.0) * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * (
+                            +PQ[b0]*PQ[b1]*(delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+
+                            +(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1])*(PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0] + PQ[g0]*delta[b0][b1])
+
+                            +PQ[g0]*(PQ[b0]*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1]) + PQ[b1]*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1]))
+                        )
+
+                        + 4.0 * S1 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * a_i * a_l * (
+                            -PA_x*PB_0*PB_1*PQ[d0]*PQ[d1]*PQ[g1]
+                        )
+
+                        + 4.0 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +(PA_x*(PB_0*PQ[b1] + PB_1*PQ[b0]) + PB_0*PB_1*PQ[g0])*(PQ[d0]*(PQ[d1]*QD_y + PQ[g1]*QD_1) + PQ[d1]*PQ[g1]*QD_0)
+                        )
+
+                        + 4.0 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_l * (
+                            -(PB_0*PQ[b1]*PQ[g0] + PQ[b0]*(PA_x*PQ[b1] + PB_1*PQ[g0]))*(PQ[d1]*QD_0*QD_y + QD_1*(PQ[d0]*QD_y + PQ[g1]*QD_0))
+                        )
+
+                        + 2.0 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * (
+                            +PQ[d0]*delta[d1][g1]*(PB_0*PQ[b1]*PQ[g0] + PQ[b0]*(PA_x*PQ[b1] + PB_1*PQ[g0]))
+
+                            +PQ[d1]*delta[d0][g1]*(PB_0*PQ[b1]*PQ[g0] + PQ[b0]*(PA_x*PQ[b1] + PB_1*PQ[g0]))
+                        )
+
+                        + 4.0 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +PQ[b0]*PQ[b1]*PQ[g0]*QD_0*QD_1*QD_y
+                        )
+
+                        + (-2.0) * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * (
+                            +PQ[b0]*PQ[b1]*PQ[g0]*QD_0*delta[d1][g1]
+
+                            +PQ[b0]*PQ[b1]*PQ[g0]*QD_1*delta[d0][g1]
+                        )
+
+                        + 0.5 * inv_S4 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +delta[b0][b1]*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0]) + delta[b0][d0]*(delta[b1][d1]*delta[g0][g1] + delta[b1][g0]*delta[d1][g1] + delta[b1][g1]*delta[d1][g0]) + delta[b0][d1]*(delta[b1][d0]*delta[g0][g1] + delta[b1][g0]*delta[d0][g1] + delta[b1][g1]*delta[d0][g0]) + delta[b0][g0]*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1] + delta[b1][g1]*delta[d0][d1]) + delta[b0][g1]*(delta[b1][d0]*delta[d1][g0] + delta[b1][d1]*delta[d0][g0] + delta[b1][g0]*delta[d0][d1])
+                        )
+
+                    )
+
+                    + F6_t[4] * (
+
+                        (-1.0) * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +PQ[b0]*PQ[b1]*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+
+                            +PQ[d0]*(PQ[b0]*(delta[b1][d1]*delta[g0][g1] + delta[b1][g0]*delta[d1][g1] + delta[b1][g1]*delta[d1][g0]) + PQ[b1]*(delta[b0][d1]*delta[g0][g1] + delta[b0][g0]*delta[d1][g1] + delta[b0][g1]*delta[d1][g0]) + PQ[d1]*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0]) + PQ[g0]*(delta[b0][b1]*delta[d1][g1] + delta[b0][d1]*delta[b1][g1] + delta[b0][g1]*delta[b1][d1]) + PQ[g1]*(delta[b0][b1]*delta[d1][g0] + delta[b0][d1]*delta[b1][g0] + delta[b0][g0]*delta[b1][d1])) + PQ[d1]*(PQ[b0]*(delta[b1][d0]*delta[g0][g1] + delta[b1][g0]*delta[d0][g1] + delta[b1][g1]*delta[d0][g0]) + PQ[b1]*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0]) + PQ[g0]*(delta[b0][b1]*delta[d0][g1] + delta[b0][d0]*delta[b1][g1] + delta[b0][g1]*delta[b1][d0]) + PQ[g1]*(delta[b0][b1]*delta[d0][g0] + delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0])) + PQ[g0]*(PQ[b0]*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1] + delta[b1][g1]*delta[d0][d1]) + PQ[b1]*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1]) + PQ[g1]*(delta[b0][b1]*delta[d0][d1] + delta[b0][d0]*delta[b1][d1] + delta[b0][d1]*delta[b1][d0])) + PQ[g1]*(PQ[b0]*(delta[b1][d0]*delta[d1][g0] + delta[b1][d1]*delta[d0][g0] + delta[b1][g0]*delta[d0][d1]) + PQ[b1]*(delta[b0][d0]*delta[d1][g0] + delta[b0][d1]*delta[d0][g0] + delta[b0][g0]*delta[d0][d1]))
+                        )
+
+                        + 2.0 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +PQ[d0]*PQ[d1]*delta[g0][g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])
+
+                            +(PB_0*PQ[b1]*PQ[g0] + PQ[b0]*(PA_x*PQ[b1] + PB_1*PQ[g0]))*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1])
+
+                            +PQ[d0]*(PA_x*(PQ[b0]*(PQ[d1]*delta[b1][g1] + PQ[g1]*delta[b1][d1]) + PQ[b1]*(PQ[d1]*delta[b0][g1] + PQ[g1]*delta[b0][d1])) + PQ[g0]*(PB_0*(PQ[d1]*delta[b1][g1] + PQ[g1]*delta[b1][d1]) + PB_1*(PQ[d1]*delta[b0][g1] + PQ[g1]*delta[b0][d1]))) + PQ[g1]*(PQ[d1]*(PA_x*(PQ[b0]*delta[b1][d0] + PQ[b1]*delta[b0][d0]) + PQ[g0]*(PB_0*delta[b1][d0] + PB_1*delta[b0][d0])) + (PB_0*PQ[b1] + PB_1*PQ[b0])*(PQ[d0]*delta[d1][g0] + PQ[d1]*delta[d0][g0]))
+
+                            +PQ[d0]*PQ[d1]*PQ[g1]*(PA_x*delta[b0][b1] + PB_0*delta[b1][g0] + PB_1*delta[b0][g0] - PQ[b0]*delta[b1][g0] - PQ[b1]*delta[b0][g0] - PQ[g0]*delta[b0][b1])
+                        )
+
+                        + (-2.0) * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +PQ[b0]*(PQ[b1]*(PQ[d0]*(QD_1*delta[g0][g1] + QD_y*delta[d1][g0]) + PQ[d1]*(QD_0*delta[g0][g1] + QD_y*delta[d0][g0]) + PQ[g0]*delta[d1][g1]*(PQ[d0] + QD_0) + PQ[g1]*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0])) + PQ[g0]*(PQ[d0]*(QD_1*delta[b1][g1] + QD_y*delta[b1][d1]) + PQ[d1]*(QD_0*delta[b1][g1] + QD_y*delta[b1][d0]) + PQ[g1]*(QD_0*delta[b1][d1] + QD_1*delta[b1][d0]))) + PQ[b1]*PQ[g0]*(PQ[d0]*(QD_1*delta[b0][g1] + QD_y*delta[b0][d1]) + PQ[d1]*(QD_0*delta[b0][g1] + QD_y*delta[b0][d0]) + PQ[g1]*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0]))
+
+                            +PQ[b0]*PQ[b1]*PQ[g0]*(delta[d0][d1]*(PQ[g1] + QD_y) + delta[d0][g1]*(PQ[d1] + QD_1))
+
+                            +(PQ[d0]*(PQ[d1]*QD_y + PQ[g1]*QD_1) + PQ[d1]*PQ[g1]*QD_0)*(PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0] + PQ[g0]*delta[b0][b1])
+                        )
+
+                        + 4.0 * S1 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_l * (
+                            -PQ[d0]*PQ[d1]*PQ[g1]*(PA_x*(PB_0*PQ[b1] + PB_1*PQ[b0]) + PB_0*PB_1*PQ[g0])
+                        )
+
+                        + 4.0 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +(PQ[d0]*(PQ[d1]*QD_y + PQ[g1]*QD_1) + PQ[d1]*PQ[g1]*QD_0)*(PB_0*PQ[b1]*PQ[g0] + PQ[b0]*(PA_x*PQ[b1] + PB_1*PQ[g0]))
+                        )
+
+                        + 4.0 * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_l * (
+                            -PQ[b0]*PQ[b1]*PQ[g0]*(PQ[d1]*QD_0*QD_y + QD_1*(PQ[d0]*QD_y + PQ[g1]*QD_0))
+                        )
+
+                        + 2.0 * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * (
+                            +PQ[b0]*PQ[b1]*PQ[d0]*PQ[g0]*delta[d1][g1]
+
+                            +PQ[b0]*PQ[b1]*PQ[d1]*PQ[g0]*delta[d0][g1]
+                        )
+
+                    )
+
+                    + F6_t[5] * (
+
+                        4.0 * S1 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_l * (
+                            -PQ[d0]*PQ[d1]*PQ[g1]*(PB_0*PQ[b1]*PQ[g0] + PQ[b0]*(PA_x*PQ[b1] + PB_1*PQ[g0]))
+                        )
+
+                        + 4.0 * S1 * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +PQ[b0]*PQ[b1]*PQ[g0]*(PQ[d0]*(PQ[d1]*QD_y + PQ[g1]*QD_1) + PQ[d1]*PQ[g1]*QD_0)
+                        )
+
+                        + 2.0 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +PQ[b0]*PQ[b1]*PQ[d0]*PQ[d1]*delta[g0][g1]
+
+                            +PQ[g0]*(PQ[b0]*(PQ[b1]*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1]) + PQ[d1]*PQ[g1]*delta[b1][d0]) + PQ[d0]*PQ[d1]*(PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1] + PQ[g1]*delta[b0][b1])) + PQ[g1]*(PQ[b1]*PQ[d1]*(PQ[b0]*delta[d0][g0] + PQ[d0]*delta[b0][g0] + PQ[g0]*delta[b0][d0]) + PQ[d0]*(PQ[b0]*(PQ[b1]*delta[d1][g0] + PQ[d1]*delta[b1][g0] + PQ[g0]*delta[b1][d1]) + PQ[b1]*PQ[g0]*delta[b0][d1]))
+                        )
+
+                    )
+
+                    + F6_t[6] * (
+
+                        (-4.0) * S1 * S1 * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * a_l * (
+                            +PQ[b0]*PQ[b1]*PQ[d0]*PQ[d1]*PQ[g0]*PQ[g1]
+                        )
+
+                    )
+
+                    );
+
+            double hess_il_xy = -eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+
+            atomicAdd(
+                hess_xy + prim_cart_ao_to_atom_inds[i] * natoms + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + l_prim],
+                hess_il_xy * ik_factor_D * frac_exact_exchange);
+
+            atomicAdd(
+                hess_yx + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + l_prim] * natoms + prim_cart_ao_to_atom_inds[i],
+                hess_il_xy * ik_factor_D * frac_exact_exchange);
+        }
+    }
+
+    __syncthreads();
+}
+
+__global__ void __launch_bounds__(TILE_SIZE_K)
+computeExchangeHessianSDSD_JK_0(double*         hess_xy,
+                                double*         hess_yx,
+                                const uint32_t  hess_cart_ind_0,
+                                const uint32_t  hess_cart_ind_1,
+                                const double    frac_exact_exchange,
+                                const uint32_t* pair_inds_i_for_K_ss,
+                                const uint32_t* pair_inds_k_for_K_ss,
+                                const double*   D_ik_for_K_ss,
+                                const uint32_t  pair_inds_count_for_K_ss,
+                                const double*   s_prim_info,
+                                const uint32_t* s_prim_aoinds,
+                                const uint32_t  s_prim_count,
+                                const double*   d_prim_info,
+                                const uint32_t* d_prim_aoinds,
+                                const uint32_t  d_prim_count,
+                                const double    dd_max_D,
+                                const double*   mat_D_full_AO,
+                                const uint32_t  naos,
+                                const double*   Q_K_sd,
+                                const uint32_t* D_inds_K_sd,
+                                const uint32_t* pair_displs_K_sd,
+                                const uint32_t* pair_counts_K_sd,
+                                const double*   pair_data_K_sd,
+                                const uint32_t* prim_cart_ao_to_atom_inds,
+                                const uint32_t  natoms,
+                                const double*   boys_func_table,
+                                const double*   boys_func_ft,
+                                const double    omega,
+                                const double    eri_threshold)
+{
+    // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
+
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
+    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ double   delta[3][3];
+    __shared__ uint32_t g0, g1;
+
+    const uint32_t ik = blockIdx.x;
+
+    // we make sure that ik < pair_inds_count_for_K_ss when calling the kernel
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+        g0 = hess_cart_ind_0;
+        g1 = hess_cart_ind_1;
+
+        i = pair_inds_i_for_K_ss[ik];
+        k = pair_inds_k_for_K_ss[ik];
+
+        count_i = pair_counts_K_sd[i];
+        count_k = pair_counts_K_sd[k];
+
+        displ_i = pair_displs_K_sd[i];
+        displ_k = pair_displs_K_sd[k];
+
+        a_i = s_prim_info[i + s_prim_count * 0];
+
+        r_i[0] = s_prim_info[i + s_prim_count * 2];
+        r_i[1] = s_prim_info[i + s_prim_count * 3];
+        r_i[2] = s_prim_info[i + s_prim_count * 4];
+
+        a_k = s_prim_info[k + s_prim_count * 0];
+
+        r_k[0] = s_prim_info[k + s_prim_count * 2];
+        r_k[1] = s_prim_info[k + s_prim_count * 3];
+        r_k[2] = s_prim_info[k + s_prim_count * 4];
+
+        ik_factor_D = (static_cast<double>(i != k) + 1.0) * D_ik_for_K_ss[ik];
+
+    }
+
+    __syncthreads();
+
+    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    {
+        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+
+        // sync threads before starting a new scan
+        __syncthreads();
+
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double PB_0, PB_1, PB_x;
+        uint32_t j_prim, j_cgto, b0, b1;
+
+        if (j < count_i)
+        {
+            Q_ij   = Q_K_sd[displ_i + j];
+
+            j_prim = D_inds_K_sd[displ_i + j];
+
+            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+
+            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+
+            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
+            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
+            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
+            S_ij_00 = pair_data_K_sd[displ_i + j];
+
+            PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+        }
+
+        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        {
+            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+
+            // Q_kl == Q_K_sd[displ_k + l]
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_sd[displ_k + l] * dd_max_D) <= eri_threshold))
+            {
+                break;
+            }
+
+            // const auto Q_kl = Q_K_sd[displ_k + l];
+
+            const auto l_prim = D_inds_K_sd[displ_k + l];
+
+            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+
+            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+
+            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
+                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
+                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+
+            const auto S_kl_00 = pair_data_K_sd[displ_k + l];
+
+            const auto d0 = d_cart_inds[l_prim % 6][0];
+            const auto d1 = d_cart_inds[l_prim % 6][1];
+
+            // J. Chem. Phys. 84, 3963-3974 (1986)
+
+            const auto S2 = a_k + a_l;
+
+            const auto inv_S2 = 1.0 / S2;
+            const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
+
+            const auto rho = S1 * S2 * inv_S4;
+
+            double d2 = 1.0;
+
+            if (omega != 0.0) d2 = omega * omega / (rho + omega * omega);
+
+            const auto Lambda = sqrt(4.0 * rho * d2 * MATH_CONST_INV_PI);
+
+            double F6_t[7];
+
+            gpu::computeBoysFunction(F6_t, rho * d2 * r2_PQ, 6, boys_func_table, boys_func_ft);
+
+            if (omega != 0.0)
+            {
+                F6_t[1] *= d2;
+                F6_t[2] *= d2 * d2;
+                F6_t[3] *= d2 * d2 * d2;
+                F6_t[4] *= d2 * d2 * d2 * d2;
+                F6_t[5] *= d2 * d2 * d2 * d2 * d2;
+                F6_t[6] *= d2 * d2 * d2 * d2 * d2 * d2;
+            }
+
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+
+            const auto QC_y = (a_l * inv_S2) * (r_l[g1] - r_k[g1]);
+
+            // j-k Hessian
+
+            const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
+                    + F6_t[0] * (
+
+                        inv_S1 * inv_S2 * a_j * a_k * (
+                            +PB_0*QD_0*delta[b1][g0]*delta[d1][g1]
+
+                            +QD_0*delta[d1][g1]*(PB_1*delta[b0][g0] + PB_x*delta[b0][b1]) + (QC_y*delta[d0][d1] + QD_1*delta[d0][g1])*(PB_0*delta[b1][g0] + PB_1*delta[b0][g0] + PB_x*delta[b0][b1])
+                        )
+
+                        + 2.0 * inv_S1 * a_j * a_k * (
+                            +PB_0*QC_y*QD_0*QD_1*delta[b1][g0]
+
+                            +QC_y*QD_0*QD_1*(PB_1*delta[b0][g0] + PB_x*delta[b0][b1])
+                        )
+
+                        + 2.0 * inv_S2 * a_j * a_k * (
+                            +PB_0*PB_1*PB_x*QD_0*delta[d1][g1]
+
+                            +PB_0*PB_1*PB_x*(QC_y*delta[d0][d1] + QD_1*delta[d0][g1])
+                        )
+
+                        + (-1.0) * inv_S2 * a_k * (
+                            +PB_0*QD_0*delta[b1][g0]*delta[d1][g1]
+
+                            +PB_0*delta[b1][g0]*(QC_y*delta[d0][d1] + QD_1*delta[d0][g1]) + PB_1*delta[b0][g0]*(QC_y*delta[d0][d1] + QD_0*delta[d1][g1] + QD_1*delta[d0][g1])
+                        )
+
+                        + 4.0 * a_j * a_k * (
+                            +PB_0*PB_1*PB_x*QC_y*QD_0*QD_1
+                        )
+
+                        + (-2.0) * a_k * (
+                            +PB_0*QC_y*QD_0*QD_1*delta[b1][g0]
+
+                            +PB_1*QC_y*QD_0*QD_1*delta[b0][g0]
+                        )
+
+                    )
+
+                    + F6_t[1] * (
+
+                        inv_S1 * inv_S4 * a_j * a_k * (
+                            +QD_0*delta[b1][g0]*delta[d1][g1]*(-PB_0 + PQ[b0])
+
+                            +QD_0*delta[d1][g1]*(delta[b0][b1]*(-PB_x + PQ[g0]) + delta[b0][g0]*(-PB_1 + PQ[b1])) + (QC_y*delta[d0][d1] + QD_1*delta[d0][g1])*(-PB_0*delta[b1][g0] - PB_1*delta[b0][g0] - PB_x*delta[b0][b1] + PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0] + PQ[g0]*delta[b0][b1])
+
+                            +QC_y*(QD_0*(delta[b0][b1]*delta[d1][g0] + delta[b0][d1]*delta[b1][g0] + delta[b0][g0]*delta[b1][d1]) + QD_1*(delta[b0][b1]*delta[d0][g0] + delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0])) + QD_0*QD_1*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+                        )
+
+                        + inv_S2 * inv_S4 * a_j * a_k * (
+                            +PB_0*PB_1*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+
+                            +PB_x*(PB_0*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1] + delta[b1][g1]*delta[d0][d1]) + PB_1*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1]))
+
+                            -(PB_0*delta[b1][g0] + PB_1*delta[b0][g0] + PB_x*delta[b0][b1])*(delta[d0][d1]*(PQ[g1] + QC_y) + delta[d0][g1]*(PQ[d1] + QD_1) + delta[d1][g1]*(PQ[d0] + QD_0))
+                        )
+
+                        + (-0.5) * inv_S2 * inv_S4 * a_k * (
+                            +delta[b0][g0]*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1] + delta[b1][g1]*delta[d0][d1]) + delta[b1][g0]*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1])
+                        )
+
+                        + (-2.0) * S1 * inv_S2 * inv_S4 * a_j * a_k * (
+                            +PB_0*PB_1*PB_x*delta[d1][g1]*(PQ[d0] + QD_0)
+
+                            +PB_0*PB_1*PB_x*(delta[d0][d1]*(PQ[g1] + QC_y) + delta[d0][g1]*(PQ[d1] + QD_1))
+                        )
+
+                        + S1 * inv_S2 * inv_S4 * a_k * (
+                            +PB_0*delta[b1][g0]*delta[d1][g1]*(PQ[d0] + QD_0)
+
+                            +PB_0*delta[b1][g0]*(delta[d0][d1]*(PQ[g1] + QC_y) + delta[d0][g1]*(PQ[d1] + QD_1)) + PB_1*delta[b0][g0]*(delta[d0][d1]*(PQ[g1] + QC_y) + delta[d0][g1]*(PQ[d1] + QD_1) + delta[d1][g1]*(PQ[d0] + QD_0))
+                        )
+
+                        + 2.0 * S2 * inv_S1 * inv_S4 * a_j * a_k * (
+                            +QC_y*QD_0*QD_1*delta[b1][g0]*(-PB_0 + PQ[b0])
+
+                            +QC_y*QD_0*QD_1*(delta[b0][b1]*(-PB_x + PQ[g0]) + delta[b0][g0]*(-PB_1 + PQ[b1]))
+                        )
+
+                        + 2.0 * inv_S4 * a_j * a_k * (
+                            +QD_0*delta[d1][g1]*(PB_0*(PB_1*PQ[g0] + PB_x*PQ[b1]) + PB_1*PB_x*PQ[b0])
+
+                            +(PB_0*(PB_1*PQ[g0] + PB_x*PQ[b1]) + PB_1*PB_x*PQ[b0])*(QC_y*delta[d0][d1] + QD_1*delta[d0][g1])
+
+                            +QC_y*(PB_0*(PB_1*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0]) + PB_x*(QD_0*delta[b1][d1] + QD_1*delta[b1][d0])) + PB_1*PB_x*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0])) + QD_0*QD_1*(PB_0*(PB_1*delta[g0][g1] + PB_x*delta[b1][g1]) + PB_1*PB_x*delta[b0][g1])
+
+                            -(PQ[g1]*QD_0*QD_1 + QC_y*(PQ[d0]*QD_1 + PQ[d1]*QD_0))*(PB_0*delta[b1][g0] + PB_1*delta[b0][g0] + PB_x*delta[b0][b1])
+                        )
+
+                        + (-1.0) * inv_S4 * a_k * (
+                            +PQ[b0]*QD_0*delta[b1][g0]*delta[d1][g1]
+
+                            +PQ[b0]*delta[b1][g0]*(QC_y*delta[d0][d1] + QD_1*delta[d0][g1]) + PQ[b1]*delta[b0][g0]*(QC_y*delta[d0][d1] + QD_0*delta[d1][g1] + QD_1*delta[d0][g1])
+
+                            +QC_y*(QD_0*(delta[b0][d1]*delta[b1][g0] + delta[b0][g0]*delta[b1][d1]) + QD_1*(delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0])) + QD_0*QD_1*(delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+                        )
+
+                        + 4.0 * S1 * inv_S4 * a_j * a_k * (
+                            -PB_0*PB_1*PB_x*(PQ[g1]*QD_0*QD_1 + QC_y*(PQ[d0]*QD_1 + PQ[d1]*QD_0))
+                        )
+
+                        + 2.0 * S1 * inv_S4 * a_k * (
+                            +PB_0*delta[b1][g0]*(PQ[g1]*QD_0*QD_1 + QC_y*(PQ[d0]*QD_1 + PQ[d1]*QD_0))
+
+                            +PB_1*delta[b0][g0]*(PQ[g1]*QD_0*QD_1 + QC_y*(PQ[d0]*QD_1 + PQ[d1]*QD_0))
+                        )
+
+                        + 4.0 * S2 * inv_S4 * a_j * a_k * (
+                            +QC_y*QD_0*QD_1*(PB_0*(PB_1*PQ[g0] + PB_x*PQ[b1]) + PB_1*PB_x*PQ[b0])
+                        )
+
+                        + (-2.0) * S2 * inv_S4 * a_k * (
+                            +PQ[b0]*QC_y*QD_0*QD_1*delta[b1][g0]
+
+                            +PQ[b1]*QC_y*QD_0*QD_1*delta[b0][g0]
+                        )
+
+                        + 0.5 * inv_S1 * inv_S2 * inv_S4 * a_j * a_k * (
+                            +delta[b0][b1]*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0]) + delta[b0][g0]*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1] + delta[b1][g1]*delta[d0][d1]) + delta[b1][g0]*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1])
+                        )
+
+                    )
+
+                    + F6_t[2] * (
+
+                        (-0.5) * inv_S1 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +delta[b0][b1]*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0]) + delta[b0][g0]*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1] + delta[b1][g1]*delta[d0][d1]) + delta[b1][g0]*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1])
+                        )
+
+                        + (-0.5) * inv_S2 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +delta[b0][b1]*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0]) + delta[b0][g0]*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1] + delta[b1][g1]*delta[d0][d1]) + delta[b1][g0]*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1])
+                        )
+
+                        + S1 * inv_S2 * inv_S4 * inv_S4 * a_j * a_k * (
+                            -PB_0*PB_1*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+
+                            -PB_x*(PB_0*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1] + delta[b1][g1]*delta[d0][d1]) + PB_1*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1]))
+
+                            +(PB_0*delta[b1][g0] + PB_1*delta[b0][g0] + PB_x*delta[b0][b1])*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1])
+                        )
+
+                        + (-1.0) * S2 * inv_S1 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +PQ[b0]*QD_0*delta[b1][g0]*delta[d1][g1]
+
+                            +QD_0*delta[d1][g1]*(PQ[b1]*delta[b0][g0] + PQ[g0]*delta[b0][b1]) + (QC_y*delta[d0][d1] + QD_1*delta[d0][g1])*(PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0] + PQ[g0]*delta[b0][b1])
+
+                            +QC_y*(QD_0*(delta[b0][b1]*delta[d1][g0] + delta[b0][d1]*delta[b1][g0] + delta[b0][g0]*delta[b1][d1]) + QD_1*(delta[b0][b1]*delta[d0][g0] + delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0])) + QD_0*QD_1*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0])
+                        )
+
+                        + inv_S4 * inv_S4 * a_j * a_k * (
+                            +(PB_0*PQ[b1] + PB_1*PQ[b0])*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+
+                            +(delta[d0][d1]*(PQ[g1] + QC_y) + delta[d0][g1]*(PQ[d1] + QD_1) + delta[d1][g1]*(PQ[d0] + QD_0))*(PB_0*delta[b1][g0] + PB_1*delta[b0][g0] + PB_x*delta[b0][b1] - PQ[b0]*delta[b1][g0] - PQ[b1]*delta[b0][g0] - PQ[g0]*delta[b0][b1])
+
+                            +(PB_0*PQ[g0] + PB_x*PQ[b0])*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1] + delta[b1][g1]*delta[d0][d1]) + (PB_1*PQ[g0] + PB_x*PQ[b1])*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1])
+
+                            +PB_0*(QC_y*(delta[b1][d0]*delta[d1][g0] + delta[b1][d1]*delta[d0][g0]) + QD_0*(delta[b1][d1]*delta[g0][g1] + delta[b1][g1]*delta[d1][g0]) + QD_1*(delta[b1][d0]*delta[g0][g1] + delta[b1][g1]*delta[d0][g0])) + PB_1*(QC_y*(delta[b0][d0]*delta[d1][g0] + delta[b0][d1]*delta[d0][g0]) + QD_0*(delta[b0][d1]*delta[g0][g1] + delta[b0][g1]*delta[d1][g0]) + QD_1*(delta[b0][d0]*delta[g0][g1] + delta[b0][g1]*delta[d0][g0])) + PB_x*(QC_y*(delta[b0][d0]*delta[b1][d1] + delta[b0][d1]*delta[b1][d0]) + QD_0*(delta[b0][d1]*delta[b1][g1] + delta[b0][g1]*delta[b1][d1]) + QD_1*(delta[b0][d0]*delta[b1][g1] + delta[b0][g1]*delta[b1][d0]))
+
+                            +(-PQ[d0]*QC_y - PQ[g1]*QD_0)*(delta[b0][b1]*delta[d1][g0] + delta[b0][d1]*delta[b1][g0] + delta[b0][g0]*delta[b1][d1]) + (-PQ[d0]*QD_1 - PQ[d1]*QD_0)*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0]) + (-PQ[d1]*QC_y - PQ[g1]*QD_1)*(delta[b0][b1]*delta[d0][g0] + delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0])
+                        )
+
+                        + 2.0 * S1 * S1 * inv_S2 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +PB_0*PB_1*PB_x*PQ[d0]*delta[d1][g1]
+
+                            +PB_0*PB_1*PB_x*(PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1])
+                        )
+
+                        + (-1.0) * S1 * S1 * inv_S2 * inv_S4 * inv_S4 * a_k * (
+                            +PB_0*PQ[d0]*delta[b1][g0]*delta[d1][g1]
+
+                            +PB_0*delta[b1][g0]*(PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1]) + PB_1*delta[b0][g0]*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1])
+                        )
+
+                        + 2.0 * S1 * inv_S4 * inv_S4 * a_j * a_k * (
+                            -delta[d1][g1]*(PQ[d0] + QD_0)*(PB_0*(PB_1*PQ[g0] + PB_x*PQ[b1]) + PB_1*PB_x*PQ[b0])
+
+                            -PB_0*(PB_1*(PQ[d0]*(QC_y*delta[d1][g0] + QD_1*delta[g0][g1]) + PQ[d1]*(QC_y*delta[d0][g0] + QD_0*delta[g0][g1]) + PQ[g1]*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0])) + PB_x*(PQ[d0]*(QC_y*delta[b1][d1] + QD_1*delta[b1][g1]) + PQ[d1]*(QC_y*delta[b1][d0] + QD_0*delta[b1][g1]) + PQ[g1]*(QD_0*delta[b1][d1] + QD_1*delta[b1][d0]))) - PB_1*PB_x*(PQ[d0]*(QC_y*delta[b0][d1] + QD_1*delta[b0][g1]) + PQ[d1]*(QC_y*delta[b0][d0] + QD_0*delta[b0][g1]) + PQ[g1]*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0]))
+
+                            -(PB_0*(PB_1*PQ[g0] + PB_x*PQ[b1]) + PB_1*PB_x*PQ[b0])*(delta[d0][d1]*(PQ[g1] + QC_y) + delta[d0][g1]*(PQ[d1] + QD_1))
+
+                            +(PQ[d0]*(PQ[d1]*QC_y + PQ[g1]*QD_1) + PQ[d1]*PQ[g1]*QD_0)*(PB_0*delta[b1][g0] + PB_1*delta[b0][g0] + PB_x*delta[b0][b1])
+                        )
+
+                        + S1 * inv_S4 * inv_S4 * a_k * (
+                            +PQ[b0]*delta[b1][g0]*delta[d1][g1]*(PQ[d0] + QD_0)
+
+                            +PQ[b0]*delta[b1][g0]*(delta[d0][d1]*(PQ[g1] + QC_y) + delta[d0][g1]*(PQ[d1] + QD_1)) + PQ[b1]*delta[b0][g0]*(delta[d0][d1]*(PQ[g1] + QC_y) + delta[d0][g1]*(PQ[d1] + QD_1) + delta[d1][g1]*(PQ[d0] + QD_0))
+
+                            +(PQ[d0]*QC_y + PQ[g1]*QD_0)*(delta[b0][d1]*delta[b1][g0] + delta[b0][g0]*delta[b1][d1]) + (PQ[d0]*QD_1 + PQ[d1]*QD_0)*(delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0]) + (PQ[d1]*QC_y + PQ[g1]*QD_1)*(delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0])
+                        )
+
+                        + (-2.0) * S2 * S2 * inv_S1 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +PQ[b0]*QC_y*QD_0*QD_1*delta[b1][g0]
+
+                            +QC_y*QD_0*QD_1*(PQ[b1]*delta[b0][g0] + PQ[g0]*delta[b0][b1])
+                        )
+
+                        + 2.0 * S2 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +QD_0*delta[d1][g1]*(PB_1*PQ[b0]*PQ[g0] + PQ[b1]*(PB_0*PQ[g0] + PB_x*PQ[b0]))
+
+                            +(QC_y*delta[d0][d1] + QD_1*delta[d0][g1])*(PB_1*PQ[b0]*PQ[g0] + PQ[b1]*(PB_0*PQ[g0] + PB_x*PQ[b0]))
+
+                            +QC_y*(PB_0*(PQ[b1]*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0]) + PQ[g0]*(QD_0*delta[b1][d1] + QD_1*delta[b1][d0])) + PB_1*(PQ[b0]*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0]) + PQ[g0]*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0])) + PB_x*(PQ[b0]*(QD_0*delta[b1][d1] + QD_1*delta[b1][d0]) + PQ[b1]*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0]))) + QD_0*QD_1*(PB_0*(PQ[b1]*delta[g0][g1] + PQ[g0]*delta[b1][g1]) + PB_1*(PQ[b0]*delta[g0][g1] + PQ[g0]*delta[b0][g1]) + PB_x*(PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1]))
+
+                            +(PQ[g1]*QD_0*QD_1 + QC_y*(PQ[d0]*QD_1 + PQ[d1]*QD_0))*(PB_0*delta[b1][g0] + PB_1*delta[b0][g0] + PB_x*delta[b0][b1] - PQ[b0]*delta[b1][g0] - PQ[b1]*delta[b0][g0] - PQ[g0]*delta[b0][b1])
+                        )
+
+                        + 4.0 * S1 * S1 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +PB_0*PB_1*PB_x*(PQ[d0]*(PQ[d1]*QC_y + PQ[g1]*QD_1) + PQ[d1]*PQ[g1]*QD_0)
+                        )
+
+                        + (-2.0) * S1 * S1 * inv_S4 * inv_S4 * a_k * (
+                            +PB_0*delta[b1][g0]*(PQ[d0]*(PQ[d1]*QC_y + PQ[g1]*QD_1) + PQ[d1]*PQ[g1]*QD_0)
+
+                            +PB_1*delta[b0][g0]*(PQ[d0]*(PQ[d1]*QC_y + PQ[g1]*QD_1) + PQ[d1]*PQ[g1]*QD_0)
+                        )
+
+                        + 4.0 * S1 * S2 * inv_S4 * inv_S4 * a_j * a_k * (
+                            -(PB_0*(PB_1*PQ[g0] + PB_x*PQ[b1]) + PB_1*PB_x*PQ[b0])*(PQ[g1]*QD_0*QD_1 + QC_y*(PQ[d0]*QD_1 + PQ[d1]*QD_0))
+                        )
+
+                        + 2.0 * S1 * S2 * inv_S4 * inv_S4 * a_k * (
+                            +PQ[b0]*delta[b1][g0]*(PQ[g1]*QD_0*QD_1 + QC_y*(PQ[d0]*QD_1 + PQ[d1]*QD_0))
+
+                            +PQ[b1]*delta[b0][g0]*(PQ[g1]*QD_0*QD_1 + QC_y*(PQ[d0]*QD_1 + PQ[d1]*QD_0))
+                        )
+
+                        + 4.0 * S2 * S2 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +QC_y*QD_0*QD_1*(PB_1*PQ[b0]*PQ[g0] + PQ[b1]*(PB_0*PQ[g0] + PB_x*PQ[b0]))
+                        )
+
+                        + 0.5 * S1 * inv_S2 * inv_S4 * inv_S4 * a_k * (
+                            +delta[b0][g0]*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1] + delta[b1][g1]*delta[d0][d1]) + delta[b1][g0]*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1])
+                        )
+
+                    )
+
+                    + F6_t[3] * (
+
+                        S1 * inv_S4 * inv_S4 * inv_S4 * a_j * a_k * (
+                            -(PB_0*PQ[b1] + PB_1*PQ[b0])*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+
+                            -PB_0*(PQ[d0]*(delta[b1][d1]*delta[g0][g1] + delta[b1][g1]*delta[d1][g0]) + PQ[d1]*(delta[b1][d0]*delta[g0][g1] + delta[b1][g1]*delta[d0][g0]) + PQ[g1]*(delta[b1][d0]*delta[d1][g0] + delta[b1][d1]*delta[d0][g0])) - PB_1*(PQ[d0]*(delta[b0][d1]*delta[g0][g1] + delta[b0][g1]*delta[d1][g0]) + PQ[d1]*(delta[b0][d0]*delta[g0][g1] + delta[b0][g1]*delta[d0][g0]) + PQ[g1]*(delta[b0][d0]*delta[d1][g0] + delta[b0][d1]*delta[d0][g0])) - PB_x*(PQ[d0]*(delta[b0][d1]*delta[b1][g1] + delta[b0][g1]*delta[b1][d1]) + PQ[d1]*(delta[b0][d0]*delta[b1][g1] + delta[b0][g1]*delta[b1][d0]) + PQ[g1]*(delta[b0][d0]*delta[b1][d1] + delta[b0][d1]*delta[b1][d0]))
+
+                            +(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1])*(-PB_0*delta[b1][g0] - PB_1*delta[b0][g0] - PB_x*delta[b0][b1] + PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0] + PQ[g0]*delta[b0][b1])
+
+                            +(-PB_0*PQ[g0] - PB_x*PQ[b0])*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1] + delta[b1][g1]*delta[d0][d1]) + (-PB_1*PQ[g0] - PB_x*PQ[b1])*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1])
+
+                            +PQ[d0]*(PQ[d1]*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0]) + PQ[g1]*(delta[b0][b1]*delta[d1][g0] + delta[b0][d1]*delta[b1][g0] + delta[b0][g0]*delta[b1][d1])) + PQ[d1]*PQ[g1]*(delta[b0][b1]*delta[d0][g0] + delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0])
+                        )
+
+                        + S2 * inv_S4 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +PQ[b0]*QD_0*(delta[b1][d1]*delta[g0][g1] + delta[b1][g1]*delta[d1][g0])
+
+                            +(PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0] + PQ[g0]*delta[b0][b1])*(delta[d0][d1]*(PQ[g1] + QC_y) + delta[d0][g1]*(PQ[d1] + QD_1) + delta[d1][g1]*(PQ[d0] + QD_0))
+
+                            +QC_y*(PQ[b0]*(delta[b1][d0]*delta[d1][g0] + delta[b1][d1]*delta[d0][g0]) + PQ[b1]*(delta[b0][d0]*delta[d1][g0] + delta[b0][d1]*delta[d0][g0]) + PQ[g0]*(delta[b0][d0]*delta[b1][d1] + delta[b0][d1]*delta[b1][d0])) + QD_0*(PQ[b1]*(delta[b0][d1]*delta[g0][g1] + delta[b0][g1]*delta[d1][g0]) + PQ[g0]*(delta[b0][d1]*delta[b1][g1] + delta[b0][g1]*delta[b1][d1])) + QD_1*(PQ[b0]*(delta[b1][d0]*delta[g0][g1] + delta[b1][g1]*delta[d0][g0]) + PQ[b1]*(delta[b0][d0]*delta[g0][g1] + delta[b0][g1]*delta[d0][g0]) + PQ[g0]*(delta[b0][d0]*delta[b1][g1] + delta[b0][g1]*delta[b1][d0]))
+
+                            +(PQ[d0]*QC_y + PQ[g1]*QD_0)*(delta[b0][b1]*delta[d1][g0] + delta[b0][d1]*delta[b1][g0] + delta[b0][g0]*delta[b1][d1]) + (PQ[d0]*QD_1 + PQ[d1]*QD_0)*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0]) + (PQ[d1]*QC_y + PQ[g1]*QD_1)*(delta[b0][b1]*delta[d0][g0] + delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0])
+
+                            +PQ[b0]*(PQ[b1]*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0]) + PQ[g0]*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1] + delta[b1][g1]*delta[d0][d1])) + PQ[b1]*PQ[g0]*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1])
+                        )
+
+                        + 2.0 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +PB_0*PB_1*PQ[d0]*PQ[d1]*delta[g0][g1]
+
+                            +(PB_0*(PB_1*PQ[g0] + PB_x*PQ[b1]) + PB_1*PB_x*PQ[b0])*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1])
+
+                            +PB_0*PB_1*PQ[g1]*(PQ[d0]*delta[d1][g0] + PQ[d1]*delta[d0][g0]) + PB_x*(PQ[d0]*(PB_0*(PQ[d1]*delta[b1][g1] + PQ[g1]*delta[b1][d1]) + PB_1*(PQ[d1]*delta[b0][g1] + PQ[g1]*delta[b0][d1])) + PQ[d1]*PQ[g1]*(PB_0*delta[b1][d0] + PB_1*delta[b0][d0]))
+
+                            -PQ[d0]*PQ[d1]*PQ[g1]*(PB_0*delta[b1][g0] + PB_1*delta[b0][g0] + PB_x*delta[b0][b1])
+                        )
+
+                        + (-1.0) * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * a_k * (
+                            +PQ[b0]*PQ[d0]*delta[b1][g0]*delta[d1][g1]
+
+                            +PQ[b0]*delta[b1][g0]*(PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1]) + PQ[b1]*delta[b0][g0]*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1])
+
+                            +PQ[d0]*(PQ[d1]*(delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0]) + PQ[g1]*(delta[b0][d1]*delta[b1][g0] + delta[b0][g0]*delta[b1][d1])) + PQ[d1]*PQ[g1]*(delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0])
+                        )
+
+                        + 2.0 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_j * a_k * (
+                            -delta[d1][g1]*(PQ[d0] + QD_0)*(PB_1*PQ[b0]*PQ[g0] + PQ[b1]*(PB_0*PQ[g0] + PB_x*PQ[b0]))
+
+                            -PB_0*(PQ[b1]*(PQ[d0]*(QC_y*delta[d1][g0] + QD_1*delta[g0][g1]) + PQ[d1]*(QC_y*delta[d0][g0] + QD_0*delta[g0][g1]) + PQ[g1]*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0])) + PQ[g0]*(PQ[d0]*(QC_y*delta[b1][d1] + QD_1*delta[b1][g1]) + PQ[d1]*(QC_y*delta[b1][d0] + QD_0*delta[b1][g1]) + PQ[g1]*(QD_0*delta[b1][d1] + QD_1*delta[b1][d0]))) - PB_1*(PQ[b0]*(PQ[d0]*(QC_y*delta[d1][g0] + QD_1*delta[g0][g1]) + PQ[d1]*(QC_y*delta[d0][g0] + QD_0*delta[g0][g1]) + PQ[g1]*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0])) + PQ[g0]*(PQ[d0]*(QC_y*delta[b0][d1] + QD_1*delta[b0][g1]) + PQ[d1]*(QC_y*delta[b0][d0] + QD_0*delta[b0][g1]) + PQ[g1]*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0]))) - PB_x*(PQ[b0]*(PQ[d0]*(QC_y*delta[b1][d1] + QD_1*delta[b1][g1]) + PQ[d1]*(QC_y*delta[b1][d0] + QD_0*delta[b1][g1]) + PQ[g1]*(QD_0*delta[b1][d1] + QD_1*delta[b1][d0])) + PQ[b1]*(PQ[d0]*(QC_y*delta[b0][d1] + QD_1*delta[b0][g1]) + PQ[d1]*(QC_y*delta[b0][d0] + QD_0*delta[b0][g1]) + PQ[g1]*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0])))
+
+                            -(delta[d0][d1]*(PQ[g1] + QC_y) + delta[d0][g1]*(PQ[d1] + QD_1))*(PB_1*PQ[b0]*PQ[g0] + PQ[b1]*(PB_0*PQ[g0] + PB_x*PQ[b0]))
+
+                            +(PQ[d0]*(PQ[d1]*QC_y + PQ[g1]*QD_1) + PQ[d1]*PQ[g1]*QD_0)*(-PB_0*delta[b1][g0] - PB_1*delta[b0][g0] - PB_x*delta[b0][b1] + PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0] + PQ[g0]*delta[b0][b1])
+                        )
+
+                        + 2.0 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +PQ[b0]*(QC_y*QD_1*(PQ[b1]*delta[d0][g0] + PQ[g0]*delta[b1][d0]) + QD_0*(PQ[b1]*(PQ[g0]*delta[d1][g1] + QC_y*delta[d1][g0] + QD_1*delta[g0][g1]) + PQ[g0]*(QC_y*delta[b1][d1] + QD_1*delta[b1][g1]))) + PQ[b1]*PQ[g0]*(QC_y*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0]) + QD_0*QD_1*delta[b0][g1])
+
+                            +PQ[b0]*PQ[b1]*PQ[g0]*(QC_y*delta[d0][d1] + QD_1*delta[d0][g1])
+
+                            +(PQ[g1]*QD_0*QD_1 + QC_y*(PQ[d0]*QD_1 + PQ[d1]*QD_0))*(PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0] + PQ[g0]*delta[b0][b1])
+                        )
+
+                        + 4.0 * S1 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * a_j * a_k * (
+                            -PB_0*PB_1*PB_x*PQ[d0]*PQ[d1]*PQ[g1]
+                        )
+
+                        + 2.0 * S1 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * a_k * (
+                            +PB_0*PQ[d0]*PQ[d1]*PQ[g1]*delta[b1][g0]
+
+                            +PB_1*PQ[d0]*PQ[d1]*PQ[g1]*delta[b0][g0]
+                        )
+
+                        + 4.0 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +(PB_0*(PB_1*PQ[g0] + PB_x*PQ[b1]) + PB_1*PB_x*PQ[b0])*(PQ[d0]*(PQ[d1]*QC_y + PQ[g1]*QD_1) + PQ[d1]*PQ[g1]*QD_0)
+                        )
+
+                        + (-2.0) * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_k * (
+                            +PQ[b0]*delta[b1][g0]*(PQ[d0]*(PQ[d1]*QC_y + PQ[g1]*QD_1) + PQ[d1]*PQ[g1]*QD_0)
+
+                            +PQ[b1]*delta[b0][g0]*(PQ[d0]*(PQ[d1]*QC_y + PQ[g1]*QD_1) + PQ[d1]*PQ[g1]*QD_0)
+                        )
+
+                        + 4.0 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_j * a_k * (
+                            -(PB_1*PQ[b0]*PQ[g0] + PQ[b1]*(PB_0*PQ[g0] + PB_x*PQ[b0]))*(PQ[g1]*QD_0*QD_1 + QC_y*(PQ[d0]*QD_1 + PQ[d1]*QD_0))
+                        )
+
+                        + 4.0 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +PQ[b0]*PQ[b1]*PQ[g0]*QC_y*QD_0*QD_1
+                        )
+
+                        + 0.5 * inv_S4 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +delta[b0][b1]*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0]) + delta[b0][d0]*(delta[b1][d1]*delta[g0][g1] + delta[b1][g0]*delta[d1][g1] + delta[b1][g1]*delta[d1][g0]) + delta[b0][d1]*(delta[b1][d0]*delta[g0][g1] + delta[b1][g0]*delta[d0][g1] + delta[b1][g1]*delta[d0][g0]) + delta[b0][g0]*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1] + delta[b1][g1]*delta[d0][d1]) + delta[b0][g1]*(delta[b1][d0]*delta[d1][g0] + delta[b1][d1]*delta[d0][g0] + delta[b1][g0]*delta[d0][d1])
+                        )
+
+                    )
+
+                    + F6_t[4] * (
+
+                        (-1.0) * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +PQ[b0]*PQ[b1]*(delta[d0][d1]*delta[g0][g1] + delta[d0][g0]*delta[d1][g1] + delta[d0][g1]*delta[d1][g0])
+
+                            +PQ[d0]*(PQ[b0]*(delta[b1][d1]*delta[g0][g1] + delta[b1][g0]*delta[d1][g1] + delta[b1][g1]*delta[d1][g0]) + PQ[b1]*(delta[b0][d1]*delta[g0][g1] + delta[b0][g0]*delta[d1][g1] + delta[b0][g1]*delta[d1][g0]) + PQ[d1]*(delta[b0][b1]*delta[g0][g1] + delta[b0][g0]*delta[b1][g1] + delta[b0][g1]*delta[b1][g0]) + PQ[g0]*(delta[b0][b1]*delta[d1][g1] + delta[b0][d1]*delta[b1][g1] + delta[b0][g1]*delta[b1][d1]) + PQ[g1]*(delta[b0][b1]*delta[d1][g0] + delta[b0][d1]*delta[b1][g0] + delta[b0][g0]*delta[b1][d1])) + PQ[d1]*(PQ[b0]*(delta[b1][d0]*delta[g0][g1] + delta[b1][g0]*delta[d0][g1] + delta[b1][g1]*delta[d0][g0]) + PQ[b1]*(delta[b0][d0]*delta[g0][g1] + delta[b0][g0]*delta[d0][g1] + delta[b0][g1]*delta[d0][g0]) + PQ[g0]*(delta[b0][b1]*delta[d0][g1] + delta[b0][d0]*delta[b1][g1] + delta[b0][g1]*delta[b1][d0]) + PQ[g1]*(delta[b0][b1]*delta[d0][g0] + delta[b0][d0]*delta[b1][g0] + delta[b0][g0]*delta[b1][d0])) + PQ[g0]*(PQ[b0]*(delta[b1][d0]*delta[d1][g1] + delta[b1][d1]*delta[d0][g1] + delta[b1][g1]*delta[d0][d1]) + PQ[b1]*(delta[b0][d0]*delta[d1][g1] + delta[b0][d1]*delta[d0][g1] + delta[b0][g1]*delta[d0][d1]) + PQ[g1]*(delta[b0][b1]*delta[d0][d1] + delta[b0][d0]*delta[b1][d1] + delta[b0][d1]*delta[b1][d0])) + PQ[g1]*(PQ[b0]*(delta[b1][d0]*delta[d1][g0] + delta[b1][d1]*delta[d0][g0] + delta[b1][g0]*delta[d0][d1]) + PQ[b1]*(delta[b0][d0]*delta[d1][g0] + delta[b0][d1]*delta[d0][g0] + delta[b0][g0]*delta[d0][d1]))
+                        )
+
+                        + 2.0 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +PQ[d0]*PQ[d1]*delta[g0][g1]*(PB_0*PQ[b1] + PB_1*PQ[b0])
+
+                            +(PB_1*PQ[b0]*PQ[g0] + PQ[b1]*(PB_0*PQ[g0] + PB_x*PQ[b0]))*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1])
+
+                            +PQ[d0]*(PB_x*(PQ[b0]*(PQ[d1]*delta[b1][g1] + PQ[g1]*delta[b1][d1]) + PQ[b1]*(PQ[d1]*delta[b0][g1] + PQ[g1]*delta[b0][d1])) + PQ[g0]*(PB_0*(PQ[d1]*delta[b1][g1] + PQ[g1]*delta[b1][d1]) + PB_1*(PQ[d1]*delta[b0][g1] + PQ[g1]*delta[b0][d1]))) + PQ[g1]*(PQ[d1]*(PB_x*(PQ[b0]*delta[b1][d0] + PQ[b1]*delta[b0][d0]) + PQ[g0]*(PB_0*delta[b1][d0] + PB_1*delta[b0][d0])) + (PB_0*PQ[b1] + PB_1*PQ[b0])*(PQ[d0]*delta[d1][g0] + PQ[d1]*delta[d0][g0]))
+
+                            +PQ[d0]*PQ[d1]*PQ[g1]*(PB_0*delta[b1][g0] + PB_1*delta[b0][g0] + PB_x*delta[b0][b1] - PQ[b0]*delta[b1][g0] - PQ[b1]*delta[b0][g0] - PQ[g0]*delta[b0][b1])
+                        )
+
+                        + (-2.0) * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +PQ[b0]*(PQ[b1]*(PQ[d0]*(QC_y*delta[d1][g0] + QD_1*delta[g0][g1]) + PQ[d1]*(QC_y*delta[d0][g0] + QD_0*delta[g0][g1]) + PQ[g0]*delta[d1][g1]*(PQ[d0] + QD_0) + PQ[g1]*(QD_0*delta[d1][g0] + QD_1*delta[d0][g0])) + PQ[g0]*(PQ[d0]*(QC_y*delta[b1][d1] + QD_1*delta[b1][g1]) + PQ[d1]*(QC_y*delta[b1][d0] + QD_0*delta[b1][g1]) + PQ[g1]*(QD_0*delta[b1][d1] + QD_1*delta[b1][d0]))) + PQ[b1]*PQ[g0]*(PQ[d0]*(QC_y*delta[b0][d1] + QD_1*delta[b0][g1]) + PQ[d1]*(QC_y*delta[b0][d0] + QD_0*delta[b0][g1]) + PQ[g1]*(QD_0*delta[b0][d1] + QD_1*delta[b0][d0]))
+
+                            +PQ[b0]*PQ[b1]*PQ[g0]*(delta[d0][d1]*(PQ[g1] + QC_y) + delta[d0][g1]*(PQ[d1] + QD_1))
+
+                            +(PQ[d0]*(PQ[d1]*QC_y + PQ[g1]*QD_1) + PQ[d1]*PQ[g1]*QD_0)*(PQ[b0]*delta[b1][g0] + PQ[b1]*delta[b0][g0] + PQ[g0]*delta[b0][b1])
+                        )
+
+                        + 4.0 * S1 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_j * a_k * (
+                            -PQ[d0]*PQ[d1]*PQ[g1]*(PB_0*(PB_1*PQ[g0] + PB_x*PQ[b1]) + PB_1*PB_x*PQ[b0])
+                        )
+
+                        + 4.0 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +(PQ[d0]*(PQ[d1]*QC_y + PQ[g1]*QD_1) + PQ[d1]*PQ[g1]*QD_0)*(PB_1*PQ[b0]*PQ[g0] + PQ[b1]*(PB_0*PQ[g0] + PB_x*PQ[b0]))
+                        )
+
+                        + 4.0 * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_j * a_k * (
+                            -PQ[b0]*PQ[b1]*PQ[g0]*(PQ[g1]*QD_0*QD_1 + QC_y*(PQ[d0]*QD_1 + PQ[d1]*QD_0))
+                        )
+
+                        + 2.0 * S1 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * (
+                            +PQ[b0]*PQ[d0]*PQ[d1]*PQ[g1]*delta[b1][g0]
+
+                            +PQ[b1]*PQ[d0]*PQ[d1]*PQ[g1]*delta[b0][g0]
+                        )
+
+                    )
+
+                    + F6_t[5] * (
+
+                        4.0 * S1 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_j * a_k * (
+                            -PQ[d0]*PQ[d1]*PQ[g1]*(PB_1*PQ[b0]*PQ[g0] + PQ[b1]*(PB_0*PQ[g0] + PB_x*PQ[b0]))
+                        )
+
+                        + 4.0 * S1 * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +PQ[b0]*PQ[b1]*PQ[g0]*(PQ[d0]*(PQ[d1]*QC_y + PQ[g1]*QD_1) + PQ[d1]*PQ[g1]*QD_0)
+                        )
+
+                        + 2.0 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +PQ[b0]*PQ[b1]*PQ[d0]*PQ[d1]*delta[g0][g1]
+
+                            +PQ[g0]*(PQ[b0]*(PQ[b1]*(PQ[d0]*delta[d1][g1] + PQ[d1]*delta[d0][g1] + PQ[g1]*delta[d0][d1]) + PQ[d1]*PQ[g1]*delta[b1][d0]) + PQ[d0]*PQ[d1]*(PQ[b0]*delta[b1][g1] + PQ[b1]*delta[b0][g1] + PQ[g1]*delta[b0][b1])) + PQ[g1]*(PQ[b1]*PQ[d1]*(PQ[b0]*delta[d0][g0] + PQ[d0]*delta[b0][g0] + PQ[g0]*delta[b0][d0]) + PQ[d0]*(PQ[b0]*(PQ[b1]*delta[d1][g0] + PQ[d1]*delta[b1][g0] + PQ[g0]*delta[b1][d1]) + PQ[b1]*PQ[g0]*delta[b0][d1]))
+                        )
+
+                    )
+
+                    + F6_t[6] * (
+
+                        (-4.0) * S1 * S1 * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_j * a_k * (
+                            +PQ[b0]*PQ[b1]*PQ[d0]*PQ[d1]*PQ[g0]*PQ[g1]
+                        )
+
+                    )
+
+                    );
+
+            double hess_jk_xy = -eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+
+            atomicAdd(
+                hess_xy + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + j_prim] * natoms + prim_cart_ao_to_atom_inds[k],
+                hess_jk_xy * ik_factor_D * frac_exact_exchange);
+
+            atomicAdd(
+                hess_yx + prim_cart_ao_to_atom_inds[k] * natoms + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + j_prim],
                 hess_jk_xy * ik_factor_D * frac_exact_exchange);
         }
     }
