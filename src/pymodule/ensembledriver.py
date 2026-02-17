@@ -38,6 +38,10 @@ import csv
 from .outputstream import OutputStream
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
+from .scfrestdriver import ScfRestrictedDriver
+from .scfunrestdriver import ScfUnrestrictedDriver
+from .sanitychecks import ensemble_driver_sanity_check
+from .errorhandler import assert_msg_critical
 
 from .veloxchemlib import (mpi_master, bohr_in_angstrom)
 
@@ -80,6 +84,25 @@ class EnsembleDriver:
         self.size = self.comm.Get_size()
         self.ostream = ostream
 
+        # settings for SCF and choice of rsp driver
+        self._is_restricted = True
+        self._rsp_property = None
+
+        # Other possible settings
+        self.xcfun = None
+        self.eri_thresh = None
+        self.ri_coulomb = None
+        self.grid_level = None
+
+        # added scf_dict, method_dict and rsp_dict as
+        # instance variables. Updated in update_settings
+        # and used in compute
+        self.scf_dict = None
+        self.method_dict = None
+        self.rsp_dict = None
+
+        # response settings can also be added here in a similar way.
+
         db_dir = Path(__file__).resolve().parent / "database" / "environment_parameters"
 
         sep_parameters_file = db_dir / "pe_sep.csv"
@@ -115,6 +138,28 @@ class EnsembleDriver:
 
         self.pe_model = None
         self.npe_model = None
+    
+    # A good routine to have to enable input-output runs later one.
+    def update_settings(self, scf_dict=None, method_dict=None, rsp_dict=None):
+        """ Updates the SCF, method, and response settings.
+
+        :param scf_dict:
+            The dictionary of SCF settings.
+        :param method_dict:
+            The dictionary of method settings.
+        :param rsp_dict:
+            The dictionary of response settings.
+        """
+        if scf_dict is None:
+            scf_dict = {}
+        if method_dict is None:
+            method_dict = {}
+        if rsp_dict is None:
+            rsp_dict = {}
+
+        self.scf_dict = dict(scf_dict)
+        self.method_dict = dict(method_dict)
+        self.rsp_dict = dict(rsp_dict)
 
     @staticmethod
     def _parse_six_floats(field: str) -> list[float]:
@@ -387,10 +432,7 @@ class EnsembleDriver:
     def compute(
         self,
         snapshots,
-        *,
         basis_label: str,
-        scf_drv,
-        rsp_drv=None,
         potdir: str | Path = "pot_frames",
         write_pe_potfiles: bool = True,
     ):
@@ -401,10 +443,6 @@ class EnsembleDriver:
             A list of snapshot dictionaries (or a single dict).
         :param basis_label: (str)
             Basis set label.
-        :param scf_drv:
-            An initialized SCF driver instance.
-        :param rsp_drv:
-            An initialized LR eigen solver.
         :param potdir : (str or Path)
             Directory to store/read PE potfiles.
         :param write_pe_potfiles: (bool)
@@ -414,18 +452,40 @@ class EnsembleDriver:
               - scf_all: list of (frame, scf_results)
               - rsp_all: list of (frame, rsp_results)
         """
-        if self.pe_model is None and self.npe_model is None:
-            raise RuntimeError("Models not set. Call set_env_models(pe_model=..., npe_model=...) first.")
+        assert_msg_critical(
+            self.pe_model is None and self.npe_model is None,
+            "Models not set. Call set_env_models(pe_model=..., npe_model=...) first.")
     
         if isinstance(snapshots, dict):
             snapshots = [snapshots]
 
-        if scf_drv is None:
-            raise ValueError("scf_drv must be provided.")
+        # here starts the suggestion of how to handle 
+        # SCF under the hood
+        if self._is_restricted:
+            scf_driver = ScfRestrictedDriver()
+        else:
+            scf_driver = ScfUnrestrictedDriver()
         
-        if rsp_drv is not None and scf_drv is None:
-            raise ValueError("rsp_drv requires scf_drv to be provided.")
+        # update settings if necessary
+        if self.scf_dict is not None or self.method_dict is not None:
+            scf_driver.update_settings(self.scf_dict, self.method_dict)
 
+        # sanity check -- update settings in SCF according to
+        # which variables the user set.
+        # see routine in sanitychecks.py
+        # I changed the name to ensemble_driver_sanity_check
+        ensemble_driver_sanity_check(scf_driver, self)
+        
+        # IULIA's comment: END of suggested code block
+        # Something similar can be done for rsp_drv;
+        # a bit more complicated, but one could use the example
+        # of creating the right response driver with a routine
+        # similar to "select_rsp_property" from main.py
+        # For now, I set rsp_drv to None. A first implementation could
+        # be done with rsp_drv = LinearResponseEigensolver();
+        # other response drivers can be added later.
+        rsp_drv = None
+        
         potdir = Path(potdir)
 
         # Detect whether we actually need PE / NPE
@@ -442,8 +502,6 @@ class EnsembleDriver:
             self.write_pot_files(snapshots, outdir=potdir)
 
         scf_all = []
-        if rsp_drv is not None:
-            rsp_all = []
 
         for snap in snapshots:
             frame = int(snap["frame"])

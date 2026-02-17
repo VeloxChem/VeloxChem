@@ -62,7 +62,40 @@ def molecule_sanity_check(mol, method_type=None):
 
     assert_msg_critical(mol.check_proximity(0.1), 'Molecule: Atoms too close')
 
+# IULIA's comment: this is an example routine that we can use to ensure
+# instance variables from ensemble_driver are passed on to the scf_driver
+# TODO: make sure all variables available in ensemble_driver's __init__
+# are added here.
+def ensemble_driver_sanity_check(scf_driver, ensemble_driver):
+    """ Updates the settings of scf_driver to be consistent
+        with the settings in ensemble_driver.
 
+        :param scf_driver:
+            The SCF driver.
+        :param ensemble_driver:
+            The ensemble driver.
+    """
+    updated_scf_info = {}
+
+    if scf_driver.rank == mpi_master():
+        if ensemble_driver.xcfun is not None:
+            updated_scf_info['xcfun'] = ensemble_driver.xcfun
+        if ensemble_driver.eri_thresh is not None:
+            updated_scf_info['eri_thresh'] = ensemble_driver.eri_thresh
+        if ensemble_driver.ri_coulomb is not None:
+            updated_scf_info['ri_coulomb'] = ensemble_driver.ri_coulomb
+        if ensemble_driver.grid_level is not None:
+            updated_scf_info['grid_level'] = ensemble_driver.grid_level
+        if ensemble_driver.potfile is not None:
+            updated_scf_info['potfile'] = ensemble_driver.potfile
+        if ensemble_driver.embedding is not None:
+            updated_scf_info['embedding'] = ensemble_driver.embedding
+
+    updated_scf_info = scf_driver.comm.bcast(updated_scf_info, root=mpi_master())
+
+    for key, val in updated_scf_info.items():
+        setattr(scf_driver, key, val)
+        
 def scf_results_sanity_check(obj, scf_results):
     """
     Checks SCF results for ERI, DFT and PE information.
