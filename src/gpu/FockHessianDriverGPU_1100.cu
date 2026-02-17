@@ -94,6 +94,7 @@
 #include "EriExchangeHessianSXPX.hpp"
 #include "EriExchangeHessianPXPX.hpp"
 #include "EriExchangeHessianSXDX.hpp"
+#include "EriExchangeHessianPSDX.hpp"
 
 namespace gpu {  // gpu namespace
 
@@ -22132,7 +22133,6 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
         timer.stop("  K block SD");
     }
 
-    /*
     // K: P-D block
 
     if (pair_inds_count_for_K_pd > 0)
@@ -22145,31 +22145,20 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
 
         dim3 num_blocks(pair_inds_count_for_K_pd, 1);
 
-        // set up primitive Cartesian AO to atom mapping
-
-        for (int64_t ik = 0; ik < pair_inds_count_for_K_pd; ik++)
-        {
-            const auto i = pair_inds_i_for_K_pd[ik];
-            const auto k = pair_inds_k_for_K_pd[ik];
-
-            // TODO: think about the ordering of cartesian components
-            const auto i_cgto = p_prim_aoinds[(i / 3) + p_prim_count * (i % 3)];
-            const auto k_cgto = d_prim_aoinds[(k / 6) + d_prim_count * (k % 6)];
-
-            prim_cart_ao_to_atom_inds[s_prim_count + i] = static_cast<uint32_t>(cart_ao_to_atom_inds[i_cgto]);
-            prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + k] = static_cast<uint32_t>(cart_ao_to_atom_inds[k_cgto]);
-        }
-
-        gpuSafe(gpuMemcpyAsync(d_prim_cart_ao_to_atom_inds, prim_cart_ao_to_atom_inds.data(), all_prim_count * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-
         // K: (PS|DS)
         //     *  *
 
-        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        for (int64_t grad_cart_ind_0 = 0; grad_cart_ind_0 < 3; grad_cart_ind_0++)
+        for (int64_t grad_cart_ind_1 = 0; grad_cart_ind_1 < 3; grad_cart_ind_1++)
         {
-            gpu::computeExchangeGradientPSDS_I_0<<<num_blocks, threads_per_block, 0, stream>>>(
+            const int64_t grad_cart_ind   = grad_cart_ind_0 * 3 + grad_cart_ind_1;
+            const int64_t grad_cart_ind_T = grad_cart_ind_1 * 3 + grad_cart_ind_0;
+
+            gpu::computeExchangeHessianPSDS_IJ_0<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
-                               static_cast<uint32_t>(grad_cart_ind),
+                               d_hess_array[grad_cart_ind_T],
+                               static_cast<uint32_t>(grad_cart_ind_0),
+                               static_cast<uint32_t>(grad_cart_ind_1),
                                frac_exact_exchange,
                                d_pair_inds_i_for_K_pd,
                                d_pair_inds_k_for_K_pd,
@@ -22198,13 +22187,16 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_pair_data_K_ps,
                                d_pair_data_K_ds,
                                d_prim_cart_ao_to_atom_inds,
+                               static_cast<uint32_t>(natoms),
                                d_boys_func_table,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPSDS_K_0<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeHessianPSDS_KL_0<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
-                               static_cast<uint32_t>(grad_cart_ind),
+                               d_hess_array[grad_cart_ind_T],
+                               static_cast<uint32_t>(grad_cart_ind_0),
+                               static_cast<uint32_t>(grad_cart_ind_1),
                                frac_exact_exchange,
                                d_pair_inds_i_for_K_pd,
                                d_pair_inds_k_for_K_pd,
@@ -22233,6 +22225,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_pair_data_K_ps,
                                d_pair_data_K_ds,
                                d_prim_cart_ao_to_atom_inds,
+                               static_cast<uint32_t>(natoms),
                                d_boys_func_table,
                                d_boys_func_ft,
                                omega,
@@ -22242,11 +22235,17 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
         // K: (PS|DP)
         //     *  *
 
-        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        for (int64_t grad_cart_ind_0 = 0; grad_cart_ind_0 < 3; grad_cart_ind_0++)
+        for (int64_t grad_cart_ind_1 = 0; grad_cart_ind_1 < 3; grad_cart_ind_1++)
         {
-            gpu::computeExchangeGradientPSDP_I_0<<<num_blocks, threads_per_block, 0, stream>>>(
+            const int64_t grad_cart_ind   = grad_cart_ind_0 * 3 + grad_cart_ind_1;
+            const int64_t grad_cart_ind_T = grad_cart_ind_1 * 3 + grad_cart_ind_0;
+
+            gpu::computeExchangeHessianPSDP_IJ_0<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
-                               static_cast<uint32_t>(grad_cart_ind),
+                               d_hess_array[grad_cart_ind_T],
+                               static_cast<uint32_t>(grad_cart_ind_0),
+                               static_cast<uint32_t>(grad_cart_ind_1),
                                frac_exact_exchange,
                                d_pair_inds_i_for_K_pd,
                                d_pair_inds_k_for_K_pd,
@@ -22275,13 +22274,16 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_pair_data_K_ps,
                                d_pair_data_K_dp,
                                d_prim_cart_ao_to_atom_inds,
+                               static_cast<uint32_t>(natoms),
                                d_boys_func_table,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPSDP_K_0<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeHessianPSDP_KL_0<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
-                               static_cast<uint32_t>(grad_cart_ind),
+                               d_hess_array[grad_cart_ind_T],
+                               static_cast<uint32_t>(grad_cart_ind_0),
+                               static_cast<uint32_t>(grad_cart_ind_1),
                                frac_exact_exchange,
                                d_pair_inds_i_for_K_pd,
                                d_pair_inds_k_for_K_pd,
@@ -22310,6 +22312,7 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_pair_data_K_ps,
                                d_pair_data_K_dp,
                                d_prim_cart_ao_to_atom_inds,
+                               static_cast<uint32_t>(natoms),
                                d_boys_func_table,
                                d_boys_func_ft,
                                omega,
@@ -22319,11 +22322,17 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
         // K: (PS|DD)
         //     *  *
 
-        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        for (int64_t grad_cart_ind_0 = 0; grad_cart_ind_0 < 3; grad_cart_ind_0++)
+        for (int64_t grad_cart_ind_1 = 0; grad_cart_ind_1 < 3; grad_cart_ind_1++)
         {
-            gpu::computeExchangeGradientPSDD_I_0<<<num_blocks, threads_per_block, 0, stream>>>(
+            const int64_t grad_cart_ind   = grad_cart_ind_0 * 3 + grad_cart_ind_1;
+            const int64_t grad_cart_ind_T = grad_cart_ind_1 * 3 + grad_cart_ind_0;
+
+            gpu::computeExchangeHessianPSDD_IJ_0<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
-                               static_cast<uint32_t>(grad_cart_ind),
+                               d_hess_array[grad_cart_ind_T],
+                               static_cast<uint32_t>(grad_cart_ind_0),
+                               static_cast<uint32_t>(grad_cart_ind_1),
                                frac_exact_exchange,
                                d_pair_inds_i_for_K_pd,
                                d_pair_inds_k_for_K_pd,
@@ -22352,13 +22361,16 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_pair_data_K_ps,
                                d_pair_data_K_dd,
                                d_prim_cart_ao_to_atom_inds,
+                               static_cast<uint32_t>(natoms),
                                d_boys_func_table,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
-            gpu::computeExchangeGradientPSDD_K_0<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeHessianPSDD_IJ_1<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_hess_array[grad_cart_ind],
-                               static_cast<uint32_t>(grad_cart_ind),
+                               d_hess_array[grad_cart_ind_T],
+                               static_cast<uint32_t>(grad_cart_ind_0),
+                               static_cast<uint32_t>(grad_cart_ind_1),
                                frac_exact_exchange,
                                d_pair_inds_i_for_K_pd,
                                d_pair_inds_k_for_K_pd,
@@ -22387,12 +22399,242 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                d_pair_data_K_ps,
                                d_pair_data_K_dd,
                                d_prim_cart_ao_to_atom_inds,
+                               static_cast<uint32_t>(natoms),
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+            gpu::computeExchangeHessianPSDD_IJ_2<<<num_blocks, threads_per_block, 0, stream>>>(
+                               d_hess_array[grad_cart_ind],
+                               d_hess_array[grad_cart_ind_T],
+                               static_cast<uint32_t>(grad_cart_ind_0),
+                               static_cast<uint32_t>(grad_cart_ind_1),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_pd,
+                               d_pair_inds_k_for_K_pd,
+                               d_D_ik_for_K_pd,
+                               static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                               d_s_prim_info,
+                               d_s_prim_aoinds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               d_p_prim_aoinds,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               d_d_prim_aoinds,
+                               static_cast<uint32_t>(d_prim_count),
+                               sd_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_ps,
+                               d_Q_K_dd,
+                               d_D_inds_K_ps,
+                               d_D_inds_K_dd,
+                               d_pair_displs_K_ps,
+                               d_pair_displs_K_dd,
+                               d_pair_counts_K_ps,
+                               d_pair_counts_K_dd,
+                               d_pair_data_K_ps,
+                               d_pair_data_K_dd,
+                               d_prim_cart_ao_to_atom_inds,
+                               static_cast<uint32_t>(natoms),
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+            gpu::computeExchangeHessianPSDD_IJ_3<<<num_blocks, threads_per_block, 0, stream>>>(
+                               d_hess_array[grad_cart_ind],
+                               d_hess_array[grad_cart_ind_T],
+                               static_cast<uint32_t>(grad_cart_ind_0),
+                               static_cast<uint32_t>(grad_cart_ind_1),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_pd,
+                               d_pair_inds_k_for_K_pd,
+                               d_D_ik_for_K_pd,
+                               static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                               d_s_prim_info,
+                               d_s_prim_aoinds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               d_p_prim_aoinds,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               d_d_prim_aoinds,
+                               static_cast<uint32_t>(d_prim_count),
+                               sd_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_ps,
+                               d_Q_K_dd,
+                               d_D_inds_K_ps,
+                               d_D_inds_K_dd,
+                               d_pair_displs_K_ps,
+                               d_pair_displs_K_dd,
+                               d_pair_counts_K_ps,
+                               d_pair_counts_K_dd,
+                               d_pair_data_K_ps,
+                               d_pair_data_K_dd,
+                               d_prim_cart_ao_to_atom_inds,
+                               static_cast<uint32_t>(natoms),
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+            gpu::computeExchangeHessianPSDD_KL_0<<<num_blocks, threads_per_block, 0, stream>>>(
+                               d_hess_array[grad_cart_ind],
+                               d_hess_array[grad_cart_ind_T],
+                               static_cast<uint32_t>(grad_cart_ind_0),
+                               static_cast<uint32_t>(grad_cart_ind_1),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_pd,
+                               d_pair_inds_k_for_K_pd,
+                               d_D_ik_for_K_pd,
+                               static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                               d_s_prim_info,
+                               d_s_prim_aoinds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               d_p_prim_aoinds,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               d_d_prim_aoinds,
+                               static_cast<uint32_t>(d_prim_count),
+                               sd_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_ps,
+                               d_Q_K_dd,
+                               d_D_inds_K_ps,
+                               d_D_inds_K_dd,
+                               d_pair_displs_K_ps,
+                               d_pair_displs_K_dd,
+                               d_pair_counts_K_ps,
+                               d_pair_counts_K_dd,
+                               d_pair_data_K_ps,
+                               d_pair_data_K_dd,
+                               d_prim_cart_ao_to_atom_inds,
+                               static_cast<uint32_t>(natoms),
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+            gpu::computeExchangeHessianPSDD_KL_1<<<num_blocks, threads_per_block, 0, stream>>>(
+                               d_hess_array[grad_cart_ind],
+                               d_hess_array[grad_cart_ind_T],
+                               static_cast<uint32_t>(grad_cart_ind_0),
+                               static_cast<uint32_t>(grad_cart_ind_1),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_pd,
+                               d_pair_inds_k_for_K_pd,
+                               d_D_ik_for_K_pd,
+                               static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                               d_s_prim_info,
+                               d_s_prim_aoinds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               d_p_prim_aoinds,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               d_d_prim_aoinds,
+                               static_cast<uint32_t>(d_prim_count),
+                               sd_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_ps,
+                               d_Q_K_dd,
+                               d_D_inds_K_ps,
+                               d_D_inds_K_dd,
+                               d_pair_displs_K_ps,
+                               d_pair_displs_K_dd,
+                               d_pair_counts_K_ps,
+                               d_pair_counts_K_dd,
+                               d_pair_data_K_ps,
+                               d_pair_data_K_dd,
+                               d_prim_cart_ao_to_atom_inds,
+                               static_cast<uint32_t>(natoms),
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+            gpu::computeExchangeHessianPSDD_KL_2<<<num_blocks, threads_per_block, 0, stream>>>(
+                               d_hess_array[grad_cart_ind],
+                               d_hess_array[grad_cart_ind_T],
+                               static_cast<uint32_t>(grad_cart_ind_0),
+                               static_cast<uint32_t>(grad_cart_ind_1),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_pd,
+                               d_pair_inds_k_for_K_pd,
+                               d_D_ik_for_K_pd,
+                               static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                               d_s_prim_info,
+                               d_s_prim_aoinds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               d_p_prim_aoinds,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               d_d_prim_aoinds,
+                               static_cast<uint32_t>(d_prim_count),
+                               sd_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_ps,
+                               d_Q_K_dd,
+                               d_D_inds_K_ps,
+                               d_D_inds_K_dd,
+                               d_pair_displs_K_ps,
+                               d_pair_displs_K_dd,
+                               d_pair_counts_K_ps,
+                               d_pair_counts_K_dd,
+                               d_pair_data_K_ps,
+                               d_pair_data_K_dd,
+                               d_prim_cart_ao_to_atom_inds,
+                               static_cast<uint32_t>(natoms),
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+            gpu::computeExchangeHessianPSDD_KL_3<<<num_blocks, threads_per_block, 0, stream>>>(
+                               d_hess_array[grad_cart_ind],
+                               d_hess_array[grad_cart_ind_T],
+                               static_cast<uint32_t>(grad_cart_ind_0),
+                               static_cast<uint32_t>(grad_cart_ind_1),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_pd,
+                               d_pair_inds_k_for_K_pd,
+                               d_D_ik_for_K_pd,
+                               static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                               d_s_prim_info,
+                               d_s_prim_aoinds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               d_p_prim_aoinds,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               d_d_prim_aoinds,
+                               static_cast<uint32_t>(d_prim_count),
+                               sd_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_ps,
+                               d_Q_K_dd,
+                               d_D_inds_K_ps,
+                               d_D_inds_K_dd,
+                               d_pair_displs_K_ps,
+                               d_pair_displs_K_dd,
+                               d_pair_counts_K_ps,
+                               d_pair_counts_K_dd,
+                               d_pair_data_K_ps,
+                               d_pair_data_K_dd,
+                               d_prim_cart_ao_to_atom_inds,
+                               static_cast<uint32_t>(natoms),
                                d_boys_func_table,
                                d_boys_func_ft,
                                omega,
                                eri_threshold);
         }
 
+        /*
         // K: (PP|DS)
         //     *  *
 
@@ -24554,12 +24796,14 @@ computeFockHessianOnGPU_1100(const              CMolecule& molecule,
                                omega,
                                eri_threshold);
         }
+        */
 
         gpuSafe(gpuStreamSynchronize(stream));
 
         timer.stop("  K block PD");
     }
 
+    /*
     // K: D-D block
 
     if (pair_inds_count_for_K_dd > 0)
