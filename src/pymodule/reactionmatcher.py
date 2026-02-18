@@ -74,10 +74,12 @@ class ReactionMatcher:
         self.max_time = 600
         self.force_hydrogen_inclusion = True
         self.brute_force_lim = 1000
+        self.rdFMCS_assist_assign = False
+        self.rdRascalMCES_assist_assign = False
         self._reduce_hydrogen = False
 
         self.max_break_attempts_guess = 1e7
-        self._breaking_depth = 1  # how many breaking edges to try
+        self._breaking_depth = -1  # how many breaking edges to try
         self._check_monomorphic = True
         self._assisting_map = {}
 
@@ -85,19 +87,23 @@ class ReactionMatcher:
         self,
         reactant,
         product,
-        breaking_bonds,
-        forming_bonds,
+        breaking_bonds=None,
+        forming_bonds=None,
     ):
 
-        self.rea_graph, self.pro_graph, self.assisting_map = self._create_reaction_graphs(
+        self.rea_graph, self.pro_graph = self._create_reaction_graphs(
             reactant, product, breaking_bonds, forming_bonds,
             self.force_hydrogen_inclusion)
+
+        self.rea_graph, self.pro_graph, self.assisting_map = self._assign_assist_ids(
+            reactant, product, self.rea_graph, self.pro_graph)
 
         if len(self.assisting_map) == len(self.rea_graph.nodes):
             # inverted_map = {v: k for k, v in self.assisting_map.items()}
             return self.assisting_map, breaking_bonds, forming_bonds
 
-        self._breaking_depth = self._decide_breaking_depth()
+        if self._breaking_depth == -1:
+            self._breaking_depth = self._decide_breaking_depth()
 
         map, breaking_edges, forming_edges = self._find_mapping(
             self.rea_graph.copy(),
@@ -110,9 +116,19 @@ class ReactionMatcher:
                 "No mapping found, retrying with hydrogens included.")
             self.ostream.flush()
             self._reduce_hydrogen = False
-            self.rea_graph, self.pro_graph, self.assisting_map = self._create_reaction_graphs(
-                reactant_ff, rea_elems, product_ff, pro_elems, breaking_bonds,
-                forming_bonds, True)
+            self.rea_graph, self.pro_graph = self._create_reaction_graphs(
+                reactant,
+                product,
+                breaking_bonds,
+                forming_bonds,
+                True,
+            )
+            self.rea_graph, self.pro_graph, self.assisting_map = self._assign_assist_ids(
+                reactant,
+                product,
+                self.rea_graph,
+                self.pro_graph,
+            )
             map, breaking_edges, forming_edges = self._find_mapping(
                 self.rea_graph.copy(),
                 self.pro_graph.copy(),
@@ -177,10 +193,7 @@ class ReactionMatcher:
                 rea_graph.remove_nodes_from(rea_hydrogens)
                 pro_graph.remove_nodes_from(pro_hydrogens)
 
-        rea_graph, pro_graph, assisting_map = self._assign_assist_ids(
-            rea_graph, pro_graph)
-
-        return rea_graph, pro_graph, assisting_map
+        return rea_graph, pro_graph
 
     def _prepare_graph(self, molecule, breaking_bonds=None, forming_bonds=None):
         graph = nx.Graph()
@@ -252,7 +265,7 @@ class ReactionMatcher:
                 return False
         return True
 
-    def _assign_assist_ids(self, rea_graph, pro_graph):
+    def _assign_assist_ids(self, reactant, product, rea_graph, pro_graph):
         # Tries to figure out the 'obvious' atom mappings before starting the full graph matching
         # This speeds up the matching significantly for larger molecules
         # Subgraphs of decreasing size in the reactant and product and product are itterated over
@@ -261,6 +274,76 @@ class ReactionMatcher:
         self.ostream.print_info(
             "Searching for matching subgraphs to assign assist ids")
         self.ostream.flush()
+        if self.rdFMCS_assist_assign or self.rdRascalMCES_assist_assign:
+            return self._get_rdkit_assist_ids(reactant, product, rea_graph,
+                                              pro_graph)
+        else:
+            return self._calculate_assist_ids(rea_graph, pro_graph)
+
+    def _get_rdkit_assist_ids(self, reactant, product, rea_graph, pro_graph):
+        try:
+            from rdkit import Chem
+            from rdkit.Chem import rdmolfiles
+            from rdkit.Chem import rdRascalMCES
+            from rdkit.Chem import rdFMCS
+
+            from rdkit.Chem import rdDetermineBonds
+
+            rd_mol1 = Chem.RWMol(
+                rdmolfiles.MolFromXYZBlock(reactant.get_xyz_string()))
+            rd_mol2 = Chem.RWMol(
+                rdmolfiles.MolFromXYZBlock(product.get_xyz_string()))
+
+            rdDetermineBonds.DetermineConnectivity(rd_mol1)
+            rdDetermineBonds.DetermineBondOrders(rd_mol1)
+            rdDetermineBonds.DetermineConnectivity(rd_mol2)
+            rdDetermineBonds.DetermineBondOrders(rd_mol2)
+            if self.rdRascalMCES_assist_assign:
+
+                res = rdRascalMCES.FindMCES(rd_mol1, rd_mol2)
+                if len(res) > 0:
+                    assist_map = {i: j for i, j in res[0].atomMatches()}
+                    for rea_node, pro_node in assist_map.items():
+                        rea_graph.nodes[rea_node]['assist_id'] = rea_node
+                        pro_graph.nodes[pro_node]['assist_id'] = rea_node
+                    self.ostream.print_info(str(res[0].atomMatches()))
+                    self.ostream.print_info(
+                        f"Assigned {len(assist_map)} assist ids: {self._print_mapping(assist_map)}"
+                    )
+                    self.ostream.flush()
+                    self.assisting_map = assist_map
+                    return rea_graph, pro_graph, assist_map
+                return rea_graph, pro_graph, {}
+
+            elif self.rdFMCS_assist_assign:
+
+                mcs = rdFMCS.FindMCS([rd_mol1, rd_mol2])
+                if mcs.numAtoms > 0:
+                    mcs_mol = Chem.MolFromSmarts(mcs.smartsString)
+                    match1 = rd_mol1.GetSubstructMatch(mcs_mol)
+                    match2 = rd_mol2.GetSubstructMatch(mcs_mol)
+                    # target_atm1 = []
+                    assist_map = {}
+                    for atom1, atom2 in zip(match1, match2):
+                        assist_map[atom1] = atom2
+                        rea_graph.nodes[atom1]['assist_id'] = atom1
+                        pro_graph.nodes[atom2]['assist_id'] = atom1
+
+                    self.ostream.print_info(
+                        f"Assigned {len(assist_map)} assist ids: {self._print_mapping(assist_map)}"
+                    )
+                    self.ostream.flush()
+                    self.assisting_map = assist_map
+                    return rea_graph, pro_graph, assist_map
+                return rea_graph, pro_graph, {}
+        except ImportError:
+            self.ostream.print_warning(
+                "rdkit not available, skipping rdkit based assist id assignment. Turn off rdFMCS_assist_assign and rdRascalMCES_assist_assign to use VeloxChem assist id assignment."
+            )
+            self.ostream.flush()
+            return rea_graph, pro_graph, {}
+
+    def _calculate_assist_ids(self, rea_graph, pro_graph):
         H_count = sum(
             [1 for n in rea_graph.nodes if rea_graph.nodes[n]['elem'] == 1.0])
 
@@ -419,11 +502,7 @@ class ReactionMatcher:
         self.ostream.flush()
         return rea_graph, pro_graph, sorted_assisting_map
 
-    def _find_mapping(self,
-                      A,
-                      B,
-                      forced_breaking_edges=None,
-                      forced_forming_edges=None):
+    def _find_mapping(self, A, B, forced_breaking_edges, forced_forming_edges):
         """
         Find a mapping between the connected components of A and B, while avoiding reconnecting broken edges.
         """
