@@ -316,9 +316,11 @@ class HessianDriver:
 
         str_width = 70
 
+        title = f'{self.flag} Setup'
+
         self.ostream.print_blank()
-        self.ostream.print_header(self.flag)
-        self.ostream.print_header((len(self.flag) + 2) * '=')
+        self.ostream.print_header(title)
+        self.ostream.print_header((len(title) + 2) * '=')
         self.ostream.flush()
 
         cur_str = 'Hessian Type                    : '
@@ -389,10 +391,10 @@ class HessianDriver:
 
         for i in range(natoms):
 
-            self.ostream.unmute()
             self.ostream.print_info(f'Processing atom {i + 1}/{natoms}...')
+            if i == natoms - 1:
+                self.ostream.print_blank()
             self.ostream.flush()
-            self.ostream.mute()
 
             for d in range(3):
                 coords[i, d] += self.delta_h
@@ -445,17 +447,19 @@ class HessianDriver:
                                       8 * grad_plus - grad_plus2) /
                                      (12.0 * self.delta_h))
                     if self.do_dipole_gradient:
-                        dipole_gradient[i, d] = (
-                            (dipmom_minus2 - 8 * dipmom_minus +
-                             8 * dipmom_plus - dipmom_plus2) /
-                            (12.0 * self.delta_h))
+                        if self.rank == mpi_master():
+                            dipole_gradient[i, d] = (
+                                (dipmom_minus2 - 8 * dipmom_minus +
+                                 8 * dipmom_plus - dipmom_plus2) /
+                                (12.0 * self.delta_h))
                 else:
                     coords[i, d] += self.delta_h
                     hessian[i, d] = ((grad_plus - grad_minus) /
                                      (2.0 * self.delta_h))
                     if self.do_dipole_gradient:
-                        dipole_gradient[i, d] = ((dipmom_plus - dipmom_minus) /
-                                                 (2.0 * self.delta_h))
+                        if self.rank == mpi_master():
+                            dipole_gradient[i, d] = ((dipmom_plus - dipmom_minus) /
+                                                     (2.0 * self.delta_h))
 
         # save energy for thermodynamics
         # and restore scf_tensors to results for the original geometry.
@@ -468,10 +472,6 @@ class HessianDriver:
             # save the dipole moment gradient in the expected shape
             self.dipole_gradient = dipole_gradient.transpose(2, 0, 1).reshape(
                 3, natm * 3)
-
-        # unmute ostream
-        # TODO: how should the ostream be handled properly?
-        self.ostream.unmute()
 
     def compute_energy(self, molecule, *args):
         """

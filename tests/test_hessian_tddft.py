@@ -10,7 +10,6 @@ from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.tdaeigensolver import TdaEigenSolver
 from veloxchem.lreigensolver import LinearResponseEigenSolver
-from veloxchem.tddftgradientdriver import TddftGradientDriver
 from veloxchem.tddfthessiandriver import TddftHessianDriver
 
 
@@ -36,6 +35,7 @@ class TestTddftHessianDriver:
         scf_drv.xcfun = xcfun_label
         scf_drv.grid_level = 6
         scf_drv.conv_thresh = 1e-10
+        scf_drv.ostream.mute()
         scf_results = scf_drv.compute(molecule, basis)
 
         if tamm_dancoff:
@@ -44,21 +44,18 @@ class TestTddftHessianDriver:
             rsp_drv = LinearResponseEigenSolver()
         rsp_drv.conv_thresh = 1e-8
         rsp_drv.nstates = 5
+        rsp_drv.ostream.mute()
         rsp_results = rsp_drv.compute(molecule, basis, scf_results)
 
-        grad_drv = TddftGradientDriver(scf_drv)
-        grad_dict = {'state_deriv_index': [1], 'do_first_order_prop': 'yes'}
+        grad_dict = {}
         cphf_dict = {'conv_thresh': 1e-8, 'use_subspace_solver': 'yes'}
-        grad_drv.update_settings(grad_dict=grad_dict,
-                                 rsp_dict={'conv_thresh': 1e-8},
-                                 orbrsp_dict=cphf_dict)
-
-        grad_drv.compute(molecule, basis, scf_drv, rsp_drv, rsp_results)
 
         hessian_drv = TddftHessianDriver(scf_drv,
-                                         rsp_drv=rsp_drv,
-                                         tddft_grad_drv=grad_drv)
+                                         rsp_drv=rsp_drv)
+        hessian_drv.update_settings(method_dict={}, grad_dict=grad_dict,
+                                     cphf_dict=cphf_dict) 
         hessian_drv.do_dipole_gradient = True
+        hessian_drv.ostream.mute()
         hessian_drv.compute(molecule, basis)
 
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
@@ -76,6 +73,7 @@ class TestTddftHessianDriver:
             assert diff_hessian < 1.0e-5
             assert diff_dipole_grad < 1.0e-5
 
+    @pytest.mark.solvers
     def test_tda(self):
         xcfun_label = "hf"
         tamm_dancoff = True
@@ -96,6 +94,14 @@ class TestTddftHessianDriver:
         ref_label = "tda_pbe0"
         self.run_tddft_hessian(xcfun_label, tamm_dancoff, ref_label)
 
+    @pytest.mark.timeconsuming
+    def test_tda_camb3lyp(self):
+        xcfun_label = "cam-b3lyp"
+        tamm_dancoff = True
+        ref_label = "tda_camb3lyp"
+        self.run_tddft_hessian(xcfun_label, tamm_dancoff, ref_label)
+
+    @pytest.mark.solvers
     def test_rpa(self):
         xcfun_label = "hf"
         tamm_dancoff = False
@@ -114,4 +120,11 @@ class TestTddftHessianDriver:
         xcfun_label = "pbe0"
         tamm_dancoff = False
         ref_label = "rpa_pbe0"
+        self.run_tddft_hessian(xcfun_label, tamm_dancoff, ref_label)
+
+    @pytest.mark.timeconsuming
+    def test_tddft_camb3lyp(self):
+        xcfun_label = "cam-b3lyp"
+        tamm_dancoff = False
+        ref_label = "rpa_camb3lyp"
         self.run_tddft_hessian(xcfun_label, tamm_dancoff, ref_label)

@@ -34,8 +34,9 @@ from contextlib import redirect_stderr
 from io import StringIO
 from pathlib import Path
 import numpy as np
-import h5py
 import tempfile
+import h5py
+import re
 
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
@@ -82,6 +83,7 @@ class VibrationalAnalysis:
         - int_pol: Parallel Raman (in A**4/amu).
         - int_depol: Perpendicular Raman (in A**4/amu).
         - depol_ratio: Depolarization ratio (in A**4/amu).
+        - state_deriv_index: index of excited state for excited-state vib. analysis.
         - frequencies: the frequency/ies of external electric field (for
           resonance Raman)
         - flag: The name of the driver.
@@ -105,7 +107,7 @@ class VibrationalAnalysis:
         - result_file: The name of the vibrational analysis output file (txt format).
     """
 
-    def __init__(self, drv, rsp_drv=None, grad_drv=None):
+    def __init__(self, drv, rsp_drv=None):
         """
         Initializes vibrational analysis driver.
         """
@@ -134,6 +136,19 @@ class VibrationalAnalysis:
         self.rsp_dict = {}
         self.polgrad_dict = {}
 
+        self.do_ir = True
+        self.do_raman = False
+        self.do_resonance_raman = False
+        self.rr_damping = None
+        self.frequencies = (0,)
+
+        # Dictionary to define the isotopes
+        self.isotopes = None
+
+        # Excited-state index in case of
+        # excited-state vibrational analysis.
+        self.state_deriv_index = None
+
         # Hessian driver etc
         self.is_scf = False
         self.is_xtb = False
@@ -148,7 +163,7 @@ class VibrationalAnalysis:
                 self.is_tddft = True
                 self.scf_driver = drv
                 self.rsp_driver = rsp_drv
-                self.hessian_driver = TddftHessianDriver(drv, rsp_drv, grad_drv)
+                self.hessian_driver = TddftHessianDriver(drv, rsp_drv)
         elif isinstance(drv, XtbDriver):
             self.is_xtb = True
             self.scf_driver = None
@@ -178,12 +193,6 @@ class VibrationalAnalysis:
         # flag for two-point or four-point approximation
         self.do_four_point_hessian = False
         self.do_four_point_raman = False
-
-        self.do_ir = True
-        self.do_raman = False
-        self.do_resonance_raman = False
-        self.rr_damping = None
-        self.frequencies = (0,)
 
         # flag for printing
         self.do_print_hessian = False
@@ -221,6 +230,9 @@ class VibrationalAnalysis:
                     ('bool', 'whether to print Raman depolarization ratio'),
                 'temperature': ('float', 'the temperature'),
                 'pressure': ('float', 'the pressure'),
+                'isotopes':
+                    ('str', 'atomic masses in amu for isotope analysis'),
+                'state_deriv_index': ('int', 'excited state index'),
                 'frequencies':
                     ('seq_range', 'frequencies of external electric field'),
                 'filename': ('str', 'base name of output files'),
@@ -388,10 +400,49 @@ class VibrationalAnalysis:
                    '  geometric via pip or conda.\n')
         assert_msg_critical(hasattr(geometric, 'normal_modes'), err_msg)
 
+        title = 'Free Energy Analysis'
+        self.ostream.print_header(title)
+        self.ostream.print_header('=' * (len(title) + 2))
+        self.ostream.print_blank()
+
         # number of atoms, elements, and coordinates
         natm = molecule.number_of_atoms()
         elem = molecule.get_labels()
         coords = molecule.get_coordinates_in_bohr().reshape(natm * 3)
+
+        masses = molecule.get_masses()
+
+        # modify masses according to the isotopes
+        if self.isotopes is not None:
+
+            for entry in self.isotopes.split(','):
+                m = re.search(r'^(.*)\((.*)\)$', entry.strip())
+                assert_msg_critical(
+                    m is not None,
+                    'VibrationalAnalysis.frequency_analysis: Invalid input ' +
+                    'for isotopes')
+
+                label = m.group(1).strip()
+                mass = m.group(2).strip()
+
+                if label.isdigit():
+                    assert_msg_critical(
+                        (int(label) == float(label) and int(label) >= 1 and
+                            int(label) <= natm),
+                        'VibrationalAnalysis.frequency_analysis: Invalid ' +
+                        'input for one-based atom index')
+                    masses[int(label) - 1] = float(mass)
+                    self.ostream.print_info(f'Using isotope mass {mass} for ' +
+                                            f'atom {label}')
+
+                elif isinstance(label, str):
+                    self.ostream.print_info(
+                        f'Using isotope mass {mass} for {label}')
+                    for iatom in range(natm):
+                        if label.lower() == elem[iatom].lower():
+                            masses[iatom] = float(mass)
+
+            self.ostream.print_blank()
 
         try:
             temp_dir = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
@@ -407,6 +458,7 @@ class VibrationalAnalysis:
                 coords,
                 self.hessian,
                 elem,
+                mass=masses,
                 energy=self.elec_energy,
                 temperature=self.temperature,
                 pressure=self.pressure,
@@ -421,11 +473,6 @@ class VibrationalAnalysis:
             vdata_file.is_file(),
             'VibrationalAnalysis.frequency_analysis: cannot find vdata file ' +
             f'{str(vdata_file)}')
-
-        title = 'Free Energy Analysis'
-        self.ostream.print_header(title)
-        self.ostream.print_header('=' * (len(title) + 2))
-        self.ostream.print_blank()
 
         text = []
         with vdata_file.open() as fh:
@@ -611,7 +658,10 @@ class VibrationalAnalysis:
         if self.is_scf:
             # only pass numerical option to ScfHessianDriver
             # since XtbHessianDriver will always be numerical
-            hessian_drv.numerical = self.numerical_hessian
+            if self.numerical_hessian and not hessian_drv.numerical:
+                hessian_drv.numerical = self.numerical_hessian
+        if self.is_tddft:
+            hessian_drv.state_deriv_index = self.state_deriv_index
         hessian_drv.do_four_point = self.do_four_point_hessian
         hessian_drv.do_dipole_gradient = self.do_ir
         hessian_drv.do_print_hessian = self.do_print_hessian
