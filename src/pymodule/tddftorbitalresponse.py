@@ -75,6 +75,9 @@ class TddftOrbitalResponse(CphfSolver):
 
         super().__init__(comm, ostream)
 
+        # TddftOrbitalResponse solvation model defaults
+        self.non_equilibrium_solv = False
+
         self.orbrsp_type = 'tddftgrad'
 
         self.tamm_dancoff = False
