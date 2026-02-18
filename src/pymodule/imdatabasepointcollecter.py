@@ -919,17 +919,16 @@ class IMDatabasePointCollecter:
         self.qm_energies_dict = {root: [] for root in self.roots_to_follow}
         self.impes_drivers = {root: None for root in self.roots_to_follow}
         self.sampled_molecules = {root: {'molecules': [], 'im_energies': [], 'qm_energies': [], 'qm_gradients': [], 'distances': []} for root in self.roots_to_follow}
-        
-        self.allowed_molecules_to_check = {root: [] for root in self.roots_to_follow}
+    
 
         if self.reference_struc_energies_file is not None:
             print('Extracting reference structures from', self.reference_struc_energies_file)
-            self.sampled_molecules = self.extract_reference_structures(self.reference_struc_energies_file, self.roots_to_follow)
-            self.allowed_molecules = self.extract_reference_structures(self.reference_struc_energies_file, self.roots_to_follow)
+            self.sampled_molecules = self.extract_reference_structures_h5(self.reference_struc_energies_file, self.roots_to_follow)
+            self.allowed_molecules = self.extract_reference_structures_h5(self.reference_struc_energies_file, self.roots_to_follow)
             self.last_added += len(self.sampled_molecules[self.roots_to_follow[0]]['molecules'])
 
         else:
-             self.reference_struc_energies_file = 'ref_struc_energy.xyz'
+             self.reference_struc_energies_file = 'QM_ref_along_traj.h5'
 
         masses = self.molecule.get_masses().copy()
         masses_cart = np.repeat(masses, 3)
@@ -984,7 +983,8 @@ class IMDatabasePointCollecter:
                 # 3) stack batch
                 X_np = np.vstack(x_list)              # (N,D)
                 y_np = np.concatenate(y_list, axis=0) # (N,)
-                    
+                
+                
 
                 gpr_driver = GPRInterpolationDriver(X_np, x_groups, y_np)
                 gpr_driver.refit(steps="auto", verbose=False)
@@ -997,6 +997,7 @@ class IMDatabasePointCollecter:
                 print("outputscale:", float(gpr_driver.model.covar_module.outputscale.detach().cpu()))
                 print("noise:", float(gpr_driver.likelihood.noise.detach().cpu()))
                 driver_object.gpr_intdriver = gpr_driver 
+            
 
             im_labels, _ = driver_object.read_labels()
             print('beginning labels', im_labels, self.add_gpr_model)
@@ -1126,7 +1127,7 @@ class IMDatabasePointCollecter:
         elapsed_time = end_time - start_time
         elapsed_time_days = elapsed_time / (24 * 3600)
         performance = (self.nsteps * timestep / 1e6) / elapsed_time_days
-
+        self.output_file_writer(self.summary_output)
         print('QM/MM simulation completed!')
         print(f'Number of steps: {self.nsteps}')
         print(f'Trajectory saved as {self.out_file}')
@@ -2171,6 +2172,7 @@ class IMDatabasePointCollecter:
                 mean_bond_rmsd = np.mean(np.array(self.impes_drivers[self.current_state].bond_rmsd))
                 mean_angle_rmsd = np.mean(np.array(self.impes_drivers[self.current_state].angle_rmsd))
                 mean_dihedral_rmsd = np.mean(np.array(self.impes_drivers[self.current_state].dihedral_rmsd))
+                
 
                 if mean_bond_rmsd > 0.01 or mean_angle_rmsd > 0.01 or mean_dihedral_rmsd > 1.0:
 
@@ -2179,8 +2181,9 @@ class IMDatabasePointCollecter:
                     new_coords = new_molecule.get_coordinates_in_bohr()
                     n_atoms = len(new_molecule.get_labels())
                     sym_group = self.non_core_symmetry_groups['gs' if self.current_state == 0 or self.drivers['es'] is not None and self.drivers['es'][0].spin_flip and self.current_state == 1 else 'es'][4]
-                    molecule_list = self.allowed_molecules_to_check[self.current_state]
+                    molecule_list = self.allowed_molecules[self.current_state]['molecules']
 
+                
                     if not hasattr(self, "previous_candidate_indices"):
                         self.previous_candidate_indices = []
 
@@ -2209,6 +2212,7 @@ class IMDatabasePointCollecter:
                         for idx, checked_molecule in enumerate(molecule_list):
                             checked_coords = checked_molecule.get_coordinates_in_bohr()
                             checked_distance = self.cartesian_just_distance(checked_coords, new_coords, sym_group)
+
                             normed_dist = (np.linalg.norm(checked_distance) / np.sqrt(n_atoms)) * bohr_in_angstrom()
                             closest_indices.append((idx, normed_dist))
                             if normed_dist <= threshold:
@@ -2654,7 +2658,6 @@ class IMDatabasePointCollecter:
                 self.allowed_molecules[root]['im_energies'].append(self.impes_drivers[root].impes_coordinate.energy)
                 self.allowed_molecules[root]['qm_energies'].append(state_specific_energies[root][0])
                 self.allowed_molecules[root]['qm_gradients'].append(state_specific_gradients[root][0])
-                self.allowed_molecules_to_check[root].append(molecule)
 
                 if self.add_gpr_model:
                     # Last molecule only
@@ -2745,11 +2748,10 @@ class IMDatabasePointCollecter:
                     print('### Predictions:', mean.ravel().tolist(), std.ravel().tolist())
                     # 5) (optional) inspect kernel hyperparameters to judge reasonableness
 
-                self.write_qm_energy_determined_points(self.allowed_molecules[root]['molecules'][self.last_added: ],
+                self.write_qm_energy_determined_points_h5(self.allowed_molecules[root]['molecules'][self.last_added: ],
                                                     self.allowed_molecules[root]['qm_energies'][self.last_added:],
                                                     self.allowed_molecules[root]['qm_gradients'][self.last_added:],
                                                     self.allowed_molecules[root]['im_energies'][self.last_added:],
-                                                    [],
                                                     root)
                 self.last_added = len(self.allowed_molecules[root]['molecules'])
 
@@ -3411,7 +3413,7 @@ class IMDatabasePointCollecter:
                                 
                                 self.simulation.saveCheckpoint('checkpoint')
                                 
-                                # self.output_file_writer(self.summary_output)
+                                self.output_file_writer(self.summary_output)
                                 state_spec_dict = {'pot_energies':[], 'gradients':[]}
                                 self.gloabal_sim_informations = {f'state_{root}':state_spec_dict for root in self.roots_to_follow}
                                 self.gloabal_sim_informations['coordinates_ang'] = []
@@ -3419,11 +3421,10 @@ class IMDatabasePointCollecter:
                                 self.gloabal_sim_informations['temperatures'] = []
                     # exit()
                     for root in mol_basis[4]:
-                        self.write_qm_energy_determined_points(self.allowed_molecules[root]['molecules'][self.last_added: ],
+                        self.write_qm_energy_determined_points_h5(self.allowed_molecules[root]['molecules'][self.last_added: ],
                                                             self.allowed_molecules[root]['qm_energies'][self.last_added:],
                                                             self.allowed_molecules[root]['qm_gradients'][self.last_added:],
                                                             self.allowed_molecules[root]['im_energies'][self.last_added:],
-                                                            [],
                                                             root)
                         self.last_added = len(self.allowed_molecules[root]['molecules'])
                 label_counter += 1
@@ -3774,10 +3775,10 @@ class IMDatabasePointCollecter:
                 dtype=dt,
                 chunks=True
             )
-            old_size = label_ds.shape[0]
-            new_size = old_size + labels.shape[0]
-            label_ds.resize((new_size,))
-            label_ds[old_size:new_size] = labels
+            # old_size = label_ds.shape[0]
+            # new_size = old_size + labels.shape[0]
+            # label_ds.resize((new_size,))
+            # label_ds[old_size:new_size] = labels
 
         ds_name = "temperatures"
         if ds_name in h5f:
@@ -3889,6 +3890,10 @@ class IMDatabasePointCollecter:
                     new_size = old_size + grad_data.shape[0]
                     ds.resize((new_size, n_atoms, 3))
                     ds[old_size:new_size, :, :] = grad_data
+
+            # store information about the checked data with reference calculations
+
+            
     
     def read_simulation_summary(self, fname, roots_to_follow):
         """
@@ -3930,114 +3935,174 @@ class IMDatabasePointCollecter:
 
         return data
     
-    def write_qm_energy_determined_points(self, molecules, qm_energies, qm_gradients, im_energies, distances, state):           
-        
-        mode = 'a' if os.path.exists(self.reference_struc_energies_file) and os.path.getsize(self.reference_struc_energies_file) > 0 else 'w'
-        print(f"Opening file in mode: {mode}")
+    def write_qm_energy_determined_points_h5(
+        self,
+        molecules,
+        qm_energies,
+        qm_gradients,
+        im_energies,
+        state,
+        h5_path=None,
+    ):
+        """
+        Append reference structures + metadata to an HDF5 file.
 
-        with open(self.reference_struc_energies_file, mode) as file:
-            
-            for i, dyn_mol in enumerate(molecules):
-                current_xyz_string = dyn_mol.get_xyz_string()
-                xyz_lines = current_xyz_string.splitlines()
+        Notes:
+        - This replaces writing XYZ text blocks.
+        - Stores xyz strings + flattened coords and gradients.
+        """
 
-                # Add energy info to comment line (second line)
-                xyz_lines[1] += f' Energies  QM: {qm_energies[i]} QM_G: {qm_gradients[i]} IM: {im_energies[i]} Distance: {1.0}  State: {state}'
-                updated_xyz_string = "\n".join(xyz_lines)
+        def _ensure_state_group(h5: h5py.File, state: int, compression="gzip", compression_opts=4):
+            """
+            Ensure /states/<state>/ datasets exist and are appendable (maxshape=None).
+            """
+            states_grp = h5.require_group("states")
+            g = states_grp.require_group(str(int(state)))
 
-                file.write(f"{updated_xyz_string}\n\n")
+            str_dt = h5py.string_dtype(encoding="utf-8")
+            vlen_f64 = h5py.vlen_dtype(np.dtype("float64"))
 
-    def extract_reference_structures(self, filename, roots):
-
-        def parse_gradient(grad_str):
-            # Remove outer [[ and ]]
-            grad_str = grad_str.strip()
-            grad_str = grad_str.lstrip("[").rstrip("]")  # remove only one layer
-            # Split by rows: each line with numbers
-            rows = grad_str.strip().split("\n")
-            data = []
-            for row in rows:
-                # Remove any inner brackets and extra spaces
-                row_clean = row.replace("[", "").replace("]", "").strip()
-                if row_clean:  # skip empty lines
-                    data.append([float(x) for x in row_clean.split()])
-            return np.array(data)
-
-        xyz_strings = []  
-        qm_energies = []
-        qm_gradients = []  
-        im_energies = []
-        distances = []
-        states = []  
-        
-        reference_molecules_check = {root: {'molecules': [], 'qm_energies': [], 'qm_gradients': [], 'im_energies': [], 'distances': []} for root in roots}
-    
-        with open(filename, 'r') as file:
-            lines = file.readlines()
-
-        atom_line_pattern = re.compile(r"^[A-Z][a-z]?\s+[-\d\.]+\s+[-\d\.]+\s+[-\d\.]+")
-
-        current_xyz = []
-        skip_gradient = False
-
-        for line in lines:
-            line = line.strip()
-
-            # new molecule start (atom count)
-            if line.isdigit():  
-                if current_xyz: 
-                    xyz_strings.append('\n'.join(current_xyz))
-                    current_xyz = []  
-                current_xyz.append(line)
-                current_xyz.append(' ')  # Add an empty line for the comment
-
-            elif "Energies" in line:
-                skip_gradient = True
-
-            elif skip_gradient:
-                # Check if this line is an atom line → resume adding
-                if atom_line_pattern.match(line):
-                    skip_gradient = False
-                    current_xyz.append(line)
-                # else: we are still in QM_G gradient → skip it
-            else:
-                current_xyz.append(line)
-
-        content = "\n".join(lines)
-        pattern = (
-                    r"QM:\s*([-0-9\.]+)\s*"
-                    r"QM_G:\s*(\[\[[\s\S]*?\]\](?=\s*IM:))\s*"  # stop right before IM:
-                    r"IM:\s*([-0-9\.]+)\s*"
-                    r"Distance:\s*([-0-9\.]+)\s*"
-                    r"State:\s*([0-9]+)"
+            def req_1d(name, dtype):
+                if name in g:
+                    return g[name]
+                # chunks=True lets HDF5 pick a reasonable chunking for 1D extendable arrays
+                return g.create_dataset(
+                    name,
+                    shape=(0,),
+                    maxshape=(None,),
+                    dtype=dtype,
+                    chunks=True,
+                    compression=compression,
+                    compression_opts=compression_opts,
+                    shuffle=True,
                 )
-        matches = list(re.finditer(pattern, content, re.DOTALL))
-        for match in matches:
-            qm_energy = float(match.group(1))
-            grad = parse_gradient(match.group(2))
-            im_energy = float(match.group(3))
-            distance = float(match.group(4))
-            state = int(match.group(5))
 
+            req_1d("qm_energy", np.float64)
+            req_1d("im_energy", np.float64)
+            req_1d("natoms", np.int32)
+            req_1d("xyz", str_dt)
+            req_1d("qm_grad_flat", vlen_f64)
+            req_1d("coords_flat", vlen_f64)
 
-            qm_energies.append(qm_energy)
-            im_energies.append(im_energy)
-            distances.append(distance)
-            states.append(state)
-            qm_gradients.append(grad)
+            return g
+        
+        h5_path = h5_path or self.reference_struc_energies_file
+        state = int(state)
 
-        if current_xyz:
-            xyz_strings.append('\n'.join(current_xyz))
+        # Basic sanity
+        n = len(molecules)
+        if not (len(qm_energies) == len(qm_gradients) == len(im_energies) == n):
+            raise ValueError("Input lists must all have the same length.")
 
-        for i, state in enumerate(states):
-            
-            mol = Molecule.from_xyz_string(xyz_strings[i])
+        with h5py.File(h5_path, "a") as h5:
+            g = _ensure_state_group(h5, state)
 
-            reference_molecules_check[state]['molecules'].append(mol)
-            reference_molecules_check[state]['qm_energies'].append(qm_energies[i])
-            reference_molecules_check[state]['qm_gradients'].append(qm_gradients[i])
-            reference_molecules_check[state]['im_energies'].append(im_energies[i])
-            reference_molecules_check[state]['distances'].append(distances[i])
+            # current length
+            N0 = g["qm_energy"].shape[0]
+            N1 = N0 + n
+
+            # resize all 1D datasets to accommodate new rows
+            for key in ["qm_energy", "im_energy", "natoms", "xyz", "qm_grad_flat", "coords_flat"]:
+                g[key].resize((N1,))
+
+            # append row-by-row (ragged arrays)
+            for i, mol in enumerate(molecules):
+                # xyz for easy reconstruction later
+                xyz = mol.get_xyz_string()
+
+                # coordinates if available; optional but recommended
+                coords = None
+                if hasattr(mol, "get_coordinates"):
+                    coords = np.asarray(mol.get_coordinates_in_angstrom(), dtype=np.float64)
+                else:
+                    # Fallback: parse from xyz string if needed (cheap enough, but implement if you want)
+                    coords = None
+
+                # natoms: prefer mol attribute, otherwise infer from gradient/coords/xyz
+                if hasattr(mol, "n_atoms"):
+                    natoms = int(mol.n_atoms)
+                elif coords is not None:
+                    natoms = int(coords.shape[0])
+                else:
+                    # xyz format: first line is natoms
+                    natoms = int(xyz.splitlines()[0].strip())
+
+                grad = np.asarray(qm_gradients[i], dtype=np.float64)
+                if grad.ndim != 2 or grad.shape[1] != 3:
+                    raise ValueError(f"qm_gradients[{i}] must have shape (natoms,3), got {grad.shape}.")
+                if grad.shape[0] != natoms:
+                    raise ValueError(f"Gradient natoms mismatch at i={i}: grad has {grad.shape[0]}, expected {natoms}.")
+
+                row = N0 + i
+                g["qm_energy"][row] = float(qm_energies[i])
+                g["im_energy"][row] = float(im_energies[i])
+                g["natoms"][row] = natoms
+                g["xyz"][row] = xyz
+                g["qm_grad_flat"][row] = grad.reshape(-1)
+
+                if coords is None:
+                    # Store empty array if coords are not accessible; reader can still rebuild from xyz
+                    g["coords_flat"][row] = np.array([], dtype=np.float64)
+                else:
+                    if coords.shape != (natoms, 3):
+                        raise ValueError(f"Coords must be shape (natoms,3), got {coords.shape}.")
+                    g["coords_flat"][row] = coords.reshape(-1)
+
+    def extract_reference_structures_h5(self, filename, roots):
+        """
+        Read reference structures from HDF5 and return the same dict structure as your
+        current extract_reference_structures(...).
+
+        returns:
+        { root/state: {
+            'molecules': [...],
+            'qm_energies': [...],
+            'qm_gradients': [...],   # arrays (natoms,3)
+            'im_energies': [...]
+            }, ...}
+        """
+        reference_molecules_check = {
+            int(root): {"molecules": [], "qm_energies": [], "qm_gradients": [], "im_energies": []}
+            for root in roots
+        }
+
+        with h5py.File(filename, "r") as h5:
+            if "states" not in h5:
+                return reference_molecules_check
+
+            states_grp = h5["states"]
+
+            for root in roots:
+                s = str(int(root))
+                if s not in states_grp:
+                    continue
+
+                g = states_grp[s]
+                qmE = g["qm_energy"][:]
+                imE = g["im_energy"][:]
+                natoms = g["natoms"][:]
+                xyzs = g["xyz"][:]               # array of strings
+                grad_flat = g["qm_grad_flat"][:] # array of vlen float arrays
+
+                for i in range(len(qmE)):
+                    # Rebuild molecule
+                    xyz_string = xyzs[i]
+                    if isinstance(xyz_string, bytes):
+                        xyz_string = xyz_string.decode("utf-8")
+
+                    mol = Molecule.from_xyz_string(xyz_string)
+
+                    # Rebuild gradient
+                    n = int(natoms[i])
+                    gf = np.asarray(grad_flat[i], dtype=np.float64)
+                    if gf.size != 3 * n:
+                        raise ValueError(f"Stored gradient size mismatch at state={root}, i={i}: got {gf.size}, expected {3*n}.")
+                    grad = gf.reshape((n, 3))
+
+                    reference_molecules_check[int(root)]["molecules"].append(mol)
+                    reference_molecules_check[int(root)]["qm_energies"].append(float(qmE[i]))
+                    reference_molecules_check[int(root)]["qm_gradients"].append(grad)
+                    reference_molecules_check[int(root)]["im_energies"].append(float(imE[i]))
 
         return reference_molecules_check
 
@@ -4083,4 +4148,4 @@ class IMDatabasePointCollecter:
             distance_vector_core_norm[i] += np.linalg.norm(distance_vector_core[i])
 
         return ref_structure_check, distance_core, distance_vector_core
-        
+

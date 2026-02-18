@@ -27,6 +27,8 @@ import math
 import itertools
 import os
 import random
+import h5py
+
 from contextlib import redirect_stderr
 from io import StringIO
 from copy import deepcopy
@@ -1739,6 +1741,156 @@ class IMForceFieldGenerator:
            List of QM-energies, IM-energies.
         """
 
+        def calculate_translation_coordinates(given_coordinates):
+            """Center the molecule by translating its geometric center to (0, 0, 0)."""
+            center = np.mean(given_coordinates, axis=0)
+            translated_coordinates = given_coordinates - center
+
+            return translated_coordinates
+
+        def cartesian_just_distance(coordinate_1, coordinate_2, non_core_atoms=[]):
+                """Calculates and returns the cartesian distance between
+                self.coordinates and data_point coordinates.
+                Besides the distance, it also returns the weight gradient,
+                which requires the distance vector to be computed.
+                :param data_point:
+                        InterpolationDatapoint object
+                """
+                target_coordinates_core = np.delete(coordinate_1, non_core_atoms, axis=0)
+                reference_coordinates_core = np.delete(coordinate_2, non_core_atoms, axis=0)
+                # First, translate the cartesian coordinates to zero
+                target_coordinates = calculate_translation_coordinates(target_coordinates_core)
+                reference_coordinates = (
+                    calculate_translation_coordinates(reference_coordinates_core))
+                # Then, determine the rotation matrix which
+                # aligns data_point (target_coordinates)
+                # to self.impes_coordinate (reference_coordinates)
+                rotation_matrix = geometric.rotate.get_rot(target_coordinates,
+                                                        reference_coordinates)
+                # Rotate the data point
+                rotated_coordinates = np.dot(rotation_matrix, target_coordinates.T).T
+                # Calculate the Cartesian distance
+                distance_vector = (reference_coordinates - rotated_coordinates)
+
+                return np.linalg.norm(distance_vector)
+
+        def database_distance_check(datafile_mols):
+
+            point_dists = {}
+
+            for mol_idx, mol_1 in enumerate(datafile_mols[:-1]):
+                min_distance = np.inf
+                min_idx = mol_idx
+
+                single_p_distances = {}
+                for mol_2_idx, mol_2 in enumerate(datafile_mols[mol_idx + 1:], start=mol_idx + 1):
+                    distance = cartesian_just_distance(mol_1.get_coordinates_in_bohr(), mol_2.get_coordinates_in_bohr())
+
+                    single_p_distances[mol_2_idx] = distance
+                    
+                point_dists[mol_idx] = single_p_distances
+
+            return point_dists
+        
+        def dist_dict_to_edges(db_distances: dict):
+            """
+            Convert upper-triangular dict-of-dicts distances into:
+            N (number of points), pairs (M,2), dists (M,)
+            """
+            idxs = set(db_distances.keys())
+            if len(idxs) < 2:
+                return 1, np.array([]), np.array([])
+            for i, row in db_distances.items():
+                for j in row.keys():
+                    idxs.add(j)
+            N = max(idxs) + 1
+
+            pairs = []
+            dists = []
+            for i, row in db_distances.items():
+                for j, dij in row.items():
+                    pairs.append((int(i), int(j)))
+                    dists.append(float(dij))
+
+            pairs = np.asarray(pairs, dtype=np.int32)
+            dists = np.asarray(dists, dtype=np.float64)
+            return N, pairs, dists
+        
+
+        # for i, mol in enumerate(molecules):
+            # xyz = mol.get_xyz_string()
+
+            # # coords optional
+            # coords = None
+            # if hasattr(mol, "get_coordinates"):
+            #     coords = np.asarray(mol.get_coordinates_in_angstrom(), dtype=np.float64)
+
+            # # natoms robust inference
+            # if hasattr(mol, "n_atoms"):
+            #     natoms = int(mol.n_atoms)
+            # elif coords is not None:
+            #     natoms = int(coords.shape[0])
+            # else:
+            #     natoms = int(xyz.splitlines()[0].strip())
+
+            # row = N0 + i
+            # row = qm_ds.shape[0]     # current length
+            # qm_ds.resize((row + 1,)) # grow by 1
+            # im_ds.resize((row + 1,)) # grow by 1
+            # na_ds.resize((row + 1,)) # grow by 1
+            # cf_ds.resize((row + 1,)) # grow by 1
+            # xyz_ds.resize((row + 1,)) # grow by 1
+        
+
+
+            # qm_ds[row] = float(qm_energies[i])
+            # im_ds[row] = float(im_energies[i])
+            # na_ds[row] = natoms
+            # xyz_ds[row] = xyz
+
+        def write_distances_h5(h5_path: str, group_name: str, db_mol: list, N: int, pairs: np.ndarray, dists: np.ndarray, labels=None):
+            """
+            Store an edge list + metadata + XYZ structures in an HDF5 file.
+            """
+
+            with h5py.File(h5_path, "a") as f:
+                # 1. Overwrite group if it exists
+                if group_name in f:
+                    del f[group_name]
+                g = f.create_group(group_name)
+
+                g.attrs["n_points"] = int(N)
+
+                # 2. Extract XYZ strings from the molecule objects
+                #    Assuming db_mol is a list of objects that have .get_xyz_string()
+                xyz_list = [mol.get_xyz_string() for mol in db_mol]
+
+                # 3. Define the variable-length string data type
+                dt = h5py.string_dtype(encoding='utf-8')
+
+                # 4. Write the XYZ dataset
+                #    We use 'dtype=object' for numpy to handle variable length strings before passing to h5py
+                g.create_dataset(
+                    "xyz", 
+                    data=np.asarray(xyz_list, dtype=object), 
+                    dtype=dt, 
+                    compression="gzip", 
+                    compression_opts=4
+                )
+
+                # 5. Optional Labels
+                if labels is not None:
+                    labels = [str(x) for x in labels]
+                    g.create_dataset("labels", data=np.asarray(labels, dtype=object), dtype=dt)
+
+                if int(N) > 1:
+                # 6. Store Distance Data
+                    g.create_dataset("pairs", data=pairs, compression="gzip", compression_opts=4, shuffle=True)
+                    g.create_dataset("dists", data=dists, compression="gzip", compression_opts=4, shuffle=True)
+                
+        overall_db_covergage = {}
+
+
         for root in self.roots_to_follow:
             database_quality = False
             drivers = None
@@ -1750,6 +1902,7 @@ class IMForceFieldGenerator:
             current_datafile = im_settings[root]['imforcefield_file']
             datapoint_molecules, _, z_matrix = self.database_extracter(current_datafile, molecule.get_labels(), im_settings[root])
 
+            overall_db_covergage[current_datafile] = {}
             if len(all_structures) == 0:
                 continue
 
@@ -1892,7 +2045,7 @@ class IMForceFieldGenerator:
                         print(mol.get_xyz_string())
                         molecules_to_add_info = [(mol, current_basis, [root])]
 
-                        if self.use_minimized_structures[0]:
+                        if self.identfy_relevant_int_coordinates:
                             current_weights = impes_driver.weights
 
                             weights = [value for _, value in current_weights.items()]
@@ -2001,10 +2154,23 @@ class IMForceFieldGenerator:
 
                             database_expanded = True
 
+                    else:
+                        with h5py.File('summary_output.h5', "a") as h5f:
+                            print(reference_energy[root])
+                            self.append_confirm_database_quality_h5(h5f, [mol], np.array([reference_energy[root]]), np.array([impes_driver.impes_coordinate.energy]), root)
+
                 if not database_expanded:
                     database_quality = True
 
+                    minmum_distances_in_db = database_distance_check(datapoint_molecules)
+                    overall_db_covergage[current_datafile]['db_distances'] = minmum_distances_in_db
+
+                    N, pairs, dists = dist_dict_to_edges(minmum_distances_in_db)
+                    labels = [f"point {i+1}" for i in range(N)]  # optional
+
+                    write_distances_h5(current_datafile, group_name="internal_dist_MDS", db_mol=datapoint_molecules, N=N, pairs=pairs, dists=dists, labels=labels)
             
+            print('Overall coverage', overall_db_covergage)
             # self.plot_final_energies(qm_energies, im_energies)
 
             self.structures_to_xyz_file(all_structures[::int(self.nsteps / self.snapshots)], 'full_xyz_traj.xyz')
@@ -2687,3 +2853,132 @@ class IMForceFieldGenerator:
 
 
         return qm_hessians
+
+    def append_confirm_database_quality_h5(
+        self,
+        h5f: h5py.File,
+        molecules,
+        qm_energies,
+        im_energies,
+        state: int,         # optional; keep None if you don't have it here
+        check_meta: dict | None = None,  # optional metadata (step, tag, etc.)
+        compression="gzip",
+        compression_opts=4,
+    ):
+        """
+        Append a batch of 'confirmed reference structures' into the *already open* HDF5 file `h5f`.
+
+        Layout (example):
+        /confirm_database_quality#000012/
+            attrs: created_by, state, ...
+            /state_<state>/
+                qm_energy    (N,) float64
+                im_energy    (N,) float64
+                distance     (N,) float64   [optional: only created if distances provided]
+                natoms       (N,) int32
+                xyz          (N,) utf-8 string
+                coords_flat  (N,) vlen<float64>  (flattened natoms*3; empty if not available)
+        """
+        state = int(state)
+        n = len(molecules)
+
+        if not (len(qm_energies) == len(im_energies) == n):
+            raise ValueError("molecules, qm_energies, im_energies must have identical length.")
+
+
+        # --------- choose next batch group name: confirm_database_quality#000000, #000001, ...
+        prefix = "confirm_database_quality#"
+        existing = [k for k in h5f.keys() if isinstance(k, str) and k.startswith(prefix)]
+        if existing:
+            # parse numeric suffixes safely
+            ids = []
+            for k in existing:
+                suf = k[len(prefix):]
+                try:
+                    ids.append(int(suf))
+                except ValueError:
+                    pass
+            next_id = (max(ids) + 1) if ids else 0
+        else:
+            next_id = 0
+
+        batch_group_name = f"{prefix}{next_id:06d}"
+        batch_grp = h5f.require_group(batch_group_name)
+
+        # add minimal metadata
+        batch_grp.attrs["state"] = state
+        if check_meta:
+            for kk, vv in check_meta.items():
+                # store simple scalar/string metadata
+                if isinstance(vv, (str, int, float, np.integer, np.floating)):
+                    batch_grp.attrs[str(kk)] = vv
+
+        # store under a per-state subgroup (keeps it consistent with your file conventions)
+        state_grp = batch_grp.require_group(f"state_{state}")
+
+        str_dt = h5py.string_dtype(encoding="utf-8")
+        vlen_f64 = h5py.vlen_dtype(np.dtype("float64"))
+
+        def req_1d(name, dtype):
+            if name in state_grp:
+                return state_grp[name]
+            return state_grp.create_dataset(
+                name,
+                shape=(0,),
+                maxshape=(None,),
+                dtype=dtype,
+                chunks=True,
+                compression=compression,
+                compression_opts=compression_opts,
+                shuffle=True,
+            )
+
+        qm_ds = req_1d("qm_energy", np.float64)
+        im_ds = req_1d("im_energy", np.float64)
+        na_ds = req_1d("natoms", np.int32)
+        xyz_ds = req_1d("xyz", str_dt)
+        cf_ds = req_1d("coords_flat", vlen_f64)
+
+        # --------- resize and append
+        N0 = qm_ds.shape[0]
+        N1 = N0 + n
+
+        for i, mol in enumerate(molecules):
+            xyz = mol.get_xyz_string()
+
+            # coords optional
+            coords = None
+            if hasattr(mol, "get_coordinates"):
+                coords = np.asarray(mol.get_coordinates_in_angstrom(), dtype=np.float64)
+
+            # natoms robust inference
+            if hasattr(mol, "n_atoms"):
+                natoms = int(mol.n_atoms)
+            elif coords is not None:
+                natoms = int(coords.shape[0])
+            else:
+                natoms = int(xyz.splitlines()[0].strip())
+
+            row = N0 + i
+            row = qm_ds.shape[0]     # current length
+            qm_ds.resize((row + 1,)) # grow by 1
+            im_ds.resize((row + 1,)) # grow by 1
+            na_ds.resize((row + 1,)) # grow by 1
+            cf_ds.resize((row + 1,)) # grow by 1
+            xyz_ds.resize((row + 1,)) # grow by 1
+        
+
+
+            qm_ds[row] = float(qm_energies[i])
+            im_ds[row] = float(im_energies[i])
+            na_ds[row] = natoms
+            xyz_ds[row] = xyz
+
+            if coords is None:
+                cf_ds[row] = np.array([], dtype=np.float64)
+            else:
+                if coords.shape != (natoms, 3):
+                    raise ValueError(f"Coords must be shape (natoms,3), got {coords.shape}.")
+                cf_ds[row] = coords.reshape(-1)
+
+        return batch_group_name  # handy for logging/debugging

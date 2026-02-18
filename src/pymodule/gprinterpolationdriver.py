@@ -112,9 +112,15 @@ class GPRInterpolationDriver:
             a = arr_like.tolist() if hasattr(arr_like, "tolist") else list(arr_like)
             return sorted(int(i) for i in a)
 
-        bond_idx    = _active_dims(groups.get('bond', []))
-        angle_idx   = _active_dims(groups.get('angle', []))
-        torsion_idx = _active_dims(groups.get('torsion', []))
+        # NEW FIXED CODE
+        raw_bond    = _active_dims(groups.get('bond', []))
+        raw_angle   = _active_dims(groups.get('angle', []))
+        raw_torsion = _active_dims(groups.get('torsion', []))
+
+        # Remap to the reduced coordinate system
+        bond_idx    = self._remap_indices(raw_bond)
+        angle_idx   = self._remap_indices(raw_angle)
+        torsion_idx = self._remap_indices(raw_torsion)
 
         self.group_names  = ["bond", "angle", "torsion"]
         self.group_dims   = {
@@ -350,7 +356,32 @@ class GPRInterpolationDriver:
                     f"Frozen mask length {self._keep_cols.numel()} != X_raw width {D}"
                 )
 
+    def _remap_indices(self, raw_indices):
+        """
+        Maps original feature indices to the reduced indices after _keep_cols is applied.
+        Returns a list of valid, shifted indices.
+        """
+        if getattr(self, "_keep_cols", None) is None:
+            return raw_indices
 
+        # _keep_cols is a boolean tensor (True = keep, False = drop)
+        keep_mask = self._keep_cols.cpu().numpy()
+        
+        # Create a map: map[old_index] -> new_index (or -1 if dropped)
+        # cumsum gives us the count of True values up to that point
+        mapping = np.cumsum(keep_mask) - 1
+        
+        new_indices = []
+        for old_idx in raw_indices:
+            # Ensure index is within bounds of the mask
+            if old_idx < len(keep_mask):
+                # Only keep the index if the column was actually kept
+                if keep_mask[old_idx]:
+                    new_indices.append(int(mapping[old_idx]))
+            # If the index was dropped (False in mask), we simply omit it 
+            # from the kernel's active_dims, as that feature no longer exists in X.
+            
+        return sorted(list(set(new_indices)))
 
     def _fit_data(self):
         self._assert_and_clean_finite()
@@ -1318,3 +1349,4 @@ class GPRInterpolationDriver:
         E_hat = E_interp_query + dE_mean
         flag = (dE_std > threshold) if threshold is not None else None
         return E_hat, dE_std, flag
+
