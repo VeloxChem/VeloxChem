@@ -549,9 +549,9 @@ def main():
         rsp_dict['filename'] = task.input_dict['filename']
 
         grad_dict = (task.input_dict['gradient']
-                         if 'gradient' in task.input_dict else {})
+                     if 'gradient' in task.input_dict else {})
 
-        run_excited_state_vibanalysis = ('state_deriv_index' in grad_dict)
+        run_excited_state_vibanalysis = ('state_deriv_index' in vib_dict)
         run_ground_state_vibanalysis = (not run_excited_state_vibanalysis)
 
         if use_xtb:
@@ -566,7 +566,7 @@ def main():
                                             polgrad_dict=polgrad_dict)
 
         else:
-            if run_ground_state_vibanalysis: 
+            if run_ground_state_vibanalysis:
                 vibrational_drv = VibrationalAnalysis(scf_drv)
                 # set print level for input file based calculation
                 vibrational_drv.print_level = 2
@@ -704,7 +704,8 @@ def main():
                 rsp_dict['filename'] = task.input_dict['filename']
 
                 grad_dict = (task.input_dict['gradient']
-                                 if 'gradient' in task.input_dict else {})
+                             if 'gradient' in task.input_dict else {})
+
                 vibrational_drv = VibrationalAnalysis(scf_drv,
                                                       rsp_prop._rsp_driver)
                 # set print level for input file based calculation

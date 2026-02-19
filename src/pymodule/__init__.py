@@ -196,6 +196,7 @@ from .solvationbuilder import SolvationBuilder
 from .solvationfepdriver import SolvationFepDriver
 from .openmmdynamics import OpenMMDynamics
 from .excitedstateanalysisdriver import ExcitedStateAnalysisDriver
+from .valetanalyzer import ValetAnalyzer
 from .evbdriver import EvbDriver
 from .reaffbuilder import ReactionForceFieldBuilder
 from .evbsystembuilder import EvbSystemBuilder
