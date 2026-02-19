@@ -127,6 +127,53 @@ auto comp_distances_ra(CSimdArray<double>& buffer, const size_t index_ra, const 
 auto comp_inverted_zeta(CSimdArray<double>& buffer, const size_t index_fact, const double a_exp, const double c_exp)
     -> void;
 
+/// @brief Computes norm of coordinates.
+/// @param buffer The SIMD array containing zeta factors.
+/// @param index_mr The row index of  |r| in SIMD array.
+/// @param index_r The primary row index of  Cartesian R points coordinates in SIMD array.
+auto comp_coordinates_norm(CSimdArray<double>& buffer, const size_t index_mr, const size_t index_r) -> void;
+
+/// @brief Computes Legendre arguments A . B / |A| |B|.
+/// @param buffer The SIMD array containing Legendre arguments.
+/// @param index_args The primary row index of  (AB) dot product  components in SIMD array.
+/// @param index_b  The primary row index of  Cartesian B points coordinates in SIMD array.
+/// @param index_mb  The primary row index of  |B|  in SIMD array.
+/// @param r_a The Cartesian A point coordinates.
+auto comp_legendre_args(CSimdArray<double>& buffer, const size_t index_args, const size_t index_b, const size_t index_mb, const TPoint<double>& r_a) -> void;
+
+/// @brief Computes gamma factors for projected ECP.
+/// @param buffer The SIMD array containing(AB) dot product components and Cartesian A, B coordinates.
+/// @param index_fg The primary index of gamma factor in SIMD array.
+/// @param index_mb  The primary index of  |B|  in SIMD array.
+/// @param r_a The Cartesian A point coordinates.
+/// @param a_exp The exponent on A center.
+/// @param c_exp The exponent on C center.
+auto comp_gamma_factors(CSimdArray<double>& buffer, const size_t index_fg, const size_t index_mb, const TPoint<double>& r_a, const double a_exp, const double c_exp) -> void;
+
+/// @brief Computes Bessel arguments for projected ECP.
+/// @param buffer The SIMD array containing T arguments.
+/// @param index_args The primary row index of  T arguments  in SIMD array.
+/// @param index_b  The primary row index of  Cartesian B points coordinates in SIMD array.
+/// @param r_a The Cartesian A point coordinates.
+/// @param a_exp The exponent on A center.
+/// @param c_exp The exponent on C center.
+auto comp_bessel_args(CSimdArray<double>& buffer, const size_t index_args, const size_t index_b, const TPoint<double>& r_a, const double a_exp, const double c_exp) -> void;
+
+/// @brief Computes In values for projected ECP.
+/// @param values The SIMD array containing In values.
+/// @param order The order of In values.
+/// @param buffer The SIMD array containing T arguments.
+/// @param index_args The primary row index of  T arguments  in SIMD array.
+auto comp_i_vals(CSimdArray<double>& values, const int order, const CSimdArray<double>& buffer, const size_t index_args) -> void;
+
+/// @brief Computes Ln values for projected ECP.
+/// @param values The SIMD array containing In values.
+/// @param order The order of In values.
+/// @param buffer The SIMD array containing T arguments.
+/// @param index_args The primary row index of  T arguments  in SIMD array.
+/// @param index_pab The primary row index of  (A.B)/|A||B|  in SIMD array.
+auto comp_l_vals(CSimdArray<double>& values, const int order, const CSimdArray<double>& buffer, const size_t index_args, const size_t index_pab) -> void;
+
 /// Computes Boys function arguments.
 /// @param bf_data The Boys function data.
 /// @param index_args The primary row index of arguments in Boys function data.

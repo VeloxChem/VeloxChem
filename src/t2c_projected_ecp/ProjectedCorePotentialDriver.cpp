@@ -38,7 +38,7 @@
 #include <utility>
 
 #include "GtoFunc.hpp"
-//#include "LocalCorePotentialFunc.hpp"
+#include "ProjectedCorePotentialFunc.hpp"
 #include "MatrixFunc.hpp"
 #include "OpenMPFunc.hpp"
 #include "T2CDistributor.hpp"
@@ -84,7 +84,7 @@ CProjectedCorePotentialDriver::compute(const CMolecularBasis &basis, const CMole
                 {
                     const auto local_ecp_pot = *ptr_ecp_pot;
                     CT2CDistributor<CMatrix> distributor(ptr_ecp_mat);
-                    //t2lecp::compute(distributor, bra_gtos, ket_gtos, local_ecp_pot, bra_indices, ket_indices, bkequal);
+                    t2pecp::compute(distributor, bra_gtos, ket_gtos, local_ecp_pot, ecp_momentum, bra_indices, ket_indices, bkequal);
                 }
             });
         }

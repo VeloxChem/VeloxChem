@@ -34,9 +34,13 @@
 
 #include <algorithm>
 #include <ranges>
+#include <cmath>
+
+#include "gsl/gsl_sf_bessel.h"
 
 #include "CustomViews.hpp"
 #include "TensorComponents.hpp"
+#include "MathConst.hpp"
 
 namespace t2cfunc {  // t2cfunc namespace
 
@@ -463,6 +467,298 @@ comp_inverted_zeta(CSimdArray<double>& buffer, const size_t index_fact, const do
     {
         facts[i] = 0.5 / (a_exp + b_exps[i] + c_exp);
     }
+}
+
+auto
+comp_coordinates_norm(CSimdArray<double>& buffer, const size_t index_mr, const size_t index_r) -> void
+{
+    // set up Cartesian R coordinates
+
+    auto r_x = buffer.data(index_r);
+
+    auto r_y = buffer.data(index_r + 1);
+
+    auto r_z = buffer.data(index_r + 2);
+    
+    // set up |r| norms
+
+    auto mr = buffer.data(index_mr);
+
+    const auto nelems = buffer.number_of_active_elements();
+
+    #pragma omp simd aligned(mr, r_x, r_y, r_z : 64)
+    for (size_t i = 0; i < nelems; i++)
+    {
+        mr[i] = std::sqrt(r_x[i] * r_x[i] + r_y[i] * r_y[i] + r_z[i] * r_z[i]);
+    }
+}
+
+auto
+comp_legendre_args(CSimdArray<double>& buffer, const size_t index_args, const size_t index_b, const size_t index_mb,  const TPoint<double>& r_a) -> void
+{
+    // set up Legendre arguments
+
+    auto fargs = buffer.data(index_args);
+    
+    // set up Cartesian B coordinates
+
+    auto b_x = buffer.data(index_b);
+
+    auto b_y = buffer.data(index_b + 1);
+
+    auto b_z = buffer.data(index_b + 2);
+    
+    // set up |B|
+
+    auto mb = buffer.data(index_mb);
+
+    // set up Cartesian A coordinates
+
+    const auto xyz = r_a.coordinates();
+
+    const auto a_x = xyz[0];
+
+    const auto a_y = xyz[1];
+
+    const auto a_z = xyz[2];
+    
+    // compute A.B
+
+    const auto nelems = buffer.number_of_active_elements();
+
+    #pragma omp simd aligned(fargs, b_x, b_y, b_z : 64)
+    for (size_t i = 0; i < nelems; i++)
+    {
+        fargs[i] = a_x * b_x[i] + a_y * b_y[i] + a_z * b_z[i];
+    }
+    
+    // compute |A|
+    
+    const auto ma = std::sqrt(a_x * a_x + a_y * a_y + a_z * a_z);
+    
+    // conditionally scale A.B by |A||B|
+    
+    for (size_t i = 0; i < nelems; i++)
+    {
+        if (const auto fact = ma * mb[i]; fact > 1.0e-12)
+        {
+            fargs[i] *= fact;
+        }
+        else
+        {
+            fargs[i] = 1.0;
+        }
+    }
+}
+
+auto
+comp_gamma_factors(CSimdArray<double>& buffer, const size_t index_gf, const size_t index_mb, const TPoint<double>& r_a, const double a_exp, const double c_exp) -> void
+{
+    // set up pi value
+    
+    const double fpi = mathconst::pi_value();
+    
+    // set up gamma factors
+
+    auto fg = buffer.data(index_gf);
+    
+    // set up exponents
+
+    auto b_exps = buffer.data(0);
+    
+    // set up B coordinates norms
+
+    auto mb = buffer.data(index_mb);
+    
+    // set up Cartesian A coordinates
+
+    const auto xyz = r_a.coordinates();
+
+    const auto a_x = xyz[0];
+
+    const auto a_y = xyz[1];
+
+    const auto a_z = xyz[2];
+    
+    // compute R coordinates
+
+    const auto nelems = buffer.number_of_active_elements();
+    
+    const double a2 = a_x * a_x + a_y * a_y + a_z * a_z;
+
+    #pragma omp simd aligned(b_exps, mb, fg : 64)
+    for (size_t i = 0; i < nelems; i++)
+    {
+        double fzi = 1.0 / (b_exps[i] + a_exp + c_exp);
+
+        double fa = a_exp * (b_exps[i] + c_exp) * fzi;
+        
+        double fb = b_exps[i] * (a_exp + c_exp) * fzi;
+        
+        double fact = fpi * fzi * std::sqrt(fpi * fzi);
+        
+        fg[i] = fact * std::exp(-fa * a2 - fb * mb[i] * mb[i]);
+    }
+}
+
+auto
+comp_bessel_args(CSimdArray<double>& buffer, const size_t index_args, const size_t index_mb, const TPoint<double>& r_a, const double a_exp, const double c_exp) -> void
+{
+    // set up T arguments
+
+    auto fargs = buffer.data(index_args);
+    
+    // set up exponents
+
+    auto b_exps = buffer.data(0);
+    
+    // set up |B|
+
+    auto mb = buffer.data(index_mb);
+    
+    // set up Cartesian A coordinates
+
+    const auto xyz = r_a.coordinates();
+
+    const auto a_x = xyz[0];
+
+    const auto a_y = xyz[1];
+
+    const auto a_z = xyz[2];
+    
+    // compute |A|
+    
+    const auto ma = std::sqrt(a_x * a_x + a_y * a_y + a_z * a_z);
+    
+    // compute Bessel arguments
+
+    const auto nelems = buffer.number_of_active_elements();
+
+#pragma omp simd aligned(b_exps, mb, fargs : 64)
+    for (size_t i = 0; i < nelems; i++)
+    {
+        fargs[i] = 2.0 * b_exps[i] * a_exp * ma * mb[i] / (b_exps[i] + a_exp + c_exp);
+    }
+}
+
+auto
+comp_i_vals(CSimdArray<double>& values, const int order, const CSimdArray<double>& buffer, const size_t index_args) -> void
+{
+    // set up T arguments
+
+    auto fargs = buffer.data(index_args);
+    
+    // set up number of active elements
+    
+    const auto nelems = buffer.number_of_active_elements();
+    
+    // zero order
+    
+    auto f0vals = values.data(0);
+    
+    for (size_t i = 0; i < nelems; i++)
+    {
+        double fact = fargs[i];
+        
+        f0vals[i] = gsl_sf_bessel_i0_scaled(fact) * std::exp(fact);
+    }
+    
+    if (order == 0) return;
+    
+    // first order
+    
+    auto f1vals = values.data(1);
+    
+    for (size_t i = 0; i < nelems; i++)
+    {
+        if (const double fact = fargs[i]; fact > 1.0e-12)
+        {
+            f1vals[i] = gsl_sf_bessel_i1_scaled(fact) * std::exp(fact) / fact  ;
+        }
+        else
+        {
+            f1vals[i] = 0.0;
+        }
+    }
+    
+    if (order == 1) return;
+    
+    // second order
+    
+    auto f2vals = values.data(2);
+    
+    for (size_t i = 0; i < nelems; i++)
+    {
+        if (const double fact = fargs[i]; fact > 1.0e-12)
+        {
+            f2vals[i] = gsl_sf_bessel_i1_scaled(fact) * std::exp(fact) / (fact * fact)  ;
+        }
+        else
+        {
+            f2vals[i] = 0.0;
+        }
+    }
+    
+    if (order == 2) return;
+    
+    // higher orders
+    
+    for (int k = 3; k <= order; k++)
+    {
+        auto fvals = values.data(size_t(k));
+        
+        for (size_t i = 0; i < nelems; i++)
+        {
+            if (const double fact = fargs[i]; fact > 1.0e-12)
+            {
+                fvals[i] = gsl_sf_bessel_il_scaled(k, fact) * std::exp(fact) * std::pow(fact, (double)k);
+            }
+            else
+            {
+                fvals[i] = 0.0;
+            }
+        }
+    }
+}
+
+auto
+comp_l_vals(CSimdArray<double>& values, const int order, const CSimdArray<double>& buffer, const size_t index_args, const size_t index_pab) -> void
+{
+    // set up T arguments
+
+    auto fargs = buffer.data(index_args);
+    
+    // set up Legendre arguments
+
+    auto pab = buffer.data(index_pab);
+    
+    // set up number of active elements
+    
+    const auto nelems = buffer.number_of_active_elements();
+    
+    // zero order
+    
+    auto f0vals = values.data(0);
+    
+    for (size_t i = 0; i < nelems; i++)
+    {
+        f0vals[i] = 1.0;
+    }
+    
+    if (order == 0) return;
+    
+    // first order
+    
+    auto f1vals = values.data(1);
+    
+    for (size_t i = 0; i < nelems; i++)
+    {
+        f1vals[i] = 3.0 * fargs[i] * pab[i];
+    }
+    
+    if (order == 1) return;
+    
+    // fix higher orders 
 }
 
 void
