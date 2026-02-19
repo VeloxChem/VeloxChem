@@ -739,20 +739,6 @@ class ScfDriver:
 
             settings = self.embedding['settings']
 
-            if 'induced_dipoles' not in settings:
-                settings['induced_dipoles'] = {}
-
-            default_values = {
-                'solver': 'jidiis',
-                'threshold': 1e-8,
-                'max_iterations': 100,
-                'mic': False,
-            }
-
-            for key, default in default_values.items():
-                settings['induced_dipoles'][key] = default
-
-
             from .embedding import PolarizableEmbeddingSCF
 
             self._embedding_drv = PolarizableEmbeddingSCF(
@@ -776,9 +762,14 @@ class ScfDriver:
 
             if 'induced_dipoles' in settings:
                 self.ostream.print_info(f'- {"induced_dipoles":<15s}')
-
-                for key in default_values.keys():
-                    value = settings['induced_dipoles'][key]
+                default_values = {
+                    'solver': 'jacobi',
+                    'threshold': 1e-8,
+                    'max_iterations': 100,
+                    'mic': False,
+                }
+                for key, default in default_values.items():
+                    value = settings['induced_dipoles'].get(key, default)
                     self.ostream.print_info(f'  - {key:<15s} : {value}')
 
             self.ostream.print_blank()
