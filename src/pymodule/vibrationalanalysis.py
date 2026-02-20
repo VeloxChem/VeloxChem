@@ -34,8 +34,9 @@ from contextlib import redirect_stderr
 from io import StringIO
 from pathlib import Path
 import numpy as np
-import h5py
 import tempfile
+import h5py
+import re
 
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
@@ -141,6 +142,9 @@ class VibrationalAnalysis:
         self.rr_damping = None
         self.frequencies = (0,)
 
+        # Dictionary to define the isotopes
+        self.isotopes = None
+
         # Excited-state index in case of
         # excited-state vibrational analysis.
         self.state_deriv_index = None
@@ -226,6 +230,8 @@ class VibrationalAnalysis:
                     ('bool', 'whether to print Raman depolarization ratio'),
                 'temperature': ('float', 'the temperature'),
                 'pressure': ('float', 'the pressure'),
+                'isotopes':
+                    ('str', 'atomic masses in amu for isotope analysis'),
                 'state_deriv_index': ('int', 'excited state index'),
                 'frequencies':
                     ('seq_range', 'frequencies of external electric field'),
@@ -394,10 +400,49 @@ class VibrationalAnalysis:
                    '  geometric via pip or conda.\n')
         assert_msg_critical(hasattr(geometric, 'normal_modes'), err_msg)
 
+        title = 'Free Energy Analysis'
+        self.ostream.print_header(title)
+        self.ostream.print_header('=' * (len(title) + 2))
+        self.ostream.print_blank()
+
         # number of atoms, elements, and coordinates
         natm = molecule.number_of_atoms()
         elem = molecule.get_labels()
         coords = molecule.get_coordinates_in_bohr().reshape(natm * 3)
+
+        masses = molecule.get_masses()
+
+        # modify masses according to the isotopes
+        if self.isotopes is not None:
+
+            for entry in self.isotopes.split(','):
+                m = re.search(r'^(.*)\((.*)\)$', entry.strip())
+                assert_msg_critical(
+                    m is not None,
+                    'VibrationalAnalysis.frequency_analysis: Invalid input ' +
+                    'for isotopes')
+
+                label = m.group(1).strip()
+                mass = m.group(2).strip()
+
+                if label.isdigit():
+                    assert_msg_critical(
+                        (int(label) == float(label) and int(label) >= 1 and
+                            int(label) <= natm),
+                        'VibrationalAnalysis.frequency_analysis: Invalid ' +
+                        'input for one-based atom index')
+                    masses[int(label) - 1] = float(mass)
+                    self.ostream.print_info(f'Using isotope mass {mass} for ' +
+                                            f'atom {label}')
+
+                elif isinstance(label, str):
+                    self.ostream.print_info(
+                        f'Using isotope mass {mass} for {label}')
+                    for iatom in range(natm):
+                        if label.lower() == elem[iatom].lower():
+                            masses[iatom] = float(mass)
+
+            self.ostream.print_blank()
 
         try:
             temp_dir = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
@@ -413,6 +458,7 @@ class VibrationalAnalysis:
                 coords,
                 self.hessian,
                 elem,
+                mass=masses,
                 energy=self.elec_energy,
                 temperature=self.temperature,
                 pressure=self.pressure,
@@ -427,11 +473,6 @@ class VibrationalAnalysis:
             vdata_file.is_file(),
             'VibrationalAnalysis.frequency_analysis: cannot find vdata file ' +
             f'{str(vdata_file)}')
-
-        title = 'Free Energy Analysis'
-        self.ostream.print_header(title)
-        self.ostream.print_header('=' * (len(title) + 2))
-        self.ostream.print_blank()
 
         text = []
         with vdata_file.open() as fh:
