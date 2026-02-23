@@ -105,7 +105,7 @@ class EnsembleDriver:
         self.method_dict = None
         self.rsp_dict = None
 
-        # response settings can also be added here in a similar way:
+        # response settings are also added here in a similar way
         self.nstates = None
         self.nto = None
         self.core_excitation = None
@@ -292,8 +292,6 @@ class EnsembleDriver:
             self.npe_model = self.npe_models[npe_model]
         else:
             self.npe_model = None
-        
-        # return self.pe_model, self.npe_model
     
     @staticmethod
     def _first_residue_atom_pattern(atom_names, resids, resnames, target_resname: str) -> list[str]:
@@ -343,7 +341,6 @@ class EnsembleDriver:
         pc = np.zeros((6, coords_ang.shape[0]), dtype=float)
         pc[0:3, :] = coords_ang.T / bohr_in_angstrom()
         pc[3, :] = q
-        # print(pc)
         return pc
 
     def write_pot_files(self, snapshots, outdir: str | Path):
@@ -500,32 +497,10 @@ class EnsembleDriver:
         if self.rsp_dict is not None or self.method_dict is not None:
             rsp_driver.update_settings(self.rsp_dict or {}, self.method_dict or {})
 
-        # # Apply user-set high-level knobs (these should override dict defaults)
-        # NOT NEEDED, taken care in sanity check.
-        # if self.xcfun is not None:
-        #     scf_driver.xcfun = self.xcfun
-        # if self.eri_thresh is not None:
-        #     scf_driver.eri_thresh = self.eri_thresh
-        # if self.ri_coulomb is not None: 
-        #     scf_driver.ri_coulomb = self.ri_coulomb
-        # if self.grid_level is not None: 
-        #     scf_driver.grid_level = self.grid_level
-
-        # sanity check -- update settings in SCF according to
+        # sanity check -- update settings in scf and rsp according to
         # which variables the user set.
-        # see routine in sanitychecks.py
-        # I changed the name to ensemble_driver_sanity_check
         ensemble_driver_scf_sanity_check(scf_driver, self)
         ensemble_driver_rsp_sanity_check(rsp_driver, self)
-        
-        # IULIA's comment: END of suggested code block
-        # Something similar can be done for rsp_drv;
-        # a bit more complicated, but one could use the example
-        # of creating the right response driver with a routine
-        # similar to "select_rsp_property" from main.py
-        # For now, I set rsp_drv to None. A first implementation could
-        # be done with rsp_drv = LinearResponseEigensolver();
-        # other response drivers can be added later.
         
         scf_all = []
         rsp_all = []
