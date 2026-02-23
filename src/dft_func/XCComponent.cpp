@@ -165,6 +165,12 @@ CXCComponent::getScalingFactor() const
     return _scalingFactor;
 }
 
+auto
+CXCComponent::setScalingFactor(const double dft_xx_coeff) -> void
+{
+    _scalingFactor = dft_xx_coeff;
+}
+
 const xc_func_type*
 CXCComponent::getFunctionalPointer() const
 {

@@ -40,6 +40,7 @@
 #include <cstring>
 #include <sstream>
 #include <string>
+#include <iostream>
 
 #include "ErrorHandler.hpp"
 #include "GridScreener.hpp"
@@ -3175,6 +3176,42 @@ CXCFunctional::setFractionOfExactExchange(const double hyb_exx_coeff) -> void
     errors::assertMsgCritical(!isRangeSeparated(), "XCFunctional.setFractionOfExactExchange: not applicable to range-separated functionals");
 
     _fractionOfExactExchange = hyb_exx_coeff;
+
+    if (format::upper_case(_nameOfFunctional) == "PBE0")
+    {
+
+        double dft_xx_coeff = 1.0 - hyb_exx_coeff;
+
+        _components[0].setScalingFactor(dft_xx_coeff);
+
+    }
+
+    if (format::upper_case(_nameOfFunctional) == "BHANDH")
+    {
+
+        double dft_xx_coeff = 1.0 - hyb_exx_coeff;
+
+        _components[0].setScalingFactor(dft_xx_coeff);
+
+    }
+
+    if (format::upper_case(_nameOfFunctional) == "BHANDHLYP")
+    {
+
+        double dft_xx_coeff = 1.0 - hyb_exx_coeff;
+
+        _components[0].setScalingFactor(dft_xx_coeff);
+
+    }
+
+    if (format::upper_case(_nameOfFunctional) == "TPSSH")
+    {
+
+        double dft_xx_coeff = 1.0 - hyb_exx_coeff;
+
+        _components[0].setScalingFactor(dft_xx_coeff);
+
+    }
 }
 
 auto

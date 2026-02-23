@@ -147,6 +147,13 @@ class CXCComponent
     double getScalingFactor() const;
 
     /**
+     Sets the scaling factor.
+
+     */
+    void setScalingFactor(const double dft_xx_coeff);
+
+
+    /**
      Gets pointer to the Libxc functional component.
 
      @return the pointer.
