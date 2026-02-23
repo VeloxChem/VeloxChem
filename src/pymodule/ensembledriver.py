@@ -40,7 +40,9 @@ from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
-from .sanitychecks import ensemble_driver_sanity_check
+from .lreigensolver import LinearResponseEigenSolver
+from .sanitychecks import ensemble_driver_scf_sanity_check
+from .sanitychecks import ensemble_driver_rsp_sanity_check
 from .errorhandler import assert_msg_critical
 
 from .veloxchemlib import (mpi_master, bohr_in_angstrom)
@@ -103,7 +105,11 @@ class EnsembleDriver:
         self.method_dict = None
         self.rsp_dict = None
 
-        # response settings can also be added here in a similar way.
+        # response settings can also be added here in a similar way:
+        self.nstates = None
+        self.nto = None
+        self.core_excitation = None
+        self.num_core_orbitals = None
 
         db_dir = Path(__file__).resolve().parent / "database" / "environment_parameters"
 
@@ -483,26 +489,34 @@ class EnsembleDriver:
             scf_driver = ScfRestrictedDriver()
         else:
             scf_driver = ScfUnrestrictedDriver()
+
+        rsp_driver = LinearResponseEigenSolver()
         
-        # update settings if necessary
+        # update settings for scf if necessary
         if self.scf_dict is not None or self.method_dict is not None:
             scf_driver.update_settings(self.scf_dict or {}, self.method_dict or {})
 
-        # Apply user-set high-level knobs (these should override dict defaults)
-        if self.xcfun is not None:
-            scf_driver.xcfun = self.xcfun
-        if self.eri_thresh is not None:
-            scf_driver.eri_thresh = self.eri_thresh
-        if self.ri_coulomb is not None: 
-            scf_driver.ri_coulomb = self.ri_coulomb
-        if self.grid_level is not None: 
-            scf_driver.grid_level = self.grid_level
+        # update settings for rsp if necessary
+        if self.rsp_dict is not None or self.method_dict is not None:
+            rsp_driver.update_settings(self.rsp_dict or {}, self.method_dict or {})
+
+        # # Apply user-set high-level knobs (these should override dict defaults)
+        # NOT NEEDED, taken care in sanity check.
+        # if self.xcfun is not None:
+        #     scf_driver.xcfun = self.xcfun
+        # if self.eri_thresh is not None:
+        #     scf_driver.eri_thresh = self.eri_thresh
+        # if self.ri_coulomb is not None: 
+        #     scf_driver.ri_coulomb = self.ri_coulomb
+        # if self.grid_level is not None: 
+        #     scf_driver.grid_level = self.grid_level
 
         # sanity check -- update settings in SCF according to
         # which variables the user set.
         # see routine in sanitychecks.py
         # I changed the name to ensemble_driver_sanity_check
-        ensemble_driver_sanity_check(scf_driver, self)
+        ensemble_driver_scf_sanity_check(scf_driver, self)
+        ensemble_driver_rsp_sanity_check(rsp_driver, self)
         
         # IULIA's comment: END of suggested code block
         # Something similar can be done for rsp_drv;
@@ -514,6 +528,7 @@ class EnsembleDriver:
         # other response drivers can be added later.
         
         scf_all = []
+        rsp_all = []
 
         for snap in snapshots:
             frame = int(snap["frame"])
@@ -547,7 +562,9 @@ class EnsembleDriver:
                 )
 
             scf_results = scf_driver.compute(molecule, basis)
+            rsp_results = rsp_driver.compute(molecule, basis, scf_results)
             scf_all.append((frame, scf_results))
+            rsp_all.append((frame, rsp_results))
 
-        results = {"scf_all": scf_all}
+        results = {"scf_all": scf_all, "rsp_all": rsp_all}
         return results
