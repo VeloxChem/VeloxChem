@@ -82,6 +82,16 @@ class SmdDriver:
 
         self.solute = None
 
+    def print_available_solvents(self):
+        """
+        Print the available solvents for SMD calculations.
+        """
+
+        if self.rank == mpi_master():
+            self.ostream.print_info('Available solvents for SMD calculations:')
+            for solvent in self.smd_solvent_parameters.keys():
+                self.ostream.print_info(f' {solvent}')
+            self.ostream.flush()
     
     def get_intrinsic_coulomb_radii(self):
         """
