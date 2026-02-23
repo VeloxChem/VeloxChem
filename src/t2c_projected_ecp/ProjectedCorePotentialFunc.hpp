@@ -39,9 +39,12 @@
 #include "BaseCorePotential.hpp"
 #include "ProjectedCorePotentialSSForS.hpp"
 #include "ProjectedCorePotentialSSForP.hpp"
-//#include "ProjectedCorePotentialSSForD.hpp"
-//#include "ProjectedCorePotentialSSForF.hpp"
-//#include "ProjectedCorePotentialSSForG.hpp"
+#include "ProjectedCorePotentialSSForD.hpp"
+#include "ProjectedCorePotentialSSForF.hpp"
+#include "ProjectedCorePotentialSSForG.hpp"
+#include "ProjectedCorePotentialSPForS.hpp"
+#include "ProjectedCorePotentialSPForP.hpp"
+#include "ProjectedCorePotentialSPForD.hpp"
 
 namespace t2pecp {
 
@@ -84,27 +87,53 @@ compute(T&                               distributor,
 
             return;
         }
-//        
-//        if (ecp_momentum == 2)
-//        {
-//            t2pecp::comp_projected_core_potential_ss_for_d(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
-//
-//            return;
-//        }
-//        
-//        if (ecp_momentum == 3)
-//        {
-//            t2pecp::comp_projected_core_potential_ss_for_f(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
-//
-//            return;
-//        }
-//        
-//        if (ecp_momentum == 4)
-//        {
-//            t2pecp::comp_projected_core_potential_ss_for_g(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
-//
-//            return;
-//        }
+        
+        if (ecp_momentum == 2)
+        {
+            t2pecp::comp_projected_core_potential_ss_for_d(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
+
+            return;
+        }
+        
+        if (ecp_momentum == 3)
+        {
+            t2pecp::comp_projected_core_potential_ss_for_f(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
+
+            return;
+        }
+        
+        if (ecp_momentum == 4)
+        {
+            t2pecp::comp_projected_core_potential_ss_for_g(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
+
+            return;
+        }
+        
+        std::cout << " *** ECP projectors of angular momentum " << ecp_momentum << " are not supported. " << std::endl;
+    }
+    
+    if ((bra_angmom == 0) && (ket_angmom == 1))
+    {
+        if (ecp_momentum == 0)
+        {
+            t2pecp::comp_projected_core_potential_sp_for_s(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
+
+            return;
+        }
+        
+        if (ecp_momentum == 1)
+        {
+            t2pecp::comp_projected_core_potential_sp_for_p(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
+
+            return;
+        }
+        
+        if (ecp_momentum == 2)
+        {
+            t2pecp::comp_projected_core_potential_sp_for_d(distributor, bra_gto_block, ket_gto_block, ecp_potential, bra_indices, ket_indices, bra_eq_ket);
+
+            return;
+        }
         
         std::cout << " *** ECP projectors of angular momentum " << ecp_momentum << " are not supported. " << std::endl;
     }

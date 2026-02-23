@@ -8,7 +8,7 @@ from veloxchem.submatrix import SubMatrix
 from veloxchem.veloxchemlib import BaseCorePotential
 
 
-class TestProjectedSECPDriver:
+class TestProjectedPECPDriver:
 
     def get_data(self):
 

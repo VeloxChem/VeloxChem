@@ -542,7 +542,7 @@ comp_legendre_args(CSimdArray<double>& buffer, const size_t index_args, const si
     {
         if (const auto fact = ma * mb[i]; fact > 1.0e-12)
         {
-            fargs[i] *= fact;
+            fargs[i] /= fact;
         }
         else
         {
@@ -677,7 +677,7 @@ comp_i_vals(CSimdArray<double>& values, const int order, const CSimdArray<double
         }
         else
         {
-            f1vals[i] = 0.0;
+            f1vals[i] = 1.0 / 3.0;
         }
     }
     
@@ -691,11 +691,11 @@ comp_i_vals(CSimdArray<double>& values, const int order, const CSimdArray<double
     {
         if (const double fact = fargs[i]; fact > 1.0e-12)
         {
-            f2vals[i] = gsl_sf_bessel_i1_scaled(fact) * std::exp(fact) / (fact * fact)  ;
+            f2vals[i] = gsl_sf_bessel_i2_scaled(fact) * std::exp(fact) / (fact * fact)  ;
         }
         else
         {
-            f2vals[i] = 0.0;
+            f2vals[i] = 1.0/ 15.0;
         }
     }
     
@@ -703,19 +703,23 @@ comp_i_vals(CSimdArray<double>& values, const int order, const CSimdArray<double
     
     // higher orders
     
+    double n2fact = 1.0 / 15.0;
+    
     for (int k = 3; k <= order; k++)
     {
         auto fvals = values.data(size_t(k));
+        
+        n2fact *= 2 * k + 1.0;
         
         for (size_t i = 0; i < nelems; i++)
         {
             if (const double fact = fargs[i]; fact > 1.0e-12)
             {
-                fvals[i] = gsl_sf_bessel_il_scaled(k, fact) * std::exp(fact) * std::pow(fact, (double)k);
+                fvals[i] = gsl_sf_bessel_il_scaled(k, fact) * std::exp(fact) * std::pow(fact, -(double)k);
             }
             else
             {
-                fvals[i] = 0.0;
+                fvals[i] = n2fact;
             }
         }
     }
@@ -758,7 +762,27 @@ comp_l_vals(CSimdArray<double>& values, const int order, const CSimdArray<double
     
     if (order == 1) return;
     
-    // fix higher orders 
+    // higher orders
+    
+    for (int k = 2; k <= order; k++)
+    {
+        // set up pointers
+        
+        auto frvals = values.data(size_t(k));
+        
+        auto fpvals = values.data(size_t(k - 1));
+        
+        auto fmvals = values.data(size_t(k - 2));
+        
+        const auto fk = double(k - 1);
+        
+        for (size_t i = 0; i < nelems; i++)
+        {
+            frvals[i] = (2.0 * fk + 3) * fargs[i] * (pab[i] * fpvals[i]
+                                                     
+                      - fk * fargs[i] * fmvals[i] / (2.0 * fk - 1.0)) / (fk + 1.0);
+        }
+    }
 }
 
 void

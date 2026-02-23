@@ -1,5 +1,7 @@
 #include "ProjectedCorePotentialPrimRecSS.hpp"
 
+#include <iostream>
+
 namespace t2pecp { // t2pecp namespace
 
 auto
@@ -44,6 +46,48 @@ comp_prim_projected_core_potential_ss(const int l,
     for (size_t i = 0; i < nelems; i++)
     {
         t_0_0[i] = a_norm * b_norms[i] * c_norm * f_gamma[i] * i_vals[i] * l_vals[i];
+    }
+    
+    if (m > 0)
+    {
+        // Set up normalization factors
+
+        auto mb = factors.data(idx_mb);
+        
+        for (int k = 0; k < 2 * m; k++)
+        {
+            #pragma omp simd aligned(mb, t_0_0 : 64)
+            for (size_t i = 0; i < nelems; i++)
+            {
+                t_0_0[i] *= mb[i];
+            }
+        }
+    }
+    
+    if (p > 0)
+    {
+        // set up Cartesian A coordinates
+
+        const auto xyz = r_a.coordinates();
+
+        const auto a_x = xyz[0];
+
+        const auto a_y = xyz[1];
+
+        const auto a_z = xyz[2];
+        
+        // compute |A|
+        
+        const auto ma = std::sqrt(a_x * a_x + a_y * a_y + a_z * a_z);
+        
+        for (int k = 0; k < 2 * p; k++)
+        {
+            #pragma omp simd aligned(t_0_0 : 64)
+            for (size_t i = 0; i < nelems; i++)
+            {
+                t_0_0[i] *= ma;
+            }
+        }
     }
 }
 

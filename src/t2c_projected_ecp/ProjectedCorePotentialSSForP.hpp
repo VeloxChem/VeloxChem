@@ -5,6 +5,7 @@
 #include <array>
 #include <vector>
 #include <utility>
+#include <iostream>
 
 #include "GtoBlock.hpp"
 #include "BaseCorePotential.hpp"
@@ -16,7 +17,7 @@
 
 namespace t2pecp { // t2lecp namespace
 
-/// @brief Computes (S|U_L|S)  integrals for pair of basis functions blocks.
+/// @brief Computes (S|U_P|S)  integrals for pair of basis functions blocks.
 /// @param distributor The integrals distributor.
 /// @param bra_gto_block The basis functions block on bra side.
 /// @param ket_gto_block The basis functions block on ket side.

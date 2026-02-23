@@ -62,12 +62,7 @@ class TestProjectedSECPDriver:
             print("XXX : ", i, " ", j)
             print("Ref. Mat. : ", rmat.to_numpy())
             print("Cal. Mat. : ", cmat.to_numpy())
-            print("Max. diff : ", np.max(np.abs(rmat.to_numpy()-cmat.to_numpy())))
-            print("(8,8) = ", rmat.to_numpy()[8,8])
-            print("(9,9) = ", rmat.to_numpy()[9,9])
-            print("(8,9) = ", rmat.to_numpy()[8,9])
-            print("(9,8) = ", rmat.to_numpy()[9,8])
-            
+            print("Max. diff : ", np.max(np.abs(rmat.to_numpy()-cmat.to_numpy())))            
             assert cmat == rmat
 
         # check full overlap matrix

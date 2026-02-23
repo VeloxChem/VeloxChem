@@ -2,6 +2,7 @@
 #define ProjectedCorePotentialPrimRecSS
 
 #include "SimdArray.hpp"
+#include "Point.hpp"
 
 namespace t2pecp { // t2pecp namespace
 
@@ -31,7 +32,7 @@ comp_prim_projected_core_potential_ss(const int l,
                                       const CSimdArray<double>& l_values,
                                       const CSimdArray<double>& factors,
                                       const size_t idx_gamma,
-                                      const size_t idx_b,
+                                      const size_t idx_mb,
                                       const TPoint<double>& r_a,
                                       const double a_norm,
                                       const double c_norm) -> void;
