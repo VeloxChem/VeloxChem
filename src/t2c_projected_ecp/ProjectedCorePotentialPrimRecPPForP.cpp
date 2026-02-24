@@ -136,23 +136,23 @@ comp_prim_projected_core_potential_pp_p(CSimdArray<double>& pbuffer,
         {
             const double fai_0 = 1.0 / a_exp;
 
-            tg_x_x_p_0_0_0[i] = tg_0_x_p_0_0_1[i] * fai_0 * a_x * fp_0;
+            tg_x_x_p_0_0_0[i] += tg_0_x_p_0_0_1[i] * fai_0 * a_x * fp_0;
 
-            tg_x_y_p_0_0_0[i] = tg_0_y_p_0_0_1[i] * fai_0 * a_x * fp_0;
+            tg_x_y_p_0_0_0[i] += tg_0_y_p_0_0_1[i] * fai_0 * a_x * fp_0;
 
-            tg_x_z_p_0_0_0[i] = tg_0_z_p_0_0_1[i] * fai_0 * a_x * fp_0;
+            tg_x_z_p_0_0_0[i] += tg_0_z_p_0_0_1[i] * fai_0 * a_x * fp_0;
 
-            tg_y_x_p_0_0_0[i] = tg_0_x_p_0_0_1[i] * fai_0 * a_y * fp_0;
+            tg_y_x_p_0_0_0[i] += tg_0_x_p_0_0_1[i] * fai_0 * a_y * fp_0;
 
-            tg_y_y_p_0_0_0[i] = tg_0_y_p_0_0_1[i] * fai_0 * a_y * fp_0;
+            tg_y_y_p_0_0_0[i] += tg_0_y_p_0_0_1[i] * fai_0 * a_y * fp_0;
 
-            tg_y_z_p_0_0_0[i] = tg_0_z_p_0_0_1[i] * fai_0 * a_y * fp_0;
+            tg_y_z_p_0_0_0[i] += tg_0_z_p_0_0_1[i] * fai_0 * a_y * fp_0;
 
-            tg_z_x_p_0_0_0[i] = tg_0_x_p_0_0_1[i] * fai_0 * a_z * fp_0;
+            tg_z_x_p_0_0_0[i] += tg_0_x_p_0_0_1[i] * fai_0 * a_z * fp_0;
 
-            tg_z_y_p_0_0_0[i] = tg_0_y_p_0_0_1[i] * fai_0 * a_z * fp_0;
+            tg_z_y_p_0_0_0[i] += tg_0_y_p_0_0_1[i] * fai_0 * a_z * fp_0;
 
-            tg_z_z_p_0_0_0[i] = tg_0_z_p_0_0_1[i] * fai_0 * a_z * fp_0;
+            tg_z_z_p_0_0_0[i] += tg_0_z_p_0_0_1[i] * fai_0 * a_z * fp_0;
         }
     }
 }

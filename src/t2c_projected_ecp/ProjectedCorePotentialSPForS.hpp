@@ -9,15 +9,15 @@
 #include "GtoBlock.hpp"
 #include "BaseCorePotential.hpp"
 #include "SimdArray.hpp"
-#include "ProjectedCorePotentialPrimRecSS.hpp"
 #include "ProjectedCorePotentialPrimRecSPForS.hpp"
+#include "ProjectedCorePotentialPrimRecSS.hpp"
 #include "T2CUtils.hpp"
 #include "T2CTransform.hpp"
 #include "BatchFunc.hpp"
 
-namespace t2pecp { // t2lecp namespace
+namespace t2pecp { // t2pecp namespace
 
-/// @brief Computes (S|U_S|P)  integrals for pair of basis functions blocks.
+/// @brief Computes (S|U_l|P)  integrals for pair of basis functions blocks.
 /// @param distributor The integrals distributor.
 /// @param bra_gto_block The basis functions block on bra side.
 /// @param ket_gto_block The basis functions block on ket side.
@@ -72,12 +72,12 @@ comp_projected_core_potential_sp_for_s(T& distributor,
     // allocate aligned 2D arrays for ket side
 
     CSimdArray<double> pfactors(9, ket_npgtos);
-    
+
     // allpcate I_n and L_n values
 
     CSimdArray<double> i_values(2, ket_npgtos);
-    
-    CSimdArray<double> l_values(2, ket_npgtos);
+
+    CSimdArray<double> l_values(1, ket_npgtos);
 
     // allocate aligned primitive integrals
 
@@ -109,23 +109,23 @@ comp_projected_core_potential_sp_for_s(T& distributor,
 
         const auto ket_width = ket_range.second - ket_range.first;
 
-        cbuffer.set_active_width(ket_width);
-        
+        i_values.set_active_width(ket_width);
+
+        l_values.set_active_width(ket_width);
+
         sbuffer.set_active_width(ket_width);
 
+        cbuffer.set_active_width(ket_width);
+
         pbuffer.set_active_width(ket_width);
-        
-        i_values.set_active_width(ket_width);
-        
-        l_values.set_active_width(ket_width);
 
         // loop over contracted basis functions on bra side
 
         for (auto j = bra_indices.first; j < bra_indices.second; j++)
         {
             cbuffer.zero();
-            
-            sbuffer.zero(); 
+
+            sbuffer.zero();
 
             const auto r_a = bra_gto_coords[j];
 
@@ -142,27 +142,27 @@ comp_projected_core_potential_sp_for_s(T& distributor,
                     const auto c_norm = ecp_facts[l];
 
                     t2cfunc::comp_coordinates_norm(pfactors, 5, 2);
-                    
+
                     t2cfunc::comp_legendre_args(pfactors, 6, 2, 5, r_a);
-                    
+
                     t2cfunc::comp_gamma_factors(pfactors, 7, 5, r_a, a_exp, c_exp);
-                    
+
                     t2cfunc::comp_bessel_args(pfactors, 8, 5, r_a, a_exp, c_exp);
-                    
+
                     t2cfunc::comp_i_vals(i_values, 1, pfactors, 8);
-                    
-                    t2cfunc::comp_l_vals(l_values, 1, pfactors, 8, 6);
+
+                    t2cfunc::comp_l_vals(l_values, 0, pfactors, 8, 6);
 
                     t2pecp::comp_prim_projected_core_potential_ss(0, 0, 0, 0, pbuffer, 0, i_values, l_values,  pfactors, 7, 5, r_a, a_norm, c_norm);
-                    
-                    t2pecp::comp_prim_projected_core_potential_ss(0, 0, 1, 0, pbuffer, 1, i_values, l_values,  pfactors, 7, 5, r_a, a_norm, c_norm);
-                    
-                    t2pecp::comp_prim_projected_core_potential_sp_s(pbuffer, 2, 0, 1, 0, -1, pfactors, 2, a_exp, c_exp);
 
-                    t2cfunc::reduce(cbuffer, 0, pbuffer, 2, 3, ket_width, ket_npgtos);
+                    t2pecp::comp_prim_projected_core_potential_ss(0, 0, 1, 0, pbuffer, 4, i_values, l_values,  pfactors, 7, 5, r_a, a_norm, c_norm);
+
+                    t2pecp::comp_prim_projected_core_potential_sp_s(pbuffer, 1, 0, 4, 0, -1, pfactors, 2, a_exp, c_exp);
+
+                    t2cfunc::reduce(cbuffer, 0, pbuffer, 1, 3, ket_width, ket_npgtos);
                 }
             }
-            
+
             t2cfunc::transform<0, 1>(sbuffer, cbuffer);
 
             distributor.distribute(sbuffer, bra_gto_indices, ket_gto_indices, 0, 1, j, ket_range, bra_eq_ket);
@@ -170,6 +170,6 @@ comp_projected_core_potential_sp_for_s(T& distributor,
     }
 }
 
-} // t2lecp namespace
+} // t2pecp namespace
 
 #endif /* ProjectedCorePotentialSPForS_hpp */

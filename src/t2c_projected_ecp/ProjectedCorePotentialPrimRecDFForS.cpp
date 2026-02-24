@@ -546,125 +546,125 @@ comp_prim_projected_core_potential_df_s(CSimdArray<double>& pbuffer,
         {
             const double fai_0 = 1.0 / a_exp;
 
-            tg_xx_xxx_s_0_0_0[i] = 1.0 / 2.0 * tg_0_xxx_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_x_xxx_s_0_0_1[i] * fai_0 * a_x * fp_0;
+            tg_xx_xxx_s_0_0_0[i] += 1.0 / 2.0 * tg_0_xxx_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_x_xxx_s_0_0_1[i] * fai_0 * a_x * fp_0;
 
-            tg_xx_xxy_s_0_0_0[i] = 1.0 / 2.0 * tg_0_xxy_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_x_xxy_s_0_0_1[i] * fai_0 * a_x * fp_0;
+            tg_xx_xxy_s_0_0_0[i] += 1.0 / 2.0 * tg_0_xxy_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_x_xxy_s_0_0_1[i] * fai_0 * a_x * fp_0;
 
-            tg_xx_xxz_s_0_0_0[i] = 1.0 / 2.0 * tg_0_xxz_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_x_xxz_s_0_0_1[i] * fai_0 * a_x * fp_0;
+            tg_xx_xxz_s_0_0_0[i] += 1.0 / 2.0 * tg_0_xxz_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_x_xxz_s_0_0_1[i] * fai_0 * a_x * fp_0;
 
-            tg_xx_xyy_s_0_0_0[i] = 1.0 / 2.0 * tg_0_xyy_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_x_xyy_s_0_0_1[i] * fai_0 * a_x * fp_0;
+            tg_xx_xyy_s_0_0_0[i] += 1.0 / 2.0 * tg_0_xyy_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_x_xyy_s_0_0_1[i] * fai_0 * a_x * fp_0;
 
-            tg_xx_xyz_s_0_0_0[i] = 1.0 / 2.0 * tg_0_xyz_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_x_xyz_s_0_0_1[i] * fai_0 * a_x * fp_0;
+            tg_xx_xyz_s_0_0_0[i] += 1.0 / 2.0 * tg_0_xyz_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_x_xyz_s_0_0_1[i] * fai_0 * a_x * fp_0;
 
-            tg_xx_xzz_s_0_0_0[i] = 1.0 / 2.0 * tg_0_xzz_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_x_xzz_s_0_0_1[i] * fai_0 * a_x * fp_0;
+            tg_xx_xzz_s_0_0_0[i] += 1.0 / 2.0 * tg_0_xzz_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_x_xzz_s_0_0_1[i] * fai_0 * a_x * fp_0;
 
-            tg_xx_yyy_s_0_0_0[i] = 1.0 / 2.0 * tg_0_yyy_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_x_yyy_s_0_0_1[i] * fai_0 * a_x * fp_0;
+            tg_xx_yyy_s_0_0_0[i] += 1.0 / 2.0 * tg_0_yyy_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_x_yyy_s_0_0_1[i] * fai_0 * a_x * fp_0;
 
-            tg_xx_yyz_s_0_0_0[i] = 1.0 / 2.0 * tg_0_yyz_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_x_yyz_s_0_0_1[i] * fai_0 * a_x * fp_0;
+            tg_xx_yyz_s_0_0_0[i] += 1.0 / 2.0 * tg_0_yyz_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_x_yyz_s_0_0_1[i] * fai_0 * a_x * fp_0;
 
-            tg_xx_yzz_s_0_0_0[i] = 1.0 / 2.0 * tg_0_yzz_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_x_yzz_s_0_0_1[i] * fai_0 * a_x * fp_0;
+            tg_xx_yzz_s_0_0_0[i] += 1.0 / 2.0 * tg_0_yzz_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_x_yzz_s_0_0_1[i] * fai_0 * a_x * fp_0;
 
-            tg_xx_zzz_s_0_0_0[i] = 1.0 / 2.0 * tg_0_zzz_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_x_zzz_s_0_0_1[i] * fai_0 * a_x * fp_0;
+            tg_xx_zzz_s_0_0_0[i] += 1.0 / 2.0 * tg_0_zzz_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_x_zzz_s_0_0_1[i] * fai_0 * a_x * fp_0;
 
-            tg_xy_xxx_s_0_0_0[i] = tg_y_xxx_s_0_0_1[i] * fai_0 * a_x * fp_0;
+            tg_xy_xxx_s_0_0_0[i] += tg_y_xxx_s_0_0_1[i] * fai_0 * a_x * fp_0;
 
-            tg_xy_xxy_s_0_0_0[i] = tg_y_xxy_s_0_0_1[i] * fai_0 * a_x * fp_0;
+            tg_xy_xxy_s_0_0_0[i] += tg_y_xxy_s_0_0_1[i] * fai_0 * a_x * fp_0;
 
-            tg_xy_xxz_s_0_0_0[i] = tg_y_xxz_s_0_0_1[i] * fai_0 * a_x * fp_0;
+            tg_xy_xxz_s_0_0_0[i] += tg_y_xxz_s_0_0_1[i] * fai_0 * a_x * fp_0;
 
-            tg_xy_xyy_s_0_0_0[i] = tg_y_xyy_s_0_0_1[i] * fai_0 * a_x * fp_0;
+            tg_xy_xyy_s_0_0_0[i] += tg_y_xyy_s_0_0_1[i] * fai_0 * a_x * fp_0;
 
-            tg_xy_xyz_s_0_0_0[i] = tg_y_xyz_s_0_0_1[i] * fai_0 * a_x * fp_0;
+            tg_xy_xyz_s_0_0_0[i] += tg_y_xyz_s_0_0_1[i] * fai_0 * a_x * fp_0;
 
-            tg_xy_xzz_s_0_0_0[i] = tg_y_xzz_s_0_0_1[i] * fai_0 * a_x * fp_0;
+            tg_xy_xzz_s_0_0_0[i] += tg_y_xzz_s_0_0_1[i] * fai_0 * a_x * fp_0;
 
-            tg_xy_yyy_s_0_0_0[i] = tg_y_yyy_s_0_0_1[i] * fai_0 * a_x * fp_0;
+            tg_xy_yyy_s_0_0_0[i] += tg_y_yyy_s_0_0_1[i] * fai_0 * a_x * fp_0;
 
-            tg_xy_yyz_s_0_0_0[i] = tg_y_yyz_s_0_0_1[i] * fai_0 * a_x * fp_0;
+            tg_xy_yyz_s_0_0_0[i] += tg_y_yyz_s_0_0_1[i] * fai_0 * a_x * fp_0;
 
-            tg_xy_yzz_s_0_0_0[i] = tg_y_yzz_s_0_0_1[i] * fai_0 * a_x * fp_0;
+            tg_xy_yzz_s_0_0_0[i] += tg_y_yzz_s_0_0_1[i] * fai_0 * a_x * fp_0;
 
-            tg_xy_zzz_s_0_0_0[i] = tg_y_zzz_s_0_0_1[i] * fai_0 * a_x * fp_0;
+            tg_xy_zzz_s_0_0_0[i] += tg_y_zzz_s_0_0_1[i] * fai_0 * a_x * fp_0;
 
-            tg_xz_xxx_s_0_0_0[i] = tg_z_xxx_s_0_0_1[i] * fai_0 * a_x * fp_0;
+            tg_xz_xxx_s_0_0_0[i] += tg_z_xxx_s_0_0_1[i] * fai_0 * a_x * fp_0;
 
-            tg_xz_xxy_s_0_0_0[i] = tg_z_xxy_s_0_0_1[i] * fai_0 * a_x * fp_0;
+            tg_xz_xxy_s_0_0_0[i] += tg_z_xxy_s_0_0_1[i] * fai_0 * a_x * fp_0;
 
-            tg_xz_xxz_s_0_0_0[i] = tg_z_xxz_s_0_0_1[i] * fai_0 * a_x * fp_0;
+            tg_xz_xxz_s_0_0_0[i] += tg_z_xxz_s_0_0_1[i] * fai_0 * a_x * fp_0;
 
-            tg_xz_xyy_s_0_0_0[i] = tg_z_xyy_s_0_0_1[i] * fai_0 * a_x * fp_0;
+            tg_xz_xyy_s_0_0_0[i] += tg_z_xyy_s_0_0_1[i] * fai_0 * a_x * fp_0;
 
-            tg_xz_xyz_s_0_0_0[i] = tg_z_xyz_s_0_0_1[i] * fai_0 * a_x * fp_0;
+            tg_xz_xyz_s_0_0_0[i] += tg_z_xyz_s_0_0_1[i] * fai_0 * a_x * fp_0;
 
-            tg_xz_xzz_s_0_0_0[i] = tg_z_xzz_s_0_0_1[i] * fai_0 * a_x * fp_0;
+            tg_xz_xzz_s_0_0_0[i] += tg_z_xzz_s_0_0_1[i] * fai_0 * a_x * fp_0;
 
-            tg_xz_yyy_s_0_0_0[i] = tg_z_yyy_s_0_0_1[i] * fai_0 * a_x * fp_0;
+            tg_xz_yyy_s_0_0_0[i] += tg_z_yyy_s_0_0_1[i] * fai_0 * a_x * fp_0;
 
-            tg_xz_yyz_s_0_0_0[i] = tg_z_yyz_s_0_0_1[i] * fai_0 * a_x * fp_0;
+            tg_xz_yyz_s_0_0_0[i] += tg_z_yyz_s_0_0_1[i] * fai_0 * a_x * fp_0;
 
-            tg_xz_yzz_s_0_0_0[i] = tg_z_yzz_s_0_0_1[i] * fai_0 * a_x * fp_0;
+            tg_xz_yzz_s_0_0_0[i] += tg_z_yzz_s_0_0_1[i] * fai_0 * a_x * fp_0;
 
-            tg_xz_zzz_s_0_0_0[i] = tg_z_zzz_s_0_0_1[i] * fai_0 * a_x * fp_0;
+            tg_xz_zzz_s_0_0_0[i] += tg_z_zzz_s_0_0_1[i] * fai_0 * a_x * fp_0;
 
-            tg_yy_xxx_s_0_0_0[i] = 1.0 / 2.0 * tg_0_xxx_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_y_xxx_s_0_0_1[i] * fai_0 * a_y * fp_0;
+            tg_yy_xxx_s_0_0_0[i] += 1.0 / 2.0 * tg_0_xxx_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_y_xxx_s_0_0_1[i] * fai_0 * a_y * fp_0;
 
-            tg_yy_xxy_s_0_0_0[i] = 1.0 / 2.0 * tg_0_xxy_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_y_xxy_s_0_0_1[i] * fai_0 * a_y * fp_0;
+            tg_yy_xxy_s_0_0_0[i] += 1.0 / 2.0 * tg_0_xxy_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_y_xxy_s_0_0_1[i] * fai_0 * a_y * fp_0;
 
-            tg_yy_xxz_s_0_0_0[i] = 1.0 / 2.0 * tg_0_xxz_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_y_xxz_s_0_0_1[i] * fai_0 * a_y * fp_0;
+            tg_yy_xxz_s_0_0_0[i] += 1.0 / 2.0 * tg_0_xxz_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_y_xxz_s_0_0_1[i] * fai_0 * a_y * fp_0;
 
-            tg_yy_xyy_s_0_0_0[i] = 1.0 / 2.0 * tg_0_xyy_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_y_xyy_s_0_0_1[i] * fai_0 * a_y * fp_0;
+            tg_yy_xyy_s_0_0_0[i] += 1.0 / 2.0 * tg_0_xyy_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_y_xyy_s_0_0_1[i] * fai_0 * a_y * fp_0;
 
-            tg_yy_xyz_s_0_0_0[i] = 1.0 / 2.0 * tg_0_xyz_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_y_xyz_s_0_0_1[i] * fai_0 * a_y * fp_0;
+            tg_yy_xyz_s_0_0_0[i] += 1.0 / 2.0 * tg_0_xyz_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_y_xyz_s_0_0_1[i] * fai_0 * a_y * fp_0;
 
-            tg_yy_xzz_s_0_0_0[i] = 1.0 / 2.0 * tg_0_xzz_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_y_xzz_s_0_0_1[i] * fai_0 * a_y * fp_0;
+            tg_yy_xzz_s_0_0_0[i] += 1.0 / 2.0 * tg_0_xzz_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_y_xzz_s_0_0_1[i] * fai_0 * a_y * fp_0;
 
-            tg_yy_yyy_s_0_0_0[i] = 1.0 / 2.0 * tg_0_yyy_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_y_yyy_s_0_0_1[i] * fai_0 * a_y * fp_0;
+            tg_yy_yyy_s_0_0_0[i] += 1.0 / 2.0 * tg_0_yyy_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_y_yyy_s_0_0_1[i] * fai_0 * a_y * fp_0;
 
-            tg_yy_yyz_s_0_0_0[i] = 1.0 / 2.0 * tg_0_yyz_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_y_yyz_s_0_0_1[i] * fai_0 * a_y * fp_0;
+            tg_yy_yyz_s_0_0_0[i] += 1.0 / 2.0 * tg_0_yyz_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_y_yyz_s_0_0_1[i] * fai_0 * a_y * fp_0;
 
-            tg_yy_yzz_s_0_0_0[i] = 1.0 / 2.0 * tg_0_yzz_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_y_yzz_s_0_0_1[i] * fai_0 * a_y * fp_0;
+            tg_yy_yzz_s_0_0_0[i] += 1.0 / 2.0 * tg_0_yzz_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_y_yzz_s_0_0_1[i] * fai_0 * a_y * fp_0;
 
-            tg_yy_zzz_s_0_0_0[i] = 1.0 / 2.0 * tg_0_zzz_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_y_zzz_s_0_0_1[i] * fai_0 * a_y * fp_0;
+            tg_yy_zzz_s_0_0_0[i] += 1.0 / 2.0 * tg_0_zzz_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_y_zzz_s_0_0_1[i] * fai_0 * a_y * fp_0;
 
-            tg_yz_xxx_s_0_0_0[i] = tg_z_xxx_s_0_0_1[i] * fai_0 * a_y * fp_0;
+            tg_yz_xxx_s_0_0_0[i] += tg_z_xxx_s_0_0_1[i] * fai_0 * a_y * fp_0;
 
-            tg_yz_xxy_s_0_0_0[i] = tg_z_xxy_s_0_0_1[i] * fai_0 * a_y * fp_0;
+            tg_yz_xxy_s_0_0_0[i] += tg_z_xxy_s_0_0_1[i] * fai_0 * a_y * fp_0;
 
-            tg_yz_xxz_s_0_0_0[i] = tg_z_xxz_s_0_0_1[i] * fai_0 * a_y * fp_0;
+            tg_yz_xxz_s_0_0_0[i] += tg_z_xxz_s_0_0_1[i] * fai_0 * a_y * fp_0;
 
-            tg_yz_xyy_s_0_0_0[i] = tg_z_xyy_s_0_0_1[i] * fai_0 * a_y * fp_0;
+            tg_yz_xyy_s_0_0_0[i] += tg_z_xyy_s_0_0_1[i] * fai_0 * a_y * fp_0;
 
-            tg_yz_xyz_s_0_0_0[i] = tg_z_xyz_s_0_0_1[i] * fai_0 * a_y * fp_0;
+            tg_yz_xyz_s_0_0_0[i] += tg_z_xyz_s_0_0_1[i] * fai_0 * a_y * fp_0;
 
-            tg_yz_xzz_s_0_0_0[i] = tg_z_xzz_s_0_0_1[i] * fai_0 * a_y * fp_0;
+            tg_yz_xzz_s_0_0_0[i] += tg_z_xzz_s_0_0_1[i] * fai_0 * a_y * fp_0;
 
-            tg_yz_yyy_s_0_0_0[i] = tg_z_yyy_s_0_0_1[i] * fai_0 * a_y * fp_0;
+            tg_yz_yyy_s_0_0_0[i] += tg_z_yyy_s_0_0_1[i] * fai_0 * a_y * fp_0;
 
-            tg_yz_yyz_s_0_0_0[i] = tg_z_yyz_s_0_0_1[i] * fai_0 * a_y * fp_0;
+            tg_yz_yyz_s_0_0_0[i] += tg_z_yyz_s_0_0_1[i] * fai_0 * a_y * fp_0;
 
-            tg_yz_yzz_s_0_0_0[i] = tg_z_yzz_s_0_0_1[i] * fai_0 * a_y * fp_0;
+            tg_yz_yzz_s_0_0_0[i] += tg_z_yzz_s_0_0_1[i] * fai_0 * a_y * fp_0;
 
-            tg_yz_zzz_s_0_0_0[i] = tg_z_zzz_s_0_0_1[i] * fai_0 * a_y * fp_0;
+            tg_yz_zzz_s_0_0_0[i] += tg_z_zzz_s_0_0_1[i] * fai_0 * a_y * fp_0;
 
-            tg_zz_xxx_s_0_0_0[i] = 1.0 / 2.0 * tg_0_xxx_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_z_xxx_s_0_0_1[i] * fai_0 * a_z * fp_0;
+            tg_zz_xxx_s_0_0_0[i] += 1.0 / 2.0 * tg_0_xxx_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_z_xxx_s_0_0_1[i] * fai_0 * a_z * fp_0;
 
-            tg_zz_xxy_s_0_0_0[i] = 1.0 / 2.0 * tg_0_xxy_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_z_xxy_s_0_0_1[i] * fai_0 * a_z * fp_0;
+            tg_zz_xxy_s_0_0_0[i] += 1.0 / 2.0 * tg_0_xxy_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_z_xxy_s_0_0_1[i] * fai_0 * a_z * fp_0;
 
-            tg_zz_xxz_s_0_0_0[i] = 1.0 / 2.0 * tg_0_xxz_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_z_xxz_s_0_0_1[i] * fai_0 * a_z * fp_0;
+            tg_zz_xxz_s_0_0_0[i] += 1.0 / 2.0 * tg_0_xxz_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_z_xxz_s_0_0_1[i] * fai_0 * a_z * fp_0;
 
-            tg_zz_xyy_s_0_0_0[i] = 1.0 / 2.0 * tg_0_xyy_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_z_xyy_s_0_0_1[i] * fai_0 * a_z * fp_0;
+            tg_zz_xyy_s_0_0_0[i] += 1.0 / 2.0 * tg_0_xyy_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_z_xyy_s_0_0_1[i] * fai_0 * a_z * fp_0;
 
-            tg_zz_xyz_s_0_0_0[i] = 1.0 / 2.0 * tg_0_xyz_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_z_xyz_s_0_0_1[i] * fai_0 * a_z * fp_0;
+            tg_zz_xyz_s_0_0_0[i] += 1.0 / 2.0 * tg_0_xyz_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_z_xyz_s_0_0_1[i] * fai_0 * a_z * fp_0;
 
-            tg_zz_xzz_s_0_0_0[i] = 1.0 / 2.0 * tg_0_xzz_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_z_xzz_s_0_0_1[i] * fai_0 * a_z * fp_0;
+            tg_zz_xzz_s_0_0_0[i] += 1.0 / 2.0 * tg_0_xzz_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_z_xzz_s_0_0_1[i] * fai_0 * a_z * fp_0;
 
-            tg_zz_yyy_s_0_0_0[i] = 1.0 / 2.0 * tg_0_yyy_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_z_yyy_s_0_0_1[i] * fai_0 * a_z * fp_0;
+            tg_zz_yyy_s_0_0_0[i] += 1.0 / 2.0 * tg_0_yyy_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_z_yyy_s_0_0_1[i] * fai_0 * a_z * fp_0;
 
-            tg_zz_yyz_s_0_0_0[i] = 1.0 / 2.0 * tg_0_yyz_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_z_yyz_s_0_0_1[i] * fai_0 * a_z * fp_0;
+            tg_zz_yyz_s_0_0_0[i] += 1.0 / 2.0 * tg_0_yyz_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_z_yyz_s_0_0_1[i] * fai_0 * a_z * fp_0;
 
-            tg_zz_yzz_s_0_0_0[i] = 1.0 / 2.0 * tg_0_yzz_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_z_yzz_s_0_0_1[i] * fai_0 * a_z * fp_0;
+            tg_zz_yzz_s_0_0_0[i] += 1.0 / 2.0 * tg_0_yzz_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_z_yzz_s_0_0_1[i] * fai_0 * a_z * fp_0;
 
-            tg_zz_zzz_s_0_0_0[i] = 1.0 / 2.0 * tg_0_zzz_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_z_zzz_s_0_0_1[i] * fai_0 * a_z * fp_0;
+            tg_zz_zzz_s_0_0_0[i] += 1.0 / 2.0 * tg_0_zzz_s_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_z_zzz_s_0_0_1[i] * fai_0 * a_z * fp_0;
         }
     }
 }

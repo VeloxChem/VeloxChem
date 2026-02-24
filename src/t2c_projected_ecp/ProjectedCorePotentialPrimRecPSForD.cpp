@@ -96,11 +96,11 @@ comp_prim_projected_core_potential_ps_d(CSimdArray<double>& pbuffer,
         {
             const double fai_0 = 1.0 / a_exp;
 
-            tg_x_0_d_0_0_0[i] = tg_0_0_d_0_0_1[i] * fai_0 * a_x * fp_0;
+            tg_x_0_d_0_0_0[i] += tg_0_0_d_0_0_1[i] * fai_0 * a_x * fp_0;
 
-            tg_y_0_d_0_0_0[i] = tg_0_0_d_0_0_1[i] * fai_0 * a_y * fp_0;
+            tg_y_0_d_0_0_0[i] += tg_0_0_d_0_0_1[i] * fai_0 * a_y * fp_0;
 
-            tg_z_0_d_0_0_0[i] = tg_0_0_d_0_0_1[i] * fai_0 * a_z * fp_0;
+            tg_z_0_d_0_0_0[i] += tg_0_0_d_0_0_1[i] * fai_0 * a_z * fp_0;
         }
     }
 }

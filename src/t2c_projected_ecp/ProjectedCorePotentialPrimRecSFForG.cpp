@@ -251,25 +251,25 @@ comp_prim_projected_core_potential_sf_g(CSimdArray<double>& pbuffer,
         {
             const double fbi_0 = 1.0 / b_exps[i];
 
-            tg_0_xxx_g_0_0_0[i] = tg_0_x_g_0_0_1[i] * fbi_0 * fbi_0 * fm_0 + tg_0_xx_g_0_0_1[i] * fbi_0 * rb_x[i] * fm_0;
+            tg_0_xxx_g_0_0_0[i] += tg_0_x_g_0_0_1[i] * fbi_0 * fbi_0 * fm_0 + tg_0_xx_g_0_0_1[i] * fbi_0 * rb_x[i] * fm_0;
 
-            tg_0_xxy_g_0_0_0[i] = tg_0_xx_g_0_0_1[i] * fbi_0 * rb_y[i] * fm_0;
+            tg_0_xxy_g_0_0_0[i] += tg_0_xx_g_0_0_1[i] * fbi_0 * rb_y[i] * fm_0;
 
-            tg_0_xxz_g_0_0_0[i] = tg_0_xx_g_0_0_1[i] * fbi_0 * rb_z[i] * fm_0;
+            tg_0_xxz_g_0_0_0[i] += tg_0_xx_g_0_0_1[i] * fbi_0 * rb_z[i] * fm_0;
 
-            tg_0_xyy_g_0_0_0[i] = tg_0_yy_g_0_0_1[i] * fbi_0 * rb_x[i] * fm_0;
+            tg_0_xyy_g_0_0_0[i] += tg_0_yy_g_0_0_1[i] * fbi_0 * rb_x[i] * fm_0;
 
-            tg_0_xyz_g_0_0_0[i] = tg_0_yz_g_0_0_1[i] * fbi_0 * rb_x[i] * fm_0;
+            tg_0_xyz_g_0_0_0[i] += tg_0_yz_g_0_0_1[i] * fbi_0 * rb_x[i] * fm_0;
 
-            tg_0_xzz_g_0_0_0[i] = tg_0_zz_g_0_0_1[i] * fbi_0 * rb_x[i] * fm_0;
+            tg_0_xzz_g_0_0_0[i] += tg_0_zz_g_0_0_1[i] * fbi_0 * rb_x[i] * fm_0;
 
-            tg_0_yyy_g_0_0_0[i] = tg_0_y_g_0_0_1[i] * fbi_0 * fbi_0 * fm_0 + tg_0_yy_g_0_0_1[i] * fbi_0 * rb_y[i] * fm_0;
+            tg_0_yyy_g_0_0_0[i] += tg_0_y_g_0_0_1[i] * fbi_0 * fbi_0 * fm_0 + tg_0_yy_g_0_0_1[i] * fbi_0 * rb_y[i] * fm_0;
 
-            tg_0_yyz_g_0_0_0[i] = tg_0_yy_g_0_0_1[i] * fbi_0 * rb_z[i] * fm_0;
+            tg_0_yyz_g_0_0_0[i] += tg_0_yy_g_0_0_1[i] * fbi_0 * rb_z[i] * fm_0;
 
-            tg_0_yzz_g_0_0_0[i] = tg_0_zz_g_0_0_1[i] * fbi_0 * rb_y[i] * fm_0;
+            tg_0_yzz_g_0_0_0[i] += tg_0_zz_g_0_0_1[i] * fbi_0 * rb_y[i] * fm_0;
 
-            tg_0_zzz_g_0_0_0[i] = tg_0_z_g_0_0_1[i] * fbi_0 * fbi_0 * fm_0 + tg_0_zz_g_0_0_1[i] * fbi_0 * rb_z[i] * fm_0;
+            tg_0_zzz_g_0_0_0[i] += tg_0_z_g_0_0_1[i] * fbi_0 * fbi_0 * fm_0 + tg_0_zz_g_0_0_1[i] * fbi_0 * rb_z[i] * fm_0;
         }
     }
 }

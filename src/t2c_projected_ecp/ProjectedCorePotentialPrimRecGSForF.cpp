@@ -319,35 +319,35 @@ comp_prim_projected_core_potential_gs_f(CSimdArray<double>& pbuffer,
         {
             const double fai_0 = 1.0 / a_exp;
 
-            tg_xxxx_0_f_0_0_0[i] = 3.0 / 2.0 * tg_xx_0_f_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_xxx_0_f_0_0_1[i] * fai_0 * a_x * fp_0;
+            tg_xxxx_0_f_0_0_0[i] += 3.0 / 2.0 * tg_xx_0_f_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_xxx_0_f_0_0_1[i] * fai_0 * a_x * fp_0;
 
-            tg_xxxy_0_f_0_0_0[i] = tg_xxx_0_f_0_0_1[i] * fai_0 * a_y * fp_0;
+            tg_xxxy_0_f_0_0_0[i] += tg_xxx_0_f_0_0_1[i] * fai_0 * a_y * fp_0;
 
-            tg_xxxz_0_f_0_0_0[i] = tg_xxx_0_f_0_0_1[i] * fai_0 * a_z * fp_0;
+            tg_xxxz_0_f_0_0_0[i] += tg_xxx_0_f_0_0_1[i] * fai_0 * a_z * fp_0;
 
-            tg_xxyy_0_f_0_0_0[i] = 1.0 / 2.0 * tg_yy_0_f_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_xyy_0_f_0_0_1[i] * fai_0 * a_x * fp_0;
+            tg_xxyy_0_f_0_0_0[i] += 1.0 / 2.0 * tg_yy_0_f_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_xyy_0_f_0_0_1[i] * fai_0 * a_x * fp_0;
 
-            tg_xxyz_0_f_0_0_0[i] = tg_xxz_0_f_0_0_1[i] * fai_0 * a_y * fp_0;
+            tg_xxyz_0_f_0_0_0[i] += tg_xxz_0_f_0_0_1[i] * fai_0 * a_y * fp_0;
 
-            tg_xxzz_0_f_0_0_0[i] = 1.0 / 2.0 * tg_zz_0_f_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_xzz_0_f_0_0_1[i] * fai_0 * a_x * fp_0;
+            tg_xxzz_0_f_0_0_0[i] += 1.0 / 2.0 * tg_zz_0_f_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_xzz_0_f_0_0_1[i] * fai_0 * a_x * fp_0;
 
-            tg_xyyy_0_f_0_0_0[i] = tg_yyy_0_f_0_0_1[i] * fai_0 * a_x * fp_0;
+            tg_xyyy_0_f_0_0_0[i] += tg_yyy_0_f_0_0_1[i] * fai_0 * a_x * fp_0;
 
-            tg_xyyz_0_f_0_0_0[i] = tg_yyz_0_f_0_0_1[i] * fai_0 * a_x * fp_0;
+            tg_xyyz_0_f_0_0_0[i] += tg_yyz_0_f_0_0_1[i] * fai_0 * a_x * fp_0;
 
-            tg_xyzz_0_f_0_0_0[i] = tg_yzz_0_f_0_0_1[i] * fai_0 * a_x * fp_0;
+            tg_xyzz_0_f_0_0_0[i] += tg_yzz_0_f_0_0_1[i] * fai_0 * a_x * fp_0;
 
-            tg_xzzz_0_f_0_0_0[i] = tg_zzz_0_f_0_0_1[i] * fai_0 * a_x * fp_0;
+            tg_xzzz_0_f_0_0_0[i] += tg_zzz_0_f_0_0_1[i] * fai_0 * a_x * fp_0;
 
-            tg_yyyy_0_f_0_0_0[i] = 3.0 / 2.0 * tg_yy_0_f_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_yyy_0_f_0_0_1[i] * fai_0 * a_y * fp_0;
+            tg_yyyy_0_f_0_0_0[i] += 3.0 / 2.0 * tg_yy_0_f_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_yyy_0_f_0_0_1[i] * fai_0 * a_y * fp_0;
 
-            tg_yyyz_0_f_0_0_0[i] = tg_yyy_0_f_0_0_1[i] * fai_0 * a_z * fp_0;
+            tg_yyyz_0_f_0_0_0[i] += tg_yyy_0_f_0_0_1[i] * fai_0 * a_z * fp_0;
 
-            tg_yyzz_0_f_0_0_0[i] = 1.0 / 2.0 * tg_zz_0_f_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_yzz_0_f_0_0_1[i] * fai_0 * a_y * fp_0;
+            tg_yyzz_0_f_0_0_0[i] += 1.0 / 2.0 * tg_zz_0_f_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_yzz_0_f_0_0_1[i] * fai_0 * a_y * fp_0;
 
-            tg_yzzz_0_f_0_0_0[i] = tg_zzz_0_f_0_0_1[i] * fai_0 * a_y * fp_0;
+            tg_yzzz_0_f_0_0_0[i] += tg_zzz_0_f_0_0_1[i] * fai_0 * a_y * fp_0;
 
-            tg_zzzz_0_f_0_0_0[i] = 3.0 / 2.0 * tg_zz_0_f_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_zzz_0_f_0_0_1[i] * fai_0 * a_z * fp_0;
+            tg_zzzz_0_f_0_0_0[i] += 3.0 / 2.0 * tg_zz_0_f_0_0_1[i] * fai_0 * fai_0 * fp_0 + tg_zzz_0_f_0_0_1[i] * fai_0 * a_z * fp_0;
         }
     }
 }

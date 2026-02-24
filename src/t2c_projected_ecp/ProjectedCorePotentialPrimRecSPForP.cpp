@@ -91,11 +91,11 @@ comp_prim_projected_core_potential_sp_p(CSimdArray<double>& pbuffer,
         {
             const double fbi_0 = 1.0 / b_exps[i];
 
-            tg_0_x_p_0_0_0[i] = tg_0_0_p_0_0_1[i] * fbi_0 * rb_x[i] * fm_0;
+            tg_0_x_p_0_0_0[i] += tg_0_0_p_0_0_1[i] * fbi_0 * rb_x[i] * fm_0;
 
-            tg_0_y_p_0_0_0[i] = tg_0_0_p_0_0_1[i] * fbi_0 * rb_y[i] * fm_0;
+            tg_0_y_p_0_0_0[i] += tg_0_0_p_0_0_1[i] * fbi_0 * rb_y[i] * fm_0;
 
-            tg_0_z_p_0_0_0[i] = tg_0_0_p_0_0_1[i] * fbi_0 * rb_z[i] * fm_0;
+            tg_0_z_p_0_0_0[i] += tg_0_0_p_0_0_1[i] * fbi_0 * rb_z[i] * fm_0;
         }
     }
 }
