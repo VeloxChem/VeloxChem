@@ -105,6 +105,8 @@ class EnsembleDriver:
         self.method_dict = None
         self.rsp_dict = None
 
+        self.run_response = False
+
         # response settings are also added here in a similar way
         self.nstates = None
         self.nto = None
@@ -168,6 +170,10 @@ class EnsembleDriver:
         self.scf_dict = dict(scf_dict)
         self.method_dict = dict(method_dict)
         self.rsp_dict = dict(rsp_dict)
+
+        # Auto-enable response if response settings are provided
+        if self.rsp_dict:
+            self.run_response = True
 
     @staticmethod
     def _parse_six_floats(field: str) -> list[float]:
@@ -493,17 +499,35 @@ class EnsembleDriver:
         if self.scf_dict is not None or self.method_dict is not None:
             scf_driver.update_settings(self.scf_dict or {}, self.method_dict or {})
 
-        # update settings for rsp if necessary
-        if self.rsp_dict is not None or self.method_dict is not None:
-            rsp_driver.update_settings(self.rsp_dict or {}, self.method_dict or {})
+        do_rsp = bool(self.run_response)
+        if not do_rsp:
+            rsp_opts_set = (
+                (self.rsp_dict is not None and len(self.rsp_dict) > 0)
+            or (self.nstates is not None)
+            or (self.nto is not None)
+            or (self.core_excitation is not None)
+            or (self.num_core_orbitals is not None)
+            )
+            if rsp_opts_set:
+                do_rsp = True
+                self.run_response = True
+        
+        rsp_driver = None
+        if do_rsp:
+            rsp_driver = LinearResponseEigenSolver()
+
+            # update settings for rsp if necessary
+            if self.rsp_dict is not None or self.method_dict is not None:
+                rsp_driver.update_settings(self.rsp_dict or {}, self.method_dict or {})
 
         # sanity check -- update settings in scf and rsp according to
         # which variables the user set.
         ensemble_driver_scf_sanity_check(scf_driver, self)
-        ensemble_driver_rsp_sanity_check(rsp_driver, self)
+        if do_rsp:
+            ensemble_driver_rsp_sanity_check(rsp_driver, self)
         
         scf_all = []
-        rsp_all = []
+        rsp_all = [] if do_rsp else None
 
         for snap in snapshots:
             frame = int(snap["frame"])
@@ -537,9 +561,13 @@ class EnsembleDriver:
                 )
 
             scf_results = scf_driver.compute(molecule, basis)
-            rsp_results = rsp_driver.compute(molecule, basis, scf_results)
             scf_all.append((frame, scf_results))
-            rsp_all.append((frame, rsp_results))
 
-        results = {"scf_all": scf_all, "rsp_all": rsp_all}
+            if do_rsp:
+                rsp_results = rsp_driver.compute(molecule, basis, scf_results)
+                rsp_all.append((frame, rsp_results))
+
+        results = {"scf_all": scf_all}
+        if do_rsp:
+            results["rsp_all"] = rsp_all
         return results
