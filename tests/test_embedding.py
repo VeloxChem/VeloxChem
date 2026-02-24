@@ -48,7 +48,7 @@ class TestPolarizableEmbedding:
             'settings': {
                 'embedding_method': 'PE',
                 'induced_dipoles': {
-                    'solver': 'jacobi',
+                    'solver': 'jidiis',
                     'mic': False,
                     'threshold': 1e-8,
                     'max_iterations': 100,

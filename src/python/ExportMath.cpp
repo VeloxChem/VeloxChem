@@ -313,6 +313,7 @@ export_math(py::module &m) -> void
             },
             "Create full matrix representation of matrix and convert to numpy array.")
         .def("flat_values", &CMatrix::flat_values, "Gets flatened vector of matrix elements.")
+        .def("reduced_flat_values", &CMatrix::reduced_flat_values, "Gets reduced flatened vector of matrix elements.")
         .def("__add__", [](const CMatrix &self, const CMatrix &other) { return self + other; })
         .def("__eq__", [](const CMatrix &self, const CMatrix &other) { return self == other; })
         .def("__ne__", [](const CMatrix &self, const CMatrix &other) { return self != other; })

@@ -243,3 +243,9 @@ CBlockedGtoPairBlock::gto_pair_blocks() const -> std::array<CGtoPairBlock, 16>
 {
     return _gto_pair_blocks;
 }
+
+auto
+CBlockedGtoPairBlock::unique_terms(const int index) const -> size_t
+{
+    return _gto_pair_blocks[index].unique_terms(); 
+}

@@ -989,7 +989,7 @@ class EvbSystemBuilder():
         assert_msg_critical('openmm' in sys.modules,
                             'openmm is required for EvbSystemBuilder.')
 
-        vlxsysbuilder = SolvationBuilder()
+        vlxsysbuilder = SolvationBuilder(ostream=self.ostream)
 
         mols_per_nm3, density, smiles_code = vlxsysbuilder._solvent_properties(
             solvent)
@@ -1038,7 +1038,7 @@ class EvbSystemBuilder():
             solvent_nb_atom_count = 0
             solvent_system_atom_count = 0
             solvent_chain = topology.addChain()
-            solvent_ff = MMForceFieldGenerator()
+            solvent_ff = MMForceFieldGenerator(ostream=self.ostream)
 
             solvent_ff.create_topology(vlx_solvent_molecule,water_model=self.water_model)
 

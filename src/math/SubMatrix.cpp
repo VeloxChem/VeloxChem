@@ -38,6 +38,8 @@
 #include "CustomViews.hpp"
 #include "MathFunc.hpp"
 
+#include <iostream>
+
 CSubMatrix::CSubMatrix()
 
     : _dimensions{0, 0, 0, 0}
@@ -68,6 +70,33 @@ CSubMatrix::CSubMatrix(const std::vector<double> &values, const std::array<size_
 
     , _values(values)
 {
+}
+
+CSubMatrix::CSubMatrix(const std::vector<double>&                    values,
+                       const std::vector<std::pair<size_t, size_t>>& mask,
+                       const std::array<size_t, 4>&                  dimensions)
+
+    : _dimensions(dimensions)
+
+    , _values(std::vector<double>(dimensions[2] * dimensions[3], 0.0))
+{
+    size_t idx = 0;
+    
+    for (const auto& index : mask)
+    {
+        if (index.first == index.second)
+        {
+            at(index) = values[idx];
+        }
+        else
+        {
+            at(index) = values[idx];
+            
+            at({index.second, index.first}) = values[idx];
+        }
+        
+        idx++;
+    }
 }
 
 CSubMatrix::CSubMatrix(const CSubMatrix &other)

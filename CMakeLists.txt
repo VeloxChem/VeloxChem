@@ -54,8 +54,8 @@ include(${PROJECT_SOURCE_DIR}/cmake/compiler_flags/CXXFlags.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/custom/eigen.cmake)
 
 # find external dependencies
-# Python 3.9+
-find_package(Python 3.9 REQUIRED COMPONENTS Interpreter Development)
+# Python 3.10+
+find_package(Python 3.10 REQUIRED COMPONENTS Interpreter Development)
 # pybind11
 find_package(pybind11 2.6 CONFIG REQUIRED)
 # Libxc

@@ -719,7 +719,7 @@ class TestMolecule:
                 if fpath.is_file():
                     fpath.unlink()
 
-    def test_dihedral(self):
+    def test_distance_angle_dihedral(self):
 
         xyz_string = """
             9
@@ -743,6 +743,14 @@ class TestMolecule:
 
         mol.set_dihedral((2, 3, 4, 5), math.pi / 2.0, 'radian')
         assert abs(mol.get_dihedral_in_degrees((2, 3, 4, 5)) - 90.0) < 1e-4
+
+        assert abs(mol.get_angle_in_degrees((1, 2, 3)) - 121.6) < 1e-1
+        mol.set_angle_in_degrees((1, 2, 3), 110.0)
+        assert abs(mol.get_angle_in_degrees((1, 2, 3)) - 110.0) < 1e-4
+
+        assert abs(mol.get_distance_in_angstroms((1, 2)) - 1.3685) < 1e-4
+        mol.set_distance_in_angstroms((1, 2), 1.7)
+        assert abs(mol.get_distance_in_angstroms((1, 2)) - 1.7) < 1e-4
 
     @pytest.mark.skipif("rdkit" not in sys.modules,
                         reason="rdkit not available")

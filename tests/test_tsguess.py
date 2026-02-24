@@ -26,6 +26,7 @@ class TestTransitionStateGuesser:
         rea = Molecule.read_smiles("C1CCC=C1")
         pro = Molecule.read_smiles("C=CC1CC1")
         ts_guesser = TransitionStateGuesser()
+        ts_guesser.ostream.mute()
         ts_guesser.scf_xcfun = "HF"
         ts_guesser.scf_basis = "STO-3G"
         results = ts_guesser.find_TS(rea, pro)

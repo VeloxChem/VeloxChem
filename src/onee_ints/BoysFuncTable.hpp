@@ -45,7 +45,7 @@ auto getFullBoysFuncTable() -> std::vector<double>;
 
 auto getBoysFuncTable(const int N) -> std::array<std::array<double, 7>, 121>;
 
-auto computeBoysFunction(double* values, const double fa, const uint32_t N, const double* bf_table, const double* ft) -> void;
+auto computeBoysFunction(double* values, const double fa, const int N, const double* bf_table, const double* ft) -> void;
 
 }  // namespace onee
 

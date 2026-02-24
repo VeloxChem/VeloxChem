@@ -113,7 +113,7 @@ class LinearResponseSolver(LinearSolver):
 
         super().update_settings(rsp_dict, method_dict)
 
-    def compute(self, molecule, basis, scf_tensors, v_grad=None):
+    def compute(self, molecule, basis, scf_results, v_grad=None):
         """
         Performs linear response calculation for a molecule and a basis set.
 
@@ -121,7 +121,7 @@ class LinearResponseSolver(LinearSolver):
             The molecule.
         :param basis:
             The AO basis set.
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
         :param v_grad:
             The gradients on the right-hand side. If not provided, v_grad will
@@ -149,7 +149,7 @@ class LinearResponseSolver(LinearSolver):
         molecule_sanity_check(molecule)
 
         # check SCF results
-        scf_results_sanity_check(self, scf_tensors)
+        scf_results_sanity_check(self, scf_results)
 
         # update checkpoint_file after scf_results_sanity_check
         if self.filename is not None and self.checkpoint_file is None:
@@ -167,14 +167,11 @@ class LinearResponseSolver(LinearSolver):
         # check solvation model setup
         if self.rank == mpi_master():
             assert_msg_critical(
-                'solvation_model' not in scf_tensors,
+                'solvation_model' not in scf_results,
                 type(self).__name__ + ': Solvation model not implemented')
 
         # check print level (verbosity of output)
-        if self.print_level < 2:
-            self.print_level = 1
-        if self.print_level > 2:
-            self.print_level = 3
+        self.print_level = max(1, min(self.print_level, 3))
 
         # initialize profiler
         profiler = Profiler({
@@ -195,10 +192,10 @@ class LinearResponseSolver(LinearSolver):
         nbeta = molecule.number_of_beta_electrons()
         assert_msg_critical(
             nalpha == nbeta,
-            'LinearResponseSolver: not implemented for unrestricted case')
+            f'{type(self).__name__}: not implemented for unrestricted case')
 
         if self.rank == mpi_master():
-            orb_ene = scf_tensors['E_alpha']
+            orb_ene = scf_results['E_alpha']
         else:
             orb_ene = None
         orb_ene = self.comm.bcast(orb_ene, root=mpi_master())
@@ -209,7 +206,7 @@ class LinearResponseSolver(LinearSolver):
         eri_dict = self._init_eri(molecule, basis)
 
         # DFT information
-        dft_dict = self._init_dft(molecule, scf_tensors)
+        dft_dict = self._init_dft(molecule, scf_results)
 
         # PE information
         pe_dict = self._init_pe(molecule, basis)
@@ -225,7 +222,7 @@ class LinearResponseSolver(LinearSolver):
 
         if not self.has_external_rhs:
             b_grad = self.get_prop_grad(self.b_operator, self.b_components,
-                                        molecule, basis, scf_tensors)
+                                        molecule, basis, scf_results)
             if self.rank == mpi_master():
                 v_grad = {
                     (op, w): v for op, v in zip(self.b_components, b_grad)
@@ -289,7 +286,7 @@ class LinearResponseSolver(LinearSolver):
 
             profiler.set_timing_key('Preparation')
 
-            self._e2n_half_size(bger, bung, molecule, basis, scf_tensors,
+            self._e2n_half_size(bger, bung, molecule, basis, scf_results,
                                 eri_dict, dft_dict, pe_dict, profiler)
 
         profiler.check_memory_usage('Initial guess')
@@ -460,7 +457,7 @@ class LinearResponseSolver(LinearSolver):
                                        rsp_vector_labels)
 
             self._e2n_half_size(new_trials_ger, new_trials_ung, molecule, basis,
-                                scf_tensors, eri_dict, dft_dict, pe_dict,
+                                scf_results, eri_dict, dft_dict, pe_dict,
                                 profiler)
 
             iter_in_hours = (tm.time() - iter_start_time) / 3600
@@ -490,7 +487,7 @@ class LinearResponseSolver(LinearSolver):
         # calculate response functions
         if not self.has_external_rhs:
             a_grad = self.get_prop_grad(self.a_operator, self.a_components,
-                                        molecule, basis, scf_tensors)
+                                        molecule, basis, scf_results)
 
             if self.is_converged:
                 if self.rank == mpi_master():
@@ -521,7 +518,8 @@ class LinearResponseSolver(LinearSolver):
                                 for aop in self.a_components
                             ]
                             write_rsp_solution_with_multiple_keys(
-                                final_h5_fname, solution_keys, x, self.group_label)
+                                final_h5_fname, solution_keys, x,
+                                self.group_label)
 
                 if self.rank == mpi_master():
                     # print information about h5 file for response solutions
@@ -542,13 +540,18 @@ class LinearResponseSolver(LinearSolver):
                         'solutions': solutions,
                     }
                 else:
+                    # non-master rank
                     return {'solutions': solutions}
+            else:
+                # not converged
+                return {}
 
         else:
+            # has_external_rhs
             if self.is_converged:
                 return {'solutions': solutions}
-
-        return None
+            else:
+                return {}
 
     @staticmethod
     def get_full_solution_vector(solution):
@@ -600,7 +603,8 @@ class LinearResponseSolver(LinearSolver):
                 output_iter += 'Residual Norm: {:.8f}'.format(rel_res)
                 self.ostream.print_header(output_iter.ljust(width))
             self.ostream.print_blank()
-            self.ostream.flush()
+
+        self.ostream.flush()
 
     def _get_precond(self, orb_ene, nocc, norb, w):
         """

@@ -145,6 +145,8 @@ from .lreigensolverunrest import LinearResponseUnrestrictedEigenSolver
 from .lrsolver import LinearResponseSolver
 from .lrsolverunrest import LinearResponseUnrestrictedSolver
 from .cppsolver import ComplexResponse
+from .cppsolverunrest import ComplexResponseUnrestricted
+from .tdacppsolver import ComplexResponseTDA
 from .c6driver import C6Driver
 from .quadraticresponsedriver import QuadraticResponseDriver
 from .cubicresponsedriver import CubicResponseDriver
@@ -163,6 +165,8 @@ from .rspabsorption import Absorption
 from .rspc6 import C6
 from .rspshg import SHG
 from .rsptpa import TPA
+from .rixsdriver import RixsDriver
+from .localizationdriver import LocalizationDriver
 #from .rspcustomproperty import CustomProperty
 from .mpitask import MpiTask
 from .subcommunicators import SubCommunicators
@@ -172,10 +176,10 @@ from .tddftorbitalresponse import TddftOrbitalResponse
 from .tddftgradientdriver import TddftGradientDriver
 from .hessiandriver import HessianDriver
 from .scfhessiandriver import ScfHessianDriver
+from .tddfthessiandriver import TddftHessianDriver
 from .cphfsolver import CphfSolver
 from .hessianorbitalresponse import HessianOrbitalResponse
 from .hessianorbitalresponseunrest import UnrestrictedHessianOrbitalResponse
-from .tdhfhessiandriver import TdhfHessianDriver
 from .polorbitalresponse import PolOrbitalResponse
 from .polarizabilitygradient import PolarizabilityGradient
 from .vibrationalanalysis import VibrationalAnalysis
@@ -184,7 +188,6 @@ from .openmmdriver import OpenMMDriver
 from .openmmgradientdriver import OpenMMGradientDriver
 from .orbitalviewer import OrbitalViewer
 from .densityviewer import DensityViewer
-from .densityvieweralternative import DensityViewerAlternative
 from .numerovdriver import NumerovDriver
 from .mmdriver import MMDriver
 from .mmgradientdriver import MMGradientDriver
@@ -193,6 +196,7 @@ from .solvationbuilder import SolvationBuilder
 from .solvationfepdriver import SolvationFepDriver
 from .openmmdynamics import OpenMMDynamics
 from .excitedstateanalysisdriver import ExcitedStateAnalysisDriver
+from .valetanalyzer import ValetAnalyzer
 from .evbdriver import EvbDriver
 from .reaffbuilder import ReactionForceFieldBuilder
 from .evbsystembuilder import EvbSystemBuilder

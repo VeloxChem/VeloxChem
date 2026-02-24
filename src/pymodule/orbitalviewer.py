@@ -33,6 +33,7 @@
 import numpy as np
 import math
 
+from .veloxchemlib import chemical_element_identifier
 from .molecularorbitals import MolecularOrbitals, molorb
 from .visualizationdriver import VisualizationDriver
 from .cubicgrid import CubicGrid
@@ -86,6 +87,8 @@ class OrbitalViewer:
         self.atom_centers = None
 
         # molecule
+        self._molecule = None
+        self._basis = None
         self._atomnr = None
         self._coords = None
 
@@ -109,6 +112,10 @@ class OrbitalViewer:
         self._plt_iso_one = None
         self._plt_iso_two = None
 
+        # viewer size
+        self._viewer_width = 600
+        self._viewer_height = 450
+
     def help_string_k3d(self):
 
         return ('Unable to import k3d. Please install k3d via pip or conda,\n' +
@@ -131,8 +138,21 @@ class OrbitalViewer:
             The AO basis set.
         """
 
-        # Define box size
+        self._molecule = molecule
+        self._basis = basis
+
         self._atomnr = np.array(molecule.get_identifiers()) - 1
+
+        # Take care of _atomnr for ghost atoms
+        for i_atom, (atom_bas_label, atom_bas_elem) in enumerate(
+                molecule.get_atom_basis_labels()):
+            if self._atomnr[i_atom] == -1:
+                elem_id = chemical_element_identifier(atom_bas_elem)
+                assert_msg_critical(
+                    elem_id > 0, 'OrbitalViewer: dummy atom is not supported')
+                self._atomnr[i_atom] = elem_id - 1
+
+        # Define box size
         self._coords = molecule.get_coordinates_in_bohr()
         if self.atom_centers is None:
             xmin = self._coords[:, 0].min() - self.grid_margins
@@ -172,27 +192,40 @@ class OrbitalViewer:
         atom_grid = CubicGrid(self._atom_origin, self.stepsize,
                               self._atom_npoints)
 
+        # Take care of mixed basis set by creating a list of atom basis labels
+        atom_basis_labels = []
+        for atom_bas_label, atom_bas_elem in molecule.get_atom_basis_labels():
+            atom_basis_labels.append(atom_bas_label)
+        for i_atom in range(len(atom_basis_labels)):
+            if not atom_basis_labels[i_atom]:
+                atom_basis_labels[i_atom] = basis.get_label()
+
         # Create atomic map
         vis_drv = VisualizationDriver()
         ao_info = vis_drv.get_atomic_orbital_info(molecule, basis)
 
         # Create reverse atomic map
         atom_to_ao = vis_drv.map_atom_to_atomic_orbitals(molecule, basis)
+
         self._ao_to_atom = [[] for i in range(len(ao_info))]
         for i_atom, atom_orbs in enumerate(atom_to_ao):
+            # Note: need atom_bas_label for distinguishing atoms that are same
+            # elements but with different basis set
+            atom_bas_label = atom_basis_labels[i_atom]
             for i_orb, orb in enumerate(atom_orbs):
-                self._ao_to_atom[orb] = [i_atom, i_orb]
+                self._ao_to_atom[orb] = (i_atom, atom_bas_label, i_orb)
 
         # Compute each unique AO on the grid
         self._ao_dict = {}
         for i_atom, atom in enumerate(self._atomnr):
-            if atom not in self._ao_dict:
+            atom_bas_label = atom_basis_labels[i_atom]
+            if (atom, atom_bas_label) not in self._ao_dict:
                 atomlist = []
                 for orb in atom_to_ao[i_atom]:
                     vis_drv.compute_atomic_orbital_for_grid(
                         atom_grid, basis, ao_info[orb])
                     atomlist.append(atom_grid.values_to_numpy())
-                self._ao_dict[atom] = atomlist
+                self._ao_dict[(atom, atom_bas_label)] = list(atomlist)
 
     def compute_orbital(self, orbital, index):
         """
@@ -234,9 +267,9 @@ class OrbitalViewer:
         # Loop over AOs
         for i_coef, coef in enumerate(this_orb):
             if abs(coef) > self.mo_threshold:
-                i_atom, i_orb = self._ao_to_atom[i_coef]
+                i_atom, atom_bas_label, i_orb = self._ao_to_atom[i_coef]
                 this_atom = self._atomnr[i_atom]
-                atom_orb = self._ao_dict[this_atom][i_orb]
+                atom_orb = self._ao_dict[(this_atom, atom_bas_label)][i_orb]
                 t = np.round(
                     (self._coords[i_atom] - self.origin + self._atom_origin) /
                     self.stepsize).astype('int')
@@ -289,9 +322,9 @@ class OrbitalViewer:
         # Loop over AOs
         for i_coef, orb_coef in enumerate(this_orb):
             if abs(orb_coef) > self.mo_threshold:
-                i_atom, i_orb = self._ao_to_atom[i_coef]
+                i_atom, atom_bas_label, i_orb = self._ao_to_atom[i_coef]
                 this_atom = self._atomnr[i_atom]
-                atom_orb = self._ao_dict[this_atom][i_orb]
+                atom_orb = self._ao_dict[(this_atom, atom_bas_label)][i_orb]
 
                 t = (self._coords[i_atom] - self.origin +
                      self._atom_origin) / self.stepsize
@@ -348,9 +381,24 @@ class OrbitalViewer:
 
         return np_orb
 
-    def plot(self, molecule, basis, mo_inp, label=''):
+    def plot(self, molecule, basis, mo_inp, label='', width=600, height=450):
         """
         Plots the orbitals, with a widget to choose which.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param mo_inp:
+            The MolecularOrbitals input (filename of h5 file storing the
+            MolecularOrbitals, or a MolecularOrbitals object).
+        """
+
+        self._plot_using_py3dmol(molecule, basis, mo_inp, label, width, height)
+
+    def plot_using_k3d(self, molecule, basis, mo_inp, label=''):
+        """
+        Plots the orbitals using k3d, with a widget to choose which.
 
         :param molecule:
             The molecule.
@@ -374,6 +422,13 @@ class OrbitalViewer:
 
         if isinstance(mo_inp, str):
             if (label and isinstance(label, str)):
+                # for backward compatibility, check and update label
+                if label.startswith('rsp/') and (
+                        not label.startswith('rsp/nto/')):
+                    new_label = label.replace('rsp/', 'rsp/nto/')
+                    if MolecularOrbitals.check_label_validity(
+                            mo_inp, new_label):
+                        label = new_label
                 mo_object = MolecularOrbitals.read_hdf5(mo_inp, label=label)
             else:
                 mo_object = MolecularOrbitals.read_hdf5(mo_inp)
@@ -718,3 +773,294 @@ class OrbitalViewer:
                                          group='Orbitals')
 
         return plt_iso_one, plt_iso_two
+
+    def _plot_using_py3dmol(self,
+                            molecule,
+                            basis,
+                            mo_inp,
+                            label='',
+                            width=600,
+                            height=450):
+        """
+        Plots the orbitals using py3dmol, with a widget to choose which.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param mo_inp:
+            The MolecularOrbitals input (filename of h5 file storing the
+            MolecularOrbitals, or a MolecularOrbitals object).
+        """
+
+        try:
+            import ipywidgets as widgets
+            from IPython.display import display, HTML
+        except ImportError:
+            raise ImportError(self.help_string_widgets_and_display())
+
+        if isinstance(mo_inp, str):
+            if (label and isinstance(label, str)):
+                # for backward compatibility, check and update label
+                if label.startswith('rsp/') and (
+                        not label.startswith('rsp/nto/')):
+                    new_label = label.replace('rsp/', 'rsp/nto/')
+                    if MolecularOrbitals.check_label_validity(
+                            mo_inp, new_label):
+                        label = new_label
+                mo_object = MolecularOrbitals.read_hdf5(mo_inp, label=label)
+            else:
+                mo_object = MolecularOrbitals.read_hdf5(mo_inp)
+        elif isinstance(mo_inp, MolecularOrbitals):
+            mo_object = mo_inp
+        else:
+            assert_msg_critical(False, 'OrbitalViewer.plot: Invalid MO input')
+
+        self.initialize(molecule, basis)
+
+        self._is_uhf = (mo_object.get_orbitals_type() == molorb.unrest)
+
+        # i_orb is an instance variable accessed by MultiPsi
+        self._i_orb = molecule.number_of_alpha_electrons() - 1
+        self._mo_coefs = mo_object.alpha_to_numpy()
+
+        # In some cases (for example NTOs) the number of orbitals is less than
+        # the number of electrons. In this case, print the middle orbital
+        if self._mo_coefs.shape[1] < molecule.number_of_alpha_electrons():
+            self._i_orb = self._mo_coefs.shape[1] // 2
+        if self._is_uhf:
+            self._mo_coefs_beta = mo_object.beta_to_numpy()
+        else:
+            self._mo_coefs_beta = self._mo_coefs
+
+        nalpha = molecule.number_of_alpha_electrons()
+        nbeta = molecule.number_of_beta_electrons()
+
+        # Create orbital list:
+        orb_ene = mo_object.ea_to_numpy()
+        orb_occ = mo_object.occa_to_numpy()
+        orb_occ_beta = mo_object.occb_to_numpy()
+        if not self._is_uhf:
+            # In case of NTO, only print alpha occupation numbers (lambda's)
+            # Otherwise print the sum of alpha and beta occupation numbers
+            if (mo_object.get_orbitals_type() != molorb.rest or
+                    not mo_object.is_nto()):
+                orb_occ += orb_occ_beta
+        orblist = []
+        for i in range(len(orb_ene)):
+            orb_label = f'{i + 1:3d} occ={orb_occ[i]:.3f} '
+            orb_label += f'ene={orb_ene[i]:.3f}'
+            if i < nalpha - 1:
+                orb_label += f'  (alpha HOMO-{nalpha - 1 - i})'
+            elif i == nalpha - 1:
+                orb_label += '  (alpha HOMO)'
+            elif i == nalpha:
+                orb_label += '  (alpha LUMO)'
+            elif i > nalpha:
+                orb_label += f'  (alpha LUMO+{i - nalpha})'
+            orblist.append((orb_label, i))
+
+        # Also do for beta if UHF
+        if self._is_uhf:
+            orb_ene_beta = mo_object.eb_to_numpy()
+            orblist_beta = []
+            for i in range(len(orb_ene_beta)):
+                orb_label = f'{i + 1:3d} occ={orb_occ_beta[i]:.3f} '
+                orb_label += f'ene={orb_ene_beta[i]:.3f}'
+                if i < nbeta - 1:
+                    orb_label += f'  (beta HOMO-{nbeta - 1 - i})'
+                elif i == nbeta - 1:
+                    orb_label += '  (beta HOMO)'
+                elif i == nbeta:
+                    orb_label += '  (beta LUMO)'
+                elif i > nbeta:
+                    orb_label += f'  (beta LUMO+{i - nbeta})'
+                orblist_beta.append((orb_label, i))
+
+        # use a persistent output widget
+        out = widgets.Output()
+
+        self._viewer_width = width
+        self._viewer_height = height
+
+        has_ghost_atom = (0 in molecule.get_identifiers())
+
+        # draw the first orbital by default
+        with out:
+            display(HTML(self._draw_orbital_html(self._i_orb)))
+
+        def update_view_alpha(change):
+            if not has_ghost_atom:
+                out.clear_output(wait=True)
+                with out:
+                    display(HTML(self._draw_molecule_html()))
+            out.clear_output(wait=True)
+            with out:
+                display(HTML(self._draw_orbital_html(change['new'], 'alpha')))
+
+        def update_view_beta(change):
+            if not has_ghost_atom:
+                out.clear_output(wait=True)
+                with out:
+                    display(HTML(self._draw_molecule_html()))
+            out.clear_output(wait=True)
+            with out:
+                display(HTML(self._draw_orbital_html(change['new'], 'beta')))
+
+        dropdown = widgets.Dropdown(options=orblist,
+                                    value=self._i_orb,
+                                    description='Alpha orbital')
+        dropdown.observe(update_view_alpha, names='value')
+
+        if self._is_uhf:
+            dropdown_beta = widgets.Dropdown(options=orblist_beta,
+                                             value=None,
+                                             description='Beta orbital')
+            dropdown_beta.observe(update_view_beta, names='value')
+            hbox = widgets.HBox([dropdown, dropdown_beta])
+            display(hbox, out)
+        else:
+            display(dropdown, out)
+
+    def _draw_molecule_html(self):
+        """
+        Generates HTML for molecule using py3dmol.
+
+        :return:
+            The HTML for molecule.
+        """
+
+        try:
+            import py3Dmol
+        except ImportError:
+            raise ImportError('Unable to import py3Dmol')
+
+        viewer = py3Dmol.view(width=self._viewer_width,
+                              height=self._viewer_height)
+
+        viewer.addModel(self._molecule.get_xyz_string(), "xyz")
+        viewer.setStyle({"stick": {}, "sphere": {"scale": 0.1}})
+
+        viewer.zoomTo()
+
+        # self-contained HTML that is stable in ipywidgets
+        return viewer._make_html()
+
+    def _draw_orbital_html(self, i_orb, spin='alpha'):
+        """
+        Generates HTML for orbital volumetric data using py3dmol.
+
+        :param i_orb:
+            The index of the orbital.
+
+        :return:
+            The HTML for orbital volumetric data.
+        """
+
+        try:
+            import py3Dmol
+        except ImportError:
+            raise ImportError('Unable to import py3Dmol')
+
+        self._i_orb = i_orb
+
+        if spin.lower() == 'alpha':
+            orbital_cube_data = self.compute_orbital(self._mo_coefs,
+                                                     self._i_orb)
+        else:
+            orbital_cube_data = self.compute_orbital(self._mo_coefs_beta,
+                                                     self._i_orb)
+
+        orbital_cube_str = self._get_orbital_cube_str(orbital_cube_data,
+                                                      f'({spin})')
+
+        viewer = py3Dmol.view(width=self._viewer_width,
+                              height=self._viewer_height)
+
+        viewer.addModel(orbital_cube_str, "cube")
+        viewer.setStyle({"stick": {}, "sphere": {"scale": 0.1}})
+
+        viewer.zoomTo()
+
+        isovalue = self.orbital_isovalue
+        opacity = self.orbital_opacity
+        if self.orbital_color_scheme == 'default':
+            positive_color = 0x0000ff
+            negative_color = 0xff0000
+        elif self.orbital_color_scheme == 'alternative':
+            positive_color = 0x62a0ea
+            negative_color = 0xe5a50a
+
+        viewer.addVolumetricData(orbital_cube_str, "cube", {
+            "isoval": isovalue,
+            "color": positive_color,
+            "opacity": opacity,
+        })
+
+        viewer.addVolumetricData(orbital_cube_str, "cube", {
+            "isoval": -isovalue,
+            "color": negative_color,
+            "opacity": opacity,
+        })
+
+        # self-contained HTML that is stable in ipywidgets
+        return viewer._make_html()
+
+    def _get_orbital_cube_str(self, orbital_data, comment=''):
+        """
+        Writes orbital data to a string in cube file format.
+
+        :param cubefile:
+            Name of the cube file.
+        :param grid:
+            The cubic grid.
+        """
+
+        cube_str_list = []
+
+        coords = self._molecule.get_coordinates_in_bohr()
+
+        x = coords[:, 0]
+        y = coords[:, 1]
+        z = coords[:, 2]
+
+        natoms = self._molecule.number_of_atoms()
+        elem_ids = self._atomnr + 1
+
+        x0, y0, z0 = self.origin
+        dx, dy, dz = self.stepsize
+        nx, ny, nz = self.npoints
+
+        cube_str_list.append('Cube file generated by VeloxChem\n')
+
+        # cube for orbital
+        cube_str_list.append('Orbital {:d} {:s}\n'.format(
+            self._i_orb + 1, comment))
+        line = '{:5d}{:12.6f}{:12.6f}{:12.6f}{:5d}\n'.format(
+            -natoms, x0, y0, z0, 1)
+        cube_str_list.append(line)
+
+        cube_str_list.append('{:5d}{:12.6f}{:12.6f}{:12.6f}\n'.format(
+            nx, dx, 0, 0))
+        cube_str_list.append('{:5d}{:12.6f}{:12.6f}{:12.6f}\n'.format(
+            ny, 0, dy, 0))
+        cube_str_list.append('{:5d}{:12.6f}{:12.6f}{:12.6f}\n'.format(
+            nz, 0, 0, dz))
+
+        for a in range(natoms):
+            line = '{:5d}{:12.6f}{:12.6f}{:12.6f}{:12.6f}\n'.format(
+                elem_ids[a], float(elem_ids[a]), x[a], y[a], z[a])
+            cube_str_list.append(line)
+
+        cube_str_list.append('{:5d}{:5d}\n'.format(1, self._i_orb + 1))
+
+        for ix in range(nx):
+            for iy in range(ny):
+                for iz in range(nz):
+                    cube_str_list.append(' {:12.5E}'.format(orbital_data[ix, iy,
+                                                                         iz]))
+                    if iz % 6 == 5:
+                        cube_str_list.append('\n')
+                cube_str_list.append('\n')
+
+        return ''.join(cube_str_list)
