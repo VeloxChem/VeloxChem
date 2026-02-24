@@ -89,7 +89,7 @@ comp_projected_core_potential_sd_for_p(T& distributor,
 
     CSimdArray<double> cbuffer(6, 1);
 
-    CSimdArray<double> sbuffer(6, 1);
+    CSimdArray<double> sbuffer(5, 1);
 
     // set up ket partitioning
 
