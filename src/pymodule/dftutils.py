@@ -82,12 +82,14 @@ def get_default_grid_level(xc_func):
 
         if func_name.upper() in [
                 'SCAN',
+                'SCAN0',
         ]:
             return 7
 
         elif func_name.upper() in [
                 'RSCAN',
                 'R2SCAN',
+                'R2SCAN50',
         ]:
             return 6
 

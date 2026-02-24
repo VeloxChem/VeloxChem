@@ -45,6 +45,11 @@ getAvailableFunctionals()
     return std::vector<std::string>({"SLATER", "SLDA",   "B88X",    "BLYP",  "B3LYP",   "BHANDH", "BHANDHLYP", "PBE",   "PBE0",   "REVPBE",
                                      "BP86",   "PW91",   "MPW1K",   "OLYP",  "O3LYP",   "X3LYP",  "B97",       "B97-1", "B97-2",  "B97-3",
                                      "LRC-WPBEH", "CAM-B3LYP", "RCAM-B3LYP", "WB97X-D4", "WB97M-D4", "LC-BLYP",
+                                     // New functionals
+                                     // "HSE06", "B97MV-D4", // these two were wildly different compared to Q-Chem (2H)
+                                     "BB1K", "CAM-QTP00", "M08-HX", "MN15", "MN15-L", "R2SCAN50", // pretty spot on vs Q-Chem or PySCf
+                                     "REVM06-L", "SCAN0", "TPSS0", "REVTPSSH", // OKish, but not spot on
+                                     // end
                                      "TPSS",   "TPSSH",  "REVTPSS", "PKZB",  "SCAN",    "RSCAN",  "R2SCAN",    "M05",   "M05-2X", "M06",
                                      "M06-2X", "M06-HF", "M06-L",   "M11-L", "MPW1B95", "MPWB1K", "PW6B95",    "PWB6K"});
 }
@@ -153,6 +158,34 @@ getExchangeCorrelationFunctional(const std::string &xcLabel)
         if (format::upper_case(xcLabel) == "PWB6K") return CXCFunctional("PWB6K", {"HYB_MGGA_XC_PWB6K"}, {1.0});
 
         // TODO add more functionals here...
+
+        // New Functionals
+
+        // if (format::upper_case(xcLabel) == "HSE06") return CXCFunctional("HSE06", {"HYB_GGA_XC_HSE06"}, {1.0}); // not working
+
+        // if (format::upper_case(xcLabel) == "B97MV-D4") return CXCFunctional("B97MV-D4", {"MGGA_XC_B97M_V"}, {1.0}); // not working
+
+        if (format::upper_case(xcLabel) == "BB1K") return CXCFunctional("BB1K", {"HYB_MGGA_XC_BB1K"}, {1.0});
+
+        if (format::upper_case(xcLabel) == "CAM-QTP00") return CXCFunctional("CAM-QTP00", {"HYB_GGA_XC_CAM_QTP_00"}, {1.0});
+
+        if (format::upper_case(xcLabel) == "M08-HX") return CXCFunctional("M08-HX", {"HYB_MGGA_X_M08_HX", "MGGA_C_M08_HX"}, {1.0, 1.0});
+
+        if (format::upper_case(xcLabel) == "MN15") return CXCFunctional("MN15", {"HYB_MGGA_X_MN15", "MGGA_C_MN15"}, {1.0, 1.0});
+
+        if (format::upper_case(xcLabel) == "MN15-L") return CXCFunctional("MN15-L", {"MGGA_X_MN15_L", "MGGA_C_MN15_L"}, {1.0, 1.0});
+
+        if (format::upper_case(xcLabel) == "REVM06-L") return CXCFunctional("REVM06-L", {"MGGA_X_REVM06_L", "MGGA_C_REVM06_L"}, {1.0, 1.0});
+
+        if (format::upper_case(xcLabel) == "SCAN0") return CXCFunctional("SCAN0", {"HYB_MGGA_X_SCAN0", "MGGA_C_SCAN"}, {1.0, 1.0});
+
+        if (format::upper_case(xcLabel) == "TPSS0") return CXCFunctional("TPSS0", {"HYB_MGGA_XC_TPSS0"}, {1.0});
+
+        if (format::upper_case(xcLabel) == "REVTPSSH") return CXCFunctional("REVTPSSH", {"HYB_MGGA_XC_REVTPSSH"}, {1.0});
+
+        if (format::upper_case(xcLabel) == "R2SCAN50") return CXCFunctional("R2SCAN50", {"HYB_MGGA_XC_R2SCAN50"}, {1.0});
+
+        // end-of-new
     }
 
     std::string errmsg(std::string("getExchangeCorrelationFunctional: ") + xcLabel + std::string(" is not available"));
