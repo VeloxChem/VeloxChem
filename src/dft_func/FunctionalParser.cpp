@@ -49,6 +49,7 @@ getAvailableFunctionals()
                                      // "HSE06", "B97MV-D4", // these two were wildly different compared to Q-Chem (2H)
                                      "BB1K", "CAM-QTP00", "M08-HX", "MN15", "MN15-L", "R2SCAN50", // pretty spot on vs Q-Chem or PySCf
                                      "REVM06-L", "SCAN0", "TPSS0", "REVTPSSH", // OKish, but not spot on
+                                     "LRC-WPBE",
                                      // end
                                      "TPSS",   "TPSSH",  "REVTPSS", "PKZB",  "SCAN",    "RSCAN",  "R2SCAN",    "M05",   "M05-2X", "M06",
                                      "M06-2X", "M06-HF", "M06-L",   "M11-L", "MPW1B95", "MPWB1K", "PW6B95",    "PWB6K"});
@@ -184,6 +185,8 @@ getExchangeCorrelationFunctional(const std::string &xcLabel)
         if (format::upper_case(xcLabel) == "REVTPSSH") return CXCFunctional("REVTPSSH", {"HYB_MGGA_XC_REVTPSSH"}, {1.0});
 
         if (format::upper_case(xcLabel) == "R2SCAN50") return CXCFunctional("R2SCAN50", {"HYB_MGGA_XC_R2SCAN50"}, {1.0});
+
+        if (format::upper_case(xcLabel) == "LRC-WPBE") return CXCFunctional("LRC-WPBE", {"HYB_GGA_XC_LRC_WPBE"}, {1.0});
 
         // end-of-new
     }
