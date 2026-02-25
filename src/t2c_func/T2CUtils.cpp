@@ -703,13 +703,13 @@ comp_i_vals(CSimdArray<double>& values, const int order, const CSimdArray<double
     
     // higher orders
     
-    double n2fact = 1.0 / 15.0;
+    double n2fact = 15.0;
     
     for (int k = 3; k <= order; k++)
     {
         auto fvals = values.data(size_t(k));
         
-        n2fact *= 2 * k + 1.0;
+        n2fact *= 2 * (double)k + 1.0;
         
         for (size_t i = 0; i < nelems; i++)
         {
@@ -719,7 +719,7 @@ comp_i_vals(CSimdArray<double>& values, const int order, const CSimdArray<double
             }
             else
             {
-                fvals[i] = n2fact;
+                fvals[i] = 1.0 / n2fact;
             }
         }
     }

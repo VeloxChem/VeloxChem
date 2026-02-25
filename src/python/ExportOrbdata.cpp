@@ -53,6 +53,7 @@
 #include "GtoPairBlockFunc.hpp"
 #include "MolecularBasis.hpp"
 #include "BaseCorePotential.hpp"
+#include "AtomCorePotential.hpp"
 
 namespace py = pybind11;
 using namespace py::literals;
@@ -465,6 +466,26 @@ export_orbdata(py::module &m)
         .def("__eq__", [](const CBaseCorePotential &self, const CBaseCorePotential &other) { return self == other; })
         .def("__copy__", [](const CBaseCorePotential &self) { return CBaseCorePotential(self); })
         .def("__deepcopy__", [](const CBaseCorePotential &self, py::dict) { return CBaseCorePotential(self); });
+    
+    // CAtomCorePotential class
+    PyClass<CAtomCorePotential>(m, "AtomCorePotential")
+        .def(py::init<>())
+        .def(py::init<const CAtomCorePotential&>())
+        .def(py::init<const CBaseCorePotential &, const std::vector<CBaseCorePotential> &, const std::vector<int> &, const int>())
+        .def(py::pickle(
+            [](const CAtomCorePotential &ecp) { return py::make_tuple(ecp.get_local_potential(), ecp.get_projected_potentials(), ecp.get_angular_momentums(), ecp.number_of_core_electrons()); },
+            [](py::tuple t) { return CAtomCorePotential(t[0].cast<CBaseCorePotential>(), t[1].cast<std::vector<CBaseCorePotential>>(), t[2].cast<std::vector<int>>(), t[3].cast<int>()); }))
+        .def("set_local_potential", &CAtomCorePotential::set_local_potential, "Sets local core potential.")
+        .def("set_projected_potentials", &CAtomCorePotential::set_projected_potentials, "Sets projected core potentials.")
+        .def("add_projected_potential", &CAtomCorePotential::add_projected_potential, "Adds projected core potential.")
+        .def("set_number_of_core_electrons", &CAtomCorePotential::set_number_core_electrons, "Sets number of excluded electron in atom core potential.")
+        .def("get_local_potential", &CAtomCorePotential::get_local_potential, "Gets local core potential")
+        .def("get_projected_potentials", &CAtomCorePotential::get_projected_potentials, "Gets vector of projected potentials.")
+        .def("get_angular_momentums", &CAtomCorePotential::get_angular_momentums, "Gets vector of angular momentums of projected potentials.")
+        .def("number_of_core_electrons", &CAtomCorePotential::number_of_core_electrons, "Gets number of electrons in atom core potential.")
+        .def("__eq__", [](const CAtomCorePotential &self, const CAtomCorePotential &other) { return self == other; })
+        .def("__copy__", [](const CAtomCorePotential &self) { return CAtomCorePotential(self); })
+        .def("__deepcopy__", [](const CAtomCorePotential &self, py::dict) { return CAtomCorePotential(self); });
 
     // exposing functions
 

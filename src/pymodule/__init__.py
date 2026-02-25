@@ -37,6 +37,7 @@ from .veloxchemlib import GtoBlock
 from .veloxchemlib import GtoPairBlock
 from .veloxchemlib import BlockedGtoPairBlock
 from .veloxchemlib import BaseCorePotential
+from .veloxchemlib import AtomCorePotential
 from .veloxchemlib import T3FlatBuffer
 from .veloxchemlib import OverlapDriver
 from .veloxchemlib import KineticEnergyDriver
@@ -65,6 +66,7 @@ from .veloxchemlib import TwoCenterElectronRepulsionDriver
 from .veloxchemlib import TwoCenterElectronRepulsionGeom100Driver
 from .veloxchemlib import LocalECPDriver
 from .veloxchemlib import ProjectedECPDriver
+from .veloxchemlib import ECPDriver
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import FockGeom1000Driver
 from .veloxchemlib import FockGeom2000Driver
