@@ -49,7 +49,17 @@ from .veloxchemlib import (mpi_master, bohr_in_angstrom)
 
 class EnsembleDriver:
     """
-    Handles the environment from the snapshots from EnsembleParser.
+    Implements ensemble calculations over a list of snapshots produced by
+    :class EnsembleParser.
+
+    Each snapshot contains teh QM subsysem and (optionally) environment atoms.
+    The driver can run, for each snapshot:
+
+    - A SCF calculation (restricted or unrestricted)
+    - Polarizable embedding (PE) via per-snapshot .pot files.
+    - Non-polarizable embedding (NPE) via point charges.
+    - Optional linear response properties using
+      :class LinearResponseEigenSolver.
 
     :param comm:
         The MPI communicator.
@@ -57,21 +67,31 @@ class EnsembleDriver:
         The output stream.
 
     Instance variables:
-        - pe_models: Dictionary containing PE model parameters.
-        - npe_models: Dictionary containing NPE model parameters.
-        - pe_model: Selected PE model dict
-        - npe_model: Selected NPE model dict
+        - pe_models: Dictionary of available PE models (e.g., SEP, CP3).
+        - npe_models: Dictionary of available NPE models (e.g., tip3p, ff19sb).
+        - pe_model: Selected PE model dictctionary.
+        - npe_model: Selected NPE model dictionary.
+        - grid_level: The accuracy level of DFT grid.
+        - xcfun: The XC functional.
+        - eri_thresh: The electron repulsion integrals screening threshold.
+        - run_response: If True, run linear response calculations after SCF.
+          response is run as well when any response option is set (e.g., :attr: `nstates`).
+        - nstates: Number of excited states to compute in linear response.
+        - nto: Whether to run NOT analysis in linear response.
+        - core_excitation: Whether to compute core excitations in linear response.
+        - num_core_orbitals: Number of core orbitals to consider for core excitations in linear response.
     """
 
     def __init__(self, comm=None, ostream=None):
         """
-        Initialize the environment driver.
+        Initializes the ensemble driver.
+
+        PE (SEP/CP3) and NPE (TIP3P/ff19sb) parameter tables are read from the
+       ``database/environment_parameters`` directory.
 
         See this reference, Figure 4, for a summary of 
-        different PE parameters approaches: SEP and CP3.
+        an overview of SEP/CP3 parametrizations:
         https://doi.org/10.1021/acs.jctc.5c01719
-
-        For NPE parameters, models supported: tip3p and ff19sb point charges.
         """
         if comm is None:
             comm = MPI.COMM_WORLD
@@ -151,7 +171,8 @@ class EnsembleDriver:
     
     # A good routine to have to enable input-output runs later one.
     def update_settings(self, scf_dict=None, method_dict=None, rsp_dict=None):
-        """ Updates the SCF, method, and response settings.
+        """
+        Updates settings in the ensemble driver.
 
         :param scf_dict:
             The dictionary of SCF settings.
@@ -177,6 +198,15 @@ class EnsembleDriver:
 
     @staticmethod
     def _parse_six_floats(field: str) -> list[float]:
+        """
+        Parse a six-component polarizability field from a CSV entry.
+
+        :param field:
+            Unoyt field containing six floating-point numbers.
+
+        :return:
+            List of six floats.
+        """
         parts = [p for p in str(field).replace(",", " ").split() if p]
         if len(parts) != 6:
             raise ValueError(f"Expected 6 floats in P11, got {len(parts)} from: {field!r}")
@@ -185,7 +215,7 @@ class EnsembleDriver:
     @staticmethod
     def _load_pe_db(csv_path: Path) -> dict:
         """
-        Loads SEP/CP3-like tables:
+        Loads PE-like table:
             molecule,res_name,atom_name,element,M0,P11
 
         Returns:
@@ -226,6 +256,7 @@ class EnsembleDriver:
         """
         Loads NPE-like table:
             molecule,res_name,atom_name,element,M0
+
         Returns:
             db[res_name][atom_name] = {"element": str, "charge": float}
         """
@@ -259,18 +290,18 @@ class EnsembleDriver:
                        pe_model: str | None = None,
                        npe_model: str | None = None):
         """
-        Set PE and/or NPE models
+        Set PE and/or NPE environment models
 
         Valid scenarios:
 
-        - PE only:  set_env_models(pe_model="CP3")
-        - NPE only: set_env_models(npe_model="ff19sb")
-        - Both:     set_env_models(pe_model="CP3", npe_model="ff19sb")
+        - PE only:  e.g., set_env_models(pe_model="CP3")
+        - NPE only: e.g., set_env_models(npe_model="ff19sb")
+        - Both:     e.g., set_env_models(pe_model="CP3", npe_model="ff19sb")
 
         :param pe_model:
-            Name of the PE parameter model.
+            Name of the PE parameter model (e.g., "SEP", "CP3").
         :param npe_model:
-            Name of the NPE parameter model.
+            Name of the NPE parameter model (e.g., "tip3p", "ff19sb").
         :return:
             None.
         :raises ValueError:
@@ -302,7 +333,7 @@ class EnsembleDriver:
     @staticmethod
     def _first_residue_atom_pattern(atom_names, resids, resnames, target_resname: str) -> list[str]:
         """
-        Return atom_name pattern for one residue instance (first resid) of target_resname,
+        Return atom_name pattern for one residue instance of target_resname,
         preserving the order in the arrays.
         """
         atom_names = np.asarray(atom_names, dtype=object)
@@ -351,20 +382,22 @@ class EnsembleDriver:
 
     def write_pot_files(self, snapshots, outdir: str | Path):
         """
-        Write pe environment snapshots to .pot files.
+        Write PE environment snapshots to .pot files.
 
-        Generates one .pot file per snapshot.
+        Generates one .pot file per snapshot, named ``pe_frame_XXXXXX.pot`` 
+        where XXXXXX is the snapshot ``frame`` index.
+
         The file contains the @environment,
         @charges, and @polarizabilities sections.
 
         :param snapshots:
-            A list of snapshot dictionaries returned from TrajectoryDriver.
+            A list of snapshot dictionaries.
         :param outdir:
             Output directory where the .pot files will be written.
         :param pe_model:
             PE model name
-        :return:
-            None.
+        :raises KeyError:
+           If a residue/atom type in the snapshots is missing from the selected PE database.
         """
         if self.pe_model is None:
             raise RuntimeError("PE model is not set. Call set_env_models(pe_model=..., npe_model=...) first.")
@@ -450,18 +483,28 @@ class EnsembleDriver:
         """
         Drives the computation over the ensemble of snapshots.
 
+        For each snapshot, an SCF calculation is performed for the QM subsystem, with
+        optional PE/NPE environment terms. Linear-response calculations are optional
+        and are controlled by :attr:`run_response` and the response options.
+
         :param snapshots:
-            A list of snapshot dictionaries (or a single dict).
+            A list of snapshot dictionaries (or a single snapshot dict).
         :param basis_label: (str)
             Basis set label.
         :param potdir : (str or Path)
             Directory to store/read PE potfiles.
         :param write_pe_potfiles: (bool)
             If True, PE potfiles are (re)generated before the loop when needed.
+        
         :return:
-            Dictionary with:
-              - scf_all: list of (frame, scf_results)
-              - rsp_all: list of (frame, rsp_results)
+            Dictionary with keys:
+            - scf_all: list of (frame, scf_results)
+            - rsp_all: list of (frame, rsp_results), only present if response is run.
+
+        :raises RuntimeError:
+            If required PE/NPE models have not been selected.
+        :raises ValueError:
+            If snapshot fields required to build NPE point charges are missing.
         """
         if self.pe_model is None and self.npe_model is None:
             raise RuntimeError(

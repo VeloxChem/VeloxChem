@@ -196,6 +196,7 @@ class EnsembleParser:
             Cutoff for polarizable embedding (PE) region selection (Angstrom).
         :param npe_cutoff:
             Cutoff for non-polarizable embedding (NPE) region selection (Angstrom).
+
         :return:
             A list of snapshot dictionaries, each containing:
             - frame (int):
@@ -206,6 +207,8 @@ class EnsembleParser:
                 Element symbols for each QM atom, shape (N_qm,).
             - pe_coords (numpy.ndarray):
                 PE region Cartesian coordinates, shape (N_pe, 3), in Angstrom.
+            - pe_atom_names (numpy.ndarray):
+                Atom names for each PE atom, shape (N_pe,).
             - pe_elements (numpy.ndarray):
                 Element symbols for each PE atom, shape (N_pe,).
             - pe_resids (numpy.ndarray):
@@ -216,6 +219,8 @@ class EnsembleParser:
                 Number of residues in the PE region.
             - npe_coords (numpy.ndarray):
                 NPE region Cartesian coordinates, shape (N_npe, 3), in Angstrom.
+            - npe_atom_names (numpy.ndarray):
+                Atom names for each NPE atom, shape (N_npe,).
             - npe_elements (numpy.ndarray):
                 Element symbols for each NPE atom, shape (N_npe,).
             - npe_resids (numpy.ndarray):
