@@ -35,6 +35,19 @@ class TestECPDriver:
         bas = MolecularBasis.read(mol, 'def2-svp')
 
         return mol, bas
+        
+    def get_gdh3_tzvpp_data(self):
+
+        gdh3str = """
+             Gd   0.000   0.000   0.000
+              H   0.200   1.800  -1.100
+              H   0.100  -0.900  -1.000
+              H   0.300   1.600   2.000
+        """
+        mol = Molecule.read_str(gdh3str, 'au')
+        bas = MolecularBasis.read(mol, 'def2-tzvpp')
+
+        return mol, bas
     
     def test_ecp_auh2_svp(self):
 
@@ -145,5 +158,60 @@ class TestECPDriver:
         # check full overlap matrix
         fmat = ecp_mat.full_matrix()
         fref = SubMatrix([0, 0, 93, 93])
+        fref.set_values(np.ascontiguousarray(ref_mat))
+        assert fmat == fref
+        
+    def test_ecp_gdh3_tzvpp(self):
+
+        mol_gdh3, bas_tzvpp = self.get_gdh3_tzvpp_data()
+        
+        lpot = BaseCorePotential([1.000000000000e+00, ], [0.000000000000e+00, ], [2,])
+                
+        spot = BaseCorePotential([2.460215100000e+01, ], [6.372008690000e+02, ], [2,])
+                                 
+        ppot = BaseCorePotential([1.688925000000e+01, ], [2.616896010000e+02, ], [2,])
+        
+        dpot = BaseCorePotential([1.364335800000e+01, ], [1.068565330000e+02, ], [2,])
+        
+        fpot = BaseCorePotential([2.412691700000e+01, ], [-5.068359000000e+01, ], [2,])
+        
+        gpot = BaseCorePotential([2.213188700000e+01, ], [-2.757963000000e+01, ], [2,])
+        
+        atom_pot = AtomCorePotential(lpot, [spot, ppot, dpot, fpot, gpot], [0, 1, 2, 3, 4], 60);
+        
+        ecp_drv = ECPDriver()
+        ecp_mat = ecp_drv.compute(mol_gdh3, bas_tzvpp, atom_pot)
+        
+        # load reference overlap data
+        here = Path(__file__).parent
+        npyfile = str(here / 'data' / 'gdh3.def2tzvpp.gd.ecp.full.npy')
+        ref_mat = np.load(npyfile)
+
+        # dimension of molecular basis
+        indexes = np.triu_indices(5)
+        basdims = [0, 19, 58, 98, 126, 144]
+        
+        print(ref_mat.shape)
+        
+        # check individual overlap submatrices
+        for i, j in zip(indexes[0], indexes[1]):
+            # bra side
+            sbra = basdims[i]
+            ebra = basdims[i + 1]
+            # ket side
+            sket = basdims[j]
+            eket = basdims[j + 1]
+            # load computed submatrix
+            cmat = ecp_mat.submatrix((i, j))
+            # load reference submatrix
+            rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
+            rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra,
+                                                         sket:eket]))
+            # compare submatrices
+            assert cmat == rmat
+
+        # check full overlap matrix
+        fmat = ecp_mat.full_matrix()
+        fref = SubMatrix([0, 0, 144, 144])
         fref.set_values(np.ascontiguousarray(ref_mat))
         assert fmat == fref
