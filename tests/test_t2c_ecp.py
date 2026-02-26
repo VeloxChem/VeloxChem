@@ -109,16 +109,14 @@ class TestECPDriver:
         
         gpot = BaseCorePotential([2.213188700000e+01, ], [-2.757963000000e+01, ], [2,])
         
-        #atom_pot = AtomCorePotential(lpot, [spot, ppot, dpot, fpot, gpot], [0, 1, 2, 3, 4], 60);
-        
-        atom_pot = AtomCorePotential(lpot, [fpot, ], [3, ], 60);
+        atom_pot = AtomCorePotential(lpot, [spot, ppot, dpot, fpot, gpot], [0, 1, 2, 3, 4], 60);
         
         ecp_drv = ECPDriver()
         ecp_mat = ecp_drv.compute(mol_gdh3, bas_svp, atom_pot)
         
         # load reference overlap data
         here = Path(__file__).parent
-        npyfile = str(here / 'data' / 'gdh3.def2svp.gd.ecp.only.f.npy')
+        npyfile = str(here / 'data' / 'gdh3.def2svp.gd.ecp.full.npy')
         ref_mat = np.load(npyfile)
 
         # dimension of molecular basis
@@ -141,11 +139,7 @@ class TestECPDriver:
             rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
             rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra,
                                                          sket:eket]))
-            
             # compare submatrices
-            print(i, " , ", j)
-            print(rmat.to_numpy())
-            print(cmat.to_numpy())
             assert cmat == rmat
 
         # check full overlap matrix

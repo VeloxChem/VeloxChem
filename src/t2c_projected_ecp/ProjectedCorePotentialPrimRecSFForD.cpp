@@ -147,7 +147,7 @@ comp_prim_projected_core_potential_sf_d(CSimdArray<double>& pbuffer,
 
     auto tg_0_zzz_d_0_0_0 = pbuffer.data(idx_sf_d_0_0_0 + 9);
 
-    #pragma omp simd aligned(b_exps, rb_x, rb_y, rb_z, tg_0_x_d_0_0_0, tg_0_x_d_0_1_0, tg_0_xx_d_0_0_0, tg_0_xx_d_0_1_0, tg_0_xx_p_0_0_1, tg_0_xx_s_0_1_1, tg_0_xxx_d_0_0_0, tg_0_xxy_d_0_0_0, tg_0_xxz_d_0_0_0, tg_0_xyy_d_0_0_0, tg_0_xyz_d_0_0_0, tg_0_xzz_d_0_0_0, tg_0_y_d_0_0_0, tg_0_y_d_0_1_0, tg_0_yy_d_0_0_0, tg_0_yy_d_0_1_0, tg_0_yy_p_0_0_1, tg_0_yy_s_0_1_1, tg_0_yyy_d_0_0_0, tg_0_yyz_d_0_0_0, tg_0_yz_d_0_0_0, tg_0_yz_d_0_1_0, tg_0_yz_p_0_0_1, tg_0_yz_s_0_1_1, tg_0_yzz_d_0_0_0, tg_0_z_d_0_0_0, tg_0_z_d_0_1_0, tg_0_zz_d_0_0_0, tg_0_zz_d_0_1_0, tg_0_zz_p_0_0_1, tg_0_zz_s_0_1_1, tg_0_zzz_d_0_0_0  : 64)
+    #pragma omp simd aligned(b_exps, rb_x, rb_y, rb_z, tg_0_x_d_0_0_0, tg_0_x_d_0_1_0, tg_0_x_s_0_1_1, tg_0_xx_d_0_0_0, tg_0_xx_d_0_1_0, tg_0_xx_p_0_0_1, tg_0_xx_s_0_1_1, tg_0_xxx_d_0_0_0, tg_0_xxy_d_0_0_0, tg_0_xxz_d_0_0_0, tg_0_xyy_d_0_0_0, tg_0_xyz_d_0_0_0, tg_0_xzz_d_0_0_0, tg_0_y_d_0_0_0, tg_0_y_d_0_1_0, tg_0_y_s_0_1_1, tg_0_yy_d_0_0_0, tg_0_yy_d_0_1_0, tg_0_yy_p_0_0_1, tg_0_yy_s_0_1_1, tg_0_yyy_d_0_0_0, tg_0_yyz_d_0_0_0, tg_0_yz_d_0_0_0, tg_0_yz_d_0_1_0, tg_0_yz_p_0_0_1, tg_0_yz_s_0_1_1, tg_0_yzz_d_0_0_0, tg_0_z_d_0_0_0, tg_0_z_d_0_1_0, tg_0_z_s_0_1_1, tg_0_zz_d_0_0_0, tg_0_zz_d_0_1_0, tg_0_zz_p_0_0_1, tg_0_zz_s_0_1_1, tg_0_zzz_d_0_0_0  : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fzi_0 = 1.0 / (a_exp + b_exps[i] + c_exp);
@@ -160,7 +160,9 @@ comp_prim_projected_core_potential_sf_d(CSimdArray<double>& pbuffer,
 
         const double f2abz_0 = 2.0 * a_exp * b_exps[i] * fzi_0;
 
-        tg_0_xxx_d_0_0_0[i] = 2.0 * tg_0_x_d_0_0_0[i] * fzi_0 + 2.0 * tg_0_x_d_0_1_0[i] * fazi_0 * fazi_0 - 5.0 * tg_0_xx_s_0_1_1[i] * f2abz_0 * rb_x[i] * fazi_0 + 5.0 * tg_0_xx_p_0_0_1[i] * a_x * fazi_0 + 2.0 * tg_0_xx_d_0_1_0[i] * rb_x[i] * fazi_0 * fazi_0 * fb_0 + tg_0_xx_d_0_0_0[i] * rb_x[i] * fbz_0;
+            const double fbi_0 = 1.0 / b_exps[i];
+
+        tg_0_xxx_d_0_0_0[i] = -5.0 * tg_0_x_s_0_1_1[i] * fbi_0 * f2abz_0 * fazi_0 + 2.0 * tg_0_x_d_0_0_0[i] * fzi_0 + 2.0 * tg_0_x_d_0_1_0[i] * fazi_0 * fazi_0 - 5.0 * tg_0_xx_s_0_1_1[i] * f2abz_0 * rb_x[i] * fazi_0 + 5.0 * tg_0_xx_p_0_0_1[i] * a_x * fazi_0 + 2.0 * tg_0_xx_d_0_1_0[i] * rb_x[i] * fazi_0 * fazi_0 * fb_0 + tg_0_xx_d_0_0_0[i] * rb_x[i] * fbz_0;
 
         tg_0_xxy_d_0_0_0[i] = -5.0 * tg_0_xx_s_0_1_1[i] * f2abz_0 * rb_y[i] * fazi_0 + 5.0 * tg_0_xx_p_0_0_1[i] * a_y * fazi_0 + 2.0 * tg_0_xx_d_0_1_0[i] * rb_y[i] * fazi_0 * fazi_0 * fb_0 + tg_0_xx_d_0_0_0[i] * rb_y[i] * fbz_0;
 
@@ -172,13 +174,13 @@ comp_prim_projected_core_potential_sf_d(CSimdArray<double>& pbuffer,
 
         tg_0_xzz_d_0_0_0[i] = -5.0 * tg_0_zz_s_0_1_1[i] * f2abz_0 * rb_x[i] * fazi_0 + 5.0 * tg_0_zz_p_0_0_1[i] * a_x * fazi_0 + 2.0 * tg_0_zz_d_0_1_0[i] * rb_x[i] * fazi_0 * fazi_0 * fb_0 + tg_0_zz_d_0_0_0[i] * rb_x[i] * fbz_0;
 
-        tg_0_yyy_d_0_0_0[i] = 2.0 * tg_0_y_d_0_0_0[i] * fzi_0 + 2.0 * tg_0_y_d_0_1_0[i] * fazi_0 * fazi_0 - 5.0 * tg_0_yy_s_0_1_1[i] * f2abz_0 * rb_y[i] * fazi_0 + 5.0 * tg_0_yy_p_0_0_1[i] * a_y * fazi_0 + 2.0 * tg_0_yy_d_0_1_0[i] * rb_y[i] * fazi_0 * fazi_0 * fb_0 + tg_0_yy_d_0_0_0[i] * rb_y[i] * fbz_0;
+        tg_0_yyy_d_0_0_0[i] = -5.0 * tg_0_y_s_0_1_1[i] * fbi_0 * f2abz_0 * fazi_0 + 2.0 * tg_0_y_d_0_0_0[i] * fzi_0 + 2.0 * tg_0_y_d_0_1_0[i] * fazi_0 * fazi_0 - 5.0 * tg_0_yy_s_0_1_1[i] * f2abz_0 * rb_y[i] * fazi_0 + 5.0 * tg_0_yy_p_0_0_1[i] * a_y * fazi_0 + 2.0 * tg_0_yy_d_0_1_0[i] * rb_y[i] * fazi_0 * fazi_0 * fb_0 + tg_0_yy_d_0_0_0[i] * rb_y[i] * fbz_0;
 
         tg_0_yyz_d_0_0_0[i] = -5.0 * tg_0_yy_s_0_1_1[i] * f2abz_0 * rb_z[i] * fazi_0 + 5.0 * tg_0_yy_p_0_0_1[i] * a_z * fazi_0 + 2.0 * tg_0_yy_d_0_1_0[i] * rb_z[i] * fazi_0 * fazi_0 * fb_0 + tg_0_yy_d_0_0_0[i] * rb_z[i] * fbz_0;
 
         tg_0_yzz_d_0_0_0[i] = -5.0 * tg_0_zz_s_0_1_1[i] * f2abz_0 * rb_y[i] * fazi_0 + 5.0 * tg_0_zz_p_0_0_1[i] * a_y * fazi_0 + 2.0 * tg_0_zz_d_0_1_0[i] * rb_y[i] * fazi_0 * fazi_0 * fb_0 + tg_0_zz_d_0_0_0[i] * rb_y[i] * fbz_0;
 
-        tg_0_zzz_d_0_0_0[i] = 2.0 * tg_0_z_d_0_0_0[i] * fzi_0 + 2.0 * tg_0_z_d_0_1_0[i] * fazi_0 * fazi_0 - 5.0 * tg_0_zz_s_0_1_1[i] * f2abz_0 * rb_z[i] * fazi_0 + 5.0 * tg_0_zz_p_0_0_1[i] * a_z * fazi_0 + 2.0 * tg_0_zz_d_0_1_0[i] * rb_z[i] * fazi_0 * fazi_0 * fb_0 + tg_0_zz_d_0_0_0[i] * rb_z[i] * fbz_0;
+        tg_0_zzz_d_0_0_0[i] = -5.0 * tg_0_z_s_0_1_1[i] * fbi_0 * f2abz_0 * fazi_0 + 2.0 * tg_0_z_d_0_0_0[i] * fzi_0 + 2.0 * tg_0_z_d_0_1_0[i] * fazi_0 * fazi_0 - 5.0 * tg_0_zz_s_0_1_1[i] * f2abz_0 * rb_z[i] * fazi_0 + 5.0 * tg_0_zz_p_0_0_1[i] * a_z * fazi_0 + 2.0 * tg_0_zz_d_0_1_0[i] * rb_z[i] * fazi_0 * fazi_0 * fb_0 + tg_0_zz_d_0_0_0[i] * rb_z[i] * fbz_0;
     }
 
     if (m > 0)
