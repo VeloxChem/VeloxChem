@@ -309,7 +309,7 @@ class IMForceFieldGenerator:
         self.use_minimized_structures = [True, []],
         self.add_conformal_structures = True
         self.add_structures_along_rcs = False
-        self.use_symmetry = True
+        self.use_symmetry = False
         self.identfy_relevant_int_coordinates = True
         self.add_gpr_model = True
         self.use_opt_confidence_radius = [False, 'single', 0.5, 0.3]
@@ -452,7 +452,7 @@ class IMForceFieldGenerator:
 
                 elif len(dimer_coordinates) > 0:
                     self.reaction_coordinates = dimer_coordinates
-
+            
                 self.roots_z_matrix[root] = self.define_z_matrix(molecule, self.reaction_coordinates)
             elif root not in self.roots_z_matrix:
                 int_driver = InterpolationDriver()

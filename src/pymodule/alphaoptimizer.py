@@ -135,7 +135,7 @@ def _eval_structure(payload):
     P       = np.asarray(drv.potentials, dtype=np.float64)                # (M,)
     G       = np.asarray(drv.gradients, dtype=np.float64).reshape(len(P), -1)  # (M,D)
     w_dα    = np.asarray(drv.dw_dalpha_list, dtype=np.float64)                  # (M,)
-    w_x     = np.asarray(drv.dw_dX_dalpha_list, dtype=np.float64).reshape(len(P), -1) # (M,D)
+    w_x_alpha     = np.asarray(drv.dw_dX_dalpha_list, dtype=np.float64).reshape(len(P), -1) # (M,D)
     S       = float(drv.sum_of_weights)                                         # ()
     S_x     = np.asarray(drv.sum_of_weights_grad, dtype=np.float64).reshape(-1) # (D,)
     
@@ -170,7 +170,7 @@ def _eval_structure(payload):
     dE_dα = (w_dα * (P - E_interp)) * (conv / S)                                 # (M,)
 
     # dG/dα (matrix M x D), all in kcal/mol
-    term1 = (w_x * (P - E_interp)[:, None]) * (conv / S)                         # (M,D)
+    term1 = (w_x_alpha * (P - E_interp)[:, None]) * (conv / S)                         # (M,D)
     term2 = (w_dα[:, None] * (G - G_interp[None, :])) * (conv / S)               # (M,D)
     term3 = ((w_dα * (P - E_interp)) / (S**2))[:, None] * (conv * S_x[None, :])  # (M,D)
     dG_dα = term1 + term2 - term3                                                # (M,D)
@@ -243,9 +243,9 @@ class AlphaOptimizer:
             sum_grad += grad_s
 
         self._cache_key  = key
-        self._cache_grad = sum_grad
+        self._cache_grad = sum_grad / self.S
 
-        return float(sum_loss)
+        return float(sum_loss / self.S)
 
     def jac(self, alphas):
         key = self._key(alphas)

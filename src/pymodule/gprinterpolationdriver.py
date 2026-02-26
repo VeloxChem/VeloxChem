@@ -124,9 +124,9 @@ class GPRInterpolationDriver:
 
         self.group_names  = ["bond", "angle", "torsion"]
         self.group_dims   = {
-            "bond":    _active_dims(groups.get("bond", [])),      # list[int]
-            "angle":   _active_dims(groups.get("angle", [])),
-            "torsion": _active_dims(groups.get("torsion", [])),
+            "bond": bond_idx,      # list[int]
+            "angle": angle_idx,
+            "torsion": torsion_idx
         }
 
         self.num_groups = sum(len(v) > 0 for v in self.group_dims.values())
@@ -170,7 +170,7 @@ class GPRInterpolationDriver:
             outputscale_constraint=gpytorch.constraints.Interval(1e-4, 1e2),
         ) 
         self.model = ExactDeltaE(X, y, self.likelihood, base_kernel=base_kernel, nu=1.5).to(self.device).double()
-        self.model.covar_module = scaled_kernel
+        # self.model.covar_module = scaled_kernel # the model scaling already happens in the ExactDetltaE function
         self.model = self.model.to(self.device).double()
 
         self.mll = gpytorch.mlls.ExactMarginalLogLikelihood(self.likelihood, self.model)
@@ -576,7 +576,6 @@ class GPRInterpolationDriver:
         self._r_nn_med = float('nan')
         prev = getattr(self, "_d_thresh_dyn", None)
         self._r_nn_med = float('nan')                 # force recompute of median NN in new metric
-        if hasattr(self, "_dist_events"): self._dist_events.clear()
         if prev is None:
             print('prev', prev)
             self._d_thresh_dyn = 1.0 
@@ -794,7 +793,7 @@ class GPRInterpolationDriver:
         res = np.array([e["abs_res"] for e in self._sim_events], float)
         T   = np.array([e["T"] for e in self._sim_events], float)
 
-        good_mask = (~added) & np.isfinite(res) & (res <= 0.25 * T)
+        good_mask = (~added) & np.isfinite(res) & (res <= 0.1 * T)
         bad_mask  = added
 
         good = s[good_mask]
@@ -803,7 +802,7 @@ class GPRInterpolationDriver:
 
         n_good, n_bad = good.size, bad.size
         n_tot = n_good + n_bad
-        print(n_good, n_bad)
+
         if n_good < min_good or n_bad < min_bad:
             # With zero bads, still allow gentle learning from good-only evidence:
             # keep threshold near prior but nudge toward a higher quantile of "good".
@@ -821,6 +820,7 @@ class GPRInterpolationDriver:
                 cand = np.clip(cand, prev - max_drop, prev + 0.0)  # no upward move
                 alpha = min(alpha_max, alpha_base * n_good / (n_good + 10))
                 self._s_thresh_dyn = (1 - alpha) * prev + alpha * cand
+                print('self similarity threshold in return', self._s_thresh_dyn)
                 return
 
 
@@ -949,9 +949,8 @@ class GPRInterpolationDriver:
         if not self._dist_events: return
 
         d, added, ar, t, cause = map(np.asarray, zip(*self._dist_events))
-        good_mask = (~added) & np.isfinite(ar) & (ar <= 0.25*t)
-        # count only distance-caused adds if you have it; otherwise fall back to 'added'
-        bad_mask  = (added) & (np.asarray(cause, object) == "distance")
+        good_mask = np.isfinite(ar) & (ar <= 0.1*t)
+        bad_mask  = np.isfinite(ar) & (ar >  0.1*t)
 
         good = d[good_mask]; bad = d[bad_mask]
         n_good, n_bad = good.size, bad.size
@@ -983,7 +982,6 @@ class GPRInterpolationDriver:
             alpha = min(alpha_max, alpha_base * n_tot / (n_tot + 10))
             self._d_thresh_dyn = (1 - alpha)*prev + alpha*cand
 
-            print('In first check', self._d_thresh_dyn)
             return
 
         if n_good < min_good or n_bad < min_bad: return
@@ -1082,24 +1080,30 @@ class GPRInterpolationDriver:
         s_thresh    = getattr(self, "_s_thresh_dyn", 0.2)  # learned percentile; default conservative
         s_max       = self.max_kernel_similarity(Xq_std, Xtr_std, topk=5)
         
-        trigger = (sig >= sigma_high) and (s_max < s_thresh) 
 
-        should_add_by_risk, diag = self.decide_add_by_risk(s_max, d_norm, sig,
-                                                  R_add=0.60, R_clear=0.45)
-        # Optionally combine with your residual rule:
+        should_add, diag = self.decide_add_by_risk(s_max, d_norm, sig, R_add=0.60, R_clear=0.45)
 
-        cause = (
-            "distance"     if (sig >= sigma_high and d_norm > d_thresh) else
-            "kernel"       if (s_max < s_thresh)                        else
-            "uncertainty"  if (sig >= sigma_high)                       else
-            "none"
-        )
+        # --- assign cause coherently (based on what actually exceeded thresholds) ---
+        # Start from the strongest direct violations.
+        if d_norm > d_thresh:
+            cause = "distance"
+        elif s_max < s_thresh:
+            cause = "kernel"
+        elif sig >= sigma_high:
+            cause = "uncertainty"
+        else:
+            cause = "none"
+
+        # If we decided to add but none of the simple rules tripped, call it "risk"
+        # (this happens when your decision is based on combined logic/EMA).
+        if should_add and cause == "none":
+            cause = "risk"
 
         self.cause = cause
-        self.record_similarity_event(s_max, False, abs_residual=abs(s_max - s_thresh), T=T)
-        self.record_distance_event(d_norm, False, abs_residual=abs(d_thresh - d_norm), T=T)
+        # self.record_similarity_event(s_max, False, abs_residual=abs(s_max - s_thresh), T=T)
+        # self.record_distance_event(d_norm, False, abs_residual=abs(d_thresh - d_norm), T=T)
 
-        if should_add_by_risk:
+        if should_add:
             return True, {"cause": cause, "s_max": s_max, "s_thresh": s_thresh,
                   "d_norm": d_norm, "d_thresh": d_thresh}
 
@@ -1286,61 +1290,49 @@ class GPRInterpolationDriver:
 
         return R, parts
 
-    def decide_add_by_risk(self, s_max: float, d_norm: float, sigma: float,
-                           R_add: float = 0.60, R_clear: float = 0.45,
-                           ema_beta: float = 0.3,
-                           hard_guards: dict | None = None):
-        """
-        Combine the three signals with weights; use hysteresis on an EMA of risk.
-        - R_add: EMA risk above this → add
-        - R_clear: EMA risk below this → safe
-        - hard_guards: immediate add if any extreme rule trips
-        """
+    def decide_add_by_risk(self, s_max, d_norm, sigma,
+                       R_add=0.60, R_clear=0.45, ema_beta=0.3,
+                       hard_guards=None):
+
         R, parts = self.risk_score(s_max, d_norm, sigma)
 
-        # Hysteresis on an EMA to avoid flapping
+        # EMA smoothing
         if not hasattr(self, "_risk_ema"):
             self._risk_ema = R
         else:
             self._risk_ema = (1 - ema_beta) * self._risk_ema + ema_beta * R
 
-        add = False
-
-        # Hard safety overrides (fail-fast)
-        # Example defaults; tune for your scales
         guards = {
-            "s_min": 0.10,          # if similarity below this → add
-            "d_max": parts["d_thr"] + 0.10,  # if distance way above thr → add
-            "u_max": parts["u_thr"] + 200000.0,  # if sigma way above thr → add
+            "s_min": 0.10,
+            "d_max": parts["d_thr"] + 0.20,
+            "u_max": parts["u_thr"] + 0.10,
         }
         if hard_guards:
             guards.update(hard_guards)
-        
-        if d_norm < 1e-6:
-            d_norm = 1e-6
-        
-        prop = s_max/d_norm 
-        if parts["s_thr"] > 0.85:
-            prop = s_max
 
-        if s_max < guards["s_min"] or prop < parts["s_thr"] or d_norm > guards["d_max"] + 0.1: #or ((sigma > guards["u_max"]) and ((d_norm > guards["d_max"]) or (s_max < parts["s_thr"]))):
+        # Hard overrides
+        if s_max < guards["s_min"]:
             add = True
-        
-        # print('Add before after the check in decider function', add)
-        # # EMA-based decision with hysteresis
-        # if not add:
-        #     if self._risk_ema >= R_add:
-        #         add = True
-        #     elif self._risk_ema <= R_clear:
-        #         add = False
-        #     else:
-        #         # keep previous state if you maintain one; default to no-add
-        #         add = getattr(self, "_risk_armed", False)
+            reason = "kernel"
+        elif d_norm > guards["d_max"]:
+            add = True
+            reason = "distance"
+        elif sigma > guards["u_max"]:
+            add = True
+            reason = "uncertainty"
+        else:
+            # EMA hysteresis decision
+            if self._risk_ema >= R_add:
+                add = True
+            elif self._risk_ema <= R_clear:
+                add = False
+            else:
+                add = getattr(self, "_risk_armed", False)
+            reason = "risk"
 
-        self._risk_armed = add  # remember last state for hysteresis
-        diag = {"R": R, "R_ema": float(self._risk_ema)} | parts
+        self._risk_armed = add
 
-        # print('DIAG', diag)
+        diag = {"R": float(R), "R_ema": float(self._risk_ema), "reason": reason} | parts
         return add, diag
 
 

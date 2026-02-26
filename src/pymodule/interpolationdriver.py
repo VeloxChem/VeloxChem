@@ -1687,7 +1687,15 @@ class InterpolationDriver():
         coverage_mass=0.8
         topk = None
 
-        
+        constraints_to_exclude = []
+
+        for el_idxelement, element in enumerate(self.z_matrix):
+            if len(element) != 3:
+                continue
+            
+            current_angle = molecule.get_angle_in_degrees((element[0] + 1, element[1] + 1, element[2] + 1))
+            if abs(current_angle) < 2.0 or abs(current_angle) > 178.0:
+                constraints_to_exclude.append(element)
 
         masses = molecule.get_masses().copy()
         masses_cart = np.repeat(masses, 3)
@@ -1877,7 +1885,7 @@ class InterpolationDriver():
 
             for idx in selected_idx:
                 coord = sorted_coords[idx]
-                if tuple(coord) in constraints:
+                if tuple(coord) in constraints or tuple(coord) in constraints_to_exclude:
                     continue
                 # optional symmetry filtering for torsions
                 if len(coord) == 4 and (tuple(sorted(coord)) in self.symmetry_information[7][3]):

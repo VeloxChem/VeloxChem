@@ -2258,6 +2258,7 @@ class IMDatabasePointCollecter:
                     # print('Error proxy', error_proxy, trigger, information)
                     Xt, yt = self.impes_drivers[self.current_state].gpr_intdriver._transform(self.impes_drivers[self.current_state].gpr_intdriver.X_raw, self.impes_drivers[self.current_state].gpr_intdriver.y_raw)
                       
+                    print('Here is the information', information, trigger)
 
                     self.add_a_point = False
                     if trigger:
@@ -2625,12 +2626,15 @@ class IMDatabasePointCollecter:
                                 s_max       = drv.max_kernel_similarity(Xq_std, Xtr_std, topk=5)
                                 # Scalar absolute residual for THIS query (QM label already available)
                                 abs_res = abs(y_true - mu_lat)
+
+                                error_good = (abs_res <= 0.1 * self.energy_threshold)
+                                necessary = (not error_good)
                                 
                                 # Update the dynamic threshold with this single pair
-                                drv.record_distance_event(d_norm, True, abs_res, T=self.energy_threshold)
+                                drv.record_distance_event(d_norm, necessary, abs_res, T=self.energy_threshold)
                                 drv.update_distance_threshold()
                                 
-                                drv.record_similarity_event(s_max, True, abs_res, T=self.energy_threshold)
+                                drv.record_similarity_event(s_max, necessary, abs_res, T=self.energy_threshold)
                                 drv.update_similarity_threshold()
                                 # ---------- 2) NOW add the point and refit (warm start) ----------
                                 drv.replace_data(X_t, y_t, clone=False)
@@ -2729,12 +2733,17 @@ class IMDatabasePointCollecter:
                         s_max       = drv.max_kernel_similarity(Xq_std, Xtr_std, topk=5)
                         # Scalar absolute residual for THIS query (QM label already available)
                         abs_res = abs(y_true - mu_lat)
+
+                        error_good = (abs_res <= 0.1 * self.energy_threshold)
+                        necessary = (not error_good)
+
+
                         
                         # Update the dynamic threshold with this single pair
-                        drv.record_distance_event(d_norm, False, abs_res, T=self.energy_threshold)
+                        drv.record_distance_event(d_norm, necessary, abs_res, T=self.energy_threshold)
                         drv.update_distance_threshold()
                         
-                        drv.record_similarity_event(s_max, False, abs_res, T=self.energy_threshold)
+                        drv.record_similarity_event(s_max, necessary, abs_res, T=self.energy_threshold)
                         drv.update_similarity_threshold()
                         # ---------- 2) NOW add the point and refit (warm start) ----------
                         drv.replace_data(X_t, y_t, clone=False)
