@@ -243,7 +243,6 @@ class EnsembleParser:
             self.universe = mda.Universe(topology_file, trajectory_file)
         
         total_frames = len(self.universe.trajectory)
-        self.ostream.print_info(f"Total frames in trajectory: {total_frames}")
         self.ostream.print_blank()
 
         if num_snapshots is None:
