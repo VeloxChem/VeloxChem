@@ -674,7 +674,7 @@ class IMForceFieldGenerator:
                     
                     if self.use_minimized_structures[0]:       
                         
-                        if ts_root == 0 and isinstance(self.drivers['gs'][0], ScfRestrictedDriver):
+                        if ts_root == 0 and isinstance(self.drivers['gs'][0], ScfRestrictedDriver) or ts_root == 0 and isinstance(self.drivers['gs'][0], XtbDriver):
                         
                             opt_drv = OptimizationDriver(opt_qm_driver)
                             current_basis = MolecularBasis.read(reaction_mol, states_basis['gs'])
@@ -731,7 +731,7 @@ class IMForceFieldGenerator:
                                     continue
                                 root_to_add = opt_root
 
-                                if  root_to_add == 0 and isinstance(self.drivers['gs'][0], ScfRestrictedDriver) or root_to_add == 0 and isinstance(self.drivers['gs'][0], ScfUnrestrictedDriver):
+                                if  root_to_add == 0 and isinstance(self.drivers['gs'][0], ScfRestrictedDriver) or root_to_add == 0 and isinstance(self.drivers['gs'][0], ScfUnrestrictedDriver) or root_to_add == 0 and isinstance(self.drivers['gs'][0], XtbDriver):
                                 
                                     opt_drv = OptimizationDriver(self.drivers['gs'][0])
                                     current_basis = MolecularBasis.read(mol, states_basis['gs'])
@@ -793,7 +793,7 @@ class IMForceFieldGenerator:
                                 molecules_to_add_info.append((molecule, current_basis, [opt_root]))
                             continue
 
-                        elif opt_root == 0 and isinstance(self.drivers['gs'][0], ScfRestrictedDriver) or opt_root == 0 and isinstance(self.drivers['gs'][0], ScfUnrestrictedDriver):
+                        elif opt_root == 0 and isinstance(self.drivers['gs'][0], ScfRestrictedDriver) or opt_root == 0 and isinstance(self.drivers['gs'][0], ScfUnrestrictedDriver) or opt_root == 0 and isinstance(self.drivers['gs'][0], XtbDriver):
                         
                             opt_drv = OptimizationDriver(self.drivers['gs'][0])
                             current_basis = MolecularBasis.read(molecule, states_basis['gs'])
@@ -1176,6 +1176,39 @@ class IMForceFieldGenerator:
 
                         print(optimized_molecule.get_xyz_string())
                     
+                    elif  self.roots_to_follow[0] == 0 and isinstance(self.drivers['gs'][0], XtbDriver):
+
+                        opt_drv = OptimizationDriver(self.drivers['gs'][0])
+                        current_basis = MolecularBasis.read(molecule, states_basis['gs'])
+                        opt_drv.ostream.mute()
+                        
+                        opt_constraint_list = []
+                        for constraint in self.use_minimized_structures[1]:
+                            if len(constraint) == 2:
+                                opt_constraint = f"freeze distance {constraint[0] + 1} {constraint[1] + 1}"
+                                opt_constraint_list.append(opt_constraint)
+                            
+                            elif len(constraint) == 3:
+                                opt_constraint = f"freeze angle {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1}"
+                                opt_constraint_list.append(opt_constraint)
+                        
+                            else:
+                                opt_constraint = f"freeze dihedral {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1} {constraint[3] + 1}"
+                                opt_constraint_list.append(opt_constraint)
+                        opt_drv.constraints = opt_constraint_list
+                        
+                        opt_results = opt_drv.compute(molecule)
+                        energy = opt_results['opt_energies'][-1]
+                        optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
+                        optimized_molecule.set_charge(molecule.get_charge())
+                        optimized_molecule.set_multiplicity(molecule.get_multiplicity())
+
+                        current_basis = MolecularBasis.read(optimized_molecule, states_basis['gs'])
+                        molecules_to_add_info.append((optimized_molecule, current_basis, self.roots_to_follow))
+
+                        print(optimized_molecule.get_xyz_string())
+
+
                     elif self.roots_to_follow[0] >= 1 and isinstance(self.drivers['es'][0], LinearResponseEigenSolver) or self.roots_to_follow[0] >= 1 and isinstance(self.drivers['es'][0], TdaEigenSolver):
 
                             opt_drv = OptimizationDriver(self.drivers['es'][1])
@@ -1247,7 +1280,7 @@ class IMForceFieldGenerator:
                             if self.use_minimized_structures[0]:   
                                 energy = None
                                 self.use_minimized_structures[1].append(key)
-                                if self.roots_to_follow[0] == 0 and isinstance(self.drivers['gs'][0], ScfRestrictedDriver) or self.roots_to_follow[0] == 0 and isinstance(self.drivers['gs'][0], ScfUnrestrictedDriver):
+                                if self.roots_to_follow[0] == 0 and isinstance(self.drivers['gs'][0], ScfRestrictedDriver) or self.roots_to_follow[0] == 0 and isinstance(self.drivers['gs'][0], ScfUnrestrictedDriver) or self.roots_to_follow[0] == 0 and isinstance(self.drivers['gs'][0], XtbDriver):
 
                                     opt_drv = OptimizationDriver(self.drivers['gs'][0])
                                     current_basis = MolecularBasis.read(mol, 'def2-svp')

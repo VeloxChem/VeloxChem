@@ -41,35 +41,14 @@ import h5py
 import itertools
 import re
 import os, copy, math
-from pathlib import Path
-from sys import stdout
-import sys
-import random
-from time import time
-import xml.etree.ElementTree as ET
-from xml.dom import minidom
+
 from contextlib import redirect_stderr
 from io import StringIO
 
-from .molecule import Molecule
 from .veloxchemlib import mpi_master
 from.veloxchemlib import hartree_in_kcalpermol, bohr_in_angstrom
-from .outputstream import OutputStream
-from .errorhandler import assert_msg_critical
-from .solvationbuilder import SolvationBuilder
-from .optimizationdriver import OptimizationDriver
-
-# Drivers
-from .scfrestdriver import ScfRestrictedDriver
-from .molecularbasis import MolecularBasis
-from .scfgradientdriver import ScfGradientDriver
-from .scfhessiandriver import ScfHessianDriver
-from .xtbdriver import XtbDriver
-from .xtbgradientdriver import XtbGradientDriver
-from .xtbhessiandriver import XtbHessianDriver
 from .interpolationdriver import InterpolationDriver
-from .interpolationdatapoint import InterpolationDatapoint
-from .localbayesresidual import LocalBayesResidual
+
 
 with redirect_stderr(StringIO()) as fg_err:
     import geometric
@@ -86,7 +65,7 @@ from concurrent.futures import ProcessPoolExecutor
 # ---- global worker state (created once per process) ----
 _W = {}
 
-def _init_worker(z_matrix, impes_dict, sym_dict, sym_datapoints, dps, idx, exponent_p_q, beta, e_x):
+def _init_worker(z_matrix, impes_dict, sym_dict, sym_datapoints, dps, idx, exponent_p_q, beta, e_x, structures, qm_e, qm_g_flat):
     """Runs once per process. Build a private driver & static constants."""
     # Avoid oversubscription when each process calls BLAS:
     os.environ["OMP_NUM_THREADS"] = "1"
@@ -113,14 +92,20 @@ def _init_worker(z_matrix, impes_dict, sym_dict, sym_datapoints, dps, idx, expon
     _W["beta"]   = float(beta)
     _W["e_x"]    = float(e_x)
     _W["conv"]   = float(hartree_in_kcalpermol())
+    _W["structures"] = tuple(structures)
+    _W["qm_e"] = np.asarray(qm_e, dtype=np.float64)
+    _W["qm_g_flat"] = np.asarray(qm_g_flat, dtype=np.float64)
 
 
 def _eval_structure(payload):
     """Compute loss and grad contrib for one structure index."""
-    s_idx, mol, E_qm, G_qm_flat, alphas = payload
+    s_idx, alphas = payload
     drv    = _W["driver"]
     idx    = _W["idx"]; nsub = _W["nsub"]
     beta   = _W["beta"]; e_x = _W["e_x"]; conv = _W["conv"]
+    mol = _W["structures"][s_idx]
+    E_qm = _W["qm_e"][s_idx]
+    G_qm_flat = _W["qm_g_flat"][s_idx]
 
     # Update alphas in this worker's private datapoints
     for j, dp in enumerate(drv.qm_data_points):
@@ -141,10 +126,8 @@ def _eval_structure(payload):
     
     # Residuals in kcal/mol
     dE_res  = (E_interp - E_qm) * conv                                          # ()
-    dg_full = (G_interp - G_qm_flat) * conv                                     # (D,)
-    
     # ----- loss (your anisotropic force term) -----
-    g_sub   = dg_full[idx]
+    g_sub   = (G_interp[idx] - G_qm_flat[idx]) * conv
     h_sub   = (G_qm_flat[idx]) * conv
     nh      = np.linalg.norm(h_sub)
     L_iso   = (g_sub @ g_sub) / nsub
@@ -169,21 +152,23 @@ def _eval_structure(payload):
     # dE/dα
     dE_dα = (w_dα * (P - E_interp)) * (conv / S)                                 # (M,)
 
-    # dG/dα (matrix M x D), all in kcal/mol
-    term1 = (w_x_alpha * (P - E_interp)[:, None]) * (conv / S)                         # (M,D)
-    term2 = (w_dα[:, None] * (G - G_interp[None, :])) * (conv / S)               # (M,D)
-    term3 = ((w_dα * (P - E_interp)) / (S**2))[:, None] * (conv * S_x[None, :])  # (M,D)
-    dG_dα = term1 + term2 - term3                                                # (M,D)
+    # dG/dα only on relevant coordinates (matrix M x nsub), all in kcal/mol
+    G_sub = G[:, idx]
+    G_interp_sub = G_interp[idx]
+    w_x_alpha_sub = w_x_alpha[:, idx]
+    S_x_sub = S_x[idx]
+    term1 = (w_x_alpha_sub * (P - E_interp)[:, None]) * (conv / S)                  # (M,nsub)
+    term2 = (w_dα[:, None] * (G_sub - G_interp_sub[None, :])) * (conv / S)          # (M,nsub)
+    term3 = ((w_dα * (P - E_interp)) / (S**2))[:, None] * (conv * S_x_sub[None, :]) # (M,nsub)
+    dG_dα_sub = term1 + term2 - term3                                                # (M,nsub)
 
-    # dL/dg (full D) via subspace projection
-    v = np.zeros_like(dg_full)
+    # dL/dg in subspace
     if nh > 1e-8:
         dL_dg_sub = (2.0 * gate) * ((beta/nsub)*(gper) + (1.0 - beta)*(gpar)) + (2.0 * (1.0 - gate) / nsub) * g_sub
     else:
         dL_dg_sub = 2.0 * g_sub / nsub
-    v[idx] = dL_dg_sub
 
-    grad_force_part  = dG_dα @ v                                 # (M,)
+    grad_force_part  = dG_dα_sub @ dL_dg_sub                     # (M,)
     grad_energy_part = 2.0 * e_x * dE_res * dE_dα                # (M,)
     grad_s = grad_energy_part + 0.5 * (1.0 - e_x) * grad_force_part   # (M,)
 
@@ -192,7 +177,7 @@ def _eval_structure(payload):
 
 
 class AlphaOptimizer:
-    def __init__(self, z_matrix, impes_dict, sym_dict, sym_datapoints, dps, structure_list, qm_e, qm_g, exponent_p_q, e_x, beta=0.8, n_workers=None):
+    def __init__(self, z_matrix, impes_dict, sym_dict, sym_datapoints, dps, structure_list, qm_e, qm_g, exponent_p_q, e_x, beta=0.8, n_workers=None, verbose=False):
         self.z_matrix       = z_matrix
         self.impes_dict     = impes_dict
         self.sym_dict       = sym_dict
@@ -206,8 +191,8 @@ class AlphaOptimizer:
         self.M              = len(dps)
         self.S              = len(structure_list)
         self.idx            = np.asarray([o*3 + i for o in sym_dict[3] for i in range(3)], dtype=int)
+        self.verbose        = bool(verbose)
         
-        # 🔒 Force each worker to a single core
         os.environ["OMP_NUM_THREADS"] = "1"
         os.environ["MKL_NUM_THREADS"] = "1"
         os.environ["OPENBLAS_NUM_THREADS"] = "1"
@@ -216,10 +201,11 @@ class AlphaOptimizer:
         self._pool = ProcessPoolExecutor(
             max_workers=(n_workers or os.cpu_count() or 2),
             initializer=_init_worker,
-            initargs=(z_matrix, impes_dict, sym_dict, sym_datapoints, dps, self.idx, exponent_p_q, self.beta, self.e_x),
+            initargs=(z_matrix, impes_dict, sym_dict, sym_datapoints, dps, self.idx, exponent_p_q, self.beta, self.e_x, self.structures, self.qm_e, self.qm_g_flat),
         )
         self._cache_key = None
         self._cache_grad = None
+        self._closed = False
 
     @staticmethod
     def _key(x):
@@ -227,9 +213,9 @@ class AlphaOptimizer:
 
     def fun(self, alphas):
         key = self._key(alphas)
-        # Build per-structure payloads (tiny):
-        payloads = [(i, self.structures[i], self.qm_e[i], self.qm_g_flat[i], np.asarray(alphas, float))
-                    for i in range(self.S)]
+        alphas_arr = np.asarray(alphas, dtype=np.float64)
+        # Build per-structure payloads with only structure index + alpha vector.
+        payloads = [(i, alphas_arr) for i in range(self.S)]
 
         # Choose a decent chunksize to lower IPC overhead:
         chunksize = max(1, math.ceil(self.S / (4 * (self._pool._max_workers or 1))))
@@ -244,6 +230,8 @@ class AlphaOptimizer:
 
         self._cache_key  = key
         self._cache_grad = sum_grad / self.S
+        if self.verbose:
+            print('loss function', float(sum_loss / self.S))
 
         return float(sum_loss / self.S)
 
@@ -254,3 +242,14 @@ class AlphaOptimizer:
         # Fallback: compute once (will also cache)
         _ = self.fun(alphas)
         return self._cache_grad
+
+    def close(self):
+        if not self._closed:
+            self._pool.shutdown(wait=True)
+            self._closed = True
+
+    def __del__(self):
+        try:
+            self.close()
+        except Exception:
+            pass

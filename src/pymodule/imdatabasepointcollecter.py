@@ -2485,7 +2485,7 @@ class IMDatabasePointCollecter:
                 print('weights', self.impes_drivers[self.roots_to_follow[identification_state + e_idx]].weights)
                 energy_difference = (abs(qm_energy[e_idx] - self.impes_drivers[self.roots_to_follow[identification_state + e_idx]].impes_coordinate.energy))
 
-                print('QM gradients', grad)
+
                 gradient_difference = (grad - self.impes_drivers[self.roots_to_follow[identification_state + e_idx]].impes_coordinate.gradient) * hartree_in_kcalpermol() * bohr_in_angstrom()
                 print('Gradient norms', np.linalg.norm(grad)  * hartree_in_kcalpermol() * bohr_in_angstrom(), np.linalg.norm(self.impes_drivers[self.roots_to_follow[identification_state + e_idx]].impes_coordinate.gradient  * hartree_in_kcalpermol() * bohr_in_angstrom()))
                 # print('predicted Grad', self.impes_drivers[self.roots_to_follow[identification_state + e_idx]].impes_coordinate.gradient)
@@ -2914,6 +2914,31 @@ class IMDatabasePointCollecter:
 
                             # qm_energy, scf_tensors = self.compute_energy(drivers[0], optimized_molecule, opt_current_basis)
                             print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', molecule.get_xyz_string())
+                        
+                        elif state_to_optim == 0 and isinstance(self.drivers['gs'][0], XtbDriver):
+
+                            opt_drv = OptimizationDriver(self.drivers['gs'][0])
+                            opt_drv.ostream.mute()
+                            
+                            opt_constraint_list = []
+                            for constraint in self.use_minimized_structures[1]:
+                                if len(constraint) == 2:
+                                    opt_constraint = f"freeze distance {constraint[0] + 1} {constraint[1] + 1}"
+                                    opt_constraint_list.append(opt_constraint)
+                                
+                                elif len(constraint) == 3:
+                                    opt_constraint = f"freeze angle {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1}"
+                                    opt_constraint_list.append(opt_constraint)
+                            
+                                else:
+                                    opt_constraint = f"freeze dihedral {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1} {constraint[3] + 1}"
+                                    opt_constraint_list.append(opt_constraint)
+                            opt_drv.constraints = opt_constraint_list
+                            
+                            optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
+                            optimized_molecule.set_charge(molecule.get_charge())
+                            optimized_molecule.set_multiplicity(molecule.get_multiplicity())
+
                         
                         elif state_to_optim >= 1 and isinstance(self.drivers['es'][0], LinearResponseEigenSolver) or state_to_optim >= 1 and isinstance(self.drivers['es'][0], TdaEigenSolver):
                                 
@@ -3488,16 +3513,49 @@ class IMDatabasePointCollecter:
             """
 
             bounds = [(1e-6, 1.5)] * len(dps)
+            sample_size = len(geom_list)
+
+            if sample_size < 50:
+                size_label = 'small'
+                n_bh_iter = 10
+                gtol = 1e-4
+                ftol = 1e-5
+                maxiter = 300
+            elif sample_size <= 300:
+                size_label = 'medium'
+                n_bh_iter = 4
+                gtol = 2e-4
+                ftol = 5e-5
+                maxiter = 220
+            else:
+                size_label = 'large'
+                n_bh_iter = 0
+                gtol = 5e-4
+                ftol = 1e-4
+                maxiter = 140
              
             opt = AlphaOptimizer(z_matrix, impes_dict, sym_dict, sym_datapoints, dps,
                  geom_list, E_ref_list, G_ref_list, exponent_p_q,
                  e_x=self.use_opt_confidence_radius[2],
                  beta=0.8, n_workers=os.cpu_count())  # pick sensible n_workers
 
-            minimizer_kwargs = {"method": "L-BFGS-B", "jac": opt.jac, "bounds": bounds, "options": {"disp": True, "gtol": 1e-4, "ftol": 1e-9, "maxls": 10}}
-            res = basinhopping(opt.fun, x0=alphas, minimizer_kwargs=minimizer_kwargs, niter=10)
-            print(res)
-            return res
+            minimizer_kwargs = {
+                "method": "L-BFGS-B",
+                "jac": opt.jac,
+                "bounds": bounds,
+                "options": {"disp": True, "gtol": gtol, "ftol": ftol, "maxls": 10, "maxiter": maxiter}
+            }
+
+            print(f"Trust-radius optimization regime: {size_label} (S={sample_size}, basinhopping niter={n_bh_iter})")
+            try:
+                if n_bh_iter > 0:
+                    res = basinhopping(opt.fun, x0=alphas, minimizer_kwargs=minimizer_kwargs, niter=n_bh_iter)
+                else:
+                    res = minimize(opt.fun, x0=alphas, jac=opt.jac, method="L-BFGS-B", bounds=bounds, options=minimizer_kwargs["options"])
+                print(res)
+                return res
+            finally:
+                opt.close()
         
         inital_alphas = [dp.confidence_radius for dp in datapoints]
 
@@ -4157,4 +4215,3 @@ class IMDatabasePointCollecter:
             distance_vector_core_norm[i] += np.linalg.norm(distance_vector_core[i])
 
         return ref_structure_check, distance_core, distance_vector_core
-
