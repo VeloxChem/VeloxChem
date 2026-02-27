@@ -145,7 +145,7 @@ class SolvationBuilder:
         # Standard forcefield
         self.parent_forcefield = 'amber03'
 
-    def solvate(self, solute, solvent='cspce', solvent_molecule=None, padding=1.0, target_density=None, neutralize=True, equilibrate=False, box = None):
+    def solvate(self, solute, solvent='cspce', solvent_molecule=None, padding=1.0, target_density=None, neutralize=True, equilibrate=False, write_log = False, box = None):
         """
         Create a solvated system with the most typical solvent molecules.
 
@@ -411,7 +411,7 @@ class SolvationBuilder:
         if equilibrate:
             try:
                 start = time.time()
-                self.perform_equilibration()
+                self.perform_equilibration(write_log)
                 end = time.time()
                 self.ostream.print_info("Equilibrating the system")
                 self.ostream.print_blank()
@@ -666,8 +666,8 @@ class SolvationBuilder:
         else:
             # Solute
             if not self.write_pdb_only:
-                self.solute_ff.write_openmm_files('solute', 'MOL')
-                self.ostream.print_info("solute.pdb, and solute.xml files written")
+                self.solute_ff.generate_residue_xml('solute.xml', 'MOL')
+                self.ostream.print_info("solute.xml file written")
                 self.ostream.flush()
 
             for i, solvent_ff in enumerate(self.solvent_ffs):
@@ -678,16 +678,12 @@ class SolvationBuilder:
             filename = 'system.pdb'
 
         # Write the system PDB file
-        if self.equilibration_flag:
-            # If the system was equilibrated, remove pdb to align with new resnames etc. 
-            Path('equilibrated_system.pdb').unlink()
-
         self._write_system_pdb(filename=filename)
         # Print information
         self.ostream.print_info(f"{filename} file written")
         self.ostream.flush()
 
-    def perform_equilibration(self):
+    def perform_equilibration(self, write_log = False):
         """
         Performs an equilibration using OpenMM.
         """
@@ -742,7 +738,7 @@ class SolvationBuilder:
         positions = pdb.positions
 
         # Create the OpenMM system
-        system = forcefield.createSystem(
+        system = forcefield.createSystem(topology,
                                         nonbondedMethod=app.PME, 
                                         nonbondedCutoff=1.0*unit.nanometers, 
                                         constraints=app.HBonds, 
@@ -761,7 +757,8 @@ class SolvationBuilder:
         simulation.minimizeEnergy()
 
         # Equilibrate
-        simulation.reporters.append(app.StateDataReporter('equilibration.log', 1000, step=True, potentialEnergy=True, temperature=True, volume=True))
+        if write_log:
+            simulation.reporters.append(app.StateDataReporter('equilibration.log', 1000, step=True, potentialEnergy=True, temperature=True, volume=True))
         simulation.step(self.steps)
 
         # Get the final positions
@@ -778,12 +775,23 @@ class SolvationBuilder:
         # Recalculate the density of the solvent
         self.ostream.print_info(f'The density of the solvent after equilibration is: {self._check_density(self.solvents[0], self.added_solvent_counts[0], volume_nm3)} kg/m^3')
         self.ostream.flush()
-        # Write the PDB file
-        with open('equilibrated_system.pdb', 'w') as f:
-            app.PDBFile.writeFile(simulation.topology, positions, f)
-
-        # Update the system molecule
-        self.system_molecule = Molecule.read_pdb_file('equilibrated_system.pdb')
+        
+        labels = [atom.element.symbol for atom in topology.atoms()]
+        xyz = f"{len(labels)}\n\n"
+        for label, coord in zip(labels, positions):
+            xyz += f"{label} {coord.x * 10} {coord.y * 10} {coord.z * 10}\n"  
+        
+        self.system_molecule = Molecule.read_xyz_string(xyz)
+        
+        # Delete the produced pdb and xml files with Path
+        if self.solvent_name == 'itself':
+            Path('liquid.pdb').unlink()
+            Path('liquid.xml').unlink()
+        else:
+            Path('system.pdb').unlink()
+            Path('solute.xml').unlink()
+            for i in range(len(self.solvent_ffs)):
+                Path(f'solvent_{i+1}.xml').unlink()
 
     # Auxiliary functions
 
