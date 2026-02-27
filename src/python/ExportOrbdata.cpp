@@ -126,17 +126,18 @@ export_orbdata(py::module &m)
     PyClass<CAtomBasis>(m, "AtomBasis")
         .def(py::init<>())
         .def(py::init<const CAtomBasis &>())
-        .def(py::init<const std::vector<CBasisFunction> &, const std::string &, const std::string &, const int>())
+        .def(py::init<const std::vector<CBasisFunction> &, const std::string &, const CAtomCorePotential &, const int>())
+        .def(py::init<const std::vector<CBasisFunction> &, const std::string &, const int>())
         .def(py::pickle(
             [](const CAtomBasis &abas) {
-                return py::make_tuple(abas.basis_functions(), abas.get_name(), abas.get_ecp_label(), abas.get_identifier());
+                return py::make_tuple(abas.basis_functions(), abas.get_name(), abas.get_ecp_potential(), abas.get_identifier());
             },
             [](py::tuple t) {
-                return CAtomBasis(t[0].cast<std::vector<CBasisFunction>>(), t[1].cast<std::string>(), t[2].cast<std::string>(), t[3].cast<int>());
+                return CAtomBasis(t[0].cast<std::vector<CBasisFunction>>(), t[1].cast<std::string>(), t[2].cast<CAtomCorePotential>(), t[3].cast<int>());
             }))
         .def("set_identifier", &CAtomBasis::set_identifier, "Sets identifier of atom basis.")
         .def("set_name", &CAtomBasis::set_name, "Sets name of atom basis.")
-        .def("set_ecp_label", &CAtomBasis::set_ecp_label, "Sets effective core potential label of atom basis.")
+        .def("set_ecp_potential", &CAtomBasis::set_ecp_potential, "Sets effective core potential of atom basis.")
         .def("add", &CAtomBasis::add, "Adds basis function to atom basis.")
         .def("reduce_to_valence_basis", &CAtomBasis::reduce_to_valence_basis, "Reduces atom basis to it's valence only form.")
         .def("get_basis_functions", py::overload_cast<>(&CAtomBasis::basis_functions, py::const_), "Gets GTOs.")
@@ -148,7 +149,7 @@ export_orbdata(py::module &m)
              "Gets GTOs with specific angular momentum and number of primitives.")
         .def("get_identifier", &CAtomBasis::get_identifier, "Gets identifier of atom basis.")
         .def("get_name", &CAtomBasis::get_name, "Gets name of atom basis.")
-        .def("get_ecp_label", &CAtomBasis::get_ecp_label, "Gets effective core potential label of atom basis.")
+        .def("get_ecp_potential", &CAtomBasis::get_ecp_potential, "Gets effective core potential of atom basis.")
         .def("need_ecp", &CAtomBasis::need_ecp, "Checks if atom basis requires effective core potential.")
         .def("max_angular_momentum", &CAtomBasis::max_angular_momentum, "Gets maximum angular momentum in atom basis.")
         .def("number_of_basis_functions",

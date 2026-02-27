@@ -149,28 +149,26 @@ def _read_atom_basis(basis_data, elem_id, basis_name):
             err_gc += 'General contraction format is currently not supported'
             assert_msg_critical(ncgto == 1, err_gc)
 
-        if shell_title[0] == 'ECP':
-            atom_basis.set_ecp_label(shell_title)
-        else:
-            angl = tensor_order(shell_title[0])
-            npgto = int(shell_title[1])
+        
+        angl = tensor_order(shell_title[0])
+        npgto = int(shell_title[1])
 
-            expons = [0.0] * npgto
-            coeffs = [0.0] * npgto
+        expons = [0.0] * npgto
+        coeffs = [0.0] * npgto
 
-            for i in range(npgto):
-                prims = basis_data_copy.pop(0).split()
-                assert_msg_critical(
-                    len(prims) == 2,
-                    'Basis set parser: {}'.format(' '.join(prims)))
+        for i in range(npgto):
+            prims = basis_data_copy.pop(0).split()
+            assert_msg_critical(
+                len(prims) == 2,
+                'Basis set parser: {}'.format(' '.join(prims)))
 
-                expons[i] = float(prims[0])
-                coeffs[i] = float(prims[1])
+            expons[i] = float(prims[0])
+            coeffs[i] = float(prims[1])
 
-            bf = BasisFunction(expons, coeffs, angl)
-            bf.normalize()
+        bf = BasisFunction(expons, coeffs, angl)
+        bf.normalize()
 
-            atom_basis.add(bf)
+        atom_basis.add(bf)
 
     atom_basis.set_identifier(elem_id)
     atom_basis.set_name(basis_name.upper())
