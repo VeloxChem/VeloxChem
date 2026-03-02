@@ -35,14 +35,71 @@
 #include <algorithm>
 #include <ranges>
 #include <cmath>
+#include <limits>
 
-#include "gsl/gsl_sf_bessel.h"
+#include <boost/math/special_functions/bessel.hpp>
 
 #include "CustomViews.hpp"
 #include "TensorComponents.hpp"
 #include "MathConst.hpp"
 
 namespace t2cfunc {  // t2cfunc namespace
+
+inline auto
+scaled_i_l_asymptotic(int l, double ax) -> double
+{
+    // ax > 0
+    // i_l(x) = sqrt(pi/(2x)) I_{l+1/2}(x)
+    // I_nu(x) ~ exp(x)/sqrt(2πx) * (1 - (μ-1)/(8x) + (μ-1)(μ-9)/(2!(8x)^2) - ...)
+    // => exp(-x) i_l(x) ~ 1/(2x) * same series, with μ = 4ν^2, ν = l+1/2.
+    const double nu = l + 0.5;
+    const double mu = 4.0 * nu * nu;
+
+    const double t = 8.0 * ax;
+
+    // 3-term asymptotic (usually plenty for large ax):
+    const double a1 = -(mu - 1.0) / t;
+    const double a2 =  (mu - 1.0) * (mu - 9.0) / (2.0 * t * t);
+    const double a3 = -(mu - 1.0) * (mu - 9.0) * (mu - 25.0) / (6.0 * t * t * t);
+
+    const double series = 1.0 + a1 + a2 + a3;
+
+    // 1/(2x) * series
+    return (0.5 / ax) * series;
+}
+
+inline auto
+bessel_il_scaled(int l, double x) -> double
+{
+    if (l < 0)
+    {
+        return std::numeric_limits<double>::quiet_NaN();
+    }
+
+    const double ax = std::abs(x);
+
+    // parity: i_l(-x) = (-1)^l i_l(x)
+    const double sgn = ((x < 0.0) && (l & 1)) ? -1.0 : 1.0;
+
+    // x == 0: i_0(0)=1, i_l(0)=0 for l>0
+    if (ax == 0.0) return (l == 0) ? 1.0 : 0.0;
+
+    // Threshold: above this, computing I_{nu}(x) may overflow before scaling.
+    // (This can be tuned; 50 is conservative and fast.)
+    constexpr double ASYMPTOTIC_SWITCH = 50.0;
+
+    if (ax >= ASYMPTOTIC_SWITCH)
+    {
+        return sgn * scaled_i_l_asymptotic(l, ax);
+    }
+
+    // Direct definition for moderate ax:
+    const double nu = l + 0.5;
+    const double I = boost::math::cyl_bessel_i(nu, ax);
+    const double i_l = std::sqrt(M_PI / (2.0 * ax)) * I;
+
+    return sgn * std::exp(-ax) * i_l;
+}
 
 auto
 comp_distances_ab(CSimdArray<double>& buffer, const size_t index_ab, const size_t index_b, const TPoint<double>& r_a) -> void
@@ -660,7 +717,7 @@ comp_i_vals(CSimdArray<double>& values, const int order, const CSimdArray<double
     {
         double fact = fargs[i];
         
-        f0vals[i] = gsl_sf_bessel_i0_scaled(fact) * std::exp(fact);
+        f0vals[i] = bessel_il_scaled(0, fact) * std::exp(fact);
     }
     
     if (order == 0) return;
@@ -673,7 +730,7 @@ comp_i_vals(CSimdArray<double>& values, const int order, const CSimdArray<double
     {
         if (const double fact = fargs[i]; fact > 1.0e-12)
         {
-            f1vals[i] = gsl_sf_bessel_i1_scaled(fact) * std::exp(fact) / fact  ;
+            f1vals[i] = bessel_il_scaled(1, fact) * std::exp(fact) / fact  ;
         }
         else
         {
@@ -691,7 +748,7 @@ comp_i_vals(CSimdArray<double>& values, const int order, const CSimdArray<double
     {
         if (const double fact = fargs[i]; fact > 1.0e-12)
         {
-            f2vals[i] = gsl_sf_bessel_i2_scaled(fact) * std::exp(fact) / (fact * fact)  ;
+            f2vals[i] = bessel_il_scaled(2, fact) * std::exp(fact) / (fact * fact)  ;
         }
         else
         {
@@ -715,7 +772,7 @@ comp_i_vals(CSimdArray<double>& values, const int order, const CSimdArray<double
         {
             if (const double fact = fargs[i]; fact > 1.0e-12)
             {
-                fvals[i] = gsl_sf_bessel_il_scaled(k, fact) * std::exp(fact) * std::pow(fact, -(double)k);
+                fvals[i] = bessel_il_scaled(k, fact) * std::exp(fact) * std::pow(fact, -(double)k);
             }
             else
             {

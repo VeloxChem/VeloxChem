@@ -9,7 +9,7 @@ VLX_TARGET := veloxchemlib.so
 VLX_MODULE := $(wildcard pymodule/*.py)
 VLX_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 
-LIB_LIST += -shared $(PYTHON_LD) $(OPENMP_LD) $(MATH_LD) $(LIBXC_LD) $(LIBGSL_LD)
+LIB_LIST += -shared $(PYTHON_LD) $(OPENMP_LD) $(MATH_LD) $(LIBXC_LD)
 
 # Select compiler flags
 ifneq "$(MAKECMDGOALS)" "release"

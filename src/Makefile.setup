@@ -44,14 +44,6 @@ LIBXC_LD  := -L /Users/rinkevic/Development/Frameworks/libxc/lib -lxc
 CXX_REL_FLG += $(LIBXC_INC)
 CXX_DEB_FLG += $(LIBXC_INC)
 
-# LibGSL interface
-
-LIBGSL_INC := -I /usr/local/include
-LIBGSL_LD  := -L /usr/local/lib -lgsl
-
-CXX_REL_FLG += $(LIBGSL_INC)
-CXX_DEB_FLG += $(LIBGSL_INC)
-
 # Eigen interface
 
 EIGEN_INC := -I /Users/rinkevic/Development/Frameworks/eigen
