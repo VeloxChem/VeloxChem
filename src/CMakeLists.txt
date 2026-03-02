@@ -40,6 +40,7 @@ target_link_libraries(vlxobjs
     OpenMP::OpenMP_CXX
     Math::LA
     Libxc::xc
+    Boost::headers
   )
 
 add_subdirectory(dft_func)

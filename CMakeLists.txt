@@ -65,6 +65,8 @@ if(Libxc_VERSION VERSION_LESS "6")
 endif()
 get_property(_loc TARGET Libxc::xc PROPERTY LOCATION)
 message(STATUS "Found Libxc: ${_loc} (found version \"${Libxc_VERSION}\")") 
+# Boost
+find_package(Boost REQUIRED)
 
 # VeloxChem-specific configuration
 include(${PROJECT_SOURCE_DIR}/cmake/custom/vlx.cmake)
