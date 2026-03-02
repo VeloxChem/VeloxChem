@@ -175,6 +175,9 @@ class EnsembleParser:
                    topology_file: str | None = None,
                    pe_cutoff: float | None = None,
                    npe_cutoff: float | None = None,
+                   start: float | None = None,
+                   end: float | None = None,
+                   last_snapshot_only: bool = False,
     ):
         """
         Parse a set of structures and extract QM and MM region data.
@@ -198,6 +201,17 @@ class EnsembleParser:
             Cutoff for polarizable embedding (PE) region selection (Angstrom).
         :param npe_cutoff:
             Cutoff for non-polarizable embedding (NPE) region selection (Angstrom).
+        :param start:
+            Start time of the trajectory window in ps. If None, the first
+            trajectory time is used. Intended for time-resolved trajectories
+            such as .xtc.
+        :param end:
+            End time of the trajectory window in ps. If None, the last
+            trajectory time is used. Intended for time-resolved trajectories
+            such as .xtc.
+        :param last_snapshot_only:
+            If True, process only the last snapshot in the trajectory. When
+            enabled, start, end, and num_snapshots are ignored.
 
         :return:
             A list of snapshot dictionaries, each containing:
@@ -247,29 +261,74 @@ class EnsembleParser:
         total_frames = len(self.universe.trajectory)
         self.ostream.print_blank()
 
-        if num_snapshots is None:
-            num_snapshots = total_frames
-
-        if num_snapshots <= 0:
-            raise ValueError("num_snapshots must be a positive integer")
-        
-        if num_snapshots > total_frames:
-            raise ValueError(
-                f"Requested number of snapshots ({num_snapshots}) exceeds total frames ({total_frames})."
-            )
-        
-        if num_snapshots == total_frames:
-            frame_indices = np.arange(total_frames, dtype=int)
-        elif num_snapshots == 1:
-            frame_indices = np.array([0], dtype=int)
+        if last_snapshot_only:
+            frame_indices = np.array([total_frames - 1], dtype=int)
         else:
-            frame_indices = np.linspace(0, total_frames - 1, num_snapshots, dtype=int)
-           
+            use_time_window = (start is not None or end is not None)
+            if use_time_window and trajectory_file.lower().endswith('.pdb'):
+                raise ValueError(
+                    "Start/end time window selection is only supported for"
+                    "time-resilved trajectories (e.g. .ztc), not .pdb input."
+                )
+            if use_time_window:
+                self.universe.trajectory[0]
+                traj_start = float(self.universe.trajectory.ts.time)
+
+                self.universe.trajectory[total_frames - 1]
+                traj_end = float(self.universe.trajectory.ts.time)
+
+                if start is None:
+                    start = traj_start
+                if end is None:
+                    end = traj_end
+                
+                if float(end) < float(start):
+                    raise ValueError("End time must be greater than or equal to start time")
+                
+                window_frames = []
+                for iframe in range(total_frames):
+                    self.universe.trajectory[iframe]
+                    t = float(self.universe.trajectory.ts.time)
+                    if float(start) <= t <= float(end):
+                        window_frames.append(iframe)
+
+                if len(window_frames) == 0:
+                    raise ValueError(
+                        f"No trajectory frames found in the requested time window "
+                        f"[{start}, {end}] ps."
+                    )
+
+                available_frames = np.array(window_frames, dtype=int)
+            else:
+                available_frames = np.arange(total_frames, dtype=int)
+
+            if num_snapshots is None:
+                num_snapshots = len(available_frames)
+
+            if num_snapshots <= 0:
+                    raise ValueError("num_snapshots must be a positive integer")
+
+            if num_snapshots > len(available_frames):
+                raise ValueError(
+                    f"Requested number of snapshots ({num_snapshots}) exceeds "
+                    f"available frames ({len(available_frames)})."
+                    )
+
+            if num_snapshots == len(available_frames):
+                frame_indices = available_frames
+            elif num_snapshots == 1:
+                frame_indices = np.array([available_frames[0]], dtype=int)
+            else:
+                sample_idx = np.linspace(
+                    0, len(available_frames) - 1, num_snapshots, dtype=int
+                )
+                frame_indices = available_frames[sample_idx]
+
         qm_atoms = self.universe.select_atoms(qm_region)
         if len(qm_atoms) == 0:
             raise ValueError(f"QM region '{qm_region}' selection is empty")
-        
-        if env_region is None:
+
+        if env_region is None or not str(env_region).strip():
             env_region_sel = f"not ({qm_region})"
         else:
             env_region_sel = str(env_region)
