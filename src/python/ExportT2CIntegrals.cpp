@@ -467,7 +467,16 @@ export_t2cintegrals(py::module& m)
                const CAtomCorePotential&   ecp_potential) -> CMatrix {
                return ecp_drv.compute(basis, molecule, ecp_potential);
             },
-             "Computes ECP matrix for given molecule, basis, atom core potential.");
+             "Computes ECP matrix for given molecule, basis, atom core potential.")
+        .def(
+            "compute",
+            [](const CCorePotentialDriver& ecp_drv,
+               const CMolecule&            molecule,
+               const CMolecularBasis&      basis,
+               const std::vector<int>&     atoms) -> CMatrix {
+               return ecp_drv.compute(basis, molecule, atoms);
+            },
+             "Computes ECP matrix for given molecule, basis, vector of atoms.");
 }
 
 }  // namespace vlx_t2cintegrals

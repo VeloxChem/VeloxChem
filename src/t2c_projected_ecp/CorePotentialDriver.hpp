@@ -33,6 +33,8 @@
 #ifndef CorePotentialDriver_hpp
 #define CorePotentialDriver_hpp
 
+#include <vector>
+
 #include "Matrix.hpp"
 #include "MolecularBasis.hpp"
 #include "Molecule.hpp"
@@ -82,6 +84,13 @@ class CCorePotentialDriver
     /// @param atom_potential The atom core potential.
     /// @return The ECP matrix.
     auto compute(const CMolecularBasis &basis, const CMolecule &molecule, const CAtomCorePotential& atom_potential) const -> CMatrix;
+    
+    /// @brief Computes ECP matrix for given molecule and molecular basis.
+    /// @param basis The molecular basis.
+    /// @param molecule The molecule.
+    /// @param atom_potential The atom core potential.
+    /// @return The ECP matrix.
+    auto compute(const CMolecularBasis &basis, const CMolecule &molecule, const std::vector<int>& atoms) const -> CMatrix;
 };
 
 #endif /* CorePotentialDriver_hpp */

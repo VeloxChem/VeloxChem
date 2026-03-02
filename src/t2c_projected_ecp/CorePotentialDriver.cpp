@@ -44,7 +44,7 @@
 auto
 CCorePotentialDriver::compute(const CMolecularBasis &basis, const CMolecule &molecule, const CAtomCorePotential& atom_potential) const -> CMatrix
 {
-    // set up local ECP matrix
+    // set up ECP matrix
 
     auto ecp_mat = matfunc::make_matrix(basis, mat_t::symmetric);
 
@@ -74,6 +74,29 @@ CCorePotentialDriver::compute(const CMolecularBasis &basis, const CMolecule &mol
             
             ecp_mat = ecp_mat + proj_mat;
         }
+    }
+    
+    return ecp_mat;
+}
+
+auto
+CCorePotentialDriver::compute(const CMolecularBasis &basis, const CMolecule &molecule, const std::vector<int>& atoms) const -> CMatrix
+{
+    // set up ECP matrix
+
+    auto ecp_mat = matfunc::make_matrix(basis, mat_t::symmetric);
+
+    ecp_mat.zero();
+    
+    // run over list of atoms
+    
+    for (const auto atom : atoms)
+    {
+        const auto loc_ecp = basis.get_ecp_potential(atom);
+        
+        auto loc_mat = compute(basis, molecule.shift_origin(atom), loc_ecp);
+        
+        ecp_mat = ecp_mat + loc_mat;
     }
     
     return ecp_mat;
