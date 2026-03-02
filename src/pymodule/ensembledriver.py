@@ -341,12 +341,17 @@ class EnsembleDriver:
         Set PE and/or NPE environment models
 
         Valid scenarios:
+        PE models = CP3 (for protein), SEP (for water and ions).
+        NPE models = ff19sb (for protein), tip3p (for water).
+        User can select any combination:
 
         - PE only:  e.g., set_env_models(pe_model="CP3")
         - NPE only: e.g., set_env_models(npe_model="ff19sb")
         - Both:     e.g., set_env_models(pe_model="CP3", npe_model="ff19sb")
         - Multiple: e.g., set_env_models(pe_model=["SEP", "CP3"], 
-                                         npe_model=["tip3p", "ff19sb"])
+                                         npe_model=["tip3p", "ff19sb"]),
+                                         e.g. a system that contains a protein,
+                                         water, and ions.
 
         :param pe_model:
             Name of the PE parameter model (e.g., "SEP", "CP3") or a list
