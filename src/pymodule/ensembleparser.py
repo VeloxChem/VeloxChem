@@ -192,6 +192,8 @@ class EnsembleParser:
             Selection string defining the QM region (MDAnalysis selection syntax).
         :param env_region:
             Selection string defining the environment region (MDAnalysis selection syntax).
+            If not provided, the environment is taken as all atoms not contained in
+            the QM region.
         :param pe_cutoff:
             Cutoff for polarizable embedding (PE) region selection (Angstrom).
         :param npe_cutoff:
