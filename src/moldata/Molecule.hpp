@@ -230,6 +230,11 @@ class CMolecule
     /// @brief Gets covalent radii of the atoms.
     /// @return the vector of covalent radii.
     auto get_covalent_radii() const -> std::vector<double>;
+    
+    /// @brief Shift orgin of Cartesian coordinates system to selected atom in molecule.
+    /// @param atom The selected atom to shift origin to.
+    /// @return the molecule with shifted Cartesian coordinates system.
+    auto shift_origin(const int atom) const -> CMolecule;
 
    private:
     /// @brief The charge of molecule.
