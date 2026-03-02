@@ -35,7 +35,6 @@
 #include <algorithm>
 #include <ranges>
 #include <cmath>
-#include <limits>
 
 #include <boost/math/special_functions/bessel.hpp>
 
@@ -46,54 +45,61 @@
 namespace t2cfunc {  // t2cfunc namespace
 
 inline auto
-scaled_i_l_asymptotic(int l, double ax) -> double
+bessel_il_scaled_miller_positive(int l, double x) -> double
 {
-    // ax > 0
-    // i_l(x) = sqrt(pi/(2x)) I_{l+1/2}(x)
-    // I_nu(x) ~ exp(x)/sqrt(2πx) * (1 - (μ-1)/(8x) + (μ-1)(μ-9)/(2!(8x)^2) - ...)
-    // => exp(-x) i_l(x) ~ 1/(2x) * same series, with μ = 4ν^2, ν = l+1/2.
-    const double nu = l + 0.5;
-    const double mu = 4.0 * nu * nu;
+    // for l>=0, x>0
 
-    const double t = 8.0 * ax;
+    const double s0 = (1.0 - std::exp(-2.0 * x)) / (2.0 * x);
 
-    // 3-term asymptotic (usually plenty for large ax):
-    const double a1 = -(mu - 1.0) / t;
-    const double a2 =  (mu - 1.0) * (mu - 9.0) / (2.0 * t * t);
-    const double a3 = -(mu - 1.0) * (mu - 9.0) * (mu - 25.0) / (6.0 * t * t * t);
+    if (l == 0) return s0;
 
-    const double series = 1.0 + a1 + a2 + a3;
+    // Empirical choice of starting order
+    const int M = l + 80 + 30 * (static_cast<int>(x) - 100) / 400;
 
-    // 1/(2x) * series
-    return (0.5 / ax) * series;
+    // Backward recurrence
+    // t_{n-1} = ((2n+1)/x) t_n + t_{n+1}
+
+    double t_np1 = 0.0; // t_{M+1}
+    double t_n   = 1.0; // t_M
+
+    double t_l = 0.0;
+    double t_0 = 0.0;
+
+    for (int n = M; n >= 1; --n)
+    {
+        const double t_nm1 = ((2.0 * n + 1.0) / x) * t_n + t_np1;
+        t_np1 = t_n;
+        t_n   = t_nm1;
+
+        if (n - 1 == l) t_l = t_nm1;
+        if (n - 1 == 0) t_0 = t_nm1;
+    }
+
+    const double scale = s0 / t_0;
+
+    return t_l * scale;
 }
 
 inline auto
 bessel_il_scaled(int l, double x) -> double
 {
-    if (l < 0)
-    {
-        return std::numeric_limits<double>::quiet_NaN();
-    }
+    // for l>=0, x>0
 
     const double ax = std::abs(x);
 
     // parity: i_l(-x) = (-1)^l i_l(x)
     const double sgn = ((x < 0.0) && (l & 1)) ? -1.0 : 1.0;
 
-    // x == 0: i_0(0)=1, i_l(0)=0 for l>0
     if (ax == 0.0) return (l == 0) ? 1.0 : 0.0;
 
-    // Threshold: above this, computing I_{nu}(x) may overflow before scaling.
-    // (This can be tuned; 50 is conservative and fast.)
-    constexpr double ASYMPTOTIC_SWITCH = 50.0;
+    // Threshold for using Miller recurrence
+    constexpr double MILLER_SWITCH = 30.0;
 
-    if (ax >= ASYMPTOTIC_SWITCH)
-    {
-        return sgn * scaled_i_l_asymptotic(l, ax);
+    if (ax >= MILLER_SWITCH) {
+        return sgn * bessel_il_scaled_miller_positive(l, ax);
     }
 
-    // Direct definition for moderate ax:
+    // For smaller x
     const double nu = l + 0.5;
     const double I = boost::math::cyl_bessel_i(nu, ax);
     const double i_l = std::sqrt(M_PI / (2.0 * ax)) * I;
