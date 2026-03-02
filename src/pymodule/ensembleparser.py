@@ -171,7 +171,7 @@ class EnsembleParser:
                    trajectory_file: str,
                    num_snapshots: int | None = None,
                    qm_region: str = "",
-                   env_region: str = "",
+                   env_region: str | None = None,
                    topology_file: str | None = None,
                    pe_cutoff: float | None = None,
                    npe_cutoff: float | None = None,
@@ -264,7 +264,15 @@ class EnsembleParser:
             frame_indices = np.linspace(0, total_frames - 1, num_snapshots, dtype=int)
            
         qm_atoms = self.universe.select_atoms(qm_region)
-        env_atoms = self.universe.select_atoms(env_region)
+        if len(qm_atoms) == 0:
+            raise ValueError(f"QM region '{qm_region}' selection is empty")
+        
+        if env_region is None:
+            env_region_sel = f"not ({qm_region})"
+        else:
+            env_region_sel = str(env_region)
+
+        env_atoms = self.universe.select_atoms(env_region_sel).difference(qm_atoms)
 
         # Identify terminal protein residues (if any) and assign N*/C* residue names
         # so that terminal variants can be treated as separate residue types downstream.
@@ -324,7 +332,7 @@ class EnsembleParser:
             # PE selection
             if pe_cutoff is not None:
                 pe_region = self.universe.select_atoms(
-                    f"byres ({env_region} and around {float(pe_cutoff)} group qm)",
+                    f"byres ({env_region_sel} and around {float(pe_cutoff)} group qm)",
                     qm=qm_atoms,
                 ).difference(qm_atoms)
 
@@ -347,7 +355,7 @@ class EnsembleParser:
             # NPE selection
             if npe_cutoff is not None:
                 outer_shell = self.universe.select_atoms(
-                    f"byres ({env_region} and around {float(npe_cutoff)} group qm)",
+                    f"byres ({env_region_sel} and around {float(npe_cutoff)} group qm)",
                     qm=qm_atoms,
                 ).difference(qm_atoms)
 
