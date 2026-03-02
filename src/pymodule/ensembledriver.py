@@ -286,9 +286,57 @@ class EnsembleDriver:
                 rdb[atom] = {"element": elem, "charge": q}
         return db
 
+    @staticmethod
+    def _normalize_model_names(model_names):
+        """
+        Normalize a model selection to a list of model names.
+        Accepts a single string, a list/tuple of strings, or None.
+        """
+        if model_names is None:
+            return []
+        if isinstance(model_names, str):
+            return [model_names]
+        return list(model_names)
+
+    @staticmethod
+    def _merge_model_dbs(model_names, available_models, model_kind: str) -> dict:
+        """
+        Merge parameter databases from one or more environment models.
+
+        :param model_names:
+            List of model names to merge.
+        :param available_models:
+            Dictionary of available models.
+        :param model_kind:
+            Model kind used in error messages (e.g., "PE" or "NPE").
+
+        :return:
+            Merged parameter database.
+        """
+        merged_db = {}
+        for model_name in model_names:
+            if model_name not in available_models:
+                raise KeyError(
+                    f"Unknown {model_kind} model '{model_name}'. \nAvailable: {sorted(available_models)}"
+                )
+            model_db = available_models[model_name]["db"]
+            for resn, atom_db in model_db.items():
+                merged_res_db = merged_db.setdefault(resn, {})
+                for atom, params in atom_db.items():
+                    if atom in merged_res_db:
+                        old = merged_res_db[atom]
+                        if old != params:
+                            raise ValueError(
+                                f"Conflicting {model_kind} parameters for {resn}/{atom} "
+                                f"when combining models {model_names}"
+                            )
+                    else:
+                        merged_res_db[atom] = dict(params)
+        return merged_db
+        
     def set_env_models(self,
-                       pe_model: str | None = None,
-                       npe_model: str | None = None):
+                       pe_model: str | list[str] | tuple[str, ...] | None = None,
+                       npe_model: str | list[str] | tuple[str, ...] | None = None):
         """
         Set PE and/or NPE environment models
 
@@ -297,36 +345,42 @@ class EnsembleDriver:
         - PE only:  e.g., set_env_models(pe_model="CP3")
         - NPE only: e.g., set_env_models(npe_model="ff19sb")
         - Both:     e.g., set_env_models(pe_model="CP3", npe_model="ff19sb")
+        - Multiple: e.g., set_env_models(pe_model=["SEP", "CP3"], 
+                                         npe_model=["tip3p", "ff19sb"])
 
         :param pe_model:
-            Name of the PE parameter model (e.g., "SEP", "CP3").
+            Name of the PE parameter model (e.g., "SEP", "CP3") or a list
+            of PE model names.
         :param npe_model:
-            Name of the NPE parameter model (e.g., "tip3p", "ff19sb").
+            Name of the NPE parameter model (e.g., "tip3p", "ff19sb") or a list
+            of NPE model names.
         :return:
             None.
         :raises ValueError:
-            If neither is provided.
+            If neither is provided or if selected models contain conflicting
+            parameters for the same residue/atom entry.
         :raises KeyError:
             If an unknown model name is requested.
         """
         if pe_model is None and npe_model is None:
             raise ValueError("At least one of pe_model or npe_model must be provided.")
         
-        if pe_model is not None:
-            if pe_model not in self.pe_models:
-                raise KeyError(
-                    f"Unknown PE model '{pe_model}'. \nAvailable: {sorted(self.pe_models)}"
-                )
-            self.pe_model = self.pe_models[pe_model]
+        pe_model_names = self._normalize_model_names(pe_model)
+        npe_model_names = self._normalize_model_names(npe_model)
+
+        if pe_model_names:
+            self.pe_model = {
+                "db": self._merge_model_dbs(pe_model_names, self.pe_models, "PE"),
+                "model_names": pe_model_names,
+            }
         else:
             self.pe_model = None
 
-        if npe_model is not None:
-            if npe_model not in self.npe_models:
-                raise KeyError(
-                    f"Unknown NPE model '{npe_model}'. \nAvailable: {sorted(self.npe_models)}"
-                )
-            self.npe_model = self.npe_models[npe_model]
+        if npe_model_names:
+            self.npe_model = {
+                "db": self._merge_model_dbs(npe_model_names, self.npe_models, "NPE"),
+                "model_names": npe_model_names,
+            }
         else:
             self.npe_model = None
     
