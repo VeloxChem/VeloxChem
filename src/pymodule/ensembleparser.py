@@ -127,7 +127,8 @@ class EnsembleParser:
             Returns an empty dictionary if no protein is present in `env_atoms`.
         """
         # Restrict to protein residues
-        prot = env_atoms.select_atoms("protein")
+        # prot = env_atoms.select_atoms("protein")
+        prot = self.universe.select_atoms("protein")
         if len(prot) == 0:
             return {}
 
