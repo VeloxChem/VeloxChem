@@ -54,7 +54,7 @@ bessel_il_scaled_miller_positive(int l, double x) -> double
     if (l == 0) return s0;
 
     // Empirical choice of starting order
-    const int M = l + 80 + 30 * (static_cast<int>(x) - 100) / 400;
+    const int M = l + 80 + 10 * static_cast<int>(x / 100.0);
 
     // Backward recurrence
     // t_{n-1} = ((2n+1)/x) t_n + t_{n+1}
