@@ -394,7 +394,7 @@ def _Molecule_read_xyz_string(xyz):
 
 
 @staticmethod
-def _Molecule_from_dict(mol_dict):
+def _Molecule_from_input_dict(mol_dict):
     """
     Reads molecule from a dictionary.
 
@@ -1822,7 +1822,7 @@ Molecule.read_smiles = _Molecule_read_smiles
 Molecule.read_molecule_string = _Molecule_read_molecule_string
 Molecule.read_xyz_file = _Molecule_read_xyz_file
 Molecule.read_xyz_string = _Molecule_read_xyz_string
-Molecule.from_dict = _Molecule_from_dict
+Molecule.from_input_dict = _Molecule_from_input_dict
 Molecule.get_connectivity_matrix = _Molecule_get_connectivity_matrix
 Molecule.get_distance = _Molecule_get_distance
 Molecule.set_distance = _Molecule_set_distance

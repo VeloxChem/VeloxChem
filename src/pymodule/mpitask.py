@@ -158,7 +158,8 @@ class MpiTask:
             if ('molecule' in self.input_dict and
                 ('xyz' in self.input_dict['molecule'] or
                  'xyzfile' in self.input_dict['molecule'])):
-                self.molecule = Molecule.from_dict(self.input_dict['molecule'])
+                self.molecule = Molecule.from_input_dict(
+                    self.input_dict['molecule'])
 
                 self.ostream.print_block(self.molecule.get_string())
                 self.ostream.print_block(self.molecule.more_info())

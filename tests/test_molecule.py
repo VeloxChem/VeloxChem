@@ -349,7 +349,7 @@ class TestMolecule:
         ]
         mdict = {"xyz": rxyz, "charge": 3.0, "multiplicity": 2, "units": "au"}
 
-        mol_a = Molecule.from_dict(mdict)
+        mol_a = Molecule.from_input_dict(mdict)
         mol_b = self.nh3_molecule()
         mol_b.set_charge(3.0)
         mol_b.set_multiplicity(2)
