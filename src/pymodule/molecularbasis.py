@@ -611,8 +611,28 @@ def _MolecularBasis_get_string(self, title):
     return bas_str
 
 
+def _MolecularBasis_get_number_of_ecp_core_electrons(self):
+    """
+    Computes number of ECP core electrons of the atoms.
+
+    :return:
+        A list of number of ECP core electrons for the atoms.
+    """
+
+    core_electrons = []
+    for atom_basis in self.basis_sets():
+        if atom_basis.has_ecp():
+            atom_ecp = atom_basis.get_ecp_potential()
+            core_electrons.append(atom_ecp.number_of_core_electrons())
+        else:
+            core_electrons.append(0)
+
+    return core_electrons
+
+
 MolecularBasis.read = _MolecularBasis_read
 MolecularBasis.read_dict = _MolecularBasis_read_dict
 MolecularBasis.get_avail_basis = _MolecularBasis_get_avail_basis
 MolecularBasis.get_string = _MolecularBasis_get_string
 MolecularBasis.info_str = _MolecularBasis_get_string
+MolecularBasis.get_number_of_ecp_core_electrons = _MolecularBasis_get_number_of_ecp_core_electrons
