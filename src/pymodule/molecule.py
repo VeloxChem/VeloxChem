@@ -443,6 +443,45 @@ def _Molecule_from_input_dict(mol_dict):
     return mol
 
 
+def _Molecule_nuclear_repulsion_energy(self, ecp_core_electrons=None):
+    """
+    Computes nuclear potential energy of a molecule.
+
+    :param ecp_core_electrons:
+        Optional list containing the number of ECP core electrons for each atom.
+    :return:
+        The nuclear potential energy.
+    """
+
+    coords_in_au = self.get_coordinates_in_bohr()
+    elem_ids = self.get_element_ids()
+
+    natoms = coords_in_au.shape[0]
+    e_nuc = 0.0
+
+    if ecp_core_electrons is not None:
+        assert_msg_critical(
+            len(ecp_core_electrons) == natoms,
+            'Molecule.nuclear_repulsion_energy: ECP core electron list must match number of atoms'
+        )
+        assert_msg_critical(
+            np.all(ecp_core_electrons >= 0),
+            'Molecule.nuclear_repulsion_energy: ECP core electrons must be non-negative'
+        )
+        elem_ids -= ecp_core_electrons
+
+    for i in range(natoms):
+        z_i = elem_ids[i]
+
+        for j in range(i + 1, natoms):
+            z_j = elem_ids[j]
+
+            distance = np.linalg.norm(coords_in_au[j] - coords_in_au[i])
+            e_nuc += z_i * z_j / distance
+
+    return e_nuc
+
+
 def _Molecule_get_connectivity_matrix(self, factor=1.3, H2_factor=1.7):
     """
     Gets connectivity matrix.
@@ -1517,12 +1556,14 @@ def _Molecule_is_linear(self):
         return False
 
 
-def _Molecule_get_aufbau_alpha_occupation(self, n_mo):
+def _Molecule_get_aufbau_alpha_occupation(self, n_mo, ecp_core_electrons=0):
     """
     Gets occupation numbers for alpha spin based on the aufbau principle.
 
     :param n_mo:
         The number of molecular orbitals.
+    :param ecp_core_electrons:
+        Number of core electrons represented by an effective core potential.
 
     :return:
         The occupation numbers for alpha spin.
@@ -1530,15 +1571,35 @@ def _Molecule_get_aufbau_alpha_occupation(self, n_mo):
 
     nalpha = self.number_of_alpha_electrons()
 
+    assert_msg_critical(
+        ecp_core_electrons >= 0,
+        'Molecule.get_aufbau_alpha_occupation: ECP core electron count must be non-negative'
+    )
+    assert_msg_critical(
+        ecp_core_electrons % 2 == 0,
+        'Molecule.get_aufbau_alpha_occupation: ECP core electron count must be even'
+    )
+
+    if ecp_core_electrons:
+        nalpha -= ecp_core_electrons // 2
+
+    nalpha = max(0, nalpha)
+    assert_msg_critical(
+        n_mo >= nalpha,
+        'Molecule.get_aufbau_alpha_occupation: Number of molecular orbitals is too small for the adjusted alpha electron count'
+    )
+
     return np.hstack((np.ones(nalpha), np.zeros(n_mo - nalpha)))
 
 
-def _Molecule_get_aufbau_beta_occupation(self, n_mo):
+def _Molecule_get_aufbau_beta_occupation(self, n_mo, ecp_core_electrons=0):
     """
     Gets occupation numbers for beta spin based on the aufbau principle.
 
     :param n_mo:
         The number of molecular orbitals.
+    :param ecp_core_electrons:
+        Number of core electrons represented by an effective core potential.
 
     :return:
         The occupation numbers for beta spin.
@@ -1546,10 +1607,31 @@ def _Molecule_get_aufbau_beta_occupation(self, n_mo):
 
     nbeta = self.number_of_beta_electrons()
 
+    assert_msg_critical(
+        ecp_core_electrons >= 0,
+        'Molecule.get_aufbau_beta_occupation: ECP core electron count must be non-negative'
+    )
+    assert_msg_critical(
+        ecp_core_electrons % 2 == 0,
+        'Molecule.get_aufbau_beta_occupation: ECP core electron count must be even'
+    )
+
+    if ecp_core_electrons:
+        nbeta -= ecp_core_electrons // 2
+
+    nbeta = max(0, nbeta)
+    assert_msg_critical(
+        n_mo >= nbeta,
+        'Molecule.get_aufbau_beta_occupation: Number of molecular orbitals is too small for the adjusted beta electron count'
+    )
+
     return np.hstack((np.ones(nbeta), np.zeros(n_mo - nbeta)))
 
 
-def _Molecule_get_aufbau_occupation(self, n_mo, flag='restricted'):
+def _Molecule_get_aufbau_occupation(self,
+                                    n_mo,
+                                    flag='restricted',
+                                    ecp_core_electrons=0):
     """
     Gets occupation vector(s) based on the aufbau principle.
 
@@ -1562,8 +1644,8 @@ def _Molecule_get_aufbau_occupation(self, n_mo, flag='restricted'):
         The occupation vector(s).
     """
 
-    occ_a = self.get_aufbau_alpha_occupation(n_mo)
-    occ_b = self.get_aufbau_beta_occupation(n_mo)
+    occ_a = self.get_aufbau_alpha_occupation(n_mo, ecp_core_electrons)
+    occ_b = self.get_aufbau_beta_occupation(n_mo, ecp_core_electrons)
 
     if flag == 'restricted':
         return 0.5 * (occ_a + occ_b)
@@ -1823,6 +1905,7 @@ Molecule.read_molecule_string = _Molecule_read_molecule_string
 Molecule.read_xyz_file = _Molecule_read_xyz_file
 Molecule.read_xyz_string = _Molecule_read_xyz_string
 Molecule.from_input_dict = _Molecule_from_input_dict
+Molecule.nuclear_repulsion_energy = _Molecule_nuclear_repulsion_energy
 Molecule.get_connectivity_matrix = _Molecule_get_connectivity_matrix
 Molecule.get_distance = _Molecule_get_distance
 Molecule.set_distance = _Molecule_set_distance

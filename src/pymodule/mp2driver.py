@@ -166,6 +166,8 @@ class Mp2Driver:
 
             # use case: mp2_drv.compute(molecule, basis, scf_results)
 
+            # TODO: add ecp_core_electrons in get_aufbau_alpha/beta_occupation
+
             if isinstance(scf_inp, dict):
                 scf_results = scf_inp
 
