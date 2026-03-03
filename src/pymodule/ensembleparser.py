@@ -167,6 +167,49 @@ class EnsembleParser:
 
         return term_map
 
+    def _protonation_resname_map(self, env_atoms):
+        """
+        Identify simple protonation-state variants from residue atom names and
+        return a renaming map keyed by MDAnalysis ``resindex``.
+
+        The purpose of this routine is analogous to ``_terminal_resname_map``:
+        it refines residue names before parameter lookup so that entries such as
+        GLU/GLH, ASP/ASH, and CYS/CYSH can be distinguished downstream without
+        modifying the writer logic.
+
+        The current heuristics are:
+
+        - GLU + HE1/HE2 -> GLH
+        - ASP + HD1/HD2 -> ASH
+        - CYS + HG/HG1  -> CYSH
+
+        Parameters
+        ----------
+        env_atoms : MDAnalysis.core.groups.AtomGroup
+            AtomGroup corresponding to the environment selection used in
+            trajectory parsing.
+
+        Returns
+        -------
+        dict[int, str]
+            Dictionary mapping residue ``resindex`` to refined residue names.
+            Only residues that need renaming are included.
+        """
+        prot_map = {}
+
+        for res in env_atoms.residues:
+            resname = str(res.resname)
+            atom_names = {str(name) for name in res.atoms.names}
+
+            if resname == "GLU" and ({"HE1", "HE2"} & atom_names):
+                prot_map[res.resindex] = "GLH"
+            elif resname == "ASP" and ({"HD1", "HD2"} & atom_names):
+                prot_map[res.resindex] = "ASH"
+            elif resname == "CYS" and ({"HG", "HG1"} & atom_names):
+                prot_map[res.resindex] = "CYSH"
+
+        return prot_map
+
     def structures(self,
                    trajectory_file: str,
                    num_snapshots: int | None = None,
@@ -337,6 +380,7 @@ class EnsembleParser:
 
         # Identify terminal protein residues (if any) and assign N*/C* residue names
         # so that terminal variants can be treated as separate residue types downstream.
+        prot_map = self._protonation_resname_map(env_atoms)
         term_map = self._terminal_resname_map(env_atoms)
 
         # MDAnalysis transforms require valid box dimensions (ts.dimensions)
@@ -404,7 +448,13 @@ class EnsembleParser:
                 )
                 pe_resids = np.asarray(pe_region.resids, dtype=int).copy()
                 pe_resnames = np.asarray(pe_region.resnames, dtype=object).copy()
-                
+                pe_residx = np.asarray(pe_region.resindices, dtype=int)
+
+                # Apply protonation-state residue renaming (GLH/ASH/CYSH, etc.) if applicable
+                if prot_map and len(pe_resnames) > 0:
+                    for ridx, newname in prot_map.items():
+                        pe_resnames[pe_residx == ridx] = newname
+
                 # Apply terminal residue renaming (NASN/CASN, etc.) if applicable
                 if term_map and len(pe_resnames) > 0:
                     pe_residx = np.asarray(pe_region.resindices, dtype=int)
@@ -429,6 +479,12 @@ class EnsembleParser:
                 )
                 npe_resids = np.asarray(npe_region.resids, dtype=int).copy()
                 npe_resnames = np.asarray(npe_region.resnames, dtype=object).copy()
+                npe_residx = np.asarray(npe_region.resindices, dtype=int)
+
+                # Apply protonation-state residue renaming (GLH/ASH/CYSH, etc.) if applicable
+                if prot_map and len(npe_resnames) > 0:
+                    for ridx, newname in prot_map.items():
+                        npe_resnames[npe_residx == ridx] = newname
 
                 # Apply terminal residue renaming (NASN/CASN, etc.) if applicable
                 if term_map and len(npe_resnames) > 0:
