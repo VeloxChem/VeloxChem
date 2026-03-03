@@ -611,6 +611,20 @@ def _MolecularBasis_get_string(self, title):
     return bas_str
 
 
+def _MolecularBasis_has_ecp(self):
+    """
+    Returns whether the molecular basis object contains ECP.
+
+    :return:
+        True if the molecular basis object contains ECP, False otherwise.
+    """
+
+    for atom_basis in self.basis_sets():
+        if atom_basis.has_ecp():
+            return True
+    return False
+
+
 def _MolecularBasis_get_number_of_ecp_core_electrons(self):
     """
     Computes number of ECP core electrons of the atoms.
@@ -635,4 +649,5 @@ MolecularBasis.read_dict = _MolecularBasis_read_dict
 MolecularBasis.get_avail_basis = _MolecularBasis_get_avail_basis
 MolecularBasis.get_string = _MolecularBasis_get_string
 MolecularBasis.info_str = _MolecularBasis_get_string
+MolecularBasis.has_ecp = _MolecularBasis_has_ecp
 MolecularBasis.get_number_of_ecp_core_electrons = _MolecularBasis_get_number_of_ecp_core_electrons

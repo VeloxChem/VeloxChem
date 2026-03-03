@@ -243,7 +243,8 @@ class ScfUnrestrictedDriver(ScfDriver):
 
         return (effmat_a, effmat_b)
 
-    def _gen_molecular_orbitals(self, molecule, eff_fock_mat, oao_mat):
+    def _gen_molecular_orbitals(self, molecule, ao_basis, eff_fock_mat,
+                                oao_mat):
         """
         Generates spin unrestricted molecular orbital by diagonalizing
         spin unrestricted open shell Fock/Kohn-Sham matrix. Overloaded base
@@ -251,6 +252,8 @@ class ScfUnrestrictedDriver(ScfDriver):
 
         :param molecule:
             The molecule.
+        :param ao_basis:
+            The AO basis set.
         :param eff_fock_mat:
             The effective Fock/Kohn-Sham matrix.
         :param oao_mat:
@@ -272,8 +275,11 @@ class ScfUnrestrictedDriver(ScfDriver):
             orb_coefs_a, eigs_a = self._delete_mos(orb_coefs_a, eigs_a)
             orb_coefs_b, eigs_b = self._delete_mos(orb_coefs_b, eigs_b)
 
-            occa = molecule.get_aufbau_alpha_occupation(eigs_a.size)
-            occb = molecule.get_aufbau_beta_occupation(eigs_b.size)
+            core_electrons = ao_basis.get_number_of_ecp_core_electrons()
+            n_ecp_elec = sum(core_electrons)
+
+            occa = molecule.get_aufbau_alpha_occupation(eigs_a.size, n_ecp_elec)
+            occb = molecule.get_aufbau_beta_occupation(eigs_b.size, n_ecp_elec)
 
             if self.pfon and (self.pfon_temperature > 0):
 
