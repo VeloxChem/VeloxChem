@@ -1255,6 +1255,10 @@ class ExcitonModelDriver:
             xc_mat_np = self.comm.reduce(vxc_mat.alpha_to_numpy(),
                                          root=mpi_master())
 
+        # TODO: enable ECP
+        assert_msg_critical(not basis.has_ecp(),
+                            'ExcitonModel: ECP is not yet supported')
+
         if self.rank == mpi_master():
             # compute dimer energy
             hcore = kin_mat + npot_mat

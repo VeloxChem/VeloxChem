@@ -465,7 +465,7 @@ def _Molecule_nuclear_repulsion_energy(self, ecp_core_electrons=None):
             'Molecule.nuclear_repulsion_energy: ECP core electron list must match number of atoms'
         )
         assert_msg_critical(
-            np.all(ecp_core_electrons >= 0),
+            np.all(np.array(ecp_core_electrons) >= 0),
             'Molecule.nuclear_repulsion_energy: ECP core electrons must be non-negative'
         )
         elem_ids -= ecp_core_electrons

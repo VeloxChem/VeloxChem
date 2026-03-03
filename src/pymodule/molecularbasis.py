@@ -634,7 +634,9 @@ def _MolecularBasis_get_number_of_ecp_core_electrons(self):
     """
 
     core_electrons = []
-    for atom_basis in self.basis_sets():
+    basis_sets = self.basis_sets()
+    for basis_index in self.basis_sets_indices():
+        atom_basis = basis_sets[basis_index]
         if atom_basis.has_ecp():
             atom_ecp = atom_basis.get_ecp_potential()
             core_electrons.append(atom_ecp.number_of_core_electrons())

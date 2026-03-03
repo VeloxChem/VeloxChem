@@ -643,7 +643,8 @@ class ScfDriver:
                     self.checkpoint_file)
 
         # nuclear repulsion energy
-        self._nuc_energy = molecule.nuclear_repulsion_energy()
+        core_electrons = ao_basis.get_number_of_ecp_core_electrons()
+        self._nuc_energy = molecule.nuclear_repulsion_energy(core_electrons)
 
         if self.rank == mpi_master():
             self._print_header()
@@ -1662,7 +1663,7 @@ class ScfDriver:
 
             self._print_iter_data(i)
 
-            self._check_convergence(molecule, ovl_mat)
+            self._check_convergence(molecule, ao_basis, ovl_mat)
 
             if self.is_converged:
                 break
@@ -2458,10 +2459,12 @@ class ScfDriver:
             T = kin_mat
             V = npot_mat
             fock_mat[0] += (T + V)
-            fock_mat[0] += ecp_mat
+            if ecp_mat is not None:
+                fock_mat[0] += ecp_mat
             if self.scf_type != 'restricted':
                 fock_mat[1] += (T + V)
-                fock_mat[1] += ecp_mat
+                if ecp_mat is not None:
+                    fock_mat[1] += ecp_mat
 
             if self._dft and not self._first_step:
                 fock_mat[0] += np_xcmat_a
@@ -2698,13 +2701,15 @@ class ScfDriver:
 
         return nteri
 
-    def _check_convergence(self, molecule, ovl_mat):
+    def _check_convergence(self, molecule, ao_basis, ovl_mat):
         """
         Sets SCF convergence flag by checking if convergence condition for
         electronic gradient is fullfiled.
 
         :param molecule:
             The molecule.
+        :param ao_basis:
+            The AO basis set.
         :param ovl_mat:
             The overlap matrix.
         """
@@ -2721,6 +2726,10 @@ class ScfDriver:
                     # number of electrons are reasonable
                     nalpha = molecule.number_of_alpha_electrons()
                     nbeta = molecule.number_of_beta_electrons()
+                    core_electrons = ao_basis.get_number_of_ecp_core_electrons()
+                    n_ecp_elec = sum(core_electrons)
+                    nalpha -= n_ecp_elec // 2
+                    nbeta -= n_ecp_elec // 2
                     calc_nelec = self._comp_number_of_electrons(ovl_mat)
                     if (abs(calc_nelec[0] - nalpha) < 1.0e-3 and
                             abs(calc_nelec[1] - nbeta) < 1.0e-3):
