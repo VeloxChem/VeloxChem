@@ -2403,13 +2403,13 @@ class ScfDriver:
                 e_kin = 2.0 * np.sum(D[0] * T)
                 e_en = 2.0 * np.sum(D[0] * V)
                 if ecp_mat is not None:
-                    e_ee += 2.0 * np.sum(D[0] * ecp_mat)
+                    e_en += 2.0 * np.sum(D[0] * ecp_mat)
             else:
                 e_ee = 0.5 * (np.sum(D[0] * F[0]) + np.sum(D[1] * F[1]))
                 e_kin = np.sum((D[0] + D[1]) * T)
                 e_en = np.sum((D[0] + D[1]) * V)
                 if ecp_mat is not None:
-                    e_ee += np.sum((D[0] + D[1]) * ecp_mat)
+                    e_en += np.sum((D[0] + D[1]) * ecp_mat)
 
             if self._dft and not self._first_step:
                 e_ee += xc_ene

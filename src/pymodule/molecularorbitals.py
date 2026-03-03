@@ -187,6 +187,8 @@ class MolecularOrbitals:
             ostream.print_header("------------------------")
 
             nocc = molecule.number_of_electrons() // 2
+            core_electrons = basis.get_number_of_ecp_core_electrons()
+            nocc -= sum(core_electrons) // 2
 
             if isinstance(orb_inds, (np.ndarray, tuple, list)):
                 assert_msg_critical(
@@ -217,6 +219,8 @@ class MolecularOrbitals:
             ostream.print_header("--------------------------------")
 
             nalpha = molecule.number_of_alpha_electrons()
+            core_electrons = basis.get_number_of_ecp_core_electrons()
+            nalpha -= sum(core_electrons) // 2
 
             if isinstance(orb_inds, (np.ndarray, tuple, list)):
                 assert_msg_critical(
@@ -242,6 +246,7 @@ class MolecularOrbitals:
             ostream.print_header("-------------------------------")
 
             nbeta = molecule.number_of_beta_electrons()
+            nbeta -= sum(core_electrons) // 2
 
             if isinstance(orb_inds, (np.ndarray, tuple, list)):
                 assert_msg_critical(
