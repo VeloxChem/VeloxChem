@@ -99,6 +99,69 @@ class EnsembleParser:
         if isinstance(resname, str) and len(resname) == 4 and resname[0] in ("N", "C"):
             return resname
         return f"{prefix}{resname}"
+
+
+    @staticmethod
+    def _looks_like_n_terminal(residue) -> bool:
+        """
+        Heuristically detect an N-terminal amino-acid residue from its atom names.
+
+        This is used as a fallback when fragment/chain metadata are not sufficient
+        to identify all chains in the system (for example, protein dimers whose
+        monomers share the same chain identifier).
+
+        Parameters
+        ----------
+        residue : MDAnalysis.core.groups.Residue
+            Protein residue to inspect.
+
+        Returns
+        -------
+        bool
+            True if the residue looks like an N-terminus, False otherwise.
+        """
+        atom_names = {str(name) for name in residue.atoms.names}
+
+        # Common terminal-ammonium naming conventions
+        if {"H1", "H2", "H3"} <= atom_names:
+            return True
+        if {"HT1", "HT2", "HT3"} <= atom_names:
+            return True
+
+        # More permissive fallback used by some force fields/topologies
+        if "N" in atom_names and ("H2" in atom_names or "H3" in atom_names):
+            return True
+        if "N" in atom_names and ("HT2" in atom_names or "HT3" in atom_names):
+            return True
+
+        return False
+
+    @staticmethod
+    def _looks_like_c_terminal(residue) -> bool:
+        """
+        Heuristically detect a C-terminal amino-acid residue from its atom names.
+
+        Parameters
+        ----------
+        residue : MDAnalysis.core.groups.Residue
+            Protein residue to inspect.
+
+        Returns
+        -------
+        bool
+            True if the residue looks like a C-terminus, False otherwise.
+        """
+        atom_names = {str(name) for name in residue.atoms.names}
+
+        # Common terminal-carboxylate naming conventions
+        if {"OXT", "OT1", "OT2", "OC1", "OC2"} & atom_names:
+            return True
+
+        # Additional generic fallback seen in some topologies
+        if "O" in atom_names and ({"O1", "O2"} & atom_names):
+            return True
+
+        return False
     
     def _terminal_resname_map(self):
         """
@@ -113,18 +176,19 @@ class EnsembleParser:
         residue in the Universe) and can be used to update per-atom `resnames`
         arrays (e.g. `AtomGroup.resnames`) based on `AtomGroup.resindices`.
 
-        Parameters
-        ----------
-        env_atoms : MDAnalysis.core.groups.AtomGroup
-            AtomGroup corresponding to the environment selection used in
-            trajectory parsing (e.g. `universe.select_atoms(env_region)`).
-
         Returns
         -------
         dict[int, str]
             Dictionary mapping residue `resindex` to the renamed residue name
             with terminal prefix. Only protein terminal residues are included.
-            Returns an empty dictionary if no protein is present in `env_atoms`.
+
+        Notes
+        -----
+        Chain detection is first attempted using connectivity information
+        (`fragments`) and then chain IDs / segment IDs. As a conservative
+        fallback, residues with atom-name patterns characteristic of N- or
+        C-termini are also recognized. This helps when multiple protein chains
+        are present but the topology does not distinguish them cleanly.
         """
         # Restrict to protein residues
         prot = self.universe.select_atoms("protein")
@@ -164,6 +228,18 @@ class EnsembleParser:
 
             term_map[nterm.resindex] = self._prefixed_resname(nterm.resname, "N")
             term_map[cterm.resindex] = self._prefixed_resname(cterm.resname, "C")
+
+        # Additional fallback based on terminal-specific atom names.
+        # This is especially useful when several protein chains are present
+        # but fragment/chain metadata collapse them into a single group.
+        for res in prot.residues:
+            ridx = int(res.resindex)
+
+            if ridx not in term_map and self._looks_like_n_terminal(res):
+                term_map[ridx] = self._prefixed_resname(res.resname, "N")
+
+            if ridx not in term_map and self._looks_like_c_terminal(res):
+                term_map[ridx] = self._prefixed_resname(res.resname, "C")
 
         return term_map
 
@@ -381,7 +457,7 @@ class EnsembleParser:
         # Identify terminal protein residues (if any) and assign N*/C* residue names
         # so that terminal variants can be treated as separate residue types downstream.
         prot_map = self._protonation_resname_map(env_atoms)
-        term_map = self._terminal_resname_map(env_atoms)
+        term_map = self._terminal_resname_map()
 
         # MDAnalysis transforms require valid box dimensions (ts.dimensions)
         # (e.g. unwrap/center_in_box/wrap). For single PDBs without box info,
