@@ -150,7 +150,7 @@ export_orbdata(py::module &m)
         .def("get_identifier", &CAtomBasis::get_identifier, "Gets identifier of atom basis.")
         .def("get_name", &CAtomBasis::get_name, "Gets name of atom basis.")
         .def("get_ecp_potential", &CAtomBasis::get_ecp_potential, "Gets effective core potential of atom basis.")
-        .def("need_ecp", &CAtomBasis::need_ecp, "Checks if atom basis requires effective core potential.")
+        .def("has_ecp", &CAtomBasis::has_ecp, "Checks if atom basis contains effective core potential.")
         .def("max_angular_momentum", &CAtomBasis::max_angular_momentum, "Gets maximum angular momentum in atom basis.")
         .def("number_of_basis_functions",
              py::overload_cast<const int>(&CAtomBasis::number_of_basis_functions, py::const_),

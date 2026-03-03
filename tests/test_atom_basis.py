@@ -116,11 +116,11 @@ class TestAtomBasis:
         bas.set_name('DEF2-SVP(NEW)')
         assert bas.get_name() == 'DEF2-SVP(NEW)'
 
-    def test_need_ecp(self):
+    def test_has_ecp(self):
 
         bas = self.get_hydrogen_svp()
 
-        assert bas.need_ecp() is False
+        assert bas.has_ecp() is False
 
     def test_add(self):
 

@@ -246,7 +246,7 @@ CAtomBasis::get_ecp_potential() const -> CAtomCorePotential
 }
 
 auto
-CAtomBasis::need_ecp() const -> bool
+CAtomBasis::has_ecp() const -> bool
 {
     return !(_ecp_potential.is_empty());
 }

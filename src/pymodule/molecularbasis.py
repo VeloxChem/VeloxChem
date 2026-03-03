@@ -541,6 +541,12 @@ def _MolecularBasis_get_string(self, title):
 
     mlabel = self.get_main_basis_label()
 
+    has_ecp = False
+    for abasis in self.basis_sets():
+        if abasis.has_ecp():
+            has_ecp = True
+            break
+
     label = 'Molecular Basis (' + title + ')'
     bas_str = f'{label:^60s}\n'
     label = (len(label) + 2) * "="
@@ -550,14 +556,25 @@ def _MolecularBasis_get_string(self, title):
     label = 'Contracted GTOs'
     bas_str += "  Atom " + f'{label:<26}'
     label = 'Primitive GTOs'
-    bas_str += f'{label:<30}\n\n'
+    bas_str += f'{label:<30}'
+    if has_ecp:
+        label = 'Core Electrons'
+        bas_str += f'{label:<16}'
+    bas_str += '\n\n'
 
     for abasis in self.basis_sets():
         if abasis.get_name() == mlabel:
             id_elem = abasis.get_identifier()
             bas_str += f'  {chemical_element_name(id_elem):<6s}'
             bas_str += f'{abasis.contraction_str():<26s}'
-            bas_str += f'{abasis.primitives_str():<30s}\n'
+            bas_str += f'{abasis.primitives_str():<30s}'
+            if abasis.has_ecp():
+                atom_ecp = abasis.get_ecp_potential()
+                n_core_elec = atom_ecp.number_of_core_electrons()
+                bas_str += f'{str(n_core_elec):<16s}'
+            else:
+                bas_str += f'{"":<16s}'
+            bas_str += '\n'
     bas_str += '\n'
 
     for abasis in self.basis_sets():
@@ -567,12 +584,22 @@ def _MolecularBasis_get_string(self, title):
             label = 'Contracted GTOs'
             bas_str += "  Atom " + f'{label:<26}'
             label = 'Primitive GTOs'
-            bas_str += f'{label:<30}\n\n'
+            bas_str += f'{label:<30}'
+            if has_ecp:
+                label = 'Core Electrons'
+                bas_str += f'{label:<16}'
+            bas_str += '\n\n'
             id_elem = abasis.get_identifier()
             bas_str += f'  {chemical_element_name(id_elem):<6s}'
             bas_str += f'{abasis.contraction_str():<26s}'
-            bas_str += f'{abasis.primitives_str():<30s}\n'
-            bas_str += '\n'
+            bas_str += f'{abasis.primitives_str():<30s}'
+            if abasis.has_ecp():
+                atom_ecp = abasis.get_ecp_potential()
+                n_core_elec = atom_ecp.number_of_core_electrons()
+                bas_str += f'{str(n_core_elec):<16s}'
+            else:
+                bas_str += f'{"":<16s}'
+            bas_str += '\n\n'
 
     label = 'Contracted Basis Functions : '
     label += f'{self.get_dimensions_of_basis()}'

@@ -145,10 +145,10 @@ class CAtomBasis
     /// @return The ECP potential.
     auto get_ecp_potential() const -> CAtomCorePotential;
 
-    /// @brief Checks if atom basis requires effective core potential.
+    /// @brief Checks if atom basis contains effective core potential.
     /// @return Trrue if atom basis contains effective core potential, False
     /// otherwise.
-    auto need_ecp() const -> bool;
+    auto has_ecp() const -> bool;
 
     /// @brief Gets maximum angular momentum of basis functions in atom basis.
     /// @return The maximum angular momentum.
