@@ -100,7 +100,7 @@ class EnsembleParser:
             return resname
         return f"{prefix}{resname}"
     
-    def _terminal_resname_map(self, env_atoms):
+    def _terminal_resname_map(self):
         """
         Identifies N- and C-terminal protein residues and returns a renaming map.
 
