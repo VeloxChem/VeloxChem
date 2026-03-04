@@ -563,9 +563,13 @@ class ScfDriver:
         profiler = Profiler()
 
         if min_basis is None:
+            if ao_basis.has_ecp():
+                min_basis_label = 'AO-START-GUESS-FOR-ECP'
+            else:
+                min_basis_label = 'AO-START-GUESS'
             if self.rank == mpi_master():
                 min_basis = MolecularBasis.read(molecule,
-                                                'AO-START-GUESS',
+                                                min_basis_label,
                                                 basis_path='.',
                                                 ostream=None)
             else:
@@ -2715,7 +2719,8 @@ class ScfDriver:
                 if self.restart:
                     # Note: when restarting from checkpoint, double check that the
                     # number of electrons are reasonable
-                    nalpha = molecule.number_of_alpha_occupied_orbitals(ao_basis)
+                    nalpha = molecule.number_of_alpha_occupied_orbitals(
+                        ao_basis)
                     nbeta = molecule.number_of_beta_occupied_orbitals(ao_basis)
                     calc_nelec = self._comp_number_of_electrons(ovl_mat)
                     if (abs(calc_nelec[0] - nalpha) < 1.0e-3 and

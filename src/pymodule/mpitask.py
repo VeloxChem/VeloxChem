@@ -182,8 +182,13 @@ class MpiTask:
                                                         basis_name, basis_path,
                                                         self.ostream)
 
+                    if self.ao_basis.has_ecp():
+                        min_basis_label = 'AO-START-GUESS-FOR-ECP'
+                    else:
+                        min_basis_label = 'AO-START-GUESS'
+
                     self.min_basis = MolecularBasis.read(self.molecule,
-                                                         'AO-START-GUESS',
+                                                         min_basis_label,
                                                          basis_path,
                                                          ostream=None)
 

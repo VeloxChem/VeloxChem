@@ -382,7 +382,7 @@ def _MolecularBasis_read(molecule,
     mol_basis = MolecularBasis()
 
     for idx, elem_id in enumerate(molecule.get_identifiers()):
-        if basis_name.upper() == 'AO-START-GUESS':
+        if basis_name.upper() in ['AO-START-GUESS', 'AO-START-GUESS-FOR-ECP']:
             atom_bas_label = basis_name.upper()
         else:
             atom_bas_label = atom_basis_labels[idx].upper()
@@ -408,7 +408,9 @@ def _MolecularBasis_read(molecule,
                                           basis_elem_id, atom_bas_label)
 
         if need_def2_ecp and elem_id >= ecp_elem_id_mininum:
-            if basis_name.upper() != 'AO-START-GUESS':
+            if basis_name.upper() not in [
+                    'AO-START-GUESS', 'AO-START-GUESS-FOR-ECP'
+            ]:
                 assert_msg_critical(
                     atom_bas_label.lower().startswith('def2-'),
                     'MolecularBasis: ECP is only implemented for the def2- ' +
