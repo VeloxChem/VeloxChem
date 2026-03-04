@@ -678,7 +678,6 @@ class EnsembleDriver:
     def plot_uv_vis_spectra(
         self,
         results: dict,
-        *,
         energy_min_ev=None,
         energy_max_ev=None,
         show_individual: bool = False,
@@ -688,39 +687,33 @@ class EnsembleDriver:
         ax=None,
         xlim_nm=None,
     ):
-        """Convenience wrapper to plot averaged UV/Vis spectra for an ensemble.
+        """
+        Convenience wrapper to plot averaged UV/Vis spectra for an ensemble.
 
         This method expects the ``results`` dictionary returned by :meth:`compute`.
         It extracts ``results["rsp_all"]`` and passes it to
-        :class:`~.spectrumaverager.SpectrumAverager`.
+        :class:`SpectrumAverager`.
 
-        Parameters
-        ----------
-        results : dict
+        :param results : dict
             Results dictionary returned by :meth:`compute`.
-        energy_min_ev, energy_max_ev : float, optional
+        :param energy_min_ev, energy_max_ev : float, optional
             Energy window in eV for the common spectrum grid.
-        show_individual : bool
+        :param show_individual : bool
             Plot individual broadened spectra for each snapshot.
-        show_sticks : bool
+        :param show_sticks : bool
             Plot oscillator-strength sticks.
-        show_std : bool
-            Plot +/- one standard deviation as a shaded band.
-        title : str
+        :param show_std : bool
+            Plot +/- one standard deviation shaded area.
+        :param title : str
             Plot title.
-        ax : matplotlib.axes.Axes, optional
+        :param ax : matplotlib.axes.Axes, optional
             Existing axes to plot on.
-        xlim_nm : tuple(float, float), optional
+        :param xlim_nm : tuple(float, float), optional
             Wavelength axis limits in nm.
-
-        Returns
-        -------
-        matplotlib.axes.Axes
+        :return:
+            matplotlib.axes.Axes
             The axes containing the plot.
-
-        Raises
-        ------
-        KeyError
+        :raises KeyError:
             If ``rsp_all`` is not present in the results dictionary.
         """
         if not isinstance(results, dict):
@@ -738,7 +731,7 @@ class EnsembleDriver:
         rsp_all = results["rsp_all"]
 
         spec_avg = SpectrumAverager(comm=self.comm, ostream=self.ostream)
-        return spec_avg.plot_uv_vis(
+        return spec_avg.plot_uv_vis_spectra(
             rsp_all,
             energy_min_ev=energy_min_ev,
             energy_max_ev=energy_max_ev,

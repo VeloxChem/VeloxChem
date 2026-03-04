@@ -265,10 +265,9 @@ class SpectrumAverager:
             "oscillator_strengths": all_f,
         }
 
-    def plot_uv_vis(
+    def plot_uv_vis_spectra(
         self,
         rsp_all,
-        *,
         energy_min_ev=None,
         energy_max_ev=None,
         show_individual=False,
