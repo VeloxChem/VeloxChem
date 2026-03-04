@@ -408,15 +408,118 @@ class EnsembleDriver:
         idx = np.where(mask & (resids == first_resid))[0]
         return [str(atom_names[i]) for i in idx]
 
+    # -------------------------------------------------------------------------
+    # CHARMM -> AMBER normalization helpers for NPE database lookup
+    # -------------------------------------------------------------------------
+
+    @staticmethod
+    def _normalize_resname_for_npe_db(db: dict, resname: str) -> str:
+        """Normalize residue name to match the selected NPE database.
+
+        This is primarily used to bridge CHARMM-style residue naming (e.g. HSD/HSE/HSP)
+        to AMBER-style naming (HID/HIE/HIP) for ff19sb.
+        """
+        resname = str(resname)
+
+        # Fast path
+        if resname in db:
+            return resname
+
+        # Common CHARMM -> AMBER mappings
+        res_alias = {
+            # Histidine tautomers / charge states
+            "HSD": "HID",
+            "HSE": "HIE",
+            "HSP": "HIP",
+            "NHSD": "NHID",
+            "NHSE": "NHIE",
+            "NHSP": "NHIP",
+            "CHSD": "CHID",
+            "CHSE": "CHIE",
+            "CHSP": "CHIP",
+            # Some workflows call protonated histidine HYP; map if present
+            "HYP": "HIP",
+            "NHYP": "NHIP",
+            "CHYP": "CHIP",
+            # Cysteine neutral thiol naming variants
+            "CYSH": "CYS",
+        }
+
+        mapped = res_alias.get(resname, resname)
+        if mapped in db:
+            return mapped
+
+        # If terminal prefixes exist, try mapping the core residue name
+        # (e.g. N + HSD -> NHID) or (C + HSE -> CHIE)
+        if len(resname) > 3 and (resname[0] in {"N", "C"}):
+            prefix = resname[0]
+            core = resname[1:]
+            core_mapped = res_alias.get(core, core)
+            cand = prefix + core_mapped
+            if cand in db:
+                return cand
+
+        # Give up: return original (caller will raise a helpful error)
+        return resname
+
+    @staticmethod
+    def _resolve_atom_name_for_npe_db(resname: str, atom_name: str, available_atoms) -> str | None:
+        """Resolve CHARMM-style atom names to names present in the NPE database."""
+        atom_name = str(atom_name)
+        avail = set(str(a) for a in available_atoms)
+
+        # Exact match first
+        if atom_name in avail:
+            return atom_name
+
+        candidates: list[str] = []
+
+        # Backbone amide proton: CHARMM often uses HN, AMBER often uses H (varies by residue in db)
+        if atom_name == "HN":
+            candidates.append("H")
+        elif atom_name == "H":
+            candidates.append("HN")
+
+        # N-terminus ammonium hydrogens: HT1/HT2/HT3 (CHARMM) vs H1/H2/H3 (AMBER)
+        if atom_name.startswith("HT") and len(atom_name) == 3 and atom_name[2] in "123":
+            candidates.append(f"H{atom_name[2]}")
+        if atom_name.startswith("H") and len(atom_name) == 2 and atom_name[1] in "123":
+            candidates.append(f"HT{atom_name[1]}")
+
+        # C-terminus oxygens: OT1/OT2 (CHARMM) vs O / OXT (AMBER)
+        if atom_name in {"OT1", "OC1"}:
+            candidates.append("O")
+        if atom_name in {"OT2", "OC2"}:
+            candidates.append("OXT")
+        if atom_name == "OXT":
+            candidates.append("OT2")
+
+        # Cysteine thiol hydrogen: HG1 (CHARMM) vs HG (AMBER) for ff19sb cysteine
+        if atom_name == "HG1":
+            candidates.append("HG")
+
+        # Try candidates in order
+        for cand in candidates:
+            if cand in avail:
+                return cand
+
+        return None
+
+
+
     def _build_point_charges(self, coords_ang, atom_names, resnames) -> np.ndarray | None:
         """
         Build point charges array expected by SCF driver: shape (6, N), coords in bohr.
-        Charges are taken from NPE database (db) by (resname, atom_name).
+
+        Charges are taken from the selected NPE database by (resname, atom_name).
+        This routine performs lightweight CHARMM->AMBER normalization so that
+        CHARMM-style names in the trajectory (e.g. HN, OT1/OT2, HSD/HSE/HSP)
+        can be resolved against AMBER-style databases such as ff19sb.
         """
         coords_ang = np.asarray(coords_ang, dtype=float)
         if coords_ang.size == 0:
             return None
-        
+
         if self.npe_model is None:
             raise RuntimeError("Snapshot contains NPE atoms but npe_model is not set.")
 
@@ -425,15 +528,27 @@ class EnsembleDriver:
         db = self.npe_model["db"]
 
         q = np.empty(atom_names.size, dtype=float)
+
         for i, (atom, resn) in enumerate(zip(atom_names, resnames)):
-            resn = str(resn)
-            atom = str(atom)
+            raw_resn = str(resn)
+            raw_atom = str(atom)
+
+            resn = self._normalize_resname_for_npe_db(db, raw_resn)
+
             if resn not in db:
-                raise KeyError(f"No NPE parameters for residue name '{resn}'")
-            if atom not in db[resn]:
-                raise KeyError(f"No NPE charge for {resn}/{atom}. "
-                               f"Available: {sorted(db[resn].keys())}")
-            q[i] = db[resn][atom]["charge"]
+                raise KeyError(
+                    f"No NPE parameters for residue name '{raw_resn}' "
+                    f"(normalized to '{resn}')."
+                )
+
+            resolved_atom = self._resolve_atom_name_for_npe_db(resn, raw_atom, db[resn].keys())
+            if resolved_atom is None:
+                raise KeyError(
+                    f"No NPE charge for {raw_resn}/{raw_atom}. "
+                    f"Available: {sorted(db[resn].keys())}"
+                )
+
+            q[i] = db[resn][resolved_atom]["charge"]
 
         pc = np.zeros((6, coords_ang.shape[0]), dtype=float)
         pc[0:3, :] = coords_ang.T / bohr_in_angstrom()
