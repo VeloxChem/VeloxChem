@@ -643,8 +643,7 @@ class ScfDriver:
                     self.checkpoint_file)
 
         # nuclear repulsion energy
-        core_electrons = ao_basis.get_number_of_ecp_core_electrons()
-        self._nuc_energy = molecule.nuclear_repulsion_energy(core_electrons)
+        self._nuc_energy = molecule.nuclear_repulsion_energy(ao_basis)
 
         if self.rank == mpi_master():
             self._print_header()

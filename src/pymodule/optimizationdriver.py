@@ -489,7 +489,15 @@ class OptimizationDriver:
                 # Note: use base_fname so that the final h5 file is kept even
                 # when keep_files is False
                 final_h5_fname = base_fname + ".h5"
-                self._write_final_hdf5(final_h5_fname, final_mol, opt_results)
+                # pass in the basis set object if it is in args
+                if len(args) >= 1 and isinstance(args[0], MolecularBasis):
+                    self._write_final_hdf5(final_h5_fname,
+                                           final_mol,
+                                           opt_results,
+                                           basis=args[0])
+                else:
+                    self._write_final_hdf5(final_h5_fname, final_mol,
+                                           opt_results)
 
             opt_results = self.comm.bcast(opt_results, root=mpi_master())
 
@@ -932,7 +940,7 @@ class OptimizationDriver:
         mol = Molecule.read_xyz_string(xyz_data_i)
         mol.show(atom_indices=atom_indices, width=640, height=360)
 
-    def _write_final_hdf5(self, fname, molecule, opt_results):
+    def _write_final_hdf5(self, fname, molecule, opt_results, basis=None):
         """
         Creats a HDF5 file and saves the optimization results.
 
@@ -942,6 +950,8 @@ class OptimizationDriver:
             The molecule.
         :param opt_results:
             The dictionary of optimzation results.
+        :param basis:
+            Optional AO basis set object (for taking care of ECP core electrons).
         """
 
         if (fname and isinstance(fname, str) and Path(fname).is_file()):
@@ -961,7 +971,7 @@ class OptimizationDriver:
                     mol = Molecule.read_xyz_string(xyzstr)
                     # TODO: take care of ECP core electrons
                     nuclear_repulsion_energies.append(
-                        mol.nuclear_repulsion_energy())
+                        mol.nuclear_repulsion_energy(basis))
                     scan_coordinates_au.append(mol.get_coordinates_in_bohr())
 
                 hf.create_dataset(opt_group + 'scan_coordinates_au',
@@ -977,7 +987,7 @@ class OptimizationDriver:
                     mol = Molecule.read_xyz_string(xyzstr)
                     # TODO: take care of ECP core electrons
                     nuclear_repulsion_energies.append(
-                        mol.nuclear_repulsion_energy())
+                        mol.nuclear_repulsion_energy(basis))
                     opt_coordinates_au.append(mol.get_coordinates_in_bohr())
 
                 hf.create_dataset(opt_group + 'opt_coordinates_au',

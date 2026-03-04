@@ -443,12 +443,12 @@ def _Molecule_from_input_dict(mol_dict):
     return mol
 
 
-def _Molecule_nuclear_repulsion_energy(self, ecp_core_electrons=None):
+def _Molecule_nuclear_repulsion_energy(self, basis=None):
     """
     Computes nuclear potential energy of a molecule.
 
-    :param ecp_core_electrons:
-        Optional list containing the number of ECP core electrons for each atom.
+    :param basis:
+        Optional AO basis set object (for taking care of ECP core electrons).
     :return:
         The nuclear potential energy.
     """
@@ -459,16 +459,17 @@ def _Molecule_nuclear_repulsion_energy(self, ecp_core_electrons=None):
     natoms = coords_in_au.shape[0]
     e_nuc = 0.0
 
-    if ecp_core_electrons is not None:
+    if basis is not None:
+        core_electrons = basis.get_number_of_ecp_core_electrons()
         assert_msg_critical(
-            len(ecp_core_electrons) == natoms,
+            len(core_electrons) == natoms,
             'Molecule.nuclear_repulsion_energy: ECP core electron list must match number of atoms'
         )
         assert_msg_critical(
-            np.all(np.array(ecp_core_electrons) >= 0),
+            np.all(np.array(core_electrons) >= 0),
             'Molecule.nuclear_repulsion_energy: ECP core electrons must be non-negative'
         )
-        elem_ids -= ecp_core_electrons
+        elem_ids -= core_electrons
 
     for i in range(natoms):
         z_i = elem_ids[i]
