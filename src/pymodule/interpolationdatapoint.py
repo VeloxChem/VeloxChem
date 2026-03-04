@@ -385,8 +385,7 @@ class InterpolationDatapoint:
         g_matrix = np.dot(self.b_matrix, self.b_matrix.T)
 
         U, s, Vt = np.linalg.svd(g_matrix)
-        
-        print('eigenvalues', s)
+
         # Make zero the values of s_inv that are smaller than tol
         s_inv = np.array([1 / s_i if s_i > tol else 0.0 for s_i in s])
         

@@ -407,11 +407,34 @@ class IMForceFieldGenerator:
                 # default → gs
                 return 'gs'
 
+            def determine_similar_groups(groups_to_process):
+                separated_groups = []
+                for group in groups_to_process:
+                    # Dictionary to group atoms by their exact neighborhood
+                    neighbor_map = {}
+                    for atom in group:
+                        # Find the indices of all atoms connected to this atom
+                        neighbors = tuple(sorted([i for i, is_bonded in enumerate(conn[atom]) if is_bonded]))
+                        neighbor_map.setdefault(neighbors, []).append(atom)
+                    
+                    # Extract the automatically separated groups
+                    for subgroup in neighbor_map.values():
+                        separated_groups.append(sorted(subgroup))
+                        
+                return separated_groups
+
+            # Apply the separation logic to fix lumped groups before iterating
+            groups = determine_similar_groups(groups)
+
+            print(groups)
+
             for group in groups:
                 if len(group) > 3:
                     continue
+                    
                 connected_subgroups = {}  # key: (state, atom in bond), value: atoms in group connected to it
                 connected_rotatable_bonds = set()
+                
                 for atom in group:
                     for a1, a2 in rotatable_bonds:
                         state = determine_state(a1, a2)
@@ -438,8 +461,9 @@ class IMForceFieldGenerator:
                                 print(molecule.get_labels()[atom], sum(conn[atom]))
                             rot_groups[state].append(sorted(subgroup))
                             new_groups[state].append(sorted(subgroup))
-  
+
             return new_groups, rot_groups
+        
 
         self.symmetry_information = {'gs': (), 'es': ()}
         self.molecule = molecule
@@ -484,6 +508,7 @@ class IMForceFieldGenerator:
             if not self.use_symmetry:
                 symmetry_groups = (symmetry_groups[0], [], symmetry_groups[2])
             ff_gen = MMForceFieldGenerator()
+            ff_gen.ostream.mute()
             ff_gen.partial_charges = molecule.get_partial_charges(molecule.get_charge())
             ff_gen.create_topology(molecule)
 
@@ -540,9 +565,6 @@ class IMForceFieldGenerator:
                             indices_list.append(i)
                 self.symmetry_information['es'] = [symmetry_groups[0], rot_groups['es'], regrouped['es'], core_atoms, non_core_atoms, rotatable_bonds_zero_based, indices_list, self.symmetry_dihedral_lists, dihedrals_to_set, [angle_index, dihedral_index]]
 
-            # self.symmetry_information['es'][3] = [0,1,2]
-
-            # self.symmetry_information['es'][4].append([3,4,5,6])
 
             if self.reaction_molecules_dict is not None and extract_z_matrix[root]:
                 for entry in self.reaction_molecules_dict:
@@ -2385,7 +2407,7 @@ class IMForceFieldGenerator:
                 combinations = list(itertools.product(*values))
                 # Convert to list of dictionaries
                 molecule_configs = [dict(zip(keys, combo)) for combo in combinations] # if all(element == combo[0] for element in combo)
-                print('MOlecule configs', molecule_configs)
+
                 for i, molecule_config in enumerate(molecule_configs):
                     cur_molecule = Molecule.from_xyz_string(molecule.get_xyz_string())
                     cur_molecule.set_charge(molecule.get_charge())
@@ -2407,6 +2429,7 @@ class IMForceFieldGenerator:
                     if i > 0:
                         symmetry_point = True
                     current_basis = MolecularBasis.read(cur_molecule, basis.get_main_basis_label())
+                    
                     adjusted_molecule['gs'].append((cur_molecule, current_basis, periodicites[dihedral],  dihedral_to_change, entries[2], symmetry_point))
             if 1 in states and len(symmetry_information['es']) != 0 and len(symmetry_information['es'][2]) != 0 and self.drivers['es'][0].spin_flip is False:
                 symmetry_mapping_groups = [item for item in range(len(molecule.get_labels()))]
@@ -2468,31 +2491,23 @@ class IMForceFieldGenerator:
                     current_basis = MolecularBasis.read(cur_molecule, basis.get_main_basis_label())
                     adjusted_molecule['es'].append((cur_molecule, current_basis, periodicites[dihedral],  dihedral_to_change, entries[2], symmetry_point))
             
-            else:
+            elif not symmetry_point:
                 if 0 in entries[2]:
                     adjusted_molecule['gs'].append((entries[0], entries[1], 1, None, [0], symmetry_point)) 
                 if any(x > 0 for x in entries[2]): 
                     states = [state for state in entries[2] if state > 0]
                     adjusted_molecule['es'].append((entries[0], entries[1], 1, None, states, symmetry_point)) 
-        # else:
-        #     adjusted_molecule['gs'].append((molecule, basis, 1, None))  
-        #     adjusted_molecule['es'].append((molecule, basis, 1, None))  
-
 
         for key, entries in adjusted_molecule.items():
             if len(entries) == 0:
                 continue
-            print(key, entries)
-
             drivers = self.drivers[key]
-
-
             org_roots = None
-
             if isinstance(drivers[0], LinearResponseEigenSolver) or isinstance(drivers[0], TdaEigenSolver):           
                     org_roots = drivers[1].state_deriv_index
 
             label_counter = 0
+
             for mol_basis in entries:
                 if isinstance(drivers[0], LinearResponseEigenSolver) or isinstance(drivers[0], TdaEigenSolver):
                     root_to_follow_calc = mol_basis[4]           
@@ -2501,16 +2516,16 @@ class IMForceFieldGenerator:
                 
                 
                 energies, scf_results, rsp_results = self.compute_energy(drivers[0], mol_basis[0], mol_basis[1])
-                print(energies)
+
                 
                 if isinstance(drivers[0], LinearResponseEigenSolver) or isinstance(drivers[0], TdaEigenSolver):
                     energies = energies[mol_basis[4]]
 
 
                 gradients = self.compute_gradient(drivers[1], mol_basis[0], mol_basis[1], scf_results, rsp_results)
-                print(gradients)
+
                 hessians = self.compute_hessian(drivers[2], mol_basis[0], mol_basis[1])
-                print(hessians)
+
                 masses = mol_basis[0].get_masses().copy()
                 masses_cart = np.repeat(masses, 3)
                 inv_sqrt_masses = 1.0 / np.sqrt(masses_cart)
@@ -2551,7 +2566,7 @@ class IMForceFieldGenerator:
                         elif len(element) == 2:
                             eq_bond_length.append(0.0)
                     eq_bond_length = [2.724954366417468, 1.8341168646042718, 1.8341161804706632]
-                    print('force dict', eq_bond_length)
+
                     
                     impes_coordinate = InterpolationDatapoint(z_matrix)
                     impes_coordinate.eq_bond_lengths = eq_bond_length
@@ -2564,7 +2579,6 @@ class IMForceFieldGenerator:
                     impes_coordinate.hessian = mw_hess_mat.reshape(hess.shape)
                     impes_coordinate.transform_gradient_and_hessian()
         
-                    print('Org Molecules', mol_basis[0].get_xyz_string())
                     if mol_basis[2] > 1:
                         
                         rotation_combinations = None
@@ -2580,7 +2594,6 @@ class IMForceFieldGenerator:
                             rotations = [0.0, np.pi]
                             dihedrals = mol_basis[3]  # your list of rotatable dihedrals
                             rotation_combinations = list(product(rotations, repeat=len(dihedrals)))
-                        print('rot comb', rotation_combinations)
                         
                         org_mask = [i for i in range(len(impes_coordinate.z_matrix))]
                         masks = [org_mask]
@@ -2591,10 +2604,8 @@ class IMForceFieldGenerator:
                                 
                             rot_mol = Molecule(self.molecule.get_labels(), mol_basis[0].get_coordinates_in_bohr(), 'bohr')
                             for angle, dihedral in zip(combo, dihedrals):
-                                print('dihedral', angle, dihedral, (mol_basis[0].get_dihedral(dihedral, 'radian')))
                                 rot_mol.set_dihedral(dihedral, mol_basis[0].get_dihedral(dihedral, 'radian') - angle, 'radian')
-                                print('dihedral', np.cos(3.0 * mol_basis[0].get_dihedral(dihedral, 'radian')), np.cos(3.0 * (mol_basis[0].get_dihedral(dihedral, 'radian') - angle)))
-                            print('rot_molecules', combo, rot_mol.get_xyz_string())
+
                             target_coordinates = self.calculate_translation_coordinates(rot_mol.get_coordinates_in_bohr())
                             reference_coordinates = self.calculate_translation_coordinates(mol_basis[0].get_coordinates_in_bohr())
                             
@@ -2705,21 +2716,20 @@ class IMForceFieldGenerator:
         symmetry_group_dihedral_dict = {} 
         angles_to_set = {}
         periodicities = {}
-        dihedral_groups = {2: [], 3: []}
+        dihedral_groups = {2: {}, 3: {}}
 
         for symmetry_group in symmetry_groups:
              
             symmetry_group_dihedral_list = symmetry_group_dihedral(symmetry_group, all_dihedrals, rot_bonds)
             symmetry_group_dihedral_dict[tuple(symmetry_group)] = symmetry_group_dihedral_list
-            print('dihedral list', symmetry_group_dihedral_list)
             
             if len(symmetry_group) == 3:
 
                 # angles_to_set[symmetry_group_dihedral_list[0]] = ([0.0, np.pi/3.0])
-                angles_to_set[tuple(symmetry_group_dihedral_list[0])] = ([0.0, np.pi/3.0])
+                angles_to_set[tuple(symmetry_group_dihedral_list[0])] = ([0.0, np.pi/6.0, np.pi/3.0, 2.0*np.pi/3.0])
 
                 periodicities[tuple(symmetry_group_dihedral_list[0])] = 3
-                dihedral_groups[3].extend([tuple(sorted(element, reverse=False)) for element in symmetry_group_dihedral_list])
+                dihedral_groups[3][tuple(symmetry_group_dihedral_list[0][1:3])] = [tuple(sorted(element, reverse=False)) for element in symmetry_group_dihedral_list]
 
             elif len(symmetry_group) == 2:
 

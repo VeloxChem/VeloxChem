@@ -32,6 +32,7 @@ import math
 import random
 import torch
 import gpytorch
+from typing import List, Tuple, Dict, Any, Optional
 from scipy.optimize import linear_sum_assignment
 from scipy.linalg import cho_factor, cho_solve
 import sys
@@ -361,7 +362,7 @@ class InterpolationDriver():
 
         # Determine weights, weight gradients,
         # energy values, and energy gradients for interpolation
-        for i, data_point in enumerate(self.qm_data_points):
+        for i, data_point in enumerate(self.qm_data_points[:2]):
             
             distance, weight_gradient, _, swapped = self.cartesian_distance(data_point)
 
@@ -620,7 +621,6 @@ class InterpolationDriver():
 
         self.impes_coordinate.gradient = (np.tensordot(W_i, gradients, axes=1) + np.tensordot(potentials, grad_W_i, axes=1))
 
-
         # --- 4.  book-keeping (optional) ---------------------------------------------
         for lbl, Wi in zip(used_labels, W_i):
             self.weights[lbl] = Wi
@@ -742,25 +742,42 @@ class InterpolationDriver():
         natm = data_point.cartesian_coordinates.shape[0]
         # print(len(self.qm_symmetry_data_points))
         dp_label = data_point.point_label 
+        
         if len(self.qm_symmetry_data_points[dp_label]) > 1 and self.use_symmetry:
 
             symmetry_data_points = self.qm_symmetry_data_points[dp_label]
-  
+
             symmetry_weights = []
             potentials = []
             pot_gradients = []
             symmetry_weight_gradients = []
             hessian_error = []
-            
-            for i, symmetry_data_point in enumerate(symmetry_data_points):
+
+            symmetry_weights_cos = []
+            symmetry_weight_gradients_cos = []
+            r_cut = 1.5
+
+            for idx, symmetry_data_point in enumerate(symmetry_data_points):
                 # if i == 0:
                 #     symmetry_data_point.confidence_radius = 1.5
                 energy = symmetry_data_point.energy
                 masks = symmetry_data_point.mapping_masks
 
-                for ww, mask in enumerate(masks):
+
+                # dihedral_maps = []
+                # for key in self.symmetry_information[7][3]:
+
+                #     if tuple(sorted(key[1:3])) not in dihedral_maps:
+                        
+                #         dihedral_maps.append(tuple(sorted(key[1:3])))
+
+                # print(self.symmetry_information[7][3])
+                # exit()
+                for ww, mask in enumerate(masks[:]):
                     
-                    
+                    sum_sym_3_dihedral_cos = {key: 0.0 for key in self.symmetry_information[7][3].keys()}
+                    sum_sym_3_dihedral_prime_cos = {key :np.zeros_like(data_point.cartesian_coordinates.reshape(-1)) for key in self.symmetry_information[7][3].keys()}
+
                     grad = symmetry_data_point.internal_gradient.copy()
                     grad[masks[0]] = grad[mask]
 
@@ -774,20 +791,20 @@ class InterpolationDriver():
 
                     dist_check = (org_int_coords.copy() - symmetry_data_point.internal_coordinates_values[mask])
                     dist_correlation = (org_int_coords.copy() - symmetry_data_point.internal_coordinates_values[mask])
-                    
+
                     sum_sym_dihedral = 0.0
                     sum_sym_dihedral_prime = np.zeros_like(data_point.cartesian_coordinates.reshape(-1))
 
                     for i, element in enumerate(self.impes_coordinate.z_matrix[self.symmetry_information[-1][1]:], start=self.symmetry_information[-1][1]): 
 
-                        if tuple(sorted(element)) in self.symmetry_information[7][3]:                                       
-
+                        if element[1:3] in self.symmetry_information[7][3]:                                       
+            
                             dist_check[i] = np.sin(dist_org[i])
                             sum_sym_dihedral += self.te_weight_general(dist_org[i], 3)
                             sum_sym_dihedral_prime += self.te_weight_gradient_general(dist_org[i], self.impes_coordinate.b_matrix[i,:], 3)
                             dist_correlation[i] = 0.0
-
-
+                            sum_sym_3_dihedral_cos[element[1:3]] += 2.0 * (1.0 - np.cos(dist_org[i]))
+                            sum_sym_3_dihedral_prime_cos[element[1:3]] += 2.0 * np.sin( dist_org[i]) * self.impes_coordinate.b_matrix[i, :]
 
                         elif tuple(sorted(element)) in self.symmetry_information[7][2]:
                             
@@ -807,15 +824,56 @@ class InterpolationDriver():
                     self.bond_rmsd.append(np.sqrt(np.mean(np.sum((dist_org[:self.symmetry_information[-1][0]])**2))))
                     self.angle_rmsd.append(np.sqrt(np.mean(np.sum(dist_org[self.symmetry_information[-1][0]:self.symmetry_information[-1][1]]**2))))
                     self.dihedral_rmsd.append(np.sqrt(np.mean(np.sum(dist_correlation[self.symmetry_information[-1][1]:]**2))))
-
-
-                    if sum_sym_dihedral == 0.0:
-                        continue
                     
-                    
-                    symmetry_weights.append(sum_sym_dihedral**10)
+                    combined_weights = []
+                    combined_weights_derivative = []
 
-                    symmetry_weight_gradients.append(10 * sum_sym_dihedral**9 * sum_sym_dihedral_prime.reshape(natm, 3))
+                    for key, entry in sum_sym_3_dihedral_cos.items():
+                        if entry >= r_cut**2:
+                            # Outside the trust radius: weight and force are EXACTLY zero
+                            combined_weights.append(0.0)
+                            
+                            combined_weights_derivative.append(np.zeros((natm, 3)))
+                        else:
+                            # Inside the trust radius: evaluate the smooth polynomial dome
+                            decay_term = 1.0 - (entry / r_cut**2)
+                            
+                            combined_weights.append(decay_term**3)
+                            
+                            grad_factor = (-3.0 / r_cut**2) * (decay_term**2)
+                            grad_matrix = grad_factor * sum_sym_3_dihedral_prime_cos[key].reshape(natm, 3)
+                            
+                            combined_weights_derivative.append(grad_matrix)
+
+                    
+                    W_total = np.prod(combined_weights)
+                 
+                    grad_W_total = np.zeros((natm, 3))
+
+                    for I in range(len(sum_sym_3_dihedral_cos.keys())):
+                        # Calculate the product of all scalar weights EXCEPT the current one (J != I)
+                        # Using a generator expression handles any number of rotors automatically
+                        prod_other_w = np.prod([combined_weights[J] for J in range(len(sum_sym_3_dihedral_cos.keys())) if J != I])
+                        
+                        # Add this rotor's contribution to the total multidimensional gradient
+                        grad_W_total += combined_weights_derivative[I] * prod_other_w
+
+                    # Now append W_total and grad_W_total to your global lists for the normalization step
+                    symmetry_weights_cos.append(W_total)
+
+
+                    symmetry_weight_gradients_cos.append(grad_W_total)
+
+                    # symmetry_weights_cos.append((1.0 - sum_sym_dihedral_cos/r_cut**2)**3)
+                    # symmetry_weight_gradients_cos.append((-3.0/r_cut**2 * (1.0 - sum_sym_dihedral_cos/r_cut**2)**2) * sum_sym_dihedral_prime_cos.reshape(natm, 3))
+
+                    # if sum_sym_dihedral == 0.0:
+                    #     continue
+
+                    symmetry_weights.append(sum_sym_dihedral**4)
+
+
+                    symmetry_weight_gradients.append(4 * sum_sym_dihedral**3 * sum_sym_dihedral_prime.reshape(natm, 3))
 
                     pes = (energy + np.matmul(dist_check.T, grad) +
                         0.5 * np.linalg.multi_dot([dist_check.T, hessian, dist_check]))
@@ -832,26 +890,18 @@ class InterpolationDriver():
                     
                     pes_prime = (np.matmul(self.impes_coordinate.b_matrix.T, (grad + dist_hessian))).reshape(natm, 3)
                     pot_gradients.append(pes_prime)
-                
-            # ---------------------------------------------------------------------------
-            # 1. raw (unnormalised) Shepard weights and their gradients
-            # ---------------------------------------------------------------------------
-            w_i       = np.asarray(symmetry_weights,          dtype=np.float64)        # shape (m,)
-            grad_w_i  = np.asarray(symmetry_weight_gradients, dtype=np.float64)        # shape (m, natm, 3)
 
-            S         = w_i.sum()                              # Σ wᵢ      (scalar)
-            sum_grad_w = grad_w_i.sum(axis=0)                  # Σ ∇wᵢ     (natm, 3)
 
-            # ---------------------------------------------------------------------------
-            # 2. normalised weights and their gradients
-            # ---------------------------------------------------------------------------
-            W_i       = w_i / S                                                    # (m,)
+            w_i       = np.asarray(symmetry_weights_cos,          dtype=np.float64)       
+            grad_w_i  = np.asarray(symmetry_weight_gradients_cos, dtype=np.float64)       
 
+            S         = w_i.sum()                              
+            sum_grad_w = grad_w_i.sum(axis=0)                  
+
+            W_i       = w_i / S                             
             grad_W_i  = (grad_w_i * S - w_i[:, None, None] * sum_grad_w) / S**2    # (m, natm, 3)
-            # print('internal wieghts', W_i)
-            # ---------------------------------------------------------------------------
-            # 3. energy and gradient of the interpolated PES
-            # ---------------------------------------------------------------------------
+
+
             U_i       = np.asarray(potentials,        dtype=np.float64)            # energies     (m,)
             grad_U_i  = np.asarray(pot_gradients,     dtype=np.float64)            # gradients    (m, natm, 3)
 
@@ -861,9 +911,6 @@ class InterpolationDriver():
                         np.tensordot(U_i,   grad_W_i, axes=1) )       # Σ Uᵢ ∇Wᵢ
             # grad_pes shape: (natm, 3)
 
-            # ---------------------------------------------------------------------------
-            # 4. book-keeping exactly as before
-            # ---------------------------------------------------------------------------
             for j, Wi in enumerate(W_i):
                 self.bond_rmsd[j]     *= Wi
                 self.angle_rmsd[j]    *= Wi
@@ -882,15 +929,9 @@ class InterpolationDriver():
             
             if not self.use_cosine_dihedral:
                 for i, element in enumerate(self.impes_coordinate.z_matrix[self.symmetry_information[-1][1]:], start=self.symmetry_information[-1][1]): 
-                    # print('calculating the dihedral')
-                    # dist_check[i] = np.tan(dist_org[i])
+
                     dist_check[i] = np.sin(dist_org[i])
             
-            # for i, element in enumerate(self.impes_coordinate.z_matrix[:self.symmetry_information[-1][1]]): 
-            #     if len(element) == 2:
-            #         # print('calculating the dihedral')
-            #         # dist_check[i] = np.tan(dist_org[i])
-            #         dist_check[i] = 1.0/org_int_coords[i] - 1.0/data_point.internal_coordinates_values[i]
 
       
             self.bond_rmsd.append(np.sqrt(np.mean(np.sum((dist_org[:self.symmetry_information[-1][0]])**2))))
@@ -905,47 +946,14 @@ class InterpolationDriver():
 
             if not self.use_cosine_dihedral:
                 for i, element in enumerate(self.impes_coordinate.z_matrix[self.symmetry_information[-1][1]:], start=self.symmetry_information[-1][1]):
-                    # derivative_vals = 1 / np.cos(dist_org[i])**2
-                    # grad[i] *= derivative_vals
-                    # dist_hessian_eff *= derivative_vals
+
                     grad[i] *= np.cos(dist_org[i])
                     dist_hessian_eff[i] *= np.cos(dist_org[i])
-            # for i, element in enumerate(self.impes_coordinate.z_matrix[:self.symmetry_information[-1][1]]): 
-            #     if len(element) == 2:
-            #         # print('calculating the dihedral')
-            #         # dist_check[i] = np.tan(dist_org[i])
-            #         grad[i] *= -1.0/org_int_coords[i]**2
-            #         dist_hessian_eff[i] *= -1.0/org_int_coords[i]**2
-            
-            
+
+
             pes_prime = (np.matmul(self.impes_coordinate.b_matrix.T, (grad + dist_hessian_eff))).reshape(natm, 3)
 
             return pes, pes_prime, (grad + dist_hessian_eff)
-
-    
-    def te_weight_gradient(self, theta, b_matrix_col):
-        
-        def _smoother_prime(t):
-            """Derivative of the smoother-step kernel."""
-            return 30*t**4 - 60*t**3 + 30*t**2
-        
-        x = np.mod(theta, 2*np.pi)          # fold into [0, 2π)
-
-        # initialise to zero so the "else" branch is automatic
-        wprime = 0.0
-
-        if x <= np.pi/3:                    # first taper
-            t       = 1.0 - x / (np.pi/3)
-            dt_dθ   = -1.0 / (np.pi/3)      #  d(1-x/L)/dθ   with  L = π/3
-            wprime  = _smoother_prime(t) * dt_dθ
-
-        elif x >= 5*np.pi/3:                # second taper
-            t       = 1.0 - (2*np.pi - x) / (np.pi/3)
-            dt_dθ   =  1.0 / (np.pi/3)
-            wprime  = _smoother_prime(t) * dt_dθ
-
-        # multiply by the B-matrix column to obtain the Cartesian gradient
-        return wprime * b_matrix_col        # same shape as b_matrix_col
             
 
     def simple_weight_gradient(self, distance_vector, distance):
@@ -1265,6 +1273,7 @@ class InterpolationDriver():
         target_coordinates = data_point.cartesian_coordinates.copy()
         reference_coordinates = self.impes_coordinate.cartesian_coordinates.copy()
 
+
         active_atoms = np.delete(np.arange(reference_coordinates.shape[0]), self.symmetry_information[4])
 
         target_coordinates_core = target_coordinates[active_atoms]
@@ -1286,7 +1295,7 @@ class InterpolationDriver():
 
         # distance_vector_sub = np.zeros_like(reference_coordinates)   # (natms,3)
         
-        distance_vector_sub[self.symmetry_information[3]] = distance_vector_sub
+        # distance_vector_sub[self.symmetry_information[3]] = distance_vector_sub
 
 
         # grad_s = distance_vector_sub @ R_x
@@ -1373,7 +1382,9 @@ class InterpolationDriver():
                 dw_dX_dalpha_i = self.trust_radius_tc_weight_gradient_gradient(data_point.confidence_radius, distance, distance_vector_sub, imp_int_coord_distance, imp_int_coord_derivative_contribution)
                 
                 self.dw_dalpha_list.append(dw_dalhpa_i)
-                self.dw_dX_dalpha_list.append(dw_dX_dalpha_i)        
+                dw_dX_dalpha_i_full = np.zeros_like(reference_coordinates)
+                dw_dX_dalpha_i_full[self.symmetry_information[3]] = dw_dX_dalpha_i
+                self.dw_dX_dalpha_list.append(dw_dX_dalpha_i_full)        
         elif self.interpolation_type == 'simple':
             weight_gradient = self.simple_weight_gradient(
                 distance_vector_sub, distance)
@@ -1687,7 +1698,13 @@ class InterpolationDriver():
         coverage_mass=0.8
         topk = None
 
+        rho_cap = 5.0
+        alpha_trust = 0.4   # how much raw impact survives even if rho is small
+        use_hybrid_score = True
+        aggregate_across_datapoints = True
+
         constraints_to_exclude = []
+        per_dp_results = []
 
         for el_idxelement, element in enumerate(self.z_matrix):
             if len(element) != 3:
@@ -1704,12 +1721,12 @@ class InterpolationDriver():
         qm_gradient_mw = qm_gradient.reshape(-1) * sqrt_masses    # mass-weighted gradient
         constraints = []
         print(len(datapoints), self.z_matrix, self.symmetry_information)
-        for datapoint in datapoints:
+        for datapoint, total_weight_contribution in datapoints:
             dihedral_difference = []
             internal_coord_elem_distance = []
             org_interal_coord_elem_distance = []
             for elem_idx, element in enumerate(self.z_matrix): 
-                if len(element) == 4 and tuple(sorted(element)) in self.symmetry_information[7][3]: 
+                if len(element) == 4 and element[1:3] in self.symmetry_information[7][3]: 
                     # internal_coord_elem_distance.append(0.5 * ( 1.0 + np.cos(3.0 * (self.impes_coordinate.internal_coordinates_values[elem_idx] - datapoint.internal_coordinates_values[elem_idx]) + np.pi)))
                     internal_coord_elem_distance.append(0.0)
                     org_interal_coord_elem_distance.append(0.0)
@@ -1775,11 +1792,34 @@ class InterpolationDriver():
             pred_im_G_int = self.transform_gradient_to_internal_coordinates(molecule, pred_G_mw, self.impes_coordinate.b_matrix)
             pred_qm_G_int = self.transform_gradient_to_internal_coordinates(molecule, qm_gradient_mw.reshape(qm_gradient.shape), self.impes_coordinate.b_matrix)
 
+            dq_raw = np.array(
+                [
+                    self.impes_coordinate.internal_coordinates_values[i]
+                    - datapoint.internal_coordinates_values[i]
+                    if len(z_matrix[i]) == 4 and z_matrix[i][1:3] not in self.symmetry_information[7][3]
+                    else 0.0
+                    for i in range(len(z_matrix))
+                ],
+                dtype=float,
+            )
+
+            diag_result = self.compute_internal_gradient_diagnostics(
+                z_matrix=z_matrix,
+                dq_raw=dq_raw,
+                H=datapoint.internal_hessian,
+                g0=datapoint.internal_gradient,
+                g_qm=pred_qm_G_int,
+            )
+
+            rho = diag_result["rho"]
+            abs_delta_g_err = np.abs(diag_result["delta_g_err"])
+
+            # bounded trust factor in [0, 1)
+            rho_capped = np.minimum(rho, rho_cap)
+            trust_factor = rho_capped / (1.0 + rho_capped)
+
             print("max energy diff",
                 abs((E_pred_check - pred_E)))
-            
-
-            
             
             g_pred_check = partial_gradient           # already Hartree/bohr
             max_grad_diff = np.max(np.abs(g_pred_check - pred_im_G_int))
@@ -1795,11 +1835,6 @@ class InterpolationDriver():
             #     continue
             delta_g = pred_qm_G_int - pred_im_G_int
             print('delta g', delta_g)
-            single_energy_error = []
-            weights = []
-            single_gradient_error = []
-            abs_pg       = np.abs(partial_gradient)
-            sum_abs_pg   = abs_pg.sum()
 
             # effective displacements already computed as internal_coord_elem_distance (Δq_eff)
             eps    = 1e-12
@@ -1827,7 +1862,7 @@ class InterpolationDriver():
 
             L_ref         = 0.1                                  # bohr, choose sensibly
             G_as_energy   = g_i * L_ref                          # Hartree
-            G_kcal        = G_as_energy * hartree_in_kcalpermol() * bohr_in_angstrom()
+            G_kcal        = G_as_energy * hartree_in_kcalpermol()
             print('Gradient in kcal', G_kcal)
             lambda_grad   = 0.5                                  # 0…1, how much you care about gradient
             score_i_kcal  = (1.0 - lambda_grad) * E_kcal + lambda_grad * G_kcal
@@ -1835,82 +1870,480 @@ class InterpolationDriver():
 
             w_tot = score_i_kcal / (score_i_kcal.sum() + eps)
 
+            # hybrid score = absolute impact boosted by trust failure
+            if use_hybrid_score:
+                hybrid_score = w_tot * (alpha_trust + (1.0 - alpha_trust) * trust_factor)
+            else:
+                hybrid_score = w_tot.copy()
+
+            # normalize for ranking / thresholding
+            hybrid_score = hybrid_score / (hybrid_score.sum() + eps)
+
+            per_dp_results.append({
+                "datapoint": datapoint,
+                "dp_weight": float(total_weight_contribution),
+                "hybrid_score": hybrid_score.copy(),
+                "w_tot": w_tot.copy(),
+                "rho": rho.copy(),
+                "coords": [tuple(int(x) for x in c) for c in z_matrix],
+            })
+
             # # for bookkeeping: check sums
             # assert np.allclose(e_i.sum(), delta_E, atol=1e-12)
             # assert np.allclose(g_i.sum(), delta_G, atol=1e-12)
 
-            # --- final per-coordinate entry ---
-            contributions = list(
-                zip(
-                    partial_energies,
-                    E_kcal,              # energy-error share (kcal/mol)
-                    G_kcal,              # gradient-error share in energy units (kcal/mol)
-                    w_tot,               # combined weight
-                    z_matrix,
-                )
-            )
+            # # --- final per-coordinate entry ---
+            # contributions = list(
+            #     zip(
+            #         partial_energies,
+            #         E_kcal,              # energy-error share (kcal/mol)
+            #         G_kcal,              # gradient-error share in energy units (kcal/mol)
+            #         w_tot,               # combined weight
+            #         hybrid_score,
+            #         trust_factor,
+            #         rho,
+            #         abs_delta_g_err,
+            #         z_matrix,
+            #     )
+            # )
 
-            sorted_contributions = sorted(
-                contributions,
-                key=lambda x: x[1] + x[2],        # total error = energy + gradient part
-                reverse=True,
-            )
-            sorted_weights = np.array([c[3] for c in sorted_contributions])
-            sorted_coords  = [tuple(int(x) for x in c[4]) for c in sorted_contributions]
+            # sorted_contributions = sorted(
+            #     contributions,
+            #     key=lambda x: x[4],        # total error = energy + gradient part
+            #     reverse=True,
+            # )
+            # sorted_weights = np.array([c[4] for c in sorted_contributions])
+            # sorted_coords  = [tuple(int(x) for x in c[8]) for c in sorted_contributions]
 
-            selected_idx = []
-            if selection_rule == 'relative':
-                if sorted_weights.size > 0:
-                    wmax = sorted_weights.max()
-                    keep = sorted_weights >= (relative_threshold * wmax)
-                    selected_idx = list(np.where(keep)[0])
-                    print(wmax, keep, selected_idx)
-            elif selection_rule == 'coverage':
-                cum = np.cumsum(sorted_weights)
-                keep = cum <= coverage_mass
-                if keep.size > 0:
-                    keep[0] = True
-                selected_idx = list(np.where(keep)[0])
-                while np.sum(cum[selected_idx]) < coverage_mass:
-                    selected_idx.append(selected_idx[-1] + 1)
+            # selected_idx = []
+            # if selection_rule == 'relative':
+            #     if sorted_weights.size > 0:
+            #         wmax = sorted_weights.max()
+            #         keep = sorted_weights >= (relative_threshold * wmax)
+            #         selected_idx = list(np.where(keep)[0])
+            #         print(wmax, keep, selected_idx)
+            # elif selection_rule == 'coverage':
+            #     cum = np.cumsum(sorted_weights)
+            #     keep = cum <= coverage_mass
+            #     if keep.size > 0:
+            #         keep[0] = True
+            #     selected_idx = list(np.where(keep)[0])
+            #     while np.sum(cum[selected_idx]) < coverage_mass:
+            #         selected_idx.append(selected_idx[-1] + 1)
 
-            elif selection_rule == 'topk':
-                k = topk if (topk is not None) else max(1, int(0.25 * N))
-                selected_idx = list(range(min(k, N)))
-                print(k, selected_idx)
-            else:
-                raise ValueError(f"Unknown selection_rule: {selection_rule}")
+            # elif selection_rule == 'topk':
+            #     k = topk if (topk is not None) else max(1, int(0.25 * N))
+            #     selected_idx = list(range(min(k, N)))
+            #     print(k, selected_idx)
+            # else:
+            #     raise ValueError(f"Unknown selection_rule: {selection_rule}")
 
             
 
-            for idx in selected_idx:
-                coord = sorted_coords[idx]
-                if tuple(coord) in constraints or tuple(coord) in constraints_to_exclude:
-                    continue
-                # optional symmetry filtering for torsions
-                if len(coord) == 4 and (tuple(sorted(coord)) in self.symmetry_information[7][3]):
-                    continue
-
-                constraints.append(tuple(coord))
-            
-            # for dev_dihedral in dihedral_difference:
-            #     if tuple(dev_dihedral) in constraints:
+            # for idx in selected_idx:
+            #     coord = sorted_coords[idx]
+            #     if tuple(coord) in constraints or tuple(coord) in constraints_to_exclude:
             #         continue
+            #     # optional symmetry filtering for torsions
+            #     if len(coord) == 4 and (tuple(sorted(coord)) in self.symmetry_information[7][3]):
+            #         continue
+
+            #     constraints.append(tuple(coord))
+            
+            # # for dev_dihedral in dihedral_difference:
+            # #     if tuple(dev_dihedral) in constraints:
+            # #         continue
                 
-            #     constraints.append(tuple(dev_dihedral))
+            # #     constraints.append(tuple(dev_dihedral))
 
-            print('Top contributors (first 10):')
-            for i, (pE, e_kcal, g_kcal, w_i, coord) in enumerate(sorted_contributions[:10]):
-                picked = 'SELECTED' if i in selected_idx else ''
-                print(f"{i:2d} {tuple(int(x) for x in coord)}:"
-                    f" |pE|={abs(pE):.3e} Ha,"
-                    f" E_share={e_kcal:.3f} kcal/mol,"
-                    f" G_share={g_kcal:.3f} kcal/mol,"
-                    f" w_tot={w_i:.3f} {picked}")
-            print('Sum of energy-weights:', float(sorted_weights.sum()))
-            print('Selected constraints so far:', constraints)
+            # print('Top contributors (first 10):')
+            # for i, (pE, e_kcal, g_kcal, w_i, coord) in enumerate(sorted_contributions[:10]):
+            #     picked = 'SELECTED' if i in selected_idx else ''
+            #     print(f"{i:2d} {tuple(int(x) for x in coord)}:"
+            #         f" |pE|={abs(pE):.3e} Ha,"
+            #         f" E_share={e_kcal:.3f} kcal/mol,"
+            #         f" G_share={g_kcal:.3f} kcal/mol,"
+            #         f" w_tot={w_i:.3f} {picked}")
+            # print('Sum of energy-weights:', float(sorted_weights.sum()))
+            # print('Selected constraints so far:', constraints)
+        # normalize datapoint weights
+        dp_weights = np.array([r["dp_weight"] for r in per_dp_results], dtype=float)
+        if dp_weights.sum() < 1e-12:
+            dp_weights[:] = 1.0
+        dp_weights /= dp_weights.sum()
 
-        return constraints
+        # sort datapoints by weight descending
+        order = np.argsort(-dp_weights)
+        cum = np.cumsum(dp_weights[order])
+        keep_mask = cum <= coverage_mass
+        if keep_mask.size > 0:
+            keep_mask[0] = True
+
+        keep_indices = order[np.where(keep_mask)[0]]
+
+        # if last included point still leaves us below coverage_mass, include one more
+        if cum[keep_mask][-1] < coverage_mass and len(keep_indices) < len(order):
+            next_idx = order[len(keep_indices)]
+            keep_indices = np.append(keep_indices, next_idx)
+
+        # aggregate coordinate scores across kept datapoints
+        global_score = np.zeros(len(z_matrix))
+        global_rho = np.zeros(len(z_matrix))
+        for idx in keep_indices:
+            wk = dp_weights[idx]
+            global_score += wk * per_dp_results[idx]["hybrid_score"]
+            global_rho += wk * per_dp_results[idx]["rho"]
+
+        global_score /= (global_score.sum() + 1e-12)
+
+        sorted_idx = np.argsort(-global_score)
+        sorted_weights = global_score[sorted_idx]
+
+        selected_pos = []
+        if selection_rule == 'relative':
+            if sorted_weights.size > 0:
+                wmax = sorted_weights.max()
+                keep = sorted_weights >= (relative_threshold * wmax)
+                selected_pos = list(np.where(keep)[0])
+
+        elif selection_rule == 'coverage':
+            cum = np.cumsum(sorted_weights)
+            keep = cum <= coverage_mass
+            if keep.size > 0:
+                keep[0] = True
+            selected_pos = list(np.where(keep)[0])
+            while selected_pos and np.sum(sorted_weights[selected_pos]) < coverage_mass and selected_pos[-1] + 1 < len(sorted_weights):
+                selected_pos.append(selected_pos[-1] + 1)
+
+        elif selection_rule == 'topk':
+            k = topk if (topk is not None) else max(1, int(0.25 * len(z_matrix)))
+            selected_pos = list(range(min(k, len(z_matrix))))
+
+        else:
+            raise ValueError(f"Unknown selection_rule: {selection_rule}")
+
+        selected_idx = [int(sorted_idx[pos]) for pos in selected_pos]
+
+        # selected_idx already came from relative / coverage / topk
+        candidate_constraints = [tuple(int(x) for x in z_matrix[idx]) for idx in selected_idx]
+
+        # choose one preferred first constraint among selected candidates
+        preferred_idx = None
+        best_idx = selected_idx[0]
+
+        for idx in selected_idx:
+            coord = tuple(int(x) for x in z_matrix[idx])
+            ctype = self.coord_type(coord)
+
+            if ctype == "dihedral" and global_score[idx] > 0.5 * global_score[best_idx]:
+                preferred_idx = idx
+                break
+
+        if preferred_idx is None:
+            preferred_idx = best_idx
+
+        primary_constraint = [tuple(int(x) for x in z_matrix[preferred_idx])]
+
+        print("Primary constraint:", primary_constraint)
+        print("Candidate constraints:", candidate_constraints)
+        
+        return primary_constraint, candidate_constraints
+
+    def coord_type(self, coord: Tuple[int, ...]) -> str:
+        """Classify coordinate type from tuple length."""
+        n = len(coord)
+        if n == 2:
+            return "bond"
+        elif n == 3:
+            return "angle"
+        elif n == 4:
+            return "dihedral"
+        return "unknown"
+
+
+    def format_coord(self, coord: Tuple[int, ...]) -> str:
+            return str(tuple(int(x) for x in coord))
+
+
+    def compute_internal_gradient_diagnostics(
+        self,
+        z_matrix,
+        dq_raw,
+        H,
+        g0,
+        g_qm,
+        eps: float = 1e-12,
+    ):
+        """
+        Compute local Taylor diagnostics in internal coordinates.
+
+        dq_raw: raw internal difference q - q0 (before torsion wrapping transform)
+        For torsions:
+            dq_eff = sin(dq_raw)
+            chain factor = cos(dq_raw)
+        For non-torsions:
+            dq_eff = dq_raw
+            chain factor = 1
+        """
+        dq_raw = np.asarray(dq_raw, dtype=float).reshape(-1)
+        H = np.asarray(H, dtype=float)
+        g0 = np.asarray(g0, dtype=float).reshape(-1)
+        g_qm = np.asarray(g_qm, dtype=float).reshape(-1)
+
+        N = len(z_matrix)
+        if dq_raw.shape[0] != N:
+            raise ValueError("dq_raw has wrong length")
+        if g0.shape[0] != N:
+            raise ValueError("g0 has wrong length")
+        if g_qm.shape[0] != N:
+            raise ValueError("g_qm has wrong length")
+        if H.shape != (N, N):
+            raise ValueError("H has wrong shape")
+
+        dq_eff = dq_raw.copy()
+        chain = np.ones(N)
+
+        for i, coord in enumerate(z_matrix):
+            if len(coord) == 4:
+                dq_eff[i] = np.sin(dq_raw[i])
+                chain[i] = np.cos(dq_raw[i])
+
+        # Taylor gradient response in the transformed coordinate convention
+        Hdq_raw = H @ dq_eff
+        diag_resp_raw = np.diag(H) * dq_eff
+
+        # Apply chain factor only to the response coordinate itself
+        g0_eff = g0 * chain
+        Hdq = Hdq_raw * chain
+        diag_resp = diag_resp_raw * chain
+        offdiag_resp = Hdq - diag_resp
+
+        g_model = g0_eff + Hdq
+        delta_g_err = g_qm - g_model
+        rho = np.abs(delta_g_err) / (np.abs(Hdq) + eps)
+
+        # Energy decomposition in effective displacement
+        linear_energy = g0_eff * dq_eff
+        diag_quad_energy = 0.5 * np.diag(H) * dq_eff * dq_eff
+
+        cross_energy_split = np.zeros(N)
+        for i in range(N):
+            for j in range(i + 1, N):
+                cross = dq_eff[i] * H[i, j] * dq_eff[j]
+                cross_energy_split[i] += 0.5 * cross
+                cross_energy_split[j] += 0.5 * cross
+
+        pE_total = linear_energy + diag_quad_energy + cross_energy_split
+
+        rows = []
+        for i, coord in enumerate(z_matrix):
+            rows.append({
+                "idx": i,
+                "coord": tuple(coord),
+                "type": self.coord_type(tuple(coord)),
+                "dq_raw": dq_raw[i],
+                "dq_eff": dq_eff[i],
+                "abs_dq": abs(dq_eff[i]),
+                "chain": chain[i],
+                "g0_eff": g0_eff[i],
+                "diag_resp": diag_resp[i],
+                "abs_diag_resp": abs(diag_resp[i]),
+                "offdiag_resp": offdiag_resp[i],
+                "abs_offdiag_resp": abs(offdiag_resp[i]),
+                "Hdq": Hdq[i],
+                "abs_Hdq": abs(Hdq[i]),
+                "g_model": g_model[i],
+                "g_qm": g_qm[i],
+                "delta_g_err": delta_g_err[i],
+                "abs_delta_g_err": abs(delta_g_err[i]),
+                "rho": rho[i],
+                "pE_total": pE_total[i],
+                "abs_pE_total": abs(pE_total[i]),
+            })
+
+        return {
+            "rows": rows,
+            "dq_eff": dq_eff,
+            "chain": chain,
+            "Hdq": Hdq,
+            "diag_resp": diag_resp,
+            "offdiag_resp": offdiag_resp,
+            "g_model": g_model,
+            "delta_g_err": delta_g_err,
+            "rho": rho,
+            "pE_total": pE_total,
+        }
+
+
+    def print_ranked_table(self,
+        rows: List[Dict[str, Any]],
+        title: str,
+        n: int = 10,
+    ) -> None:
+        """Pretty-print a ranked summary table."""
+        print(f"\n{title}")
+        print("-" * len(title))
+        header = (
+            f"{'rank':>4} {'idx':>4} {'type':>9} {'coord':>18} "
+            f"{'|dq|':>12} {'|diag|':>12} {'|offdiag|':>12} "
+            f"{'|Hdq|':>12} {'|err|':>12} {'rho':>12}"
+        )
+        print(header)
+        print("-" * len(header))
+
+        for rank, r in enumerate(rows[:n]):
+            print(
+                f"{rank:4d} "
+                f"{r['idx']:4d} "
+                f"{r['type']:>9} "
+                f"{self.format_coord(r['coord']):>18} "
+                f"{r['abs_dq']:12.6e} "
+                f"{r['abs_diag_resp']:12.6e} "
+                f"{r['abs_offdiag_resp']:12.6e} "
+                f"{r['abs_Hdq']:12.6e} "
+                f"{r['abs_delta_g_err']:12.6e} "
+                f"{r['rho']:12.6e}"
+            )
+
+
+    def print_source_decomposition(self,
+        z_matrix: List[Tuple[int, ...]],
+        dq: np.ndarray,
+        H: np.ndarray,
+        target_idx: int,
+        top_m: int = 8,
+    ) -> None:
+        """
+        For one response coordinate i, print the largest source terms H[i,j] * dq[j].
+        This identifies which displaced coordinates drive the response in coordinate i.
+        """
+        z_matrix = [tuple(c) for c in z_matrix]
+        dq = np.asarray(dq, dtype=float).reshape(-1)
+        H = np.asarray(H, dtype=float)
+
+        N = len(z_matrix)
+        if target_idx < 0 or target_idx >= N:
+            raise IndexError(f"target_idx {target_idx} out of range 0..{N-1}")
+
+        terms = []
+        for j in range(N):
+            contrib = H[target_idx, j] * dq[j]
+            terms.append({
+                "j": j,
+                "coord_j": z_matrix[j],
+                "type_j": self.coord_type(z_matrix[j]),
+                "dq_j": dq[j],
+                "H_ij": H[target_idx, j],
+                "contrib": contrib,
+                "abs_contrib": abs(contrib),
+            })
+
+        terms_sorted = sorted(terms, key=lambda t: t["abs_contrib"], reverse=True)
+
+        target_coord = z_matrix[target_idx]
+        total = np.sum([t["contrib"] for t in terms])
+
+        print(f"\nSource decomposition for target idx={target_idx}, coord={self.format_coord(target_coord)}")
+        print(f"Total response sum_j H[i,j] * dq[j] = {total:.6e}")
+        print(
+            f"{'rank':>4} {'j':>4} {'type':>9} {'coord_j':>18} "
+            f"{'dq_j':>12} {'H[i,j]':>12} {'H[i,j]*dq_j':>15}"
+        )
+        print("-" * 86)
+
+        for rank, t in enumerate(terms_sorted[:top_m]):
+            print(
+                f"{rank:4d} "
+                f"{t['j']:4d} "
+                f"{t['type_j']:>9} "
+                f"{self.format_coord(t['coord_j']):>18} "
+                f"{t['dq_j']:12.6e} "
+                f"{t['H_ij']:12.6e} "
+                f"{t['contrib']:15.6e}"
+            )
+
+
+    def print_type_summary(self, rows: List[Dict[str, Any]]) -> None:
+        """Aggregate diagnostics by coordinate type."""
+        buckets: Dict[str, Dict[str, float]] = {}
+        for r in rows:
+            t = r["type"]
+            if t not in buckets:
+                buckets[t] = {
+                    "count": 0,
+                    "sum_abs_dq": 0.0,
+                    "sum_abs_Hdq": 0.0,
+                    "sum_abs_err": 0.0,
+                    "sum_abs_pE": 0.0,
+                }
+            buckets[t]["count"] += 1
+            buckets[t]["sum_abs_dq"] += r["abs_dq"]
+            buckets[t]["sum_abs_Hdq"] += r["abs_Hdq"]
+            buckets[t]["sum_abs_err"] += r["abs_delta_g_err"]
+            buckets[t]["sum_abs_pE"] += r["abs_pE_total"]
+
+        print("\nSummary by coordinate type")
+        print("--------------------------")
+        print(
+            f"{'type':>9} {'count':>7} {'sum|dq|':>14} "
+            f"{'sum|Hdq|':>14} {'sum|err|':>14} {'sum|pE|':>14}"
+        )
+        print("-" * 76)
+        for t, vals in buckets.items():
+            print(
+                f"{t:>9} "
+                f"{vals['count']:7d} "
+                f"{vals['sum_abs_dq']:14.6e} "
+                f"{vals['sum_abs_Hdq']:14.6e} "
+                f"{vals['sum_abs_err']:14.6e} "
+                f"{vals['sum_abs_pE']:14.6e}"
+            )
+
+
+    def run_full_internal_diagnostic(self,
+        z_matrix: List[Tuple[int, ...]],
+        dq: np.ndarray,
+        H: np.ndarray,
+        g0: np.ndarray,
+        g_qm: np.ndarray,
+        top_n: int = 10,
+        decompose_top_err: int = 3,
+    ) -> Dict[str, Any]:
+        """
+        Run the full diagnostic workflow and print useful summaries.
+
+        Suggested usage:
+            result = run_full_internal_diagnostic(z_matrix, dq, H, g0, g_qm)
+        """
+        result = self.compute_internal_gradient_diagnostics(
+            z_matrix=z_matrix,
+            dq=dq,
+            H=H,
+            g0=g0,
+            g_qm=g_qm,
+            top_n=top_n,
+        )
+
+        rows = result["rows"]
+
+        self.print_ranked_table(result["by_abs_dq"], "Ranked by |dq| (source displacement candidates)", n=top_n)
+        self.print_ranked_table(result["by_abs_Hdq"], "Ranked by |H dq| (response channels)", n=top_n)
+        self.print_ranked_table(result["by_abs_err"], "Ranked by |g_qm - g_model| (actual model failure)", n=top_n)
+        self.print_ranked_table(result["by_rho"], "Ranked by rho = |err| / (|H dq| + eps)", n=top_n)
+        self.print_ranked_table(result["by_abs_pE"], "Ranked by |partial energy contribution|", n=top_n)
+        self.print_type_summary(rows)
+
+        # Decompose the top few error coordinates to find their source coordinates
+        for r in result["by_abs_err"][:decompose_top_err]:
+            self.print_source_decomposition(
+                z_matrix=z_matrix,
+                dq=dq,
+                H=H,
+                target_idx=r["idx"],
+                top_m=8,
+            )
+
+        return result
 
     
     def transform_gradient_to_internal_coordinates(self, molecule, gradient, b_matrix, tol=1e-6):
@@ -1927,8 +2360,7 @@ class InterpolationDriver():
         g_matrix = np.dot(b_matrix, b_matrix.T)
         
         U, s, Vt = np.linalg.svd(g_matrix)
-        
-        print('eigenvalues', s)
+
         # Make zero the values of s_inv that are smaller than tol
         s_inv = np.array([1 / s_i if s_i > tol else 0.0 for s_i in s])
         

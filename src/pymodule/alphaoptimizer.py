@@ -73,7 +73,7 @@ def _init_worker(z_matrix, impes_dict, sym_dict, sym_datapoints, dps, idx, expon
     os.environ["OPENBLAS_NUM_THREADS"] = "1"
     
     driver = InterpolationDriver(z_matrix)
-    driver.use_symmetry = False
+    driver.use_symmetry = bool(sym_datapoints)
     driver.update_settings(impes_dict)
     driver.symmetry_information = sym_dict
     driver.qm_symmetry_data_points = sym_datapoints
@@ -224,9 +224,11 @@ class AlphaOptimizer:
         futs = self._pool.map(_eval_structure, payloads, chunksize=chunksize)
         sum_loss = 0.0
         sum_grad = np.zeros(self.M, dtype=np.float64)
+        counter = 0
         for loss_s, grad_s in futs:
             sum_loss += loss_s
             sum_grad += grad_s
+            counter += 1
 
         self._cache_key  = key
         self._cache_grad = sum_grad / self.S
