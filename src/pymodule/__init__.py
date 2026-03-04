@@ -215,7 +215,7 @@ from .smddriver import SmdDriver
 from .atombdedriver import AtomBdeDriver
 from .ensembleparser import EnsembleParser
 from .ensembledriver import EnsembleDriver
-from .spectraaverager import SpectraAverager
+from .spectrumaverager import SpectrumAverager
 # for backward compatibility only
 from .peforcefieldgenerator import PEForceFieldGenerator as LoPropDriver
 
