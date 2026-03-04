@@ -74,7 +74,7 @@ class EnsembleDriver:
         - grid_level: The accuracy level of DFT grid.
         - xcfun: The XC functional.
         - eri_thresh: The electron repulsion integrals screening threshold.
-        - run_response: If True, run linear response calculations after SCF.
+        - excited_states: If True, run linear response after SCF.
           response is run as well when any response option is set (e.g., :attr: `nstates`).
         - nstates: Number of excited states to compute in linear response.
         - nto: Whether to run NOT analysis in linear response.
@@ -125,7 +125,7 @@ class EnsembleDriver:
         self.method_dict = None
         self.rsp_dict = None
 
-        self.run_response = False
+        self.excited_states = False
 
         # response settings are also added here in a similar way
         self.nstates = None
@@ -194,7 +194,7 @@ class EnsembleDriver:
 
         # Auto-enable response if response settings are provided
         if self.rsp_dict:
-            self.run_response = True
+            self.excited_states = True
 
     @staticmethod
     def _parse_six_floats(field: str) -> list[float]:
@@ -544,7 +544,7 @@ class EnsembleDriver:
 
         For each snapshot, an SCF calculation is performed for the QM subsystem, with
         optional PE/NPE environment terms. Linear-response calculations are optional
-        and are controlled by :attr:`run_response` and the response options.
+        and are controlled by :attr:`excited_states` and the response options.
 
         :param snapshots:
             A list of snapshot dictionaries (or a single snapshot dict).
@@ -601,7 +601,7 @@ class EnsembleDriver:
         if self.scf_dict is not None or self.method_dict is not None:
             scf_driver.update_settings(self.scf_dict or {}, self.method_dict or {})
 
-        do_rsp = bool(self.run_response)
+        do_rsp = bool(self.excited_states)
         if not do_rsp:
             rsp_opts_set = (
                 (self.rsp_dict is not None and len(self.rsp_dict) > 0)
@@ -612,7 +612,7 @@ class EnsembleDriver:
             )
             if rsp_opts_set:
                 do_rsp = True
-                self.run_response = True
+                self.excited_states = True
         
         rsp_driver = None
         if do_rsp:
