@@ -970,7 +970,7 @@ class ScfDriver:
         if self.rank == mpi_master():
             self._print_scf_energy()
 
-            s2 = self.compute_s2(molecule, self.scf_results)
+            s2 = self.compute_s2(molecule, ao_basis, self.scf_results)
             self._print_ground_state(molecule, s2)
 
             if self.print_level == 2:
@@ -1199,8 +1199,8 @@ class ScfDriver:
         C_start_a, C_start_b = None, None
 
         if self.rank == mpi_master():
-            n_alpha = molecule.number_of_alpha_electrons()
-            n_beta = molecule.number_of_beta_electrons()
+            n_alpha = molecule.number_of_alpha_occupied_orbitals(basis)
+            n_beta = molecule.number_of_beta_occupied_orbitals(basis)
 
             # Reorder alpha to match beta
             if self.scf_type == 'restricted_openshell':
@@ -1567,7 +1567,7 @@ class ScfDriver:
                     f'Applying level-shifting ({self.level_shifting:.2f}au)')
 
                 C_alpha = self.molecular_orbitals.alpha_to_numpy()
-                nocc_a = molecule.number_of_alpha_electrons()
+                nocc_a = molecule.number_of_alpha_occupied_orbitals(ao_basis)
                 fmo_a = np.linalg.multi_dot([C_alpha.T, fock_mat[0], C_alpha])
                 for idx in range(nocc_a, fmo_a.shape[0]):
                     fmo_a[idx, idx] += self.level_shifting
@@ -1577,7 +1577,7 @@ class ScfDriver:
                 if self.scf_type != 'restricted':
 
                     C_beta = self.molecular_orbitals.beta_to_numpy()
-                    nocc_b = molecule.number_of_beta_electrons()
+                    nocc_b = molecule.number_of_beta_occupied_orbitals(ao_basis)
                     fmo_b = np.linalg.multi_dot([C_beta.T, fock_mat[1], C_beta])
                     for idx in range(nocc_b, fmo_b.shape[0]):
                         fmo_b[idx, idx] += self.level_shifting
@@ -1682,7 +1682,7 @@ class ScfDriver:
                     self.pfon_temperature = 0
 
             if self._mom is not None:
-                self._apply_mom(molecule, ovl_mat)
+                self._apply_mom(molecule, ao_basis, ovl_mat)
 
             self._update_mol_orbs_phase()
 
@@ -2556,12 +2556,14 @@ class ScfDriver:
 
         return MolecularOrbitals()
 
-    def _apply_mom(self, molecule, ovl_mat):
+    def _apply_mom(self, molecule, ao_basis, ovl_mat):
         """
         Apply the maximum overlap constraint.
 
         :param molecule:
             The molecule.
+        :param ao_basis:
+            The AO basis set.
         :param ovl_mat:
             The overlap matrix..
         """
@@ -2572,7 +2574,7 @@ class ScfDriver:
             mo_a = self.molecular_orbitals.alpha_to_numpy()
             ea = self.molecular_orbitals.ea_to_numpy()
             occ_a = self.molecular_orbitals.occa_to_numpy()
-            n_alpha = molecule.number_of_alpha_electrons()
+            n_alpha = molecule.number_of_alpha_occupied_orbitals(ao_basis)
 
             ovl = np.linalg.multi_dot([self._mom[0].T, smat, mo_a])
             argsort = np.argsort(np.sum(np.abs(ovl), 0))[::-1]
@@ -2588,7 +2590,7 @@ class ScfDriver:
                                                              molorb.rest)
 
             else:
-                n_beta = molecule.number_of_beta_electrons()
+                n_beta = molecule.number_of_beta_occupied_orbitals(ao_basis)
                 occ_b = self.molecular_orbitals.occb_to_numpy()
 
                 if self.scf_type == 'unrestricted':
@@ -2713,12 +2715,8 @@ class ScfDriver:
                 if self.restart:
                     # Note: when restarting from checkpoint, double check that the
                     # number of electrons are reasonable
-                    nalpha = molecule.number_of_alpha_electrons()
-                    nbeta = molecule.number_of_beta_electrons()
-                    core_electrons = ao_basis.get_number_of_ecp_core_electrons()
-                    n_ecp_elec = sum(core_electrons)
-                    nalpha -= n_ecp_elec // 2
-                    nbeta -= n_ecp_elec // 2
+                    nalpha = molecule.number_of_alpha_occupied_orbitals(ao_basis)
+                    nbeta = molecule.number_of_beta_occupied_orbitals(ao_basis)
                     calc_nelec = self._comp_number_of_electrons(ovl_mat)
                     if (abs(calc_nelec[0] - nalpha) < 1.0e-3 and
                             abs(calc_nelec[1] - nbeta) < 1.0e-3):
@@ -3023,12 +3021,14 @@ class ScfDriver:
 
         return (mol_orbs[:, molist], mol_eigs[molist])
 
-    def compute_s2(self, molecule, scf_results):
+    def compute_s2(self, molecule, ao_basis, scf_results):
         """
         Computes expectation value of the S**2 operator.
 
         :param molecule:
             The molecule.
+        :param ao_basis:
+            The AO basis set.
         :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
 
@@ -3036,8 +3036,8 @@ class ScfDriver:
             Expectation value <S**2>.
         """
 
-        nalpha = molecule.number_of_alpha_electrons()
-        nbeta = molecule.number_of_beta_electrons()
+        nalpha = molecule.number_of_alpha_occupied_orbitals(ao_basis)
+        nbeta = molecule.number_of_beta_occupied_orbitals(ao_basis)
 
         smat = scf_results['S']
         Cocc_a = scf_results['C_alpha'][:, :nalpha].copy()

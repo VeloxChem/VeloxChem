@@ -288,7 +288,7 @@ class ScfRestrictedOpenDriver(ScfDriver):
                 kT = boltzmann_in_hartreeperkelvin() * self.pfon_temperature
                 inv_kT = 1.0 / kT
 
-                nocc_a = molecule.number_of_alpha_electrons()
+                nocc_a = molecule.number_of_alpha_occupied_orbitals(ao_basis)
                 e_fermi_a = 0.5 * (eigs[nocc_a - 1] + eigs[nocc_a])
                 idx_start_a = max(0, nocc_a - self.pfon_nocc)
                 idx_end_a = min(eigs.size, nocc_a + self.pfon_nvir)
@@ -306,7 +306,7 @@ class ScfRestrictedOpenDriver(ScfDriver):
                     pfon_a[idx] *= pfon_scale_a
                     occa[idx] = pfon_a[idx]
 
-                nocc_b = molecule.number_of_beta_electrons()
+                nocc_b = molecule.number_of_beta_occupied_orbitals(ao_basis)
                 e_fermi_b = 0.5 * (eigs[nocc_b - 1] + eigs[nocc_b])
                 idx_start_b = max(0, nocc_b - self.pfon_nocc)
                 idx_end_b = min(eigs.size, nocc_b + self.pfon_nvir)
