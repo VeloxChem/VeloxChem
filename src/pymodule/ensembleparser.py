@@ -45,9 +45,9 @@ class EnsembleParser:
     This class automates the parsing of molecular dynamics trajectories and
     extracts information from the qm and environment regions for each snapshot.
 
-    : param comm:
+    :param comm:
         The MPI communicator.
-    : param ostream:
+    :param ostream:
         The output stream.
     """
     def __init__(self, comm=None, ostream=None):
@@ -80,16 +80,11 @@ class EnsembleParser:
         This routine adds a terminal prefix to a residue name, 
         so that the correct parameters can be later assigned.
 
-        Parameters
-        ----------
-        resname : str
+        :param resname (str)
             Residue name as read from the structure/topology (e.g. 'ASN').
-        prefix : str
+        :param prefix (str)
             Terminal prefix to add. Expected values are 'N' or 'C'.
-
-        Returns
-        -------
-        str
+        :return (str)
             Prefixed residue name (e.g. 'NASN', 'CASN'), or the original name
             if it already looks prefixed.
         """
@@ -110,14 +105,9 @@ class EnsembleParser:
         to identify all chains in the system (for example, protein dimers whose
         monomers share the same chain identifier).
 
-        Parameters
-        ----------
-        residue : MDAnalysis.core.groups.Residue
+        :param residue
             Protein residue to inspect.
-
-        Returns
-        -------
-        bool
+        :return (bool)
             True if the residue looks like an N-terminus, False otherwise.
         """
         atom_names = {str(name) for name in residue.atoms.names}
@@ -141,14 +131,9 @@ class EnsembleParser:
         """
         Heuristically detect a C-terminal amino-acid residue from its atom names.
 
-        Parameters
-        ----------
-        residue : MDAnalysis.core.groups.Residue
+        :param residue
             Protein residue to inspect.
-
-        Returns
-        -------
-        bool
+        :return (bool)
             True if the residue looks like a C-terminus, False otherwise.
         """
         atom_names = {str(name) for name in residue.atoms.names}
@@ -176,15 +161,11 @@ class EnsembleParser:
         residue in the Universe) and can be used to update per-atom `resnames`
         arrays (e.g. `AtomGroup.resnames`) based on `AtomGroup.resindices`.
 
-        Returns
-        -------
-        dict[int, str]
+        :return dict[int, str]
             Dictionary mapping residue `resindex` to the renamed residue name
             with terminal prefix. Only protein terminal residues are included.
 
-        Notes
-        -----
-        Chain detection is first attempted using connectivity information
+        Note: Chain detection is first attempted using connectivity information
         (`fragments`) and then chain IDs / segment IDs. As a conservative
         fallback, residues with atom-name patterns characteristic of N- or
         C-termini are also recognized. This helps when multiple protein chains
@@ -258,15 +239,11 @@ class EnsembleParser:
         - GLU + HE1/HE2 -> GLH
         - ASP + HD1/HD2 -> ASH
 
-        Parameters
-        ----------
-        env_atoms : MDAnalysis.core.groups.AtomGroup
+        :param env_atoms (MDAnalysis.core.groups.AtomGroup)
             AtomGroup corresponding to the environment selection used in
             trajectory parsing.
 
-        Returns
-        -------
-        dict[int, str]
+        :return dict[int, str]
             Dictionary mapping residue ``resindex`` to refined residue names.
             Only residues that need renaming are included.
         """
@@ -280,8 +257,6 @@ class EnsembleParser:
                 prot_map[res.resindex] = "GLH"
             elif resname == "ASP" and ({"HD1", "HD2"} & atom_names):
                 prot_map[res.resindex] = "ASH"
-            # elif resname == "CYS" and ({"HG", "HG1"} & atom_names):
-            #     prot_map[res.resindex] = "CYSH"
 
         return prot_map
 
