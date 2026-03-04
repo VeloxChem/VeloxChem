@@ -350,7 +350,7 @@ class EnsembleParser:
                 Residue id for each PE atom, shape (N_pe,).
             - pe_resnames (numpy.ndarray):
                 Residue name for each PE atom, shape (N_pe,).
-            - pe_n_residues (int):
+            - number_residues_pe (int):
                 Number of residues in the PE region.
             - npe_coords (numpy.ndarray):
                 NPE region Cartesian coordinates, shape (N_npe, 3), in Angstrom.
@@ -362,7 +362,7 @@ class EnsembleParser:
                 Residue id for each NPE atom, shape (N_npe,).
             - npe_resnames (numpy.ndarray):
                 Residue name for each NPE atom, shape (N_npe,).
-            - npe_n_residues (int):
+            - number_residues_npe (int):
                 Number of residues in the NPE region.
         """
                
@@ -498,14 +498,14 @@ class EnsembleParser:
             pe_elements = empty_obj
             pe_resids = empty_int
             pe_resnames = empty_obj
-            pe_n_residues = 0
+            number_residues_pe = 0
             pe_atom_names = empty_obj
 
             npe_coords = empty_xyz
             npe_elements = empty_obj
             npe_resids = empty_int
             npe_resnames = empty_obj
-            npe_n_residues = 0
+            number_residues_npe = 0
             npe_atom_names = empty_obj
 
             pe_region = None
@@ -537,7 +537,7 @@ class EnsembleParser:
                     for ridx, newname in term_map.items():
                         pe_resnames[pe_residx == ridx] = newname
 
-                pe_n_residues = int(pe_region.residues.n_residues)
+                number_residues_pe = int(pe_region.residues.n_residues)
 
             # NPE selection
             if npe_cutoff is not None:
@@ -568,7 +568,7 @@ class EnsembleParser:
                     for ridx, newname in term_map.items():
                         npe_resnames[npe_residx == ridx] = newname
 
-                npe_n_residues = int(npe_region.residues.n_residues)                
+                number_residues_npe = int(npe_region.residues.n_residues)                
 
             # If neither cutoff is set, interpret as all-qm
 
@@ -583,14 +583,14 @@ class EnsembleParser:
                     "pe_elements": pe_elements,
                     "pe_resids": pe_resids,
                     "pe_resnames": pe_resnames,
-                    "pe_n_residues": pe_n_residues,
+                    "number_residues_pe": number_residues_pe,
 
                     "npe_coords": npe_coords,
                     "npe_atom_names": npe_atom_names,
                     "npe_elements": npe_elements,
                     "npe_resids": npe_resids,
                     "npe_resnames": npe_resnames,
-                    "npe_n_residues": npe_n_residues,
+                    "number_residues_npe": number_residues_npe,
             }
             snapshots.append(snapshot)
         return snapshots
