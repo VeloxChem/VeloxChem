@@ -52,6 +52,8 @@ class SadGuessDriver:
 
         self._num_unpaired_electrons_on_atoms = []
 
+        self._has_ecp = False
+
     def set_number_of_unpaired_electrons_on_atoms(self, num_unpaired_electrons):
 
         self._num_unpaired_electrons_on_atoms = list(num_unpaired_electrons)
@@ -200,7 +202,6 @@ class SadGuessDriver:
             1.0, 1.0, 1.0, 1.0, 1.0
         ]
 
-    @staticmethod
     def _get_occ_5s(nocc):
         """
         Gets occupation numbers for 5s elements.
@@ -214,6 +215,12 @@ class SadGuessDriver:
 
         occ = max(0.0, nocc)
 
+        if self._has_ecp:
+            #   4s   5s   4p-1 4p0  4p+1
+            return [
+                1.0, occ, 1.0, 1.0, 1.0,
+            ]
+
         #   1s   2s   3s   4s   5s   2p-1 3p-1 4p-1 2p0  3p0  4p0  2p+1 3p+1
         #   4p+1 3d-2 3d-1 3d0  3d+1 3d+2
         return [
@@ -221,7 +228,6 @@ class SadGuessDriver:
             1.0, 1.0, 1.0, 1.0, 1.0, 1.0
         ]
 
-    @staticmethod
     def _get_occ_4d(nocc):
         """
         Gets occupation numbers for 4d elements.
@@ -235,6 +241,12 @@ class SadGuessDriver:
 
         occ = max(0.0, nocc)
 
+        if self._has_ecp:
+            #   4s   5s   4p-1 4p0  4p+1 4d-2 4d-1 4d0  4d+1 4d+2
+            return [
+                1.0, 1.0, 1.0, 1.0, 1.0, occ, occ, occ, occ, occ
+            ]
+
         #   1s   2s   3s   4s   5s   2p-1 3p-1 4p-1 2p0  3p0  4p0  2p+1 3p+1
         #   4p+1 3d-2 4d-2 3d-1 4d-1 3d0  4d0  3d+1 4d+1 3d+2 4d+2
         return [
@@ -242,7 +254,6 @@ class SadGuessDriver:
             1.0, 1.0, occ, 1.0, occ, 1.0, occ, 1.0, occ, 1.0, occ
         ]
 
-    @staticmethod
     def _get_occ_5s5p(nocc):
         """
         Gets occupation numbers for 5s5p elements.
@@ -256,6 +267,12 @@ class SadGuessDriver:
 
         occ = max(0.0, nocc)
 
+        if self._has_ecp:
+            #   4s   5s   4p-1 5p-1 4p0  5p0 4p+1 5p+1 4d-2 4d-1 4d0  4d+1 4d+2
+            return [
+                1.0, occ, 1.0, occ, 1.0, occ, 1.0, occ, 1.0, 1.0, 1.0, 1.0, 1.0
+            ]
+
         #   1s   2s   3s   4s   5s   2p-1 3p-1 4p-1 5p-1 2p0  3p0  4p0  5p0
         #   2p+1 3p+1 4p+1 5p+1 3d-2 4d-2 3d-1 4d-1 3d0  4d0  3d+1 4d+1 3d+2 4d+2
         return [
@@ -263,7 +280,6 @@ class SadGuessDriver:
             1.0, 1.0, 1.0, occ, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0
         ]
 
-    @staticmethod
     def _get_occ_6s(nocc):
         """
         Gets occupation numbers for 6s elements.
@@ -277,6 +293,12 @@ class SadGuessDriver:
 
         occ = max(0.0, nocc)
 
+        if self._has_ecp:
+            #   5s   6s   5p-1 5p0  5p+1
+            return [
+                1.0, occ, 1.0, 1.0, 1.0,
+            ]
+
         #   1s   2s   3s   4s   5s   6s   2p-1 3p-1 4p-1 5p-1 2p0  3p0  4p0
         #   5p0  2p+1 3p+1 4p+1 5p+1 3d-2 4d-2 3d-1 4d-1 3d0  4d0  3d+1 4d+1
         #   3d+2 4d+2
@@ -286,7 +308,6 @@ class SadGuessDriver:
             1.0, 1.0
         ]
 
-    @staticmethod
     def _get_occ_4f(nocc):
         """
         Gets occupation numbers for 4f elements.
@@ -300,6 +321,14 @@ class SadGuessDriver:
 
         occ = max(0.0, nocc)
 
+        if self._has_ecp:
+            #   4s   5s   6s   4p-1 5p-1 4p0  5p0  4p+1 5p+1 4d-2 4d-1 4d0  4d+1
+            #   4d+2 4f-3 4f-2 4f-1 4f0  4f+1 4f+2 4f+3
+            return [
+                1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+                1.0, occ, occ, occ, occ, occ, occ, occ
+            ]
+
         #   1s   2s   3s   4s   5s   6s   2p-1 3p-1 4p-1 5p-1 2p0  3p0  4p0
         #   5p0  2p+1 3p+1 4p+1 5p+1 3d-2 4d-2 3d-1 4d-1 3d0  4d0  3d+1 4d+1
         #   3d+2 4d+2 4f-3 4f-2 4f-1 4f0  4f+1 4f+2 4f+3
@@ -309,8 +338,7 @@ class SadGuessDriver:
             1.0, 1.0, occ, occ, occ, occ, occ, occ, occ
         ]
 
-    @staticmethod
-    def _get_occ_5d(nocc):
+    def _get_occ_5d(self, nocc):
         """
         Gets occupation numbers for 5d elements.
 
@@ -323,6 +351,12 @@ class SadGuessDriver:
 
         occ = max(0.0, nocc)
 
+        if self._has_ecp:
+            #   5s   6s   5p-1 5p0  5p+1 5d-2 5d-1 5d0  5d+1 5d+2
+            return [
+                1.0, 1.0, 1.0, 1.0, 1.0, occ, occ, occ, occ, occ,
+            ]
+
         #   1s   2s   3s   4s   5s   6s   2p-1 3p-1 4p-1 5p-1 2p0  3p0  4p0
         #   5p0  2p+1 3p+1 4p+1 5p+1 3d-2 4d-2 5d-2 3d-1 4d-1 5d-1 3d0  4d0
         #   5d0  3d+1 4d+1 5d+1 3d+2 4d+2 5d+2 4f-3 4f-2 4f-1 4f0  4f+1 4f+2 4f+3
@@ -332,7 +366,6 @@ class SadGuessDriver:
             occ, 1.0, 1.0, occ, 1.0, 1.0, occ, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0
         ]
 
-    @staticmethod
     def _get_occ_6s6p(nocc):
         """
         Gets occupation numbers for 6s6p elements.
@@ -346,8 +379,14 @@ class SadGuessDriver:
 
         occ = max(0.0, nocc)
 
-        #   1s   2s   3s   4s   5s   6s   2p-1 3p-1 4p-1 5p-1 6s-1 2p0  3p0
-        #   4p0  5p0  6s0  2p+1 3p+1 4p+1 5p+1 6s+1 3d-2 4d-2 5d-2 3d-1 4d-1
+        if self._has_ecp:
+            #   5s   6s   5p-1 6p-1 5p0  6p0  5p+1 6p+1 5d-2 5d-1 5d0  5d+1 5d+2
+            return [
+                1.0, occ, 1.0, occ, 1.0, occ, 1.0, occ, 1.0, 1.0, 1.0, 1.0, 1.0
+            ]
+
+        #   1s   2s   3s   4s   5s   6s   2p-1 3p-1 4p-1 5p-1 6p-1 2p0  3p0
+        #   4p0  5p0  6p0  2p+1 3p+1 4p+1 5p+1 6p+1 3d-2 4d-2 5d-2 3d-1 4d-1
         #   5d-1 3d0  4d0  5d0  3d+1 4d+1 5d+1 3d+2 4d+2 5d+2 4f-3 4f-2 4f-1
         #   4f0  4f+1 4f+2 4f+3
         return [
@@ -371,8 +410,8 @@ class SadGuessDriver:
 
         occ = max(0.0, nocc)
 
-        #   1s   2s   3s   4s   5s   6s   7s   2p-1 3p-1 4p-1 5p-1 6s-1 2p0
-        #   3p0  4p0  5p0  6s0  2p+1 3p+1 4p+1 5p+1 6s+1 3d-2 4d-2 5d-2 3d-1
+        #   1s   2s   3s   4s   5s   6s   7s   2p-1 3p-1 4p-1 5p-1 6p-1 2p0
+        #   3p0  4p0  5p0  6p0  2p+1 3p+1 4p+1 5p+1 6p+1 3d-2 4d-2 5d-2 3d-1
         #   4d-1 5d-1 3d0  4d0  5d0  3d+1 4d+1 5d+1 3d+2 4d+2 5d+2 4f-3 4f-2
         #   4f-1 4f0  4f+1 4f+2 4f+3
         return [
@@ -396,8 +435,8 @@ class SadGuessDriver:
 
         occ = max(0.0, nocc)
 
-        #   1s   2s   3s   4s   5s   6s   7s   2p-1 3p-1 4p-1 5p-1 6s-1 2p0
-        #   3p0  4p0  5p0  6s0  2p+1 3p+1 4p+1 5p+1 6s+1 3d-2 4d-2 5d-2 3d-1
+        #   1s   2s   3s   4s   5s   6s   7s   2p-1 3p-1 4p-1 5p-1 6p-1 2p0
+        #   3p0  4p0  5p0  6p0  2p+1 3p+1 4p+1 5p+1 6p+1 3d-2 4d-2 5d-2 3d-1
         #   4d-1 5d-1 3d0  4d0  5d0  3d+1 4d+1 5d+1 3d+2 4d+2 5d+2 4f-3 5f-3
         #   4f-2 5f-2 4f-1 5f-1 4f0  5f0  4f+1 5f+1 4f+2 5f+2 4f+3 5f+3
         return [
@@ -862,6 +901,8 @@ class SadGuessDriver:
         :return:
             A tuple containing density matricies as numpy arrays.
         """
+
+        self._has_ecp = basis_2.has_ecp()
 
         natoms = molecule.number_of_atoms()
 
