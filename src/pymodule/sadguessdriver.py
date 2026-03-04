@@ -202,7 +202,7 @@ class SadGuessDriver:
             1.0, 1.0, 1.0, 1.0, 1.0
         ]
 
-    def _get_occ_5s(nocc):
+    def _get_occ_5s(self, nocc):
         """
         Gets occupation numbers for 5s elements.
 
@@ -228,7 +228,7 @@ class SadGuessDriver:
             1.0, 1.0, 1.0, 1.0, 1.0, 1.0
         ]
 
-    def _get_occ_4d(nocc):
+    def _get_occ_4d(self, nocc):
         """
         Gets occupation numbers for 4d elements.
 
@@ -254,7 +254,7 @@ class SadGuessDriver:
             1.0, 1.0, occ, 1.0, occ, 1.0, occ, 1.0, occ, 1.0, occ
         ]
 
-    def _get_occ_5s5p(nocc):
+    def _get_occ_5s5p(self, nocc):
         """
         Gets occupation numbers for 5s5p elements.
 
@@ -280,7 +280,7 @@ class SadGuessDriver:
             1.0, 1.0, 1.0, occ, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0
         ]
 
-    def _get_occ_6s(nocc):
+    def _get_occ_6s(self, nocc):
         """
         Gets occupation numbers for 6s elements.
 
@@ -308,7 +308,7 @@ class SadGuessDriver:
             1.0, 1.0
         ]
 
-    def _get_occ_4f(nocc):
+    def _get_occ_4f(self, nocc, elem_symbol=''):
         """
         Gets occupation numbers for 4f elements.
 
@@ -320,6 +320,14 @@ class SadGuessDriver:
         """
 
         occ = max(0.0, nocc)
+
+        # TODO: 5d occupation for La/Ce/Gd? (also adjustment in AO-START-GUESS-FOR-ECP?)
+
+        if self._has_ecp and elem_symbol.capitalize() == 'La':
+            #   5s   6s   5p-1 5p0  5p+1 4f-3 4f-2 4f-1 4f0  4f+1 4f+2 4f+3
+            return [
+                1.0, 1.0, 1.0, 1.0, 1.0, occ, occ, occ, occ, occ, occ, occ
+            ]
 
         if self._has_ecp:
             #   4s   5s   6s   4p-1 5p-1 4p0  5p0  4p+1 5p+1 4d-2 4d-1 4d0  4d+1
@@ -338,18 +346,28 @@ class SadGuessDriver:
             1.0, 1.0, occ, occ, occ, occ, occ, occ, occ
         ]
 
-    def _get_occ_5d(self, nocc):
+    def _get_occ_5d(self, nocc, elem_symbol=''):
         """
         Gets occupation numbers for 5d elements.
 
         :param nocc:
             Number of 5d orbitals.
+        :param elem_symbol:
+            The element symbol.
 
         :return:
             List of occupation numbers.
         """
 
         occ = max(0.0, nocc)
+
+        if self._has_ecp and elem_symbol.capitalize() == 'Lu':
+            #   4s   5s   6s   4p-1 5p-1 4p0  5p0  4p+1 5p+1 4d-2 5d-2 4d-1 5d-1
+            #   4d0  5d0  4d+1 5d+1 4d+2 5d+2 4f-3 4f-2 4f-1 4f0  4f+1 4f+2 4f+3
+            return [
+                1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, occ, 1.0, occ,
+                1.0, occ, 1.0, occ, 1.0, occ, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0
+            ]
 
         if self._has_ecp:
             #   5s   6s   5p-1 5p0  5p+1 5d-2 5d-1 5d0  5d+1 5d+2
@@ -366,7 +384,7 @@ class SadGuessDriver:
             occ, 1.0, 1.0, occ, 1.0, 1.0, occ, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0
         ]
 
-    def _get_occ_6s6p(nocc):
+    def _get_occ_6s6p(self, nocc):
         """
         Gets occupation numbers for 6s6p elements.
 
@@ -651,10 +669,10 @@ class SadGuessDriver:
         elif elem_id == 56:
             return self._get_occ_6s(1.0 + nelec)
 
-        # La,Ce,Pr,Nd,Pm,Sm,Eu,Gb,Tb,Dy,Ho,Er,Tm,Yb
+        # La,Ce,Pr,Nd,Pm,Sm,Eu,Gd,Tb,Dy,Ho,Er,Tm,Yb
 
         elif elem_id == 57:
-            return self._get_occ_4f(1.0 / 14.0 + nelec / 7.0)
+            return self._get_occ_4f(1.0 / 14.0 + nelec / 7.0, elem_symbol='La')
 
         elif elem_id == 58:
             return self._get_occ_4f(2.0 / 14.0 + nelec / 7.0)
@@ -698,7 +716,7 @@ class SadGuessDriver:
         # Lu,Hf,Ta,W,Re,Os,Ir,Pt,Au,Hg
 
         elif elem_id == 71:
-            return self._get_occ_5d(0.1 + nelec / 5.0)
+            return self._get_occ_5d(0.1 + nelec / 5.0, elem_symbol='Lu')
 
         elif elem_id == 72:
             return self._get_occ_5d(0.2 + nelec / 5.0)
