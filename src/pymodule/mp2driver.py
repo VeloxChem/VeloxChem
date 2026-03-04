@@ -260,7 +260,7 @@ class Mp2Driver:
             if mol_orbs.get_orbitals_type() == molorb.rest:
 
                 orb_ene = mol_orbs.ea_to_numpy()
-                nocc = molecule.number_of_alpha_electrons()
+                nocc = molecule.number_of_alpha_occupied_orbitals(basis)
                 eocc = orb_ene[:nocc]
                 evir = orb_ene[nocc:]
                 e_vv = evir.reshape(-1, 1) + evir
@@ -284,8 +284,8 @@ class Mp2Driver:
                 orb_ene_a = mol_orbs.ea_to_numpy()
                 orb_ene_b = mol_orbs.eb_to_numpy()
 
-                nocc_a = molecule.number_of_alpha_electrons()
-                nocc_b = molecule.number_of_beta_electrons()
+                nocc_a = molecule.number_of_alpha_occupied_orbitals(basis)
+                nocc_b = molecule.number_of_beta_occupied_orbitals(basis)
 
                 eocc_a = orb_ene_a[:nocc_a]
                 evir_a = orb_ene_a[nocc_a:]
@@ -400,8 +400,8 @@ class Mp2Driver:
 
             mol_orbs = mol_orbs.broadcast(cross_comm, mpi_master())
 
-            nocc_a = molecule.number_of_alpha_electrons()
-            nocc_b = molecule.number_of_beta_electrons()
+            nocc_a = molecule.number_of_alpha_occupied_orbitals(basis)
+            nocc_b = molecule.number_of_beta_occupied_orbitals(basis)
 
             mo_a = mol_orbs.alpha_to_numpy()
             mo_b = mol_orbs.beta_to_numpy()
