@@ -535,7 +535,7 @@ class EnsembleDriver:
     def compute(
         self,
         snapshots,
-        basis_label: str,
+        basis_set: str,
         potdir: str | Path = "pot_frames",
         write_pe_potfiles: bool = True,
     ):
@@ -548,8 +548,8 @@ class EnsembleDriver:
 
         :param snapshots:
             A list of snapshot dictionaries (or a single snapshot dict).
-        :param basis_label: (str)
-            Basis set label.
+        :param basis_set: (str)
+            Basis set.
         :param potdir : (str or Path)
             Directory to store/read PE potfiles.
         :param write_pe_potfiles: (bool)
@@ -637,7 +637,7 @@ class EnsembleDriver:
             labels = [str(x) for x in snap["qm_elements"]]
             coords = np.asarray(snap["qm_coords"], dtype=float)
             molecule = Molecule(labels, coords)
-            basis = MolecularBasis.read(molecule, basis_label)
+            basis = MolecularBasis.read(molecule, basis_set)
 
             pe_coords = np.asarray(snap.get("pe_coords", []), dtype=float)
             npe_coords = np.asarray(snap.get("npe_coords", []), dtype=float)
