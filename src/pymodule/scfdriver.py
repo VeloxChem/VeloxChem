@@ -1509,6 +1509,11 @@ class ScfDriver:
             ecp_atom_inds = [
                 idx for idx, nelec in enumerate(core_electrons) if nelec > 0
             ]
+            # TODO: distribute ecp atoms over MPI ranks
+            ecp_mat = ecp_drv.compute(molecule, ao_basis, ecp_atom_inds)
+            ecp_mat = ecp_mat.to_numpy()
+        else:
+            ecp_mat = None
 
         for i in self._get_scf_range():
 
@@ -1527,13 +1532,6 @@ class ScfDriver:
                 den_mat, molecule, ao_basis, screener, e_grad, profiler)
 
             profiler.start_timer('ErrVec')
-
-            if has_ecp:
-                # TODO: distribute ecp atoms over MPI ranks
-                ecp_mat = ecp_drv.compute(molecule, ao_basis, ecp_atom_inds)
-                ecp_mat = ecp_mat.to_numpy()
-            else:
-                ecp_mat = None
 
             e_el = self._comp_energy(fock_mat, vxc_mat, e_emb, kin_mat,
                                      npot_mat, ecp_mat, den_mat)

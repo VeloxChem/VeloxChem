@@ -23,14 +23,12 @@ class TestScfRestrictedDriver:
         basis_label = 'def2-svp'
 
         mol = Molecule.read_xyz_string(xyz_string)
-
         bas = MolecularBasis.read(mol, basis_label, ostream=None)
-        min_bas = MolecularBasis.read(mol, 'ao-start-guess', ostream=None)
 
         scf_drv = ScfRestrictedDriver()
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label
-        scf_results = scf_drv.compute(mol, bas, min_bas)
+        scf_results = scf_drv.compute(mol, bas)
 
         if scf_drv.rank == mpi_master():
             assert abs(ref_scf_energy - scf_results['scf_energy']) < tol
@@ -54,3 +52,29 @@ class TestScfRestrictedDriver:
     def test_tpssh(self):
 
         self.run_scf_rest('tpssh', -152.7062253947, 1.0e-6)
+
+    def run_scf_rest_with_ecp(self, xcfun_label, ref_scf_energy, tol):
+
+        # TODO: test AgCl
+
+        xyz_string = """2
+        xyz
+        Ag  0.0  0.0  0.0
+        H   0.0  1.6  0.0
+        """
+        basis_label = 'def2-svp'
+
+        mol = Molecule.read_xyz_string(xyz_string)
+        bas = MolecularBasis.read(mol, basis_label, ostream=None)
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_drv.xcfun = xcfun_label
+        scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            assert abs(ref_scf_energy - scf_results['scf_energy']) < tol
+
+    def test_hf_with_ecp(self):
+
+        self.run_scf_rest_with_ecp('hf', -146.6236483631, 1.0e-8)
