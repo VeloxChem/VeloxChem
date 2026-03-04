@@ -257,18 +257,32 @@ class VisualizationDriver:
 
                 if cube_type in ['mo', 'amo']:
                     spin = 'alpha'
-                    nelec = molecule.number_of_alpha_electrons()
+                    nocc = molecule.number_of_alpha_electrons()
                     mo_coefs = mol_orbs.alpha_to_numpy()
                 else:
                     spin = 'beta'
-                    nelec = molecule.number_of_beta_electrons()
+                    nocc = molecule.number_of_beta_electrons()
                     mo_coefs = mol_orbs.beta_to_numpy()
 
                 # Note: the input MO index should be 1-based
                 cube_value = m.group(2).strip().lower()
-                cube_value = cube_value.replace('homo', str(nelec))
-                cube_value = cube_value.replace('lumo', str(nelec + 1))
-                orb_id = eval(cube_value) - 1
+
+                mo_index_map = {'homo': nocc, 'lumo': nocc + 1}
+
+                if 'homo' in cube_value or 'lumo' in cube_value:
+                    # e.g. mo(homo-1): cube_value == 'homo-1'
+                    if '+' in cube_value:
+                        mo_name, mo_shift = cube_value.split('+')
+                        orb_id = mo_index_map[mo_name] + int(mo_shift) - 1
+                    elif '-' in cube_value:
+                        mo_name, mo_shift = cube_value.split('-')
+                        orb_id = mo_index_map[mo_name] - int(mo_shift) - 1
+                    else:
+                        mo_name = cube_value
+                        orb_id = mo_index_map[mo_name] - 1
+                else:
+                    # e.g. mo(10): cube_value == '10'
+                    orb_id = int(cube_value) - 1
 
                 self.compute(cubic_grid, molecule, basis, mo_coefs, orb_id)
 
