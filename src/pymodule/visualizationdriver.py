@@ -257,11 +257,11 @@ class VisualizationDriver:
 
                 if cube_type in ['mo', 'amo']:
                     spin = 'alpha'
-                    nocc = molecule.number_of_alpha_electrons()
+                    nocc = molecule.number_of_alpha_occupied_orbitals(basis)
                     mo_coefs = mol_orbs.alpha_to_numpy()
                 else:
                     spin = 'beta'
-                    nocc = molecule.number_of_beta_electrons()
+                    nocc = molecule.number_of_beta_occupied_orbitals(basis)
                     mo_coefs = mol_orbs.beta_to_numpy()
 
                 # Note: the input MO index should be 1-based

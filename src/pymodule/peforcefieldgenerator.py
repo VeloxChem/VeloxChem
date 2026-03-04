@@ -100,6 +100,10 @@ class PEForceFieldGenerator:
 
         if self.rank == mpi_master():
 
+            assert_msg_critical(
+                scf_tensors['scf_type'] == 'restricted',
+                f'{type(self).__name__}.compute: open-shell is not yet supported')
+
             S = scf_tensors['S']
             C = scf_tensors['C_alpha']
             D = scf_tensors['D_alpha'] + scf_tensors['D_beta']
@@ -215,7 +219,7 @@ class PEForceFieldGenerator:
             Nz *= -1.0
 
             # unpact response vectors to matrix form
-            nocc = molecule.number_of_alpha_electrons()
+            nocc = molecule.number_of_alpha_occupied_orbitals(basis)
             norb = n_mo
             kappa_x = self.lr2mat(Nx, nocc, norb)
             kappa_y = self.lr2mat(Ny, nocc, norb)

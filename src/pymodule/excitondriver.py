@@ -308,6 +308,11 @@ class ExcitonModelDriver:
             The minimal AO basis set.
         """
 
+        # TODO: enable ECP
+        assert_msg_critical(
+            not basis.has_ecp(),
+            f'{type(self).__name__}.compute: ECP is not yet supported')
+
         if self.checkpoint_file is None and self.filename is not None:
             self.checkpoint_file = f'{self.filename}_exciton.h5'
 
@@ -539,8 +544,8 @@ class ExcitonModelDriver:
                     CA = self.monomers[ind_A]['mo']
                     CB = self.monomers[ind_B]['mo']
 
-                    nocc_A = monomer_a.number_of_alpha_electrons()
-                    nocc_B = monomer_b.number_of_alpha_electrons()
+                    nocc_A = monomer_a.number_of_alpha_occupied_orbitals(bas_a)
+                    nocc_B = monomer_b.number_of_alpha_occupied_orbitals(bas_b)
                     nvir_A = CA.shape[1] - nocc_A
                     nvir_B = CB.shape[1] - nocc_B
 
@@ -1052,7 +1057,7 @@ class ExcitonModelDriver:
         magdip_ints = one_elec_ints['magnetic_dipole']
 
         mo = scf_results['C_alpha']
-        nocc = monomer.number_of_alpha_electrons()
+        nocc = monomer.number_of_alpha_occupied_orbitals(basis)
         nvir = mo.shape[1] - nocc
         mo_occ = mo[:, :nocc].copy()
         mo_vir = mo[:, nocc:].copy()
@@ -1122,8 +1127,8 @@ class ExcitonModelDriver:
         nao_A, nmo_A = mo_a.shape[0], mo_a.shape[1]
         nao_B, nmo_B = mo_b.shape[0], mo_b.shape[1]
 
-        nocc_A = monomer_a.number_of_alpha_electrons()
-        nocc_B = monomer_b.number_of_alpha_electrons()
+        nocc_A = monomer_a.number_of_alpha_occupied_orbitals(bas_a)
+        nocc_B = monomer_b.number_of_alpha_occupied_orbitals(bas_b)
         nvir_A = nmo_A - nocc_A
 
         nocc = nocc_A + nocc_B
@@ -1191,7 +1196,7 @@ class ExcitonModelDriver:
 
         # density matrix
         if self.rank == mpi_master():
-            nocc = dimer.number_of_alpha_electrons()
+            nocc = dimer.number_of_alpha_occupied_orbitals(basis)
             mo_occ = mo[:, :nocc].copy()
             dens = np.matmul(mo_occ, mo_occ.T)
         else:
@@ -1254,10 +1259,6 @@ class ExcitonModelDriver:
             xc_ene = self.comm.reduce(vxc_mat.get_energy(), root=mpi_master())
             xc_mat_np = self.comm.reduce(vxc_mat.alpha_to_numpy(),
                                          root=mpi_master())
-
-        # TODO: enable ECP
-        assert_msg_critical(not basis.has_ecp(),
-                            'ExcitonModel: ECP is not yet supported')
 
         if self.rank == mpi_master():
             # compute dimer energy
@@ -1511,7 +1512,7 @@ class ExcitonModelDriver:
         tdens = []
 
         if self.rank == mpi_master():
-            nocc = dimer.number_of_alpha_electrons()
+            nocc = dimer.number_of_alpha_occupied_orbitals(basis)
             mo_occ = mo[:, :nocc].copy()
             mo_vir = mo[:, nocc:].copy()
             num_ci_vecs = len(ci_vectors)
@@ -1642,7 +1643,7 @@ class ExcitonModelDriver:
         linmom_ints = one_elec_ints['linear_momentum']
         magdip_ints = one_elec_ints['magnetic_dipole']
 
-        nocc = dimer.number_of_alpha_electrons()
+        nocc = dimer.number_of_alpha_occupied_orbitals(basis)
         mo_occ = mo[:, :nocc].copy()
         mo_vir = mo[:, nocc:].copy()
 
