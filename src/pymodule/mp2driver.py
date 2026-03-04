@@ -166,10 +166,6 @@ class Mp2Driver:
 
             # use case: mp2_drv.compute(molecule, basis, scf_results)
 
-            # TODO: add ecp_core_electrons in get_aufbau_alpha/beta_occupation
-            assert_msg_critical(not basis.has_ecp(),
-                                'Mp2Driver.compute: ECP is not yet supported')
-
             if isinstance(scf_inp, dict):
                 scf_results = scf_inp
 
@@ -177,7 +173,7 @@ class Mp2Driver:
 
                 mo_a = scf_results['C_alpha']
                 ene_a = scf_results['E_alpha']
-                occ_a = molecule.get_aufbau_alpha_occupation(ene_a.shape[0])
+                occ_a = molecule.get_aufbau_alpha_occupation(ene_a.shape[0], basis)
 
                 if scf_type == 'restricted':
                     mol_orbs = MolecularOrbitals([mo_a], [ene_a], [occ_a],
@@ -186,12 +182,12 @@ class Mp2Driver:
                 elif scf_type == 'unrestricted':
                     mo_b = scf_results['C_beta']
                     ene_b = scf_results['E_beta']
-                    occ_b = molecule.get_aufbau_beta_occupation(ene_b.shape[0])
+                    occ_b = molecule.get_aufbau_beta_occupation(ene_b.shape[0], basis)
                     mol_orbs = MolecularOrbitals([mo_a, mo_b], [ene_a, ene_b],
                                                  [occ_a, occ_b], molorb.unrest)
 
                 elif scf_type == 'restricted_openshell':
-                    occ_b = molecule.get_aufbau_beta_occupation(ene_a.shape[0])
+                    occ_b = molecule.get_aufbau_beta_occupation(ene_a.shape[0], basis)
                     mol_orbs = MolecularOrbitals([mo_a], [ene_a],
                                                  [occ_a, occ_b],
                                                  molorb.restopen)

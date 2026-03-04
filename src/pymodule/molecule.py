@@ -1557,82 +1557,67 @@ def _Molecule_is_linear(self):
         return False
 
 
-def _Molecule_get_aufbau_alpha_occupation(self, n_mo, ecp_core_electrons=0):
+def _Molecule_get_aufbau_alpha_occupation(self, n_mo, basis=None):
     """
     Gets occupation numbers for alpha spin based on the aufbau principle.
 
     :param n_mo:
         The number of molecular orbitals.
-    :param ecp_core_electrons:
-        Number of core electrons represented by an effective core potential.
+    :param basis:
+        The AO basis set.
 
     :return:
         The occupation numbers for alpha spin.
     """
 
-    nalpha = self.number_of_alpha_electrons()
+    if basis is not None:
+        nalpha = self.number_of_alpha_occupied_orbitals(basis)
+    else:
+        nalpha = self.number_of_alpha_electrons()
 
     assert_msg_critical(
-        ecp_core_electrons >= 0,
-        'Molecule.get_aufbau_alpha_occupation: ECP core electron count must be non-negative'
+        nalpha >= 0,
+        'Molecule.get_aufbau_alpha_occupation: Number of explicit alpha electrons must be non-negative'
     )
-    assert_msg_critical(
-        ecp_core_electrons % 2 == 0,
-        'Molecule.get_aufbau_alpha_occupation: ECP core electron count must be even'
-    )
-
-    if ecp_core_electrons:
-        nalpha -= ecp_core_electrons // 2
-
-    nalpha = max(0, nalpha)
     assert_msg_critical(
         n_mo >= nalpha,
-        'Molecule.get_aufbau_alpha_occupation: Number of molecular orbitals is too small for the adjusted alpha electron count'
+        'Molecule.get_aufbau_alpha_occupation: Number of molecular orbitals is too small for explicit alpha electrons'
     )
 
     return np.hstack((np.ones(nalpha), np.zeros(n_mo - nalpha)))
 
 
-def _Molecule_get_aufbau_beta_occupation(self, n_mo, ecp_core_electrons=0):
+def _Molecule_get_aufbau_beta_occupation(self, n_mo, basis=None):
     """
     Gets occupation numbers for beta spin based on the aufbau principle.
 
     :param n_mo:
         The number of molecular orbitals.
-    :param ecp_core_electrons:
-        Number of core electrons represented by an effective core potential.
+    :param basis:
+        The AO basis set.
 
     :return:
         The occupation numbers for beta spin.
     """
 
-    nbeta = self.number_of_beta_electrons()
+    if basis is not None:
+        nbeta = self.number_of_beta_occupied_orbitals(basis)
+    else:
+        nbeta = self.number_of_beta_electrons()
 
     assert_msg_critical(
-        ecp_core_electrons >= 0,
-        'Molecule.get_aufbau_beta_occupation: ECP core electron count must be non-negative'
+        nbeta >= 0,
+        'Molecule.get_aufbau_beta_occupation: Number of explicit beta electrons must be non-negative'
     )
-    assert_msg_critical(
-        ecp_core_electrons % 2 == 0,
-        'Molecule.get_aufbau_beta_occupation: ECP core electron count must be even'
-    )
-
-    if ecp_core_electrons:
-        nbeta -= ecp_core_electrons // 2
-
-    nbeta = max(0, nbeta)
     assert_msg_critical(
         n_mo >= nbeta,
-        'Molecule.get_aufbau_beta_occupation: Number of molecular orbitals is too small for the adjusted beta electron count'
+        'Molecule.get_aufbau_beta_occupation: Number of molecular orbitals is too small for explicit beta electrons'
     )
 
     return np.hstack((np.ones(nbeta), np.zeros(n_mo - nbeta)))
 
 
-def _Molecule_get_aufbau_occupation(self,
-                                    n_mo,
-                                    flag='restricted',
-                                    ecp_core_electrons=0):
+def _Molecule_get_aufbau_occupation(self, n_mo, flag='restricted', basis=None):
     """
     Gets occupation vector(s) based on the aufbau principle.
 
@@ -1640,13 +1625,15 @@ def _Molecule_get_aufbau_occupation(self,
         The number of molecular orbitals.
     :param flag:
         The flag (restricted or unrestricted).
+    :param basis:
+        The AO basis set.
 
     :return:
         The occupation vector(s).
     """
 
-    occ_a = self.get_aufbau_alpha_occupation(n_mo, ecp_core_electrons)
-    occ_b = self.get_aufbau_beta_occupation(n_mo, ecp_core_electrons)
+    occ_a = self.get_aufbau_alpha_occupation(n_mo, basis)
+    occ_b = self.get_aufbau_beta_occupation(n_mo, basis)
 
     if flag == 'restricted':
         return 0.5 * (occ_a + occ_b)
@@ -1715,6 +1702,42 @@ def _Molecule_number_of_beta_electrons(self):
     """
 
     return (self.number_of_electrons() - self.get_multiplicity() + 1) // 2
+
+
+def _Molecule_number_of_alpha_occupied_orbitals(self, basis):
+    """
+    Returns number of spin-alpha occupied orbitals.
+
+    :param basis:
+        The AO basis set.
+    :return:
+        The number of spin-alpha occupied orbitals.
+    """
+
+    nalpha = self.number_of_alpha_electrons()
+
+    core_electrons = basis.get_number_of_ecp_core_electrons()
+    n_ecp_elec = sum(core_electrons)
+
+    return nalpha - n_ecp_elec // 2
+
+
+def _Molecule_number_of_beta_occupied_orbitals(self, basis):
+    """
+    Returns number of spin-beta occupied orbitals.
+
+    :param basis:
+        The AO basis set.
+    :return:
+        The number of spin-beta occupied orbitals.
+    """
+
+    nbeta = self.number_of_beta_electrons()
+
+    core_electrons = basis.get_number_of_ecp_core_electrons()
+    n_ecp_elec = sum(core_electrons)
+
+    return nbeta - n_ecp_elec // 2
 
 
 def _Molecule_partition_atoms(self, comm):
@@ -1938,6 +1961,8 @@ Molecule.print_keywords = _Molecule_print_keywords
 Molecule.check_multiplicity = _Molecule_check_multiplicity
 Molecule.number_of_alpha_electrons = _Molecule_number_of_alpha_electrons
 Molecule.number_of_beta_electrons = _Molecule_number_of_beta_electrons
+Molecule.number_of_alpha_occupied_orbitals = _Molecule_number_of_alpha_occupied_orbitals
+Molecule.number_of_beta_occupied_orbitals = _Molecule_number_of_beta_occupied_orbitals
 Molecule.partition_atoms = _Molecule_partition_atoms
 Molecule.is_water_molecule = _Molecule_is_water_molecule
 

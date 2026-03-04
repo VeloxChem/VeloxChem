@@ -1100,27 +1100,24 @@ class ScfDriver:
                     row_1 += nbf_1
                     row_2 += nbf_2
 
-        core_electrons = ao_basis.get_number_of_ecp_core_electrons()
-        n_ecp_elec = sum(core_electrons)
-
         if self.scf_type == 'restricted':
             proj_mo = MolecularOrbitals(
                 [mo_2a], [np.zeros(nmo_1)],
-                [molecule.get_aufbau_alpha_occupation(nmo_1, n_ecp_elec)],
+                [molecule.get_aufbau_alpha_occupation(nmo_1, ao_basis)],
                 valence_mo.get_orbitals_type())
 
         elif self.scf_type == 'unrestricted':
             proj_mo = MolecularOrbitals(
                 [mo_2a, mo_2b],
                 [np.zeros(nmo_1), np.zeros(nmo_1)], [
-                    molecule.get_aufbau_alpha_occupation(nmo_1, n_ecp_elec),
-                    molecule.get_aufbau_beta_occupation(nmo_1, n_ecp_elec)
+                    molecule.get_aufbau_alpha_occupation(nmo_1, ao_basis),
+                    molecule.get_aufbau_beta_occupation(nmo_1, ao_basis)
                 ], valence_mo.get_orbitals_type())
 
         elif self.scf_type == 'restricted_openshell':
             proj_mo = MolecularOrbitals([mo_2a], [np.zeros(nmo_1)], [
-                molecule.get_aufbau_alpha_occupation(nmo_1, n_ecp_elec),
-                molecule.get_aufbau_beta_occupation(nmo_1, n_ecp_elec)
+                molecule.get_aufbau_alpha_occupation(nmo_1, ao_basis),
+                molecule.get_aufbau_beta_occupation(nmo_1, ao_basis)
             ], valence_mo.get_orbitals_type())
 
         else:
@@ -1284,11 +1281,8 @@ class ScfDriver:
             assert_msg_critical(n_ao == C_alpha.shape[0], err_ao)
             n_mo = C_alpha.shape[1]
 
-            core_electrons = basis.get_number_of_ecp_core_electrons()
-            n_ecp_elec = sum(core_electrons)
-
             ene_a = np.zeros(n_mo)
-            occ_a = molecule.get_aufbau_alpha_occupation(n_mo, n_ecp_elec)
+            occ_a = molecule.get_aufbau_alpha_occupation(n_mo, basis)
 
             if self.scf_type == 'restricted':
                 self._molecular_orbitals = MolecularOrbitals([C_alpha], [ene_a],
@@ -1300,14 +1294,14 @@ class ScfDriver:
                 assert_msg_critical(n_ao == C_beta.shape[0], err_ao)
                 assert_msg_critical(n_mo == C_beta.shape[1], err_mo)
                 ene_b = np.zeros(n_mo)
-                occ_b = molecule.get_aufbau_beta_occupation(n_mo, n_ecp_elec)
+                occ_b = molecule.get_aufbau_beta_occupation(n_mo, basis)
                 self._molecular_orbitals = MolecularOrbitals([C_alpha, C_beta],
                                                              [ene_a, ene_b],
                                                              [occ_a, occ_b],
                                                              molorb.unrest)
 
             elif self.scf_type == 'restricted_openshell':
-                occ_b = molecule.get_aufbau_beta_occupation(n_mo, n_ecp_elec)
+                occ_b = molecule.get_aufbau_beta_occupation(n_mo, basis)
                 self._molecular_orbitals = MolecularOrbitals([C_alpha], [ene_a],
                                                              [occ_a, occ_b],
                                                              molorb.restopen)
@@ -1727,13 +1721,9 @@ class ScfDriver:
                 E_alpha = self.molecular_orbitals.ea_to_numpy()
                 E_beta = self.molecular_orbitals.eb_to_numpy()
 
-                core_electrons = ao_basis.get_number_of_ecp_core_electrons()
-                n_ecp_elec = sum(core_electrons)
-
                 n_mo = C_alpha.shape[1]
-                occ_alpha = molecule.get_aufbau_alpha_occupation(
-                    n_mo, n_ecp_elec)
-                occ_beta = molecule.get_aufbau_beta_occupation(n_mo, n_ecp_elec)
+                occ_alpha = molecule.get_aufbau_alpha_occupation(n_mo, ao_basis)
+                occ_beta = molecule.get_aufbau_beta_occupation(n_mo, ao_basis)
 
                 if self.scf_type == 'restricted':
                     D_alpha = self._density[0]

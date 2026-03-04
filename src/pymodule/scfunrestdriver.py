@@ -275,11 +275,8 @@ class ScfUnrestrictedDriver(ScfDriver):
             orb_coefs_a, eigs_a = self._delete_mos(orb_coefs_a, eigs_a)
             orb_coefs_b, eigs_b = self._delete_mos(orb_coefs_b, eigs_b)
 
-            core_electrons = ao_basis.get_number_of_ecp_core_electrons()
-            n_ecp_elec = sum(core_electrons)
-
-            occa = molecule.get_aufbau_alpha_occupation(eigs_a.size, n_ecp_elec)
-            occb = molecule.get_aufbau_beta_occupation(eigs_b.size, n_ecp_elec)
+            occa = molecule.get_aufbau_alpha_occupation(eigs_a.size, ao_basis)
+            occb = molecule.get_aufbau_beta_occupation(eigs_b.size, ao_basis)
 
             if self.pfon and (self.pfon_temperature > 0):
 

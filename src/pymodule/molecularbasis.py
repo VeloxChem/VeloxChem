@@ -639,7 +639,16 @@ def _MolecularBasis_get_number_of_ecp_core_electrons(self):
         atom_basis = basis_sets[basis_index]
         if atom_basis.has_ecp():
             atom_ecp = atom_basis.get_ecp_potential()
-            core_electrons.append(atom_ecp.number_of_core_electrons())
+            n_core_elec = atom_ecp.number_of_core_electrons()
+            assert_msg_critical(
+                n_core_elec >= 0,
+                'MolecularBasis.get_number_of_ecp_core_electrons: ECP core electron count must be non-negative'
+            )
+            assert_msg_critical(
+                n_core_elec % 2 == 0,
+                'MolecularBasis.get_number_of_ecp_core_electrons: ECP core electron count must be even'
+            )
+            core_electrons.append(n_core_elec)
         else:
             core_electrons.append(0)
 
