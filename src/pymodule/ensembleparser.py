@@ -250,14 +250,13 @@ class EnsembleParser:
 
         The purpose of this routine is analogous to ``_terminal_resname_map``:
         it refines residue names before parameter lookup so that entries such as
-        GLU/GLH, ASP/ASH, and CYS/CYSH can be distinguished downstream without
+        GLU/GLH, ASP/ASH, can be distinguished downstream without
         modifying the writer logic.
 
         The current heuristics are:
 
         - GLU + HE1/HE2 -> GLH
         - ASP + HD1/HD2 -> ASH
-        - CYS + HG/HG1  -> CYSH
 
         Parameters
         ----------
@@ -281,8 +280,8 @@ class EnsembleParser:
                 prot_map[res.resindex] = "GLH"
             elif resname == "ASP" and ({"HD1", "HD2"} & atom_names):
                 prot_map[res.resindex] = "ASH"
-            elif resname == "CYS" and ({"HG", "HG1"} & atom_names):
-                prot_map[res.resindex] = "CYSH"
+            # elif resname == "CYS" and ({"HG", "HG1"} & atom_names):
+            #     prot_map[res.resindex] = "CYSH"
 
         return prot_map
 
