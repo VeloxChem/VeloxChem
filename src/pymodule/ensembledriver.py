@@ -258,7 +258,7 @@ class EnsembleDriver:
         Loads NPE-like table:
             molecule,res_name,atom_name,element,M0
 
-        Returns:
+        :return
             db[res_name][atom_name] = {"element": str, "charge": float}
         """
         if not csv_path.is_file():
@@ -352,7 +352,7 @@ class EnsembleDriver:
         - Multiple: e.g., set_env_models(pe_model=["SEP", "CP3"], 
                                          npe_model=["tip3p", "ff19sb"]),
                                          e.g. a system that contains a protein,
-                                         water, and ions.
+                                         water, and described with both pe and npe.
 
         :param pe_model:
             Name of the PE parameter model (e.g., "SEP", "CP3") or a list

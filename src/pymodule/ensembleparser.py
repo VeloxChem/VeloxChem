@@ -500,7 +500,7 @@ class EnsembleParser:
                 pe_resnames = np.asarray(pe_region.resnames, dtype=object).copy()
                 pe_residx = np.asarray(pe_region.resindices, dtype=int)
 
-                # Apply protonation-state residue renaming (GLH/ASH/CYSH, etc.) if applicable
+                # Apply protonation-state residue renaming (GLH/ASH) if applicable
                 if prot_map and len(pe_resnames) > 0:
                     for ridx, newname in prot_map.items():
                         pe_resnames[pe_residx == ridx] = newname
@@ -531,7 +531,7 @@ class EnsembleParser:
                 npe_resnames = np.asarray(npe_region.resnames, dtype=object).copy()
                 npe_residx = np.asarray(npe_region.resindices, dtype=int)
 
-                # Apply protonation-state residue renaming (GLH/ASH/CYSH, etc.) if applicable
+                # Apply protonation-state residue renaming (GLH/ASH) if applicable
                 if prot_map and len(npe_resnames) > 0:
                     for ridx, newname in prot_map.items():
                         npe_resnames[npe_residx == ridx] = newname
