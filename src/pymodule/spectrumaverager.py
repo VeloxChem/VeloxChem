@@ -90,7 +90,7 @@ class SpectrumAverager:
         self.xstep_ev = 0.01
         self.padding_ev = 0.8
         self.spectrum_color = "k"
-        self.bar_color = "darkcyan"
+        self.stick_color = "darkcyan"
 
     def unpack_snapshots(self, rsp_all):
         """
@@ -272,7 +272,7 @@ class SpectrumAverager:
         energy_min_ev=None,
         energy_max_ev=None,
         show_individual=False,
-        show_bars=True,
+        show_sticks=True,
         show_std=False,
         title="Absorption Spectrum (Averaged)",
         ax=None,
@@ -292,8 +292,8 @@ class SpectrumAverager:
             (max excitation energy + padding).
         :param show_individual:
             If True, plot individual broadened spectra for each snapshot.
-        :param show_bars:
-            If True, plots oscillator strength bars at transition wavelengths.
+        :param show_sticks:
+            If True, plots oscillator strength sticks at transition wavelengths.
         :param show_std:
             If True, shows a shaded area corresponding to +/- one standard deviation.
         :param title:
@@ -351,7 +351,7 @@ class SpectrumAverager:
                 raise ValueError("xlim_nm must be a tuple of (xmin, xmax)")
             ax.set_xlim(float(xlim_nm[0]), float(xlim_nm[1]))
 
-        if show_bars:
+        if show_sticks:
             ax2 = ax.twinx()
             ax2.set_ylabel("Oscillator strength")
 
@@ -359,7 +359,7 @@ class SpectrumAverager:
                 e_au = np.asarray(e_au, dtype=float)
                 with np.errstate(divide="ignore", invalid="ignore"):
                     wl_t = au2nm / e_au
-                ax2.vlines(wl_t, 0.0, f, alpha=0.35, linewidth=2, color=self.bar_color)
+                ax2.vlines(wl_t, 0.0, f, alpha=0.35, linewidth=2, color=self.stick_color)
 
             ax2.set_ylim(0.0, max(0.2, ax2.get_ylim()[1]))
             ax2.set_xlim(ax.get_xlim())
