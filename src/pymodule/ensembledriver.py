@@ -41,6 +41,7 @@ from .molecularbasis import MolecularBasis
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .lreigensolver import LinearResponseEigenSolver
+from .spectrumaverager import SpectrumAverager
 from .sanitychecks import ensemble_driver_scf_sanity_check
 from .sanitychecks import ensemble_driver_rsp_sanity_check
 from .errorhandler import assert_msg_critical
@@ -673,3 +674,78 @@ class EnsembleDriver:
         if do_rsp:
             results["rsp_all"] = rsp_all
         return results
+
+    def plot_uv_vis_spectra(
+        self,
+        results: dict,
+        *,
+        energy_min_ev=None,
+        energy_max_ev=None,
+        show_individual: bool = False,
+        show_sticks: bool = True,
+        show_std: bool = False,
+        title: str = "Absorption Spectrum (Averaged)",
+        ax=None,
+        xlim_nm=None,
+    ):
+        """Convenience wrapper to plot averaged UV/Vis spectra for an ensemble.
+
+        This method expects the ``results`` dictionary returned by :meth:`compute`.
+        It extracts ``results["rsp_all"]`` and passes it to
+        :class:`~.spectrumaverager.SpectrumAverager`.
+
+        Parameters
+        ----------
+        results : dict
+            Results dictionary returned by :meth:`compute`.
+        energy_min_ev, energy_max_ev : float, optional
+            Energy window in eV for the common spectrum grid.
+        show_individual : bool
+            Plot individual broadened spectra for each snapshot.
+        show_sticks : bool
+            Plot oscillator-strength sticks.
+        show_std : bool
+            Plot +/- one standard deviation as a shaded band.
+        title : str
+            Plot title.
+        ax : matplotlib.axes.Axes, optional
+            Existing axes to plot on.
+        xlim_nm : tuple(float, float), optional
+            Wavelength axis limits in nm.
+
+        Returns
+        -------
+        matplotlib.axes.Axes
+            The axes containing the plot.
+
+        Raises
+        ------
+        KeyError
+            If ``rsp_all`` is not present in the results dictionary.
+        """
+        if not isinstance(results, dict):
+            raise TypeError(
+                "results must be a dictionary as returned by EnsembleDriver.compute()."
+            )
+
+        if "rsp_all" not in results or results.get("rsp_all", None) is None:
+            raise KeyError(
+                "No 'rsp_all' found in results. Make sure you ran a response calculation "
+                "(e.g., set ens_drv.excited_states=True or set ens_drv.nstates / rsp_dict "
+                "before calling compute())."
+            )
+
+        rsp_all = results["rsp_all"]
+
+        spec_avg = SpectrumAverager(comm=self.comm, ostream=self.ostream)
+        return spec_avg.plot_uv_vis(
+            rsp_all,
+            energy_min_ev=energy_min_ev,
+            energy_max_ev=energy_max_ev,
+            show_individual=show_individual,
+            show_sticks=show_sticks,
+            show_std=show_std,
+            title=title,
+            ax=ax,
+            xlim_nm=xlim_nm,
+        )

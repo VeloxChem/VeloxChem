@@ -1,6 +1,7 @@
 molecule,res_name,atom_name,element,M0
 alanine,ALA,N,N,-0.4157
 alanine,ALA,H,H,0.2719
+alanine,ALA,HN,H,0.2719
 alanine,ALA,CA,C,0.0337
 alanine,ALA,HA,H,0.0823
 alanine,ALA,CB,C,-0.1825
@@ -11,6 +12,7 @@ alanine,ALA,C,C,0.5973
 alanine,ALA,O,O,-0.5679
 arginine,ARG,N,N,-0.3479
 arginine,ARG,H,H,0.2747
+arginine,ARG,HN,H,0.2747
 arginine,ARG,CA,C,-0.2637
 arginine,ARG,HA,H,0.156
 arginine,ARG,CB,C,-0.0007
@@ -52,6 +54,7 @@ aspartic acid,ASH,C,C,0.5973
 aspartic acid,ASH,O,O,-0.5679
 asparagine,ASN,N,N,-0.4157
 asparagine,ASN,H,H,0.2719
+asparagine,ASN,HN,H,0.2719
 asparagine,ASN,CA,C,0.0143
 asparagine,ASN,HA,H,0.1048
 asparagine,ASN,CB,C,-0.2041
@@ -132,6 +135,7 @@ glutamic acid,GLH,C,C,0.5973
 glutamic acid,GLH,O,O,-0.5679
 glutamine,GLN,N,N,-0.4157
 glutamine,GLN,H,H,0.2719
+glutamine,GLN,HN,H,0.2719
 glutamine,GLN,CA,C,-0.0031
 glutamine,GLN,HA,H,0.085
 glutamine,GLN,CB,C,-0.0036
@@ -150,6 +154,7 @@ glutamine,GLN,HE22,H,0.4251
 glutamine,GLN,C,C,0.5973
 glutamine,GLN,O,O,-0.5679
 glutamate,GLU,N,N,-0.5163
+glutamate,GLU,HN,H,0.2936
 glutamate,GLU,H,H,0.2936
 glutamate,GLU,CA,C,0.0397
 glutamate,GLU,HA,H,0.1105
@@ -168,6 +173,7 @@ glutamate,GLU,C,C,0.5366
 glutamate,GLU,O,O,-0.5819
 glycine,GLY,N,N,-0.4157
 glycine,GLY,H,H,0.2719
+glycine,GLY,HN,H,0.2719
 glycine,GLY,CA,C,-0.0252
 glycine,GLY,HA1,H,0.0698
 glycine,GLY,HA2,H,0.0698
@@ -246,6 +252,7 @@ HYP,HYP,HA,H,0.077
 HYP,HYP,C,C,0.5896
 HYP,HYP,O,O,-0.5748
 isoleucine,ILE,N,N,-0.4157
+isoleucine,ILE,HN,H,0.2719
 isoleucine,ILE,H,H,0.2719
 isoleucine,ILE,CA,C,-0.0597
 isoleucine,ILE,HA,H,0.0869
@@ -271,6 +278,7 @@ isoleucine,ILE,C,C,0.5973
 isoleucine,ILE,O,O,-0.5679
 leucine,LEU,N,N,-0.4157
 leucine,LEU,H,H,0.2719
+leucine,LEU,HN,H,0.2719
 leucine,LEU,CA,C,-0.0518
 leucine,LEU,HA,H,0.0922
 leucine,LEU,CB,C,-0.1102
@@ -317,6 +325,7 @@ lysine (deprotonated),LYN,C,C,0.5973
 lysine (deprotonated),LYN,O,O,-0.5679
 lysine,LYS,N,N,-0.3479
 lysine,LYS,H,H,0.2747
+lysine,LYS,HN,H,0.2747
 lysine,LYS,CA,C,-0.24
 lysine,LYS,HA,H,0.1426
 lysine,LYS,CB,C,-0.0094
@@ -343,6 +352,7 @@ lysine,LYS,C,C,0.7341
 lysine,LYS,O,O,-0.5894
 methionine,MET,N,N,-0.4157
 methionine,MET,H,H,0.2719
+methionine,MET,HN,H,0.2719
 methionine,MET,CA,C,-0.0237
 methionine,MET,HA,H,0.088
 methionine,MET,CB,C,0.0342
@@ -362,6 +372,7 @@ methionine,MET,C,C,0.5973
 methionine,MET,O,O,-0.5679
 phenylalanine,PHE,N,N,-0.4157
 phenylalanine,PHE,H,H,0.2719
+phenylalanine,PHE,HN,H,0.2719
 phenylalanine,PHE,CA,C,-0.0024
 phenylalanine,PHE,HA,H,0.0978
 phenylalanine,PHE,CB,C,-0.0343
@@ -400,6 +411,7 @@ proline,PRO,C,C,0.5896
 proline,PRO,O,O,-0.5748
 serine,SER,N,N,-0.4157
 serine,SER,H,H,0.2719
+serine,SER,HN,H,0.2719
 serine,SER,CA,C,-0.0249
 serine,SER,HA,H,0.0843
 serine,SER,CB,C,0.2117
@@ -408,10 +420,12 @@ serine,SER,HB2,H,0.0352
 serine,SER,HB3,H,0.0352
 serine,SER,OG,O,-0.6546
 serine,SER,HG,H,0.4275
+serine,SER,HG1,H,0.4275
 serine,SER,C,C,0.5973
 serine,SER,O,O,-0.5679
 threonine,THR,N,N,-0.4157
 threonine,THR,H,H,0.2719
+threonine,THR,HN,H,0.2719
 threonine,THR,CA,C,-0.0389
 threonine,THR,HA,H,0.1007
 threonine,THR,CB,C,0.3654
@@ -426,6 +440,7 @@ threonine,THR,C,C,0.5973
 threonine,THR,O,O,-0.5679
 tryptophan,TRP,N,N,-0.4157
 tryptophan,TRP,H,H,0.2719
+tryptophan,TRP,HN,H,0.2719
 tryptophan,TRP,CA,C,-0.0275
 tryptophan,TRP,HA,H,0.1123
 tryptophan,TRP,CB,C,-0.005
@@ -452,6 +467,7 @@ tryptophan,TRP,C,C,0.5973
 tryptophan,TRP,O,O,-0.5679
 tyrosine,TYR,N,N,-0.4157
 tyrosine,TYR,H,H,0.2719
+tyrosine,TYR,HN,H,0.2719
 tyrosine,TYR,CA,C,-0.0014
 tyrosine,TYR,HA,H,0.0876
 tyrosine,TYR,CB,C,-0.0152
@@ -474,6 +490,7 @@ tyrosine,TYR,C,C,0.5973
 tyrosine,TYR,O,O,-0.5679
 valine,VAL,N,N,-0.4157
 valine,VAL,H,H,0.2719
+valine,VAL,HN,H,0.2719
 valine,VAL,CA,C,-0.0875
 valine,VAL,HA,H,0.0969
 valine,VAL,CB,C,0.2985
@@ -596,8 +613,11 @@ cysteine (disulfide),NCYX,C,C,0.6123
 cysteine (disulfide),NCYX,O,O,-0.5713
 glutamine,NGLN,N,N,0.1493
 glutamine,NGLN,H1,H,0.1996
+glutamine,NGLN,HT1,H,0.1996
 glutamine,NGLN,H2,H,0.1996
+glutamine,NGLN,HT2,H,0.1996
 glutamine,NGLN,H3,H,0.1996
+glutamine,NGLN,HT3,H,0.1996
 glutamine,NGLN,CA,C,0.0536
 glutamine,NGLN,HA,H,0.1015
 glutamine,NGLN,CB,C,0.0651
@@ -856,6 +876,7 @@ serine,NSER,HB2,H,0.0273
 serine,NSER,HB3,H,0.0273
 serine,NSER,OG,O,-0.6714
 serine,NSER,HG,H,0.4239
+serine,NSER,HG1,H,0.4239
 serine,NSER,C,C,0.6163
 serine,NSER,O,O,-0.5722
 threonine,NTHR,N,N,0.1812
@@ -957,6 +978,7 @@ alanine,CALA,O,O,-0.8055
 alanine,CALA,OXT,O,-0.8055
 arginine,CARG,N,N,-0.3481
 arginine,CARG,H,H,0.2764
+arginine,CARG,HN,H,0.2764
 arginine,CARG,CA,C,-0.3068
 arginine,CARG,HA,H,0.1447
 arginine,CARG,CB,C,-0.0374
@@ -985,6 +1007,7 @@ arginine,CARG,O,O,-0.8266
 arginine,CARG,OXT,O,-0.8266
 asparagine,CASN,N,N,-0.3821
 asparagine,CASN,H,H,0.2681
+asparagine,CASN,HN,H,0.2681
 asparagine,CASN,CA,C,-0.208
 asparagine,CASN,HA,H,0.1358
 asparagine,CASN,CB,C,-0.2299
@@ -1040,6 +1063,7 @@ cysteine (disulfide),CCYX,O,O,-0.8041
 cysteine (disulfide),CCYX,OXT,O,-0.8041
 glutamine,CGLN,N,N,-0.3821
 glutamine,CGLN,H,H,0.2681
+glutamine,CGLN,HN,H,0.2681
 glutamine,CGLN,CA,C,-0.2248
 glutamine,CGLN,HA,H,0.1232
 glutamine,CGLN,CB,C,-0.0664
@@ -1187,6 +1211,7 @@ isoleucine,CILE,O,O,-0.819
 isoleucine,CILE,OXT,O,-0.819
 leucine,CLEU,N,N,-0.3821
 leucine,CLEU,H,H,0.2681
+leucine,CLEU,HN,H,0.2681
 leucine,CLEU,CA,C,-0.2847
 leucine,CLEU,HA,H,0.1346
 leucine,CLEU,CB,C,-0.2469
@@ -1210,6 +1235,7 @@ leucine,CLEU,O2,O,-0.8199
 leucine,CLEU,OXT,O,-0.8199
 lysine,CLYS,N,N,-0.3481
 lysine,CLYS,H,H,0.2764
+lysine,CLYS,HN,H,0.2764
 lysine,CLYS,CA,C,-0.2903
 lysine,CLYS,HA,H,0.1438
 lysine,CLYS,CB,C,-0.0538
@@ -1237,6 +1263,7 @@ lysine,CLYS,O,O,-0.8252
 lysine,CLYS,OXT,O,-0.8252
 methionine,CMET,N,N,-0.3821
 methionine,CMET,H,H,0.2681
+methionine,CMET,HN,H,0.2681
 methionine,CMET,CA,C,-0.2597
 methionine,CMET,HA,H,0.1277
 methionine,CMET,CB,C,-0.0236
@@ -1257,6 +1284,7 @@ methionine,CMET,O,O,-0.8105
 methionine,CMET,OXT,O,-0.8105
 phenylalanine,CPHE,N,N,-0.3821
 phenylalanine,CPHE,H,H,0.2681
+phenylalanine,CPHE,HN,H,0.2681
 phenylalanine,CPHE,CA,C,-0.1825
 phenylalanine,CPHE,HA,H,0.1098
 phenylalanine,CPHE,CB,C,-0.0959
@@ -1305,11 +1333,13 @@ serine,CSER,HB2,H,0.0813
 serine,CSER,HB3,H,0.0813
 serine,CSER,OG,O,-0.6514
 serine,CSER,HG,H,0.4474
+serine,CSER,HG1,H,0.4474
 serine,CSER,C,C,0.8113
 serine,CSER,O,O,-0.8132
 serine,CSER,OXT,O,-0.8132
 threonine,CTHR,N,N,-0.3821
 threonine,CTHR,H,H,0.2681
+threonine,CTHR,HN,H,0.2681
 threonine,CTHR,CA,C,-0.242
 threonine,CTHR,HA,H,0.1207
 threonine,CTHR,CB,C,0.3025
@@ -1375,6 +1405,7 @@ tyrosine,CTYR,O,O,-0.807
 tyrosine,CTYR,OXT,O,-0.807
 valine,CVAL,N,N,-0.3821
 valine,CVAL,H,H,0.2681
+valine,CVAL,HN,H,0.2681
 valine,CVAL,CA,C,-0.3438
 valine,CVAL,HA,H,0.1438
 valine,CVAL,CB,C,0.194
