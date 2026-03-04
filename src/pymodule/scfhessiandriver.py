@@ -149,6 +149,11 @@ class ScfHessianDriver(HessianDriver):
             The AO basis set.
         """
 
+        # TODO: enable ECP
+        assert_msg_critical(
+            not basis.has_ecp(),
+            f'{type(self).__name__}.compute: ECP is not yet supported')
+
         if self.rank == mpi_master():
             self.print_header()
 
