@@ -55,12 +55,10 @@ class TestScfRestrictedDriver:
 
     def run_scf_rest_with_ecp(self, xcfun_label, ref_scf_energy, tol):
 
-        # TODO: test AgCl
-
         xyz_string = """2
         xyz
         Ag  0.0  0.0  0.0
-        H   0.0  1.6  0.0
+        Br  0.0  2.5  0.0
         """
         basis_label = 'def2-svp'
 
@@ -77,4 +75,4 @@ class TestScfRestrictedDriver:
 
     def test_hf_with_ecp(self):
 
-        self.run_scf_rest_with_ecp('hf', -146.6236483631, 1.0e-8)
+        self.run_scf_rest_with_ecp('hf', -2718.2407866974, 1.0e-8)
