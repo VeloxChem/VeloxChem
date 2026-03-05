@@ -826,31 +826,35 @@ class EnsembleDriver:
         """
         Convenience wrapper to plot averaged UV/Vis spectra for an ensemble.
 
-        This method expects the ``results`` dictionary returned by :meth:`compute`.
-        It extracts ``results["rsp_all"]`` and passes it to
+        This method expects the `results` dictionary returned by :meth:`compute`.
+        It extracts `results["rsp_all"]` and passes it to
         :class:`SpectrumAverager`.
 
-        :param results : dict
+        :param results:
             Results dictionary returned by :meth:`compute`.
-        :param energy_min_ev, energy_max_ev : float, optional
-            Energy window in eV for the common spectrum grid.
-        :param show_individual : bool
-            Plot individual broadened spectra for each snapshot.
-        :param show_sticks : bool
-            Plot oscillator-strength sticks.
-        :param show_std : bool
-            Plot +/- one standard deviation shaded area.
-        :param title : str
-            Plot title.
-        :param ax : matplotlib.axes.Axes, optional
-            Existing axes to plot on.
-        :param xlim_nm : tuple(float, float), optional
-            Wavelength axis limits in nm.
+        :param energy_min_ev:
+            Minimum photon energy in eV for the common grid. If None, it is set to
+            (min excitation energy - padding).
+        :param energy_max_ev:
+            Maximum photon energy in eV for the common grid. If None, it is set to
+            (max excitation energy + padding).
+        :param show_individual:
+            If True, plot individual broadened spectra for each snapshot.
+        :param show_sticks:
+            If True, plots oscillator strength sticks at transition wavelengths.
+        :param show_std:
+            If True, shows a shaded area corresponding to +/- one standard deviation.
+        :param title:
+            Title of the plot.
+        :param ax:
+            Matplotlib Axes object to plot on. If None, a new figure and axes are
+            created.
+        :param xlim_nm:
+            Tuple (xmin, xmax) to set x-axis limits in nm. If None, automatic limits are used.
         :return:
-            matplotlib.axes.Axes
-            The axes containing the plot.
+            The Matplotlib Axes object containing the plot.
         :raises KeyError:
-            If ``rsp_all`` is not present in the results dictionary.
+            If `rsp_all` is not present in the results dictionary.
         """
         if not isinstance(results, dict):
             raise TypeError(
