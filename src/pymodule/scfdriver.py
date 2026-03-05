@@ -1497,23 +1497,28 @@ class ScfDriver:
                                                      thresh_int,
                                                      verbose=False)
 
-        e_grad = None
-
-        if self.rank == mpi_master():
-            self._print_scf_title()
-
-        has_ecp = ao_basis.has_ecp()
-        if has_ecp:
+        if ao_basis.has_ecp():
             ecp_drv = ECPDriver()
             core_electrons = ao_basis.get_number_of_ecp_core_electrons()
             ecp_atom_inds = [
                 idx for idx, nelec in enumerate(core_electrons) if nelec > 0
             ]
             # TODO: distribute ecp atoms over MPI ranks
+            ecp_t0 = tm.time()
             ecp_mat = ecp_drv.compute(molecule, ao_basis, ecp_atom_inds)
             ecp_mat = ecp_mat.to_numpy()
+            if self.print_level > 1:
+                self.ostream.print_info(
+                    'Effective core potential matrix computed in ' +
+                    f'{(tm.time() - ecp_t0):.2f} sec.')
+                self.ostream.print_blank()
         else:
             ecp_mat = None
+
+        e_grad = None
+
+        if self.rank == mpi_master():
+            self._print_scf_title()
 
         for i in self._get_scf_range():
 
