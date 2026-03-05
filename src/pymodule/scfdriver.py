@@ -167,6 +167,9 @@ class ScfDriver:
         self.level_shifting = 0.0
         self.level_shifting_delta = 0.01
 
+        # density damping
+        self.density_damping = False
+
         # thresholds
         self.conv_thresh = 1.0e-6
         self.ovl_thresh = 1.0e-6
@@ -311,6 +314,7 @@ class ScfDriver:
                 'pfon_nvir': ('int', 'number of virtual orbitals used in pFON'),
                 'level_shifting': ('float', 'level shifting parameter'),
                 'level_shifting_delta': ('float', 'level shifting delta'),
+                'density_damping': ('bool', 'use density damping'),
                 'conv_thresh': ('float', 'SCF convergence threshold'),
                 'eri_thresh': ('float', 'ERI screening threshold'),
                 'eri_thresh_tight':
@@ -1707,6 +1711,24 @@ class ScfDriver:
             else:
                 den_mat = None
             den_mat = self.comm.bcast(den_mat, root=mpi_master())
+
+            if self.density_damping:
+                if e_grad < 1.0e-2:
+                    den_damp = 1.0
+                elif e_grad < 1.0e-1:
+                    den_damp = 0.5
+                elif e_grad < 1.0:
+                    den_damp = 0.2
+                else:
+                    den_damp = 0.1
+
+                if 0.0 < den_damp and den_damp < 1.0:
+                    damped_den_mat = []
+                    for idx in range(len(den_mat)):
+                        damped_den_mat.append((1.0 - den_damp) *
+                                              self._density[idx] +
+                                              den_damp * den_mat[idx])
+                    den_mat = tuple(damped_den_mat)
 
             profiler.stop_timer('NewDens')
 
