@@ -149,7 +149,7 @@ class ScfDriver:
         """
 
         # scf accelerator
-        self.acc_type = 'L2_DIIS'
+        self.acc_type = 'L2_C2DIIS'
         self.max_err_vecs = 10
         self.max_iter = 50
         self._first_step = False
@@ -587,7 +587,10 @@ class ScfDriver:
         # for now, force DIIS for RI
         # TODO: double check
         if self.ri_coulomb or self.ri_jk:
-            self.acc_type = 'DIIS'
+            if self.acc_type == 'L2_C2DIIS':
+                self.acc_type = 'C2DIIS'
+            elif self.acc_type == 'L2_DIIS':
+                self.acc_type = 'DIIS'
 
             assert_msg_critical(
                 not (self.ri_coulomb and self.ri_jk),
@@ -645,7 +648,10 @@ class ScfDriver:
                                                     self.scf_type)
 
         if self.restart:
-            self.acc_type = 'DIIS'
+            if self.acc_type == 'L2_C2DIIS':
+                self.acc_type = 'C2DIIS'
+            elif self.acc_type == 'L2_DIIS':
+                self.acc_type = 'DIIS'
             if self.rank == mpi_master():
                 self._ref_mol_orbs = MolecularOrbitals.read_hdf5(
                     self.checkpoint_file)
@@ -903,7 +909,7 @@ class ScfDriver:
             self._nuc_mm_energy = self.comm.allreduce(self._nuc_mm_energy)
 
         # C2-DIIS method
-        if self.acc_type.upper() == 'DIIS':
+        if self.acc_type.upper() in ['C2DIIS', 'DIIS']:
             if self.rank == mpi_master():
                 if self.restart:
                     den_mat = self.gen_initial_density_restart(molecule)
@@ -924,7 +930,7 @@ class ScfDriver:
             self._comp_diis(molecule, ao_basis, min_basis, den_mat, profiler)
 
         # two level C2-DIIS method
-        if self.acc_type.upper() == 'L2_DIIS':
+        if self.acc_type.upper() in ['L2_C2DIIS', 'L2_DIIS']:
 
             # first step
             self._first_step = True
@@ -3023,8 +3029,14 @@ class ScfDriver:
             The string with type of SCF convergence accelerator.
         """
 
+        if self.acc_type.upper() == 'C2DIIS':
+            return 'C2 Direct Inversion of Iterative Subspace'
+
         if self.acc_type.upper() == 'DIIS':
             return 'Direct Inversion of Iterative Subspace'
+
+        if self.acc_type.upper() == 'L2_C2DIIS':
+            return 'Two Level C2 Direct Inversion of Iterative Subspace'
 
         if self.acc_type.upper() == 'L2_DIIS':
             return 'Two Level Direct Inversion of Iterative Subspace'

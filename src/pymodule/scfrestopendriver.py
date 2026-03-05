@@ -42,6 +42,7 @@ from .molecularorbitals import MolecularOrbitals, molorb
 from .outputstream import OutputStream
 from .scfdriver import ScfDriver
 from .c2diis import CTwoDiis
+from .diis import Diis
 
 
 class ScfRestrictedOpenDriver(ScfDriver):
@@ -215,7 +216,10 @@ class ScfRestrictedOpenDriver(ScfDriver):
 
             if len(self._fock_matrices_alpha) > 1:
 
-                acc_diis = CTwoDiis()
+                if self.acc_type.upper() in ['C2DIIS', 'L2_C2DIIS']:
+                    acc_diis = CTwoDiis()
+                elif self.acc_type.upper() in ['DIIS', 'L2_DIIS']:
+                    acc_diis = Diis()
 
                 acc_diis.compute_error_vectors_restricted_openshell(
                     self._fock_matrices_alpha, self._fock_matrices_beta,
