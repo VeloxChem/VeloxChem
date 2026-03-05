@@ -585,19 +585,39 @@ comp_gamma_factors(CSimdArray<double>& buffer, const size_t index_gf, const size
     const auto nelems = buffer.number_of_active_elements();
     
     const double a2 = a_x * a_x + a_y * a_y + a_z * a_z;
+    
+    const double ma = std::sqrt(a2);
 
     #pragma omp simd aligned(b_exps, mb, fg : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         double fzi = 1.0 / (b_exps[i] + a_exp + c_exp);
-
+        
         double fa = a_exp * (b_exps[i] + c_exp) * fzi;
         
         double fb = b_exps[i] * (a_exp + c_exp) * fzi;
         
+        fg[i] = -fa * a2 - fb * mb[i] * mb[i];
+    }
+    
+    // folding large Bessel values into G factor.
+    
+    for (size_t i = 0; i < nelems; i++)
+    {
+        const double fzi = 1.0 / (b_exps[i] + a_exp + c_exp);
+        
+        const double tval = 2.0 * b_exps[i] * a_exp * ma * mb[i] * fzi;
+        
         double fact = fpi * fzi * std::sqrt(fpi * fzi);
         
-        fg[i] = fact * std::exp(-fa * a2 - fb * mb[i] * mb[i]);
+        if (tval > 150)
+        {
+            fg[i] = fact * std::exp(fg[i] + tval);
+        }
+        else
+        {
+            fg[i] = fact * std::exp(fg[i]);
+        }
     }
 }
 
@@ -658,9 +678,14 @@ comp_i_vals(CSimdArray<double>& values, const int order, const CSimdArray<double
     
     for (size_t i = 0; i < nelems; i++)
     {
-        double fact = fargs[i];
-        
-        f0vals[i] = gsl_sf_bessel_i0_scaled(fact) * std::exp(fact);
+        if (const double fact = fargs[i]; fact > 150)
+        {
+            f0vals[i] = 0.5 / fact;
+        }
+        else
+        {
+            f0vals[i] = gsl_sf_bessel_i0_scaled(fact) * std::exp(fact);
+        }
     }
     
     if (order == 0) return;
@@ -671,13 +696,17 @@ comp_i_vals(CSimdArray<double>& values, const int order, const CSimdArray<double
     
     for (size_t i = 0; i < nelems; i++)
     {
-        if (const double fact = fargs[i]; fact > 1.0e-12)
+        if (const double fact = fargs[i]; fact > 150)
         {
-            f1vals[i] = gsl_sf_bessel_i1_scaled(fact) * std::exp(fact) / fact  ;
+            f1vals[i] = 0.5 * (1.0 / fact - 1.0 / (fact * fact));
+        }
+        else if (fact <= 1.0e-12)
+        {
+            f1vals[i] = 1.0 / 3.0;
         }
         else
         {
-            f1vals[i] = 1.0 / 3.0;
+            f1vals[i] = gsl_sf_bessel_i1_scaled(fact) * std::exp(fact) / fact;
         }
     }
     
@@ -689,13 +718,17 @@ comp_i_vals(CSimdArray<double>& values, const int order, const CSimdArray<double
     
     for (size_t i = 0; i < nelems; i++)
     {
-        if (const double fact = fargs[i]; fact > 1.0e-12)
+        if (const double fact = fargs[i]; fact > 150)
         {
-            f2vals[i] = gsl_sf_bessel_i2_scaled(fact) * std::exp(fact) / (fact * fact)  ;
+            f1vals[i] = 0.5 * (1.0 / fact - 3.0 / (fact * fact));
+        }
+        else if (fact <= 1.0e-12)
+        {
+            f2vals[i] = 1.0/ 15.0;
         }
         else
         {
-            f2vals[i] = 1.0/ 15.0;
+            f2vals[i] = gsl_sf_bessel_i2_scaled(fact) * std::exp(fact) / (fact * fact);
         }
     }
     
@@ -713,13 +746,17 @@ comp_i_vals(CSimdArray<double>& values, const int order, const CSimdArray<double
         
         for (size_t i = 0; i < nelems; i++)
         {
-            if (const double fact = fargs[i]; fact > 1.0e-12)
+            if (const double fact = fargs[i]; fact > 150)
             {
-                fvals[i] = gsl_sf_bessel_il_scaled(k, fact) * std::exp(fact) * std::pow(fact, -(double)k);
+                f1vals[i] = 0.5 * (1.0 / fact - 0.5 * (double)k * ((double)k + 1) / (fact * fact));
+            }
+            else if (fact <= 1.0e-12)
+            {
+                fvals[i] = 1.0 / n2fact;
             }
             else
             {
-                fvals[i] = 1.0 / n2fact;
+                fvals[i] = gsl_sf_bessel_il_scaled(k, fact) * std::exp(fact) * std::pow(fact, -(double)k);
             }
         }
     }
