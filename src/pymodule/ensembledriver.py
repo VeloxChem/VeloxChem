@@ -520,6 +520,127 @@ class EnsembleDriver:
 
         return None
 
+
+    @staticmethod
+    def _resolve_atom_name_for_pe_db(atom_name: str, available_atoms) -> str | None:
+        """
+        Resolve atom names to names present in the PE database.
+
+        This bridges naming differences coming from different topology conventions,
+        e.g. terminal oxygens O1/O2 (CHARMM topologies) vs OT1/OT2 or OC1/OC2
+        in CP3/SEP tables.
+
+        The resolver tries:
+        1) exact match
+        2) common aliases (HN <-> H, HT1-3 <-> H1-3)
+        3) terminal oxygen aliases (O1/O2 <-> OT1/OT2, OC1/OC2, O/OXT)
+        4) hydrogen digit conventions (HB1 <-> 1HB, HD11 <-> 1HD1, etc.)
+
+        :param atom_name:
+            Atom name from the trajectory/topology.
+        :param available_atoms:
+            Atom names available in the selected PE db for the residue.
+        :return:
+            A matching atom name in the db, or None.
+        """
+        import re
+
+        atom_name = str(atom_name)
+        avail = set(str(a) for a in available_atoms)
+
+        # Exact match first
+        if atom_name in avail:
+            return atom_name
+
+        candidates: list[str] = []
+
+        # Backbone amide proton name
+        if atom_name == "HN":
+            candidates.append("H")
+        elif atom_name == "H":
+            candidates.append("HN")
+
+        # N-terminus ammonium hydrogens: HT1/HT2/HT3 (CHARMM) vs H1/H2/H3 (AMBER/GROMACS)
+        if atom_name.startswith("HT") and len(atom_name) == 3 and atom_name[2] in "123":
+            candidates.append(f"H{atom_name[2]}")
+        if atom_name.startswith("H") and len(atom_name) == 2 and atom_name[1] in "123":
+            candidates.append(f"HT{atom_name[1]}")
+
+        # Terminal carboxylate oxygens:
+        # Many GROMACS topologies use O1/O2. CP3/SEP often use OT1/OT2 (and sometimes OC1/OC2).
+        if atom_name == "O1":
+            candidates.extend(["OT1", "OC1", "O"])
+        elif atom_name == "O2":
+            candidates.extend(["OT2", "OC2", "OXT"])
+        elif atom_name == "OXT":
+            candidates.extend(["OT2", "OC2", "O2"])
+        elif atom_name in {"OT1", "OC1"}:
+            candidates.append("O1")
+        elif atom_name in {"OT2", "OC2"}:
+            candidates.append("O2")
+
+        # Some CHARMM conventions: OT1/OT2 <-> O/OXT (useful if db uses O/OXT instead)
+        if atom_name in {"OT1", "OC1"}:
+            candidates.append("O")
+        if atom_name in {"OT2", "OC2"}:
+            candidates.append("OXT")
+        if atom_name == "O":
+            candidates.append("OT1")
+        if atom_name == "OXT":
+            candidates.append("OT2")
+
+        # Hydrogen digit conventions:
+        #   - CHARMM: HD11, HD12, HD13  <->  AMBER: 1HD1, 2HD1, 3HD1
+        #   - Also HB1 <-> 1HB, HG2 <-> 2HG, etc.
+        m = re.match(r"^H([A-Z]+)(\d)(\d)$", atom_name)
+        if m:
+            base = m.group(1)
+            carbon_idx = m.group(2)
+            hyd_idx = m.group(3)
+            candidates.append(f"{hyd_idx}H{base}{carbon_idx}")  # HD12 -> 2HD1
+
+        m = re.match(r"^([123])H([A-Z]+)(\d)$", atom_name)
+        if m:
+            hyd_idx = m.group(1)
+            base = m.group(2)
+            carbon_idx = m.group(3)
+            candidates.append(f"H{base}{carbon_idx}{hyd_idx}")  # 2HD1 -> HD12
+
+        # Single-digit variants like HB1 <-> 1HB
+        m = re.match(r"^H([A-Z]+)([123])$", atom_name)
+        if m:
+            base = m.group(1)
+            idx = m.group(2)
+            candidates.append(f"{idx}H{base}")  # HB1 -> 1HB
+
+        m = re.match(r"^([123])H([A-Z]+)$", atom_name)
+        if m:
+            idx = m.group(1)
+            base = m.group(2)
+            candidates.append(f"H{base}{idx}")  # 1HB -> HB1
+
+        # Glycine alpha hydrogens: HA1/HA2 <-> 1HA/2HA
+        m = re.match(r"^HA([12])$", atom_name)
+        if m:
+            candidates.append(f"{m.group(1)}HA")
+        m = re.match(r"^([12])HA$", atom_name)
+        if m:
+            candidates.append(f"HA{m.group(1)}")
+
+        # Remove duplicates while preserving order
+        seen = set()
+        uniq_candidates = []
+        for c in candidates:
+            if c not in seen:
+                seen.add(c)
+                uniq_candidates.append(c)
+
+        for cand in uniq_candidates:
+            if cand in avail:
+                return cand
+
+        return None
+
     def _build_point_charges(self, coords_ang, atom_names, resnames) -> np.ndarray | None:
         """
         Build point charges array expected by SCF driver: shape (6, N), coords in bohr.
@@ -651,9 +772,12 @@ class EnsembleDriver:
                         raise KeyError(f"No PE parameters for residue name '{resn}'")
                     pattern_atoms = self._first_residue_atom_pattern(pe_atom_names, pe_resids, pe_resnames, resn)
                     for atom in pattern_atoms:
-                        if atom not in pe_db[resn]:
-                            raise KeyError(f"No PE params for {resn}/{atom}. Available: {sorted(pe_db[resn].keys())}")
-                        p = pe_db[resn][atom]
+                        resolved_atom = self._resolve_atom_name_for_pe_db(atom, pe_db[resn].keys())
+                        if resolved_atom is None:
+                            raise KeyError(
+                                f"No PE params for {resn}/{atom}. Available: {sorted(pe_db[resn].keys())}"
+                            )
+                        p = pe_db[resn][resolved_atom]
                         fh.write(f"{p['element']:<2} {p['charge']:12.8f}  {resn}\n")
                 fh.write("@end\n\n")
 
@@ -661,7 +785,12 @@ class EnsembleDriver:
                 for resn in resname_set:
                     pattern_atoms = self._first_residue_atom_pattern(pe_atom_names, pe_resids, pe_resnames, resn)
                     for atom in pattern_atoms:
-                        p = pe_db[resn][atom]
+                        resolved_atom = self._resolve_atom_name_for_pe_db(atom, pe_db[resn].keys())
+                        if resolved_atom is None:
+                            raise KeyError(
+                                f"No PE params for {resn}/{atom}. Available: {sorted(pe_db[resn].keys())}"
+                            )
+                        p = pe_db[resn][resolved_atom]
                         pol = p["polar"]
                         fh.write(
                             f"{p['element']:<2} {pol[0]:12.8f} {pol[1]:12.8f} {pol[2]:12.8f} "
