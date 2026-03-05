@@ -271,6 +271,27 @@ class CpcmDriver:
 
         return gradA + gradB + gradC
 
+    def compute_excited_gradient(self, molecule, basis, density, density_ao, x_ao_as_mat):
+        """
+        Compute CPCM excited state gradient contribution.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The atomic basis.
+        :param density:
+            The density matrix.
+
+        :return:
+            The CPCM gradient contribution.
+        """
+
+        grad_V_pol = self.grad_V_pol(molecule, basis, self._cpcm_grid, self._cpcm_sw_func, self._cpcm_precond, self._cpcm_q, self.epsilon, self.x, density, density_ao)
+    
+        grad_f_pol = self.grad_f_pol(molecule, basis, self._cpcm_grid, self._cpcm_sw_func, self._cpcm_precond, self.epsilon, self.x, x_ao_as_mat)
+
+        return grad_V_pol + grad_f_pol
+
     @staticmethod
     def erf_array(array):
         """
@@ -950,3 +971,110 @@ class CpcmDriver:
         cg_solution = self.comm.bcast(cg_solution, root=mpi_master())
 
         return cg_solution
+    
+    def grad_V_pol(self, molecule, basis, grid, sw_f, precond, q, eps, x, DM, density_ao, cpcm_cg_thresh=1e-8):
+        """
+        Calculates the first contribution to the excited state gradient.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param grid:
+            The grid object containing the grid positions, weights,
+            the Gaussian exponents, and indices for which atom they belong to.
+        :param sw_f:
+            The switching function.
+        :param q:
+            The grid point charges.
+        :param eps:
+            Dielectric constant.
+        :param x:
+            Alternative scale factor in the denominator of
+            the scaling function f.
+        :param DM:
+            The converged density matrix.
+        :param density_ao:
+            Relaxed AO density matrix.
+        :param cpcm_cg_thresh:
+            threshold for solving charges.
+
+        :return:
+            The gradient array of each cartesian component -- of shape (nAtoms, 3).
+        """
+
+        # First term
+        grad_V_pol = self.grad_C(molecule, basis, grid, q, density_ao) 
+    
+        # Second term
+        C_rsp = self.form_vector_C(molecule, basis, grid, density_ao)
+
+        if self.rank == mpi_master():
+            scale_f = -(eps - 1) / (eps + x)
+            rhs = scale_f * C_rsp
+        else:
+            rhs = None
+        rhs = self.comm.bcast(rhs, root=mpi_master())
+
+        cpcm_rsp_q = self.cg_solve_parallel_direct(grid,
+                                                   sw_f,
+                                                   precond, rhs,
+                                                   None, cpcm_cg_thresh)
+
+        grad_V_pol += self.grad_B(molecule, grid, cpcm_rsp_q) + self.grad_C(molecule, basis, grid, cpcm_rsp_q, DM) 
+
+        # Missing third term
+
+        
+        return grad_V_pol
+    
+    def grad_f_pol(self, molecule, basis, grid, sw_f, precond, eps, x, x_ao_as_mat, cpcm_cg_thresh = 1e-8):
+        """
+        Calculates the second contribution to the excited state gradient.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param grid:
+            The grid object containing the grid positions, weights,
+            the Gaussian exponents, and indices for which atom they belong to.
+        :param sw_f:
+            The switching function.
+        :param q:
+            The grid point charges.
+        :param eps:
+            Dielectric constant.
+        :param x:
+            Alternative scale factor in the denominator of
+            the scaling function f.
+        :param x_ao_as_mat:
+            Density matrix.
+        :param cpcm_cg_thresh:
+            threshold for solving charges.
+
+        :return:
+            The gradient array of each cartesian component -- of shape (nAtoms, 3).
+        """
+
+        C_rsp = self.form_vector_C(molecule, basis, grid, x_ao_as_mat)
+
+        if self.rank == mpi_master():
+            scale_f = -(eps - 1) / (eps + x)
+            rhs = scale_f * C_rsp
+        else:
+            rhs = None
+        rhs = self.comm.bcast(rhs, root=mpi_master())
+
+        cpcm_rsp_q = self.cg_solve_parallel_direct(grid,
+                                                   sw_f,
+                                                   precond, rhs,
+                                                   None, cpcm_cg_thresh)
+        
+        # First term
+        grad_f_pol = self.grad_C(molecule, basis, grid, cpcm_rsp_q, x_ao_as_mat)
+
+        # Second term
+        grad_f_pol += self.grad_Aij(molecule, grid, cpcm_rsp_q, eps, x) + self.grad_Aii(molecule, grid, sw_f, cpcm_rsp_q,  eps, x)
+
+        return 4.0 * grad_f_pol
