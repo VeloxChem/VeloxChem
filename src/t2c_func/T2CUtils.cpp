@@ -585,8 +585,6 @@ comp_gamma_factors(CSimdArray<double>& buffer, const size_t index_gf, const size
     const auto nelems = buffer.number_of_active_elements();
     
     const double a2 = a_x * a_x + a_y * a_y + a_z * a_z;
-    
-    const double ma = std::sqrt(a2);
 
     #pragma omp simd aligned(b_exps, mb, fg : 64)
     for (size_t i = 0; i < nelems; i++)
@@ -597,27 +595,9 @@ comp_gamma_factors(CSimdArray<double>& buffer, const size_t index_gf, const size
         
         double fb = b_exps[i] * (a_exp + c_exp) * fzi;
         
-        fg[i] = -fa * a2 - fb * mb[i] * mb[i];
-    }
-    
-    // folding large Bessel values into G factor.
-    
-    for (size_t i = 0; i < nelems; i++)
-    {
-        const double fzi = 1.0 / (b_exps[i] + a_exp + c_exp);
-        
-        const double tval = 2.0 * b_exps[i] * a_exp * ma * mb[i] * fzi;
-        
         double fact = fpi * fzi * std::sqrt(fpi * fzi);
         
-        if (tval > 150)
-        {
-            fg[i] = fact * std::exp(fg[i] + tval);
-        }
-        else
-        {
-            fg[i] = fact * std::exp(fg[i]);
-        }
+        fg[i] = fact * std::exp(-fa * a2 - fb * mb[i] * mb[i]);
     }
 }
 
@@ -678,9 +658,9 @@ comp_i_vals(CSimdArray<double>& values, const int order, const CSimdArray<double
     
     for (size_t i = 0; i < nelems; i++)
     {
-        if (const double fact = fargs[i]; fact > 150)
+        if (const double fact = fargs[i]; fact > 150.0)
         {
-            f0vals[i] = 0.5 / fact;
+            f0vals[i] = 0.0;
         }
         else
         {
@@ -696,9 +676,9 @@ comp_i_vals(CSimdArray<double>& values, const int order, const CSimdArray<double
     
     for (size_t i = 0; i < nelems; i++)
     {
-        if (const double fact = fargs[i]; fact > 150)
+        if (const double fact = fargs[i]; fact > 150.0)
         {
-            f1vals[i] = 0.5 * (1.0 / fact - 1.0 / (fact * fact));
+            f1vals[i] = 0.0;
         }
         else if (fact <= 1.0e-12)
         {
@@ -718,9 +698,9 @@ comp_i_vals(CSimdArray<double>& values, const int order, const CSimdArray<double
     
     for (size_t i = 0; i < nelems; i++)
     {
-        if (const double fact = fargs[i]; fact > 150)
+        if (const double fact = fargs[i]; fact > 150.0)
         {
-            f1vals[i] = 0.5 * (1.0 / fact - 3.0 / (fact * fact));
+            f1vals[i] = 0.0;
         }
         else if (fact <= 1.0e-12)
         {
@@ -746,9 +726,9 @@ comp_i_vals(CSimdArray<double>& values, const int order, const CSimdArray<double
         
         for (size_t i = 0; i < nelems; i++)
         {
-            if (const double fact = fargs[i]; fact > 150)
+            if (const double fact = fargs[i]; fact > 150.0)
             {
-                f1vals[i] = 0.5 * (1.0 / fact - 0.5 * (double)k * ((double)k + 1) / (fact * fact));
+                f1vals[i] = 0.0;
             }
             else if (fact <= 1.0e-12)
             {
