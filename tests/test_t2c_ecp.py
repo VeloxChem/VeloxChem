@@ -27,9 +27,9 @@ class TestECPDriver:
 
         auclstr = """
             Au 0.000   0.000   0.000
-            Cl 2.300   0.300  -0.400
+            Cl 0.000   2.550   0.000
         """
-        mol = Molecule.read_str(auclstr, 'au')
+        mol = Molecule.read_str(auclstr)
         bas = MolecularBasis.read(mol, 'def2-svp')
 
         return mol, bas
@@ -247,15 +247,17 @@ class TestECPDriver:
                                  [124.79066561, 16.30072573, -30.49008890, -5.17107381],
                                  [2, 2, 2, 2])
         
-        #atom_pot = AtomCorePotential(lpot, [spot, ppot, dpot], [0, 1, 2], 60);
+        atom_pot = AtomCorePotential(lpot, [spot, ppot, dpot], [0, 1, 2], 60);
         
-        atom_pot = AtomCorePotential(lpot, [spot, ], [0, ], 60);
+        #atom_pot = AtomCorePotential(lpot, [], [], 60);
         
         print(bas_svp.info_str('TEST'))
         
         ecp_drv = ECPDriver()
         ecp_mat = ecp_drv.compute(mol_aucl, bas_svp, atom_pot)
        
-        print(np.argwhere(np.isnan(ecp_mat.full_matrix().to_numpy())))
+        print(np.max(ecp_mat.full_matrix().to_numpy()))
+        
+        print(np.min(ecp_mat.full_matrix().to_numpy()))
        
         assert False

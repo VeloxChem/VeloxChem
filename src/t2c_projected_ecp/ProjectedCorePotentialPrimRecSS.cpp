@@ -26,6 +26,10 @@ comp_prim_projected_core_potential_ss(const int l,
 
     auto b_norms = factors.data(1);
     
+    // Set up normalization factors
+
+    auto t_args = factors.data(8);
+    
     // Set up gamma factors
     
     auto f_gamma = factors.data(idx_gamma);
@@ -42,10 +46,17 @@ comp_prim_projected_core_potential_ss(const int l,
 
     auto t_0_0 = pbuffer.data(idx_ss);
 
-    #pragma omp simd aligned(f_gamma, i_vals, l_vals, b_norms, t_0_0 : 64)
+    //#pragma omp simd aligned(f_gamma, i_vals, l_vals, b_norms, t_0_0 : 64)
     for (size_t i = 0; i < nelems; i++)
     {
-        t_0_0[i] = a_norm * b_norms[i] * c_norm * f_gamma[i] * i_vals[i] * l_vals[i];
+        if (t_args[i] > 149.99)
+        {
+            t_0_0[i] = 0.0; 
+        }
+        else
+        {
+            t_0_0[i] = a_norm * b_norms[i] * c_norm * f_gamma[i] * i_vals[i] * l_vals[i];
+        }
     }
     
     if (m > 0)
