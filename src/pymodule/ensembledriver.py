@@ -44,7 +44,6 @@ from .lreigensolver import LinearResponseEigenSolver
 from .spectrumaverager import SpectrumAverager
 from .sanitychecks import ensemble_driver_scf_sanity_check
 from .sanitychecks import ensemble_driver_rsp_sanity_check
-from .errorhandler import assert_msg_critical
 
 from .veloxchemlib import (mpi_master, bohr_in_angstrom)
 
@@ -219,7 +218,10 @@ class EnsembleDriver:
         Loads PE-like table:
             molecule,res_name,atom_name,element,M0,P11
 
-        Returns:
+        :param csv_path:
+            Path to the CSV file containing PE parameters.
+
+        :return:
             db[res_name][atom_name] = {"element": str, "charge": float, "polar": [6 floats]}
         """
         if not csv_path.is_file():
@@ -258,7 +260,10 @@ class EnsembleDriver:
         Loads NPE-like table:
             molecule,res_name,atom_name,element,M0
 
-        :return
+        :param csv_path:
+            Path to the CSV file containing NPE parameters.
+
+        :return:
             db[res_name][atom_name] = {"element": str, "charge": float}
         """
         if not csv_path.is_file():
@@ -408,16 +413,19 @@ class EnsembleDriver:
         idx = np.where(mask & (resids == first_resid))[0]
         return [str(atom_names[i]) for i in idx]
 
-    # -------------------------------------------------------------------------
-    # CHARMM -> AMBER normalization helpers for NPE database lookup
-    # -------------------------------------------------------------------------
-
     @staticmethod
     def _normalize_resname_for_npe_db(db: dict, resname: str) -> str:
-        """Normalize residue name to match the selected NPE database.
+        """
+        Normalize residue name to match the selected NPE database.
 
         This is primarily used to bridge CHARMM-style residue naming (e.g. HSD/HSE/HSP)
         to AMBER-style naming (HID/HIE/HIP) for ff19sb.
+        :param db:
+            The NPE database to check against.
+        :param resname:
+            The residue name to normalize.
+        :return:
+            The normalized residue name.
         """
         resname = str(resname)
 
@@ -458,13 +466,20 @@ class EnsembleDriver:
             cand = prefix + core_mapped
             if cand in db:
                 return cand
-
-        # Give up: return original (caller will raise a helpful error)
         return resname
 
     @staticmethod
-    def _resolve_atom_name_for_npe_db(resname: str, atom_name: str, available_atoms) -> str | None:
-        """Resolve CHARMM-style atom names to names present in the NPE database."""
+    def _resolve_atom_name_for_npe_db(atom_name: str, available_atoms) -> str | None:
+        """
+        Resolve CHARMM-style atom names to names present in the NPE database.
+
+        :param atom_name:
+            The atom name to resolve.
+        :param available_atoms:
+            The set of atom names available in the NPE database for the given residue.
+        :return:
+            The resolved atom name if found, or None if no match is found.
+        """
         atom_name = str(atom_name)
         avail = set(str(a) for a in available_atoms)
 
@@ -505,8 +520,6 @@ class EnsembleDriver:
 
         return None
 
-
-
     def _build_point_charges(self, coords_ang, atom_names, resnames) -> np.ndarray | None:
         """
         Build point charges array expected by SCF driver: shape (6, N), coords in bohr.
@@ -515,6 +528,16 @@ class EnsembleDriver:
         This routine performs lightweight CHARMM->AMBER normalization so that
         CHARMM-style names in the trajectory (e.g. HN, OT1/OT2, HSD/HSE/HSP)
         can be resolved against AMBER-style databases such as ff19sb.
+
+        :param coords_ang:
+            Coordinates of the NPE atoms in angstrom, shape (N, 3).
+        :param atom_names:
+            Atom names of the NPE atoms, shape (N,).
+        :param resnames:
+            Residue names of the NPE atoms, shape (N,).
+        :return:
+            Point charges array of shape (6, N) with coordinates in bohr and charges from the NPE database,
+            or None if there are no NPE atoms.
         """
         coords_ang = np.asarray(coords_ang, dtype=float)
         if coords_ang.size == 0:
@@ -541,7 +564,7 @@ class EnsembleDriver:
                     f"(normalized to '{resn}')."
                 )
 
-            resolved_atom = self._resolve_atom_name_for_npe_db(resn, raw_atom, db[resn].keys())
+            resolved_atom = self._resolve_atom_name_for_npe_db(raw_atom, db[resn].keys())
             if resolved_atom is None:
                 raise KeyError(
                     f"No NPE charge for {raw_resn}/{raw_atom}. "
@@ -558,9 +581,7 @@ class EnsembleDriver:
     def write_pot_files(self, snapshots, outdir: str | Path):
         """
         Write PE environment snapshots to .pot files.
-
-        Generates one .pot file per snapshot, named ``pe_frame_XXXXXX.pot`` 
-        where XXXXXX is the snapshot ``frame`` index.
+        Generates one .pot file per snapshot.
 
         The file contains the @environment,
         @charges, and @polarizabilities sections.
