@@ -1505,13 +1505,18 @@ class ScfDriver:
             ]
             # TODO: distribute ecp atoms over MPI ranks
             ecp_t0 = tm.time()
-            ecp_mat = ecp_drv.compute(molecule, ao_basis, ecp_atom_inds)
-            ecp_mat = ecp_mat.to_numpy()
+            if self.rank == mpi_master():
+                ecp_mat = ecp_drv.compute(molecule, ao_basis, ecp_atom_inds)
+                ecp_mat = ecp_mat.to_numpy()
+            else:
+                ecp_mat = None
+            ecp_mat = self.comm.bcast(ecp_mat, root=mpi_master())
             if self.print_level > 1:
                 self.ostream.print_info(
                     'Effective core potential matrix computed in ' +
                     f'{(tm.time() - ecp_t0):.2f} sec.')
                 self.ostream.print_blank()
+                self.ostream.flush()
         else:
             ecp_mat = None
 
