@@ -67,8 +67,8 @@ class Diis:
             The orthogonalization matrix.
         """
 
-        self._build_error_vectors(fock_matrices, density_matrices, overlap_matrix,
-                                  oao_matrix)
+        self.error_vectors = self._collect_error_matrices(
+            fock_matrices, density_matrices, overlap_matrix, oao_matrix)
 
     def compute_error_vectors_restricted_openshell(self, fock_matrices,
                                                    fock_matrices_beta,
@@ -187,16 +187,6 @@ class Diis:
             err = np.matmul(tmat.T, np.matmul(fds - fds.T, tmat))
             errs.append(err)
         return errs
-
-    def _build_error_vectors(self, fock_matrices, density_matrices,
-                             overlap_matrix, oao_matrix):
-        """
-        Helper that stores the collected residuals.
-        """
-
-        errs = self._collect_error_matrices(fock_matrices, density_matrices,
-                                            overlap_matrix, oao_matrix)
-        self.error_vectors = [err for err in errs]
 
     def _build_bmatrix(self):
         """

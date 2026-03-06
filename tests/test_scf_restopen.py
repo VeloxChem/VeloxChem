@@ -77,6 +77,7 @@ class TestScfRestrictedOpenDriver:
         scf_drv = ScfRestrictedOpenDriver()
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label
+        scf_drv.acc_type = 'diis'
         scf_results = scf_drv.compute(mol, bas)
 
         if scf_drv.rank == mpi_master():
