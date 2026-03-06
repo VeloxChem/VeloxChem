@@ -36,76 +36,13 @@
 #include <ranges>
 #include <cmath>
 
-#include <boost/math/special_functions/bessel.hpp>
+#include "gsl/gsl_sf_bessel.h"
 
 #include "CustomViews.hpp"
 #include "TensorComponents.hpp"
 #include "MathConst.hpp"
 
 namespace t2cfunc {  // t2cfunc namespace
-
-inline auto
-bessel_il_scaled_miller_positive(int l, double x) -> double
-{
-    // for l>=0, x>0
-
-    const double s0 = (1.0 - std::exp(-2.0 * x)) / (2.0 * x);
-
-    if (l == 0) return s0;
-
-    // Empirical choice of starting order
-    const int M = l + 80 + 10 * static_cast<int>(x / 100.0);
-
-    // Backward recurrence
-    // t_{n-1} = ((2n+1)/x) t_n + t_{n+1}
-
-    double t_np1 = 0.0; // t_{M+1}
-    double t_n   = 1.0; // t_M
-
-    double t_l = 0.0;
-    double t_0 = 0.0;
-
-    for (int n = M; n >= 1; --n)
-    {
-        const double t_nm1 = ((2.0 * n + 1.0) / x) * t_n + t_np1;
-        t_np1 = t_n;
-        t_n   = t_nm1;
-
-        if (n - 1 == l) t_l = t_nm1;
-        if (n - 1 == 0) t_0 = t_nm1;
-    }
-
-    const double scale = s0 / t_0;
-
-    return t_l * scale;
-}
-
-inline auto
-bessel_il_scaled(int l, double x) -> double
-{
-    // for l>=0, x>0
-
-    const double ax = std::abs(x);
-
-    // parity: i_l(-x) = (-1)^l i_l(x)
-    const double sgn = ((x < 0.0) && (l & 1)) ? -1.0 : 1.0;
-
-    if (ax == 0.0) return (l == 0) ? 1.0 : 0.0;
-
-    // Threshold for using Miller recurrence
-    constexpr double MILLER_SWITCH = 30.0;
-
-    if (ax >= MILLER_SWITCH) {
-        return sgn * bessel_il_scaled_miller_positive(l, ax);
-    }
-
-    // For smaller x
-    const double nu = l + 0.5;
-    const double I = boost::math::cyl_bessel_i(nu, ax);
-    const double i_l = std::sqrt(M_PI / (2.0 * ax)) * I;
-
-    return sgn * std::exp(-ax) * i_l;
-}
 
 auto
 comp_distances_ab(CSimdArray<double>& buffer, const size_t index_ab, const size_t index_b, const TPoint<double>& r_a) -> void
@@ -648,8 +585,6 @@ comp_gamma_factors(CSimdArray<double>& buffer, const size_t index_gf, const size
     const auto nelems = buffer.number_of_active_elements();
     
     const double a2 = a_x * a_x + a_y * a_y + a_z * a_z;
-    
-    const double ma = std::sqrt(a2);
 
     #pragma omp simd aligned(b_exps, mb, fg : 64)
     for (size_t i = 0; i < nelems; i++)
@@ -660,27 +595,9 @@ comp_gamma_factors(CSimdArray<double>& buffer, const size_t index_gf, const size
         
         double fb = b_exps[i] * (a_exp + c_exp) * fzi;
         
-        fg[i] = -fa * a2 - fb * mb[i] * mb[i];
-    }
-    
-    // folding large Bessel values into G factor.
-    
-    for (size_t i = 0; i < nelems; i++)
-    {
-        const double fzi = 1.0 / (b_exps[i] + a_exp + c_exp);
-        
-        const double tval = 2.0 * b_exps[i] * a_exp * ma * mb[i] * fzi;
-        
         double fact = fpi * fzi * std::sqrt(fpi * fzi);
         
-        if (tval > 150)
-        {
-            fg[i] = fact * std::exp(fg[i] + tval);
-        }
-        else
-        {
-            fg[i] = fact * std::exp(fg[i]);
-        }
+        fg[i] = fact * std::exp(-fa * a2 - fb * mb[i] * mb[i]);
     }
 }
 
@@ -741,13 +658,13 @@ comp_i_vals(CSimdArray<double>& values, const int order, const CSimdArray<double
     
     for (size_t i = 0; i < nelems; i++)
     {
-        if (const double fact = fargs[i]; fact > 150)
+        if (const double fact = fargs[i]; fact > 150.0)
         {
-            f0vals[i] = 0.5 / fact;
+            f0vals[i] = 0.0;
         }
         else
         {
-            f0vals[i] = bessel_il_scaled(0, fact) * std::exp(fact);
+            f0vals[i] = gsl_sf_bessel_i0_scaled(fact) * std::exp(fact);
         }
     }
     
@@ -759,9 +676,9 @@ comp_i_vals(CSimdArray<double>& values, const int order, const CSimdArray<double
     
     for (size_t i = 0; i < nelems; i++)
     {
-        if (const double fact = fargs[i]; fact > 150)
+        if (const double fact = fargs[i]; fact > 150.0)
         {
-            f1vals[i] = 0.5 * (1.0 / fact - 1.0 / (fact * fact));
+            f1vals[i] = 0.0;
         }
         else if (fact <= 1.0e-12)
         {
@@ -769,7 +686,7 @@ comp_i_vals(CSimdArray<double>& values, const int order, const CSimdArray<double
         }
         else
         {
-            f1vals[i] = bessel_il_scaled(1, fact) * std::exp(fact) / fact;
+            f1vals[i] = gsl_sf_bessel_i1_scaled(fact) * std::exp(fact) / fact;
         }
     }
     
@@ -781,9 +698,9 @@ comp_i_vals(CSimdArray<double>& values, const int order, const CSimdArray<double
     
     for (size_t i = 0; i < nelems; i++)
     {
-        if (const double fact = fargs[i]; fact > 150)
+        if (const double fact = fargs[i]; fact > 150.0)
         {
-            f1vals[i] = 0.5 * (1.0 / fact - 3.0 / (fact * fact));
+            f1vals[i] = 0.0;
         }
         else if (fact <= 1.0e-12)
         {
@@ -791,7 +708,7 @@ comp_i_vals(CSimdArray<double>& values, const int order, const CSimdArray<double
         }
         else
         {
-            f2vals[i] = bessel_il_scaled(2, fact) * std::exp(fact) / (fact * fact);
+            f2vals[i] = gsl_sf_bessel_i2_scaled(fact) * std::exp(fact) / (fact * fact);
         }
     }
     
@@ -809,9 +726,9 @@ comp_i_vals(CSimdArray<double>& values, const int order, const CSimdArray<double
         
         for (size_t i = 0; i < nelems; i++)
         {
-            if (const double fact = fargs[i]; fact > 150)
+            if (const double fact = fargs[i]; fact > 150.0)
             {
-                f1vals[i] = 0.5 * (1.0 / fact - 0.5 * (double)k * ((double)k + 1) / (fact * fact));
+                f1vals[i] = 0.0;
             }
             else if (fact <= 1.0e-12)
             {
@@ -819,7 +736,7 @@ comp_i_vals(CSimdArray<double>& values, const int order, const CSimdArray<double
             }
             else
             {
-                fvals[i] = bessel_il_scaled(k, fact) * std::exp(fact) * std::pow(fact, -(double)k);
+                fvals[i] = gsl_sf_bessel_il_scaled(k, fact) * std::exp(fact) * std::pow(fact, -(double)k);
             }
         }
     }
