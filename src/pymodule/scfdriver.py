@@ -76,7 +76,7 @@ from .checkpoint import (create_hdf5, write_scf_results_to_hdf5,
 
 class ScfDriver:
     """
-    Implements SCF method with C2-DIIS and two-level C2-DIIS convergence
+    Implements SCF method with DIIS and two-level DIIS convergence
     accelerators.
 
     # vlxtag: RHF, Energy
@@ -96,12 +96,12 @@ class ScfDriver:
         - acc_type: The type of SCF convergence accelerator.
         - max_err_vecs: The maximum number of error vectors.
         - max_iter: The maximum number of SCF iterations.
-        - first_step: The flag for first step in two-level C2-DIIS convergence
+        - first_step: The flag for first step in two-level DIIS convergence
           acceleration.
         - conv_thresh: The SCF convergence threshold.
         - eri_thresh: The electron repulsion integrals screening threshold.
         - ovl_thresh: The atomic orbitals linear dependency threshold.
-        - diis_thresh: The C2-DIIS switch on threshold.
+        - diis_thresh: The DIIS switch on threshold.
         - iter_data: The dictionary of SCF iteration data (scf energy, scf
           energy change, gradient, density change, etc.).
         - is_converged: The flag for SCF convergence.
@@ -908,7 +908,7 @@ class ScfDriver:
 
             self._nuc_mm_energy = self.comm.allreduce(self._nuc_mm_energy)
 
-        # C2-DIIS method
+        # DIIS method
         if self.acc_type.upper() in ['C2DIIS', 'DIIS']:
             if self.rank == mpi_master():
                 if self.restart:
@@ -929,7 +929,7 @@ class ScfDriver:
 
             self._comp_diis(molecule, ao_basis, min_basis, den_mat, profiler)
 
-        # two level C2-DIIS method
+        # two level DIIS method
         if self.acc_type.upper() in ['L2_C2DIIS', 'L2_DIIS']:
 
             # first step
@@ -1363,7 +1363,7 @@ class ScfDriver:
 
     def _comp_diis(self, molecule, ao_basis, min_basis, den_mat, profiler):
         """
-        Performs SCF calculation with C2-DIIS acceleration.
+        Performs SCF calculation with DIIS acceleration.
 
         :param molecule:
             The molecule.
