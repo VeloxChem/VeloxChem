@@ -7,6 +7,7 @@ include Makefile.setup
 VLX_BAS := ../basis
 VLX_TARGET := veloxchemlib.so
 VLX_MODULE := $(wildcard pymodule/*.py)
+VLX_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 
 LIB_LIST += -shared $(PYTHON_LD) $(OPENMP_LD) $(MATH_LD) $(LIBXC_LD)
 
@@ -75,6 +76,8 @@ debug: $(VLX_LIBS)
 	$(CP) -r $(VLX_BAS) $(CURDIR)/../build/python/veloxchem
 	$(CP) -r ../database $(CURDIR)/../build/python/veloxchem
 	$(CP) pymodule/mklconf.py.in $(CURDIR)/../build/python/veloxchem/mklconf.py
+	@echo ""                               >> $(CURDIR)/../build/python/veloxchem/__init__.py
+	@echo "__commit__ = \"$(VLX_COMMIT)\"" >> $(CURDIR)/../build/python/veloxchem/__init__.py
 
 # Release
 release: $(VLX_LIBS)
@@ -88,6 +91,8 @@ release: $(VLX_LIBS)
 	$(CP) -r $(VLX_BAS) $(CURDIR)/../build/python/veloxchem
 	$(CP) -r ../database $(CURDIR)/../build/python/veloxchem
 	$(CP) pymodule/mklconf.py.in $(CURDIR)/../build/python/veloxchem/mklconf.py
+	@echo ""                               >> $(CURDIR)/../build/python/veloxchem/__init__.py
+	@echo "__commit__ = \"$(VLX_COMMIT)\"" >> $(CURDIR)/../build/python/veloxchem/__init__.py
 
 # Clean up
 clean:
@@ -101,4 +106,4 @@ clean:
 .PHONY: $(VLX_LIBS) $(VLX_LIBS_DIR)
 $(VLX_LIBS): $(VLX_LIBS_DIR)
 $(VLX_LIBS_DIR):
-	make --directory=$@ $(MAKECMDGOALS)
+	$(MAKE) --directory=$@ $(MAKECMDGOALS)
