@@ -130,6 +130,7 @@ comp_grad_Aij(const double* ptr_grid_coords,
               const double* ptr_zeta,
               const int*    ptr_atom_indices,
               const double* ptr_q,
+              const double* ptr_q_rsp,
               const int     row_start,
               const int     row_end,
               const int     npoints,
@@ -198,7 +199,7 @@ comp_grad_Aij(const double* ptr_grid_coords,
 
                     ptr_omp_grad_Aij[thread_id * natoms * 3 + a * 3 + c] +=
 
-                        ptr_q[i] * delta_ij * dA_dr * uvec_ij[c] * ptr_q[j];
+                        ptr_q[i] * delta_ij * dA_dr * uvec_ij[c] * ptr_q_rsp[j];
                 }
             }
         }
@@ -226,6 +227,7 @@ comp_grad_Aii(const double* ptr_grid_coords,
               const double* ptr_sw_f,
               const int*    ptr_atom_indices,
               const double* ptr_q,
+			  const double* ptr_q_rsp,
               const double* ptr_atom_coords,
               const double* ptr_atom_radii,
               const int     row_start,
@@ -257,10 +259,11 @@ comp_grad_Aii(const double* ptr_grid_coords,
 
         const auto sw_f_i = ptr_sw_f[i];
         const auto q_i = ptr_q[i];
+        const auto q_rsp_i = ptr_q_rsp[i];
 
         const auto atomidx_i = ptr_atom_indices[i];
 
-        const auto factor_i = sqrt_2_inv_pi * (zeta_i / sw_f_i) * (q_i * q_i);
+        const auto factor_i = sqrt_2_inv_pi * (zeta_i / sw_f_i) * (q_i * q_rsp_i);
 
         for (int b = 0; b < natoms; b++)
         {

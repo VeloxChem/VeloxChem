@@ -759,7 +759,7 @@ class CpcmDriver:
         start = sum(counts[:self.rank])
         end = sum(counts[:self.rank + 1])
 
-        grad_Aij = cpcm_comp_grad_Aij(grid_coords, zeta, atom_indices, q, start,
+        grad_Aij = cpcm_comp_grad_Aij(grid_coords, zeta, atom_indices, q, q, start,
                                       end, natoms)
         grad_Aij *= (-0.5 / scale_f)
 
@@ -807,7 +807,7 @@ class CpcmDriver:
         # i: grid points
         # c: Cartesian components
         # np.einsum('aib,ib,ibc,i->ac', delta, ratio_fiJ, dr_iJ, factor_i * q**2)
-        grad_Aii = cpcm_comp_grad_Aii(grid_coords, zeta_i, sw_f, atom_idx, q,
+        grad_Aii = cpcm_comp_grad_Aii(grid_coords, zeta_i, sw_f, atom_idx, q, q,
                                       start, end, atom_coords, atom_radii)
         grad_Aii *= (-0.5 / scale_f)
 

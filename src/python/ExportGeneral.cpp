@@ -296,6 +296,7 @@ export_general(py::module &m) -> void
              const py::array_t<double>& zeta,
              const py::array_t<int>&    atom_indices,
              const py::array_t<double>& q,
+             const py::array_t<double>& q_rsp,
              const int                  grid_index_start,
              const int                  grid_index_end,
              const int                  natoms) -> py::array_t<double> {
@@ -304,18 +305,20 @@ export_general(py::module &m) -> void
               auto        c_style_2 = py::detail::check_flags(zeta.ptr(), py::array::c_style);
               auto        c_style_3 = py::detail::check_flags(atom_indices.ptr(), py::array::c_style);
               auto        c_style_4 = py::detail::check_flags(q.ptr(), py::array::c_style);
-              errors::assertMsgCritical((c_style_1 && c_style_2 && c_style_3 && c_style_4), errstyle);
+              auto        c_style_5 = py::detail::check_flags(q_rsp.ptr(), py::array::c_style);
+              errors::assertMsgCritical((c_style_1 && c_style_2 && c_style_3 && c_style_4 && c_style_5), errstyle);
               std::string errsize("cpcm_comp_grad_Aij: Inconsistent sizes");
               errors::assertMsgCritical(grid_coords.shape(0) == zeta.shape(0), errsize);
               errors::assertMsgCritical(grid_coords.shape(0) == atom_indices.shape(0), errsize);
               errors::assertMsgCritical(grid_coords.shape(0) == q.shape(0), errsize);
+              errors::assertMsgCritical(grid_coords.shape(0) == q_rsp.shape(0), errsize);
               errors::assertMsgCritical(grid_coords.shape(1) == 3, errsize);
               const auto npoints = static_cast<int>(grid_coords.shape(0));
               std::string errindex("cpcm_comp_grad_Aij: Invalid indices");
               errors::assertMsgCritical((0 <= grid_index_start) && (grid_index_start < npoints), errindex);
               errors::assertMsgCritical((0 < grid_index_end) && (grid_index_end <= npoints), errindex);
               auto grad_Amat = cpcm::comp_grad_Aij(grid_coords.data(), zeta.data(), atom_indices.data(), q.data(),
-                                                   grid_index_start, grid_index_end, npoints, natoms);
+                                                   q_rsp.data(), grid_index_start, grid_index_end, npoints, natoms);
               return vlx_general::pointer_to_numpy(grad_Amat.data(), {natoms, 3});
           },
           "Compute C-PCM gradient for Aij.",
@@ -323,6 +326,7 @@ export_general(py::module &m) -> void
           "zeta"_a,
           "atom_indices"_a,
           "q"_a,
+          "q_rsp"_a,
           "grid_index_start"_a,
           "grid_index_end"_a,
           "natoms"_a);
@@ -333,6 +337,7 @@ export_general(py::module &m) -> void
              const py::array_t<double>& sw_f,
              const py::array_t<int>&    atom_indices,
              const py::array_t<double>& q,
+             const py::array_t<double>& q_rsp,
              const int                  grid_index_start,
              const int                  grid_index_end,
              const py::array_t<double>& atom_coords,
@@ -343,15 +348,17 @@ export_general(py::module &m) -> void
               auto        c_style_3 = py::detail::check_flags(sw_f.ptr(), py::array::c_style);
               auto        c_style_4 = py::detail::check_flags(atom_indices.ptr(), py::array::c_style);
               auto        c_style_5 = py::detail::check_flags(q.ptr(), py::array::c_style);
-              auto        c_style_6 = py::detail::check_flags(atom_coords.ptr(), py::array::c_style);
-              auto        c_style_7 = py::detail::check_flags(atom_radii.ptr(), py::array::c_style);
+              auto        c_style_6 = py::detail::check_flags(q_rsp.ptr(), py::array::c_style);
+              auto        c_style_7 = py::detail::check_flags(atom_coords.ptr(), py::array::c_style);
+              auto        c_style_8 = py::detail::check_flags(atom_radii.ptr(), py::array::c_style);
               errors::assertMsgCritical((c_style_1 && c_style_2 && c_style_3 && c_style_4), errstyle);
-              errors::assertMsgCritical((c_style_5 && c_style_6 && c_style_7), errstyle);
+              errors::assertMsgCritical((c_style_5 && c_style_6 && c_style_7 && c_style_8), errstyle);
               std::string errsize("cpcm_comp_grad_Aii: Inconsistent sizes");
               errors::assertMsgCritical(grid_coords.shape(0) == zeta.shape(0), errsize);
               errors::assertMsgCritical(grid_coords.shape(0) == sw_f.shape(0), errsize);
               errors::assertMsgCritical(grid_coords.shape(0) == atom_indices.shape(0), errsize);
               errors::assertMsgCritical(grid_coords.shape(0) == q.shape(0), errsize);
+              errors::assertMsgCritical(grid_coords.shape(0) == q_rsp.shape(0), errsize);
               errors::assertMsgCritical(grid_coords.shape(1) == 3, errsize);
               errors::assertMsgCritical(atom_coords.shape(0) == atom_radii.shape(0), errsize);
               errors::assertMsgCritical(atom_coords.shape(1) == 3, errsize);
@@ -361,7 +368,7 @@ export_general(py::module &m) -> void
               errors::assertMsgCritical((0 <= grid_index_start) && (grid_index_start < npoints), errindex);
               errors::assertMsgCritical((0 < grid_index_end) && (grid_index_end <= npoints), errindex);
               auto grad_Amat = cpcm::comp_grad_Aii(grid_coords.data(), zeta.data(), sw_f.data(), atom_indices.data(), q.data(),
-                                                   atom_coords.data(), atom_radii.data(), grid_index_start, grid_index_end, npoints, natoms);
+                                                   q_rsp.data(), atom_coords.data(), atom_radii.data(), grid_index_start, grid_index_end, npoints, natoms);
               return vlx_general::pointer_to_numpy(grad_Amat.data(), {natoms, 3});
           },
           "Compute C-PCM gradient for Aii.",
@@ -370,6 +377,7 @@ export_general(py::module &m) -> void
           "sw_f"_a,
           "atom_indices"_a,
           "q"_a,
+          "q_rsp"_a,
           "grid_index_start"_a,
           "grid_index_end"_a,
           "atom_coords"_a,
