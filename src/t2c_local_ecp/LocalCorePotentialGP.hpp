@@ -10,12 +10,14 @@
 #include "BaseCorePotential.hpp"
 #include "SimdArray.hpp"
 #include "LocalCorePotentialPrimRecSS.hpp"
+#include "LocalCorePotentialPrimRecSP.hpp"
 #include "LocalCorePotentialPrimRecPS.hpp"
+#include "LocalCorePotentialPrimRecPP.hpp"
 #include "LocalCorePotentialPrimRecDS.hpp"
+#include "LocalCorePotentialPrimRecDP.hpp"
 #include "LocalCorePotentialPrimRecFS.hpp"
-#include "LocalCorePotentialPrimRecGS.hpp"
-#include "LocalCorePotentialPrimRecHS.hpp"
-#include "T2CHrrABRecGP.hpp"
+#include "LocalCorePotentialPrimRecFP.hpp"
+#include "LocalCorePotentialPrimRecGP.hpp"
 #include "T2CUtils.hpp"
 #include "T2CTransform.hpp"
 #include "BatchFunc.hpp"
@@ -76,17 +78,15 @@ comp_local_core_potential_gp(T& distributor,
 
     // allocate aligned 2D arrays for ket side
 
-    CSimdArray<double> pfactors(12, ket_npgtos);
-
-    CSimdArray<double> cfactors(6, 1);
+    CSimdArray<double> pfactors(15, ket_npgtos);
 
     // allocate aligned primitive integrals
 
-    CSimdArray<double> pbuffer(56, ket_npgtos);
+    CSimdArray<double> pbuffer(125, ket_npgtos);
 
     // allocate aligned contracted integrals
 
-    CSimdArray<double> cbuffer(81, 1);
+    CSimdArray<double> cbuffer(45, 1);
 
     CSimdArray<double> sbuffer(27, 1);
 
@@ -105,8 +105,6 @@ comp_local_core_potential_gp(T& distributor,
         pfactors.load(ket_gto_norms, ket_range, 1, ket_npgtos);
 
         pfactors.replicate_points(ket_gto_coords, ket_range, 2, ket_npgtos);
-
-        cfactors.replicate_points(ket_gto_coords, ket_range, 0, 1);
 
         // set up active SIMD width
 
@@ -128,8 +126,6 @@ comp_local_core_potential_gp(T& distributor,
 
             const auto r_a = bra_gto_coords[j];
 
-            t2cfunc::comp_distances_ab(cfactors, 3, 0, r_a);
-
             for (size_t k = 0; k < bra_npgtos; k++)
             {
                 const auto a_exp = bra_gto_exps[k * bra_ncgtos + j];
@@ -144,32 +140,35 @@ comp_local_core_potential_gp(T& distributor,
 
                     t2cfunc::comp_coordinates_r(pfactors, 5, 2, r_a, a_exp, c_exp);
 
-                    t2cfunc::comp_distances_ra(pfactors, 8, 5, r_a);
+                    t2cfunc::comp_distances_ra(pfactors, 8 , 5, r_a);
 
-                    t2cfunc::comp_inverted_zeta(pfactors, 11, a_exp, c_exp);
+                    t2cfunc::comp_distances_rb(pfactors, 11, 5, 2);
 
-                    t2lecp::comp_prim_local_core_potential_ss(pbuffer, 0, pfactors, r_a, a_exp, c_exp, a_norm, c_norm);
+                    t2cfunc::comp_inverted_zeta(pfactors, 14, a_exp, c_exp);
 
-                    t2lecp::comp_prim_local_core_potential_ps(pbuffer, 1, 0, pfactors);
+                    t2lecp::comp_prim_local_core_potential_ss(pbuffer, 0, pfactors, 5, 14, r_a, a_exp, c_exp, a_norm, c_norm);
 
-                    t2lecp::comp_prim_local_core_potential_ds(pbuffer, 4, 0, 1, pfactors);
+                    t2lecp::comp_prim_local_core_potential_sp(pbuffer, 1, 0, pfactors, 11, 14);
 
-                    t2lecp::comp_prim_local_core_potential_fs(pbuffer, 10, 1, 4, pfactors);
+                    t2lecp::comp_prim_local_core_potential_ps(pbuffer, 4, 0, pfactors, 8, 14);
 
-                    t2lecp::comp_prim_local_core_potential_gs(pbuffer, 20, 4, 10, pfactors);
+                    t2lecp::comp_prim_local_core_potential_pp(pbuffer, 7, 0, 1, pfactors, 8, 14);
 
-                    t2lecp::comp_prim_local_core_potential_hs(pbuffer, 35, 10, 20, pfactors);
+                    t2lecp::comp_prim_local_core_potential_ds(pbuffer, 16, 0, 4, pfactors, 8, 14);
 
-                    t2cfunc::reduce(cbuffer, 0, pbuffer, 20, 15, ket_width, ket_npgtos);
+                    t2lecp::comp_prim_local_core_potential_dp(pbuffer, 22, 1, 4, 7, pfactors, 8, 14);
 
-                    t2cfunc::reduce(cbuffer, 60, pbuffer, 35, 21, ket_width, ket_npgtos);
+                    t2lecp::comp_prim_local_core_potential_fs(pbuffer, 40, 4, 16, pfactors, 8, 14);
 
+                    t2lecp::comp_prim_local_core_potential_fp(pbuffer, 50, 7, 16, 22, pfactors, 8, 14);
+
+                    t2lecp::comp_prim_local_core_potential_gp(pbuffer, 80, 22, 40, 50, pfactors, 8, 14);
+
+                    t2cfunc::reduce(cbuffer, pbuffer, 80, ket_width, ket_npgtos);
                 }
             }
 
-            t2chrr::comp_hrr_gp(cbuffer, 15, 0, 60, cfactors);
-
-            t2cfunc::transform<4, 1>(sbuffer, cbuffer, 15);
+            t2cfunc::transform<4, 1>(sbuffer, cbuffer);
 
             distributor.distribute(sbuffer, bra_gto_indices, ket_gto_indices, 4, 1, j, ket_range, bra_eq_ket);
         }

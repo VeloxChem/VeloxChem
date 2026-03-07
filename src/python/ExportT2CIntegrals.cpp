@@ -480,7 +480,7 @@ export_t2cintegrals(py::module& m)
              "Computes ECP matrix for given molecule, basis, vector of atoms.");
     
     // CProjectedCorePotentialGeom100Driver class
-    PyClass<CProjectedCorePotentialGeomX00Driver<1>>(m, "ProjectedCorePotentialGeom100Driver")
+    PyClass<CProjectedCorePotentialGeomX00Driver<1>>(m, "ProjectedECPGeom100Driver")
         .def(py::init<>())
         .def(
             "compute",
