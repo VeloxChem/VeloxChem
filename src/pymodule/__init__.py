@@ -65,6 +65,8 @@ from .veloxchemlib import ThreeCenterElectronRepulsionGeom010Driver
 from .veloxchemlib import TwoCenterElectronRepulsionDriver
 from .veloxchemlib import TwoCenterElectronRepulsionGeom100Driver
 from .veloxchemlib import LocalECPDriver
+from .veloxchemlib import LocalECPGeom100Driver
+from .veloxchemlib import LocalECPGeom200Driver
 from .veloxchemlib import ProjectedECPDriver
 from .veloxchemlib import ProjectedECPGeom100Driver
 from .veloxchemlib import ECPDriver

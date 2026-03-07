@@ -57,6 +57,7 @@
 #include "ProjectedCorePotentialDriver.hpp"
 #include "CorePotentialDriver.hpp"
 #include "ProjectedCorePotentialGeomX00Driver.hpp"
+#include "LocalCorePotentialGeomX00Driver.hpp"
 
 namespace vlx_t2cintegrals {
 
@@ -491,6 +492,32 @@ export_t2cintegrals(py::module& m)
                const int                                      ecp_momentum,
                const int                                      iatom)
                 -> CMatrices { return geom_drv.compute(basis, molecule, ecp_potential, ecp_momentum, iatom); },
+            "Computes projected core potential first derivatives matrices for given molecule, basis and selected atom.");
+    
+    // CLocalCorePotentialGeom100Driver class
+    PyClass<CLocalCorePotentialGeomX00Driver<1>>(m, "LocalECPGeom100Driver")
+        .def(py::init<>())
+        .def(
+            "compute",
+            [](const CLocalCorePotentialGeomX00Driver<1>& geom_drv,
+               const CMolecule&                           molecule,
+               const CMolecularBasis&                     basis,
+               const CBaseCorePotential&                  ecp_potential,
+               const int                                  iatom)
+                -> CMatrices { return geom_drv.compute(basis, molecule, ecp_potential, iatom); },
+            "Computes projected core potential first derivatives matrices for given molecule, basis and selected atom.");
+    
+    // CLocalCorePotentialGeom200Driver class
+    PyClass<CLocalCorePotentialGeomX00Driver<2>>(m, "LocalECPGeom200Driver")
+        .def(py::init<>())
+        .def(
+            "compute",
+            [](const CLocalCorePotentialGeomX00Driver<2>& geom_drv,
+               const CMolecule&                           molecule,
+               const CMolecularBasis&                     basis,
+               const CBaseCorePotential&                  ecp_potential,
+               const int                                  iatom)
+                -> CMatrices { return geom_drv.compute(basis, molecule, ecp_potential, iatom); },
             "Computes projected core potential first derivatives matrices for given molecule, basis and selected atom.");
 }
 
