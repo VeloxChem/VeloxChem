@@ -581,6 +581,101 @@ class MoleculeToolkit:
 
     # ------------------------------------------------------------------
 
+    def add_bidentate_ligand(
+        self,
+        complex_mol,
+        metal_idx: int,
+        ligand_mol,
+        idx1: int,
+        idx2: int,
+        target_vec1,
+        target_vec2,
+        bond_length: float = 2.0,
+        bond_length2: float = None,
+    ):
+        """
+        Place a bidentate ligand whose geometry is already correct for chelation.
+
+        The ligand is treated as a rigid body — no bonds are broken.  Use this
+        when the input ligand is already in the right conformation (e.g. a
+        pre-built or pre-rotated flat cis-bipy).  For ligands fresh from
+        ``read_smiles`` that need conformation fixing, use
+        :meth:`add_bidentate_rigid` instead.
+
+        Algorithm
+        ---------
+        1. Two-point rigid superposition: align the donor–donor axis to
+           ``(target1 − target2)`` and translate the donor midpoint to the
+           target midpoint.  Ligand internal geometry is fully preserved.
+        2. Rotate around the donor–donor axis (3600 steps) to maximise the
+           sum of LP·(donor→M) for both donors, placing the coordinating face
+           of the ligand toward the metal.
+
+        Parameters
+        ----------
+        complex_mol     : current complex
+        metal_idx       : 1-based index of the metal atom in *complex_mol*
+        ligand_mol      : bidentate ligand in chelating conformation
+        idx1, idx2      : 1-based donor atom indices in *ligand_mol*
+        target_vec1/2   : direction vectors from metal to each donor site
+        bond_length     : M–donor₁ distance in Å
+        bond_length2    : M–donor₂ distance (defaults to *bond_length*)
+        """
+        metal_idx = self._i(metal_idx)
+        idx1      = self._i(idx1)
+        idx2      = self._i(idx2)
+        assert metal_idx < complex_mol.number_of_atoms()
+        if bond_length2 is None:
+            bond_length2 = bond_length
+
+        c_labels = list(complex_mol.get_labels())
+        c_coords = np.array(complex_mol.get_coordinates_in_angstrom(), dtype=float)
+        l_labels = list(ligand_mol.get_labels())
+        l_coords = np.array(ligand_mol.get_coordinates_in_angstrom(), dtype=float)
+        m_pos    = c_coords[metal_idx]
+
+        t1 = np.array(target_vec1, dtype=float); t1 /= np.linalg.norm(t1)
+        t2 = np.array(target_vec2, dtype=float); t2 /= np.linalg.norm(t2)
+        target1 = m_pos + t1 * bond_length
+        target2 = m_pos + t2 * bond_length2
+
+        # Step 1: two-point rigid superposition
+        donor_mid  = (l_coords[idx1] + l_coords[idx2]) / 2.0
+        l_c        = l_coords - donor_mid
+        R_align    = self.get_rotation_matrix(l_c[idx1] - l_c[idx2], target1 - target2)
+        l_c        = l_c @ R_align.T
+        l_c       += (target1 + target2) / 2.0
+
+        # Step 2: rotate around donor–donor axis to face LP toward metal
+        nn_axis = (target1 - target2) / np.linalg.norm(target1 - target2)
+        pivot   = (target1 + target2) / 2.0
+        best_angle, best_score = 0.0, -1e9
+        for deg in np.linspace(0.0, 360.0, 3600, endpoint=False):
+            angle = np.radians(deg)
+            K     = np.array([[0, -nn_axis[2], nn_axis[1]],
+                               [nn_axis[2], 0, -nn_axis[0]],
+                               [-nn_axis[1], nn_axis[0], 0]])
+            R_try = np.eye(3) + np.sin(angle)*K + (1-np.cos(angle))*(K@K)
+            trial = (l_c - pivot) @ R_try.T + pivot
+            lp1   = self._lone_pair_and_nbonds(trial, l_labels, idx1)[0]
+            lp2   = self._lone_pair_and_nbonds(trial, l_labels, idx2)[0]
+            v1    = (m_pos - trial[idx1]) / np.linalg.norm(m_pos - trial[idx1])
+            v2    = (m_pos - trial[idx2]) / np.linalg.norm(m_pos - trial[idx2])
+            score = np.dot(lp1, v1) + np.dot(lp2, v2)
+            if score > best_score:
+                best_score = score; best_angle = angle
+
+        K      = np.array([[0, -nn_axis[2], nn_axis[1]],
+                            [nn_axis[2], 0, -nn_axis[0]],
+                            [-nn_axis[1], nn_axis[0], 0]])
+        R_best = np.eye(3) + np.sin(best_angle)*K + (1-np.cos(best_angle))*(K@K)
+        l_c    = (l_c - pivot) @ R_best.T + pivot
+
+        return vlx.Molecule(c_labels + l_labels,
+                            np.vstack([c_coords, l_c]), 'angstrom')
+
+    # ------------------------------------------------------------------
+
     def add_bidentate_rigid(
         self,
         complex_mol,
@@ -1104,6 +1199,149 @@ class MoleculeToolkit:
             def node_match(n1, n2):
                 if n2.get('is_star'): return n1.get('mol_idx') == candidate
                 return n1['element'] == n2['element']
+
+            GM = isomorphism.GraphMatcher(target_G, query_G, node_match=node_match)
+            for mapping in GM.subgraph_isomorphisms_iter():
+                inv       = {v: k for k, v in mapping.items()}
+                anchor    = inv[star_idx]
+                to_remove = set(mapping.keys()) - {anchor}
+                key       = tuple(sorted(to_remove))
+                if key in seen: break
+                cut = sum(1 for u in to_remove
+                          for v in target_G.neighbors(u) if v not in to_remove)
+                if cut == 1:
+                    unique.append((to_remove, anchor))
+                    seen.add(key)
+                    print(f"[remove_fragment] found {fragment_smiles} at anchor {anchor}")
+                break  # one match per candidate
+
+        output = {'molecules': [], 'radical_indices': []}
+        for to_remove, rad_idx in unique:
+            new_labels, new_coords, old_to_new = [], [], {}
+            curr = 0
+            for i in range(len(labels)):
+                if i not in to_remove:
+                    new_labels.append(labels[i]); new_coords.append(coords[i])
+                    old_to_new[i] = curr; curr += 1
+            output['molecules'].append(
+                vlx.Molecule(new_labels, np.array(new_coords), 'angstrom'))
+            output['radical_indices'].append(old_to_new[rad_idx])
+
+        return output
+
+    def identify_aromatic_carbons_gaff(self, vlx_mol) -> tuple[list, dict]:
+        """
+        Identify aromatic carbon sites in *vlx_mol* using GAFF atom types.
+
+        Returns ``(ca_indices, gaff_dict)`` where *ca_indices* is a list of
+        ``(idx, gaff_type)`` tuples for aromatic-carbon atoms.
+        Indices are **1-based** (VeloxChem convention).
+        """
+        at_id = vlx.AtomTypeIdentifier()
+        at_id.generate_gaff_atomtypes(vlx_mol)
+        gaff_dict = at_id.atom_types_dict
+        ca_types  = {'ca', 'cc', 'cd', 'cp', 'cq', 'ce', 'cf'}
+        ca_indices = []
+        for key, val in gaff_dict.items():
+            if val.get('gaff') in ca_types:
+                # GAFF keys are 1-based (e.g. "C1", "C2"); keep as 1-based for the user
+                idx = int(''.join(filter(str.isdigit, key)))
+                ca_indices.append((idx, val.get('gaff')))
+        return ca_indices, gaff_dict
+
+    def add_smiles_radical(
+        self,
+        vlx_mol,
+        target_idx: int,
+        smiles_with_star: str,
+        gaff_dict: dict,
+        bond_length: float = 1.45,
+    ):
+        """
+        Add a SMILES radical fragment to the aromatic carbon *target_idx*.
+
+        The radical is oriented perpendicular to the ring plane at *target_idx*
+        and steric clash is minimised by a torsion scan.  Existing substituents
+        on *target_idx* are deflected to accommodate the sp³ geometry.
+
+        Returns a new VeloxChem Molecule, or ``None`` on failure.
+        """
+        coords = np.array(vlx_mol.get_coordinates_in_angstrom())
+        labels = list(vlx_mol.get_labels())
+        target_idx = self._i(target_idx)
+        tpos   = coords[target_idx]
+
+        nbs     = [i for i, p in enumerate(coords)
+                   if i != target_idx and np.linalg.norm(p-tpos) < 1.7]
+        ring_nbs, sub_idx = [], -1
+        for ni in nbs:
+            g = gaff_dict.get(f"{labels[ni]}{ni+1}", {}).get('gaff', '')
+            if (g.startswith('c') or g.startswith('n')) and len(ring_nbs) < 2:
+                ring_nbs.append(ni)
+            else:
+                sub_idx = ni
+        if len(ring_nbs) < 2:
+            return None
+
+        v1 = coords[ring_nbs[0]]-tpos; v2 = coords[ring_nbs[1]]-tpos
+        rnorm = np.cross(v1, v2); rnorm /= np.linalg.norm(rnorm)
+        if sub_idx != -1:
+            vsub = (coords[sub_idx]-tpos)/np.linalg.norm(coords[sub_idx]-tpos)
+        else:
+            vsub = -(v1/np.linalg.norm(v1)+v2/np.linalg.norm(v2))
+            vsub /= np.linalg.norm(vsub)
+
+        bend_axis  = np.cross(rnorm, vsub)
+        v_bond_out = self.rotate_vector(vsub, bend_axis, np.radians(-54.75))
+
+        coords_copy = coords.copy()
+        if sub_idx != -1:
+            new_vsub = self.rotate_vector(vsub, bend_axis, np.radians(54.75))
+            rot_mat  = self.get_rotation_matrix(vsub, new_vsub)
+            branch   = [sub_idx]; added = True
+            while added:
+                added = False
+                for i, p in enumerate(coords):
+                    if i in branch or i==target_idx or i in ring_nbs: continue
+                    if any(np.linalg.norm(p-coords[b])<1.7 for b in branch):
+                        branch.append(i); added = True
+            for i in branch:
+                coords_copy[i] = tpos + rot_mat @ (coords[i]-tpos)
+
+        frag = Chem.MolFromSmiles(smiles_with_star.replace('*', '[Xe]'))
+        frag = Chem.AddHs(frag); AllChem.EmbedMolecule(frag, AllChem.ETKDG())
+        fc   = frag.GetConformer().GetPositions()
+        xe   = [a.GetIdx() for a in frag.GetAtoms() if a.GetSymbol()=='Xe'][0]
+        rad  = frag.GetAtoms()[xe].GetNeighbors()[0].GetIdx()
+        fc  -= fc[rad]
+        fc   = fc @ self.get_rotation_matrix(fc[xe]/np.linalg.norm(fc[xe]), -v_bond_out).T
+        f_labels = [a.GetSymbol() for i, a in enumerate(frag.GetAtoms()) if i != xe]
+        f_coords = np.delete(fc, xe, axis=0)
+
+        f_coords = self._clash_torsion_scan(
+            coords_copy, labels, f_coords, f_labels,
+            pivot=np.zeros(3), axis=v_bond_out,
+        )
+        f_coords += tpos + v_bond_out * bond_length
+
+        return vlx.Molecule(list(labels)+f_labels,
+                            np.concatenate([coords_copy, f_coords], axis=0), 'angstrom')
+
+    def run_radical_addition(
+        self,
+        molecule,
+        smiles_fragment: str,
+    ) -> list:
+        """
+        Add *smiles_fragment* to every aromatic carbon site in *molecule*.
+
+        Returns a list of VeloxChem Molecules (one per site), skipping any
+        sites where the addition fails.
+        """
+        ca_sites, gaff_info = self.identify_aromatic_carbons_gaff(molecule)
+        return [iso for idx, gtype in ca_sites
+                for iso in [self.add_smiles_radical(molecule, idx, smiles_fragment, gaff_info)]
+                if iso is not None]
 
             GM = isomorphism.GraphMatcher(target_G, query_G, node_match=node_match)
             for mapping in GM.subgraph_isomorphisms_iter():
