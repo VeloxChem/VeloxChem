@@ -47,11 +47,14 @@ class MoleculeToolkit:
     """
     Unified molecule-building and modification toolkit for VeloxChem.
 
+    **All atom indices are 1-based**, following VeloxChem convention.
+    The first atom in a molecule is atom 1, not atom 0.
+
     Instantiate once and use all methods on any VeloxChem Molecule objects:
 
         tk = MoleculeToolkit()
         mol = vlx.Molecule.read_molecule_string("Pt  0.0  0.0  0.0")
-        mol = tk.add_monodentate_ligand(mol, 0, nh3, 0, [1,0,0], 2.05)
+        mol = tk.add_monodentate_ligand(mol, 1, nh3, 1, [1,0,0], 2.05)
         ...
     """
 
@@ -89,6 +92,26 @@ class MoleculeToolkit:
 
     def __init__(self) -> None:
         pass   # all data lives at the class level; nothing to initialise
+
+    # ------------------------------------------------------------------
+    # Index convention
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _i(idx: int) -> int:
+        """
+        Convert a 1-based atom index (as used in VeloxChem) to the 0-based
+        index used internally by NumPy arrays.  Every public method converts
+        its user-facing index parameters through this helper immediately on
+        entry, so all internal logic remains 0-based throughout.
+        """
+        if idx < 1:
+            raise ValueError(
+                f"Atom index {idx} is invalid — MoleculeToolkit uses "
+                "1-based indices (VeloxChem convention). "
+                "The first atom is index 1."
+            )
+        return idx - 1
 
     # ==================================================================
     # ── Section 1: Low-level geometry helpers ─────────────────────────
@@ -247,12 +270,14 @@ class MoleculeToolkit:
         Public lone-pair interface.  Returns a unit vector pointing toward
         where a metal (or bond partner) would coordinate to *atom_idx*.
 
+        *atom_idx* is **1-based** (VeloxChem convention).
+
         Works for any hybridisation:
         * sp³ N (NH₃)      — from 3 N–H vectors
         * sp² N (pyridine) — in-plane, away from ring
         * sp  C (CO)       — sigma LP on C
         """
-        lp, _ = self._lone_pair_and_nbonds(coords, labels, atom_idx)
+        lp, _ = self._lone_pair_and_nbonds(coords, labels, self._i(atom_idx))
         return lp
 
     # ==================================================================
@@ -280,14 +305,16 @@ class MoleculeToolkit:
         Parameters
         ----------
         complex_mol     : current complex
-        metal_idx       : index of the metal atom in *complex_mol*
+        metal_idx       : 1-based index of the metal atom in *complex_mol*
         ligand_mol      : ligand to attach
-        coord_atom_idx  : donor atom index in *ligand_mol*
+        coord_atom_idx  : 1-based donor atom index in *ligand_mol*
         target_vec      : direction from metal to donor site (need not be normalised)
         bond_length     : M–donor distance in Å
         """
-        assert 0 <= metal_idx       < complex_mol.number_of_atoms()
-        assert 0 <= coord_atom_idx  < ligand_mol.number_of_atoms()
+        metal_idx      = self._i(metal_idx)
+        coord_atom_idx = self._i(coord_atom_idx)
+        assert metal_idx      < complex_mol.number_of_atoms()
+        assert coord_atom_idx < ligand_mol.number_of_atoms()
 
         c_labels = list(complex_mol.get_labels())
         c_coords = np.array(complex_mol.get_coordinates_in_angstrom(), dtype=float)
@@ -295,7 +322,7 @@ class MoleculeToolkit:
         l_coords = np.array(ligand_mol.get_coordinates_in_angstrom(), dtype=float)
         t_unit   = np.array(target_vec, dtype=float) / np.linalg.norm(target_vec)
 
-        print(f"[add_monodentate] ligand={l_labels}, donor={coord_atom_idx}, "
+        print(f"[add_monodentate] ligand={l_labels}, donor={coord_atom_idx+1}, "
               f"target={np.round(t_unit, 2)}, bl={bond_length}")
 
         # Centre on donor
@@ -389,12 +416,15 @@ class MoleculeToolkit:
 
         Parameters
         ----------
-        idx1, idx2      : donor atom indices in *ligand_mol*
+        idx1, idx2      : 1-based donor atom indices in *ligand_mol*
         target_vec1/2   : direction vectors from metal to each donor site
         bond_length     : M–donor₁ distance
         bond_length2    : M–donor₂ distance (defaults to *bond_length*)
         """
-        assert 0 <= metal_idx < complex_mol.number_of_atoms()
+        metal_idx = self._i(metal_idx)
+        idx1      = self._i(idx1)
+        idx2      = self._i(idx2)
+        assert metal_idx < complex_mol.number_of_atoms()
         if bond_length2 is None:
             bond_length2 = bond_length
 
@@ -499,7 +529,7 @@ class MoleculeToolkit:
 
         Returns
         -------
-        ``(idx1, idx2)`` — indices of the el1 and el2 donor atoms.
+        ``(idx1, idx2)`` — **1-based** indices of the el1 and el2 donor atoms.
         """
         labels = list(ligand_mol.get_labels())
         coords = np.array(ligand_mol.get_coordinates_in_angstrom(), dtype=float)
@@ -510,7 +540,7 @@ class MoleculeToolkit:
         if el1 == el2:
             if len(el1_atoms) < 2:
                 raise ValueError(f"Need ≥2 '{el1}' atoms, found {len(el1_atoms)}")
-            return el1_atoms[0], el1_atoms[1]
+            return el1_atoms[0] + 1, el1_atoms[1] + 1
 
         if not el1_atoms:
             raise ValueError(f"No '{el1}' atom found in ligand")
@@ -547,7 +577,7 @@ class MoleculeToolkit:
             if dot > best_dot:
                 best_dot = dot; best = c
 
-        return idx_N, best
+        return idx_N + 1, best + 1
 
     # ------------------------------------------------------------------
 
@@ -578,12 +608,15 @@ class MoleculeToolkit:
 
         Parameters
         ----------
-        idx1, idx2      : donor atom indices in *ligand_mol*
+        idx1, idx2      : 1-based donor atom indices in *ligand_mol*
         target_vec1/2   : direction vectors from metal to each donor site
         bond_length     : M–donor₁ distance
         bond_length2    : M–donor₂ distance (defaults to *bond_length*)
         """
-        assert 0 <= metal_idx < complex_mol.number_of_atoms()
+        metal_idx = self._i(metal_idx)
+        idx1      = self._i(idx1)
+        idx2      = self._i(idx2)
+        assert metal_idx < complex_mol.number_of_atoms()
         if bond_length2 is None:
             bond_length2 = bond_length
 
@@ -661,6 +694,8 @@ class MoleculeToolkit:
         labels = list(ligand_mol.get_labels())
         coords = np.array(ligand_mol.get_coordinates_in_angstrom(), dtype=float)
         G      = self._get_molecule_graph(ligand_mol)
+        idx1   = self._i(idx1)
+        idx2   = self._i(idx2)
 
         path = nx.shortest_path(G, idx1, idx2)
         rotatable = [(a, b) for a, b in zip(path[:-1], path[1:])
@@ -736,9 +771,10 @@ class MoleculeToolkit:
 
         Raises ``ValueError`` if no H is found on that atom.
         """
-        labels = list(ligand_mol.get_labels())
-        coords = np.array(ligand_mol.get_coordinates_in_angstrom(), dtype=float)
-        r_d    = self._cov_radius(labels[donor_idx])
+        labels    = list(ligand_mol.get_labels())
+        coords    = np.array(ligand_mol.get_coordinates_in_angstrom(), dtype=float)
+        donor_idx = self._i(donor_idx)
+        r_d       = self._cov_radius(labels[donor_idx])
         h_idx  = next(
             (i for i, lbl in enumerate(labels)
              if i != donor_idx and lbl == 'H'
@@ -756,8 +792,10 @@ class MoleculeToolkit:
         Remove a ligand by severing the M–donor bond and deleting every atom
         in the ligand fragment.
         """
-        assert 0 <= metal_idx  < complex_mol.number_of_atoms()
-        assert 0 <= donor_idx  < complex_mol.number_of_atoms()
+        metal_idx  = self._i(metal_idx)
+        donor_idx  = self._i(donor_idx)
+        assert metal_idx  < complex_mol.number_of_atoms()
+        assert donor_idx  < complex_mol.number_of_atoms()
         labels = list(complex_mol.get_labels())
         coords = np.array(complex_mol.get_coordinates_in_angstrom(), dtype=float)
         G      = self._get_molecule_graph(complex_mol)
@@ -773,7 +811,8 @@ class MoleculeToolkit:
         Replace the metal at *metal_idx* with *new_metal_symbol*, scaling all
         M–L bond lengths to match the new covalent radius.
         """
-        assert 0 <= metal_idx < vlx_mol.number_of_atoms()
+        metal_idx = self._i(metal_idx)
+        assert metal_idx < vlx_mol.number_of_atoms()
         labels = list(vlx_mol.get_labels())
         coords = np.array(vlx_mol.get_coordinates_in_angstrom(), dtype=float)
         G      = self._get_molecule_graph(vlx_mol)
@@ -915,6 +954,7 @@ class MoleculeToolkit:
         l_b, c_b, j_b, v_b = self._prepare_organic_fragment(smiles_b)
         l_a = list(mol_a.get_labels())
         c_a = np.array(mol_a.get_coordinates_in_angstrom())
+        index_a = self._i(index_a)
 
         # Centre mol_a at bonding atom; rotate so exit_vec points along +Z
         c_a -= c_a[index_a]
@@ -946,11 +986,11 @@ class MoleculeToolkit:
 
         Parameters
         ----------
-        idx_a, idx_b : bonding atom indices (0-based) in *mol_a* and *mol_b*
+        idx_a, idx_b : 1-based bonding atom indices in *mol_a* and *mol_b*
         bond_length  : new bond length in Å (default 1.54 for C–C)
         """
-        l_a, c_a, j_a, v_a = self._prepare_organic_fragment(mol_a, idx_a)
-        l_b, c_b, j_b, v_b = self._prepare_organic_fragment(mol_b, idx_b)
+        l_a, c_a, j_a, v_a = self._prepare_organic_fragment(mol_a, self._i(idx_a))
+        l_b, c_b, j_b, v_b = self._prepare_organic_fragment(mol_b, self._i(idx_b))
 
         c_a -= c_a[j_a]
         c_a  = c_a @ self.get_rotation_matrix(v_a, [0,0,1.]).T
@@ -1100,6 +1140,7 @@ class MoleculeToolkit:
 
         Returns ``(ca_indices, gaff_dict)`` where *ca_indices* is a list of
         ``(idx, gaff_type)`` tuples for aromatic-carbon atoms.
+        Indices are **1-based** (VeloxChem convention).
         """
         at_id = vlx.AtomTypeIdentifier()
         at_id.generate_gaff_atomtypes(vlx_mol)
@@ -1108,7 +1149,8 @@ class MoleculeToolkit:
         ca_indices = []
         for key, val in gaff_dict.items():
             if val.get('gaff') in ca_types:
-                idx = int(''.join(filter(str.isdigit, key))) - 1
+                # GAFF keys are 1-based (e.g. "C1", "C2"); keep as 1-based for the user
+                idx = int(''.join(filter(str.isdigit, key)))
                 ca_indices.append((idx, val.get('gaff')))
         return ca_indices, gaff_dict
 
@@ -1131,6 +1173,7 @@ class MoleculeToolkit:
         """
         coords = np.array(vlx_mol.get_coordinates_in_angstrom())
         labels = list(vlx_mol.get_labels())
+        target_idx = self._i(target_idx)
         tpos   = coords[target_idx]
 
         nbs     = [i for i, p in enumerate(coords)
@@ -1200,6 +1243,10 @@ class MoleculeToolkit:
         Returns a list of VeloxChem Molecules (one per site), skipping any
         sites where the addition fails.
         """
+        ca_sites, gaff_info = self.identify_aromatic_carbons_gaff(molecule)
+        return [iso for idx, gtype in ca_sites
+                for iso in [self.add_smiles_radical(molecule, idx, smiles_fragment, gaff_info)]
+                if iso is not None]
         ca_sites, gaff_info = self.identify_aromatic_carbons_gaff(molecule)
         return [iso for idx, gtype in ca_sites
                 for iso in [self.add_smiles_radical(molecule, idx, smiles_fragment, gaff_info)]
