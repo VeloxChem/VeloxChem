@@ -1468,3 +1468,4 @@ class MoleculeToolkit:
         return [iso for idx, gtype in ca_sites
                 for iso in [self.add_smiles_radical(molecule, idx, smiles_fragment, gaff_info)]
                 if iso is not None]
+
