@@ -1718,7 +1718,8 @@ class ScfDriver:
                 den_mat = None
             den_mat = self.comm.bcast(den_mat, root=mpi_master())
 
-            if self.density_damping:
+            # Note: skip density_damping for iteration 0
+            if self.density_damping and self._num_iter > 0:
                 if e_grad < 1.0e-2:
                     den_damp = 1.0
                 elif e_grad < 1.0e-1:

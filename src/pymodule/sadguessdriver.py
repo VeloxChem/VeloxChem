@@ -1004,6 +1004,12 @@ class SadGuessDriver:
             mat_s = np.linalg.multi_dot([block_12, block_22_inv, block_12.T])
 
             eigvals, eigvecs = np.linalg.eigh(mat_s)
+
+            num_eigs = sum(eigvals > 1e-12)  # hard-coded threshold
+            if num_eigs < eigvals.size:
+                eigvals = eigvals[-num_eigs:]
+                eigvecs = eigvecs[:, -num_eigs:]
+
             mat_m = np.linalg.multi_dot(
                 [eigvecs, np.diag(1.0 / np.sqrt(eigvals)), eigvecs.T])
 
