@@ -1,5 +1,5 @@
 """
-molecule_toolkit.py
+vlx_builder.py
 ====================
 A unified toolkit for building and modifying molecules in VeloxChem.
 
@@ -673,6 +673,191 @@ class MoleculeToolkit:
 
         return vlx.Molecule(c_labels + l_labels,
                             np.vstack([c_coords, l_c]), 'angstrom')
+
+    # ------------------------------------------------------------------
+
+    def add_pi_ligand(
+        self,
+        complex_mol,
+        metal_idx: int,
+        ligand_mol,
+        pi_indices: list,
+        target_vec,
+        bond_length: float = 2.1,
+    ):
+        """
+        Place a π ligand so the metal sits above the centroid of the π-bonding
+        atoms at *bond_length*, equidistant from all of them.
+
+        Works for any hapticity:
+          η² — alkene (2 atoms), alkyne (2 atoms)
+          η³ — allyl  (3 atoms)
+          η⁵ — Cp     (5 atoms)
+          η⁶ — arene  (6 atoms)
+          … or any other set of atoms the user specifies.
+
+        *target_vec* points from the metal toward the **centroid** of the
+        π-bonding atoms (i.e. it defines where the middle of the π system
+        ends up, not any individual carbon).  The ligand plane is oriented
+        perpendicular to this vector.
+
+        After placement a 360-step torsion scan rotates the ligand around
+        *target_vec* to minimise steric clash with the existing complex.
+
+        Parameters
+        ----------
+        complex_mol : current complex
+        metal_idx   : 1-based index of the metal in *complex_mol*
+        ligand_mol  : the π ligand
+        pi_indices  : 1-based indices of the π-bonding atoms in *ligand_mol*
+                      (e.g. [1, 2] for ethylene, [1,2,3,4,5] for Cp)
+        target_vec  : direction from metal to the centroid of the π system
+        bond_length : M–C distance in Å (applied equally to every π atom)
+        """
+        assert len(pi_indices) >= 2, "Need at least 2 pi_indices"
+        metal_idx  = self._i(metal_idx)
+        pi_idx_0   = [self._i(i) for i in pi_indices]   # 0-based internally
+
+        c_labels = list(complex_mol.get_labels())
+        c_coords = np.array(complex_mol.get_coordinates_in_angstrom(), dtype=float)
+        l_labels = list(ligand_mol.get_labels())
+        l_coords = np.array(ligand_mol.get_coordinates_in_angstrom(), dtype=float)
+
+        m_pos   = c_coords[metal_idx]
+        t_unit  = np.array(target_vec, dtype=float)
+        t_unit /= np.linalg.norm(t_unit)
+
+        # --- Step 1: centre ligand on the pi-atom centroid -----------------
+        centroid  = np.mean(l_coords[pi_idx_0], axis=0)
+        l_coords -= centroid          # centroid now at origin
+
+        # --- Step 2: orient ligand plane perpendicular to target_vec -------
+        # The pi-atom centroid should sit at m_pos + t_unit * bond_length,
+        # with all pi atoms equidistant from the metal.
+        # We need the normal of the pi-atom plane to align with t_unit.
+
+        if len(pi_idx_0) >= 3:
+            # Fit a plane through the pi atoms via SVD
+            pts      = l_coords[pi_idx_0]     # centroid already at origin
+            _, _, Vt = np.linalg.svd(pts)
+            pi_normal = Vt[-1]                # smallest singular vector = normal
+        else:
+            # For η²: fit the molecular plane through ALL ligand atoms via SVD.
+            # The normal to this plane is the π-lobe direction.
+            all_pts   = l_coords - np.mean(l_coords, axis=0)
+            _, _, Vt  = np.linalg.svd(all_pts)
+            pi_normal = Vt[-1]                # normal to the molecular plane
+
+            # SVD sign is arbitrary — ensure the normal points AWAY from the
+            # substituent hydrogens (i.e. toward the empty π face).
+            # The H atoms bonded to the pi carbons lie in the molecular plane;
+            # their centroid relative to the C=C midpoint has no out-of-plane
+            # component, so we instead check: the normal should point away from
+            # the average position of all non-pi atoms (the H substituents).
+            non_pi    = [i for i in range(len(l_labels)) if i not in pi_idx_0]
+            if non_pi:
+                h_centroid = np.mean(l_coords[non_pi], axis=0)
+                # h_centroid is in the molecular plane; pi_normal should point
+                # perpendicular to the molecular plane, but we enforce that it
+                # is not accidentally biased toward H by checking the component
+                # along the C=C-to-H in-plane direction.
+                # Simply: the correct π face is the one where the metal would
+                # see the C=C bond end-on — pi_normal is already perpendicular
+                # to the molecular plane, so both signs are equally valid for
+                # the actual binding face. We pick the sign consistently by
+                # aligning with target_vec (the user's intended approach direction).
+                if np.dot(pi_normal, np.array(target_vec, dtype=float)) < 0:
+                    pi_normal = -pi_normal
+
+        pi_normal /= np.linalg.norm(pi_normal)
+
+        # Rotate so pi_normal aligns with t_unit (metal approaches from above)
+        R = self.get_rotation_matrix(pi_normal, t_unit)
+        l_coords = l_coords @ R.T
+
+        # --- Step 3: translate centroid to target position -----------------
+        # Each pi atom should be at bond_length from the metal.
+        # Place centroid at m_pos + t_unit * d, where d is chosen so that
+        # each pi atom is exactly bond_length from the metal.
+        # For a regular polygon the centroid is at radius r from each vertex,
+        # so d = sqrt(bond_length^2 - r^2) where r = distance from centroid
+        # to any pi atom (after rotation).
+        pi_coords_rot = l_coords[pi_idx_0]
+        # r_centroid: average distance from centroid to each pi atom (in the ligand plane)
+        # Since we already centred on the centroid and rotated, the pi atoms lie
+        # in the plane perpendicular to t_unit. Their distance from the centroid
+        # (origin) is purely in-plane.
+        r_centroid = np.mean(np.linalg.norm(pi_coords_rot, axis=1))
+
+        # The metal sits at distance bond_length from each pi atom.
+        # Each pi atom is at distance r_centroid from the centroid in-plane,
+        # and at distance d along t_unit from the centroid.
+        # So: bond_length^2 = r_centroid^2 + d^2  =>  d = sqrt(bl^2 - r^2)
+        # Guard against r >= bond_length (unphysical input).
+        if r_centroid >= bond_length:
+            d = 0.0
+        else:
+            d = np.sqrt(bond_length**2 - r_centroid**2)
+
+        l_coords += m_pos + t_unit * d
+
+        # --- Step 4: torsion scan around target_vec to orient the ligand ----
+        # For η²: align the C=C (or π-bond) axis to be parallel to the
+        # coordination plane of the existing complex, and minimise steric clash.
+        # For ηⁿ (n≥3): only steric clash matters (the ring is symmetric).
+        pivot = m_pos + t_unit * d
+        axis  = t_unit
+
+        # Pre-compute the C=C bond axis (for η² geometric alignment)
+        is_eta2 = (len(pi_idx_0) == 2)
+        if is_eta2:
+            cc_axis = l_coords[pi_idx_0[1]] - l_coords[pi_idx_0[0]]
+            cc_axis /= np.linalg.norm(cc_axis)
+
+        best_angle, best_score = 0.0, -1e9
+        for deg in np.linspace(0, 360, 360, endpoint=False):
+            angle = np.radians(deg)
+            K     = np.array([[0, -axis[2], axis[1]],
+                               [axis[2], 0, -axis[0]],
+                               [-axis[1], axis[0], 0]])
+            R_ax  = np.eye(3) + np.sin(angle)*K + (1-np.cos(angle))*(K@K)
+            trial = pivot + (l_coords - pivot) @ R_ax.T
+
+            # Steric score: minimum distance to existing complex atoms
+            dists = [np.linalg.norm(trial[i] - c_coords[j])
+                     for i in range(len(trial))
+                     for j in range(len(c_coords)) if j != metal_idx]
+            steric = min(dists) if dists else 0.0
+
+            if is_eta2 and len(c_coords) > 1:
+                # Geometric score: C=C should be perpendicular to the M–L
+                # vectors of existing ligands (parallel to the coordination plane).
+                # We maximise the minimum |sin(angle)| between C=C and each M–L,
+                # which equals 1 when C=C is perpendicular to all M–L vectors.
+                trial_cc = R_ax @ cc_axis
+                ml_vecs  = [c_coords[j] - m_pos for j in range(len(c_coords))
+                            if j != metal_idx]
+                if ml_vecs:
+                    sins = [np.sqrt(max(0., 1. - np.dot(trial_cc,
+                                v/np.linalg.norm(v))**2)) for v in ml_vecs]
+                    geom = min(sins)
+                else:
+                    geom = 1.0
+                score = steric + 2.0 * geom   # weight geometric term
+            else:
+                score = steric
+
+            if score > best_score:
+                best_score = score; best_angle = angle
+
+        K      = np.array([[0, -axis[2], axis[1]],
+                            [axis[2], 0, -axis[0]],
+                            [-axis[1], axis[0], 0]])
+        R_best = np.eye(3) + np.sin(best_angle)*K + (1-np.cos(best_angle))*(K@K)
+        l_coords = pivot + (l_coords - pivot) @ R_best.T
+
+        return vlx.Molecule(c_labels + l_labels,
+                            np.vstack([c_coords, l_coords]), 'angstrom')
 
     # ------------------------------------------------------------------
 
