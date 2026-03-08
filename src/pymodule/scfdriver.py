@@ -149,7 +149,7 @@ class ScfDriver:
         """
 
         # scf accelerator
-        self.acc_type = 'L2_C2DIIS'
+        self.acc_type = 'L2_DIIS'
         self.max_err_vecs = 10
         self.max_iter = 50
         self._first_step = False
@@ -3031,13 +3031,13 @@ class ScfDriver:
         """
 
         if self.acc_type.upper() == 'C2DIIS':
-            return 'C2 Direct Inversion of Iterative Subspace'
+            return 'C2-DIIS'
 
         if self.acc_type.upper() == 'DIIS':
             return 'Direct Inversion of Iterative Subspace'
 
         if self.acc_type.upper() == 'L2_C2DIIS':
-            return 'Two Level C2 Direct Inversion of Iterative Subspace'
+            return 'Two Level C2-DIIS'
 
         if self.acc_type.upper() == 'L2_DIIS':
             return 'Two Level Direct Inversion of Iterative Subspace'
