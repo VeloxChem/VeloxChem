@@ -710,7 +710,7 @@ def _Molecule_set_distance(self,
 
     assert_msg_critical(
         i not in atoms_connected_to_j,
-        'Molecule.set_distance: Cannot rotate distance ' +
+        'Molecule.set_distance: Cannot set distance ' +
         '(Maybe it is part of a ring?)')
 
     # rotate whole molecule around normal vector of i-j-k
@@ -877,7 +877,7 @@ def _Molecule_set_angle(self,
 
     assert_msg_critical(
         i not in atoms_connected_to_j,
-        'Molecule.set_angle: Cannot rotate angle ' +
+        'Molecule.set_angle: Cannot set angle ' +
         '(Maybe it is part of a ring?)')
 
     # rotate whole molecule around normal vector of i-j-k
@@ -1053,7 +1053,7 @@ def _Molecule_set_dihedral(self,
 
     assert_msg_critical(
         i not in atoms_connected_to_j,
-        'Molecule.set_dihedral: Cannot rotate dihedral ' +
+        'Molecule.set_dihedral: Cannot set dihedral ' +
         '(Maybe it is part of a ring?)')
 
     # rotate whole molecule around vector i->j
