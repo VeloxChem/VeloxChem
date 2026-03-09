@@ -121,13 +121,13 @@ class OptimizationDriver:
 
         self._debug = False
 
-        # input f
+        # input keywords
         self.input_keywords = {
             'optimize': {
                 'coordsys': ('str_lower', 'coordinate system'),
                 'constraints': ('list', 'constraints'),
                 'check_interval':
-                ('int', 'interval for checking coordinate system'),
+                    ('int', 'interval for checking coordinate system'),
                 'trust': ('float', 'trust radius to begin with'),
                 'tmax': ('float', 'maximum value of trust radius'),
                 'max_iter': ('int', 'maximum number of optimization steps'),
@@ -137,7 +137,7 @@ class OptimizationDriver:
                 'ref_xyz': ('str', 'reference geometry'),
                 'keep_files': ('bool', 'flag to keep output files'),
                 'conv_maxiter':
-                ('bool', 'consider converged if max_iter is reached'),
+                    ('bool', 'consider converged if max_iter is reached'),
                 'conv_energy': ('float', ''),
                 'conv_grms': ('float', ''),
                 'conv_gmax': ('float', ''),
@@ -179,8 +179,7 @@ class OptimizationDriver:
         """
 
         opt_keywords = {
-            key: val[0]
-            for key, val in self.input_keywords['optimize'].items()
+            key: val[0] for key, val in self.input_keywords['optimize'].items()
         }
 
         parse_input(self, opt_keywords, opt_dict)
@@ -213,11 +212,11 @@ class OptimizationDriver:
         elif isinstance(drv, MMDriver):
             grad_drv = MMGradientDriver(drv)
 
-        elif (isinstance(drv, ScfGradientDriver)
-              or isinstance(drv, XtbGradientDriver)
-              or isinstance(drv, OpenMMGradientDriver)
-              or isinstance(drv, TddftGradientDriver)
-              or isinstance(drv, MMGradientDriver)):
+        elif (isinstance(drv, ScfGradientDriver) or
+              isinstance(drv, XtbGradientDriver) or
+              isinstance(drv, OpenMMGradientDriver) or
+              isinstance(drv, TddftGradientDriver) or
+              isinstance(drv, MMGradientDriver)):
             grad_drv = drv
 
         else:
@@ -344,7 +343,7 @@ class OptimizationDriver:
 
         # pre-compute Hessian
 
-        if self.is_scf and self.hessian == 'first' or self.hessian == 'first+last':
+        if self.is_scf and self.hessian in ['first', 'first+last']:
             hessian_drv = ScfHessianDriver(self.grad_drv.scf_driver)
             hessian_drv.compute(molecule, args[0])
             if self.rank == mpi_master():

@@ -33,7 +33,6 @@
 from pathlib import Path
 import numpy as np
 import math
-import os
 
 from .veloxchemlib import Molecule
 from .veloxchemlib import bohr_in_angstrom, mpi_master
@@ -546,8 +545,8 @@ def _Molecule_find_connected_atoms(self, atom_idx, connectivity_matrix=None):
         more_connected_atoms = set()
         for a in connected_atoms:
             for b in range(connectivity_matrix.shape[0]):
-                if (b not in connected_atoms
-                        and connectivity_matrix[a, b] == 1):
+                if (b not in connected_atoms and
+                        connectivity_matrix[a, b] == 1):
                     more_connected_atoms.add(b)
         if more_connected_atoms:
             connected_atoms.update(more_connected_atoms)
@@ -877,8 +876,7 @@ def _Molecule_set_angle(self,
     atoms_connected_to_j = self._find_connected_atoms(j, connectivity_matrix)
 
     assert_msg_critical(
-        i not in atoms_connected_to_j,
-        'Molecule.set_angle: Cannot set angle ' +
+        i not in atoms_connected_to_j, 'Molecule.set_angle: Cannot set angle ' +
         '(Maybe it is part of a ring?)')
 
     # rotate whole molecule around normal vector of i-j-k
@@ -1317,20 +1315,18 @@ def _Molecule_write_xyz_file(self, xyz_filename):
         fh.write(self.get_xyz_string())
 
 
-def _Molecule_show(
-    self,
-    width=400,
-    height=300,
-    atom_indices=False,
-    atom_labels=False,
-    gradient=None,
-    starting_index=1,
-    bonds=None,
-    forming_bonds=None,
-    breaking_bonds=None,
-    forming_width=0.15,
-    breaking_width=0.15,
-):
+def _Molecule_show(self,
+                   width=400,
+                   height=300,
+                   atom_indices=False,
+                   atom_labels=False,
+                   gradient=None,
+                   starting_index=1,
+                   bonds=None,
+                   forming_bonds=None,
+                   breaking_bonds=None,
+                   forming_width=0.15,
+                   breaking_width=0.15):
     """
     Creates a 3D view with py3dmol.
 
@@ -1415,7 +1411,6 @@ def _Molecule_show(
 
         else:
             from rdkit import Chem
-            import re
 
             rdmol = Chem.MolFromXYZBlock(self.get_xyz_string())
             edit_mol = Chem.EditableMol(rdmol)
@@ -1494,12 +1489,7 @@ def _Molecule_show(
                         'backgroundOpacity': 0.0,
                     })
         viewer.setViewStyle({"style": "outline", "width": 0.05})
-        viewer.setStyle({
-            "stick": {},
-            "sphere": {
-                "scale": 0.25,
-            }
-        })
+        viewer.setStyle({"stick": {}, "sphere": {"scale": 0.25}})
         viewer.zoomTo()
         viewer.show()
 
@@ -1848,8 +1838,10 @@ def _Molecule_is_water_molecule(self):
     conn = self.get_connectivity_matrix()
 
     bond_labels = [
-        sorted([labels[i], labels[j]]) for i in range(natoms)
-        for j in range(i, natoms) if conn[i, j] == 1
+        sorted([labels[i], labels[j]])
+        for i in range(natoms)
+        for j in range(i, natoms)
+        if conn[i, j] == 1
     ]
 
     if bond_labels != [['H', 'O'], ['H', 'O']]:

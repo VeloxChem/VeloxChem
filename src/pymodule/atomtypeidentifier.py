@@ -189,10 +189,10 @@ class AtomTypeIdentifier:
     
     def element_id_is_metal(self, elem_id):
         return ((elem_id in [3, 4, 11, 12, 13]) or
-            (19 <= elem_id and elem_id <= 32) or
-            (37 <= elem_id and elem_id <= 51) or
-            (55 <= elem_id and elem_id <= 84) or
-            (87 <= elem_id and elem_id <= 108))
+            (19 <= elem_id and elem_id <= 31) or
+            (37 <= elem_id and elem_id <= 50) or
+            (55 <= elem_id and elem_id <= 83) or
+            (87 <= elem_id and elem_id <= 116))
         
     def detect_closed_cyclic_structures(self):
         """
@@ -674,7 +674,6 @@ class AtomTypeIdentifier:
 
         if phosphorus_type is None:
             self.ostream.print_warning(f"Phosphorus type is None for atom {connected_atom_number}, assigning hp to connected hydrogen.")
-        #     return None
 
         hydrogen_type = None
 
