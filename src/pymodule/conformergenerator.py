@@ -103,7 +103,7 @@ class ConformerGenerator:
 
         self.use_gromacs_files = False
 
-        # --- Monte Carlo search settings -----------------------------------
+        # --- Monte Carlo random sampling settings --------------------------
         # Set mc_search = True to use random sampling instead of the full
         # combinatorial grid.  mc_steps controls how many random dihedral
         # combinations are drawn.  mc_seed ensures reproducibility.
@@ -111,6 +111,31 @@ class ConformerGenerator:
         self.mc_search = False
         self.mc_steps = 500
         self.mc_seed = 42
+
+        # --- Basin-hopping settings ----------------------------------------
+        # Set bh_search = True to use basin-hopping instead of grid/MC search.
+        # Algorithm:
+        #   1. Start from the input geometry (energy-minimised).
+        #   2. Randomly perturb a subset of dihedral angles.
+        #   3. Minimise the perturbed geometry with OpenMM.
+        #   4. Accept the new basin if exp(-ΔE / (R·bh_temperature)) > U(0,1),
+        #      where ΔE = E_new − E_current  (kJ/mol), R = 8.314e-3 kJ/mol/K.
+        #   5. Collect every accepted (unique) basin; return after bh_steps.
+        #
+        # bh_perturb = 'grid'       draw angles from the discrete periodicity grid
+        # bh_perturb = 'continuous' draw uniformly from [0, 360)
+        # bh_temperature            effective temperature for Boltzmann criterion (K)
+        # bh_steps                  total MC steps (accepted + rejected)
+        # bh_seed                   random seed for reproducibility
+        #
+        # Basin-hopping runs on rank 0 only (sequential by design).
+        # All other MPI ranks idle during the search and receive results
+        # via broadcast at the end.
+        self.bh_search = False
+        self.bh_steps = 500
+        self.bh_temperature = 300.0
+        self.bh_perturb = 'grid'    # 'grid' or 'continuous'
+        self.bh_seed = 42
 
     def _analyze_equiv(self, molecule):
 
@@ -394,6 +419,129 @@ class ConformerGenerator:
 
         return dih_comb_array
 
+    def _run_basin_hopping(self, molecule, dihedrals_candidates,
+                           top_file_name, simulation):
+        """
+        Basin-hopping conformational search.
+
+        Runs a Markov chain over energy-minimised basins.  At each step a
+        random subset of dihedrals is perturbed, the geometry is minimised
+        with OpenMM, and the new basin is accepted or rejected by a Boltzmann
+        criterion.  Every accepted basin (including the starting one) is
+        stored; duplicates are removed later by the standard RMSD/energy
+        filter in ``generate()``.
+
+        This method runs exclusively on MPI rank 0.  The caller is responsible
+        for broadcasting the returned list to other ranks.
+
+        Parameters
+        ----------
+        molecule             : starting VeloxChem Molecule
+        dihedrals_candidates : list of (dihedral_indices, angle_list) tuples
+        top_file_name        : topology file stem for OpenMM
+        simulation           : initialised OpenMM Simulation object
+
+        Returns
+        -------
+        list of [energy (float), coords_angstrom (ndarray)] pairs —
+        one entry per accepted basin (including the initial minimised geometry).
+        """
+        # Physical constant: R in kJ / (mol·K)
+        R_kJ = 8.314e-3
+
+        rng = np.random.default_rng(self.bh_seed)
+
+        dih_indices = [cand[0] for cand in dihedrals_candidates]   # (i,j,k,l)
+        dih_grids   = [cand[1] for cand in dihedrals_candidates]   # angle lists
+        n_bonds     = len(dih_indices)
+
+        assert_msg_critical(
+            self.bh_perturb in ('grid', 'continuous'),
+            "ConformerGenerator: bh_perturb must be 'grid' or 'continuous'."
+        )
+
+        # ── Step 0: minimise the starting geometry ──────────────────────────
+        current_energy, current_coords = self._minimize_energy(
+            molecule, simulation, self.em_tolerance)
+        current_mol = Molecule(molecule)
+        for i, coord in enumerate(current_coords):
+            current_mol.set_atom_coordinates(i, coord / bohr_in_angstrom())
+
+        accepted_basins = [[current_energy, current_coords]]
+
+        n_accepted = 1
+        n_rejected = 0
+
+        self.ostream.print_info(
+            f"Basin-hopping: starting energy = {current_energy:.3f} kJ/mol"
+        )
+        self.ostream.flush()
+
+        # ── Main loop ────────────────────────────────────────────────────────
+        for step in range(self.bh_steps):
+
+            # — Perturbation —
+            # Choose a random non-empty subset of bonds (size 1 … n_bonds)
+            subset_size = int(rng.integers(1, n_bonds + 1))
+            subset      = rng.choice(n_bonds, size=subset_size, replace=False)
+
+            trial_mol = Molecule(current_mol)
+
+            for bond_i in subset:
+                idx_quad = list(np.array(dih_indices[bond_i]) + 1)  # 1-based
+
+                if self.bh_perturb == 'grid':
+                    angle = float(rng.choice(dih_grids[bond_i]))
+                else:  # continuous
+                    angle = float(rng.uniform(0.0, 360.0))
+
+                trial_mol.set_dihedral_in_degrees(idx_quad, angle,
+                                                  verbose=False)
+
+            # — Minimisation —
+            trial_energy, trial_coords = self._minimize_energy(
+                trial_mol, simulation, self.em_tolerance)
+
+            # — Boltzmann acceptance —
+            delta_e = trial_energy - current_energy
+            if delta_e <= 0.0:
+                accept = True
+            else:
+                prob   = np.exp(-delta_e / (R_kJ * self.bh_temperature))
+                accept = bool(rng.random() < prob)
+
+            if accept:
+                current_energy = trial_energy
+                current_coords = trial_coords
+                current_mol    = Molecule(trial_mol)
+                for i, coord in enumerate(trial_coords):
+                    current_mol.set_atom_coordinates(
+                        i, coord / bohr_in_angstrom())
+                accepted_basins.append([trial_energy, trial_coords])
+                n_accepted += 1
+            else:
+                n_rejected += 1
+
+            # Progress report every 100 steps
+            if (step + 1) % 100 == 0:
+                acceptance_rate = n_accepted / (step + 1) * 100
+                self.ostream.print_info(
+                    f"Basin-hopping: step {step + 1}/{self.bh_steps}  "
+                    f"accepted={n_accepted}  rejected={n_rejected}  "
+                    f"rate={acceptance_rate:.1f}%  "
+                    f"current E={current_energy:.3f} kJ/mol"
+                )
+                self.ostream.flush()
+
+        self.ostream.print_info(
+            f"Basin-hopping finished: {n_accepted} unique basins found "
+            f"in {self.bh_steps} steps "
+            f"(acceptance rate {n_accepted / self.bh_steps * 100:.1f}%)."
+        )
+        self.ostream.flush()
+
+        return accepted_basins
+
     def _init_openmm_system(self, topology_file, implicit_solvent_model):
 
         assert_msg_critical('openmm' in sys.modules,
@@ -576,7 +724,13 @@ class ConformerGenerator:
 
         # --- Log which search strategy is being used ----------------------
         if rank == mpi_master():
-            if self.mc_search:
+            if self.bh_search:
+                self.ostream.print_info(
+                    f"ConformerGenerator: using basin-hopping search "
+                    f"({self.bh_steps} steps, T={self.bh_temperature} K, "
+                    f"perturb='{self.bh_perturb}', seed={self.bh_seed})."
+                )
+            elif self.mc_search:
                 self.ostream.print_info(
                     f"ConformerGenerator: using Monte Carlo random sampling "
                     f"({self.mc_steps} steps, seed={self.mc_seed})."
@@ -591,9 +745,39 @@ class ConformerGenerator:
                         f"ConformerGenerator: grid search will generate "
                         f"{grid_size} conformers ({len(dihedrals_candidates)} "
                         f"rotatable bonds). Consider setting mc_search=True "
-                        f"with mc_steps=500 to limit the search."
+                        f"with mc_steps=500, or bh_search=True to limit the search."
                     )
             self.ostream.flush()
+
+        # ── Basin-hopping: runs on rank 0, results broadcast to all ranks ──
+        if self.bh_search:
+            if rank == mpi_master():
+                simulation = self._init_openmm_system(top_file_name,
+                                                      self.implicit_solvent_model)
+                bh_basins = self._run_basin_hopping(
+                    molecule, dihedrals_candidates, top_file_name, simulation)
+            else:
+                bh_basins = None
+
+            bh_basins = comm.bcast(bh_basins, root=mpi_master())
+
+            # bh_basins is already a list of [energy, coords] pairs —
+            # plug directly into the shared post-processing block below.
+            all_sorted_energy_coords = sorted(bh_basins, key=lambda x: x[0])
+            num_total_conformers = len(all_sorted_energy_coords)
+
+            self.ostream.print_info(
+                f"{num_total_conformers} basins collected before deduplication.")
+            self.ostream.flush()
+
+            # ── shared post-processing (deduplication + output) ───────────
+            if rank == mpi_master():
+                return self._postprocess_conformers(
+                    molecule, all_sorted_energy_coords, conf_gen_t0)
+            else:
+                return None
+
+        # ── Grid / MC search (original parallel pipeline) ──────────────────
 
         if rank == mpi_master():
             conformation_dih_arr = self._get_mol_comb(molecule, top_file_name,
@@ -684,118 +868,110 @@ class ConformerGenerator:
                 ene_coord for local_energy_coords in gathered_energy_coords
                 for ene_coord in local_energy_coords
             ]
-
             all_sorted_energy_coords = sorted(all_sel_energy_coords,
                                               key=lambda x: x[0])
-            min_energy, min_coords_angstrom = all_sorted_energy_coords[0]
-            min_mol = Molecule(molecule)
-            for iatom in range(min_mol.number_of_atoms()):
-                min_mol.set_atom_coordinates(
-                    iatom, min_coords_angstrom[iatom] / bohr_in_angstrom())
-            self.ostream.print_info(
-                f"Global minimum energy: {min_energy:.3f} kJ/mol")
-            self.ostream.flush()
-
-            self.global_minimum_conformer = min_mol
-            self.global_minimum_energy = min_energy
-
-            conformers_dict = {
-                'energies': [],
-                'molecules': [],
-                'geometries': [],
-            }
-
-            for conf_energy, conf_coords_angstrom in all_sorted_energy_coords:
-                conformers_dict["energies"].append(conf_energy)
-                mol_copy = Molecule(molecule)
-                for iatom in range(mol_copy.number_of_atoms()):
-                    mol_copy.set_atom_coordinates(
-                        iatom,
-                        conf_coords_angstrom[iatom] / bohr_in_angstrom())
-                conformers_dict["molecules"].append(mol_copy)
-                conformers_dict["geometries"].append(
-                    mol_copy.get_xyz_string(
-                        comment=f"Energy: {conf_energy:.3f} kJ/mol"))
-
-            num_conformers = len(conformers_dict["energies"])
-
-            equiv_conformer_pairs = []
-
-            for i in range(num_conformers):
-                xyz_i = conformers_dict["molecules"][
-                    i].get_coordinates_in_angstrom()
-                ene_i = conformers_dict["energies"][i]
-
-                for j in range(i + 1, num_conformers):
-                    xyz_j = conformers_dict["molecules"][
-                        j].get_coordinates_in_angstrom()
-                    ene_j = conformers_dict["energies"][j]
-
-                    if abs(ene_i - ene_j) < self.energy_threshold:
-                        rmsd, rot, trans = svd_superimpose(xyz_j, xyz_i)
-                        if rmsd < self.rmsd_threshold:
-                            equiv_conformer_pairs.append((i, j))
-
-            duplicate_conformers = [j for i, j in equiv_conformer_pairs]
-            duplicate_conformers = sorted(list(set(duplicate_conformers)))
-
-            filtered_energies = [
-                e for i, e in enumerate(conformers_dict["energies"])
-                if i not in duplicate_conformers
-            ]
-            filtered_molecules = [
-                Molecule(m) for i, m in enumerate(conformers_dict["molecules"])
-                if i not in duplicate_conformers
-            ]
-            filtered_geometries = [
-                g for i, g in enumerate(conformers_dict["geometries"])
-                if i not in duplicate_conformers
-            ]
-
-            conformers_dict = {
-                "energies":
-                filtered_energies[:self.number_of_conformers_to_select],
-                "molecules":
-                filtered_molecules[:self.number_of_conformers_to_select],
-                "geometries":
-                filtered_geometries[:self.number_of_conformers_to_select],
-            }
-
-            if self.save_xyz_files:
-                if self.save_path is None:
-                    save_path = Path("selected_conformers")
-                else:
-                    save_path = Path(self.save_path)
-                save_path.mkdir(parents=True, exist_ok=True)
-
-                for i in range(len(conformers_dict["energies"])):
-                    conf_energy = conformers_dict["energies"][i]
-                    conf_mol = conformers_dict["molecules"][i]
-                    xyz_path = save_path / f"conformer_{i + 1}.xyz"
-                    with xyz_path.open("w") as fh:
-                        fh.write(
-                            conf_mol.get_xyz_string(
-                                comment=f"Energy: {conf_energy:.3f} kJ/mol"))
-
-                self.ostream.print_info(
-                    f"{len(conformers_dict['energies'])} conformers with " +
-                    f"the lowest energies are saved in folder {str(save_path)}"
-                )
-            else:
-                self.ostream.print_info(
-                    f"{len(conformers_dict['energies'])} conformers remain " +
-                    "after removal of duplicate conformers.")
-
-            self.ostream.print_info(
-                "Total time spent in generating conformers: " +
-                f"{time.time() - conf_gen_t0:.2f} sec")
-            self.ostream.flush()
-
-            self.conformer_dict = conformers_dict
-
-            return conformers_dict
+            return self._postprocess_conformers(
+                molecule, all_sorted_energy_coords, conf_gen_t0)
         else:
             return None
+
+    def _postprocess_conformers(self, molecule, all_sorted_energy_coords,
+                                conf_gen_t0):
+        """
+        Shared post-processing for all search strategies.
+
+        Takes a sorted list of ``[energy, coords_angstrom]`` pairs,
+        builds VeloxChem Molecule objects, removes duplicates by RMSD and
+        energy, optionally saves XYZ files, and returns the standard
+        ``conformers_dict``.  Sets ``self.global_minimum_conformer`` and
+        ``self.global_minimum_energy`` as side effects.
+
+        Must be called on rank 0 only.
+        """
+        min_energy, min_coords_angstrom = all_sorted_energy_coords[0]
+        min_mol = Molecule(molecule)
+        for iatom in range(min_mol.number_of_atoms()):
+            min_mol.set_atom_coordinates(
+                iatom, min_coords_angstrom[iatom] / bohr_in_angstrom())
+        self.ostream.print_info(
+            f"Global minimum energy: {min_energy:.3f} kJ/mol")
+        self.ostream.flush()
+
+        self.global_minimum_conformer = min_mol
+        self.global_minimum_energy    = min_energy
+
+        conformers_dict = {'energies': [], 'molecules': [], 'geometries': []}
+
+        for conf_energy, conf_coords_angstrom in all_sorted_energy_coords:
+            conformers_dict["energies"].append(conf_energy)
+            mol_copy = Molecule(molecule)
+            for iatom in range(mol_copy.number_of_atoms()):
+                mol_copy.set_atom_coordinates(
+                    iatom, conf_coords_angstrom[iatom] / bohr_in_angstrom())
+            conformers_dict["molecules"].append(mol_copy)
+            conformers_dict["geometries"].append(
+                mol_copy.get_xyz_string(
+                    comment=f"Energy: {conf_energy:.3f} kJ/mol"))
+
+        num_conformers = len(conformers_dict["energies"])
+
+        # Deduplicate by RMSD + energy threshold
+        equiv_conformer_pairs = []
+        for i in range(num_conformers):
+            xyz_i = conformers_dict["molecules"][i].get_coordinates_in_angstrom()
+            ene_i = conformers_dict["energies"][i]
+            for j in range(i + 1, num_conformers):
+                xyz_j = conformers_dict["molecules"][j].get_coordinates_in_angstrom()
+                ene_j = conformers_dict["energies"][j]
+                if abs(ene_i - ene_j) < self.energy_threshold:
+                    rmsd, rot, trans = svd_superimpose(xyz_j, xyz_i)
+                    if rmsd < self.rmsd_threshold:
+                        equiv_conformer_pairs.append((i, j))
+
+        duplicate_conformers = sorted(
+            set(j for i, j in equiv_conformer_pairs))
+
+        n_to_select = self.number_of_conformers_to_select or num_conformers
+
+        filtered_energies  = [e for i, e in enumerate(conformers_dict["energies"])
+                               if i not in duplicate_conformers]
+        filtered_molecules = [Molecule(m) for i, m in enumerate(conformers_dict["molecules"])
+                               if i not in duplicate_conformers]
+        filtered_geometries = [g for i, g in enumerate(conformers_dict["geometries"])
+                                if i not in duplicate_conformers]
+
+        conformers_dict = {
+            "energies":   filtered_energies[:n_to_select],
+            "molecules":  filtered_molecules[:n_to_select],
+            "geometries": filtered_geometries[:n_to_select],
+        }
+
+        if self.save_xyz_files:
+            save_path = Path(self.save_path) if self.save_path else Path("selected_conformers")
+            save_path.mkdir(parents=True, exist_ok=True)
+            for i in range(len(conformers_dict["energies"])):
+                conf_energy = conformers_dict["energies"][i]
+                conf_mol    = conformers_dict["molecules"][i]
+                xyz_path    = save_path / f"conformer_{i + 1}.xyz"
+                with xyz_path.open("w") as fh:
+                    fh.write(conf_mol.get_xyz_string(
+                        comment=f"Energy: {conf_energy:.3f} kJ/mol"))
+            self.ostream.print_info(
+                f"{len(conformers_dict['energies'])} conformers with the "
+                f"lowest energies are saved in folder {str(save_path)}"
+            )
+        else:
+            self.ostream.print_info(
+                f"{len(conformers_dict['energies'])} conformers remain "
+                "after removal of duplicate conformers.")
+
+        self.ostream.print_info(
+            "Total time spent in generating conformers: "
+            f"{time.time() - conf_gen_t0:.2f} sec")
+        self.ostream.flush()
+
+        self.conformer_dict = conformers_dict
+        return conformers_dict
 
     def show_global_minimum(self, atom_indices=False, atom_labels=False):
 
