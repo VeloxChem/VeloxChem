@@ -797,9 +797,24 @@ class ConformerGenerator:
                 grid.append({'Q': Q, 'phi': phi})
 
         elif N == 6:
-            # Uniform sampling on a sphere: use equal-area θ spacing
-            thetas = np.arccos(np.linspace(1, -1, n_pts + 2)[1:-1])  # skip poles
-            phis   = np.linspace(0, 2 * np.pi, n_pts, endpoint=False)
+            # The CP sphere for N=6:
+            #   theta=0   → chair (one orientation)
+            #   theta=pi  → inverted chair
+            #   theta=pi/2 → boat/twist-boat belt
+            #
+            # Always include the two chair poles explicitly — they are the
+            # most important conformations and are skipped by equal-area
+            # interior grids.  Fill the equatorial belt between them.
+            phis = np.linspace(0, 2 * np.pi, n_pts, endpoint=False)
+
+            # South pole: chair (theta ~ pi)
+            grid.append({'Q': Q, 'theta': np.pi, 'phi': 0.0})
+
+            # North pole: inverted chair (theta ~ 0)
+            grid.append({'Q': Q, 'theta': 0.0, 'phi': 0.0})
+
+            # Interior points: equal-area spacing, skipping poles
+            thetas = np.arccos(np.linspace(1, -1, n_pts + 2)[1:-1])
             for theta in thetas:
                 for phi in phis:
                     grid.append({'Q': Q, 'theta': float(theta), 'phi': float(phi)})
@@ -856,15 +871,21 @@ class ConformerGenerator:
             if self.cp_amplitude is not None:
                 Q = self.cp_amplitude
             else:
+                # Use the amplitude from the input geometry, but fall back to
+                # chemically meaningful defaults if the input is too flat.
+                # Typical values: 6-ring chair ~0.63 Å, 5-ring envelope ~0.40 Å,
+                # 7-ring ~0.50 Å.  Input geometries from SMILES are often flat
+                # (Q ~ 0), so we take the larger of the measured value and the
+                # default to ensure a meaningful scan.
+                _cp_defaults = {5: 0.40, 6: 0.63, 7: 0.50}
                 cp_ref = self._cremer_pople_from_coords(ring_coords)
                 if N == 5:
-                    Q = cp_ref['Q']
+                    Q_input = cp_ref['Q']
                 elif N == 6:
-                    Q = cp_ref['Q']
+                    Q_input = cp_ref['Q']
                 else:
-                    Q = np.sqrt(cp_ref['Q2']**2 + cp_ref['Q3']**2)
-                # Ensure a physically meaningful amplitude (min 0.3 Å)
-                Q = max(Q, 0.3)
+                    Q_input = np.sqrt(cp_ref['Q2']**2 + cp_ref['Q3']**2)
+                Q = max(Q_input, _cp_defaults[N])
 
             grid = self._cp_grid(N, Q, self.cp_grid_points)
 
