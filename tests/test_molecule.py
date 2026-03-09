@@ -136,6 +136,116 @@ class TestMolecule:
         mol_d = Molecule.read_str(self.nh3_h2o_xyzstr(), 'au')
         assert mol_c == mol_d
 
+    def test_read_molecule_string_ghost_atoms_and_basis_labels(self):
+
+        mol = Molecule.read_molecule_string("""Bq_N  0.0  0.0  0.0  def2-svp
+                                               H_Bq  0.0  0.0  1.0  aug-cc-pvdz
+                                               O     0.0  1.0  0.0""")
+
+        assert mol.get_labels() == ['Bq', 'Bq', 'O']
+        assert mol.get_identifiers() == [0, 0, 8]
+        assert mol.get_atom_basis_labels() == [('DEF2-SVP', 'N'),
+                                               ('AUG-CC-PVDZ', 'H'), ('', 'O')]
+        assert 'Bq_N' in mol.get_xyz_string()
+        assert 'Bq_H' in mol.get_xyz_string()
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    def test_read_xyz_string_validation(self):
+
+        with pytest.raises(AssertionError,
+                           match='Invalid number of atoms in XYZ input'):
+            Molecule.read_xyz_string("""not-an-int
+                                        comment
+                                        H 0.0 0.0 0.0""")
+
+        with pytest.raises(AssertionError,
+                           match='Inconsistent number of atoms in XYZ input'):
+            Molecule.read_xyz_string("""2
+                                        comment
+                                        H 0.0 0.0 0.0""")
+
+    def test_read_xyz_file_success(self, tmp_path):
+
+        xyz_path = tmp_path / 'water.xyz'
+        xyz_path.write_text("""3
+        water
+        O  0.0  0.0  -1.0
+        H  0.0  1.4  -2.1
+        H  0.0 -1.4  -2.1
+        """)
+
+        mol = Molecule.read_xyz_file(xyz_path)
+        ref_mol = Molecule.read_molecule_string(self.h2o_xyzstr(), 'angstrom')
+        assert mol == ref_mol
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    def test_read_xyz_file_missing_file(self, tmp_path):
+
+        missing_path = tmp_path / 'missing.xyz'
+        with pytest.raises(AssertionError,
+                           match=f'xyzfile {missing_path} does not exist'):
+            Molecule.read_xyz_file(missing_path)
+
+    def test_read_gro_file_element_guessing(self, tmp_path):
+
+        gro_path = tmp_path / 'test.gro'
+        gro_lines = [
+            'test system',
+            '3',
+            f'{1:5d}{"ALA":<5}{"CA":>5}{1:5d}{0.100:8.3f}{0.200:8.3f}{0.300:8.3f}',
+            f'{1:5d}{"LIG":<5}{"CL1":>5}{2:5d}{0.400:8.3f}{0.500:8.3f}{0.600:8.3f}',
+            f'{1:5d}{"NA":<5}{"NA":>5}{3:5d}{0.700:8.3f}{0.800:8.3f}{0.900:8.3f}',
+            '   1.00000   1.00000   1.00000',
+        ]
+        gro_path.write_text('\n'.join(gro_lines) + '\n')
+
+        mol = Molecule.read_gro_file(gro_path)
+
+        assert mol.get_labels() == ['C', 'Cl', 'Na']
+        assert np.allclose(
+            mol.get_coordinates_in_angstrom(),
+            np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]]))
+
+    def test_read_pdb_file_element_guessing_and_explicit_columns(
+            self, tmp_path):
+
+        pdb_path = tmp_path / 'test.pdb'
+
+        def pdb_record(record,
+                       serial,
+                       atom_name,
+                       residue_name,
+                       x,
+                       y,
+                       z,
+                       element=''):
+            return (f'{record:<6s}{serial:5d} '
+                    f'{atom_name:^4s}'
+                    f' '
+                    f'{residue_name:>3s} A'
+                    f'{1:4d}'
+                    f'    '
+                    f'{x:8.3f}{y:8.3f}{z:8.3f}'
+                    f'{1.00:6.2f}{0.00:6.2f}'
+                    f'          '
+                    f'{element:>2s}')
+
+        pdb_lines = [
+            pdb_record('ATOM', 1, 'NA', 'NA', 1.0, 2.0, 3.0),
+            pdb_record('HETATM', 2, 'CL1', 'UNL', 4.0, 5.0, 6.0),
+            pdb_record('HETATM', 3, 'O', 'HOH', 7.0, 8.0, 9.0, 'O'),
+        ]
+        pdb_path.write_text('\n'.join(pdb_lines) + '\n')
+
+        mol = Molecule.read_pdb_file(pdb_path)
+
+        assert mol.get_labels() == ['Na', 'Cl', 'O']
+        assert np.allclose(
+            mol.get_coordinates_in_angstrom(),
+            np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]]))
+
     def test_pickle(self):
 
         mol_a = self.nh3_molecule()
