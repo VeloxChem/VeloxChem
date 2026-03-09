@@ -137,6 +137,24 @@ class ConformerGenerator:
         self.bh_perturb = 'grid'    # 'grid' or 'continuous'
         self.bh_seed = 42
 
+        # --- Cremer-Pople ring puckering settings -------------------------
+        # Set cp_search = True to enumerate ring conformations by sampling
+        # the Cremer-Pople puckering coordinate space on a uniform grid.
+        # Supported ring sizes: 5, 6, 7.
+        #
+        # For N=5: one amplitude Q and one phase φ  (circle, 1D grid)
+        # For N=6: one amplitude Q, polar angle θ, azimuthal angle φ  (sphere)
+        # For N=7: two amplitudes Q2,Q3 and two phases φ2,φ3 (4D, reduced)
+        #
+        # cp_grid_points  — number of grid points along each angular axis
+        #                   (total conformers ≈ cp_grid_points^(n_angles) per ring)
+        # cp_amplitude    — fixed puckering amplitude Q in Å (None = auto from
+        #                   the input geometry)
+        # cp_rings        — list of rings to sample (None = auto-detect all)
+        self.cp_search      = False
+        self.cp_grid_points = 12       # points per angular axis
+        self.cp_amplitude   = None     # Å; None = use amplitude of input geometry
+
     def _analyze_equiv(self, molecule):
 
         idtf = AtomTypeIdentifier()
@@ -542,6 +560,354 @@ class ConformerGenerator:
 
         return accepted_basins
 
+    # ------------------------------------------------------------------
+    # Cremer-Pople ring puckering
+    # ------------------------------------------------------------------
+
+    def _detect_rings(self, molecule):
+        """
+        Detect all rings of size 5, 6, or 7 in *molecule* using a simple
+        DFS bond-graph traversal.  Returns a list of tuples of **0-based**
+        atom indices, one tuple per ring, in ring-traversal order.
+        """
+        labels = list(molecule.get_labels())
+        coords = np.array(molecule.get_coordinates_in_angstrom(), dtype=float)
+        n = len(labels)
+
+        # Build adjacency from covalent distances
+        adj = [[] for _ in range(n)]
+        for i in range(n):
+            for j in range(i + 1, n):
+                ri = self._cov_radius_cp(labels[i])
+                rj = self._cov_radius_cp(labels[j])
+                if np.linalg.norm(coords[i] - coords[j]) < 1.3 * (ri + rj):
+                    adj[i].append(j)
+                    adj[j].append(i)
+
+        rings = []
+        seen_sets = set()
+
+        def dfs(start, current, path, depth):
+            for nb in adj[current]:
+                if depth >= 2 and nb == start and 5 <= len(path) <= 7:
+                    key = frozenset(path)
+                    if key not in seen_sets:
+                        seen_sets.add(key)
+                        rings.append(tuple(path))
+                    continue
+                if nb not in path and len(path) < 7:
+                    dfs(start, nb, path + [nb], depth + 1)
+
+        for i in range(n):
+            dfs(i, i, [i], 0)
+
+        # Keep only rings of size 5–7, remove duplicates (forward/reverse)
+        unique = []
+        unique_sets = set()
+        for ring in rings:
+            if not (5 <= len(ring) <= 7):
+                continue
+            key = frozenset(ring)
+            if key not in unique_sets:
+                unique_sets.add(key)
+                unique.append(ring)
+
+        return unique
+
+    @staticmethod
+    def _cov_radius_cp(element):
+        """Covalent radius table for ring detection."""
+        table = {
+            'H': 0.31, 'C': 0.76, 'N': 0.71, 'O': 0.66, 'S': 1.05,
+            'F': 0.57, 'P': 1.07, 'Cl': 1.02, 'Se': 1.20, 'Si': 1.11,
+        }
+        return table.get(element, 0.77)
+
+    @staticmethod
+    def _cremer_pople_from_coords(ring_coords):
+        """
+        Compute Cremer-Pople puckering coordinates from ring Cartesian coords.
+
+        Parameters
+        ----------
+        ring_coords : (N, 3) array, atoms in ring order
+
+        Returns
+        -------
+        dict with keys depending on ring size N:
+          N=5: {'Q': float, 'phi': float}            (φ in radians)
+          N=6: {'Q': float, 'theta': float, 'phi': float}
+          N=7: {'Q2': float, 'phi2': float,
+                'Q3': float, 'phi3': float}
+        """
+        coords = np.asarray(ring_coords, dtype=float)
+        N = len(coords)
+        assert N in (5, 6, 7), f"Ring size {N} not supported"
+
+        # Mean plane: subtract centroid, build reference plane via SVD
+        centroid = coords.mean(axis=0)
+        r = coords - centroid                          # (N, 3)
+
+        # Cremer-Pople mass-weighted reference plane vectors
+        # e1, e2 span the mean plane; n is the normal
+        R1 = np.sum([r[j] * np.sin(2 * np.pi * j / N) for j in range(N)], axis=0)
+        R2 = np.sum([r[j] * np.cos(2 * np.pi * j / N) for j in range(N)], axis=0)
+        n  = np.cross(R1, R2)
+        if np.linalg.norm(n) < 1e-10:
+            n = np.array([0., 0., 1.])
+        n /= np.linalg.norm(n)
+
+        # Out-of-plane displacements z_j
+        z = r @ n                                     # (N,)
+
+        if N == 5:
+            # One puckering mode: m=2
+            A2 = np.sqrt(2 / N) * np.sum(z * np.cos(4 * np.pi * np.arange(N) / N))
+            B2 = -np.sqrt(2 / N) * np.sum(z * np.sin(4 * np.pi * np.arange(N) / N))
+            Q   = np.sqrt(A2**2 + B2**2)
+            phi = np.arctan2(B2, A2)
+            return {'Q': Q, 'phi': phi}
+
+        elif N == 6:
+            # Two puckering modes: m=2 (equatorial), m=3 (axial/chair)
+            j   = np.arange(6)
+            A2  = np.sqrt(1/3) * np.sum(z * np.cos(2 * np.pi * j * 2 / 6))
+            B2  = -np.sqrt(1/3) * np.sum(z * np.sin(2 * np.pi * j * 2 / 6))
+            q3  = (1 / np.sqrt(6)) * np.sum(z * np.cos(np.pi * j))   # alternating ±1
+
+            Q2    = np.sqrt(A2**2 + B2**2)
+            phi2  = np.arctan2(B2, A2)
+            Q     = np.sqrt(Q2**2 + q3**2)
+            theta = np.arctan2(Q2, q3)    # 0=chair, π/2=boat, π=inverted chair
+            phi   = phi2
+            return {'Q': Q, 'theta': theta, 'phi': phi}
+
+        else:  # N == 7
+            j = np.arange(7)
+            A2 = np.sqrt(2/7) * np.sum(z * np.cos(2*np.pi*j*2/7))
+            B2 = -np.sqrt(2/7) * np.sum(z * np.sin(2*np.pi*j*2/7))
+            A3 = np.sqrt(2/7) * np.sum(z * np.cos(2*np.pi*j*3/7))
+            B3 = -np.sqrt(2/7) * np.sum(z * np.sin(2*np.pi*j*3/7))
+            Q2   = np.sqrt(A2**2 + B2**2)
+            phi2 = np.arctan2(B2, A2)
+            Q3   = np.sqrt(A3**2 + B3**2)
+            phi3 = np.arctan2(B3, A3)
+            return {'Q2': Q2, 'phi2': phi2, 'Q3': Q3, 'phi3': phi3}
+
+    @staticmethod
+    def _ring_coords_from_cremer_pople(ring_coords_ref, cp_params):
+        """
+        Given a reference ring geometry and target CP parameters, reconstruct
+        new ring atom positions that have the desired puckering.
+
+        Strategy: keep the mean plane and bond lengths/angles from the
+        reference; only the out-of-plane displacements z_j are replaced by
+        values computed from the target CP parameters.
+
+        Parameters
+        ----------
+        ring_coords_ref : (N, 3) reference ring atom positions
+        cp_params       : dict from _cremer_pople_from_coords (target)
+
+        Returns
+        -------
+        new_coords : (N, 3) ring atom positions with target puckering
+        """
+        coords = np.asarray(ring_coords_ref, dtype=float)
+        N = len(coords)
+
+        centroid = coords.mean(axis=0)
+        r = coords - centroid
+
+        # Reference mean-plane normal (same as in analysis)
+        R1 = np.sum([r[j] * np.sin(2 * np.pi * j / N) for j in range(N)], axis=0)
+        R2 = np.sum([r[j] * np.cos(2 * np.pi * j / N) for j in range(N)], axis=0)
+        n  = np.cross(R1, R2)
+        if np.linalg.norm(n) < 1e-10:
+            # Fallback: use z-axis
+            n = np.array([0., 0., 1.])
+        n /= np.linalg.norm(n)
+
+        # In-plane components (project out the normal)
+        r_ip = r - np.outer(r @ n, n)   # (N, 3) in-plane displacements
+
+        # Build target z_j from CP parameters
+        j = np.arange(N, dtype=float)
+        if N == 5:
+            Q   = cp_params['Q']
+            phi = cp_params['phi']
+            A2  = Q * np.cos(phi)
+            B2  = Q * np.sin(phi)
+            z_new = np.sqrt(2 / N) * (
+                A2 * np.cos(4 * np.pi * j / N) -
+                B2 * np.sin(4 * np.pi * j / N)
+            )
+
+        elif N == 6:
+            Q     = cp_params['Q']
+            theta = cp_params['theta']
+            phi   = cp_params['phi']
+            Q2    = Q * np.sin(theta)
+            q3    = Q * np.cos(theta)
+            A2    = Q2 * np.cos(phi)
+            B2    = Q2 * np.sin(phi)
+            z_new = (
+                np.sqrt(1/3) * (A2 * np.cos(2*np.pi*j*2/6) -
+                                B2 * np.sin(2*np.pi*j*2/6)) +
+                (1/np.sqrt(6)) * q3 * np.cos(np.pi * j)
+            )
+
+        else:  # N == 7
+            Q2   = cp_params['Q2']
+            phi2 = cp_params['phi2']
+            Q3   = cp_params['Q3']
+            phi3 = cp_params['phi3']
+            A2 = Q2 * np.cos(phi2); B2 = Q2 * np.sin(phi2)
+            A3 = Q3 * np.cos(phi3); B3 = Q3 * np.sin(phi3)
+            z_new = (
+                np.sqrt(2/7) * (A2 * np.cos(2*np.pi*j*2/7) -
+                                B2 * np.sin(2*np.pi*j*2/7)) +
+                np.sqrt(2/7) * (A3 * np.cos(2*np.pi*j*3/7) -
+                                B3 * np.sin(2*np.pi*j*3/7))
+            )
+
+        # Reconstruct: in-plane part + new out-of-plane part
+        new_coords = centroid + r_ip + np.outer(z_new, n)
+        return new_coords
+
+    def _cp_grid(self, N, Q, n_pts):
+        """
+        Generate a uniform grid of Cremer-Pople parameters for a ring of
+        size N with fixed amplitude Q.
+
+        Returns a list of CP parameter dicts suitable for
+        ``_ring_coords_from_cremer_pople``.
+
+        Grid definitions
+        ----------------
+        N=5 : φ ∈ [0, 2π)  — ``n_pts`` points on a circle
+        N=6 : θ ∈ (0, π), φ ∈ [0, 2π)  — ``n_pts`` × ``n_pts`` points
+              on a sphere (sin-weighted in θ for uniformity)
+        N=7 : Q2, Q3 split with Q2²+Q3²=Q²; φ2, φ3 ∈ [0, 2π)
+              ``n_pts`` amplitude ratios × ``n_pts``² phase combinations
+        """
+        grid = []
+        if N == 5:
+            for phi in np.linspace(0, 2 * np.pi, n_pts, endpoint=False):
+                grid.append({'Q': Q, 'phi': phi})
+
+        elif N == 6:
+            # Uniform sampling on a sphere: use equal-area θ spacing
+            thetas = np.arccos(np.linspace(1, -1, n_pts + 2)[1:-1])  # skip poles
+            phis   = np.linspace(0, 2 * np.pi, n_pts, endpoint=False)
+            for theta in thetas:
+                for phi in phis:
+                    grid.append({'Q': Q, 'theta': float(theta), 'phi': float(phi)})
+
+        else:  # N == 7
+            # Sample amplitude ratio r = Q2/Q ∈ [0,1]; Q3 = sqrt(Q²-Q2²)
+            ratios = np.linspace(0, 1, n_pts)
+            phis   = np.linspace(0, 2 * np.pi, n_pts, endpoint=False)
+            for r in ratios:
+                Q2 = Q * r
+                Q3 = Q * np.sqrt(max(1 - r**2, 0))
+                for phi2 in phis:
+                    for phi3 in phis:
+                        grid.append({'Q2': Q2, 'phi2': float(phi2),
+                                     'Q3': Q3, 'phi3': float(phi3)})
+
+        return grid
+
+    def _run_cremer_pople_search(self, molecule, top_file_name, simulation):
+        """
+        Enumerate ring conformations by scanning the Cremer-Pople coordinate
+        space for every ring of size 5–7 in the molecule.
+
+        For each ring, a uniform grid over the CP sphere/circle is constructed.
+        For each grid point the ring atom positions are updated in the full
+        molecular geometry, the geometry is minimised with OpenMM, and the
+        result stored.
+
+        Runs on rank 0 only.  Returns a list of [energy, coords_angstrom] pairs.
+        """
+        rings = self._detect_rings(molecule)
+        rings = [r for r in rings if len(r) in (5, 6, 7)]
+
+        if not rings:
+            self.ostream.print_info(
+                "Cremer-Pople: no 5-, 6-, or 7-membered rings detected.")
+            self.ostream.flush()
+            return []
+
+        self.ostream.print_info(
+            f"Cremer-Pople: found {len(rings)} ring(s) — sizes "
+            f"{[len(r) for r in rings]}."
+        )
+        self.ostream.flush()
+
+        all_results = []
+        ref_coords  = np.array(molecule.get_coordinates_in_angstrom(), dtype=float)
+
+        for ring_idx, ring in enumerate(rings):
+            N            = len(ring)
+            ring_coords  = ref_coords[list(ring)]
+
+            # Determine puckering amplitude
+            if self.cp_amplitude is not None:
+                Q = self.cp_amplitude
+            else:
+                cp_ref = self._cremer_pople_from_coords(ring_coords)
+                if N == 5:
+                    Q = cp_ref['Q']
+                elif N == 6:
+                    Q = cp_ref['Q']
+                else:
+                    Q = np.sqrt(cp_ref['Q2']**2 + cp_ref['Q3']**2)
+                # Ensure a physically meaningful amplitude (min 0.3 Å)
+                Q = max(Q, 0.3)
+
+            grid = self._cp_grid(N, Q, self.cp_grid_points)
+
+            self.ostream.print_info(
+                f"Cremer-Pople: ring {ring_idx + 1} (size {N}, Q={Q:.3f} Å) "
+                f"— {len(grid)} grid points."
+            )
+            self.ostream.flush()
+
+            for pt_idx, cp_params in enumerate(grid):
+                # Build new ring coords from CP parameters
+                new_ring_coords = self._ring_coords_from_cremer_pople(
+                    ring_coords, cp_params)
+
+                # Embed into full molecular geometry
+                trial_full = ref_coords.copy()
+                for local_i, global_i in enumerate(ring):
+                    trial_full[global_i] = new_ring_coords[local_i]
+
+                # Build trial VeloxChem Molecule
+                trial_mol = Molecule(molecule)
+                for iatom, coord in enumerate(trial_full):
+                    trial_mol.set_atom_coordinates(
+                        iatom, coord / bohr_in_angstrom())
+
+                # Minimise and store
+                try:
+                    energy, opt_coords = self._minimize_energy(
+                        trial_mol, simulation, self.em_tolerance)
+                    all_results.append([energy, opt_coords])
+                except Exception as e:
+                    self.ostream.print_info(
+                        f"Cremer-Pople: skipping ring {ring_idx+1} "
+                        f"point {pt_idx+1} ({e})")
+
+            self.ostream.print_info(
+                f"Cremer-Pople: ring {ring_idx + 1} done "
+                f"({len(all_results)} conformers so far)."
+            )
+            self.ostream.flush()
+
+        return all_results
+
     def _init_openmm_system(self, topology_file, implicit_solvent_model):
 
         assert_msg_critical('openmm' in sys.modules,
@@ -730,13 +1096,18 @@ class ConformerGenerator:
                     f"({self.bh_steps} steps, T={self.bh_temperature} K, "
                     f"perturb='{self.bh_perturb}', seed={self.bh_seed})."
                 )
+            elif self.cp_search:
+                self.ostream.print_info(
+                    f"ConformerGenerator: using Cremer-Pople ring puckering search "
+                    f"(grid_points={self.cp_grid_points}, "
+                    f"amplitude={'auto' if self.cp_amplitude is None else f'{self.cp_amplitude:.3f} Å'})."
+                )
             elif self.mc_search:
                 self.ostream.print_info(
                     f"ConformerGenerator: using Monte Carlo random sampling "
                     f"({self.mc_steps} steps, seed={self.mc_seed})."
                 )
             else:
-                # Warn the user if the grid is going to be very large
                 grid_size = 1
                 for _, angles in dihedrals_candidates:
                     grid_size *= len(angles)
@@ -760,9 +1131,6 @@ class ConformerGenerator:
                 bh_basins = None
 
             bh_basins = comm.bcast(bh_basins, root=mpi_master())
-
-            # bh_basins is already a list of [energy, coords] pairs —
-            # plug directly into the shared post-processing block below.
             all_sorted_energy_coords = sorted(bh_basins, key=lambda x: x[0])
             num_total_conformers = len(all_sorted_energy_coords)
 
@@ -770,7 +1138,37 @@ class ConformerGenerator:
                 f"{num_total_conformers} basins collected before deduplication.")
             self.ostream.flush()
 
-            # ── shared post-processing (deduplication + output) ───────────
+            if rank == mpi_master():
+                return self._postprocess_conformers(
+                    molecule, all_sorted_energy_coords, conf_gen_t0)
+            else:
+                return None
+
+        # ── Cremer-Pople ring puckering: runs on rank 0, results broadcast ──
+        if self.cp_search:
+            if rank == mpi_master():
+                simulation  = self._init_openmm_system(top_file_name,
+                                                       self.implicit_solvent_model)
+                cp_results  = self._run_cremer_pople_search(
+                    molecule, top_file_name, simulation)
+            else:
+                cp_results = None
+
+            cp_results = comm.bcast(cp_results, root=mpi_master())
+
+            if not cp_results:
+                self.ostream.print_info(
+                    "Cremer-Pople search found no conformers.")
+                self.ostream.flush()
+                return None
+
+            all_sorted_energy_coords = sorted(cp_results, key=lambda x: x[0])
+
+            self.ostream.print_info(
+                f"{len(all_sorted_energy_coords)} conformers collected "
+                "before deduplication.")
+            self.ostream.flush()
+
             if rank == mpi_master():
                 return self._postprocess_conformers(
                     molecule, all_sorted_energy_coords, conf_gen_t0)
