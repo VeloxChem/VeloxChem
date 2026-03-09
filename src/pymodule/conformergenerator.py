@@ -52,7 +52,7 @@ try:
     import openmm
     from openmm import LangevinIntegrator, Platform
     from openmm.app import NoCutoff, Simulation, PDBFile, ForceField, GromacsTopFile
-    from openmm.unit import nanometer, md_unit_system, kelvin, picoseconds, picosecond,dalton
+    from openmm.unit import nanometer, md_unit_system, kelvin, picoseconds, picosecond, dalton
 except ImportError:
     pass
 
@@ -94,7 +94,6 @@ class ConformerGenerator:
 
         # thresholds for removing duplicate conformers
         # rmsd threshold in Angstrom, energy threshold in kJ/mol
-        # TODO: double check the thresholds
         self.rmsd_threshold = 1.2
         self.energy_threshold = 1.2
 
@@ -103,6 +102,15 @@ class ConformerGenerator:
         self.solvent_dielectric = 78.39
 
         self.use_gromacs_files = False
+
+        # --- Monte Carlo search settings -----------------------------------
+        # Set mc_search = True to use random sampling instead of the full
+        # combinatorial grid.  mc_steps controls how many random dihedral
+        # combinations are drawn.  mc_seed ensures reproducibility.
+        # When mc_search is False (default) the original grid search is used.
+        self.mc_search = False
+        self.mc_steps = 500
+        self.mc_seed = 42
 
     def _analyze_equiv(self, molecule):
 
@@ -129,30 +137,20 @@ class ConformerGenerator:
     def _check_equivside_in_dihedrals(self, dihedral_indices, atom_info_dict,
                                       one_based_equiv_atoms_groups):
 
-        # according to the connected_atom and equivalent list, if one side is
-        # connected to a equivalent group "like methyl" then no need to sample
-
-        # for i,j,k,l we check side_j and side_k
-        # we check twice because any side works
-
         side_j_index = dihedral_indices[1] + 1  # convert to 1 based index
         side_k_index = dihedral_indices[2] + 1  # convert to 1 based index
 
         side_equiv = False
         max_equiv_atoms = 0
 
-        # check j and k side of dihedral
         for a, b in [(side_j_index, side_k_index),
                      (side_k_index, side_j_index)]:
 
-            # check equiv_atoms on one dihedral atom
             if atom_info_dict[a]["AtomicSymbol"] == "C":
                 one_based_connected_atom_numbers = atom_info_dict[a][
                     "ConnectedAtomsNumbers"]
                 connected_set = set(one_based_connected_atom_numbers)
-                connected_set = connected_set - {
-                    b
-                }  # remove the other dihedral atom
+                connected_set = connected_set - {b}
 
                 for equiv_g in one_based_equiv_atoms_groups:
                     if connected_set.issubset(set(equiv_g)):
@@ -168,7 +166,6 @@ class ConformerGenerator:
         side_j_index = dihedral_indices[1] + 1  # convert to 1 based index
         side_k_index = dihedral_indices[2] + 1  # convert to 1 based index
 
-        # check j and k side of dihedral
         for a, b in [(side_j_index, side_k_index),
                      (side_k_index, side_j_index)]:
 
@@ -176,9 +173,7 @@ class ConformerGenerator:
                 one_based_connected_atom_numbers = atom_info_dict[a][
                     "ConnectedAtomsNumbers"]
                 connected_set = set(one_based_connected_atom_numbers)
-                connected_set = connected_set - {
-                    b
-                }  # remove the other dihedral atom
+                connected_set = connected_set - {b}
                 connected_elements = [
                     atom_info_dict[idx]["AtomicSymbol"]
                     for idx in connected_set
@@ -206,14 +201,12 @@ class ConformerGenerator:
             mmff_gen.write_gromacs_files(filename=top_file_name)
         else:
             mmff_gen.write_openmm_files(filename=top_file_name)
-        # make sure to sync the ranks after the top file is written
         self._comm.barrier()
 
         atom_info_dict = deepcopy(mmff_gen.atom_info_dict)
         rotatable_bonds = deepcopy(mmff_gen.rotatable_bonds)
         dihedrals_dict = deepcopy(mmff_gen.dihedrals)
 
-        # remove freeze_atoms from rotatable_bonds
         if self.freeze_atoms is not None:
             freeze_set = set(self.freeze_atoms)
             new_rotatable_bonds = []
@@ -226,7 +219,6 @@ class ConformerGenerator:
             )
             self.ostream.flush()
 
-        # convert to zero based index
         rotatable_bonds_zero_based = [(i - 1, j - 1) for (i, j) in rotatable_bonds]
         rotatable_dihedrals_dict = {}
 
@@ -236,7 +228,6 @@ class ConformerGenerator:
             else:
                 return periodicity
 
-        # only pick one dihedral for each rotatable bond
         for (i, j, k, l), dih in dihedrals_dict.items():
 
             sorted_bond = tuple(sorted([j, k]))
@@ -258,7 +249,6 @@ class ConformerGenerator:
 
         dihedrals_candidates = []
 
-        # needed by _check_equivside_in_dihedrals
         one_based_equiv_atoms_groups = self._analyze_equiv(molecule)
 
         for k, v in rotatable_dihedrals_dict.items():
@@ -278,11 +268,9 @@ class ConformerGenerator:
 
             dih_index = v["dihedral_indices"]
 
-            # skip dihedral angle involving methyl group
             if self._check_methyl_group(dih_index, atom_info_dict):
                 continue
 
-            # look for equiv_atoms, and skip if number of equiv_atoms equals max_periodicity
             side_equiv, max_equiv_atoms = self._check_equivside_in_dihedrals(
                 dih_index, atom_info_dict, one_based_equiv_atoms_groups)
             if side_equiv and max_equiv_atoms == max_periodicity:
@@ -293,9 +281,7 @@ class ConformerGenerator:
         return dihedrals_candidates, atom_info_dict, dihedrals_dict
 
     def _get_dihedral_combinations(self, dihedrals_candidates):
-
-        # assemble all possible combinations of dihedrals
-
+        """Full combinatorial grid — original behaviour."""
         dih_angles = [i[1] for i in dihedrals_candidates]
         dihedrals_combinations = list(itertools.product(*dih_angles))
         dihedral_list = [i[0] for i in dihedrals_candidates]
@@ -306,21 +292,106 @@ class ConformerGenerator:
 
         return dihedrals_combinations, dihedral_list
 
+    def _get_mc_combinations(self, dihedrals_candidates):
+        """
+        Monte Carlo random sampling of dihedral angle combinations.
+
+        Instead of the full Cartesian product, ``mc_steps`` combinations are
+        drawn by independently and uniformly sampling one angle from each
+        dihedral's discrete grid.  Duplicate draws are silently discarded so
+        the actual number of conformers is at most ``mc_steps`` (and can be
+        less if the search space is small — in that case every unique
+        combination is kept).
+
+        The grid angles defined per-bond in ``_get_dihedral_candidates`` are
+        respected: only angles that would be visited by the grid search are
+        eligible.  This keeps the MC sampling physically meaningful (angles
+        correspond to periodicity minima) while avoiding the combinatorial
+        explosion.
+
+        Parameters
+        ----------
+        dihedrals_candidates : list of (dihedral_indices, angle_list) tuples
+            as returned by ``_get_dihedral_candidates``
+
+        Returns
+        -------
+        dihedrals_combinations : list of tuples
+            Each tuple contains one angle per rotatable bond.
+        dihedral_list : list of (i,j,k,l) tuples
+            Atom index quadruplets, same order as each combination tuple.
+        """
+        rng = np.random.default_rng(self.mc_seed)
+
+        dih_angles  = [candidate[1] for candidate in dihedrals_candidates]
+        dihedral_list = [candidate[0] for candidate in dihedrals_candidates]
+
+        # Maximum unique combinations possible given the discrete grids
+        max_unique = 1
+        for angles in dih_angles:
+            max_unique *= len(angles)
+
+        n_steps = min(self.mc_steps, max_unique)
+
+        if n_steps < self.mc_steps:
+            self.ostream.print_info(
+                f"MC search: requested {self.mc_steps} steps but search space "
+                f"has only {max_unique} unique combinations — "
+                f"switching to full grid search for this molecule."
+            )
+            self.ostream.flush()
+            return self._get_dihedral_combinations(dihedrals_candidates)
+
+        # Draw unique combinations by sampling with replacement and
+        # deduplicating.  For large spaces this converges quickly; for small
+        # spaces (caught above) we already fall back to grid search.
+        seen = set()
+        dihedrals_combinations = []
+
+        # Draw in batches to avoid an O(n²) loop for large mc_steps
+        batch = n_steps
+        while len(dihedrals_combinations) < n_steps:
+            # Sample one random angle per bond for `batch` independent draws
+            samples = np.array(
+                [rng.choice(angles, size=batch) for angles in dih_angles]
+            ).T   # shape: (batch, n_bonds)
+
+            for row in samples:
+                key = tuple(row)
+                if key not in seen:
+                    seen.add(key)
+                    dihedrals_combinations.append(key)
+                    if len(dihedrals_combinations) == n_steps:
+                        break
+
+        self.ostream.print_info(
+            f"MC search: {n_steps} random conformers will be generated "
+            f"(search space: {max_unique} combinations, "
+            f"{len(dih_angles)} rotatable bonds)."
+        )
+        self.ostream.flush()
+
+        return dihedrals_combinations, dihedral_list
+
     def _get_mol_comb(self, molecule, top_file_name, dihedrals_candidates):
+        """
+        Assemble the dihedral-combination array for broadcast.
+        Dispatches to grid search or MC sampling depending on ``self.mc_search``.
+        """
+        if self.mc_search:
+            dihedrals_combinations, dihedral_list = self._get_mc_combinations(
+                dihedrals_candidates)
+        else:
+            dihedrals_combinations, dihedral_list = self._get_dihedral_combinations(
+                dihedrals_candidates)
 
-        dihedrals_combinations, dihedral_list = self._get_dihedral_combinations(
-            dihedrals_candidates)
-
-        # assemble the dihedral and the angle to a dict
         conformation_dih_dict = []
         for i in range(len(dihedrals_combinations)):
             combo = np.array(dihedrals_combinations[i]).reshape(-1, 1)
             conformation_dih_dict.append(np.hstack((dihedral_list, combo)))
 
-        # make an array to store the dihedral conformation_dih_dict for broadcast
         dih_comb_array = np.array(conformation_dih_dict)
 
-        # should be aware that dihedral_dict count atom index from 0, but molecule to set dihedral count from 1
         return dih_comb_array
 
     def _init_openmm_system(self, topology_file, implicit_solvent_model):
@@ -368,7 +439,6 @@ class ConformerGenerator:
                     f"Using implicit solvent model {implicit_solvent_model}")
                 self.ostream.flush()
 
-        # platform settings for small molecule
         platform = Platform.getPlatformByName("CPU")
         platform.setPropertyDefaultValue("Threads", "1")
 
@@ -401,7 +471,6 @@ class ConformerGenerator:
 
         coords_nm = molecule.get_coordinates_in_angstrom() * 0.1
         simulation.context.setPositions(coords_nm * nanometer)
-        #freeze atoms if specified
         if self.freeze_atoms is not None:
             for atom_idx in self.freeze_atoms:
                 simulation.system.setParticleMass(atom_idx, 0.0 * dalton)
@@ -411,12 +480,9 @@ class ConformerGenerator:
         state = simulation.context.getState(
             getPositions=True,
             getEnergy=True,
-            # getForces=True,
         )
 
-        energy = state.getPotentialEnergy().value_in_unit_system(
-            md_unit_system)
-        # convert to angstrom
+        energy = state.getPotentialEnergy().value_in_unit_system(md_unit_system)
         optimized_coords = state.getPositions(
             asNumpy=True).value_in_unit_system(md_unit_system) * 10
 
@@ -440,7 +506,6 @@ class ConformerGenerator:
             mmff_gen.write_gromacs_files(filename=top_file_name)
         else:
             mmff_gen.write_openmm_files(filename=top_file_name)
-        # make sure to sync the ranks after the top file is written
         self._comm.barrier()
 
         if self._rank == mpi_master():
@@ -462,7 +527,6 @@ class ConformerGenerator:
 
     def generate(self, molecule):
 
-        # sanity check
         if self.implicit_solvent_model is not None:
             self.use_gromacs_files = False
 
@@ -477,8 +541,7 @@ class ConformerGenerator:
         comm = self._comm
         rank = self._comm.Get_rank()
         size = self._comm.Get_size()
-        #default partial charges are RESP charges: self.resp_charges is True and partial_charges is None as default 
-        #if the user provides partial charges, then skip RESP charges calculation
+
         if self.resp_charges and (self.partial_charges is None):
             basis = MolecularBasis.read(molecule, "6-31g*")
             self.partial_charges = self.resp_charges_driver.compute(
@@ -488,7 +551,6 @@ class ConformerGenerator:
             self._get_dihedral_candidates(molecule, top_file_name,
                                           self.partial_charges))
 
-        # exit early if there is no candidate dihedral to rotate
         if not dihedrals_candidates:
             self.ostream.print_info(
                 "No rotatable bond found, no new conformer will be generated.")
@@ -512,6 +574,27 @@ class ConformerGenerator:
             else:
                 return None
 
+        # --- Log which search strategy is being used ----------------------
+        if rank == mpi_master():
+            if self.mc_search:
+                self.ostream.print_info(
+                    f"ConformerGenerator: using Monte Carlo random sampling "
+                    f"({self.mc_steps} steps, seed={self.mc_seed})."
+                )
+            else:
+                # Warn the user if the grid is going to be very large
+                grid_size = 1
+                for _, angles in dihedrals_candidates:
+                    grid_size *= len(angles)
+                if grid_size > 10000:
+                    self.ostream.print_warning(
+                        f"ConformerGenerator: grid search will generate "
+                        f"{grid_size} conformers ({len(dihedrals_candidates)} "
+                        f"rotatable bonds). Consider setting mc_search=True "
+                        f"with mc_steps=500 to limit the search."
+                    )
+            self.ostream.flush()
+
         if rank == mpi_master():
             conformation_dih_arr = self._get_mol_comb(molecule, top_file_name,
                                                       dihedrals_candidates)
@@ -529,12 +612,6 @@ class ConformerGenerator:
         dih_comb_arr_rank = conformation_dih_arr[displs[rank]:displs[rank] +
                                                  counts[rank]].copy()
 
-        # generate conformers based on the dihedral combinations and based on
-        # previous conformer to save time
-
-        # each rank will generate the conformers based on the assigned dihedral
-        # combinations
-
         conf_start_time = time.time()
 
         conformations = []
@@ -544,7 +621,6 @@ class ConformerGenerator:
                 new_molecule = Molecule(conformations[-1])
                 old_dih_settings = dih_comb_arr_rank[i - 1][:, 4]
                 new_dih_settings = dih_comb_arr_rank[i][:, 4]
-                # compare the difference between the two sets and only update the dihedrals that are different
                 diff_dih_ind = np.where(
                     old_dih_settings != new_dih_settings)[0]
             else:
@@ -570,8 +646,6 @@ class ConformerGenerator:
         self.ostream.print_info(info)
         self.ostream.flush()
 
-        # optimize energy and coordinates for each conformation
-
         opt_start_time = time.time()
 
         simulation = self._init_openmm_system(top_file_name,
@@ -596,30 +670,23 @@ class ConformerGenerator:
         self.ostream.print_info(info)
         self.ostream.flush()
 
-        # sort and select energy_coords
         if self.number_of_conformers_to_select is None:
             self.number_of_conformers_to_select = num_total_conformers
         sorted_energy_coords = sorted(
             energy_coords,
             key=lambda x: x[0])[:self.number_of_conformers_to_select]
 
-        # gather energy and opt_coords
         gathered_energy_coords = comm.gather(sorted_energy_coords,
                                              root=mpi_master())
 
         if rank == mpi_master():
-            # now we have all optimized conformer and energy, so we can analyze
-            # the energy and get the lowest energy conformer reshape the
-            # all_energy_coords to a list
             all_sel_energy_coords = [
                 ene_coord for local_energy_coords in gathered_energy_coords
                 for ene_coord in local_energy_coords
             ]
 
-            # sort all_energy_coords
             all_sorted_energy_coords = sorted(all_sel_energy_coords,
                                               key=lambda x: x[0])
-            # get the lowest energy conformer
             min_energy, min_coords_angstrom = all_sorted_energy_coords[0]
             min_mol = Molecule(molecule)
             for iatom in range(min_mol.number_of_atoms()):
@@ -632,7 +699,6 @@ class ConformerGenerator:
             self.global_minimum_conformer = min_mol
             self.global_minimum_energy = min_energy
 
-            # return conformers info
             conformers_dict = {
                 'energies': [],
                 'molecules': [],
@@ -695,7 +761,6 @@ class ConformerGenerator:
                 filtered_geometries[:self.number_of_conformers_to_select],
             }
 
-            # save the selected conformers to file
             if self.save_xyz_files:
                 if self.save_path is None:
                     save_path = Path("selected_conformers")
