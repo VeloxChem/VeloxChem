@@ -2407,9 +2407,9 @@ class IMForceFieldGenerator:
             org_roots = None
             if isinstance(drivers[0], LinearResponseEigenSolver) or isinstance(drivers[0], TdaEigenSolver):           
                     org_roots = drivers[1].state_deriv_index
-
+            label_counter = 0
             for mol_basis in entries:
-                label_counter = 0
+                
                 if isinstance(drivers[0], LinearResponseEigenSolver) or isinstance(drivers[0], TdaEigenSolver):
                     root_to_follow_calc = mol_basis[4]           
                     drivers[1].state_deriv_index = root_to_follow_calc 
