@@ -1048,9 +1048,9 @@ class IMForceFieldGenerator:
     
                             if self.use_minimized_structures[0]:
                                 transition = False
-                                constraints_global = []
+                                constraints_global = self.use_minimized_structures[1]
                                 if dih_key:
-                                    constraints_global = [dih_key]
+                                    constraints_global.append([dih_key])
                                 if mode == 'transition':
                                     transition = True
                                     constraints_global = []
@@ -1112,7 +1112,7 @@ class IMForceFieldGenerator:
                                             energy = opt_results['opt_energies'][-1]
                                             print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', molecule.get_xyz_string())
                                             current_basis = MolecularBasis.read(optimized_molecule, states_basis['es'])
-                                            molecules_to_add_info.append((optimized_molecule, current_basis, self.roots_to_follow))
+                                            molecules_to_add_info.append((optimized_molecule, current_basis, self.roots_to_follow, constraints_global))
 
                                     # self.add_point(molecules_to_add_info, self.states_interpolation_settings, symmetry_information=self.symmetry_information)
 
@@ -1120,10 +1120,10 @@ class IMForceFieldGenerator:
                             else:
                                 if self.roots_to_follow[0] == 0:
                                     current_basis = MolecularBasis.read(mol, states_basis['gs'])
-                                    molecules_to_add_info.append((mol, current_basis, self.roots_to_follow))
+                                    molecules_to_add_info.append((mol, current_basis, self.roots_to_follow, []))
                                 else:
                                     current_basis = MolecularBasis.read(mol, states_basis['es'])
-                                    molecules_to_add_info.append((mol, current_basis, self.roots_to_follow))
+                                    molecules_to_add_info.append((mol, current_basis, self.roots_to_follow, []))
 
                         self.add_point(molecules_to_add_info, self.states_interpolation_settings, symmetry_information=self.symmetry_information)
 
@@ -1203,10 +1203,10 @@ class IMForceFieldGenerator:
                 
                 if self.roots_to_follow[0] == 0:
                     current_basis = MolecularBasis.read(molecule, states_basis['gs'])
-                    molecules_to_add_info.append((molecule, current_basis, self.roots_to_follow))
+                    molecules_to_add_info.append((molecule, current_basis, self.roots_to_follow, []))
                 else:
                     current_basis = MolecularBasis.read(molecule, states_basis['es'])
-                    molecules_to_add_info.append((molecule, current_basis, self.roots_to_follow))
+                    molecules_to_add_info.append((molecule, current_basis, self.roots_to_follow, []))
 
             self.density_of_datapoints, self.molecules_along_rp, self.allowed_deviation = self.determine_molecules_along_dihedral_scan(molecules_to_add_info, self.roots_to_follow, specific_dihedrals=self.dihedrals_dict)
             density_of_datapoints = self.determine_datapoint_density(self.density_of_datapoints, self.states_interpolation_settings)
@@ -1433,7 +1433,7 @@ class IMForceFieldGenerator:
         point_densities = {root: {} for root in roots_to_follow}
         allowed_deviation = {root: {} for root in roots_to_follow}
         
-        molecules_info = {states[0]: molecule for molecule, _, states in molecules_to_add_info}
+        molecules_info = {states[0]: molecule for molecule, _, states, _ in molecules_to_add_info}
 
         if specific_dihedrals is not None:
             for entries in specific_dihedrals:
@@ -2409,7 +2409,8 @@ class IMForceFieldGenerator:
                     org_roots = drivers[1].state_deriv_index
             label_counter = 0
             for mol_basis in entries:
-                
+                if not mol_basis[5]:
+                    label_counter = 0
                 if isinstance(drivers[0], LinearResponseEigenSolver) or isinstance(drivers[0], TdaEigenSolver):
                     root_to_follow_calc = mol_basis[4]           
                     drivers[1].state_deriv_index = root_to_follow_calc 

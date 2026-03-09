@@ -186,6 +186,8 @@ class ConformerGenerator:
                 ]
                 if tuple(connected_elements) == ("H", "H", "H"):
                     return True
+                elif tuple(connected_elements) == ("F", "F", "F"):
+                    return True
 
         return False
 
