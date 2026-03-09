@@ -729,7 +729,7 @@ class VibrationalAnalysis:
             lr_drv.update_settings(self.rsp_dict, self.method_dict)
             lr_drv.damping = polgrad_drv.damping
             # get absorption cross section from CPP calculations
-            lr_drv.cpp_flag = 'absorption'
+            lr_drv.property = 'absorption'
             # don't save the solution vectors
             lr_drv.save_solutions = False
             if 'frequencies' not in self.rsp_dict:

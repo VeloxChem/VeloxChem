@@ -163,7 +163,8 @@ def select_rsp_property(task, mol_orbs, rsp_dict, method_dict):
         rsp_prop = Absorption(rsp_dict, method_dict)
 
     elif prop_type in [
-            'linear absorption cross-section',
+            'linear absorption cross-section (cpp)',
+            'linear absorption cross-section(cpp)',
             'linear absorption (cpp)',
             'linear absorption(cpp)',
             'absorption (cpp)',
@@ -172,7 +173,8 @@ def select_rsp_property(task, mol_orbs, rsp_dict, method_dict):
         rsp_prop = LinearAbsorptionCrossSection(rsp_dict, method_dict)
 
     elif prop_type in [
-            'circular dichroism spectrum',
+            'circular dichroism spectrum (cpp)',
+            'circular dichroism spectrum(cpp)',
             'circular dichroism (cpp)',
             'circular dichroism(cpp)',
             'ecd (cpp)',
