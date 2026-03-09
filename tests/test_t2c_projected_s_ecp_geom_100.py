@@ -77,12 +77,11 @@ class TestProjectedSECPGeom100Driver:
                     print("Calculated :", cmat.to_numpy())
                     print("Reference :", rmat.to_numpy())
                     print(np.max(np.abs(cmat.to_numpy()-rmat.to_numpy())))
-                    print(np.max(np.abs(cmat.to_numpy()-rmat.to_numpy())))
                     #assert cmat == rmat
             smat = fmat.full_matrix()
             fref = SubMatrix([0, 0, 42, 42])
             fref.set_values(np.ascontiguousarray(ref_mat[k]))
-            #assert smat == fref
+            assert smat == fref
         
         print(ref_mat.shape)
         

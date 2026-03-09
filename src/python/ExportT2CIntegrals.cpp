@@ -59,6 +59,7 @@
 #include "ProjectedCorePotentialGeomX00Driver.hpp"
 #include "LocalCorePotentialGeomX00Driver.hpp"
 #include "LocalCorePotentialGeomX0YDriver.hpp"
+#include "LocalCorePotentialGeom0X0Driver.hpp"
 
 namespace vlx_t2cintegrals {
 
@@ -534,6 +535,18 @@ export_t2cintegrals(py::module& m)
                const int                                  jatom)
                 -> CMatrices { return geom_drv.compute(basis, molecule, ecp_potential, iatom, jatom); },
             "Computes projected core potential first derivatives matrices for given molecule, basis and selected atoms.");
+    
+    // CLocalCorePotentialGeom010Driver class
+    PyClass<CLocalCorePotentialGeom0X0Driver<1>>(m, "LocalECPGeom010Driver")
+        .def(py::init<>())
+        .def(
+            "compute",
+            [](const CLocalCorePotentialGeom0X0Driver<1>& geom_drv,
+               const CMolecule&                           molecule,
+               const CMolecularBasis&                     basis,
+               const CBaseCorePotential&                  ecp_potential)
+                -> CMatrices { return geom_drv.compute(basis, molecule, ecp_potential); },
+            "Computes projected core potential first derivatives matrices for given molecule, basis.");
 }
 
 }  // namespace vlx_t2cintegrals
