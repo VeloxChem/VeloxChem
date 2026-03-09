@@ -6,6 +6,7 @@ import pickle
 import pytest
 import math
 import sys
+from unittest.mock import Mock
 
 from veloxchem.veloxchemlib import Point
 from veloxchem.veloxchemlib import bohr_in_angstrom, mpi_master
@@ -1379,6 +1380,30 @@ class TestMolecule:
         mol = Molecule.read_smiles('OO')
         assert not mol.is_water_molecule()
 
+    @pytest.mark.skipif("rdkit" not in sys.modules,
+                        reason="rdkit not available")
+    def test_smiles_to_xyz_returns_xyz_for_both_hydrogen_options(self):
+
+        xyz_with_hydrogen = Molecule.smiles_to_xyz('O', hydrogen=True)
+        xyz_without_hydrogen = Molecule.smiles_to_xyz('O', hydrogen=False)
+
+        assert isinstance(xyz_with_hydrogen, str)
+        assert isinstance(xyz_without_hydrogen, str)
+        assert int(xyz_with_hydrogen.splitlines()[0]) == 3
+        assert int(xyz_without_hydrogen.splitlines()[0]) == 1
+
+    @pytest.mark.skipif("rdkit" not in sys.modules,
+                        reason="rdkit not available")
+    def test_draw_2d_uses_display(self, monkeypatch):
+
+        ipython_display = pytest.importorskip("IPython.display")
+        display_mock = Mock()
+        monkeypatch.setattr(ipython_display, "display", display_mock)
+
+        Molecule.draw_2d('O', width=200, height=100)
+
+        display_mock.assert_called_once()
+
     def test_is_water_molecule_requires_water_connectivity(self):
 
         mol = Molecule.read_molecule_string("""O  0.000  0.000  0.000
@@ -1390,3 +1415,22 @@ class TestMolecule:
                                                H  0.000  0.000  5.000
                                                H  0.000  5.000  0.000""")
         assert not mol.is_water_molecule()
+
+    def test_contains_water_molecule(self):
+
+        mol = Molecule.read_molecule_string(self.nh3_h2o_xyzstr(), 'au')
+        assert mol.contains_water_molecule()
+
+        mol = Molecule.read_molecule_string(self.nh3_xyzstr(), 'au')
+        assert not mol.contains_water_molecule()
+
+        mol = Molecule.read_molecule_string(
+            """N  -3.710   3.019  -0.037
+                                               H  -3.702   4.942   0.059
+                                               H  -4.704   2.415   1.497
+                                               H  -4.780   2.569  -1.573
+                                               O   0.000   0.000  -1.000
+                                               H   0.000   0.000   4.000
+                                               H   0.000   4.000  -1.000""",
+            'au')
+        assert not mol.contains_water_molecule()

@@ -77,7 +77,7 @@ def _Molecule_smiles_to_xyz(smiles_str, optimize=True, hydrogen=True):
     :param optimize:
         Boolean indicating whether to perform geometry optimization.
     :param hydrogen:
-        Boolean indicating whether to remove hydrogens.
+        Boolean indicating whether to include hydrogens.
 
     :return:
         An xyz string (including number of atoms).
@@ -99,7 +99,7 @@ def _Molecule_smiles_to_xyz(smiles_str, optimize=True, hydrogen=True):
         if hydrogen:
             return Chem.MolToXYZBlock(mol_full)
         else:
-            return Chem.RemoveHs(mol_full)
+            return Chem.MolToXYZBlock(Chem.RemoveHs(mol_full))
 
     except ImportError:
         raise ImportError('Unable to import rdkit.')
@@ -1512,14 +1512,13 @@ def _Molecule_draw_2d(smiles_str, width=400, height=300):
 
     try:
         from rdkit import Chem
+        from rdkit.Chem import Draw
         from IPython.display import SVG
         from IPython.display import display
 
-        mol_no_hydrogen = Molecule.smiles_to_xyz(smiles_str,
-                                                 optimize=True,
-                                                 hydrogen=False)
+        mol_no_hydrogen = Chem.RemoveHs(Chem.MolFromSmiles(smiles_str))
 
-        drawer = Chem.Draw.rdMolDraw2D.MolDraw2DSVG(width, height)
+        drawer = Draw.rdMolDraw2D.MolDraw2DSVG(width, height)
         drawer.DrawMolecule(mol_no_hydrogen)
         drawer.FinishDrawing()
 
