@@ -697,12 +697,24 @@ class ConformerGenerator:
     @staticmethod
     def _ring_coords_from_cremer_pople(ring_coords_ref, cp_params):
         """
-        Given a reference ring geometry and target CP parameters, reconstruct
-        new ring atom positions that have the desired puckering.
+        Reconstruct ring atom positions with target Cremer-Pople puckering.
 
-        Strategy: keep the mean plane and bond lengths/angles from the
-        reference; only the out-of-plane displacements z_j are replaced by
-        values computed from the target CP parameters.
+        Strategy
+        --------
+        Rather than patching the in-plane positions from the reference
+        (which can be distorted), we:
+
+        1. Place N atoms on a regular polygon in the XY plane with radius
+           equal to the mean in-plane radius of the reference ring.  This
+           gives an ideal, undistorted mean plane.
+        2. Compute the target out-of-plane displacements z_j from the CP
+           parameters.
+        3. Add z_j along the plane normal (Z axis).
+        4. Rotate and translate the result so the centroid and orientation
+           match the reference ring (so substituents stay attached).
+
+        This guarantees that the output ring has *exactly* the requested
+        puckering with no in-plane distortion artefacts.
 
         Parameters
         ----------
@@ -714,34 +726,38 @@ class ConformerGenerator:
         new_coords : (N, 3) ring atom positions with target puckering
         """
         coords = np.asarray(ring_coords_ref, dtype=float)
-        N = len(coords)
+        N      = len(coords)
+        j      = np.arange(N, dtype=float)
 
+        # ── 1. Mean in-plane radius from reference ────────────────────────
         centroid = coords.mean(axis=0)
-        r = coords - centroid
+        r        = coords - centroid
 
-        # Reference mean-plane normal (same as in analysis)
-        R1 = np.sum([r[j] * np.sin(2 * np.pi * j / N) for j in range(N)], axis=0)
-        R2 = np.sum([r[j] * np.cos(2 * np.pi * j / N) for j in range(N)], axis=0)
-        n  = np.cross(R1, R2)
-        if np.linalg.norm(n) < 1e-10:
-            # Fallback: use z-axis
-            n = np.array([0., 0., 1.])
-        n /= np.linalg.norm(n)
+        # Reference mean-plane normal
+        R1 = np.sum([r[k] * np.sin(2*np.pi*k/N) for k in range(N)], axis=0)
+        R2 = np.sum([r[k] * np.cos(2*np.pi*k/N) for k in range(N)], axis=0)
+        n_ref = np.cross(R1, R2)
+        if np.linalg.norm(n_ref) < 1e-10:
+            n_ref = np.array([0., 0., 1.])
+        n_ref /= np.linalg.norm(n_ref)
 
-        # In-plane components (project out the normal)
-        r_ip = r - np.outer(r @ n, n)   # (N, 3) in-plane displacements
+        # In-plane displacements and mean radius
+        r_ip   = r - np.outer(r @ n_ref, n_ref)
+        R_mean = np.mean(np.linalg.norm(r_ip, axis=1))
 
-        # Build target z_j from CP parameters
-        j = np.arange(N, dtype=float)
+        # ── 2. Ideal polygon in XY plane ──────────────────────────────────
+        phi0    = np.arctan2(r_ip[0, 1], r_ip[0, 0])   # align atom 0 to ref
+        angles  = 2 * np.pi * j / N + phi0
+        xy      = R_mean * np.column_stack([np.cos(angles), np.sin(angles)])
+
+        # ── 3. Target z_j from CP parameters ─────────────────────────────
         if N == 5:
             Q   = cp_params['Q']
             phi = cp_params['phi']
             A2  = Q * np.cos(phi)
             B2  = Q * np.sin(phi)
-            z_new = np.sqrt(2 / N) * (
-                A2 * np.cos(4 * np.pi * j / N) -
-                B2 * np.sin(4 * np.pi * j / N)
-            )
+            z_new = np.sqrt(2/N) * (
+                A2 * np.cos(4*np.pi*j/N) - B2 * np.sin(4*np.pi*j/N))
 
         elif N == 6:
             Q     = cp_params['Q']
@@ -754,25 +770,40 @@ class ConformerGenerator:
             z_new = (
                 np.sqrt(1/3) * (A2 * np.cos(2*np.pi*j*2/6) -
                                 B2 * np.sin(2*np.pi*j*2/6)) +
-                (1/np.sqrt(6)) * q3 * np.cos(np.pi * j)
-            )
+                (1/np.sqrt(6)) * q3 * np.cos(np.pi * j))
 
         else:  # N == 7
-            Q2   = cp_params['Q2']
-            phi2 = cp_params['phi2']
-            Q3   = cp_params['Q3']
-            phi3 = cp_params['phi3']
-            A2 = Q2 * np.cos(phi2); B2 = Q2 * np.sin(phi2)
-            A3 = Q3 * np.cos(phi3); B3 = Q3 * np.sin(phi3)
+            Q2, phi2 = cp_params['Q2'], cp_params['phi2']
+            Q3, phi3 = cp_params['Q3'], cp_params['phi3']
+            A2 = Q2*np.cos(phi2); B2 = Q2*np.sin(phi2)
+            A3 = Q3*np.cos(phi3); B3 = Q3*np.sin(phi3)
             z_new = (
-                np.sqrt(2/7) * (A2 * np.cos(2*np.pi*j*2/7) -
-                                B2 * np.sin(2*np.pi*j*2/7)) +
-                np.sqrt(2/7) * (A3 * np.cos(2*np.pi*j*3/7) -
-                                B3 * np.sin(2*np.pi*j*3/7))
-            )
+                np.sqrt(2/7) * (A2*np.cos(2*np.pi*j*2/7) -
+                                B2*np.sin(2*np.pi*j*2/7)) +
+                np.sqrt(2/7) * (A3*np.cos(2*np.pi*j*3/7) -
+                                B3*np.sin(2*np.pi*j*3/7)))
 
-        # Reconstruct: in-plane part + new out-of-plane part
-        new_coords = centroid + r_ip + np.outer(z_new, n)
+        # ── 4. Assemble in local frame (XY plane + Z normal) ─────────────
+        new_local = np.column_stack([xy, z_new])   # (N, 3) in local frame
+
+        # ── 5. Rotate local frame to match reference orientation ──────────
+        # We want the local Z axis to align with n_ref, and local X to align
+        # with the in-plane direction of atom 0 in the reference.
+        z_axis = np.array([0., 0., 1.])
+
+        # Rotation: local Z → n_ref
+        v    = np.cross(z_axis, n_ref)
+        c    = np.dot(z_axis, n_ref)
+        if np.linalg.norm(v) < 1e-10:
+            R_zn = np.eye(3) if c > 0 else np.diag([1., 1., -1.])
+        else:
+            s    = np.linalg.norm(v)
+            K    = np.array([[0, -v[2], v[1]],
+                              [v[2], 0, -v[0]],
+                              [-v[1], v[0], 0]])
+            R_zn = np.eye(3) + K + K @ K * ((1 - c) / s**2)
+
+        new_coords = new_local @ R_zn.T + centroid
         return new_coords
 
     def _cp_grid(self, N, Q, n_pts):
