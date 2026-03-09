@@ -627,35 +627,21 @@ class IMForceFieldGenerator:
 
             conf_molecule_xyz = conformal_structures['molecules'][0].get_xyz_string()
 
-            for entry_idx, entries in enumerate(dihedral_canditates[:]):
-                
-                dihedral = entries[0]
-                dih_key = tuple([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1])
-                periodicity = len(entries[1])
-                conformers_plus_ts[0][dih_key] = []
-                for i in range(len(entries[1])):
-                    conformers_plus_ts[0][dih_key].append((conformal_structures['molecules'][i], 'normal'))
-                    print(conformal_structures['molecules'][i].get_xyz_string())
+            if len(dihedral_canditates) > 0:
+                for entry_idx, entries in enumerate(dihedral_canditates[:]):
                     
-                #     current_molecule = Molecule.from_xyz_string(conf_molecule_xyz)
-                #     current_molecule.set_charge(molecule.get_charge())
-                #     current_molecule.set_multiplicity(molecule.get_multiplicity())
-                #     if i + 1 < len(entries[1]):
-                #         new_angle = entries[1][i] - (entries[1][i + 1]/periodicity)
-                #         current_molecule.set_dihedral_in_degrees([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1], new_angle)
-                #         constriant = [dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1]
-                #         conformal_structures['molecules'].append((current_molecule, constriant))
-                #         print(new_angle)
-                #     else:
-                #         new_angle = entries[1][i] - (entries[1][i]/2)
-                #         current_molecule.set_dihedral_in_degrees([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1], new_angle)
-                #         constriant = [dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1]
-                #         conformal_structures['molecules'].append((current_molecule, constriant))
-                #         print(new_angle)
+                    dihedral = entries[0]
+                    dih_key = tuple([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1])
+                    periodicity = len(entries[1])
+                    conformers_plus_ts[0][dih_key] = []
+                    for i in range(len(entries[1])):
+                        conformers_plus_ts[0][dih_key].append((conformal_structures['molecules'][i], 'normal'))
+                        print(conformal_structures['molecules'][i].get_xyz_string())
 
-                _, ts_molecule = self.determine_atom_transfer_reaction_path([conformers_plus_ts[0][dih_key][-2][0]], [conformers_plus_ts[0][dih_key][-1][0]], scf=False)
-                conformers_plus_ts[0][dih_key].append((ts_molecule, 'transition'))
-
+                    _, ts_molecule = self.determine_atom_transfer_reaction_path([conformers_plus_ts[0][dih_key][-2][0]], [conformers_plus_ts[0][dih_key][-1][0]], scf=False)
+                    conformers_plus_ts[0][dih_key].append((ts_molecule, 'transition'))
+            else:
+                conformers_plus_ts[0][None] = [(conformal_structures['molecules'][0], 'normal')]
             self.conformal_structures = conformers_plus_ts
 
     def compute(self, molecule, states_basis=None):
@@ -1059,10 +1045,12 @@ class IMForceFieldGenerator:
                         dih_key, mol_info = mol_entries
 
                         for mol, mode in mol_info:
-                            print('start mol', mol.get_xyz_string())
+    
                             if self.use_minimized_structures[0]:
                                 transition = False
-                                constraints_global = [dih_key]
+                                constraints_global = []
+                                if dih_key:
+                                    constraints_global = [dih_key]
                                 if mode == 'transition':
                                     transition = True
                                     constraints_global = []
@@ -1086,7 +1074,7 @@ class IMForceFieldGenerator:
                                         energy = opt_results['opt_energies'][-1]
 
                                         current_basis = MolecularBasis.read(optimized_molecule, states_basis['gs'])
-                                        molecules_to_add_info.append((optimized_molecule, current_basis, self.roots_to_follow))
+                                        molecules_to_add_info.append((optimized_molecule, current_basis, self.roots_to_follow, constraints_global))
 
                                         print(optimized_molecule.get_xyz_string())
 
@@ -1103,7 +1091,7 @@ class IMForceFieldGenerator:
                                         energy = opt_results['opt_energies'][-1]
 
                                         current_basis = MolecularBasis.read(optimized_molecule, states_basis['gs'])
-                                        molecules_to_add_info.append((optimized_molecule, current_basis, self.roots_to_follow))
+                                        molecules_to_add_info.append((optimized_molecule, current_basis, self.roots_to_follow, constraints_global))
 
                                         print('Optimized mol', optimized_molecule.get_xyz_string(), transition)
 
@@ -1159,7 +1147,7 @@ class IMForceFieldGenerator:
                         energy = opt_results['opt_energies'][-1]
 
                         current_basis = MolecularBasis.read(optimized_molecule, states_basis['gs'])
-                        molecules_to_add_info.append((optimized_molecule, current_basis, self.roots_to_follow))
+                        molecules_to_add_info.append((optimized_molecule, current_basis, self.roots_to_follow, self.use_minimized_structures[1]))
 
                         print(optimized_molecule.get_xyz_string())
                     
@@ -1175,7 +1163,7 @@ class IMForceFieldGenerator:
                         energy = opt_results['opt_energies'][-1]
 
                         current_basis = MolecularBasis.read(optimized_molecule, states_basis['gs'])
-                        molecules_to_add_info.append((optimized_molecule, current_basis, self.roots_to_follow))
+                        molecules_to_add_info.append((optimized_molecule, current_basis, self.roots_to_follow, self.use_minimized_structures[1]))
 
                         print(optimized_molecule.get_xyz_string())
 
@@ -1196,7 +1184,7 @@ class IMForceFieldGenerator:
                             energy = opt_results['opt_energies'][-1]
                             print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', molecule.get_xyz_string())
                             current_basis = MolecularBasis.read(optimized_molecule, states_basis['es'])
-                            molecules_to_add_info.append((optimized_molecule, current_basis, self.roots_to_follow))
+                            molecules_to_add_info.append((optimized_molecule, current_basis, self.roots_to_follow, self.use_minimized_structures[1]))
                         
                     self.add_point(molecules_to_add_info, self.states_interpolation_settings, symmetry_information=self.symmetry_information)
 
@@ -1204,10 +1192,10 @@ class IMForceFieldGenerator:
                 else:
                     if self.roots_to_follow[0] == 0:
                         current_basis = MolecularBasis.read(molecule, states_basis['gs'])
-                        molecules_to_add_info.append((molecule, current_basis, self.roots_to_follow))
+                        molecules_to_add_info.append((molecule, current_basis, self.roots_to_follow, []))
                     else:
                         current_basis = MolecularBasis.read(molecule, states_basis['es'])
-                        molecules_to_add_info.append((molecule, current_basis, self.roots_to_follow))
+                        molecules_to_add_info.append((molecule, current_basis, self.roots_to_follow, []))
                     
                     self.add_point(molecules_to_add_info, self.states_interpolation_settings, symmetry_information=self.symmetry_information)
 
@@ -2277,6 +2265,7 @@ class IMForceFieldGenerator:
             molecule = entries[0]
             basis = entries[1]
             states = entries[2]
+            outside_constraints = entries[3]
             symmetry_point = False
             if 0 in states and len(symmetry_information['gs']) != 0 and len(symmetry_information['gs'][2]) != 0 or 1 in states and len(symmetry_information['gs']) != 0 and self.drivers['es'][0].spin_flip and len(symmetry_information['gs'][2]) != 0:
                 symmetry_mapping_groups = [item for item in range(len(molecule.get_labels()))]
@@ -2295,7 +2284,7 @@ class IMForceFieldGenerator:
                     cur_molecule.set_charge(molecule.get_charge())
                     cur_molecule.set_multiplicity(molecule.get_multiplicity())
                     dihedral_to_change = []
-                    constraints = []
+                    constraints = outside_constraints
                     for dihedral, angle in molecule_config.items():
                         opt_dihedral_angle = molecule.get_dihedral([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1], 'radian')
      
