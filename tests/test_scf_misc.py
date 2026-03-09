@@ -85,6 +85,19 @@ class TestScfDriverMiscellaneous:
             assert second_results["scf_energy"] == pytest.approx(
                 first_results["scf_energy"], abs=1.0e-10)
 
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    def test_conflicting_ri_modes_raise(self):
+
+        molecule, basis = self.get_water_and_basis()
+
+        def configure(driver):
+            driver.ri_coulomb = True
+            driver.ri_jk = True
+
+        with pytest.raises(AssertionError, match="either ri_coulomb or ri_jk"):
+            self.run_hf_scf(molecule, basis, configure)
+
     def test_grid_level_consistency(self):
 
         molecule, basis = self.get_water_and_basis()
