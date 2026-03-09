@@ -1000,7 +1000,7 @@ class EnsembleDriver:
         rsp_all = results["rsp_all"]
 
         spec_avg = SpectrumAverager(comm=self.comm, ostream=self.ostream)
-        return spec_avg.plot_uv_vis_spectra(
+        spec_avg.plot_uv_vis_spectra(
             rsp_all,
             energy_min_ev=energy_min_ev,
             energy_max_ev=energy_max_ev,
