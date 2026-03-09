@@ -271,7 +271,8 @@ class CpcmDriver:
 
         return gradA + gradB + gradC
 
-    def compute_excited_gradient(self, molecule, basis, density, density_ao, x_ao_as_mat):
+    def compute_excited_gradient(self, molecule, basis, density, density_ao,
+                                 x_ao_as_mat):
         """
         Compute CPCM excited state gradient contribution.
 
@@ -286,9 +287,14 @@ class CpcmDriver:
             The CPCM gradient contribution.
         """
 
-        grad_V_pol = self.grad_V_pol(molecule, basis, self._cpcm_grid, self._cpcm_sw_func, self._cpcm_precond, self._cpcm_q, self.epsilon, self.x, density, density_ao)
-    
-        grad_f_pol = self.grad_f_pol(molecule, basis, self._cpcm_grid, self._cpcm_sw_func, self._cpcm_precond, self.epsilon, self.x, x_ao_as_mat)
+        grad_V_pol = self.grad_V_pol(molecule, basis, self._cpcm_grid,
+                                     self._cpcm_sw_func, self._cpcm_precond,
+                                     self._cpcm_q, self.epsilon, self.x,
+                                     density, density_ao)
+
+        grad_f_pol = self.grad_f_pol(molecule, basis, self._cpcm_grid,
+                                     self._cpcm_sw_func, self._cpcm_precond,
+                                     self.epsilon, self.x, x_ao_as_mat)
 
         return grad_V_pol + grad_f_pol
 
@@ -759,8 +765,8 @@ class CpcmDriver:
         start = sum(counts[:self.rank])
         end = sum(counts[:self.rank + 1])
 
-        grad_Aij = cpcm_comp_grad_Aij(grid_coords, zeta, atom_indices, q, q, start,
-                                      end, natoms)
+        grad_Aij = cpcm_comp_grad_Aij(grid_coords, zeta, atom_indices, q, q,
+                                      start, end, natoms)
         grad_Aij *= (-0.5 / scale_f)
 
         return grad_Aij
@@ -971,8 +977,19 @@ class CpcmDriver:
         cg_solution = self.comm.bcast(cg_solution, root=mpi_master())
 
         return cg_solution
-    
-    def grad_V_pol(self, molecule, basis, grid, sw_f, precond, q, eps, x, DM, density_ao, cpcm_cg_thresh=1e-8):
+
+    def grad_V_pol(self,
+                   molecule,
+                   basis,
+                   grid,
+                   sw_f,
+                   precond,
+                   q,
+                   eps,
+                   x,
+                   DM,
+                   density_ao,
+                   cpcm_cg_thresh=1e-8):
         """
         Calculates the first contribution to the excited state gradient.
 
@@ -1004,8 +1021,8 @@ class CpcmDriver:
         """
 
         # First term
-        grad_V_pol = self.grad_C(molecule, basis, grid, q, density_ao) 
-    
+        grad_V_pol = self.grad_C(molecule, basis, grid, q, density_ao)
+
         # Second term
         C_rsp = self.form_vector_C(molecule, basis, grid, density_ao)
 
@@ -1016,19 +1033,46 @@ class CpcmDriver:
             rhs = None
         rhs = self.comm.bcast(rhs, root=mpi_master())
 
-        cpcm_rsp_q = self.cg_solve_parallel_direct(grid,
-                                                   sw_f,
-                                                   precond, rhs,
+        cpcm_rsp_q = self.cg_solve_parallel_direct(grid, sw_f, precond, rhs,
                                                    None, cpcm_cg_thresh)
 
-        grad_V_pol += self.grad_B(molecule, grid, cpcm_rsp_q) + self.grad_C(molecule, basis, grid, cpcm_rsp_q, DM) 
+        grad_V_pol += self.grad_B(molecule, grid, cpcm_rsp_q) + self.grad_C(
+            molecule, basis, grid, cpcm_rsp_q, DM)
 
-        # Missing third term
+        # Third term
+        natoms = molecule.number_of_atoms()
 
-        
+        grid_coords = grid[:, :3].copy()
+        zeta = grid[:, 4].copy()
+        atom_indices = grid[:, -1].copy()
+
+        npoints = grid_coords.shape[0]
+        ave, rem = divmod(npoints, self.nodes)
+        counts = [ave + 1 if p < rem else ave for p in range(self.nodes)]
+        start = sum(counts[:self.rank])
+        end = sum(counts[:self.rank + 1])
+
+        atom_radii = self.get_cpcm_vdw_radii(molecule) * self.radii_scaling
+        atom_coords = molecule.get_coordinates_in_bohr()
+
+        grad_V_pol -= (cpcm_comp_grad_Aij(grid_coords, zeta, atom_indices,
+                                          cpcm_rsp_q, q, start, end, natoms) +
+                       cpcm_comp_grad_Aii(grid_coords, zeta, sw_f, atom_indices,
+                                          cpcm_rsp_q, q, 0, end, atom_coords,
+                                          atom_radii)) / scale_f
+
         return grad_V_pol
-    
-    def grad_f_pol(self, molecule, basis, grid, sw_f, precond, eps, x, x_ao_as_mat, cpcm_cg_thresh = 1e-8):
+
+    def grad_f_pol(self,
+                   molecule,
+                   basis,
+                   grid,
+                   sw_f,
+                   precond,
+                   eps,
+                   x,
+                   x_ao_as_mat,
+                   cpcm_cg_thresh=1e-8):
         """
         Calculates the second contribution to the excited state gradient.
 
@@ -1053,7 +1097,7 @@ class CpcmDriver:
         :param cpcm_cg_thresh:
             threshold for solving charges.
 
-        :return:
+        :return: 
             The gradient array of each cartesian component -- of shape (nAtoms, 3).
         """
 
@@ -1066,15 +1110,15 @@ class CpcmDriver:
             rhs = None
         rhs = self.comm.bcast(rhs, root=mpi_master())
 
-        cpcm_rsp_q = self.cg_solve_parallel_direct(grid,
-                                                   sw_f,
-                                                   precond, rhs,
+        cpcm_rsp_q = self.cg_solve_parallel_direct(grid, sw_f, precond, rhs,
                                                    None, cpcm_cg_thresh)
-        
+
         # First term
         grad_f_pol = self.grad_C(molecule, basis, grid, cpcm_rsp_q, x_ao_as_mat)
 
         # Second term
-        grad_f_pol += self.grad_Aij(molecule, grid, cpcm_rsp_q, eps, x) + self.grad_Aii(molecule, grid, sw_f, cpcm_rsp_q,  eps, x)
+        grad_f_pol += self.grad_Aij(
+            molecule, grid, cpcm_rsp_q, eps, x) + self.grad_Aii(
+                molecule, grid, sw_f, cpcm_rsp_q, eps, x)
 
         return 4.0 * grad_f_pol
