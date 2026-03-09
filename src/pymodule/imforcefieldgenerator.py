@@ -317,6 +317,47 @@ class IMForceFieldGenerator:
         self.imp_int_coordinates = []
 
 
+    def _build_opt_constraint_list(self, constraints, index_offset=1):
+
+        opt_constraint_list = []
+        for constraint in constraints:
+            if isinstance(constraint, str):
+                opt_constraint_list.append(constraint)
+                continue
+
+            shifted = [value + index_offset for value in constraint]
+            if len(shifted) == 2:
+                opt_constraint = f"freeze distance {shifted[0]} {shifted[1]}"
+            elif len(shifted) == 3:
+                opt_constraint = f"freeze angle {shifted[0]} {shifted[1]} {shifted[2]}"
+            else:
+                opt_constraint = f"freeze dihedral {shifted[0]} {shifted[1]} {shifted[2]} {shifted[3]}"
+            opt_constraint_list.append(opt_constraint)
+
+        return opt_constraint_list
+
+    def _run_optimization(self, optimization_driver, molecule, constraints=None, transition=False, index_offset=1, compute_args=None, source_molecule=None):
+
+        opt_drv = OptimizationDriver(optimization_driver)
+        opt_drv.ostream.mute()
+        opt_drv.transition = transition
+        if constraints is not None:
+            opt_drv.constraints = self._build_opt_constraint_list(constraints, index_offset=index_offset)
+
+        if compute_args is None:
+            opt_results = opt_drv.compute(molecule)
+        else:
+            opt_results = opt_drv.compute(molecule, *compute_args)
+
+        if source_molecule is None:
+            source_molecule = molecule
+
+        optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
+        optimized_molecule.set_charge(source_molecule.get_charge())
+        optimized_molecule.set_multiplicity(source_molecule.get_multiplicity())
+
+        return optimized_molecule, opt_results
+
     def set_up_the_system(self, molecule, extract_z_matrix=None):
 
         """
@@ -574,41 +615,48 @@ class IMForceFieldGenerator:
                     self.atom_transfer_reaction_path[entry['root']].append(self.determine_atom_transfer_reaction_path(entry['reactants'], entry['products']))
 
 
-        if self.add_conformal_structures:
+        if self.add_conformal_structures and 0 in self.roots_to_follow:
 
-            rotatable_dihedrals_dict = {}
+            conformers_plus_ts = {0 : {}}
         
             conformer_generator = ConformerGenerator()
             conformal_structures = conformer_generator.generate(molecule)
             dihedral_canditates = conformer_generator.dihedral_candidates
 
-            
+            print(dihedral_canditates)
+
             conf_molecule_xyz = conformal_structures['molecules'][0].get_xyz_string()
 
-            for entry_idx, entries in enumerate(dihedral_canditates):
+            for entry_idx, entries in enumerate(dihedral_canditates[:]):
                 
                 dihedral = entries[0]
+                dih_key = tuple([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1])
                 periodicity = len(entries[1])
-                conformal_structures['molecules'][entry_idx] = (conformal_structures['molecules'][entry_idx], [dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1])
-
+                conformers_plus_ts[0][dih_key] = []
                 for i in range(len(entries[1])):
-                    current_molecule = Molecule.from_xyz_string(conf_molecule_xyz)
-                    current_molecule.set_charge(molecule.get_charge())
-                    current_molecule.set_multiplicity(molecule.get_multiplicity())
-                    if i + 1 < len(entries[1]):
-                        new_angle = entries[1][i] - (entries[1][i + 1]/periodicity)
-                        current_molecule.set_dihedral_in_degrees([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1], new_angle)
-                        constriant = [dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1]
-                        conformal_structures['molecules'].append((current_molecule, constriant))
-                        print(new_angle)
-                    else:
-                        new_angle = entries[1][i] - (entries[1][i]/2)
-                        current_molecule.set_dihedral_in_degrees([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1], new_angle)
-                        constriant = [dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1]
-                        conformal_structures['molecules'].append((current_molecule, constriant))
-                        print(new_angle)
-            
-            self.conformal_structures = {None : conformal_structures['molecules']}
+                    conformers_plus_ts[0][dih_key].append((conformal_structures['molecules'][i], 'normal'))
+                    print(conformal_structures['molecules'][i].get_xyz_string())
+                    
+                #     current_molecule = Molecule.from_xyz_string(conf_molecule_xyz)
+                #     current_molecule.set_charge(molecule.get_charge())
+                #     current_molecule.set_multiplicity(molecule.get_multiplicity())
+                #     if i + 1 < len(entries[1]):
+                #         new_angle = entries[1][i] - (entries[1][i + 1]/periodicity)
+                #         current_molecule.set_dihedral_in_degrees([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1], new_angle)
+                #         constriant = [dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1]
+                #         conformal_structures['molecules'].append((current_molecule, constriant))
+                #         print(new_angle)
+                #     else:
+                #         new_angle = entries[1][i] - (entries[1][i]/2)
+                #         current_molecule.set_dihedral_in_degrees([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1], new_angle)
+                #         constriant = [dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1]
+                #         conformal_structures['molecules'].append((current_molecule, constriant))
+                #         print(new_angle)
+
+                _, ts_molecule = self.determine_atom_transfer_reaction_path([conformers_plus_ts[0][dih_key][-2][0]], [conformers_plus_ts[0][dih_key][-1][0]], scf=False)
+                conformers_plus_ts[0][dih_key].append((ts_molecule, 'transition'))
+
+            self.conformal_structures = conformers_plus_ts
 
     def compute(self, molecule, states_basis=None):
 
@@ -698,30 +746,16 @@ class IMForceFieldGenerator:
                         
                         if ts_root == 0 and isinstance(self.drivers['gs'][0], ScfRestrictedDriver) or ts_root == 0 and isinstance(self.drivers['gs'][0], XtbDriver):
                         
-                            opt_drv = OptimizationDriver(opt_qm_driver)
                             current_basis = MolecularBasis.read(reaction_mol, states_basis['gs'])
                             _, scf_results, _ = self.compute_energy(opt_qm_driver, reaction_mol, current_basis)
-                            opt_drv.ostream.mute()
-                            
-                            opt_constraint_list = []
-                            for constraint in self.use_minimized_structures[1]:
-                                if len(constraint) == 2:
-                                    opt_constraint = f"freeze distance {constraint[0] + 1} {constraint[1] + 1}"
-                                    opt_constraint_list.append(opt_constraint)
-                                
-                                elif len(constraint) == 3:
-                                    opt_constraint = f"freeze angle {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1}"
-                                    opt_constraint_list.append(opt_constraint)
-                            
-                                else:
-                                    opt_constraint = f"freeze dihedral {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1} {constraint[3] + 1}"
-                                    opt_constraint_list.append(opt_constraint)
-                            opt_drv.constraints = opt_constraint_list
-
-                            opt_results = opt_drv.compute(reaction_mol, current_basis, scf_results)
-                            optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
-                            optimized_molecule.set_charge(molecule.get_charge())
-                            optimized_molecule.set_multiplicity(molecule.get_multiplicity())
+                            optimized_molecule, _ = self._run_optimization(
+                                opt_qm_driver,
+                                reaction_mol,
+                                constraints=self.use_minimized_structures[1],
+                                index_offset=1,
+                                compute_args=(current_basis, scf_results),
+                                source_molecule=molecule,
+                            )
                             reaction_mol = optimized_molecule
                             print(optimized_molecule.get_xyz_string())
 
@@ -755,32 +789,21 @@ class IMForceFieldGenerator:
 
                                 if  root_to_add == 0 and isinstance(self.drivers['gs'][0], ScfRestrictedDriver) or root_to_add == 0 and isinstance(self.drivers['gs'][0], ScfUnrestrictedDriver) or root_to_add == 0 and isinstance(self.drivers['gs'][0], XtbDriver):
                                 
-                                    opt_drv = OptimizationDriver(self.drivers['gs'][0])
                                     current_basis = MolecularBasis.read(mol, states_basis['gs'])
                                     _, scf_results, _ = self.compute_energy(self.drivers['gs'][0], mol, current_basis)
-                                    opt_drv.ostream.mute()
-                                    
-                                    opt_constraint_list = []
-                                    for constraint in self.use_minimized_structures[1]:
-                                        if len(constraint) == 2:
-                                            opt_constraint = f"freeze distance {constraint[0] + 1} {constraint[1] + 1}"
-                                            opt_constraint_list.append(opt_constraint)
-                                        
-                                        elif len(constraint) == 3:
-                                            opt_constraint = f"freeze angle {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1}"
-                                            opt_constraint_list.append(opt_constraint)
-                                    
-                                        else:
-                                            opt_constraint = f"freeze dihedral {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1} {constraint[3] + 1}"
-                                            opt_constraint_list.append(opt_constraint)
-                                    opt_constraint_list.extend(constraint_conf)
-                                    opt_drv.constraints = opt_constraint_list
-                                    
-                                    opt_results = opt_drv.compute(mol, current_basis, scf_results)
+                                    combined_constraints = (
+                                        self.use_minimized_structures[1]
+                                        + constraint_conf
+                                    )
+                                    optimized_molecule, opt_results = self._run_optimization(
+                                        self.drivers['gs'][0],
+                                        mol,
+                                        constraints=combined_constraints,
+                                        index_offset=1,
+                                        compute_args=(current_basis, scf_results),
+                                        source_molecule=molecule,
+                                    )
                                     energy = opt_results['opt_energies'][-1]
-                                    optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
-                                    optimized_molecule.set_charge(molecule.get_charge())
-                                    optimized_molecule.set_multiplicity(molecule.get_multiplicity())
 
                                     current_basis = MolecularBasis.read(optimized_molecule, states_basis['gs'])
                                     molecules_to_add_info.append((optimized_molecule, current_basis, [root_to_add]))
@@ -817,65 +840,36 @@ class IMForceFieldGenerator:
 
                         elif opt_root == 0 and isinstance(self.drivers['gs'][0], ScfRestrictedDriver) or opt_root == 0 and isinstance(self.drivers['gs'][0], ScfUnrestrictedDriver) or opt_root == 0 and isinstance(self.drivers['gs'][0], XtbDriver):
                         
-                            opt_drv = OptimizationDriver(self.drivers['gs'][0])
                             current_basis = MolecularBasis.read(molecule, states_basis['gs'])
                             _, scf_results, _ = self.compute_energy(self.drivers['gs'][0], molecule, current_basis)
-                            opt_drv.ostream.mute()
-                            
-                            opt_constraint_list = []
-                            for constraint in self.use_minimized_structures[1]:
-                                if len(constraint) == 2:
-                                    opt_constraint = f"freeze distance {constraint[0] + 1} {constraint[1] + 1}"
-                                    opt_constraint_list.append(opt_constraint)
-                                
-                                elif len(constraint) == 3:
-                                    opt_constraint = f"freeze angle {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1}"
-                                    opt_constraint_list.append(opt_constraint)
-                            
-                                else:
-                                    opt_constraint = f"freeze dihedral {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1} {constraint[3] + 1}"
-                                    opt_constraint_list.append(opt_constraint)
-                            opt_drv.constraints = opt_constraint_list
-                            
-                            opt_results = opt_drv.compute(molecule, current_basis, scf_results)
+                            optimized_molecule, opt_results = self._run_optimization(
+                                self.drivers['gs'][0],
+                                molecule,
+                                constraints=self.use_minimized_structures[1],
+                                index_offset=1,
+                                compute_args=(current_basis, scf_results),
+                            )
                             energy = opt_results['opt_energies'][-1]
-                            optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
-                            optimized_molecule.set_charge(molecule.get_charge())
-                            optimized_molecule.set_multiplicity(molecule.get_multiplicity())
                             print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', molecule.get_xyz_string())
                             molecule = optimized_molecule
 
                         elif opt_root >= 1 and isinstance(self.drivers['es'][0], LinearResponseEigenSolver) or opt_root >= 1 and isinstance(self.drivers['es'][0], TdaEigenSolver):
                             
                             self.drivers['es'][1].state_deriv_index = [opt_root]
-                            opt_drv = OptimizationDriver(self.drivers['es'][1])
                             current_basis = MolecularBasis.read(molecule, states_basis['es'])
                             _, _, rsp_results = self.compute_energy(self.drivers['es'][0], molecule, current_basis)
-                            opt_drv.ostream.mute()
-                            
-                            opt_constraint_list = []
-                            for constraint in self.use_minimized_structures[1]:
-                                if len(constraint) == 2:
-                                    opt_constraint = f"freeze distance {constraint[0] + 1} {constraint[1] + 1}"
-                                    opt_constraint_list.append(opt_constraint)
-                                
-                                elif len(constraint) == 3:
-                                    opt_constraint = f"freeze angle {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1}"
-                                    opt_constraint_list.append(opt_constraint)
-                            
-                                else:
-                                    opt_constraint = f"freeze dihedral {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1} {constraint[3] + 1}"
-                                    opt_constraint_list.append(opt_constraint)
-                            opt_drv.constraints = opt_constraint_list
                             self.drivers['es'][3].ostream.mute()
                             self.drivers['es'][0].ostream.mute()
-                            opt_results = opt_drv.compute(molecule, current_basis, self.drivers['es'][3], self.drivers['es'][0], rsp_results)
+                            optimized_molecule, opt_results = self._run_optimization(
+                                self.drivers['es'][1],
+                                molecule,
+                                constraints=self.use_minimized_structures[1],
+                                index_offset=1,
+                                compute_args=(current_basis, self.drivers['es'][3], self.drivers['es'][0], rsp_results),
+                            )
                             excitated_roots = [root for root in self.roots_to_follow if root != 0]
                             self.drivers['es'][1].state_deriv_index = excitated_roots
                             energy = opt_results['opt_energies'][-1]
-                            optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
-                            optimized_molecule.set_charge(molecule.get_charge())
-                            optimized_molecule.set_multiplicity(molecule.get_multiplicity())
                             print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', molecule.get_xyz_string())
                             molecule = optimized_molecule
 
@@ -1037,30 +1031,16 @@ class IMForceFieldGenerator:
                         optimized_molecule = None
                         if self.roots_to_follow[0] == 0 and isinstance(self.drivers['gs'][0], ScfRestrictedDriver) or self.roots_to_follow[0] == 0 and isinstance(self.drivers['gs'][0], ScfUnrestrictedDriver):
                         
-                            opt_drv = OptimizationDriver(self.drivers['gs'][0])
                             current_basis = MolecularBasis.read(reaction_mol, states_basis['gs'])
                             _, scf_results, _ = self.compute_energy(self.drivers['gs'][0], reaction_mol, current_basis)
-                            opt_drv.ostream.mute()
-                            
-                            opt_constraint_list = []
-                            for constraint in self.use_minimized_structures[1]:
-                                if len(constraint) == 2:
-                                    opt_constraint = f"freeze distance {constraint[0] + 1} {constraint[1] + 1}"
-                                    opt_constraint_list.append(opt_constraint)
-                                
-                                elif len(constraint) == 3:
-                                    opt_constraint = f"freeze angle {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1}"
-                                    opt_constraint_list.append(opt_constraint)
-                            
-                                else:
-                                    opt_constraint = f"freeze dihedral {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1} {constraint[3] + 1}"
-                                    opt_constraint_list.append(opt_constraint)
-                            opt_drv.constraints = opt_constraint_list
-
-                            opt_results = opt_drv.compute(reaction_mol, current_basis, scf_results)
-                            optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
-                            optimized_molecule.set_charge(molecule.get_charge())
-                            optimized_molecule.set_multiplicity(molecule.get_multiplicity())
+                            optimized_molecule, _ = self._run_optimization(
+                                self.drivers['gs'][0],
+                                reaction_mol,
+                                constraints=self.use_minimized_structures[1],
+                                index_offset=1,
+                                compute_args=(current_basis, scf_results),
+                                source_molecule=molecule,
+                            )
 
                             print(optimized_molecule.get_xyz_string())                           
 
@@ -1071,93 +1051,93 @@ class IMForceFieldGenerator:
 
             if self.add_conformal_structures and not os.path.exists(imforcefieldfile):
                 for counter, entry in enumerate(self.conformal_structures.items()):
+       
+                    key, molecules_info = entry
+                    
+                    for i, mol_entries in enumerate(molecules_info.items()):
+                        molecules_to_add_info = []
+                        dih_key, mol_info = mol_entries
 
-                    key, molecules = entry
-                    molecules_to_add_info = []
-                    for i, mol_const in enumerate(molecules):
-                        mol = mol_const[0]
-                        constraint_conf = [f"freeze dihedral {mol_const[1][0]} {mol_const[1][1]} {mol_const[1][2]} {mol_const[1][3]}"]
+                        for mol, mode in mol_info:
+                            print('start mol', mol.get_xyz_string())
+                            if self.use_minimized_structures[0]:
+                                transition = False
+                                constraints_global = [dih_key]
+                                if mode == 'transition':
+                                    transition = True
+                                    constraints_global = []
 
-                        if self.use_minimized_structures[0]:       
-                            optimized_molecule = None
-                            if self.roots_to_follow[0] == 0 and isinstance(self.drivers['gs'][0], ScfRestrictedDriver) or self.roots_to_follow[0] == 0 and isinstance(self.drivers['gs'][0], ScfUnrestrictedDriver):
-                            
-
-                                opt_drv = OptimizationDriver(self.drivers['gs'][0])
-                                current_basis = MolecularBasis.read(mol, states_basis['gs'])
-                                _, scf_results, _ = self.compute_energy(self.drivers['gs'][0], mol, current_basis)
-                                opt_drv.ostream.mute()
-                                
-                                opt_constraint_list = []
-                                for constraint in self.use_minimized_structures[1]:
-                                    if len(constraint) == 2:
-                                        opt_constraint = f"freeze distance {constraint[0] + 1} {constraint[1] + 1}"
-                                        opt_constraint_list.append(opt_constraint)
+                                if self.use_minimized_structures[0]:       
+                                    optimized_molecule = None
+                                    if self.roots_to_follow[0] == 0 and isinstance(self.drivers['gs'][0], ScfRestrictedDriver) or self.roots_to_follow[0] == 0 and isinstance(self.drivers['gs'][0], ScfUnrestrictedDriver):
                                     
-                                    elif len(constraint) == 3:
-                                        opt_constraint = f"freeze angle {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1}"
-                                        opt_constraint_list.append(opt_constraint)
-                                
-                                    else:
-                                        opt_constraint = f"freeze dihedral {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1} {constraint[3] + 1}"
-                                        opt_constraint_list.append(opt_constraint)
-                                opt_drv.constraints = opt_constraint_list
-                                
-                                opt_results = opt_drv.compute(mol, current_basis, scf_results)
-                                energy = opt_results['opt_energies'][-1]
-                                optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
-                                optimized_molecule.set_charge(molecule.get_charge())
-                                optimized_molecule.set_multiplicity(molecule.get_multiplicity())
 
-                                current_basis = MolecularBasis.read(optimized_molecule, states_basis['gs'])
-                                molecules_to_add_info.append((optimized_molecule, current_basis, self.roots_to_follow))
+                                        current_basis = MolecularBasis.read(mol, states_basis['gs'])
+                                        _, scf_results, _ = self.compute_energy(self.drivers['gs'][0], mol, current_basis)
+                                        optimized_molecule, opt_results = self._run_optimization(
+                                            self.drivers['gs'][0],
+                                            mol,
+                                            constraints=constraints_global,
+                                            transition=transition,
+                                            index_offset=0,
+                                            compute_args=(current_basis, scf_results),
+                                            source_molecule=molecule,
+                                        )
+                                        energy = opt_results['opt_energies'][-1]
 
-                                print(optimized_molecule.get_xyz_string())
-                            
-                            elif self.roots_to_follow[0] >= 1 and isinstance(self.drivers['es'][0], LinearResponseEigenSolver) or self.roots_to_follow[0] >= 1 and isinstance(self.drivers['es'][0], TdaEigenSolver):
+                                        current_basis = MolecularBasis.read(optimized_molecule, states_basis['gs'])
+                                        molecules_to_add_info.append((optimized_molecule, current_basis, self.roots_to_follow))
 
-                                    opt_drv = OptimizationDriver(self.drivers['es'][1])
-                                    current_basis = MolecularBasis.read(mol, states_basis['es'])
-                                    _, _, rsp_results  = self.compute_energy(self.drivers['es'][0], mol, current_basis)
-                                    opt_drv.ostream.mute()
-                                    
-                                    opt_constraint_list = []
-                                    for constraint in self.use_minimized_structures[1]:
-                                        if len(constraint) == 2:
-                                            opt_constraint = f"freeze distance {constraint[0] + 1} {constraint[1] + 1}"
-                                            opt_constraint_list.append(opt_constraint)
-                                        
-                                        elif len(constraint) == 3:
-                                            opt_constraint = f"freeze angle {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1}"
-                                            opt_constraint_list.append(opt_constraint)
-                                    
-                                        else:
-                                            opt_constraint = f"freeze dihedral {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1} {constraint[3] + 1}"
-                                            opt_constraint_list.append(opt_constraint)
-                                    opt_drv.constraints = opt_constraint_list
-                                    self.drivers['es'][3].ostream.mute()
-                                    self.drivers['es'][0].ostream.mute()
-                                    opt_results = opt_drv.compute(molecule, current_basis, self.drivers['es'][3], self.drivers['es'][0], rsp_results)
-                                    energy = opt_results['opt_energies'][-1]
-                                    optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
-                                    optimized_molecule.set_charge(molecule.get_charge())
-                                    optimized_molecule.set_multiplicity(molecule.get_multiplicity())
-                                    print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', molecule.get_xyz_string())
-                                    current_basis = MolecularBasis.read(optimized_molecule, states_basis['es'])
-                                    molecules_to_add_info.append((optimized_molecule, current_basis, self.roots_to_follow))
-                                
-                            self.add_point(molecules_to_add_info, self.states_interpolation_settings, symmetry_information=self.symmetry_information)
+                                        print(optimized_molecule.get_xyz_string())
+
+                                    elif  self.roots_to_follow[0] == 0 and isinstance(self.drivers['gs'][0], XtbDriver):
+
+                                        current_basis = MolecularBasis.read(molecule, states_basis['gs'])
+                                        optimized_molecule, opt_results = self._run_optimization(
+                                            self.drivers['gs'][0],
+                                            molecule,
+                                            constraints=constraints_global,
+                                            transition=transition,
+                                            index_offset=1,
+                                        )
+                                        energy = opt_results['opt_energies'][-1]
+
+                                        current_basis = MolecularBasis.read(optimized_molecule, states_basis['gs'])
+                                        molecules_to_add_info.append((optimized_molecule, current_basis, self.roots_to_follow))
+
+                                        print('Optimized mol', optimized_molecule.get_xyz_string(), transition)
+
+                                    elif self.roots_to_follow[0] >= 1 and isinstance(self.drivers['es'][0], LinearResponseEigenSolver) or self.roots_to_follow[0] >= 1 and isinstance(self.drivers['es'][0], TdaEigenSolver):
+
+                                            current_basis = MolecularBasis.read(mol, states_basis['es'])
+                                            _, _, rsp_results  = self.compute_energy(self.drivers['es'][0], mol, current_basis)
+                                            self.drivers['es'][3].ostream.mute()
+                                            self.drivers['es'][0].ostream.mute()
+                                            optimized_molecule, opt_results = self._run_optimization(
+                                                self.drivers['es'][1],
+                                                molecule,
+                                                constraints=self.use_minimized_structures[1],
+                                                index_offset=1,
+                                                compute_args=(current_basis, self.drivers['es'][3], self.drivers['es'][0], rsp_results),
+                                                source_molecule=molecule,
+                                            )
+                                            energy = opt_results['opt_energies'][-1]
+                                            print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', molecule.get_xyz_string())
+                                            current_basis = MolecularBasis.read(optimized_molecule, states_basis['es'])
+                                            molecules_to_add_info.append((optimized_molecule, current_basis, self.roots_to_follow))
+
+                                    # self.add_point(molecules_to_add_info, self.states_interpolation_settings, symmetry_information=self.symmetry_information)
 
 
-                        else:
-                            if self.roots_to_follow[0] == 0:
-                                current_basis = MolecularBasis.read(mol, states_basis['gs'])
-                                molecules_to_add_info.append((mol, current_basis, self.roots_to_follow))
                             else:
-                                current_basis = MolecularBasis.read(mol, states_basis['es'])
-                                molecules_to_add_info.append((mol, current_basis, self.roots_to_follow))
-                            
-                            self.add_point(molecules_to_add_info, self.states_interpolation_settings, symmetry_information=self.symmetry_information)
+                                if self.roots_to_follow[0] == 0:
+                                    current_basis = MolecularBasis.read(mol, states_basis['gs'])
+                                    molecules_to_add_info.append((mol, current_basis, self.roots_to_follow))
+                                else:
+                                    current_basis = MolecularBasis.read(mol, states_basis['es'])
+                                    molecules_to_add_info.append((mol, current_basis, self.roots_to_follow))
+
+                        self.add_point(molecules_to_add_info, self.states_interpolation_settings, symmetry_information=self.symmetry_information)
 
             elif not self.add_conformal_structures and not os.path.exists(imforcefieldfile):
         
@@ -1167,31 +1147,16 @@ class IMForceFieldGenerator:
                     if self.roots_to_follow[0] == 0 and isinstance(self.drivers['gs'][0], ScfRestrictedDriver) or self.roots_to_follow[0] == 0 and isinstance(self.drivers['gs'][0], ScfUnrestrictedDriver):
                     
 
-                        opt_drv = OptimizationDriver(self.drivers['gs'][0])
                         current_basis = MolecularBasis.read(molecule, states_basis['gs'])
                         _, scf_results, _ = self.compute_energy(self.drivers['gs'][0], molecule, current_basis)
-                        opt_drv.ostream.mute()
-                        
-                        opt_constraint_list = []
-                        for constraint in self.use_minimized_structures[1]:
-                            if len(constraint) == 2:
-                                opt_constraint = f"freeze distance {constraint[0] + 1} {constraint[1] + 1}"
-                                opt_constraint_list.append(opt_constraint)
-                            
-                            elif len(constraint) == 3:
-                                opt_constraint = f"freeze angle {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1}"
-                                opt_constraint_list.append(opt_constraint)
-                        
-                            else:
-                                opt_constraint = f"freeze dihedral {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1} {constraint[3] + 1}"
-                                opt_constraint_list.append(opt_constraint)
-                        opt_drv.constraints = opt_constraint_list
-                        
-                        opt_results = opt_drv.compute(molecule, current_basis, scf_results)
+                        optimized_molecule, opt_results = self._run_optimization(
+                            self.drivers['gs'][0],
+                            molecule,
+                            constraints=self.use_minimized_structures[1],
+                            index_offset=1,
+                            compute_args=(current_basis, scf_results),
+                        )
                         energy = opt_results['opt_energies'][-1]
-                        optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
-                        optimized_molecule.set_charge(molecule.get_charge())
-                        optimized_molecule.set_multiplicity(molecule.get_multiplicity())
 
                         current_basis = MolecularBasis.read(optimized_molecule, states_basis['gs'])
                         molecules_to_add_info.append((optimized_molecule, current_basis, self.roots_to_follow))
@@ -1200,30 +1165,14 @@ class IMForceFieldGenerator:
                     
                     elif  self.roots_to_follow[0] == 0 and isinstance(self.drivers['gs'][0], XtbDriver):
 
-                        opt_drv = OptimizationDriver(self.drivers['gs'][0])
                         current_basis = MolecularBasis.read(molecule, states_basis['gs'])
-                        opt_drv.ostream.mute()
-                        
-                        opt_constraint_list = []
-                        for constraint in self.use_minimized_structures[1]:
-                            if len(constraint) == 2:
-                                opt_constraint = f"freeze distance {constraint[0] + 1} {constraint[1] + 1}"
-                                opt_constraint_list.append(opt_constraint)
-                            
-                            elif len(constraint) == 3:
-                                opt_constraint = f"freeze angle {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1}"
-                                opt_constraint_list.append(opt_constraint)
-                        
-                            else:
-                                opt_constraint = f"freeze dihedral {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1} {constraint[3] + 1}"
-                                opt_constraint_list.append(opt_constraint)
-                        opt_drv.constraints = opt_constraint_list
-                        
-                        opt_results = opt_drv.compute(molecule)
+                        optimized_molecule, opt_results = self._run_optimization(
+                            self.drivers['gs'][0],
+                            molecule,
+                            constraints=self.use_minimized_structures[1],
+                            index_offset=1,
+                        )
                         energy = opt_results['opt_energies'][-1]
-                        optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
-                        optimized_molecule.set_charge(molecule.get_charge())
-                        optimized_molecule.set_multiplicity(molecule.get_multiplicity())
 
                         current_basis = MolecularBasis.read(optimized_molecule, states_basis['gs'])
                         molecules_to_add_info.append((optimized_molecule, current_basis, self.roots_to_follow))
@@ -1233,32 +1182,18 @@ class IMForceFieldGenerator:
 
                     elif self.roots_to_follow[0] >= 1 and isinstance(self.drivers['es'][0], LinearResponseEigenSolver) or self.roots_to_follow[0] >= 1 and isinstance(self.drivers['es'][0], TdaEigenSolver):
 
-                            opt_drv = OptimizationDriver(self.drivers['es'][1])
                             current_basis = MolecularBasis.read(molecule, states_basis['es'])
                             _, _, rsp_results  = self.compute_energy(self.drivers['es'][0], molecule, current_basis)
-                            opt_drv.ostream.mute()
-                            
-                            opt_constraint_list = []
-                            for constraint in self.use_minimized_structures[1]:
-                                if len(constraint) == 2:
-                                    opt_constraint = f"freeze distance {constraint[0] + 1} {constraint[1] + 1}"
-                                    opt_constraint_list.append(opt_constraint)
-                                
-                                elif len(constraint) == 3:
-                                    opt_constraint = f"freeze angle {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1}"
-                                    opt_constraint_list.append(opt_constraint)
-                            
-                                else:
-                                    opt_constraint = f"freeze dihedral {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1} {constraint[3] + 1}"
-                                    opt_constraint_list.append(opt_constraint)
-                            opt_drv.constraints = opt_constraint_list
                             self.drivers['es'][3].ostream.mute()
                             self.drivers['es'][0].ostream.mute()
-                            opt_results = opt_drv.compute(molecule, current_basis, self.drivers['es'][3], self.drivers['es'][0], rsp_results)
+                            optimized_molecule, opt_results = self._run_optimization(
+                                self.drivers['es'][1],
+                                molecule,
+                                constraints=self.use_minimized_structures[1],
+                                index_offset=1,
+                                compute_args=(current_basis, self.drivers['es'][3], self.drivers['es'][0], rsp_results),
+                            )
                             energy = opt_results['opt_energies'][-1]
-                            optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
-                            optimized_molecule.set_charge(molecule.get_charge())
-                            optimized_molecule.set_multiplicity(molecule.get_multiplicity())
                             print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', molecule.get_xyz_string())
                             current_basis = MolecularBasis.read(optimized_molecule, states_basis['es'])
                             molecules_to_add_info.append((optimized_molecule, current_basis, self.roots_to_follow))
@@ -1304,30 +1239,16 @@ class IMForceFieldGenerator:
                                 self.use_minimized_structures[1].append(key)
                                 if self.roots_to_follow[0] == 0 and isinstance(self.drivers['gs'][0], ScfRestrictedDriver) or self.roots_to_follow[0] == 0 and isinstance(self.drivers['gs'][0], ScfUnrestrictedDriver) or self.roots_to_follow[0] == 0 and isinstance(self.drivers['gs'][0], XtbDriver):
 
-                                    opt_drv = OptimizationDriver(self.drivers['gs'][0])
                                     current_basis = MolecularBasis.read(mol, 'def2-svp')
                                     _, scf_results, _ = self.compute_energy(self.drivers['gs'][0], mol, current_basis)
-                                    opt_drv.ostream.mute()
-                                    
-                                    opt_constraint_list = []
-                                    for constraint in self.use_minimized_structures[1]:
-                                        if len(constraint) == 2:
-                                            opt_constraint = f"freeze distance {constraint[0]} {constraint[1]}"
-                                            opt_constraint_list.append(opt_constraint)
-                                        
-                                        elif len(constraint) == 3:
-                                            opt_constraint = f"freeze angle {constraint[0]} {constraint[1]} {constraint[2]}"
-                                            opt_constraint_list.append(opt_constraint)
-                                    
-                                        else:
-                                            opt_constraint = f"freeze dihedral {constraint[0]} {constraint[1]} {constraint[2]} {constraint[3]}"
-                                            opt_constraint_list.append(opt_constraint)
-                                    opt_drv.constraints = opt_constraint_list
-                                    
-                                    opt_results = opt_drv.compute(mol, current_basis, scf_results)
-                                    optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
-                                    optimized_molecule.set_charge(molecule.get_charge())
-                                    optimized_molecule.set_multiplicity(molecule.get_multiplicity())
+                                    optimized_molecule, opt_results = self._run_optimization(
+                                        self.drivers['gs'][0],
+                                        mol,
+                                        constraints=self.use_minimized_structures[1],
+                                        index_offset=0,
+                                        compute_args=(current_basis, scf_results),
+                                        source_molecule=molecule,
+                                    )
                                     energy = opt_results['opt_energies'][-1]
                                     print(optimized_molecule.get_xyz_string())
                             
@@ -1475,17 +1396,18 @@ class IMForceFieldGenerator:
             products_partial_charges_list.append(current_charge)
 
         ts_guesser = TransitionStateGuesser()
-        TS_mol, results = ts_guesser.find_TS(reactants, products, reactant_partial_charges=reactants_partial_charges_list, product_partial_charges=products_partial_charges_list, scf=True)
-
+        results = ts_guesser.find_TS(reactants, products, reactant_partial_charges=reactants_partial_charges_list, product_partial_charges=products_partial_charges_list, scf=scf)
         molecules_along_reaction_path = []
-        for xyz_string in results['xyz_geometries']:
+        print(results.keys())
+        ts_guess_mol = Molecule.from_xyz_string(results['max_mm_structure'])
+        for xyz_string in results['structures']:
             mol_to_add = Molecule.from_xyz_string(xyz_string)
             mol_to_add.set_charge(self.molecule.get_charge())
             mol_to_add.set_multiplicity(self.molecule.get_multiplicity())
             molecules_along_reaction_path.append(mol_to_add)
 
 
-        return molecules_along_reaction_path
+        return molecules_along_reaction_path, ts_guess_mol
 
     def determine_molecules_along_dihedral_scan(self, molecules_to_add_info, roots_to_follow, specific_dihedrals=None):
         """
@@ -2128,42 +2050,15 @@ class IMForceFieldGenerator:
                             if isinstance(drivers[0], ScfRestrictedDriver) or isinstance(drivers[0], ScfUnrestrictedDriver):
 
                                 _, scf_tensors, _ = self.compute_energy(drivers[0], molecule, current_basis)
-                                opt_drv = OptimizationDriver(drivers[0])
-                                opt_drv.ostream.mute()
-                                
-                                opt_constraint_list = []
-                                for constraint in constraints:
-                                    if len(constraint) == 2:
-                                        opt_constraint = f"freeze distance {constraint[0] + 1} {constraint[1] + 1}"
-                                        opt_constraint_list.append(opt_constraint)
-                                    
-                                    elif len(constraint) == 3:
-                                        opt_constraint = f"freeze angle {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1}"
-                                        opt_constraint_list.append(opt_constraint)
-                                
-                                    else:
-                                        opt_constraint = f"freeze dihedral {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1} {constraint[3] + 1}"
-                                        opt_constraint_list.append(opt_constraint)
-                                
-                                for constraint in self.use_minimized_structures[1]:
-                                    if constraint in opt_constraint_list:
-                                        continue
-                                    if len(constraint) == 2:
-                                        opt_constraint = f"freeze distance {constraint[0]} {constraint[1]}"
-                                        opt_constraint_list.append(opt_constraint)
-                                    
-                                    elif len(constraint) == 3:
-                                        opt_constraint = f"freeze angle {constraint[0]} {constraint[1]} {constraint[2]}"
-                                        opt_constraint_list.append(opt_constraint)
-                                
-                                    else:
-                                        opt_constraint = f"freeze dihedral {constraint[0]} {constraint[1]} {constraint[2]} {constraint[3]}"
-                                        opt_constraint_list.append(opt_constraint)
-                                opt_drv.constraints = opt_constraint_list
-                                opt_results = opt_drv.compute(mol, current_basis, scf_tensors)
-                                optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
-                                optimized_molecule.set_charge(mol.get_charge())
-                                optimized_molecule.set_multiplicity(mol.get_multiplicity())
+                                opt_constraint_list = self._build_opt_constraint_list(constraints, index_offset=1)
+                                opt_constraint_list.extend(self._build_opt_constraint_list(self.use_minimized_structures[1], index_offset=0))
+                                optimized_molecule, opt_results = self._run_optimization(
+                                    drivers[0],
+                                    mol,
+                                    constraints=opt_constraint_list,
+                                    index_offset=1,
+                                    compute_args=(current_basis, scf_tensors),
+                                )
                                 
                                 # qm_energy, scf_tensors = self.compute_energy(drivers[0], optimized_molecule, opt_current_basis)
                                 print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', mol.get_xyz_string())
@@ -2172,32 +2067,18 @@ class IMForceFieldGenerator:
 
                             elif root >= 1 and isinstance(drivers['es'][0], LinearResponseEigenSolver) or root >= 1 and isinstance(drivers['es'][0], TdaEigenSolver):
 
-                                opt_drv = OptimizationDriver(drivers['es'][1])
                                 current_basis = MolecularBasis.read(molecule, basis['es'])
                                 _, _, rsp_results  = self.compute_energy(self.drivers['es'][0], molecule, current_basis)
-                                opt_drv.ostream.mute()
-                                
-                                opt_constraint_list = []
-                                for constraint in self.use_minimized_structures[1]:
-                                    if len(constraint) == 2:
-                                        opt_constraint = f"freeze distance {constraint[0] + 1} {constraint[1] + 1}"
-                                        opt_constraint_list.append(opt_constraint)
-                                    
-                                    elif len(constraint) == 3:
-                                        opt_constraint = f"freeze angle {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1}"
-                                        opt_constraint_list.append(opt_constraint)
-                                
-                                    else:
-                                        opt_constraint = f"freeze dihedral {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1} {constraint[3] + 1}"
-                                        opt_constraint_list.append(opt_constraint)
-                                opt_drv.constraints = opt_constraint_list
                                 self.drivers['es'][3].ostream.mute()
                                 self.drivers['es'][0].ostream.mute()
-                                opt_results = opt_drv.compute(molecule, current_basis, self.drivers['es'][3], self.drivers['es'][0], rsp_results)
+                                optimized_molecule, opt_results = self._run_optimization(
+                                    drivers['es'][1],
+                                    molecule,
+                                    constraints=self.use_minimized_structures[1],
+                                    index_offset=1,
+                                    compute_args=(current_basis, self.drivers['gs'][3], self.drivers['gs'][0], rsp_results),
+                                )
                                 energy = opt_results['opt_energies'][-1]
-                                optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
-                                optimized_molecule.set_charge(molecule.get_charge())
-                                optimized_molecule.set_multiplicity(molecule.get_multiplicity())
                                 print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', molecule.get_xyz_string())
                                 current_basis = MolecularBasis.read(optimized_molecule, basis['es'])
                                 molecules_to_add_info = [(optimized_molecule, current_basis, [root])]
@@ -2364,6 +2245,7 @@ class IMForceFieldGenerator:
                     z_matrix.append(tuple(coord))
                     if self.use_cosine_dihedral:
                         z_matrix.append(tuple(coord))
+        
 
         return z_matrix
     
@@ -2416,21 +2298,50 @@ class IMForceFieldGenerator:
                     constraints = []
                     for dihedral, angle in molecule_config.items():
                         opt_dihedral_angle = molecule.get_dihedral([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1], 'radian')
-                        print(molecule.get_xyz_string())
+     
                         print('Dihedral creation', dihedral, opt_dihedral_angle, angle)
                         
                         cur_molecule.set_dihedral([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1], opt_dihedral_angle + angle, 'radian')
                         dihedral_to_change.append([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1])
                         constraint = f"freeze dihedral {dihedral[0] + 1} {dihedral[1] + 1} {dihedral[2] + 1} {dihedral[3] + 1}"
                         constraints.append(constraint)
+                    
                         if self.symmetry_information is not None:
                             print('opt_dihedral_angle', opt_dihedral_angle)
                             self.symmetry_information['gs'][8][dihedral].append(opt_dihedral_angle)
+
                     if i > 0:
                         symmetry_point = True
-                    current_basis = MolecularBasis.read(cur_molecule, basis.get_main_basis_label())
                     
+                    current_basis = MolecularBasis.read(cur_molecule, basis.get_main_basis_label())
+                    dihedral_to_change.extend(self.use_minimized_structures[1])
+
+                    if isinstance(self.drivers['gs'][0], ScfRestrictedDriver):
+                        _, scf_results, _ = self.compute_energy(self.drivers['gs'][0], cur_molecule, current_basis)
+                        optimized_molecule, opt_results = self._run_optimization(
+                                        self.drivers['gs'][1],
+                                        cur_molecule,
+                                        constraints=constraints,
+                                        index_offset=0,
+                                        compute_args=(current_basis, scf_results),
+                                        source_molecule=molecule
+                                    )
+                        cur_molecule = optimized_molecule
+                        
+                    elif isinstance(self.drivers['gs'][0], XtbDriver):
+                        optimized_molecule, opt_results = self._run_optimization(
+                                        self.drivers['gs'][1],
+                                        cur_molecule,
+                                        constraints=constraints,
+                                        index_offset=0,
+                                        source_molecule=molecule
+                                    )
+                        cur_molecule = optimized_molecule
+                    print('Optimized molecule', cur_molecule.get_xyz_string())
+                    current_basis = MolecularBasis.read(cur_molecule, basis.get_main_basis_label())
+
                     adjusted_molecule['gs'].append((cur_molecule, current_basis, periodicites[dihedral],  dihedral_to_change, entries[2], symmetry_point))
+            
             if 1 in states and len(symmetry_information['es']) != 0 and len(symmetry_information['es'][2]) != 0 and self.drivers['es'][0].spin_flip is False:
                 symmetry_mapping_groups = [item for item in range(len(molecule.get_labels()))]
                 symmetry_exclusion_groups = [item for element in symmetry_information['es'][1] for item in element]
@@ -2498,6 +2409,8 @@ class IMForceFieldGenerator:
                     states = [state for state in entries[2] if state > 0]
                     adjusted_molecule['es'].append((entries[0], entries[1], 1, None, states, symmetry_point)) 
 
+        
+        
         for key, entries in adjusted_molecule.items():
             if len(entries) == 0:
                 continue
@@ -2506,9 +2419,8 @@ class IMForceFieldGenerator:
             if isinstance(drivers[0], LinearResponseEigenSolver) or isinstance(drivers[0], TdaEigenSolver):           
                     org_roots = drivers[1].state_deriv_index
 
-            label_counter = 0
-
             for mol_basis in entries:
+                label_counter = 0
                 if isinstance(drivers[0], LinearResponseEigenSolver) or isinstance(drivers[0], TdaEigenSolver):
                     root_to_follow_calc = mol_basis[4]           
                     drivers[1].state_deriv_index = root_to_follow_calc 

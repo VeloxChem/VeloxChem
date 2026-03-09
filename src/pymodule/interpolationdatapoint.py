@@ -653,7 +653,6 @@ class InterpolationDatapoint:
                   self.use_cosine_dihedral):
                 
                 if prev_dihedral != q:
-                    print('I am chaning the internal dihedral')
                     prev_dihedral = q 
                     int_coords.append(np.cos(q.value(coords)))
                 else:

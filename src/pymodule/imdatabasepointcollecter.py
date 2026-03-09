@@ -2052,6 +2052,16 @@ class IMDatabasePointCollecter:
             self.impes_drivers[root].qm_data_points = self.qm_data_point_dict[root]
             self.impes_drivers[root].compute(new_molecule)
 
+            # report = self.impes_drivers[root].validate_shepard_parallel(
+            #     molecule=new_molecule,
+            #     max_workers=None,   # or e.g. 8
+            #     atol=1e-10,
+            #     rtol=1e-8,
+            #     restore_serial=True
+            # )
+            # print(report["all_close"], report)
+
+
 
         if self.nstates > 1:
             for root_1 in range(0, self.nstates):
@@ -2879,12 +2889,15 @@ class IMDatabasePointCollecter:
                             break
                     # qm_datapoints_weighted = [qm_datapoint for qm_datapoint in enumerate if ]
                     print('Items', sorted_items, len(internal_coordinate_datapoints), state_specific_energies[state_to_optim][0])
-                    primary_constraint, backup_constraint = self.impes_drivers[state_to_optim].determine_important_internal_coordinates(state_specific_energies[state_to_optim][0], state_specific_gradients[state_to_optim][0], molecule, self.root_z_matrix[state_to_optim], internal_coordinate_datapoints)
+                    primary_constraint, backup_constraint, ranked_block = self.impes_drivers[state_to_optim].determine_important_internal_coordinates(state_specific_energies[state_to_optim][0], state_specific_gradients[state_to_optim][0], molecule, self.root_z_matrix[state_to_optim], internal_coordinate_datapoints)
                     corr_new_dp_distrib = False
+                    # primary_constraint.append([2,3])
+                    # primary_constraint = [[2,3]]
                     main_constraint_list = primary_constraint
                     old_const_len = len(main_constraint_list)
+                    opt_results = None
                     while not corr_new_dp_distrib:
-                        print('CONSTRAINTS', primary_constraint, backup_constraint)
+                        print('CONSTRAINTS', primary_constraint, backup_constraint, ranked_block)
                         if state_to_optim == 0 and isinstance(self.drivers['gs'][0], ScfRestrictedDriver) or state_to_optim == 0 and isinstance(self.drivers['gs'][0], ScfUnrestrictedDriver):
                             _, scf_tensors, rsp_results = self.compute_energy(self.drivers['gs'][0], molecule, current_basis)
         
@@ -3021,63 +3034,67 @@ class IMDatabasePointCollecter:
                         
                         imp_int_coord = main_constraint_list
 
-                        same = False
-                        sum_of_values = 0
-                        old_sorted_shorted = []
-                        for item, vlaue in sorted_items:
-                            sum_of_values += vlaue
-                            old_sorted_shorted.append(item)
-                            if sum_of_values > 0.8:       
-                                break
+                        # same = False
+                        # sum_of_values = 0
+                        # old_sorted_shorted = []
+                        # for item, vlaue in sorted_items:
+                        #     sum_of_values += vlaue
+                        #     old_sorted_shorted.append(item)
+                        #     if sum_of_values > 0.8:       
+                        #         break
 
-                        while not same:
+                        # while not same:
                             
-                            interpolation_driver = InterpolationDriver(self.root_z_matrix[state_to_optim])
-                            interpolation_driver.update_settings(self.interpolation_settings[state_to_optim])
-                            interpolation_driver.symmetry_information = self.impes_drivers[state_to_optim].symmetry_information
-                            interpolation_driver.qm_symmetry_data_points = self.impes_drivers[state_to_optim].qm_symmetry_data_points
-                            interpolation_driver.impes_coordinate.inv_sqrt_masses = self.inv_sqrt_masses
-                            interpolation_driver.distance_thrsh = 1000
-                            interpolation_driver.exponent_p = self.impes_drivers[state_to_optim].exponent_p
-                            interpolation_driver.print = False
-                            interpolation_driver.use_symmetry = self.use_symmetry
-                            interpolation_driver.qm_data_points = self.impes_drivers[state_to_optim].qm_data_points
-                            interpolation_driver.calc_optim_trust_radius = True
+                        #     interpolation_driver = InterpolationDriver(self.root_z_matrix[state_to_optim])
+                        #     interpolation_driver.update_settings(self.interpolation_settings[state_to_optim])
+                        #     interpolation_driver.symmetry_information = self.impes_drivers[state_to_optim].symmetry_information
+                        #     interpolation_driver.qm_symmetry_data_points = self.impes_drivers[state_to_optim].qm_symmetry_data_points
+                        #     interpolation_driver.impes_coordinate.inv_sqrt_masses = self.inv_sqrt_masses
+                        #     interpolation_driver.distance_thrsh = 1000
+                        #     interpolation_driver.exponent_p = self.impes_drivers[state_to_optim].exponent_p
+                        #     interpolation_driver.print = False
+                        #     interpolation_driver.use_symmetry = self.use_symmetry
+                        #     interpolation_driver.qm_data_points = self.impes_drivers[state_to_optim].qm_data_points
+                        #     interpolation_driver.calc_optim_trust_radius = True
 
-                            interpolation_driver.compute(optimized_molecule)
+                        #     interpolation_driver.compute(optimized_molecule)
 
+                        #     print('enegy difference', opt_results['opt_energies'][-1], interpolation_driver.get_energy(), abs(opt_results['opt_energies'][-1] - interpolation_driver.get_energy()) * hartree_in_kcalpermol())
 
-                            _, distance_to_org, _ = self.calculate_distance_to_ref(optimized_molecule.get_coordinates_in_bohr(), molecule.get_coordinates_in_bohr())
-                            distances_dp_to_org = []
-                            distances_dp_to_opt = []
-                            for dp in self.impes_drivers[state_to_optim].qm_data_points:
+                            
+                            # _, distance_to_org, _ = self.calculate_distance_to_ref(optimized_molecule.get_coordinates_in_bohr(), 
+                            #                                                        molecule.get_coordinates_in_bohr(), self.impes_drivers[state_to_optim].symmetry_information)
+                            # print(distance_to_org)
+                            # # distances_dp_to_org = []
+                            # # distances_dp_to_opt = []
+                            # for dp in self.impes_drivers[state_to_optim].qm_data_points:
                                 
-                                _, dist, _ = self.calculate_distance_to_ref(molecule.get_coordinates_in_bohr(), dp.cartesian_coordinates)
-                                _, dist_opt, _ = self.calculate_distance_to_ref(optimized_molecule.get_coordinates_in_bohr(), dp.cartesian_coordinates)
-                                distances_dp_to_org.append(dist)
-                                distances_dp_to_opt.append(dist_opt)
+                            # #     _, dist, _ = self.calculate_distance_to_ref(molecule.get_coordinates_in_bohr(), dp.cartesian_coordinates)
+                            # #     _, dist_opt, _ = self.calculate_distance_to_ref(optimized_molecule.get_coordinates_in_bohr(), dp.cartesian_coordinates)
+                            # #     distances_dp_to_org.append(dist)
+                            # #     distances_dp_to_opt.append(dist_opt)
 
-                            if any(dist for dist in distances_dp_to_org) < distance_to_org:
-                                min_distance = min(distances_dp_to_org)
-                                min_idx = distances_dp_to_org.index(min_distance)
+                            # # if any(dist for dist in distances_dp_to_org) < distance_to_org:
+                            # #     min_distance = min(distances_dp_to_org)
+                            # #     min_idx = distances_dp_to_org.index(min_distance)
 
-                                cart_coord = self.impes_drivers[state_to_optim].qm_data_points[min_idx].cartesian_coordinates
+                            # #     cart_coord = self.impes_drivers[state_to_optim].qm_data_points[min_idx].cartesian_coordinates
 
 
-                                _, dist, distance_vec = self.calculate_distance_to_ref(optimized_molecule.get_coordinates_in_bohr(), cart_coord)
+                            # #     _, dist, distance_vec = self.calculate_distance_to_ref(optimized_molecule.get_coordinates_in_bohr(), cart_coord)
 
-                                self.opt_mols_org_mol_swap[state_to_optim] = molecule
-                                for imp_coord in backup_constraint:
-                                    if imp_coord not in main_constraint_list:
-                                        main_constraint_list.append(imp_coord)
-                                        break
-                                same = True
+                            #     self.opt_mols_org_mol_swap[state_to_optim] = molecule
+                            #     for imp_coord in backup_constraint:
+                            #         if imp_coord not in main_constraint_list:
+                            #             main_constraint_list.append(imp_coord)
+                            #             break
+                            #     same = True
                             
-                            if len(main_constraint_list) != old_const_len:
-                                old_const_len = len(main_constraint_list)
-                            else:
-                                same = True
-                                corr_new_dp_distrib = True
+                            # if len(main_constraint_list) != old_const_len:
+                            #     old_const_len = len(main_constraint_list)
+                            # else:
+                            #     same = True
+                            #     corr_new_dp_distrib = True
                                 
                             # newly_weights = interpolation_driver.weights
                             # new_weights = [value for _, value in newly_weights.items()]
@@ -3135,9 +3152,9 @@ class IMDatabasePointCollecter:
                             #     if len(old_list_change) == 0:
                             #         old_list_change = elem_list.copy()
                             #         same = True
-
+                        corr_new_dp_distrib = True
                     state_specific_molecules.append((optimized_molecule, current_basis, [state_to_optim], imp_int_coord))
-
+                    
                 print('New optimized molecule \n', optimized_molecule.get_xyz_string())
                 self.add_point(state_specific_molecules, self.non_core_symmetry_groups)
                 self.last_point_added = self.point_checker - 1
@@ -3193,19 +3210,52 @@ class IMDatabasePointCollecter:
                 combinations = list(itertools.product(*values))
                 # Convert to list of dictionaries
                 molecule_configs = [dict(zip(keys, combo)) for combo in combinations] # if all(element == combo[0] for element in combo)
-                print('MOlecule configs', molecule_configs)
+
                 for i, molecule_config in enumerate(molecule_configs):
                     cur_molecule = Molecule.from_xyz_string(entries[0].get_xyz_string())
                     cur_molecule.set_charge(entries[0].get_charge())
                     cur_molecule.set_multiplicity(entries[0].get_multiplicity())
                     dihedral_to_change = []
+                    optim_dih_0based = []
                     for dihedral, angle in molecule_config.items():
-                        cur_molecule.set_dihedral([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1], angle, 'radian')
+             
+                        opt_dihedral_val = cur_molecule.get_dihedral([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1], 'radian')
+                        cur_molecule.set_dihedral([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1], opt_dihedral_val + angle, 'radian')
                         dihedral_to_change.append([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1])
+                        optim_dih_0based.append(dihedral)
                     current_basis = MolecularBasis.read(cur_molecule, entries[1].get_main_basis_label())
                     if i > 0:
                         symmetry_point = True
-                    adjusted_molecule['gs'].append((cur_molecule, current_basis, periodicites[dihedral],  dihedral_to_change, entries[2], symmetry_point, entries[3]))
+                    
+                    current_basis = MolecularBasis.read(cur_molecule, entries[1].get_main_basis_label())
+                    optim_dih_0based.extend(entries[3])
+
+                    # if isinstance(self.drivers['gs'][0], ScfRestrictedDriver):
+                    #     _, scf_results, _ = self.compute_energy(self.drivers['gs'][0], cur_molecule, current_basis)
+                    #     optimized_molecule, opt_results = self._run_optimization(
+                    #                     self.drivers['gs'][1],
+                    #                     cur_molecule,
+                    #                     constraints=optim_dih_0based,
+                    #                     index_offset=1,
+                    #                     compute_args=(current_basis, scf_results),
+                    #                     source_molecule=entries[0]
+                    #                 )
+                    #     cur_molecule = optimized_molecule
+                        
+                    # elif isinstance(self.drivers['gs'][0], XtbDriver):
+                    #     optimized_molecule, opt_results = self._run_optimization(
+                    #                     self.drivers['gs'][1],
+                    #                     cur_molecule,
+                    #                     constraints=optim_dih_0based,
+                    #                     index_offset=1,
+                    #                     source_molecule=entries[0]
+                    #                 )
+                    #     cur_molecule = optimized_molecule
+                    # print('Optimized molecule', cur_molecule.get_xyz_string())
+                    # current_basis = MolecularBasis.read(cur_molecule, entries[1].get_main_basis_label())
+                    
+                    adjusted_molecule['gs'].append((cur_molecule, current_basis, periodicites[dihedral], dihedral_to_change, entries[2], symmetry_point, entries[3]))
+            
             elif any(x > 0 for x in entries[2]) and len(symmetry_information['es']) != 0 and len(symmetry_information['es'][2]) != 0:
                 symmetry_mapping_groups = [item for item in range(len(entries[0].get_labels()))]
                 symmetry_exclusion_groups = [item for element in symmetry_information['es'][1] for item in element]
@@ -3332,7 +3382,6 @@ class IMDatabasePointCollecter:
                             for angle, dihedral in zip(combo, dihedrals):
                                 
                                 rot_mol.set_dihedral(dihedral, mol_basis[0].get_dihedral(dihedral, 'radian') - angle, 'radian')
-                            print('rot_molecules', combo, rot_mol.get_xyz_string())
                             target_coordinates = self.calculate_translation_coordinates(rot_mol.get_coordinates_in_bohr())
                             reference_coordinates = self.calculate_translation_coordinates(mol_basis[0].get_coordinates_in_bohr())
                             
@@ -3493,8 +3542,49 @@ class IMDatabasePointCollecter:
             if self.current_state in self.opt_mols_org_mol_swap:
                 self.impes_drivers[self.current_state].compute(self.opt_mols_org_mol_swap[self.current_state])
                 print(self.impes_drivers[self.current_state].weights, self.impes_drivers[self.current_state].get_energy(), self.opt_mols_org_mol_swap[self.current_state].get_xyz_string())
+
+        
         self.simulation.saveCheckpoint('checkpoint')    
-    
+     
+    def _build_opt_constraint_list(self, constraints, index_offset=1):
+
+        opt_constraint_list = []
+        for constraint in constraints:
+            if isinstance(constraint, str):
+                opt_constraint_list.append(constraint)
+                continue
+
+            shifted = [value + index_offset for value in constraint]
+            if len(shifted) == 2:
+                opt_constraint = f"freeze distance {shifted[0]} {shifted[1]}"
+            elif len(shifted) == 3:
+                opt_constraint = f"freeze angle {shifted[0]} {shifted[1]} {shifted[2]}"
+            else:
+                opt_constraint = f"freeze dihedral {shifted[0]} {shifted[1]} {shifted[2]} {shifted[3]}"
+            opt_constraint_list.append(opt_constraint)
+
+        return opt_constraint_list
+
+    def _run_optimization(self, optimization_driver, molecule, constraints=None, index_offset=1, compute_args=None, source_molecule=None):
+
+        opt_drv = OptimizationDriver(optimization_driver)
+        opt_drv.ostream.mute()
+        if constraints is not None:
+            opt_drv.constraints = self._build_opt_constraint_list(constraints, index_offset=index_offset)
+
+        if compute_args is None:
+            opt_results = opt_drv.compute(molecule)
+        else:
+            opt_results = opt_drv.compute(molecule, *compute_args)
+
+        if source_molecule is None:
+            source_molecule = molecule
+
+        optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
+        optimized_molecule.set_charge(source_molecule.get_charge())
+        optimized_molecule.set_multiplicity(source_molecule.get_multiplicity())
+
+        return optimized_molecule, opt_results
     
     def determine_beysian_trust_radius(self, molecules, qm_energies, current_datapoints, interpolation_setting, sym_datapoints, sym_dict, z_matrix):
     
@@ -4207,7 +4297,7 @@ class IMDatabasePointCollecter:
         return translated_coordinates
     
 
-    def calculate_distance_to_ref(self, current_coordinates, datapoint_coordinate):
+    def calculate_distance_to_ref(self, current_coordinates, datapoint_coordinate, symmetry_info):
         """Calculates and returns the cartesian distance between
            self.coordinates and data_point coordinates.
            Besides the distance, it also returns the weight gradient,
@@ -4217,9 +4307,14 @@ class IMDatabasePointCollecter:
                 InterpolationDatapoint object
         """
 
+        active_atoms = np.delete(np.arange(datapoint_coordinate.shape[0]), symmetry_info[4])
+
+        target_coordinates_core = datapoint_coordinate[active_atoms]
+        reference_coordinates_core = current_coordinates[active_atoms]
+
         # First, translate the cartesian coordinates to zero
-        target_coordinates = self.calculate_translation_coordinates(datapoint_coordinate)
-        reference_coordinates = self.calculate_translation_coordinates(current_coordinates)
+        target_coordinates = self.calculate_translation_coordinates(target_coordinates_core)
+        reference_coordinates = self.calculate_translation_coordinates(reference_coordinates_core)
 
         # Then, determine the rotation matrix which
         # aligns data_point (target_coordinates)
