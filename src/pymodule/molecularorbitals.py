@@ -464,10 +464,12 @@ class MolecularOrbitals:
             The nuclear charges.
         :param basis_set:
             Name of the basis set.
+        :param label:
+            Dataset prefix, including any trailing separator such as "_".
         """
 
         if label and isinstance(label, str):
-            prefix = label + '_'
+            prefix = label
         else:
             prefix = ''
 
@@ -517,13 +519,15 @@ class MolecularOrbitals:
 
         :param fname:
             The name of the hdf5 file.
+        :param label:
+            Dataset prefix, including any trailing separator such as "_".
 
         :return:
             True if the label is valid, False otherwise.
         """
 
         if label and isinstance(label, str):
-            prefix = label + '_'
+            prefix = label
         else:
             prefix = ''
 
@@ -546,13 +550,15 @@ class MolecularOrbitals:
 
         :param fname:
             The name of the hdf5 file.
+        :param label:
+            Dataset prefix, including any trailing separator such as "_".
 
         :return:
             The molecular orbitals.
         """
 
         if label and isinstance(label, str):
-            prefix = label + '_'
+            prefix = label
         else:
             prefix = ''
 
