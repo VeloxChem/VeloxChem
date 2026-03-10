@@ -33,6 +33,7 @@
 from pathlib import Path
 import numpy as np
 import math
+import os
 
 from .veloxchemlib import Molecule
 from .veloxchemlib import bohr_in_angstrom, mpi_master
@@ -443,7 +444,7 @@ def _Molecule_from_dict(mol_dict):
     return mol
 
 
-def _Molecule_get_connectivity_matrix(self, factor=1.3, H2_factor=1.7):
+def _Molecule_get_connectivity_matrix(self, factor=1.3, H2_factor=1.8):
     """
     Gets connectivity matrix.
 
@@ -505,8 +506,8 @@ def _Molecule_find_connected_atoms(self, atom_idx, connectivity_matrix=None):
         more_connected_atoms = set()
         for a in connected_atoms:
             for b in range(connectivity_matrix.shape[0]):
-                if (b not in connected_atoms and
-                        connectivity_matrix[a, b] == 1):
+                if (b not in connected_atoms
+                        and connectivity_matrix[a, b] == 1):
                     more_connected_atoms.add(b)
         if more_connected_atoms:
             connected_atoms.update(more_connected_atoms)
@@ -1276,15 +1277,21 @@ def _Molecule_write_xyz_file(self, xyz_filename):
         fh.write(self.get_xyz_string())
 
 
-def _Molecule_show(self,
-                   width=400,
-                   height=300,
-                   atom_indices=False,
-                   atom_labels=False,
-                   gradient=None,
-                   starting_index=1,
-                   bonds=None,
-                   dashed_bonds=None):
+def _Molecule_show(
+    self,
+    width=400,
+    height=300,
+    atom_indices=False,
+    atom_labels=False,
+    gradient=None,
+    starting_index=1,
+    bonds=None,
+    forming_bonds=None,
+    breaking_bonds=None,
+    forming_width=0.15,
+    breaking_width=0.15,
+    label_font_size=16,
+):
     """
     Creates a 3D view with py3dmol.
 
@@ -1299,18 +1306,33 @@ def _Molecule_show(self,
         that list as labels.
     :param gradient:
         The molecular gradient.
-    :starting_index:
+    :param starting_index:
         The starting index for atom indices.
-    :bonds:
-        A list of tuples with bonds to draw. If None, connectivity is based on
+    :param bonds:
+        A list of zero-indexed tuples with bonds to draw. If None, connectivity is based on
         proximity.
-    :dashed_bonds:
-        A list of tuples with bonds to draw as dashed lines.
+    :param forming_bonds:
+        A list of zero-indexed tuples with bonds to draw as green dashed lines.
+    :param breaking_bonds:
+        A list of zero-indexed tuples with bonds to draw as orange dashed lines.
+    :param forming_width:
+        The radius of forming bonds.
+    :param breaking_width:
+        The radius of breaking bonds.
     """
 
     try:
         import py3Dmol
         viewer = py3Dmol.view(width=width, height=height)
+
+        if forming_bonds is not None and breaking_bonds is not None:
+            dashed_bonds = forming_bonds + breaking_bonds
+        elif forming_bonds is not None:
+            dashed_bonds = forming_bonds
+        elif breaking_bonds is not None:
+            dashed_bonds = breaking_bonds
+        else:
+            dashed_bonds = None
 
         if bonds is None:
             viewer.addModel(self.get_xyz_string())
@@ -1367,23 +1389,43 @@ def _Molecule_show(self,
                 edit_mol.AddBond(bond[0], bond[1], Chem.BondType.SINGLE)
 
             sdf = Chem.MolToMolBlock(edit_mol.GetMol())
-
-            if dashed_bonds is not None:
-                lines = sdf.split('\n')
-                last_line = lines[-2]
-                lines = lines[:-2]
-                for key in sorted(dashed_bonds):
-                    line = f" {key[0] + 1:<2} {key[1] + 1:<2} 0.5  0"
-                    lines.append(line)
-                lines.append(last_line)
-
-                splitline = re.split(r'(\s+)', lines[3])
-                splitline[4] = str(int(splitline[4]) + len(dashed_bonds))
-                splitline[3] = " " * (2 - len(splitline[4]))
-                lines[3] = ''.join(splitline)
-                sdf = '\n'.join(lines)
-
             viewer.addModel(sdf, 'sdf')
+
+        if dashed_bonds is not None:
+            coords = self.get_coordinates_in_angstrom()
+            for bond in dashed_bonds:
+                p1 = coords[bond[0]]
+                p2 = coords[bond[1]]
+                if bond in forming_bonds:
+                    colour = "#00a287"
+                    radius = forming_width
+                else:
+                    colour = "#ffa200"
+                    radius = breaking_width
+                if radius >= 0.17:
+                    dashed = False
+                else:
+                    dashed = True
+
+                viewer.addCylinder({
+                    "start": {
+                        "x": p1[0],
+                        "y": p1[1],
+                        "z": p1[2]
+                    },
+                    "end": {
+                        "x": p2[0],
+                        "y": p2[1],
+                        "z": p2[2]
+                    },
+                    "color": colour,
+                    "dashed": dashed,
+                    "radius": radius,
+                    "fromCap": "round",
+                    "toCap": "round",
+                    "dashLength": 0.075,
+                    "gapLength": 0.35 + radius
+                })
 
         if atom_indices or atom_labels:
             coords = self.get_coordinates_in_angstrom()
@@ -1411,9 +1453,15 @@ def _Molecule_show(self,
                         'fontColor': 0x000000,
                         'backgroundColor': 0xffffff,
                         'backgroundOpacity': 0.0,
+                        'fontSize': label_font_size,
                     })
         viewer.setViewStyle({"style": "outline", "width": 0.05})
-        viewer.setStyle({"stick": {}, "sphere": {"scale": 0.25}})
+        viewer.setStyle({
+            "stick": {},
+            "sphere": {
+                "scale": 0.25,
+            }
+        })
         viewer.zoomTo()
         viewer.show()
 
@@ -1696,16 +1744,48 @@ def _Molecule_is_water_molecule(self):
     conn = self.get_connectivity_matrix()
 
     bond_labels = [
-        sorted([labels[i], labels[j]])
-        for i in range(natoms)
-        for j in range(i, natoms)
-        if conn[i, j] == 1
+        sorted([labels[i], labels[j]]) for i in range(natoms)
+        for j in range(i, natoms) if conn[i, j] == 1
     ]
 
     if bond_labels != [['H', 'O'], ['H', 'O']]:
         return False
 
     return True
+
+
+def _Molecule_contains_water_molecule(self):
+    """
+    Checks if a molecule contains a water molecule.
+
+    :return:
+        True if the molecule contains a water molecule, False otherwise.
+    """
+
+    conn = self.get_connectivity_matrix()
+    natoms = self.number_of_atoms()
+    visited = set()
+    labels = self.get_labels()
+
+    for i in range(natoms):
+        if i in visited:
+            continue
+        if labels[i] != 'O':
+            continue
+
+        connected_atoms = self._find_connected_atoms(i, conn)
+        if len(connected_atoms) != 3:
+            continue
+
+        connected_atoms.remove(i)
+        connected_atoms = list(connected_atoms)
+        if labels[connected_atoms[0]] == 'H' and labels[
+                connected_atoms[1]] == 'H':
+            return True
+
+        visited.update(connected_atoms)
+
+    return False
 
 
 @staticmethod
@@ -1856,6 +1936,7 @@ Molecule.number_of_alpha_electrons = _Molecule_number_of_alpha_electrons
 Molecule.number_of_beta_electrons = _Molecule_number_of_beta_electrons
 Molecule.partition_atoms = _Molecule_partition_atoms
 Molecule.is_water_molecule = _Molecule_is_water_molecule
+Molecule.contains_water_molecule = _Molecule_contains_water_molecule
 
 Molecule.read_name = _Molecule_read_name
 Molecule.name_to_smiles = _Molecule_name_to_smiles
