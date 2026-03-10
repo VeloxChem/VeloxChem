@@ -1143,43 +1143,100 @@ class MoleculeToolkit:
 
         *obj* may be:
         * a SMILES string with ``*`` marking the attachment point, or
-        * a VeloxChem Molecule (``index`` is the bonding atom).
+        * a VeloxChem Molecule (``index`` is the bonding atom, 0-based).
 
-        One H is removed from the bonding atom; ``exit_vec`` is the vector
-        that pointed from the bonding atom toward that removed H.
+        For SMILES input the ``*`` atom is located explicitly — it need not be
+        first in the string.  The atom bonded to ``*`` is the join atom; ``*``
+        itself is removed and the exit vector points along the bond that was
+        ``*``→join.  One H on the join atom is also removed to make room for
+        the new bond.
+
+        For VeloxChem Molecule input, one H is removed from *index*; the exit
+        vector points from *index* toward that removed H.
         """
         if isinstance(obj, str):
-            full = obj.replace('*', '[H]')
-            mol  = Chem.MolFromSmiles(full); mol = Chem.AddHs(mol)
-            AllChem.EmbedMolecule(mol, AllChem.ETKDG())
-            conf   = mol.GetConformer().GetPositions()
-            labels = [a.GetSymbol() for a in mol.GetAtoms()]
-            # First heavy atom is the join point
-            join   = next(i for i, a in enumerate(mol.GetAtoms()) if a.GetSymbol() != 'H')
-            h_nb   = next(n.GetIdx() for n in mol.GetAtoms()[join].GetNeighbors()
-                          if n.GetSymbol() == 'H')
-            exit_vec = conf[h_nb] - conf[join]
-            f_lab = [l for i, l in enumerate(labels) if i != h_nb]
-            f_coo = np.delete(conf, h_nb, axis=0)
-            new_join = join if join < h_nb else join - 1
-            return f_lab, f_coo, new_join, exit_vec
+            # ── Locate the * atom and its neighbor before embedding ───────
+            mol_star = Chem.MolFromSmiles(obj)
+            if mol_star is None:
+                raise ValueError(f"Invalid SMILES: {obj!r}")
 
-        # VeloxChem Molecule path
+            # Find * atom and its single neighbor (the true join atom)
+            star_atom = next(
+                (a for a in mol_star.GetAtoms() if a.GetSymbol() == '*'), None)
+            if star_atom is None:
+                raise ValueError(f"SMILES {obj!r} contains no '*' anchor atom")
+            star_idx_in_mol = star_atom.GetIdx()
+            nbs = list(star_atom.GetNeighbors())
+            if not nbs:
+                raise ValueError(f"'*' atom in {obj!r} has no neighbors")
+            if len(nbs) > 1:
+                raise ValueError(
+                    f"'*' atom in {obj!r} has {len(nbs)} neighbors — "
+                    f"'*' must be exocyclic (pendant), not a ring atom itself. "
+                    f"For a ring attachment use e.g. 'C1CC(*)CCC1' not 'C1CC*CCC1'."
+                )
+            join_heavy = nbs[0].GetIdx()   # neighbor of * in the mol without H
+
+            # Tag the join atom with map number 1 so we can find it after
+            # RDKit canonicalises the SMILES when we remove *.
+            edit = Chem.RWMol(mol_star)
+            edit.GetAtomWithIdx(join_heavy).SetAtomMapNum(1)
+            # Remove the * atom — must remove higher index first to keep join_heavy valid
+            edit.RemoveAtom(star_idx_in_mol)
+            tagged_smi = Chem.MolToSmiles(edit.GetMol())
+
+            # Parse the *-free SMILES and embed
+            mol_clean = Chem.MolFromSmiles(tagged_smi)
+            mol_clean = Chem.AddHs(mol_clean)
+            AllChem.EmbedMolecule(mol_clean, AllChem.ETKDG())
+            conf       = mol_clean.GetConformer().GetPositions()
+            labels_all = [a.GetSymbol() for a in mol_clean.GetAtoms()]
+
+            # Find join atom by map number 1
+            join_idx = next(
+                i for i, a in enumerate(mol_clean.GetAtoms())
+                if a.GetAtomMapNum() == 1)
+            mol_clean.GetAtomWithIdx(join_idx).SetAtomMapNum(0)
+
+            # Find an H bonded to join to define the exit vector
+            join_atom = mol_clean.GetAtomWithIdx(join_idx)
+            h_nb_idx  = next(
+                (n.GetIdx() for n in join_atom.GetNeighbors()
+                 if n.GetSymbol() == 'H'), None)
+            if h_nb_idx is None:
+                # No H on join atom — point away from all neighbors
+                nb_pos   = np.mean(
+                    [conf[n.GetIdx()] for n in join_atom.GetNeighbors()], axis=0)
+                exit_vec = conf[join_idx] - nb_pos
+            else:
+                exit_vec = conf[h_nb_idx] - conf[join_idx]
+
+            # Remove that H
+            keep     = [i for i in range(len(labels_all)) if i != h_nb_idx]
+            f_labels = [labels_all[i] for i in keep]
+            f_coords = conf[keep]
+            new_join = join_idx - (1 if h_nb_idx is not None and h_nb_idx < join_idx else 0)
+
+            return f_labels, f_coords, new_join, exit_vec
+
+        # ── VeloxChem Molecule path (unchanged) ───────────────────────────
         labels = list(obj.get_labels())
         coords = np.array(obj.get_coordinates_in_angstrom())
         h_idx  = next(
             (i for i, (l, p) in enumerate(zip(labels, coords))
-             if l == 'H' and np.linalg.norm(p-coords[index]) < 1.3),
+             if l == 'H' and np.linalg.norm(p - coords[index]) < 1.3),
             -1,
         )
         if h_idx != -1:
             exit_vec = coords[h_idx] - coords[index]
-            labels.pop(h_idx); coords = np.delete(coords, h_idx, axis=0)
-            if index > h_idx: index -= 1
+            labels.pop(h_idx)
+            coords = np.delete(coords, h_idx, axis=0)
+            if index > h_idx:
+                index -= 1
         else:
             nbs      = [coords[i] for i in range(len(coords))
-                        if i != index and np.linalg.norm(coords[i]-coords[index]) < 1.8]
-            exit_vec = -np.mean([n-coords[index] for n in nbs], axis=0) if nbs \
+                        if i != index and np.linalg.norm(coords[i] - coords[index]) < 1.8]
+            exit_vec = -np.mean([n - coords[index] for n in nbs], axis=0) if nbs \
                        else np.array([0., 0., 1.])
         return labels, coords, index, exit_vec
 
