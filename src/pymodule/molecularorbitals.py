@@ -454,16 +454,12 @@ class MolecularOrbitals:
 
         return MolecularOrbitals(mo_coefs, mo_enes, mo_occs, mo_type)
 
-    def write_hdf5(self, fname, nuclear_charges=None, basis_set=None, label=''):
+    def write_hdf5(self, fname, label=''):
         """
         Writes molecular orbitals to hdf5 file.
 
         :param fname:
             The name of the hdf5 file.
-        :param nuclear_charges:
-            The nuclear charges.
-        :param basis_set:
-            Name of the basis set.
         :param label:
             Dataset prefix, including any trailing separator such as "_".
         """
@@ -476,39 +472,29 @@ class MolecularOrbitals:
         hf = h5py.File(fname, 'a')
 
         for key in [
-                prefix + 'alpha_orbitals',
-                prefix + 'alpha_energies',
-                prefix + 'alpha_occupations',
-                prefix + 'beta_orbitals',
-                prefix + 'beta_energies',
-                prefix + 'beta_occupations',
+                prefix + 'C_alpha',
+                prefix + 'E_alpha',
+                prefix + 'occ_alpha',
+                prefix + 'C_beta',
+                prefix + 'E_beta',
+                prefix + 'occ_beta',
                 prefix + 'nuclear_charges',
                 prefix + 'basis_set',
         ]:
             if key in hf:
                 del hf[key]
 
-        hf.create_dataset(prefix + 'alpha_orbitals', data=self.alpha_to_numpy())
-        hf.create_dataset(prefix + 'alpha_energies', data=self.ea_to_numpy())
-        hf.create_dataset(prefix + 'alpha_occupations',
-                          data=self.occa_to_numpy())
+        hf.create_dataset(prefix + 'C_alpha', data=self.alpha_to_numpy())
+        hf.create_dataset(prefix + 'E_alpha', data=self.ea_to_numpy())
+        hf.create_dataset(prefix + 'occ_alpha', data=self.occa_to_numpy())
 
         if self._orbitals_type == molorb.unrest:
-            hf.create_dataset(prefix + 'beta_orbitals',
-                              data=self.beta_to_numpy())
-            hf.create_dataset(prefix + 'beta_energies', data=self.eb_to_numpy())
-            hf.create_dataset(prefix + 'beta_occupations',
-                              data=self.occb_to_numpy())
+            hf.create_dataset(prefix + 'C_beta', data=self.beta_to_numpy())
+            hf.create_dataset(prefix + 'E_beta', data=self.eb_to_numpy())
+            hf.create_dataset(prefix + 'occ_beta', data=self.occb_to_numpy())
 
         elif self._orbitals_type == molorb.restopen:
-            hf.create_dataset(prefix + 'beta_occupations',
-                              data=self.occb_to_numpy())
-
-        if nuclear_charges is not None:
-            hf.create_dataset(prefix + 'nuclear_charges', data=nuclear_charges)
-
-        if basis_set is not None:
-            hf.create_dataset(prefix + 'basis_set', data=np.bytes_([basis_set]))
+            hf.create_dataset(prefix + 'occ_beta', data=self.occb_to_numpy())
 
         hf.close()
 
@@ -535,7 +521,7 @@ class MolecularOrbitals:
 
         is_valid = True
 
-        for key in ['alpha_orbitals', 'alpha_energies', 'alpha_occupations']:
+        for key in ['C_alpha', 'E_alpha', 'occ_alpha']:
             key_in_hf = ((prefix + key) in hf)
             is_valid = (is_valid and key_in_hf)
 
@@ -566,43 +552,43 @@ class MolecularOrbitals:
 
         orbs_type = molorb.rest
 
-        for key in ['alpha_orbitals', 'alpha_energies', 'alpha_occupations']:
+        for key in ['C_alpha', 'E_alpha', 'occ_alpha']:
             assert_msg_critical((prefix + key) in hf,
                                 f'MolecularOrbitals.read_hdf5: {key} not found')
 
-        if 'beta_orbitals' in hf or 'beta_energies' in hf:
+        if prefix + 'C_beta' in hf or prefix + 'E_beta' in hf:
             orbs_type = molorb.unrest
 
-            for key in ['beta_orbitals', 'beta_energies', 'beta_occupations']:
+            for key in ['C_beta', 'E_beta', 'occ_beta']:
                 assert_msg_critical(
                     (prefix + key) in hf,
                     f'MolecularOrbitals.read_hdf5: {key} not found')
 
-        elif 'beta_occupations' in hf:
+        elif prefix + 'occ_beta' in hf:
             orbs_type = molorb.restopen
 
         orbs = []
         enes = []
         occs = []
 
-        orbs.append(np.array(hf.get(prefix + 'alpha_orbitals')))
-        enes.append(np.array(hf.get(prefix + 'alpha_energies')))
-        occs.append(np.array(hf.get(prefix + 'alpha_occupations')))
+        orbs.append(np.array(hf.get(prefix + 'C_alpha')))
+        enes.append(np.array(hf.get(prefix + 'E_alpha')))
+        occs.append(np.array(hf.get(prefix + 'occ_alpha')))
 
         if orbs_type == molorb.unrest:
-            orbs.append(np.array(hf.get(prefix + 'beta_orbitals')))
-            enes.append(np.array(hf.get(prefix + 'beta_energies')))
-            occs.append(np.array(hf.get(prefix + 'beta_occupations')))
+            orbs.append(np.array(hf.get(prefix + 'C_beta')))
+            enes.append(np.array(hf.get(prefix + 'E_beta')))
+            occs.append(np.array(hf.get(prefix + 'occ_beta')))
 
         elif orbs_type == molorb.restopen:
-            occs.append(np.array(hf.get(prefix + 'beta_occupations')))
+            occs.append(np.array(hf.get(prefix + 'occ_beta')))
 
         hf.close()
 
         return MolecularOrbitals(orbs, enes, occs, orbs_type)
 
     @staticmethod
-    def match_hdf5(fname, nuclear_charges, basis_set, scf_type):
+    def match_hdf5(fname, nuclear_charges, basis_set, scf_type, label=''):
         """
         Checks if the hdf5 file matches the given nuclear charges and basis set.
 
@@ -620,6 +606,11 @@ class MolecularOrbitals:
             Whether the hdf5 file matches the given nuclear charges and basis set.
         """
 
+        if label and isinstance(label, str):
+            prefix = label
+        else:
+            prefix = ''
+
         hf = h5py.File(fname, 'r')
 
         match_nuclear_charges = False
@@ -634,9 +625,9 @@ class MolecularOrbitals:
             h5_basis_set = hf.get('basis_set')[0].decode('utf-8')
             match_basis_set = (h5_basis_set.upper() == basis_set.upper())
 
-        if 'beta_orbitals' in hf or 'beta_energies' in hf:
+        if prefix + 'C_beta' in hf or prefix + 'E_beta' in hf:
             h5_scf_type = 'unrestricted'
-        elif 'beta_occupations' in hf:
+        elif prefix + 'occ_beta' in hf:
             h5_scf_type = 'restricted_openshell'
         else:
             h5_scf_type = 'restricted'

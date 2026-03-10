@@ -654,7 +654,7 @@ class ScfDriver:
                 self.acc_type = 'DIIS'
             if self.rank == mpi_master():
                 self._ref_mol_orbs = MolecularOrbitals.read_hdf5(
-                    self.checkpoint_file)
+                    self.checkpoint_file, 'scf/')
 
         # nuclear repulsion energy
         self._nuc_energy = molecule.nuclear_repulsion_energy(ao_basis)
@@ -1154,7 +1154,7 @@ class ScfDriver:
         """
 
         self._molecular_orbitals = MolecularOrbitals.read_hdf5(
-            self.checkpoint_file)
+            self.checkpoint_file, 'scf/')
         den_mat = self._molecular_orbitals.get_density(molecule, self.scf_type)
 
         restart_text = 'Restarting from checkpoint file: '
@@ -1187,7 +1187,7 @@ class ScfDriver:
                     Path(self.checkpoint_file).is_file()):
                 valid = MolecularOrbitals.match_hdf5(self.checkpoint_file,
                                                      nuclear_charges, basis_set,
-                                                     scf_type)
+                                                     scf_type, 'scf/')
 
         valid = self.comm.bcast(valid, root=mpi_master())
 
@@ -1365,9 +1365,7 @@ class ScfDriver:
 
                 create_hdf5(self.checkpoint_file, molecule, basis, xc_label,
                             potfile_text)
-                self.molecular_orbitals.write_hdf5(self.checkpoint_file,
-                                                   molecule.get_element_ids(),
-                                                   basis.get_label())
+                self.molecular_orbitals.write_hdf5(self.checkpoint_file, 'scf/')
                 if self._cpcm:
                     write_cpcm_charges(self.checkpoint_file,
                                        self.cpcm_drv._cpcm_q)
