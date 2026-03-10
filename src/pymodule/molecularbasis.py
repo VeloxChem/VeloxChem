@@ -574,7 +574,7 @@ def _MolecularBasis_get_string(self, title):
                 atom_ecp = abasis.get_ecp_potential()
                 n_core_elec = atom_ecp.number_of_core_electrons()
                 bas_str += f'{str(n_core_elec):<16s}'
-            else:
+            elif has_ecp:
                 bas_str += f'{"":<16s}'
             bas_str += '\n'
     bas_str += '\n'
