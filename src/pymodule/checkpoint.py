@@ -642,11 +642,11 @@ def read_results(fname, label):
             the dictionary of results.
     """
 
-    valid_checkpoint = (fname and isinstance(fname, str) and
-                        Path(fname).is_file())
+    valid_filename = (fname and isinstance(fname, str))
+    assert_msg_critical(valid_filename, f"{fname!r} is not a valid filename.")
 
-    assert_msg_critical(valid_checkpoint,
-                        fname + " is not a valid checkpoint file.")
+    file_exists = Path(fname).is_file()
+    assert_msg_critical(file_exists, f"{fname!r} does not exist.")
 
     res_dict = {}
     h5f = h5py.File(fname, "r")
@@ -729,11 +729,11 @@ def read_molecule_and_basis(fname):
         The molecule and AO basis set.
     """
 
-    valid_checkpoint = (fname and isinstance(fname, str) and
-                        Path(fname).is_file())
+    valid_filename = (fname and isinstance(fname, str))
+    assert_msg_critical(valid_filename, f"{fname!r} is not a valid filename.")
 
-    assert_msg_critical(valid_checkpoint,
-                        fname + " is not a valid checkpoint file.")
+    file_exists = Path(fname).is_file()
+    assert_msg_critical(file_exists, f"{fname!r} does not exist.")
 
     molecule = None
     basis = None

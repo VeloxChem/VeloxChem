@@ -71,7 +71,8 @@ from .sanitychecks import (molecule_sanity_check, dft_sanity_check,
                            pe_sanity_check, solvation_model_sanity_check)
 from .errorhandler import assert_msg_critical
 from .checkpoint import (create_hdf5, write_scf_results_to_hdf5,
-                         write_cpcm_charges, read_cpcm_charges)
+                         write_cpcm_charges, read_cpcm_charges,
+                         read_molecule_and_basis)
 
 
 class ScfDriver:
@@ -552,22 +553,61 @@ class ScfDriver:
                 'with polarizable embedding')
             # Note: we allow restarting SCF with point charges
 
-    def compute(self, molecule, ao_basis, min_basis=None):
+    def compute(self,
+                molecule=None,
+                basis=None,
+                min_basis=None,
+                checkpoint=None):
         """
         Performs SCF calculation using molecular data.
 
         :param molecule:
             The molecule.
-        :param ao_basis:
+        :param basis:
             The AO basis set.
         :param min_basis:
             The minimal AO basis set.
+        :param checkpoint:
+            The checkpoint file to restart from.
         """
+
+        if checkpoint is None:
+            # No checkpoint provided via argument.
+            # Run normal SCF calculation using molecule and basis.
+            # This may still be a restarted SCF calculation if
+            # `checkpoint_file` or `filename` is properly set.
+            assert_msg_critical(
+                molecule is not None and basis is not None,
+                'ScfDriver.compute: Need valid molecule and basis')
+        else:
+            # Checkpoint provided via argument.
+            # Restart SCF calculation using checkpoint.
+            assert_msg_critical(
+                molecule is None and basis is None and min_basis is None,
+                'ScfDriver.compute: Please only provide checkpoint ' +
+                'when restarting SCF')
+            checkpoint = str(checkpoint)
+            assert_msg_critical(
+                Path(checkpoint).is_file(),
+                'ScfDriver.compute: Checkpoint does not exist')
+            assert_msg_critical(
+                Path(checkpoint).suffix == '.h5',
+                'ScfDriver.compute: Checkpoint must be a .h5 file')
+            molecule, basis = read_molecule_and_basis(checkpoint)
+            self.restart = True
+            self.checkpoint_file = checkpoint
+            # To avoid inconsistency across MPI ranks
+            self.checkpoint_file = self.comm.bcast(self.checkpoint_file,
+                                                   root=mpi_master())
+            if checkpoint.endswith('_scf.h5'):
+                self.filename = checkpoint[:-len('_scf.h5')]
+            else:
+                self.filename = checkpoint[:-len('.h5')]
 
         profiler = Profiler()
 
         if min_basis is None:
-            if ao_basis.has_ecp():
+            if basis.has_ecp():
                 min_basis_label = 'AO-START-GUESS-FOR-ECP'
             else:
                 min_basis_label = 'AO-START-GUESS'
@@ -644,7 +684,7 @@ class ScfDriver:
 
         if self.restart:
             self.restart = self.validate_checkpoint(molecule.get_element_ids(),
-                                                    ao_basis.get_label(),
+                                                    basis.get_label(),
                                                     self.scf_type)
 
         if self.restart:
@@ -657,7 +697,7 @@ class ScfDriver:
                     self.checkpoint_file, 'scf/')
 
         # nuclear repulsion energy
-        self._nuc_energy = molecule.nuclear_repulsion_energy(ao_basis)
+        self._nuc_energy = molecule.nuclear_repulsion_energy(basis)
 
         if self.rank == mpi_master():
             self._print_header()
@@ -758,7 +798,7 @@ class ScfDriver:
 
             self._embedding_drv = PolarizableEmbeddingSCF(
                 molecule=molecule,
-                ao_basis=ao_basis,
+                ao_basis=basis,
                 options=self.embedding,
                 comm=self.comm)
 
@@ -915,7 +955,7 @@ class ScfDriver:
                     den_mat = self.gen_initial_density_restart(molecule)
                 else:
                     den_mat = self.gen_initial_density_sad(
-                        molecule, ao_basis, min_basis)
+                        molecule, basis, min_basis)
             else:
                 den_mat = None
             den_mat = self.comm.bcast(den_mat, root=mpi_master())
@@ -927,7 +967,7 @@ class ScfDriver:
                 self.cpcm_drv._cpcm_q = self.comm.bcast(self.cpcm_drv._cpcm_q,
                                                         root=mpi_master())
 
-            self._comp_diis(molecule, ao_basis, min_basis, den_mat, profiler)
+            self._comp_diis(molecule, basis, min_basis, den_mat, profiler)
 
         # two level DIIS method
         if self.acc_type.upper() in ['L2_C2DIIS', 'L2_DIIS']:
@@ -941,7 +981,7 @@ class ScfDriver:
             old_max_iter = self.max_iter
             self.max_iter = 5
 
-            val_basis = ao_basis.reduce_to_valence_basis()
+            val_basis = basis.reduce_to_valence_basis()
             if self.rank == mpi_master():
                 den_mat = self.gen_initial_density_sad(molecule, val_basis,
                                                        min_basis)
@@ -959,11 +999,11 @@ class ScfDriver:
 
             if self.rank == mpi_master():
                 den_mat = self.gen_initial_density_proj(
-                    molecule, ao_basis, val_basis, self._molecular_orbitals)
+                    molecule, basis, val_basis, self._molecular_orbitals)
             else:
                 den_mat = None
             den_mat = self.comm.bcast(den_mat, root=mpi_master())
-            self._comp_diis(molecule, ao_basis, val_basis, den_mat, profiler)
+            self._comp_diis(molecule, basis, val_basis, den_mat, profiler)
 
         self._fock_matrices_alpha.clear()
         self._fock_matrices_beta.clear()
@@ -984,15 +1024,15 @@ class ScfDriver:
         if self.rank == mpi_master():
             self._print_scf_energy()
 
-            s2 = self.compute_s2(molecule, ao_basis, self.scf_results)
+            s2 = self.compute_s2(molecule, basis, self.scf_results)
             self._print_ground_state(molecule, s2)
 
             if self.print_level == 2:
-                self.molecular_orbitals.print_orbitals(molecule, ao_basis, None,
+                self.molecular_orbitals.print_orbitals(molecule, basis, None,
                                                        self.ostream)
             if self.print_level == 3:
                 self.molecular_orbitals.print_orbitals(
-                    molecule, ao_basis,
+                    molecule, basis,
                     (0, self.molecular_orbitals.number_of_mos()), self.ostream)
 
             if self.print_level > 1:

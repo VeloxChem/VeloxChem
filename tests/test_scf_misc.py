@@ -66,6 +66,11 @@ class TestScfDriverMiscellaneous:
         filename = str(tmp_path / "water_restart")
         checkpoint_file = Path(f"{filename}_scf.h5")
 
+        # To avoid inconsistency across MPI ranks
+        comm = MPI.COMM_WORLD
+        filename = comm.bcast(filename, root=mpi_master())
+        checkpoint_file = comm.bcast(checkpoint_file, root=mpi_master())
+
         first_drv, first_results = self.run_hf_scf(
             molecule, basis, lambda drv: setattr(drv, "filename", filename))
 
@@ -83,6 +88,20 @@ class TestScfDriverMiscellaneous:
         if self.is_master():
             assert second_drv._ref_mol_orbs is not None
             assert second_results["scf_energy"] == pytest.approx(
+                first_results["scf_energy"], abs=1.0e-10)
+
+        third_drv = ScfRestrictedDriver()
+        third_drv.ostream.mute()
+        # no configure for third_drv
+        third_results = third_drv.compute(checkpoint=str(checkpoint_file))
+
+        assert third_results is not None
+        assert third_drv.filename == filename
+        assert third_drv.checkpoint_file == str(checkpoint_file)
+        assert third_drv.restart
+        if self.is_master():
+            assert third_drv._ref_mol_orbs is not None
+            assert third_results["scf_energy"] == pytest.approx(
                 first_results["scf_energy"], abs=1.0e-10)
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
