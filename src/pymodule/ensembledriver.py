@@ -804,6 +804,8 @@ class EnsembleDriver:
         basis_set: str,
         potdir: str | Path = "pot_frames",
         write_pe_potfiles: bool = True,
+        qm_charge: int | None = None,
+        qm_multiplicity: int | None = None,
     ):
         """
         Drives the computation over the ensemble of snapshots.
@@ -820,6 +822,12 @@ class EnsembleDriver:
             Directory to store/read PE potfiles.
         :param write_pe_potfiles: (bool)
             If True, PE potfiles are (re)generated before the loop when needed.
+        :param qm_charge:
+            Optional override for the QM-region charge. If None, the value stored
+            in each snapshot is used, defaulting to 0 when absent.
+        :param qm_multiplicity:
+            Optional override for the QM-region multiplicity. If None, the value stored
+            in each snapshot is used, defaulting to 1 when absent.
         
         :return:
             Dictionary with keys:
@@ -838,6 +846,13 @@ class EnsembleDriver:
     
         if isinstance(snapshots, dict):
             snapshots = [snapshots]
+
+        if qm_charge is not None:
+            qm_charge = int(qm_charge)
+        if qm_multiplicity is not None:
+            qm_multiplicity = int(qm_multiplicity)
+            if qm_multiplicity <= 0:
+                raise ValueError("QM multiplicity must be a positive integer.")
 
         potdir = Path(potdir)
 
@@ -902,7 +917,27 @@ class EnsembleDriver:
 
             labels = [str(x) for x in snap["qm_elements"]]
             coords = np.asarray(snap["qm_coords"], dtype=float)
+
+            snap_qm_charge = (
+                qm_charge
+                if qm_charge is not None 
+                else int(snap.get("qm_charge", 0))
+            )
+            snap_qm_multiplicity = (
+                qm_multiplicity
+                if qm_multiplicity is not None 
+                else int(snap.get("qm_multiplicity", 1))
+            )
+
             molecule = Molecule(labels, coords)
+            molecule.set_charge(snap_qm_charge)
+            molecule.set_multiplicity(snap_qm_multiplicity)
+
+            if not molecule.check_multiplicity():
+                raise ValueError(
+                    f"Incompatible QM charge ({snap_qm_charge}) and multiplicity"
+                    f"({snap_qm_multiplicity}) for frame {frame}."
+                )
             basis = MolecularBasis.read(molecule, basis_set)
 
             pe_coords = np.asarray(snap.get("pe_coords", []), dtype=float)

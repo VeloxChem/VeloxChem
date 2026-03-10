@@ -264,6 +264,8 @@ class EnsembleParser:
                    trajectory_file: str,
                    num_snapshots: int | None = None,
                    qm_region: str = "",
+                   qm_charge: int = 0,
+                   qm_multiplicity: int = 1,
                    env_region: str | None = None,
                    topology_file: str | None = None,
                    pe_cutoff: float | None = None,
@@ -286,6 +288,10 @@ class EnsembleParser:
             processed. If an integer, frames are sampled evenly.
         :param qm_region:
             Selection string defining the QM region (MDAnalysis selection syntax).
+        :param qm_charge:
+            Total charge of the QM region. Default is 0.
+        :param qm_multiplicity:
+            Spin multiplicity of the QM region. Default is 1 (singlet).
         :param env_region:
             Selection string defining the environment region (MDAnalysis selection syntax).
             If not provided, the environment is taken as all atoms not contained in
@@ -314,6 +320,10 @@ class EnsembleParser:
                 QM region Cartesian coordinates, shape (N_qm, 3), in Angstrom.
             - qm_elements (numpy.ndarray):
                 Element symbols for each QM atom, shape (N_qm,).
+            - qm_charge (int):
+                Total charge of the QM region.
+            - qm_multiplicity (int):
+                Spin multiplicity of the QM region.
             - pe_coords (numpy.ndarray):
                 PE region Cartesian coordinates, shape (N_pe, 3), in Angstrom.
             - pe_atom_names (numpy.ndarray):
@@ -343,7 +353,13 @@ class EnsembleParser:
         if pe_cutoff is not None and npe_cutoff is not None:
             if float(npe_cutoff) < float(pe_cutoff):
                 raise ValueError("npe_cutoff must be >= pe_cutoff")
-        
+            
+        qm_charge = int(qm_charge)
+        qm_multiplicity = int(qm_multiplicity)
+
+        if qm_multiplicity <=0:
+            raise ValueError("qm_multiplicity must be a positive integer")
+
         if trajectory_file.lower().endswith('.pdb'):
             self.universe = mda.Universe(trajectory_file, guess_bonds=True)
         else:
@@ -551,6 +567,8 @@ class EnsembleParser:
 
                     "qm_coords": qm_coords,
                     "qm_elements": qm_elements,
+                    "qm_charge": qm_charge,
+                    "qm_multiplicity": qm_multiplicity,
 
                     "pe_coords": pe_coords,
                     "pe_atom_names": pe_atom_names,
