@@ -169,10 +169,7 @@ class TestMolecularBasis:
 
         h2o = self.get_h2o()
         bdict = {'3': 'DEF2-SVPD'}
-        a_basis = MolecularBasis.read_dict(h2o,
-                                           'DEF2-SVP',
-                                           bdict,
-                                           ostream=None)
+        a_basis = MolecularBasis.read_dict(h2o, 'DEF2-SVP', bdict, ostream=None)
         assert a_basis.get_label() == 'MIXED-BASIS-SETS'
         b_basis = self.get_h2o_mixed()
         assert a_basis == b_basis
@@ -221,31 +218,17 @@ class TestMolecularBasis:
         b_basis = ref_basis.slice([0, 2])
         assert a_basis == b_basis
 
-        a_basis = MolecularBasis([
-            o_bas,
-        ], [
-            0,
-        ])
-        b_basis = ref_basis.slice([
-            0,
-        ])
+        a_basis = MolecularBasis([o_bas], [0])
+        b_basis = ref_basis.slice([0])
         assert a_basis == b_basis
 
-        a_basis = MolecularBasis([
-            h_bas,
-        ], [0])
-        b_basis = ref_basis.slice([
-            1,
-        ])
+        a_basis = MolecularBasis([h_bas], [0])
+        b_basis = ref_basis.slice([1])
         assert a_basis == b_basis
-        b_basis = ref_basis.slice([
-            2,
-        ])
+        b_basis = ref_basis.slice([2])
         assert a_basis == b_basis
 
-        a_basis = MolecularBasis([
-            h_bas,
-        ], [0, 0])
+        a_basis = MolecularBasis([h_bas], [0, 0])
         b_basis = ref_basis.slice([1, 2])
         assert a_basis == b_basis
 
@@ -563,7 +546,7 @@ class TestMolecularBasis:
         a_indexes = basis.atomic_indices([0, 2], 0, 3)
         b_indexes = [2]
         assert a_indexes == b_indexes
-        
+
         # test getter for atomic indexes
         a_indexes = basis.atomic_indices([2, 1], 0, 3)
         b_indexes = [2, 1]
@@ -583,7 +566,7 @@ class TestMolecularBasis:
         a_indexes = basis.atomic_indices([0, 2], 0, 1)
         b_indexes = [0, 0, 2]
         assert a_indexes == b_indexes
-        
+
         # test getter for atomic indexes
         a_indexes = basis.atomic_indices([2, 0, 1], 0, 1)
         b_indexes = [2, 0, 0, 1]
