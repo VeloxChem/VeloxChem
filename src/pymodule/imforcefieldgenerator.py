@@ -341,6 +341,7 @@ class IMForceFieldGenerator:
         opt_drv = OptimizationDriver(optimization_driver)
         opt_drv.ostream.mute()
         opt_drv.transition = transition
+
         if constraints is not None:
             opt_drv.constraints = self._build_opt_constraint_list(constraints, index_offset=index_offset)
 
@@ -623,11 +624,8 @@ class IMForceFieldGenerator:
             conformal_structures = conformer_generator.generate(molecule)
             dihedral_canditates = conformer_generator.dihedral_candidates
 
-            print(dihedral_canditates)
-
-            conf_molecule_xyz = conformal_structures['molecules'][0].get_xyz_string()
-
             if len(dihedral_canditates) > 0:
+                global_counter = 0
                 for entry_idx, entries in enumerate(dihedral_canditates[:]):
                     
                     dihedral = entries[0]
@@ -635,8 +633,9 @@ class IMForceFieldGenerator:
                     periodicity = len(entries[1])
                     conformers_plus_ts[0][dih_key] = []
                     for i in range(len(entries[1])):
-                        conformers_plus_ts[0][dih_key].append((conformal_structures['molecules'][i], 'normal'))
-                        print(conformal_structures['molecules'][i].get_xyz_string())
+                        global_counter += i
+                        conformers_plus_ts[0][dih_key].append((conformal_structures['molecules'][entry_idx + global_counter], 'normal'))
+                        print(conformal_structures['molecules'][entry_idx + global_counter].get_xyz_string())
 
                     _, ts_molecule = self.determine_atom_transfer_reaction_path([conformers_plus_ts[0][dih_key][-2][0]], [conformers_plus_ts[0][dih_key][-1][0]], scf=False)
                     conformers_plus_ts[0][dih_key].append((ts_molecule, 'transition'))
@@ -1045,12 +1044,14 @@ class IMForceFieldGenerator:
                         dih_key, mol_info = mol_entries
 
                         for mol, mode in mol_info:
-    
+                            print('String', mol.get_xyz_string())
                             if self.use_minimized_structures[0]:
                                 transition = False
-                                constraints_global = self.use_minimized_structures[1]
+                                constraints_global = []
+                                if len(self.use_minimized_structures[1]) > 0:
+                                    constraints_global.append(self.use_minimized_structures[1])
                                 if dih_key:
-                                    constraints_global.append([dih_key])
+                                    constraints_global.append(dih_key)
                                 if mode == 'transition':
                                     transition = True
                                     constraints_global = []
@@ -1080,13 +1081,13 @@ class IMForceFieldGenerator:
 
                                     elif  self.roots_to_follow[0] == 0 and isinstance(self.drivers['gs'][0], XtbDriver):
 
-                                        current_basis = MolecularBasis.read(molecule, states_basis['gs'])
+                                        current_basis = MolecularBasis.read(mol, states_basis['gs'])
                                         optimized_molecule, opt_results = self._run_optimization(
                                             self.drivers['gs'][0],
-                                            molecule,
+                                            mol,
                                             constraints=constraints_global,
                                             transition=transition,
-                                            index_offset=1,
+                                            index_offset=0,
                                         )
                                         energy = opt_results['opt_energies'][-1]
 
@@ -2290,9 +2291,9 @@ class IMForceFieldGenerator:
      
                         print('Dihedral creation', dihedral, opt_dihedral_angle, angle)
                         
-                        cur_molecule.set_dihedral([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1], opt_dihedral_angle + angle, 'radian')
+                        cur_molecule.set_dihedral([dihedral[0], dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1], opt_dihedral_angle + angle, 'radian')
                         dihedral_to_change.append([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1])
-                        constraint = f"freeze dihedral {dihedral[0] + 1} {dihedral[1] + 1} {dihedral[2] + 1} {dihedral[3] + 1}"
+                        constraint = f"freeze dihedral {dihedral[0]} {dihedral[1]} {dihedral[2]} {dihedral[3]}"
                         constraints.append(constraint)
                     
                         if self.symmetry_information is not None:
@@ -2303,7 +2304,6 @@ class IMForceFieldGenerator:
                         symmetry_point = True
                     
                     current_basis = MolecularBasis.read(cur_molecule, basis.get_main_basis_label())
-                    dihedral_to_change.extend(self.use_minimized_structures[1])
 
                     if isinstance(self.drivers['gs'][0], ScfRestrictedDriver):
                         _, scf_results, _ = self.compute_energy(self.drivers['gs'][0], cur_molecule, current_basis)
@@ -2311,7 +2311,7 @@ class IMForceFieldGenerator:
                                         self.drivers['gs'][1],
                                         cur_molecule,
                                         constraints=constraints,
-                                        index_offset=0,
+                                        index_offset=1,
                                         compute_args=(current_basis, scf_results),
                                         source_molecule=molecule
                                     )
@@ -2322,7 +2322,7 @@ class IMForceFieldGenerator:
                                         self.drivers['gs'][1],
                                         cur_molecule,
                                         constraints=constraints,
-                                        index_offset=0,
+                                        index_offset=1,
                                         source_molecule=molecule
                                     )
                         cur_molecule = optimized_molecule

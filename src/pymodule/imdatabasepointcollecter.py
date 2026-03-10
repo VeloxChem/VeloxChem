@@ -2893,7 +2893,7 @@ class IMDatabasePointCollecter:
                     corr_new_dp_distrib = False
                     # primary_constraint.append([2,3])
                     # primary_constraint = [[2,3]]
-                    main_constraint_list = primary_constraint
+                    main_constraint_list = backup_constraint
                     old_const_len = len(main_constraint_list)
                     opt_results = None
                     while not corr_new_dp_distrib:

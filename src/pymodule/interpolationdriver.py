@@ -2156,13 +2156,26 @@ class InterpolationDriver():
         # Block ranking
         pair_weight = 0.35
         support_weight = 0.40
-        novelty_weight = 0.60
-        redundancy_weight = 0.90
 
         novelty_sigma = 0.20              # subspace-distance scale (tune)
         support_top_frac = 0.20           # top fraction in a datapoint to count "support"
         top_err_for_causal = 4
         top_src_per_err = 8
+
+
+        novelty_weight = 0.35          # stronger than before, but not dominant
+        redundancy_weight = 0.55       # softer penalty than before
+
+        # extra preference for torsional exploration
+        dihedral_anchor_bonus = 0.35
+        dihedral_in_block_bonus = 0.20
+        dihedral_novelty_bonus = 0.40
+
+        # automatic constraint selection
+        max_constraints_to_return = 3
+        dihedral_score_frac = 0.35     # torsion considered relevant if >= 35% of top block coord score
+        secondary_score_frac = 0.20    # secondary constraints should be meaningful
+
 
         eps = 1e-12
 
@@ -2190,6 +2203,8 @@ class InterpolationDriver():
         q_current = np.asarray(self.impes_coordinate.internal_coordinates_values, dtype=float)
         N = len(z_matrix)
 
+        global_coord_novelty = np.zeros(N, dtype=float)
+
         # ------------------------------------------------------------------
         # Per-datapoint diagnostic pass
         # ------------------------------------------------------------------
@@ -2214,6 +2229,12 @@ class InterpolationDriver():
             pred_qm_G_int = self.transform_gradient_to_internal_coordinates(
                 molecule, qm_gradient_mw.reshape(qm_gradient.shape), self.impes_coordinate.b_matrix
             )
+
+            coord_novelty_local_abs = self._compute_acquisition_novelty(
+                dq_raw=dq_raw,
+                z_matrix=z_matrix,
+            )
+            coord_novelty_local_rel = self._normalize_nonnegative(coord_novelty_local_abs)
 
             # local diagnostic without printing
             diag_result = self.compute_internal_gradient_diagnostics(
@@ -2324,8 +2345,12 @@ class InterpolationDriver():
                 "pair_score": pair_score.copy(),
                 "coord_score": dp_coord_score.copy(),
                 "support_mask": support_mask.copy(),
+                "coord_novelty_local_abs": coord_novelty_local_abs.copy(),
+                "coord_novelty_local_rel": coord_novelty_local_rel.copy(),
                 "coords": [tuple(int(x) for x in c) for c in z_matrix],
             })
+
+            
 
         if not per_dp_results:
             return [], [], []
@@ -2361,6 +2386,9 @@ class InterpolationDriver():
         global_support = np.zeros(N, dtype=float)
         global_rho = np.zeros(N, dtype=float)
         global_pair = np.zeros((N, N), dtype=float)
+        global_coord_novelty_abs = np.zeros(N, dtype=float)
+        global_coord_novelty_rel = np.zeros(N, dtype=float)
+
 
         for idx in keep_indices:
             wk = dp_weights[idx]
@@ -2373,11 +2401,15 @@ class InterpolationDriver():
             global_support += wk * r["support_mask"]
             global_rho += wk * r["rho"]
             global_pair += wk * r["pair_score"]
+            
+            global_coord_novelty_abs += wk * r["coord_novelty_local_abs"]
+            global_coord_novelty_rel += wk * r["coord_novelty_local_rel"]
 
         global_hybrid = self._normalize_nonnegative(global_hybrid)
         global_source = self._normalize_nonnegative(global_source)
         global_error = self._normalize_nonnegative(global_error)
         global_causal = self._normalize_nonnegative(global_causal)
+        global_coord_novelty_rel = self._normalize_nonnegative(global_coord_novelty_rel)
         global_support = global_support / (global_support.max() + eps)
 
         global_coord_score = (
@@ -2461,9 +2493,9 @@ class InterpolationDriver():
                 continue
             seen_blocks.add(key)
 
-            # block-level components
             coord_mass = float(np.sum(global_coord_score[block_indices]))
             support_mass = float(np.mean(global_support[block_indices]))
+            coord_novelty_mass = float(np.sum(global_coord_novelty[block_indices]))
 
             pair_mass = 0.0
             for a in range(len(block_indices)):
@@ -2483,16 +2515,41 @@ class InterpolationDriver():
             novelty = dmin / (dmin + novelty_sigma + eps)
             redundancy = np.exp(- (dmin / (novelty_sigma + eps)) ** 2)
 
-            acq_score = (
+            # --- type-aware torsion preference ---
+            anchor_type = self.coord_type(anchor_coord)
+            dihedral_indices_in_block = [
+                i for i in block_indices
+                if self.coord_type(tuple(int(x) for x in z_matrix[i])) == "dihedral"
+            ]
+
+            dihedral_bonus = 0.0
+
+            if anchor_type == "dihedral":
+                dihedral_bonus += dihedral_anchor_bonus
+
+            if dihedral_indices_in_block:
+                dihedral_bonus += dihedral_in_block_bonus
+
+                # reward torsional novelty specifically
+                torsion_novelty = float(np.sum(global_coord_novelty[dihedral_indices_in_block]))
+                dihedral_bonus += dihedral_novelty_bonus * torsion_novelty
+
+            # --- repair and explore split ---
+            repair_score = (
                 coord_mass
                 + pair_weight * pair_mass
             ) * (
                 1.0 + support_weight * support_mass
-            ) * (
+            )
+
+            explore_score = (
                 1.0 + novelty_weight * novelty
+                + 0.5 * novelty_weight * coord_novelty_mass
             ) * (
                 1.0 - redundancy_weight * redundancy
             )
+
+            acq_score = repair_score * explore_score * (1.0 + dihedral_bonus)
 
             block_coords = [tuple(int(x) for x in z_matrix[i]) for i in block_indices]
 
@@ -2515,34 +2572,92 @@ class InterpolationDriver():
 
         if not ranked_blocks:
             return [], [], []
+        
+        ranked_torsions = self._rank_torsion_exploration_candidates(
+            z_matrix=z_matrix,
+            global_coord_score=global_coord_score,
+            global_support=global_support,
+            global_torsion_novelty=global_coord_novelty_abs,
+            global_source=global_source,
+            constraints_to_exclude=constraints_to_exclude,
+            top_n=10,
+        )
+        best_repair_block = ranked_blocks[0]
+
+        selection_mode, chosen_torsion = self._choose_repair_vs_exploration(
+            best_repair_block=best_repair_block,
+            ranked_torsions=ranked_torsions,
+            global_coord_score=global_coord_score,
+            torsion_novelty_threshold=0.25,
+            exploration_competitiveness=0.55,
+        )
+
 
         # ------------------------------------------------------------------
         # Best block -> primary constraint and candidate constraints
         # ------------------------------------------------------------------
-        best_block = ranked_blocks[0]
+        if selection_mode == "exploration":
+            torsion_idx = chosen_torsion["idx"]
 
-        # Prefer a torsion anchor inside the best block if it is competitive
-        best_anchor_idx = best_block["anchor_idx"]
-        best_anchor_score = global_coord_score[best_anchor_idx]
-
-        torsion_candidates = []
-        for idx in best_block["block_indices"]:
-            coord = tuple(int(x) for x in z_matrix[idx])
-            if self.coord_type(coord) == "dihedral":
-                torsion_candidates.append(idx)
-
-        if torsion_candidates:
-            torsion_candidates = sorted(
-                torsion_candidates,
-                key=lambda i: global_coord_score[i],
-                reverse=True
+            exploration_block_indices = self._build_local_block_around_torsion(
+                torsion_idx=torsion_idx,
+                global_coord_score=global_coord_score,
+                global_pair=global_pair,
+                z_matrix=z_matrix,
+                max_neighbors=max_constraints_to_return - 1,
+                min_pair_frac=0.10,
+                min_score_frac=0.15,
             )
-            torsion_idx = torsion_candidates[0]
-            if global_coord_score[torsion_idx] >= 0.6 * best_anchor_score:
-                best_anchor_idx = torsion_idx
 
-        primary_constraint = [tuple(int(x) for x in z_matrix[best_anchor_idx])]
-        candidate_constraints = [tuple(int(x) for x in c) for c in best_block["block_coords"]]
+            selected_constraints, primary_constraint = self._select_constraints_for_torsion_block(
+                torsion_idx=torsion_idx,
+                block_indices=exploration_block_indices,
+                global_coord_score=global_coord_score,
+                global_torsion_novelty=global_coord_novelty,
+                z_matrix=z_matrix,
+                max_constraints=max_constraints_to_return,
+            )
+
+            candidate_constraints = selected_constraints
+            best_block = {
+                "anchor_idx": torsion_idx,
+                "anchor_coord": tuple(int(x) for x in z_matrix[torsion_idx]),
+                "anchor_type": "dihedral",
+                "block_indices": exploration_block_indices,
+                "block_coords": [tuple(int(x) for x in z_matrix[i]) for i in exploration_block_indices],
+                "coord_mass": float(np.sum(global_coord_score[exploration_block_indices])),
+                "pair_mass": float(np.sum([
+                    global_pair[i, j]
+                    for a, i in enumerate(exploration_block_indices)
+                    for j in exploration_block_indices[a+1:]
+                ])),
+                "support_mass": float(np.mean(global_support[exploration_block_indices])),
+                "dmin": self._min_block_distance_to_existing_datapoints(
+                    block_indices=exploration_block_indices,
+                    q_current=q_current,
+                    datapoints=[r["datapoint"] for r in per_dp_results],
+                    z_matrix=z_matrix,
+                    symmetry_information=self.symmetry_information,
+                ),
+                "novelty": float(chosen_torsion["novelty"]),
+                "redundancy": 0.0,
+                "acq_score": float(chosen_torsion["explore_score"]),
+            }
+
+        else:
+            best_block = best_repair_block
+
+            selected_constraints, primary_constraint = self._select_constraints_from_block(
+                block_indices=best_block["block_indices"],
+                global_coord_score=global_coord_score,
+                global_coord_novelty=global_coord_novelty,
+                z_matrix=z_matrix,
+                max_constraints=max_constraints_to_return,
+                dihedral_score_frac=dihedral_score_frac,
+                secondary_score_frac=secondary_score_frac,
+            )
+
+            candidate_constraints = selected_constraints
 
         # ------------------------------------------------------------------
         # Debug printout
@@ -2577,6 +2692,19 @@ class InterpolationDriver():
                 f"{blk['acq_score']:12.6e}"
             )
             print(f"      block coords: {blk['block_coords']}")
+        
+        print("\n=== Ranked torsional exploration candidates ===")
+        print(f"{'rank':>4} {'idx':>4} {'coord':>18} {'novelty':>12} {'coord':>12} {'source':>12} {'support':>12} {'explore':>12}")
+        print("-" * 94)
+        for rank, t in enumerate(ranked_torsions[:10]):
+            print(
+                f"{rank:4d} {t['idx']:4d} {self.format_coord(t['coord']):>18} "
+                f"{t['novelty']:12.6e} {t['coord_score']:12.6e} "
+                f"{t['source_score']:12.6e} {t['support']:12.6e} "
+                f"{t['explore_score']:12.6e}"
+            )
+
+        print("\nSelection mode:", selection_mode)
 
         print("\nPrimary constraint:", primary_constraint)
         print("Candidate constraints (best block):", candidate_constraints)
@@ -2587,7 +2715,334 @@ class InterpolationDriver():
     # ======================================================================
     # Helper methods
     # ======================================================================
+    def _select_constraints_for_torsion_block(
+        self,
+        torsion_idx: int,
+        block_indices: List[int],
+        global_coord_score: np.ndarray,
+        global_torsion_novelty: np.ndarray,
+        z_matrix: List[Tuple[int, ...]],
+        max_constraints: int = 3,
+    ):
+        """
+        Select constraints for a torsion-led acquisition.
 
+        Strategy
+        --------
+        - primary: the torsion itself
+        - secondary/tertiary: best non-dihedral local stabilizers in the torsion block
+        """
+        primary = [tuple(int(x) for x in z_matrix[torsion_idx])]
+        selected = [tuple(int(x) for x in z_matrix[torsion_idx])]
+
+        remaining = [i for i in block_indices if i != torsion_idx]
+
+        def rank_key(i):
+            coord = tuple(int(x) for x in z_matrix[i])
+            ctype = self.coord_type(coord)
+
+            # prefer non-dihedrals as stabilizers
+            type_pref = 0 if ctype != "dihedral" else 1
+            return (
+                type_pref,
+                -float(global_coord_score[i]),
+                -float(global_torsion_novelty[i]) if ctype == "dihedral" else 0.0
+            )
+
+        remaining = sorted(remaining, key=rank_key)
+
+        for i in remaining:
+            if len(selected) >= max_constraints:
+                break
+            selected.append(tuple(int(x) for x in z_matrix[i]))
+
+        return selected, primary
+    
+    def _choose_repair_vs_exploration(
+        self,
+        best_repair_block: Dict[str, Any],
+        ranked_torsions: List[Dict[str, Any]],
+        global_coord_score: np.ndarray,
+        torsion_novelty_threshold: float = 0.45,
+        exploration_competitiveness: float = 0.55,
+    ):
+        """
+        Decide whether to use the best repair block or switch to torsional exploration.
+
+        Decision rule
+        -------------
+        Use exploration if:
+        - there is a torsion candidate,
+        - its torsional novelty is high enough,
+        - and its exploration score is sufficiently competitive relative to the repair block.
+
+        Returns
+        -------
+        mode : str, one of {"repair", "exploration"}
+        chosen_torsion : dict or None
+        """
+        if not ranked_torsions:
+            return "repair", None
+
+        best_torsion = ranked_torsions[0]
+        repair_score = float(best_repair_block["acq_score"])
+        torsion_score = float(best_torsion["explore_score"])
+        torsion_novelty = float(best_torsion["novelty"])
+
+        if torsion_novelty >= torsion_novelty_threshold and torsion_score >= exploration_competitiveness * repair_score:
+            return "exploration", best_torsion
+
+        return "repair", None
+    
+    def _build_local_block_around_torsion(
+        self,
+        torsion_idx: int,
+        global_coord_score: np.ndarray,
+        global_pair: np.ndarray,
+        z_matrix: List[Tuple[int, ...]],
+        max_neighbors: int = 4,
+        min_pair_frac: float = 0.10,
+        min_score_frac: float = 0.15,
+    ) -> List[int]:
+        """
+        Build a local block around a chosen torsion.
+
+        Strategy
+        --------
+        Start from the torsion and add strong nearby non-dihedral partners based on:
+        - pair coupling
+        - coordinate score
+        - atom overlap preference
+
+        Returns
+        -------
+        block_indices : list[int]
+        """
+        torsion_coord = tuple(int(x) for x in z_matrix[torsion_idx])
+        torsion_atoms = set(torsion_coord)
+
+        pair_row = np.asarray(global_pair[torsion_idx], dtype=float).copy()
+        best_pair = np.max(pair_row[np.arange(len(pair_row)) != torsion_idx]) if len(pair_row) > 1 else 0.0
+        if best_pair < 1e-12:
+            best_pair = 1.0
+
+        candidates = []
+        best_score = float(global_coord_score[torsion_idx])
+
+        for j in range(len(z_matrix)):
+            if j == torsion_idx:
+                continue
+
+            coord_j = tuple(int(x) for x in z_matrix[j])
+            atoms_j = set(coord_j)
+
+            pair_val = float(pair_row[j])
+            score_val = float(global_coord_score[j])
+            overlap = len(torsion_atoms.intersection(atoms_j))
+
+            # prefer non-dihedrals as local stabilizers
+            type_penalty = 0.0 if self.coord_type(coord_j) != "dihedral" else -0.05
+
+            if pair_val < min_pair_frac * best_pair and score_val < min_score_frac * best_score:
+                continue
+
+            local_score = 0.55 * pair_val + 0.25 * score_val + 0.20 * overlap + type_penalty
+
+            candidates.append((j, local_score))
+
+        candidates = sorted(candidates, key=lambda x: x[1], reverse=True)
+
+        block = [int(torsion_idx)]
+        for j, _ in candidates[:max_neighbors]:
+            block.append(int(j))
+
+        return block
+
+    def _rank_torsion_exploration_candidates(
+        self,
+        z_matrix: List[Tuple[int, ...]],
+        global_coord_score: np.ndarray,
+        global_support: np.ndarray,
+        global_torsion_novelty: np.ndarray,
+        global_source: np.ndarray,
+        constraints_to_exclude: List[Tuple[int, ...]],
+        top_n: int = 10,
+    ):
+        """
+        Rank dihedrals as exploration candidates.
+
+        Philosophy
+        ----------
+        A torsional exploration candidate should be rewarded for:
+        - raw torsional novelty
+        - some coordinate relevance (so we do not choose irrelevant torsions)
+        - some source importance (so it actually moves the structure)
+        - support across important datapoints
+
+        Returns
+        -------
+        ranked_torsions : list of dicts
+        """
+        ranked = []
+
+        for i, coord in enumerate(z_matrix):
+            coord = tuple(int(x) for x in coord)
+
+            if self.coord_type(coord) != "dihedral":
+                continue
+
+            if coord in constraints_to_exclude:
+                continue
+
+            # skip symmetry-excluded torsions
+            if len(coord) == 4 and coord[1:3] in self.symmetry_information[7][3]:
+                continue
+
+            novelty = float(global_torsion_novelty[i])
+            coord_score = float(global_coord_score[i])
+            source_score = float(global_source[i])
+            support = float(global_support[i])
+
+            # exploration score: novelty dominates, but not novelty alone
+            explore_score = (
+                0.60 * novelty
+                + 0.20 * coord_score
+                + 0.15 * source_score
+                + 0.05 * support
+            )
+
+            ranked.append({
+                "idx": int(i),
+                "coord": coord,
+                "novelty": novelty,
+                "coord_score": coord_score,
+                "source_score": source_score,
+                "support": support,
+                "explore_score": explore_score,
+            })
+
+        ranked = sorted(ranked, key=lambda x: x["explore_score"], reverse=True)
+        return ranked[:top_n]
+
+    def _compute_acquisition_novelty(
+        self,
+        dq_raw: np.ndarray,
+        z_matrix: List[Tuple[int, ...]],
+        bond_angle_scale: float = 0.25,
+    ) -> np.ndarray:
+        """
+        Acquisition novelty metric.
+
+        Purpose
+        -------
+        This is separate from dq_eff used in the interpolation model.
+        For acquisition, we want torsional novelty to reflect true wrapped angular distance.
+
+        Definitions
+        -----------
+        - bonds / angles:
+            novelty ~ |dq_raw| scaled by bond_angle_scale and clipped to [0, 1]
+        - dihedrals:
+            novelty = |wrapped angle difference| / pi
+
+        Returns
+        -------
+        novelty : np.ndarray, shape (N,), values in [0, 1]
+        """
+        dq_raw = np.asarray(dq_raw, dtype=float).reshape(-1)
+        novelty = np.zeros_like(dq_raw)
+
+        for i, coord in enumerate(z_matrix):
+            coord = tuple(int(x) for x in coord)
+
+            if len(coord) == 4:
+                # wrapped torsional distance normalized by pi
+                novelty[i] = abs(dq_raw[i]) / np.pi
+            else:
+                # rough bounded novelty for non-torsions
+                novelty[i] = min(abs(dq_raw[i]) / bond_angle_scale, 1.0)
+
+        return novelty
+
+    def _select_constraints_from_block(
+        self,
+        block_indices: List[int],
+        global_coord_score: np.ndarray,
+        global_coord_novelty: np.ndarray,
+        z_matrix: List[Tuple[int, ...]],
+        max_constraints: int = 3,
+        dihedral_score_frac: float = 0.35,
+        secondary_score_frac: float = 0.20,
+    ):
+        """
+        Automatically choose a reasonable constraint set from the winning block.
+
+        Strategy
+        --------
+        1) If a meaningful dihedral exists in the block, choose it as primary.
+        2) Then add 1-2 local stabilizing coordinates (prefer angle/bond).
+        3) If no meaningful dihedral exists, use the best overall coordinate as primary.
+        """
+
+        block_indices = list(block_indices)
+        block_scores = {i: float(global_coord_score[i]) for i in block_indices}
+        block_novel = {i: float(global_coord_novelty[i]) for i in block_indices}
+
+        # combined steering score: prioritize novelty more for torsions
+        steering_score = {}
+        for i in block_indices:
+            coord = tuple(int(x) for x in z_matrix[i])
+            ctype = self.coord_type(coord)
+
+            s = block_scores[i] + 0.35 * block_novel[i]
+            if ctype == "dihedral":
+                s += 0.25 * block_novel[i] + 0.10 * block_scores[i]
+            steering_score[i] = s
+
+        best_block_score = max(block_scores.values()) if block_scores else 0.0
+
+        dihedral_candidates = []
+        non_dihedral_candidates = []
+
+        for i in block_indices:
+            coord = tuple(int(x) for x in z_matrix[i])
+            ctype = self.coord_type(coord)
+
+            if ctype == "dihedral" and block_scores[i] >= dihedral_score_frac * best_block_score:
+                dihedral_candidates.append(i)
+            else:
+                non_dihedral_candidates.append(i)
+
+        # primary: prefer dihedral if relevant
+        if dihedral_candidates:
+            primary_idx = max(dihedral_candidates, key=lambda i: steering_score[i])
+        else:
+            primary_idx = max(block_indices, key=lambda i: steering_score[i])
+
+        primary_constraint = [tuple(int(x) for x in z_matrix[primary_idx])]
+
+        # secondary/tertiary: prefer local shape stabilizers that are not torsions
+        remaining = [i for i in block_indices if i != primary_idx]
+
+        # prioritize non-dihedrals first as stabilizers
+        remaining_sorted = sorted(
+            remaining,
+            key=lambda i: (self.coord_type(tuple(int(x) for x in z_matrix[i])) == "dihedral",
+                        -block_scores[i],
+                        -block_novel[i])
+        )
+
+        selected = [tuple(int(x) for x in z_matrix[primary_idx])]
+
+        for i in remaining_sorted:
+            if len(selected) >= max_constraints:
+                break
+            if block_scores[i] < secondary_score_frac * best_block_score:
+                continue
+            selected.append(tuple(int(x) for x in z_matrix[i]))
+
+        return selected, primary_constraint
+        
     def _normalize_nonnegative(self, x: np.ndarray, eps: float = 1e-12) -> np.ndarray:
         x = np.asarray(x, dtype=float)
         x = np.maximum(x, 0.0)
@@ -2844,7 +3299,7 @@ class InterpolationDriver():
                 if tuple(coord[1:3]) in sym_torsion_centers:
                     continue
                 d = self._principal_torsion_delta(q_a[i] - q_b[i])
-                x = np.sin(d)
+                x = d / np.pi
             else:
                 x = q_a[i] - q_b[i]
 
