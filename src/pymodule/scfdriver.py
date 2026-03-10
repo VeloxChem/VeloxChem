@@ -1333,18 +1333,18 @@ class ScfDriver:
                 name_string = get_random_string_parallel(self.comm)
                 base_fname = 'vlx_' + name_string
             self.checkpoint_file = f'{base_fname}_scf.h5'
-        self.write_checkpoint(molecule.get_element_ids(), basis.get_label())
+        self.write_checkpoint(molecule, basis)
 
         self.comm.barrier()
 
-    def write_checkpoint(self, nuclear_charges, basis_set):
+    def write_checkpoint(self, molecule, basis):
         """
         Writes molecular orbitals to checkpoint file.
 
-        :param nuclear_charges:
-            The nuclear charges.
-        :param basis_set:
-            Name of the basis set.
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
         """
 
         if self._skip_writing_h5:
@@ -1352,8 +1352,22 @@ class ScfDriver:
 
         if self.rank == mpi_master():
             if self.checkpoint_file and isinstance(self.checkpoint_file, str):
+                if self._dft:
+                    xc_label = self.xcfun.get_func_label()
+                else:
+                    xc_label = 'HF'
+
+                if self._pe:
+                    with open(str(self.pe_options['potfile']), 'r') as f_pot:
+                        potfile_text = '\n'.join(f_pot.readlines())
+                else:
+                    potfile_text = ''
+
+                create_hdf5(self.checkpoint_file, molecule, basis, xc_label,
+                            potfile_text)
                 self.molecular_orbitals.write_hdf5(self.checkpoint_file,
-                                                   nuclear_charges, basis_set)
+                                                   molecule.get_element_ids(),
+                                                   basis.get_label())
                 if self._cpcm:
                     write_cpcm_charges(self.checkpoint_file,
                                        self.cpcm_drv._cpcm_q)
@@ -1748,8 +1762,7 @@ class ScfDriver:
                     self._graceful_exit(molecule, ao_basis)
 
         if not self._first_step:
-            self.write_checkpoint(molecule.get_element_ids(),
-                                  ao_basis.get_label())
+            self.write_checkpoint(molecule, ao_basis)
 
         if (not self._first_step) and self.is_converged:
 
@@ -1906,7 +1919,7 @@ class ScfDriver:
         self.ostream.print_info('Preparing for a graceful termination...')
         self.ostream.flush()
 
-        self.write_checkpoint(molecule.get_element_ids(), basis.get_label())
+        self.write_checkpoint(molecule, basis)
 
         self.ostream.print_blank()
         self.ostream.print_info('...done.')
