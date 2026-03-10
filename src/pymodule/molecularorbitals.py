@@ -478,8 +478,7 @@ class MolecularOrbitals:
                 prefix + 'C_beta',
                 prefix + 'E_beta',
                 prefix + 'occ_beta',
-                prefix + 'nuclear_charges',
-                prefix + 'basis_set',
+                prefix + 'scf_type',
         ]:
             if key in hf:
                 del hf[key]
@@ -492,9 +491,17 @@ class MolecularOrbitals:
             hf.create_dataset(prefix + 'C_beta', data=self.beta_to_numpy())
             hf.create_dataset(prefix + 'E_beta', data=self.eb_to_numpy())
             hf.create_dataset(prefix + 'occ_beta', data=self.occb_to_numpy())
+            hf.create_dataset(prefix + 'scf_type',
+                              data=np.bytes_(['unrestricted']))
 
         elif self._orbitals_type == molorb.restopen:
             hf.create_dataset(prefix + 'occ_beta', data=self.occb_to_numpy())
+            hf.create_dataset(prefix + 'scf_type',
+                              data=np.bytes_(['restricted_openshell']))
+
+        else:
+            hf.create_dataset(prefix + 'scf_type',
+                              data=np.bytes_(['restricted']))
 
         hf.close()
 
@@ -550,22 +557,28 @@ class MolecularOrbitals:
 
         hf = h5py.File(fname, 'r')
 
-        orbs_type = molorb.rest
+        scf_type = hf.get(prefix + 'scf_type')[0].decode('utf-8')
+
+        if scf_type == 'restricted':
+            orbs_type = molorb.rest
+        elif scf_type == 'unrestricted':
+            orbs_type = molorb.unrest
+        elif scf_type == 'restricted_openshell':
+            orbs_type = molorb.restopen
 
         for key in ['C_alpha', 'E_alpha', 'occ_alpha']:
             assert_msg_critical((prefix + key) in hf,
                                 f'MolecularOrbitals.read_hdf5: {key} not found')
 
-        if prefix + 'C_beta' in hf or prefix + 'E_beta' in hf:
-            orbs_type = molorb.unrest
-
+        if orbs_type == molorb.unrest:
             for key in ['C_beta', 'E_beta', 'occ_beta']:
                 assert_msg_critical(
                     (prefix + key) in hf,
                     f'MolecularOrbitals.read_hdf5: {key} not found')
 
-        elif prefix + 'occ_beta' in hf:
-            orbs_type = molorb.restopen
+        elif orbs_type == molorb.restopen:
+            assert_msg_critical((prefix + 'occ_beta') in hf,
+                                f'MolecularOrbitals.read_hdf5: {key} not found')
 
         orbs = []
         enes = []
@@ -625,13 +638,10 @@ class MolecularOrbitals:
             h5_basis_set = hf.get('basis_set')[0].decode('utf-8')
             match_basis_set = (h5_basis_set.upper() == basis_set.upper())
 
-        if prefix + 'C_beta' in hf or prefix + 'E_beta' in hf:
-            h5_scf_type = 'unrestricted'
-        elif prefix + 'occ_beta' in hf:
-            h5_scf_type = 'restricted_openshell'
-        else:
-            h5_scf_type = 'restricted'
-        match_scf_type = (h5_scf_type == scf_type)
+        match_scf_type = False
+        if (prefix + 'scf_type') in hf:
+            h5_scf_type = hf.get(prefix + 'scf_type')[0].decode('utf-8')
+            match_scf_type = (h5_scf_type == scf_type)
 
         hf.close()
 

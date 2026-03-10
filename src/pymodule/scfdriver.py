@@ -593,10 +593,13 @@ class ScfDriver:
             assert_msg_critical(
                 Path(checkpoint).suffix == '.h5',
                 'ScfDriver.compute: Checkpoint must be a .h5 file')
-            molecule, basis = read_molecule_and_basis(checkpoint)
             self.restart = True
-            self.checkpoint_file = checkpoint
             # To avoid inconsistency across MPI ranks
+            if self.rank == mpi_master():
+                molecule, basis = read_molecule_and_basis(checkpoint)
+                self.checkpoint_file = checkpoint
+            molecule = self.comm.bcast(molecule, root=mpi_master())
+            basis = self.comm.bcast(basis, root=mpi_master())
             self.checkpoint_file = self.comm.bcast(self.checkpoint_file,
                                                    root=mpi_master())
             if checkpoint.endswith('_scf.h5'):
