@@ -763,7 +763,7 @@ class ThreePATransitionDriver(NonlinearSolver):
         return e4_vec, s4_vec
 
 
-    def get_nxy(self, freqs, Nx, fo, fo2, nocc, norb, d_a_mo, X, molecule,ao_basis, scf_tensors,Xf):
+    def get_nxy(self, freqs, Nx, fo, fo2, nocc, norb, d_a_mo, X, molecule,ao_basis, scf_results,Xf):
         """
         Computed NXY
 
@@ -931,7 +931,7 @@ class ThreePATransitionDriver(NonlinearSolver):
             fpath = fpath.with_name(fpath.stem)
             Nxy_drv.checkpoint_file = str(fpath) + '_3patrans_2.h5'
 
-        Nxy_results = Nxy_drv.compute(molecule, ao_basis, scf_tensors, XY)
+        Nxy_results = Nxy_drv.compute(molecule, ao_basis, scf_results, XY)
 
         self._is_converged = (self._is_converged and Nxy_drv.is_converged)
 

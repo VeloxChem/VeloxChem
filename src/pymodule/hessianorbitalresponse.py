@@ -30,7 +30,6 @@
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-from collections import Counter
 import numpy as np
 import time as tm
 import math
@@ -87,7 +86,7 @@ class HessianOrbitalResponse(CphfSolver):
     def compute_rhs(self,
                     molecule,
                     basis,
-                    scf_tensors,
+                    scf_results,
                     eri_dict,
                     dft_dict,
                     pe_dict,
@@ -100,7 +99,7 @@ class HessianOrbitalResponse(CphfSolver):
             The molecule.
         :param basis:
             The AO basis set.
-        :param scf_tensors:
+        :param scf_results:
             The tensors from the converged SCF calculation.
 
         :returns:
@@ -120,11 +119,11 @@ class HessianOrbitalResponse(CphfSolver):
         nocc = molecule.number_of_alpha_electrons()
 
         if self.rank == mpi_master():
-            density = scf_tensors['D_alpha']
-            eocc = scf_tensors['E_alpha'][:nocc]
-            mo = scf_tensors['C_alpha']
-            point_charges = scf_tensors.get('point_charges', None)
-            qm_vdw_params = scf_tensors.get('qm_vdw_params', None)
+            density = scf_results['D_alpha']
+            eocc = scf_results['E_alpha'][:nocc]
+            mo = scf_results['C_alpha']
+            point_charges = scf_results.get('point_charges', None)
+            qm_vdw_params = scf_results.get('qm_vdw_params', None)
         else:
             density = None
             eocc = None

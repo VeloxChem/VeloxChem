@@ -74,7 +74,7 @@ class PEForceFieldGenerator:
         self.nodes = self.comm.Get_size()
         self.ostream = ostream
 
-    def compute(self, molecule, basis, scf_tensors):
+    def compute(self, molecule, basis, scf_results):
         """
         Calculates the loprop transformation matrix T, patial charge (Qab) and
         localized polarizabilities.
@@ -83,7 +83,7 @@ class PEForceFieldGenerator:
             the molecule
         :param basis:
             the bais functions
-        :param scf_tensors:
+        :param scf_results:
             The tensors from the converged SCF calculation.
 
         :return:
@@ -101,12 +101,13 @@ class PEForceFieldGenerator:
         if self.rank == mpi_master():
 
             assert_msg_critical(
-                scf_tensors['scf_type'] == 'restricted',
-                f'{type(self).__name__}.compute: open-shell is not yet supported')
+                scf_results['scf_type'] == 'restricted',
+                f'{type(self).__name__}.compute: open-shell is not yet supported'
+            )
 
-            S = scf_tensors['S']
-            C = scf_tensors['C_alpha']
-            D = scf_tensors['D_alpha'] + scf_tensors['D_beta']
+            S = scf_results['S']
+            C = scf_results['C_alpha']
+            D = scf_results['D_alpha'] + scf_results['D_beta']
 
             # number of orbitals
             n_ao = C.shape[0]
@@ -195,7 +196,7 @@ class PEForceFieldGenerator:
 
         # solve linear response
         lrs_drv = LinearResponseSolver(self.comm, self.ostream)
-        lrs_out = lrs_drv.compute(molecule, basis, scf_tensors)
+        lrs_out = lrs_drv.compute(molecule, basis, scf_results)
 
         # obtain response vectors
         Nx = LinearResponseSolver.get_full_solution_vector(

@@ -704,7 +704,7 @@ class VibrationalAnalysis:
         # check if both normal and resonance Raman requested
         raman_sanity_check(self)
 
-        scf_tensors = self.scf_driver.scf_tensors
+        scf_results = self.scf_driver.scf_results
 
         # set up the polarizability gradient driver
         polgrad_drv = PolarizabilityGradient(self.scf_driver, self.comm,
@@ -734,7 +734,7 @@ class VibrationalAnalysis:
             lr_drv.save_solutions = False
             if 'frequencies' not in self.rsp_dict:
                 lr_drv.frequencies = polgrad_drv.frequencies
-            lr_results = lr_drv.compute(molecule, ao_basis, scf_tensors)
+            lr_results = lr_drv.compute(molecule, ao_basis, scf_results)
         else:
             lr_drv = LinearResponseSolver(self.comm, self.ostream)
             lr_drv.update_settings(self.rsp_dict, self.method_dict)
@@ -742,10 +742,10 @@ class VibrationalAnalysis:
             lr_drv.save_solutions = False
             if 'frequencies' not in self.rsp_dict:
                 lr_drv.frequencies = self.frequencies
-            lr_results = lr_drv.compute(molecule, ao_basis, scf_tensors)
+            lr_results = lr_drv.compute(molecule, ao_basis, scf_results)
 
         # compute polarizability gradient
-        polgrad = polgrad_drv.compute(molecule, ao_basis, scf_tensors,
+        polgrad = polgrad_drv.compute(molecule, ao_basis, scf_results,
                                       lr_results)
 
         # save the gradient

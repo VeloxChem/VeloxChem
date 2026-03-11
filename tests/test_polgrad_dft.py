@@ -20,7 +20,7 @@ class TestPolgrad:
         scf_drv = ScfRestrictedDriver()
         scf_drv.xcfun = xcfun
         scf_drv.ostream.mute()
-        scf_tensors = scf_drv.compute(molecule, basis)
+        scf_results = scf_drv.compute(molecule, basis)
 
         # linear response
         rsp_settings = {'conv_thresh': 1.0e-5, 'frequencies': (0.0, 0.4)}
@@ -29,7 +29,7 @@ class TestPolgrad:
         lr_drv.b_operator = "electric dipole"
         lr_drv.update_settings(rsp_settings)
         lr_drv.ostream.mute()
-        lr_results = lr_drv.compute(molecule, basis, scf_tensors)
+        lr_results = lr_drv.compute(molecule, basis, scf_results)
 
         # test real analytical gradient
         an_polgrad_drv = PolarizabilityGradient(scf_drv)
@@ -37,7 +37,7 @@ class TestPolgrad:
         polgrad_settings = {'frequencies': (0.0, 0.4)}
         an_polgrad_drv.update_settings(polgrad_settings, cphf_settings)
         an_polgrad_drv.ostream.mute()
-        polgrad_results = an_polgrad_drv.compute(molecule, basis, scf_tensors, lr_results)
+        polgrad_results = an_polgrad_drv.compute(molecule, basis, scf_results, lr_results)
 
         if scf_drv.rank == mpi_master():
             #polgrad_results = an_polgrad_drv.polgradient
@@ -62,7 +62,7 @@ class TestPolgrad:
         cphf_settings = {}
         num_polgrad_drv.update_settings(polgrad_settings, cphf_settings)
         num_polgrad_drv.ostream.mute()
-        polgrad_results = num_polgrad_drv.compute(molecule, basis, scf_tensors, lr_results=None)
+        polgrad_results = num_polgrad_drv.compute(molecule, basis, scf_results, lr_results=None)
 
         if scf_drv.rank == mpi_master():
             #polgrad_results = num_polgrad_drv.polgradient
@@ -84,7 +84,7 @@ class TestPolgrad:
         scf_drv = ScfRestrictedDriver()
         scf_drv.xcfun = xcfun
         scf_drv.ostream.mute()
-        scf_tensors = scf_drv.compute(molecule, basis)
+        scf_results = scf_drv.compute(molecule, basis)
 
         # linear response
         rsp_settings = {'conv_thresh': 1.0e-5, 'frequencies': (0.0, 0.4),
@@ -94,7 +94,7 @@ class TestPolgrad:
         lr_drv.b_operator = "electric dipole"
         lr_drv.update_settings(rsp_settings)
         lr_drv.ostream.mute()
-        lr_results = lr_drv.compute(molecule, basis, scf_tensors)
+        lr_results = lr_drv.compute(molecule, basis, scf_results)
 
         # test complex analytical gradient
         an_polgrad_drv = PolarizabilityGradient(scf_drv)
@@ -103,7 +103,7 @@ class TestPolgrad:
                             'damping': 0.5}
         an_polgrad_drv.update_settings(polgrad_settings, cphf_settings)
         an_polgrad_drv.ostream.mute()
-        polgrad_results = an_polgrad_drv.compute(molecule, basis, scf_tensors, lr_results)
+        polgrad_results = an_polgrad_drv.compute(molecule, basis, scf_results, lr_results)
 
         if scf_drv.rank == mpi_master():
             #polgrad_results = an_polgrad_drv.polgradient
@@ -128,7 +128,7 @@ class TestPolgrad:
                             'damping': 0.5, 'numerical': 'yes', 'do_four_point': 'yes'}
         num_polgrad_drv.update_settings(polgrad_settings, cphf_settings)
         num_polgrad_drv.ostream.mute()
-        polgrad_results = num_polgrad_drv.compute(molecule, basis, scf_tensors)
+        polgrad_results = num_polgrad_drv.compute(molecule, basis, scf_results)
 
         if scf_drv.rank == mpi_master():
             #polgrad_results = num_polgrad_drv.polgradient

@@ -222,7 +222,7 @@ class C6Driver(LinearSolver):
 
         return dist_new_ger, dist_new_ung
 
-    def compute(self, molecule, basis, scf_tensors):
+    def compute(self, molecule, basis, scf_results):
         """
         Solves for the response vector iteratively while checking the residuals
         for convergence.
@@ -231,7 +231,7 @@ class C6Driver(LinearSolver):
             The molecule.
         :param basis:
             The AO basis.
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
 
         :return:
@@ -252,7 +252,7 @@ class C6Driver(LinearSolver):
         molecule_sanity_check(molecule)
 
         # check SCF results
-        scf_results_sanity_check(self, scf_tensors)
+        scf_results_sanity_check(self, scf_results)
 
         # update checkpoint_file after scf_results_sanity_check
         if self.filename is not None and self.checkpoint_file is None:
@@ -270,7 +270,7 @@ class C6Driver(LinearSolver):
         # check solvation model setup
         if self.rank == mpi_master():
             assert_msg_critical(
-                'solvation_model' not in scf_tensors,
+                'solvation_model' not in scf_results,
                 type(self).__name__ + ': Solvation model not implemented')
 
         # check print level (verbosity of output)
@@ -297,7 +297,7 @@ class C6Driver(LinearSolver):
                             'C6Driver: not implemented for unrestricted case')
 
         if self.rank == mpi_master():
-            orb_ene = scf_tensors['E_alpha']
+            orb_ene = scf_results['E_alpha']
         else:
             orb_ene = None
         orb_ene = self.comm.bcast(orb_ene, root=mpi_master())
@@ -308,7 +308,7 @@ class C6Driver(LinearSolver):
         eri_dict = self._init_eri(molecule, basis)
 
         # DFT information
-        dft_dict = self._init_dft(molecule, scf_tensors)
+        dft_dict = self._init_dft(molecule, scf_results)
 
         # PE information
         pe_dict = self._init_pe(molecule, basis)
@@ -318,7 +318,7 @@ class C6Driver(LinearSolver):
 
         # right-hand side (gradient)
         b_grad = self.get_complex_prop_grad(self.b_operator, self.b_components,
-                                            molecule, basis, scf_tensors)
+                                            molecule, basis, scf_results)
 
         points, weights = np.polynomial.legendre.leggauss(self.n_points)
         imagfreqs = [self.w0 * (1 - t) / (1 + t) for t in points]
@@ -391,7 +391,7 @@ class C6Driver(LinearSolver):
 
             profiler.set_timing_key('Preparation')
 
-            self._e2n_half_size(bger, bung, molecule, basis, scf_tensors,
+            self._e2n_half_size(bger, bung, molecule, basis, scf_results,
                                 eri_dict, dft_dict, pe_dict, profiler)
 
         profiler.check_memory_usage('Initial guess')
@@ -591,7 +591,7 @@ class C6Driver(LinearSolver):
             # creating new sigma and rho linear transformations
 
             self._e2n_half_size(new_trials_ger, new_trials_ung, molecule, basis,
-                                scf_tensors, eri_dict, dft_dict, pe_dict,
+                                scf_results, eri_dict, dft_dict, pe_dict,
                                 profiler)
 
             iter_in_hours = (tm.time() - iter_start_time) / 3600
@@ -620,7 +620,7 @@ class C6Driver(LinearSolver):
 
         # calculate response functions
         a_grad = self.get_complex_prop_grad(self.a_operator, self.a_components,
-                                            molecule, basis, scf_tensors)
+                                            molecule, basis, scf_results)
 
         if self.is_converged:
             if self.rank == mpi_master():
