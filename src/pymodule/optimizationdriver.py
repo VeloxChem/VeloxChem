@@ -121,13 +121,13 @@ class OptimizationDriver:
 
         self._debug = False
 
-        # input f
+        # input keywords
         self.input_keywords = {
             'optimize': {
                 'coordsys': ('str_lower', 'coordinate system'),
                 'constraints': ('list', 'constraints'),
                 'check_interval':
-                ('int', 'interval for checking coordinate system'),
+                    ('int', 'interval for checking coordinate system'),
                 'trust': ('float', 'trust radius to begin with'),
                 'tmax': ('float', 'maximum value of trust radius'),
                 'max_iter': ('int', 'maximum number of optimization steps'),
@@ -137,7 +137,7 @@ class OptimizationDriver:
                 'ref_xyz': ('str', 'reference geometry'),
                 'keep_files': ('bool', 'flag to keep output files'),
                 'conv_maxiter':
-                ('bool', 'consider converged if max_iter is reached'),
+                    ('bool', 'consider converged if max_iter is reached'),
                 'conv_energy': ('float', ''),
                 'conv_grms': ('float', ''),
                 'conv_gmax': ('float', ''),
@@ -179,8 +179,7 @@ class OptimizationDriver:
         """
 
         opt_keywords = {
-            key: val[0]
-            for key, val in self.input_keywords['optimize'].items()
+            key: val[0] for key, val in self.input_keywords['optimize'].items()
         }
 
         parse_input(self, opt_keywords, opt_dict)
@@ -213,11 +212,11 @@ class OptimizationDriver:
         elif isinstance(drv, MMDriver):
             grad_drv = MMGradientDriver(drv)
 
-        elif (isinstance(drv, ScfGradientDriver)
-              or isinstance(drv, XtbGradientDriver)
-              or isinstance(drv, OpenMMGradientDriver)
-              or isinstance(drv, TddftGradientDriver)
-              or isinstance(drv, MMGradientDriver)):
+        elif (isinstance(drv, ScfGradientDriver) or
+              isinstance(drv, XtbGradientDriver) or
+              isinstance(drv, OpenMMGradientDriver) or
+              isinstance(drv, TddftGradientDriver) or
+              isinstance(drv, MMGradientDriver)):
             grad_drv = drv
 
         else:
@@ -344,7 +343,7 @@ class OptimizationDriver:
 
         # pre-compute Hessian
 
-        if self.is_scf and self.hessian == 'first' or self.hessian == 'first+last':
+        if self.is_scf and self.hessian in ['first', 'first+last']:
             hessian_drv = ScfHessianDriver(self.grad_drv.scf_driver)
             hessian_drv.compute(molecule, args[0])
             if self.rank == mpi_master():
@@ -490,7 +489,15 @@ class OptimizationDriver:
                 # Note: use base_fname so that the final h5 file is kept even
                 # when keep_files is False
                 final_h5_fname = base_fname + ".h5"
-                self._write_final_hdf5(final_h5_fname, final_mol, opt_results)
+                # pass in the basis set object if it is in args
+                if len(args) >= 1 and isinstance(args[0], MolecularBasis):
+                    self._write_final_hdf5(final_h5_fname,
+                                           final_mol,
+                                           opt_results,
+                                           basis=args[0])
+                else:
+                    self._write_final_hdf5(final_h5_fname, final_mol,
+                                           opt_results)
 
             opt_results = self.comm.bcast(opt_results, root=mpi_master())
 
@@ -933,7 +940,7 @@ class OptimizationDriver:
         mol = Molecule.read_xyz_string(xyz_data_i)
         mol.show(atom_indices=atom_indices, width=640, height=360)
 
-    def _write_final_hdf5(self, fname, molecule, opt_results):
+    def _write_final_hdf5(self, fname, molecule, opt_results, basis=None):
         """
         Creats a HDF5 file and saves the optimization results.
 
@@ -943,6 +950,8 @@ class OptimizationDriver:
             The molecule.
         :param opt_results:
             The dictionary of optimzation results.
+        :param basis:
+            Optional AO basis set object (for taking care of ECP core electrons).
         """
 
         if (fname and isinstance(fname, str) and Path(fname).is_file()):
@@ -960,8 +969,9 @@ class OptimizationDriver:
                 scan_coordinates_au = []
                 for xyzstr in opt_results['scan_geometries']:
                     mol = Molecule.read_xyz_string(xyzstr)
+                    # TODO: take care of ECP core electrons
                     nuclear_repulsion_energies.append(
-                        mol.nuclear_repulsion_energy())
+                        mol.nuclear_repulsion_energy(basis))
                     scan_coordinates_au.append(mol.get_coordinates_in_bohr())
 
                 hf.create_dataset(opt_group + 'scan_coordinates_au',
@@ -975,8 +985,9 @@ class OptimizationDriver:
                 opt_coordinates_au = []
                 for xyzstr in opt_results['opt_geometries']:
                     mol = Molecule.read_xyz_string(xyzstr)
+                    # TODO: take care of ECP core electrons
                     nuclear_repulsion_energies.append(
-                        mol.nuclear_repulsion_energy())
+                        mol.nuclear_repulsion_energy(basis))
                     opt_coordinates_au.append(mol.get_coordinates_in_bohr())
 
                 hf.create_dataset(opt_group + 'opt_coordinates_au',

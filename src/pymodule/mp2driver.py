@@ -173,7 +173,7 @@ class Mp2Driver:
 
                 mo_a = scf_results['C_alpha']
                 ene_a = scf_results['E_alpha']
-                occ_a = molecule.get_aufbau_alpha_occupation(ene_a.shape[0])
+                occ_a = molecule.get_aufbau_alpha_occupation(ene_a.shape[0], basis)
 
                 if scf_type == 'restricted':
                     mol_orbs = MolecularOrbitals([mo_a], [ene_a], [occ_a],
@@ -182,12 +182,12 @@ class Mp2Driver:
                 elif scf_type == 'unrestricted':
                     mo_b = scf_results['C_beta']
                     ene_b = scf_results['E_beta']
-                    occ_b = molecule.get_aufbau_beta_occupation(ene_b.shape[0])
+                    occ_b = molecule.get_aufbau_beta_occupation(ene_b.shape[0], basis)
                     mol_orbs = MolecularOrbitals([mo_a, mo_b], [ene_a, ene_b],
                                                  [occ_a, occ_b], molorb.unrest)
 
                 elif scf_type == 'restricted_openshell':
-                    occ_b = molecule.get_aufbau_beta_occupation(ene_a.shape[0])
+                    occ_b = molecule.get_aufbau_beta_occupation(ene_a.shape[0], basis)
                     mol_orbs = MolecularOrbitals([mo_a], [ene_a],
                                                  [occ_a, occ_b],
                                                  molorb.restopen)
@@ -260,7 +260,7 @@ class Mp2Driver:
             if mol_orbs.get_orbitals_type() == molorb.rest:
 
                 orb_ene = mol_orbs.ea_to_numpy()
-                nocc = molecule.number_of_alpha_electrons()
+                nocc = molecule.number_of_alpha_occupied_orbitals(basis)
                 eocc = orb_ene[:nocc]
                 evir = orb_ene[nocc:]
                 e_vv = evir.reshape(-1, 1) + evir
@@ -284,8 +284,8 @@ class Mp2Driver:
                 orb_ene_a = mol_orbs.ea_to_numpy()
                 orb_ene_b = mol_orbs.eb_to_numpy()
 
-                nocc_a = molecule.number_of_alpha_electrons()
-                nocc_b = molecule.number_of_beta_electrons()
+                nocc_a = molecule.number_of_alpha_occupied_orbitals(basis)
+                nocc_b = molecule.number_of_beta_occupied_orbitals(basis)
 
                 eocc_a = orb_ene_a[:nocc_a]
                 evir_a = orb_ene_a[nocc_a:]
@@ -400,8 +400,8 @@ class Mp2Driver:
 
             mol_orbs = mol_orbs.broadcast(cross_comm, mpi_master())
 
-            nocc_a = molecule.number_of_alpha_electrons()
-            nocc_b = molecule.number_of_beta_electrons()
+            nocc_a = molecule.number_of_alpha_occupied_orbitals(basis)
+            nocc_b = molecule.number_of_beta_occupied_orbitals(basis)
 
             mo_a = mol_orbs.alpha_to_numpy()
             mo_b = mol_orbs.beta_to_numpy()

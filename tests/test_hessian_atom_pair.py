@@ -38,6 +38,7 @@ class TestHessianAtomPair:
 
         scf_drv = ScfRestrictedDriver()
         scf_drv.ostream.mute()
+        scf_drv.acc_type = 'l2_c2diis'
         scf_drv.compute(mol, basis)
 
         hess_drv = ScfHessianDriver(scf_drv)

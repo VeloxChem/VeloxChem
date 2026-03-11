@@ -1,0 +1,26 @@
+target_sources(vlxobjs
+  PRIVATE
+    LocalCorePotentialDriver.cpp
+    LocalCorePotentialPrimRecDS.cpp
+    LocalCorePotentialPrimRecFS.cpp
+    LocalCorePotentialPrimRecGS.cpp
+    LocalCorePotentialPrimRecHS.cpp
+    LocalCorePotentialPrimRecIS.cpp
+    LocalCorePotentialPrimRecKS.cpp
+    LocalCorePotentialPrimRecLS.cpp
+    LocalCorePotentialPrimRecPS.cpp
+    LocalCorePotentialPrimRecSD.cpp
+    LocalCorePotentialPrimRecSF.cpp
+    LocalCorePotentialPrimRecSG.cpp
+    LocalCorePotentialPrimRecSH.cpp
+    LocalCorePotentialPrimRecSI.cpp
+    LocalCorePotentialPrimRecSK.cpp
+    LocalCorePotentialPrimRecSL.cpp
+    LocalCorePotentialPrimRecSP.cpp
+    LocalCorePotentialPrimRecSS.cpp
+  )
+
+target_include_directories(vlxobjs
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>
+  )

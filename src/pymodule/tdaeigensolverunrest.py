@@ -330,7 +330,7 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
 
         # start TDA iteration
 
-        for i in range(self.max_iter):
+        for i in range(n_restart_iterations + self.max_iter):
 
             profiler.set_timing_key(f'Iteration {i + 1}')
 
@@ -478,7 +478,7 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
         excitation_details = []
 
         for s in range(self.nstates):
-            if self.rank == mpi_master():
+            if self.rank == mpi_master() and self._is_converged:
                 t_mat_a = eigvecs[:n_ov_a, s].reshape(mo_occ_a.shape[1],
                                                       mo_vir_a.shape[1])
                 t_mat_b = eigvecs[n_ov_a:, s].reshape(mo_occ_b.shape[1],
