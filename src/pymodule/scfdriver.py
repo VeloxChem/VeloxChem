@@ -33,6 +33,7 @@
 from pathlib import Path
 from datetime import datetime
 from collections import deque
+from copy import deepcopy
 import numpy as np
 import time as tm
 import math
@@ -1043,7 +1044,7 @@ class ScfDriver:
 
             self.ostream.flush()
 
-        return self.scf_results
+        return deepcopy(self.scf_results)
 
     def gen_initial_density_sad(self, molecule, ao_basis, min_basis):
         """

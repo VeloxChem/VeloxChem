@@ -218,6 +218,7 @@ class TestMolecularOrbitals:
             handle.create_dataset('E_alpha', data=np.zeros(2))
             handle.create_dataset('occ_alpha', data=np.zeros(2))
             handle.create_dataset('C_beta', data=np.eye(2))
+            handle.create_dataset('scf_type', data=np.bytes_(['unrestricted']))
 
         with pytest.raises(AssertionError, match='E_beta not found'):
             MolecularOrbitals.read_hdf5(str(filename))
