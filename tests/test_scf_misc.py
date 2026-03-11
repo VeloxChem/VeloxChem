@@ -194,3 +194,29 @@ class TestScfDriverMiscellaneous:
 
         assert scf_results is None
         assert not scf_drv.is_converged
+
+    def test_scf_results_being_independent(self):
+
+        molecule, basis = self.get_water_and_basis()
+
+        scf_drv, scf_results = self.run_hf_scf(molecule, basis)
+
+        if self.is_master():
+            ref_energy = scf_results["scf_energy"]
+            scf_results["scf_energy"] = 0.0
+
+            ref_C_alpha = scf_results["C_alpha"].copy()
+            scf_results["C_alpha"][:, :] = 0.0
+
+            assert scf_results is not scf_drv.scf_results
+            assert scf_results["C_alpha"] is not scf_drv.scf_results["C_alpha"]
+
+            assert ref_energy == scf_drv.scf_results["scf_energy"]
+            assert 0.0 == np.max(
+                np.abs(ref_C_alpha - scf_drv.scf_results["C_alpha"]))
+
+            assert 0.0 == scf_results["scf_energy"]
+            assert 0.0 == np.max(np.abs(scf_results["C_alpha"]))
+
+            assert 0.0 != scf_drv.scf_results["scf_energy"]
+            assert 0.0 != np.max(np.abs(scf_drv.scf_results["C_alpha"]))
