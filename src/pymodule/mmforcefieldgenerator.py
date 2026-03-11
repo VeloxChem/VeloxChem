@@ -97,6 +97,11 @@ class MMForceFieldGenerator:
         - force_field: The force field to use for sigma/epsilon lookup.
           Supported values: 'gaff' (default), 'opls'.
           Set via   mmgen.force_field = 'opls'   before calling create_topology().
+          OPLS-AA sigma/epsilon parameters are sourced from an embedded table
+          transcribed from GROMACS 2026.1 oplsaa.ff/ffnonbonded.itp.
+          Atoms with no OPLS-AA equivalent (opls: None in atomtypeidentifier)
+          fall back to GAFF sigma/epsilon with a printed warning.
+          OPLS-AA also sets comb_rule=3 and fudgeLJ=fudgeQQ=0.5 in the .top file.
           Note: full OPLS-AA sigma/epsilon lookup requires a bundled OPLS-AA
           parameter file; until that is available the code falls back to GAFF
           parameters and emits a warning for any atom type that has no OPLS-AA
@@ -183,9 +188,9 @@ class MMForceFieldGenerator:
         # Set via   mmgen.force_field = 'opls'   before calling create_topology().
         # OPLS-AA uses geometric-mean LJ mixing (comb_rule 3 in GROMACS); this
         # is applied automatically in write_top() when force_field == 'opls'.
-        # Full OPLS-AA sigma/epsilon lookup is not yet implemented (requires a
-        # bundled OPLS-AA parameter file); GAFF parameters are used as fallback
-        # and a warning is printed for types that have no OPLS-AA equivalent.
+        # sigma/epsilon values are looked up from an embedded table derived from
+        # GROMACS 2026.1 oplsaa.ff/ffnonbonded.itp via get_oplsaa_data_dict().
+        # Atoms with no OPLS-AA equivalent fall back to GAFF with a warning.
         self.force_field = 'gaff'
 
     def update_settings(self, ffg_dict, resp_dict=None):
@@ -1079,6 +1084,391 @@ class MMForceFieldGenerator:
 
         return data
 
+    @staticmethod
+    def get_oplsaa_data_dict():
+        """
+        Returns a dictionary of OPLS-AA nonbonded (sigma, epsilon) parameters
+        keyed by OPLS type string (e.g. 'opls_135').
+
+        Data sourced from the GROMACS oplsaa.ff/ffnonbonded.itp file
+        (GROMACS 2026.1, https://github.com/gromacs/gromacs).
+        Units: sigma in nm, epsilon in kJ/mol (GROMACS convention).
+
+        References:
+          W. L. Jorgensen, D. S. Maxwell, J. Tirado-Rives,
+          J. Am. Chem. Soc. 118, 11225-11236 (1996).
+          W. L. Jorgensen, N. A. McDonald, J. Phys. Chem. B 102, 8049 (1998).
+          E. K. Watkins, W. L. Jorgensen, J. Phys. Chem. A 105, 4118 (2001).
+        """
+
+        # fmt: off
+        # Each entry: (sigma [nm], epsilon [kJ/mol])
+        # Transcribed verbatim from GROMACS 2026.1 oplsaa.ff/ffnonbonded.itp
+        _raw = {
+            'opls_001': (3.75000e-01, 4.39320e-01),
+            'opls_002': (2.96000e-01, 8.78640e-01),
+            'opls_003': (3.25000e-01, 7.11280e-01),
+            'opls_004': (0.00000e+00, 0.00000e+00),
+            'opls_032': (3.55000e-01, 1.04600e+00),
+            'opls_033': (0.00000e+00, 0.00000e+00),
+            'opls_035': (3.55000e-01, 1.04600e+00),
+            'opls_038': (3.55000e-01, 1.04600e+00),
+            'opls_040': (3.25000e-01, 7.11280e-01),
+            'opls_041': (0.00000e+00, 0.00000e+00),
+            'opls_042': (3.25000e-01, 7.11280e-01),
+            'opls_062': (3.00000e-01, 7.11280e-01),
+            'opls_108': (3.00000e-01, 7.11280e-01),
+            'opls_135': (3.50000e-01, 2.76144e-01),
+            'opls_136': (3.50000e-01, 2.76144e-01),
+            'opls_137': (3.50000e-01, 2.76144e-01),
+            'opls_138': (3.50000e-01, 2.76144e-01),
+            'opls_139': (3.50000e-01, 2.76144e-01),
+            'opls_140': (2.50000e-01, 1.25520e-01),
+            'opls_141': (3.55000e-01, 3.17984e-01),
+            'opls_142': (3.55000e-01, 3.17984e-01),
+            'opls_143': (3.55000e-01, 3.17984e-01),
+            'opls_144': (2.42000e-01, 1.25520e-01),
+            'opls_145': (3.55000e-01, 2.92880e-01),
+            'opls_146': (2.42000e-01, 1.25520e-01),
+            'opls_147': (3.55000e-01, 2.92880e-01),
+            'opls_148': (3.50000e-01, 2.76144e-01),
+            'opls_149': (3.50000e-01, 2.76144e-01),
+            'opls_151': (3.40000e-01, 1.25520e+00),
+            'opls_154': (3.12000e-01, 7.11280e-01),
+            'opls_155': (0.00000e+00, 0.00000e+00),
+            'opls_157': (3.50000e-01, 2.76144e-01),
+            'opls_158': (3.50000e-01, 2.76144e-01),
+            'opls_159': (3.50000e-01, 2.76144e-01),
+            'opls_164': (2.94000e-01, 2.55224e-01),
+            'opls_166': (3.55000e-01, 2.92880e-01),
+            'opls_167': (3.07000e-01, 7.11280e-01),
+            'opls_168': (0.00000e+00, 0.00000e+00),
+            'opls_169': (3.07000e-01, 7.11280e-01),
+            'opls_170': (0.00000e+00, 0.00000e+00),
+            'opls_171': (3.07000e-01, 7.11280e-01),
+            'opls_172': (0.00000e+00, 0.00000e+00),
+            'opls_178': (3.55000e-01, 3.17984e-01),
+            'opls_179': (2.90000e-01, 5.85760e-01),
+            'opls_180': (2.90000e-01, 5.85760e-01),
+            'opls_181': (3.50000e-01, 2.76144e-01),
+            'opls_182': (3.50000e-01, 2.76144e-01),
+            'opls_183': (3.50000e-01, 2.76144e-01),
+            'opls_184': (3.50000e-01, 2.76144e-01),
+            'opls_185': (3.50000e-01, 2.76144e-01),
+            'opls_186': (2.90000e-01, 5.85760e-01),
+            'opls_187': (3.07000e-01, 7.11280e-01),
+            'opls_188': (0.00000e+00, 0.00000e+00),
+            'opls_200': (3.60000e-01, 1.77820e+00),
+            'opls_201': (3.70000e-01, 1.04600e+00),
+            'opls_202': (3.60000e-01, 1.48532e+00),
+            'opls_203': (3.55000e-01, 1.04600e+00),
+            'opls_204': (0.00000e+00, 0.00000e+00),
+            'opls_205': (0.00000e+00, 0.00000e+00),
+            'opls_206': (3.50000e-01, 2.76144e-01),
+            'opls_207': (3.50000e-01, 2.76144e-01),
+            'opls_208': (3.50000e-01, 2.76144e-01),
+            'opls_209': (3.50000e-01, 2.76144e-01),
+            'opls_210': (3.50000e-01, 2.76144e-01),
+            'opls_211': (3.50000e-01, 2.76144e-01),
+            'opls_212': (3.50000e-01, 2.76144e-01),
+            'opls_222': (3.55000e-01, 1.04600e+00),
+            'opls_226': (3.40000e-01, 1.25520e+00),
+            'opls_231': (3.75000e-01, 4.39320e-01),
+            'opls_232': (3.75000e-01, 4.39320e-01),
+            'opls_233': (3.75000e-01, 4.39320e-01),
+            'opls_234': (3.75000e-01, 4.39320e-01),
+            'opls_235': (3.75000e-01, 4.39320e-01),
+            'opls_236': (2.96000e-01, 8.78640e-01),
+            'opls_237': (3.25000e-01, 7.11280e-01),
+            'opls_238': (3.25000e-01, 7.11280e-01),
+            'opls_239': (3.25000e-01, 7.11280e-01),
+            'opls_240': (0.00000e+00, 0.00000e+00),
+            'opls_241': (0.00000e+00, 0.00000e+00),
+            'opls_247': (3.75000e-01, 4.39320e-01),
+            'opls_248': (2.96000e-01, 8.78640e-01),
+            'opls_249': (3.25000e-01, 7.11280e-01),
+            'opls_250': (0.00000e+00, 0.00000e+00),
+            'opls_251': (3.25000e-01, 7.11280e-01),
+            'opls_252': (3.75000e-01, 4.39320e-01),
+            'opls_253': (2.96000e-01, 8.78640e-01),
+            'opls_254': (0.00000e+00, 0.00000e+00),
+            'opls_260': (3.55000e-01, 2.92880e-01),
+            'opls_261': (3.65000e-01, 6.27600e-01),
+            'opls_262': (3.20000e-01, 7.11280e-01),
+            'opls_263': (3.55000e-01, 2.92880e-01),
+            'opls_264': (3.40000e-01, 1.25520e+00),
+            'opls_265': (3.25000e-01, 7.11280e-01),
+            'opls_266': (3.55000e-01, 2.92880e-01),
+            'opls_267': (3.75000e-01, 4.39320e-01),
+            'opls_268': (3.00000e-01, 7.11280e-01),
+            'opls_269': (2.96000e-01, 8.78640e-01),
+            'opls_270': (0.00000e+00, 0.00000e+00),
+            'opls_271': (3.75000e-01, 4.39320e-01),
+            'opls_272': (2.96000e-01, 8.78640e-01),
+            'opls_279': (2.42000e-01, 6.27600e-02),
+            'opls_280': (3.75000e-01, 4.39320e-01),
+            'opls_281': (2.96000e-01, 8.78640e-01),
+            'opls_282': (2.42000e-01, 6.27600e-02),
+            'opls_287': (3.25000e-01, 7.11280e-01),
+            'opls_288': (3.25000e-01, 7.11280e-01),
+            'opls_289': (0.00000e+00, 0.00000e+00),
+            'opls_290': (0.00000e+00, 0.00000e+00),
+            'opls_291': (3.50000e-01, 2.76144e-01),
+            'opls_296': (3.50000e-01, 2.76144e-01),
+            'opls_300': (3.25000e-01, 7.11280e-01),
+            'opls_301': (0.00000e+00, 0.00000e+00),
+            'opls_302': (2.25000e-01, 2.09200e-01),
+            'opls_303': (3.25000e-01, 7.11280e-01),
+            'opls_304': (0.00000e+00, 0.00000e+00),
+            'opls_311': (3.25000e-01, 7.11280e-01),
+            'opls_312': (3.50000e-01, 3.34720e-01),
+            'opls_313': (3.25000e-01, 7.11280e-01),
+            'opls_314': (0.00000e+00, 0.00000e+00),
+            'opls_315': (3.50000e-01, 3.34720e-01),
+            'opls_316': (2.50000e-01, 2.09200e-01),
+            'opls_317': (3.50000e-01, 3.34720e-01),
+            'opls_318': (2.50000e-01, 2.09200e-01),
+            'opls_319': (3.25000e-01, 7.11280e-01),
+            'opls_320': (3.75000e-01, 4.39320e-01),
+            'opls_321': (3.25000e-01, 7.11280e-01),
+            'opls_322': (3.75000e-01, 4.39320e-01),
+            'opls_323': (3.50000e-01, 3.34720e-01),
+            'opls_324': (3.50000e-01, 3.34720e-01),
+            'opls_325': (0.00000e+00, 0.00000e+00),
+            'opls_326': (2.96000e-01, 8.78640e-01),
+            'opls_327': (0.00000e+00, 0.00000e+00),
+            'opls_328': (2.96000e-01, 8.78640e-01),
+            'opls_329': (2.50000e-01, 2.09200e-01),
+            'opls_330': (2.50000e-01, 2.09200e-01),
+            'opls_331': (3.50000e-01, 3.34720e-01),
+            'opls_332': (2.50000e-01, 2.09200e-01),
+            'opls_333': (3.25000e-01, 7.11280e-01),
+            'opls_334': (3.75000e-01, 4.39320e-01),
+            'opls_335': (3.25000e-01, 7.11280e-01),
+            'opls_336': (3.50000e-01, 3.34720e-01),
+            'opls_337': (3.50000e-01, 3.34720e-01),
+            'opls_338': (3.50000e-01, 3.34720e-01),
+            'opls_339': (0.00000e+00, 0.00000e+00),
+            'opls_340': (2.96000e-01, 8.78640e-01),
+            'opls_341': (3.25000e-01, 7.11280e-01),
+            'opls_342': (0.00000e+00, 0.00000e+00),
+            'opls_343': (0.00000e+00, 0.00000e+00),
+            'opls_344': (2.50000e-01, 2.09200e-01),
+            'opls_345': (2.50000e-01, 2.09200e-01),
+            'opls_346': (3.25000e-01, 7.11280e-01),
+            'opls_347': (3.50000e-01, 3.34720e-01),
+            'opls_348': (3.25000e-01, 7.11280e-01),
+            'opls_349': (3.50000e-01, 3.34720e-01),
+            'opls_350': (3.50000e-01, 3.34720e-01),
+            'opls_351': (3.50000e-01, 3.34720e-01),
+            'opls_352': (3.25000e-01, 7.11280e-01),
+            'opls_353': (3.50000e-01, 3.34720e-01),
+            'opls_354': (3.25000e-01, 7.11280e-01),
+            'opls_355': (2.50000e-01, 2.09200e-01),
+            'opls_356': (3.25000e-01, 7.11280e-01),
+            'opls_357': (0.00000e+00, 0.00000e+00),
+            'opls_358': (0.00000e+00, 0.00000e+00),
+            'opls_359': (2.50000e-01, 2.09200e-01),
+            'opls_360': (0.00000e+00, 0.00000e+00),
+            'opls_361': (3.25000e-01, 7.11280e-01),
+            'opls_362': (3.50000e-01, 3.34720e-01),
+            'opls_363': (3.25000e-01, 7.11280e-01),
+            'opls_364': (3.50000e-01, 3.34720e-01),
+            'opls_365': (3.50000e-01, 3.34720e-01),
+            'opls_366': (3.75000e-01, 4.39320e-01),
+            'opls_367': (0.00000e+00, 0.00000e+00),
+            'opls_368': (3.25000e-01, 7.11280e-01),
+            'opls_369': (0.00000e+00, 0.00000e+00),
+            'opls_370': (2.96000e-01, 8.78640e-01),
+            'opls_371': (3.50000e-01, 3.34720e-01),
+            'opls_372': (2.50000e-01, 2.09200e-01),
+            'opls_373': (3.50000e-01, 3.34720e-01),
+            'opls_374': (2.50000e-01, 2.09200e-01),
+            'opls_375': (3.50000e-01, 3.34720e-01),
+            'opls_376': (2.50000e-01, 2.09200e-01),
+            'opls_377': (3.25000e-01, 7.11280e-01),
+            'opls_378': (3.75000e-01, 4.39320e-01),
+            'opls_379': (3.25000e-01, 7.11280e-01),
+            'opls_380': (3.50000e-01, 3.34720e-01),
+            'opls_381': (3.50000e-01, 3.34720e-01),
+            'opls_382': (3.50000e-01, 3.34720e-01),
+            'opls_383': (0.00000e+00, 0.00000e+00),
+            'opls_384': (2.96000e-01, 8.78640e-01),
+            'opls_385': (0.00000e+00, 0.00000e+00),
+            'opls_386': (3.25000e-01, 7.11280e-01),
+            'opls_387': (0.00000e+00, 0.00000e+00),
+            'opls_388': (0.00000e+00, 0.00000e+00),
+            'opls_389': (2.50000e-01, 2.09200e-01),
+            'opls_390': (2.50000e-01, 2.09200e-01),
+            'opls_391': (3.50000e-01, 3.34720e-01),
+            'opls_392': (2.50000e-01, 2.09200e-01),
+            'opls_393': (3.74000e-01, 8.36800e-01),
+            'opls_394': (2.96000e-01, 8.78640e-01),
+            'opls_395': (3.00000e-01, 7.11280e-01),
+            'opls_396': (3.55000e-01, 2.76144e-01),
+            'opls_440': (3.74000e-01, 8.36800e-01),
+            'opls_441': (3.15000e-01, 8.36800e-01),
+            'opls_442': (2.90000e-01, 5.85760e-01),
+            'opls_443': (3.50000e-01, 2.76144e-01),
+            'opls_444': (2.50000e-01, 1.25520e-01),
+            'opls_445': (3.74000e-01, 8.36800e-01),
+            'opls_446': (3.15000e-01, 8.36800e-01),
+            'opls_447': (2.90000e-01, 5.85760e-01),
+            'opls_450': (3.74000e-01, 8.36800e-01),
+            'opls_451': (3.15000e-01, 8.36800e-01),
+            'opls_452': (2.90000e-01, 5.85760e-01),
+            'opls_465': (3.75000e-01, 4.39320e-01),
+            'opls_466': (2.96000e-01, 8.78640e-01),
+            'opls_467': (3.00000e-01, 7.11280e-01),
+            'opls_468': (3.50000e-01, 2.76144e-01),
+            'opls_469': (2.42000e-01, 6.27600e-02),
+            'opls_470': (3.75000e-01, 4.39320e-01),
+            'opls_471': (3.75000e-01, 4.39320e-01),
+            'opls_472': (3.55000e-01, 2.92880e-01),
+            'opls_473': (3.00000e-01, 7.11280e-01),
+            'opls_474': (3.55000e-01, 1.04600e+00),
+            'opls_475': (2.96000e-01, 7.11280e-01),
+            'opls_478': (3.25000e-01, 7.11280e-01),
+            'opls_479': (0.00000e+00, 0.00000e+00),
+            'opls_480': (3.25000e-01, 7.11280e-01),
+            'opls_481': (0.00000e+00, 0.00000e+00),
+            'opls_500': (3.55000e-01, 2.92880e-01),
+            'opls_501': (3.55000e-01, 2.92880e-01),
+            'opls_502': (3.55000e-01, 2.92880e-01),
+            'opls_503': (3.25000e-01, 7.11280e-01),
+            'opls_504': (0.00000e+00, 0.00000e+00),
+            'opls_505': (3.50000e-01, 2.76144e-01),
+            'opls_506': (3.55000e-01, 2.92880e-01),
+            'opls_507': (3.55000e-01, 2.92880e-01),
+            'opls_508': (3.55000e-01, 2.92880e-01),
+            'opls_509': (3.55000e-01, 2.92880e-01),
+            'opls_510': (3.55000e-01, 2.92880e-01),
+            'opls_511': (3.25000e-01, 7.11280e-01),
+            'opls_512': (3.25000e-01, 7.11280e-01),
+            'opls_513': (0.00000e+00, 0.00000e+00),
+            'opls_514': (3.55000e-01, 2.92880e-01),
+            'opls_515': (3.50000e-01, 2.76144e-01),
+            'opls_516': (3.50000e-01, 2.76144e-01),
+            'opls_517': (3.55000e-01, 3.17984e-01),
+            'opls_518': (3.55000e-01, 3.17984e-01),
+            'opls_520': (3.25000e-01, 7.11280e-01),
+            'opls_521': (3.55000e-01, 2.92880e-01),
+            'opls_522': (3.55000e-01, 2.92880e-01),
+            'opls_523': (3.55000e-01, 2.92880e-01),
+            'opls_524': (2.42000e-01, 1.25520e-01),
+            'opls_525': (2.42000e-01, 1.25520e-01),
+            'opls_526': (2.42000e-01, 1.25520e-01),
+            'opls_527': (3.25000e-01, 7.11280e-01),
+            'opls_528': (3.55000e-01, 2.92880e-01),
+            'opls_529': (2.42000e-01, 1.25520e-01),
+            'opls_530': (3.25000e-01, 7.11280e-01),
+            'opls_531': (3.55000e-01, 2.92880e-01),
+            'opls_532': (3.55000e-01, 2.92880e-01),
+            'opls_533': (3.55000e-01, 2.92880e-01),
+            'opls_534': (2.42000e-01, 1.25520e-01),
+            'opls_535': (2.42000e-01, 1.25520e-01),
+            'opls_536': (2.42000e-01, 1.25520e-01),
+            'opls_537': (3.25000e-01, 7.11280e-01),
+            'opls_538': (3.55000e-01, 2.92880e-01),
+            'opls_539': (3.55000e-01, 2.92880e-01),
+            'opls_540': (2.42000e-01, 1.25520e-01),
+            'opls_541': (2.42000e-01, 1.25520e-01),
+            'opls_542': (3.25000e-01, 7.11280e-01),
+            'opls_543': (3.55000e-01, 2.92880e-01),
+            'opls_544': (3.55000e-01, 2.92880e-01),
+            'opls_545': (0.00000e+00, 0.00000e+00),
+            'opls_546': (2.42000e-01, 1.25520e-01),
+            'opls_547': (2.42000e-01, 1.25520e-01),
+            'opls_548': (3.25000e-01, 7.11280e-01),
+            'opls_549': (3.25000e-01, 7.11280e-01),
+            'opls_550': (3.55000e-01, 2.92880e-01),
+            'opls_551': (3.55000e-01, 2.92880e-01),
+            'opls_552': (3.55000e-01, 2.92880e-01),
+            'opls_553': (0.00000e+00, 0.00000e+00),
+            'opls_554': (2.42000e-01, 1.25520e-01),
+            'opls_555': (2.42000e-01, 1.25520e-01),
+            'opls_556': (2.42000e-01, 1.25520e-01),
+            'opls_557': (3.25000e-01, 7.11280e-01),
+            'opls_558': (3.55000e-01, 2.92880e-01),
+            'opls_559': (3.25000e-01, 7.11280e-01),
+            'opls_560': (3.55000e-01, 2.92880e-01),
+            'opls_561': (3.55000e-01, 2.92880e-01),
+            'opls_562': (0.00000e+00, 0.00000e+00),
+            'opls_563': (2.42000e-01, 1.25520e-01),
+            'opls_564': (2.42000e-01, 1.25520e-01),
+            'opls_565': (2.42000e-01, 1.25520e-01),
+            'opls_566': (2.90000e-01, 5.85760e-01),
+            'opls_567': (3.55000e-01, 2.92880e-01),
+            'opls_568': (3.55000e-01, 3.17984e-01),
+            'opls_569': (2.42000e-01, 1.25520e-01),
+            'opls_570': (2.42000e-01, 1.25520e-01),
+            'opls_571': (2.90000e-01, 5.85760e-01),
+            'opls_572': (3.55000e-01, 2.92880e-01),
+            'opls_573': (3.25000e-01, 7.11280e-01),
+            'opls_574': (3.55000e-01, 2.92880e-01),
+            'opls_575': (3.55000e-01, 2.92880e-01),
+            'opls_576': (2.42000e-01, 1.25520e-01),
+            'opls_577': (2.42000e-01, 1.25520e-01),
+            'opls_578': (2.42000e-01, 1.25520e-01),
+            'opls_579': (2.90000e-01, 5.85760e-01),
+            'opls_580': (3.25000e-01, 7.11280e-01),
+            'opls_581': (3.55000e-01, 2.92880e-01),
+            'opls_582': (3.55000e-01, 2.92880e-01),
+            'opls_583': (3.55000e-01, 2.92880e-01),
+            'opls_584': (2.42000e-01, 1.25520e-01),
+            'opls_585': (2.42000e-01, 1.25520e-01),
+            'opls_586': (2.42000e-01, 1.25520e-01),
+            'opls_587': (3.25000e-01, 7.11280e-01),
+            'opls_588': (3.55000e-01, 2.92880e-01),
+            'opls_589': (3.55000e-01, 2.92880e-01),
+            'opls_633': (3.55000e-01, 1.04600e+00),
+            'opls_634': (3.55000e-01, 2.92880e-01),
+            'opls_635': (3.25000e-01, 7.11280e-01),
+            'opls_636': (3.55000e-01, 2.92880e-01),
+            'opls_637': (3.55000e-01, 2.92880e-01),
+            'opls_638': (2.42000e-01, 1.25520e-01),
+            'opls_639': (2.42000e-01, 1.25520e-01),
+            'opls_640': (2.42000e-01, 1.25520e-01),
+            'opls_700': (3.55000e-01, 3.17984e-01),
+            'opls_711': (3.50000e-01, 2.76144e-01),
+            'opls_712': (3.50000e-01, 2.76144e-01),
+            'opls_713': (3.50000e-01, 2.76144e-01),
+            'opls_719': (2.85000e-01, 2.55224e-01),
+            'opls_720': (3.55000e-01, 2.92880e-01),
+            'opls_721': (2.85000e-01, 2.55224e-01),
+            'opls_722': (3.47000e-01, 1.96648e+00),
+            'opls_724': (3.55000e-01, 2.92880e-01),
+            'opls_725': (3.25000e-01, 2.59408e-01),
+            'opls_726': (2.94000e-01, 2.55224e-01),
+            'opls_727': (3.55000e-01, 2.92880e-01),
+            'opls_728': (2.85000e-01, 2.55224e-01),
+            'opls_729': (3.55000e-01, 2.92880e-01),
+            'opls_730': (3.47000e-01, 1.96648e+00),
+            'opls_731': (3.55000e-01, 2.92880e-01),
+            'opls_732': (3.67000e-01, 2.42672e+00),
+            'opls_733': (3.50000e-01, 2.76144e-01),
+            'opls_734': (3.55000e-01, 1.04600e+00),
+            'opls_749': (3.25000e-01, 7.11280e-01),
+            'opls_750': (3.20000e-01, 7.11280e-01),
+            'opls_751': (3.25000e-01, 7.11280e-01),
+            'opls_752': (2.25000e-01, 2.09200e-01),
+            'opls_753': (3.20000e-01, 7.11280e-01),
+            'opls_754': (3.30000e-01, 2.76144e-01),
+            'opls_760': (3.25000e-01, 5.02080e-01),
+            'opls_761': (2.96000e-01, 7.11280e-01),
+            'opls_771': (2.96000e-01, 8.78640e-01),
+            'opls_772': (3.75000e-01, 4.39320e-01),
+            'opls_773': (3.00000e-01, 7.11280e-01),
+            'opls_787': (3.15000e-01, 7.11280e-01),
+            'opls_788': (2.86000e-01, 8.78640e-01),
+            'opls_900': (3.30000e-01, 7.11280e-01),
+            'opls_901': (3.30000e-01, 7.11280e-01),
+            'opls_902': (3.30000e-01, 7.11280e-01),
+        }
+        # fmt: on
+
+        return _raw
+
     def create_topology(self,
                         molecule,
                         basis=None,
@@ -1671,6 +2061,7 @@ class MMForceFieldGenerator:
                        equivalent_atoms):
 
         use_gaff = False
+        use_opls = False
         use_uff = False
         use_tm = False
 
@@ -1684,27 +2075,39 @@ class MMForceFieldGenerator:
         for i, atom_type in enumerate(self.atom_types_dict.values()):
             atom_type_found = False
 
-            # OPLS-AA branch: check the 'opls' key and warn if no equivalent exists.
-            # NOTE: Full OPLS-AA sigma/epsilon lookup (keyed on the opls type number)
-            # is not yet implemented — it requires a bundled OPLS-AA parameter file.
-            # Until that file is available the code falls through to the GAFF block
-            # below so that valid sigma/epsilon values are always produced.
+            # OPLS-AA branch: look up sigma/epsilon from the embedded parameter table.
             if self.force_field == 'opls' and 'opls' in atom_type:
                 oplstype = atom_type.get('opls')
                 if oplstype is None:
-                    # atomtypeidentifier.py set 'opls': None for this chemical
-                    # environment, meaning no standard OPLS-AA equivalent exists.
-                    gafftype_str = atom_type['gaff'].strip() if 'gaff' in atom_type else '?'
+                    # atomtypeidentifier.py set 'opls': None — no standard
+                    # OPLS-AA equivalent for this GAFF type.  Fall through to
+                    # GAFF below and warn the user.
+                    gafftype_str = (atom_type['gaff'].strip()
+                                    if 'gaff' in atom_type else '?')
                     warnmsg = (
-                        f'MMForceFieldGenerator: no OPLS-AA type for GAFF type '
-                        f'{gafftype_str!r} (atom index {i + 1}). '
+                        f'MMForceFieldGenerator: no OPLS-AA type for GAFF '
+                        f'type {gafftype_str!r} (atom index {i + 1}). '
                         'Falling back to GAFF sigma/epsilon parameters.')
                     self.ostream.print_warning(warnmsg)
-                # Whether oplstype is a valid string or None, fall through to
-                # the GAFF lookup below.
-                # TODO: once an OPLS-AA parameter file is bundled with VeloxChem,
-                # add a sigma/epsilon lookup keyed on oplstype here and set
-                # atom_type_found = True so the GAFF block is skipped.
+                else:
+                    oplsaa_dict = self.get_oplsaa_data_dict()
+                    if oplstype in oplsaa_dict:
+                        sigma, epsilon = oplsaa_dict[oplstype]
+                        comment = 'OPLS-AA'
+                        atom_type_found = True
+                        use_opls = True
+                        atom_type = oplstype
+                    else:
+                        # Type is named but absent from our embedded table —
+                        # warn and fall through to GAFF.
+                        gafftype_str = (atom_type['gaff'].strip()
+                                        if 'gaff' in atom_type else '?')
+                        warnmsg = (
+                            f'MMForceFieldGenerator: OPLS-AA type {oplstype!r}'
+                            f' (GAFF {gafftype_str!r}, atom index {i + 1}) '
+                            'not found in parameter table. '
+                            'Falling back to GAFF sigma/epsilon parameters.')
+                        self.ostream.print_warning(warnmsg)
 
             if 'gaff' in atom_type:
                 # Note: need strip() for converting e.g. 'c ' to 'c'
@@ -1774,11 +2177,11 @@ class MMForceFieldGenerator:
                 'comment': comment,
             }
 
-        self.print_references(gaff_version, use_gaff, use_uff, use_tm)
+        self.print_references(gaff_version, use_gaff, use_opls, use_uff, use_tm)
 
         return atoms
 
-    def print_references(self, gaff_version, use_gaff, use_uff, use_tm):
+    def print_references(self, gaff_version, use_gaff, use_opls, use_uff, use_tm):
         if use_gaff:
             if gaff_version is not None:
                 self.ostream.print_info(
@@ -1788,6 +2191,20 @@ class MMForceFieldGenerator:
             gaff_ref = 'J. Wang, R. M. Wolf, J. W. Caldwell, P. A. Kollman,'
             gaff_ref += ' D. A. Case, J. Comput. Chem. 2004, 25, 1157-1174.'
             self.ostream.print_reference('Reference: ' + gaff_ref)
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+        if use_opls:
+            self.ostream.print_info('Using OPLS-AA parameters.')
+            opls_ref1 = ('W. L. Jorgensen, D. S. Maxwell, J. Tirado-Rives, '
+                         'J. Am. Chem. Soc. 1996, 118, 11225-11236.')
+            opls_ref2 = ('W. L. Jorgensen, N. A. McDonald, '
+                         'J. Phys. Chem. B 1998, 102, 8049-8059.')
+            opls_ref3 = ('E. K. Watkins, W. L. Jorgensen, '
+                         'J. Phys. Chem. A 2001, 105, 4118-4125.')
+            self.ostream.print_reference('References: ' + opls_ref1)
+            self.ostream.print_reference('           ' + opls_ref2)
+            self.ostream.print_reference('           ' + opls_ref3)
             self.ostream.print_blank()
             self.ostream.flush()
 
@@ -2805,12 +3222,20 @@ class MMForceFieldGenerator:
                 cur_str += '        fudgeLJ   fudgeQQ\n'
                 f_top.write(cur_str)
                 gen_pairs = 'yes' if self.gen_pairs else 'no'
-                # OPLS-AA uses geometric-mean LJ mixing (comb_rule 3 in GROMACS).
-                # GAFF/AMBER uses Lorentz-Berthelot mixing (comb_rule 2).
-                comb_rule = 3 if self.force_field == 'opls' else self.comb_rule
+                # OPLS-AA uses geometric-mean LJ mixing (comb_rule 3) and
+                # equal 1-4 scaling (fudgeLJ = fudgeQQ = 0.5).
+                # GAFF/AMBER uses Lorentz-Berthelot mixing (comb_rule 2) and
+                # fudgeQQ = 1/1.2.
+                if self.force_field == 'opls':
+                    comb_rule = 3
+                    fudgeLJ = 0.5
+                    fudgeQQ = 0.5
+                else:
+                    comb_rule = self.comb_rule
+                    fudgeLJ = self.fudgeLJ
+                    fudgeQQ = self.fudgeQQ
                 f_top.write('{}{:16}{:>18}{:21.6f}{:10.6f}\n'.format(
-                    self.nbfunc, comb_rule, gen_pairs, self.fudgeLJ,
-                    self.fudgeQQ))
+                    self.nbfunc, comb_rule, gen_pairs, fudgeLJ, fudgeQQ))
 
             # include itp
 
