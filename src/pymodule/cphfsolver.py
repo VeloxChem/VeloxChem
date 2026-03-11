@@ -42,7 +42,7 @@ from .distributedarray import DistributedArray
 from .subcommunicators import SubCommunicators
 from .linearsolver import LinearSolver
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           dft_sanity_check, pe_sanity_check)
+                           ri_sanity_check, dft_sanity_check, pe_sanity_check)
 from .errorhandler import assert_msg_critical, safe_solve
 from .inputparser import parse_input
 from .checkpoint import write_rsp_hdf5, check_rsp_hdf5
@@ -152,6 +152,9 @@ class CphfSolver(LinearSolver):
               self.checkpoint_file.endswith('_rsp.h5')):
             self.checkpoint_file = (self.checkpoint_file[:-len('_rsp.h5')] +
                                     '_orbrsp.h5')
+
+        # check RI setup
+        ri_sanity_check(self)
 
         # check dft setup
         dft_sanity_check(self, 'compute')
@@ -371,6 +374,9 @@ class CphfSolver(LinearSolver):
               self.checkpoint_file.endswith('_rsp.h5')):
             self.checkpoint_file = (self.checkpoint_file[:-len('_rsp.h5')] +
                                     '_orbrsp.h5')
+
+        # check RI setup
+        ri_sanity_check(self)
 
         # check dft setup
         dft_sanity_check(self, 'compute')

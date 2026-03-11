@@ -107,6 +107,11 @@ class ScfGradientDriver(GradientDriver):
             not basis.has_ecp(),
             f'{type(self).__name__}.compute: ECP is not yet supported')
 
+        # TODO: enable RI-JK
+        assert_msg_critical(
+            not self.scf_driver.ri_jk,
+            f'{type(self).__name__}.compute: RI-JK is not yet supported')
+
         if scf_results is None:
             scf_results = self.scf_driver.scf_results
 

@@ -46,7 +46,7 @@ from .rifockdriver import RIFockDriver
 from .fockdriver import FockDriver
 from .linearsolver import LinearSolver
 from .distributedarray import DistributedArray
-from .sanitychecks import dft_sanity_check
+from .sanitychecks import dft_sanity_check, ri_sanity_check
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input, print_keywords, print_attributes
 from .dftutils import get_default_grid_level
@@ -102,7 +102,9 @@ class NonlinearSolver:
 
         # RI-J
         self.ri_coulomb = False
+        self.ri_jk = False
         self.ri_auxiliary_basis = 'def2-universal-jfit'
+        self.ri_metric_threshold = 1.0e-12
         self._ri_drv = None
 
         # dft
@@ -274,6 +276,8 @@ class NonlinearSolver:
 
         parse_input(self, method_keywords, method_dict)
 
+        ri_sanity_check(self)
+
         dft_sanity_check(self, 'update_settings', 'nonlinear')
 
         if self.potfile is not None:
@@ -305,6 +309,11 @@ class NonlinearSolver:
         assert_msg_critical(
             not basis.has_ecp(),
             f'{type(self).__name__}.compute: ECP is not yet supported')
+
+        # TODO: enable RI-JK
+        assert_msg_critical(
+            not self.ri_jk,
+            f'{type(self).__name__}.compute: RI-JK is not yet supported')
 
         if self.rank == mpi_master():
             screening = T4CScreener()

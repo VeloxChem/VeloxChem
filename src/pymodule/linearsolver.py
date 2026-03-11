@@ -53,7 +53,7 @@ from .oneeints import (compute_electric_dipole_integrals,
                        compute_quadrupole_integrals,
                        compute_linear_momentum_integrals,
                        compute_angular_momentum_integrals)
-from .sanitychecks import (dft_sanity_check, pe_sanity_check,
+from .sanitychecks import (dft_sanity_check, ri_sanity_check, pe_sanity_check,
                            solvation_model_sanity_check)
 from .errorhandler import assert_msg_critical
 from .inputparser import (parse_input, print_keywords, print_attributes,
@@ -124,7 +124,9 @@ class LinearSolver:
 
         # RI-J
         self.ri_coulomb = False
+        self.ri_jk = False
         self.ri_auxiliary_basis = 'def2-universal-jfit'
+        self.ri_metric_threshold = 1.0e-12
         self._ri_drv = None
 
         # dft
@@ -364,6 +366,8 @@ class LinearSolver:
 
         parse_input(self, method_keywords, method_dict)
 
+        ri_sanity_check(self)
+
         dft_sanity_check(self, 'update_settings')
 
         pe_sanity_check(self, method_dict)
@@ -403,6 +407,11 @@ class LinearSolver:
         assert_msg_critical(
             not basis.has_ecp(),
             f'{type(self).__name__}.compute: ECP is not yet supported')
+
+        # TODO: enable RI-JK
+        assert_msg_critical(
+            not self.ri_jk,
+            f'{type(self).__name__}.compute: RI-JK is not yet supported')
 
         if self.rank == mpi_master():
             screening = T4CScreener()

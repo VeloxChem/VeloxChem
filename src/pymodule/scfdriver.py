@@ -69,7 +69,8 @@ from .inputparser import (parse_input, print_keywords, print_attributes,
                           get_random_string_parallel)
 from .dftutils import get_default_grid_level, print_xc_reference
 from .sanitychecks import (molecule_sanity_check, dft_sanity_check,
-                           pe_sanity_check, solvation_model_sanity_check)
+                           ri_sanity_check, pe_sanity_check,
+                           solvation_model_sanity_check)
 from .errorhandler import assert_msg_critical
 from .checkpoint import (create_hdf5, write_scf_results_to_hdf5,
                          write_cpcm_charges, read_cpcm_charges,
@@ -530,6 +531,8 @@ class ScfDriver:
 
         parse_input(self, method_keywords, method_dict)
 
+        ri_sanity_check(self)
+
         dft_sanity_check(self, 'update_settings')
 
         pe_sanity_check(self, method_dict)
@@ -627,27 +630,11 @@ class ScfDriver:
         if self.filename is not None and self.checkpoint_file is None:
             self.checkpoint_file = f'{self.filename}_scf.h5'
 
-        # check RI
-        # for now, force DIIS for RI
-        # TODO: double check
-        if self.ri_coulomb or self.ri_jk:
-            if self.acc_type == 'L2_C2DIIS':
-                self.acc_type = 'C2DIIS'
-            elif self.acc_type == 'L2_DIIS':
-                self.acc_type = 'DIIS'
-
-            assert_msg_critical(
-                not (self.ri_coulomb and self.ri_jk),
-                'ScfDriver: please use either ri_coulomb or ri_jk, not both.')
-
-            if self.ri_coulomb and self.ri_auxiliary_basis == 'def2-universal-jkfit':
-                self.ri_auxiliary_basis = 'def2-universal-jfit'
-
-            if self.ri_jk and self.ri_auxiliary_basis == 'def2-universal-jfit':
-                self.ri_auxiliary_basis = 'def2-universal-jkfit'
-
         # check molecule
         molecule_sanity_check(molecule, self.scf_type)
+
+        # check RI setup
+        ri_sanity_check(self)
 
         # check dft setup
         dft_sanity_check(self, 'compute')

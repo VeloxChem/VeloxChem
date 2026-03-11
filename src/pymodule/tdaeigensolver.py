@@ -53,7 +53,7 @@ from .oneeints import (compute_electric_dipole_integrals,
                        compute_linear_momentum_integrals,
                        compute_angular_momentum_integrals)
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           dft_sanity_check, pe_sanity_check,
+                           ri_sanity_check, dft_sanity_check, pe_sanity_check,
                            solvation_model_sanity_check)
 from .errorhandler import assert_msg_critical
 from .checkpoint import (read_rsp_hdf5, write_rsp_hdf5, write_rsp_solution,
@@ -220,6 +220,9 @@ class TdaEigenSolver(LinearSolver):
         # update checkpoint_file after scf_results_sanity_check
         if self.filename is not None and self.checkpoint_file is None:
             self.checkpoint_file = f'{self.filename}_rsp.h5'
+
+        # check RI setup
+        ri_sanity_check(self)
 
         # check dft setup
         dft_sanity_check(self, 'compute')
