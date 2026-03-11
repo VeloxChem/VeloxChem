@@ -1097,7 +1097,7 @@ class CpcmDriver:
         :param cpcm_cg_thresh:
             threshold for solving charges.
 
-        :return: 
+        :return:
             The gradient array of each cartesian component -- of shape (nAtoms, 3).
         """
 
