@@ -1247,7 +1247,6 @@ class VibrationalAnalysis:
             ra = [s for s in self.raman_activities]
             hf.create_dataset(vib_group + 'raman_activities', data=np.array(ra))
             polgrad = [self.polarizability_gradient[a] for a in self.polarizability_gradient.keys()]
-            print(polgrad)
             hf.create_dataset(vib_group + 'polarizability_gradient',
                             data=np.array(polgrad))
 
