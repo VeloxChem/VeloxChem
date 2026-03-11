@@ -85,14 +85,21 @@ class EvbFepDriver():
 
         self.isothermal: bool = False
         self.isobaric: bool = False
-        self.langevin_friction = 1.0  # 1/ps
-
+        
+        self.temperature = -1
+        self.pressure = -1
+        
+        # Nose hoover options
         # a default of tau = 1000*dt is on the safe side, See discussion on Tdam: https://docs.lammps.org/fix_nh.html
         self.nhc_frequency = 1.0  #1/ps,
         self.nhc_small_length = 3
         self.nhc_bulk_length = 1
-        self.temperature = -1
-        self.pressure = -1
+        
+        self.langevin_friction = 1.0  # 1/ps
+        # See https://docs.openmm.org/latest/api-python/generated/openmm.openmm.VariableLangevinIntegrator.html
+        self.langevin_tolerance = 0.001
+        
+        self.NVT_integrator = "variable Langevin"
 
         self.equil_NVT_steps = 50000
         self.equil_NPT_steps = 50000
@@ -119,7 +126,7 @@ class EvbFepDriver():
         self.pdb_equil_start_temp = 10  #kelvin
         self.pdb_equil_temp_step = 50  # kelvin
         self.pdb_temperatures = []
-        self.NVT_integrator = "nose-hoover"
+        
 
         self.pdb = None
         self.pdb_posres_equil = False  # if True, an extra equilibration will be performed every lambda with posres turned on
@@ -130,6 +137,7 @@ class EvbFepDriver():
             "langevin_friction": {
                 "type": float
             },
+            "langevin_tolerance": {"type":float},
             "nhc_frequency": {
                 "type": float
             },
@@ -405,6 +413,8 @@ class EvbFepDriver():
                 f"Perfoming PDB warmup with T-vector {np.array(self.pdb_temperatures)}"
             )
             self.ostream.flush()
+            self.ostream.print_info("Turning posres force off")
+            simulation.context.setParameter('posres_k', 0)
             for T in self.pdb_temperatures:
                 simulation.integrator.setTemperature(T)
 
@@ -419,18 +429,22 @@ class EvbFepDriver():
                 else:
                     self._safe_step(simulation, self.initial_equil_NVT_steps,
                                     f"PDB warmup NVT equilibration T = {T}")
-
-            self.ostream.print_info("Turning posres force off")
-            simulation.context.setParameter('posres_k', 0)
+                if self.debug:
+                    self._save_state(
+                        simulation,
+                        f"warmup_equil_state_{T:.1f}K",
+                        xml=False,
+                        chk=False,
+                        pdb=True,
+                    )
 
         equil_state = simulation.context.getState(
             getPositions=True,
             getVelocities=True,
-            getForces=True,
             getEnergy=True,
-            getParameters=True,
-            getParameterDerivatives=True,
-            getIntegratorParameters=True,
+            # getParameters=True,
+            # getParameterDerivatives=True,
+            # getIntegratorParameters=True,
             enforcePeriodicBox=True,
         )
         self._save_state(
@@ -438,6 +452,7 @@ class EvbFepDriver():
             f"equil_state_initial",
             xml=False,
             chk=True,
+            pdb=False,
         )
         return equil_state
 
@@ -490,10 +505,12 @@ class EvbFepDriver():
 
         if self.pdb is not None and self.pdb_posres_equil:
             self.ostream.print_info("Turning posres force on")
+            self.ostream.flush()
             simulation.context.setParameter('posres_k', self.posres_k)
             self._safe_step(simulation, self.equil_NVT_steps,
                             "NVT posres equilibration")
             self.ostream.print_info("Turning posres force off")
+            self.ostream.flush()
             simulation.context.setParameter('posres_k', 0)
 
         if self.isobaric:
@@ -510,11 +527,11 @@ class EvbFepDriver():
         equil_state = simulation.context.getState(
             getPositions=True,
             getVelocities=True,
-            getForces=True,
+            # getForces=True,
             getEnergy=True,
-            getParameters=True,
-            getParameterDerivatives=True,
-            getIntegratorParameters=True,
+            # getParameters=True,
+            # getParameterDerivatives=True,
+            # getIntegratorParameters=True,
             enforcePeriodicBox=True,
         )
 
@@ -577,13 +594,19 @@ class EvbFepDriver():
 
     def _get_simulation(self, system, step_size):
         if self.isothermal:
-            if self.NVT_integrator == "langevin":
+            if self.NVT_integrator == "variable Langevin":
+                integrator = mm.VariableLangevinIntegrator(
+                    self.temperature * mmunit.kelvin,  #type: ignore
+                    self.langevin_friction / mmunit.picosecond,  #type: ignore
+                    self.langevin_tolerance,
+                )
+            elif self.NVT_integrator == "Langevin":
                 integrator = mm.LangevinMiddleIntegrator(
                     self.temperature * mmunit.kelvin,  #type: ignore
                     self.langevin_friction / mmunit.picosecond,  #type: ignore
                     step_size * mmunit.picoseconds,
                 )
-            elif self.NVT_integrator == "nose-hoover":
+            elif self.NVT_integrator == "Nose-Hoover":
                 if system.getNumParticles() > 100:
                     chain_length = self.nhc_bulk_length
                 else:
@@ -596,7 +619,7 @@ class EvbFepDriver():
                     chain_length,
                 )
             else:
-                assert False, "NVT-integrator should be either 'langevin' or 'nose-hoover'"
+                assert False, "NVT-integrator should be either 'variable Langevin', 'Langevin' or 'Nose-Hoover'"
         else:
             integrator = mm.VerletIntegrator(step_size)
 
@@ -698,13 +721,21 @@ class EvbFepDriver():
         self.ostream.print_info(f"Constrained {count} bonds involving H atoms")
         return system
 
-    def _save_state(self, simulation, name, xml=True, chk=True):
+    def _save_state(self, simulation, name, xml=True, chk=True,pdb = True):
         if xml:
             chk_file = str(self.run_folder / f"{name}.chk")
             simulation.saveCheckpoint(chk_file)
         if chk:
             xml_file = str(self.run_folder / f"{name}.xml")
             simulation.saveState(xml_file)
+        if pdb:
+            state = simulation.context.getState(getPositions=True, enforcePeriodicBox=True)
+            positions = np.array(state.getPositions().value_in_unit(mm.unit.angstrom))
+            mmapp.PDBFile.writeFile(
+                self.topology,
+                positions,
+                open(self.run_folder / f"{name}.pdb", "w"),
+            )
 
     def _safe_step(self, simulation, steps, name=""):
         self.ostream.print_info(
@@ -729,10 +760,11 @@ class EvbFepDriver():
                 self._save_states(states, simulation, i)
                 raise e
 
+            #todo only querry velocities and forces if reporting them or debugging
             state = simulation.context.getState(
                 getPositions=True,
                 getVelocities=True,
-                getForces=True,
+                getForces=self.report_forces or self.debug,
                 getEnergy=True,
                 enforcePeriodicBox=True,
             )

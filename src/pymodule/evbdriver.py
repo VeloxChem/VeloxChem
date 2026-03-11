@@ -218,10 +218,12 @@ class EvbDriver():
         #Per configuration
         for conf in self.configurations:
             #create folders,
-            data_folder = f"EVB_{self.name}_{conf['name']}_data_{self.t_label}"
+            # todo make this go more automatic. Don't require providing a name
+            selfname = f"_{self.name}" if self.name is not None else ""
+            data_folder = f"EVB{selfname}_{conf['name']}_data_{self.t_label}"
             while Path(data_folder).exists():
                 self.t_label += 1
-                data_folder = f"EVB_{self.name}_{conf['name']}_data_{self.t_label}"
+                data_folder = f"EVB{selfname}_{conf['name']}_data_{self.t_label}"
 
             run_folder = str(Path(data_folder) / "run")
             conf["data_folder"] = data_folder
@@ -240,10 +242,10 @@ class EvbDriver():
             self.product.molecule.write_xyz_file(
                 str(data_folder_path / "product_struct.xyz"))
 
-            MMForceFieldGenerator.save_forcefield_as_json(
-                self.reactant, str(data_folder_path / f"reactant_ff_data.json"))
-            MMForceFieldGenerator.save_forcefield_as_json(
-                self.product, str(data_folder_path / f"product_ff_data.json"))
+            # MMForceFieldGenerator.save_forcefield(
+            #     self.reactant, str(data_folder_path / f"reactant_ff_data.json"))
+            # MMForceFieldGenerator.save_forcefield(
+            #     self.product, str(data_folder_path / f"product_ff_data.json"))
 
             if conf.get('solvent', None) is None and conf.get('pressure',
                                                               -1) > 0:
@@ -365,14 +367,6 @@ class EvbDriver():
     ):
         """Run the the FEP calculations for all configurations in self.system_confs.
 
-        Args:
-            equil_steps (int, optional): The amount of timesteps to equilibrate at the beginning af each Lambda frame. Equilibration is done with frozen H-bonds. Defaults to 5000.
-            sample_steps (int, optional): The amount of steps to sample. Defaults to 100000.
-            write_step (int, optional): Per how many steps to take a sample and save its data as well as the trajectory point. Defaults to 1000.
-            initial_equil_steps (int, optional): The amount of timesteps to add to the equilibration at the first Lambda frame. Defaults to 5000.
-            step_size (float, optional): The step size during the sampling in picoseconds. Defaults to 0.001.
-            equil_step_size (float, optional): The step size during the equilibration in picoseconds. Is typically larger then step_size as equilibration is done with frozen H-bonds. Defaults to 0.002.
-            initial_equil_step_size (float, optional): The step size during initial equilibration in picoseconds. Defaults to 0.002.
         """
 
         for conf in self.system_confs:

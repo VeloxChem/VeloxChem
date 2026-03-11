@@ -376,11 +376,17 @@ class EvbSystemBuilder():
                 f"Reacting residue {residue.name} {residue.id} with {len(res_atoms)} atoms added to reaction_atoms"
             )
             self.ostream.flush()
+            
+        for id in self.reactant.atoms.keys():
+            if  self.reactant.atoms[id].get('pdb') != 'sys':
+                self.reactant.atoms[id]['pdb'] = 'unmapped'
+                
 
         return system, topology, system_mol, reaction_atoms
 
     def _get_mapped_atom_ids_from_residue(self, residue):
         # create a graph of the residue
+        # if the bonds are not available, create them based on proximity from the positions
 
         # figure out a mapping from self.reactant.atoms to the atoms in the residue with networkx
         vlx_elements = self.reactant.molecule.get_element_ids()
@@ -537,7 +543,7 @@ class EvbSystemBuilder():
 
             for id, atom in self.reactant.atoms.items():
                 # if the pdb field is sys, the atom is already in the system and added to the nbforce
-                if atom.get('pdb') == 'sys':
+                if atom.get('pdb') == 'sys' or atom.get('pdb') == 'unmapped':
                     continue
                 mm_element = mmapp.Element.getBySymbol(elements[id])
                 name = f"{elements[id]}{id}"
@@ -1191,6 +1197,38 @@ class EvbSystemBuilder():
 
     def _interpolate_system(self, system, lambda_vec, nb_force, E_field_force):
         systems = {}
+        rea_charge = [atom['charge'] for atom in self.reactant.atoms.values()]
+        rea_pdb_charge = [atom['charge'] for atom in self.reactant.atoms.values() if atom.get('pdb') != 'unmapped']
+        
+        if round(sum(rea_charge),5).is_integer() and len(rea_pdb_charge) > 0:
+            rea_formal_charge = int(round(sum(rea_charge)))
+            rea_offset = rea_formal_charge - sum(rea_pdb_charge)
+            rea_offset_per_atom = rea_offset / len(rea_pdb_charge)
+            if abs(rea_offset) > 0.01:
+                self.ostream.print_info(f"Total reactant charge is {rea_formal_charge} but charge sum of the pdb atoms is {sum(rea_pdb_charge)}")
+                self.ostream.print_info(f"Applying an offset of {rea_offset_per_atom:.4f} to {len(rea_pdb_charge)} reactant pdb atoms")
+        elif len(rea_pdb_charge) == 0:
+            rea_offset_per_atom = 0
+        else:
+            rea_offset_per_atom = 0
+            self.ostream.print_warning(f"Total reactant charge is {sum(rea_charge)} and is not sufficiently close to a whole number, skipping charge offset")
+        
+        pro_charge = [atom['charge'] for atom in self.product.atoms.values()]
+        pro_pdb_charge = [pro_atom['charge'] for rea_atom,pro_atom in zip(self.reactant.atoms.values(),self.product.atoms.values()) if rea_atom.get('pdb') != 'unmapped']
+        
+        if round(sum(pro_charge),5).is_integer() and len(pro_pdb_charge) > 0:
+            pro_formal_charge = int(round(sum(pro_charge)))
+            pro_offset = pro_formal_charge - sum(pro_pdb_charge)
+            pro_offset_per_atom = pro_offset / len(pro_pdb_charge)
+            if abs(pro_offset) > 0.01:
+                self.ostream.print_info(f"Total product charge is {pro_formal_charge} but charge sum of the pdb atoms is {sum(pro_pdb_charge)}")
+                self.ostream.print_info(f"Applying an offset of {pro_offset_per_atom:.4f} to {len(pro_pdb_charge)} product pdb atoms")
+        elif len(pro_pdb_charge) == 0:
+            pro_offset_per_atom = 0
+        else:
+            pro_offset_per_atom = 0
+            self.ostream.print_warning(f"Total product charge is {sum(pro_charge)} and is not sufficiently close to a whole number, skipping charge offset")
+        
         for lam in lambda_vec:
             total_charge = 0
             if not self.no_reactant:
@@ -1198,10 +1236,11 @@ class EvbSystemBuilder():
                 for i, (reactant_atom, product_atom) in enumerate(
                         zip(self.reactant.atoms.values(),
                             self.product.atoms.values())):
-                    if reactant_atom.get('pdb') == 'cap':
+                    if reactant_atom.get('pdb') == 'unmapped':
                         continue
-                    charge = (1 - lam) * reactant_atom[
-                        "charge"] + lam * product_atom["charge"]
+                    rea_charge = reactant_atom["charge"] + rea_offset_per_atom
+                    pro_charge = product_atom["charge"] + pro_offset_per_atom
+                    charge = (1 - lam) * rea_charge + lam * pro_charge
                     total_charge += charge
                     sigma = (1 - lam) * reactant_atom[
                         "sigma"] + lam * product_atom["sigma"]
