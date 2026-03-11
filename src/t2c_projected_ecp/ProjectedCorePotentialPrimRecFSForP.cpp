@@ -132,7 +132,7 @@ comp_prim_projected_core_potential_fs_p(CSimdArray<double>& pbuffer,
 
         const double fbzi_0 = b_exps[i] * fzi_0;
 
-        tg_xxx_0_p_0_0_0[i] = 2.0 * tg_x_0_p_0_0_0[i] * fzi_0 + 2.0 * tg_x_0_p_1_0_0[i] * fbzi_0 * fbzi_0 + 3.0 * tg_xx_0_s_0_0_1[i] * rb_x[i] * fbzi_0 + 2.0 * tg_xx_0_p_1_0_0[i] * a_x * a_exp * fbzi_0 * fbzi_0 + tg_xx_0_p_0_0_0[i] * a_x * faz_0;
+        tg_xxx_0_p_0_0_0[i] = tg_x_0_p_0_0_0[i] * fzi_0 + 2.0 * tg_x_0_p_1_0_0[i] * fbzi_0 * fbzi_0 + 3.0 * tg_xx_0_s_0_0_1[i] * rb_x[i] * fbzi_0 + 2.0 * tg_xx_0_p_1_0_0[i] * a_x * a_exp * fbzi_0 * fbzi_0 + tg_xx_0_p_0_0_0[i] * a_x * faz_0;
 
         tg_xxy_0_p_0_0_0[i] = 3.0 * tg_xx_0_s_0_0_1[i] * rb_y[i] * fbzi_0 + 2.0 * tg_xx_0_p_1_0_0[i] * a_y * a_exp * fbzi_0 * fbzi_0 + tg_xx_0_p_0_0_0[i] * a_y * faz_0;
 
@@ -144,13 +144,13 @@ comp_prim_projected_core_potential_fs_p(CSimdArray<double>& pbuffer,
 
         tg_xzz_0_p_0_0_0[i] = 3.0 * tg_zz_0_s_0_0_1[i] * rb_x[i] * fbzi_0 + 2.0 * tg_zz_0_p_1_0_0[i] * a_x * a_exp * fbzi_0 * fbzi_0 + tg_zz_0_p_0_0_0[i] * a_x * faz_0;
 
-        tg_yyy_0_p_0_0_0[i] = 2.0 * tg_y_0_p_0_0_0[i] * fzi_0 + 2.0 * tg_y_0_p_1_0_0[i] * fbzi_0 * fbzi_0 + 3.0 * tg_yy_0_s_0_0_1[i] * rb_y[i] * fbzi_0 + 2.0 * tg_yy_0_p_1_0_0[i] * a_y * a_exp * fbzi_0 * fbzi_0 + tg_yy_0_p_0_0_0[i] * a_y * faz_0;
+        tg_yyy_0_p_0_0_0[i] = tg_y_0_p_0_0_0[i] * fzi_0 + 2.0 * tg_y_0_p_1_0_0[i] * fbzi_0 * fbzi_0 + 3.0 * tg_yy_0_s_0_0_1[i] * rb_y[i] * fbzi_0 + 2.0 * tg_yy_0_p_1_0_0[i] * a_y * a_exp * fbzi_0 * fbzi_0 + tg_yy_0_p_0_0_0[i] * a_y * faz_0;
 
         tg_yyz_0_p_0_0_0[i] = 3.0 * tg_yy_0_s_0_0_1[i] * rb_z[i] * fbzi_0 + 2.0 * tg_yy_0_p_1_0_0[i] * a_z * a_exp * fbzi_0 * fbzi_0 + tg_yy_0_p_0_0_0[i] * a_z * faz_0;
 
         tg_yzz_0_p_0_0_0[i] = 3.0 * tg_zz_0_s_0_0_1[i] * rb_y[i] * fbzi_0 + 2.0 * tg_zz_0_p_1_0_0[i] * a_y * a_exp * fbzi_0 * fbzi_0 + tg_zz_0_p_0_0_0[i] * a_y * faz_0;
 
-        tg_zzz_0_p_0_0_0[i] = 2.0 * tg_z_0_p_0_0_0[i] * fzi_0 + 2.0 * tg_z_0_p_1_0_0[i] * fbzi_0 * fbzi_0 + 3.0 * tg_zz_0_s_0_0_1[i] * rb_z[i] * fbzi_0 + 2.0 * tg_zz_0_p_1_0_0[i] * a_z * a_exp * fbzi_0 * fbzi_0 + tg_zz_0_p_0_0_0[i] * a_z * faz_0;
+        tg_zzz_0_p_0_0_0[i] = tg_z_0_p_0_0_0[i] * fzi_0 + 2.0 * tg_z_0_p_1_0_0[i] * fbzi_0 * fbzi_0 + 3.0 * tg_zz_0_s_0_0_1[i] * rb_z[i] * fbzi_0 + 2.0 * tg_zz_0_p_1_0_0[i] * a_z * a_exp * fbzi_0 * fbzi_0 + tg_zz_0_p_0_0_0[i] * a_z * faz_0;
     }
 
     if (p > 0)
