@@ -61,6 +61,7 @@
 #include "LocalCorePotentialGeomX00Driver.hpp"
 #include "LocalCorePotentialGeomX0YDriver.hpp"
 #include "LocalCorePotentialGeom0X0Driver.hpp"
+#include "CorePotentialGradientDriver.hpp"
 
 namespace vlx_t2cintegrals {
 
@@ -561,6 +562,48 @@ export_t2cintegrals(py::module& m)
                const int                                      ecp_momentum)
                 -> CMatrices { return geom_drv.compute(basis, molecule, ecp_potential, ecp_momentum); },
             "Computes projected core potential first derivatives matrices for given molecule, basis.");
+    
+    // CCorePotentialGradientDriver class
+    PyClass<CCorePotentialGradientDriver>(m, "ECPGradientDriver")
+        .def(py::init<>())
+        .def(
+            "compute_bra_grad",
+            [](const CCorePotentialGradientDriver& ecp_drv,
+               const CMolecule&            molecule,
+               const CMolecularBasis&      basis,
+               const CAtomCorePotential&   ecp_potential,
+               const int                   iatom) -> CMatrices {
+               return ecp_drv.compute_bra_grad(basis, molecule, ecp_potential, iatom);
+            },
+             "Computes ECP matrix for given molecule, basis, atom core potential.")
+        .def(
+            "compute_bra_grad",
+            [](const CCorePotentialGradientDriver& ecp_drv,
+               const CMolecule&                    molecule,
+               const CMolecularBasis&              basis,
+               const std::vector<int>&             atoms,
+               const int                           iatom) -> CMatrices {
+               return ecp_drv.compute_bra_grad(basis, molecule, atoms, iatom);
+            },
+             "Computes ECP matrix for given molecule, basis, vector of atoms.")
+        .def(
+            "compute_pot_grad",
+            [](const CCorePotentialGradientDriver& ecp_drv,
+               const CMolecule&            molecule,
+               const CMolecularBasis&      basis,
+               const CAtomCorePotential&   ecp_potential) -> CMatrices {
+               return ecp_drv.compute_pot_grad(basis, molecule, ecp_potential);
+            },
+             "Computes ECP matrix for given molecule, basis, atom core potential.")
+        .def(
+            "compute_pot_grad",
+            [](const CCorePotentialGradientDriver& ecp_drv,
+               const CMolecule&                    molecule,
+               const CMolecularBasis&              basis,
+               const int                           iatom) -> CMatrices {
+               return ecp_drv.compute_pot_grad(basis, molecule, iatom);
+            },
+             "Computes ECP matrix for given molecule, basis, vector of atoms.");
 }
 
 }  // namespace vlx_t2cintegrals
