@@ -30,7 +30,7 @@ class TestMolecularOrbitals:
         return MolecularOrbitals(orbitals, energies, occupations, molorb.unrest)
 
     @staticmethod
-    def make_restricted_open_shell():
+    def make_restricted_openshell():
 
         orbitals = [np.array([[0.8, 0.6], [0.6, -0.8]])]
         energies = [np.array([-0.5, 0.1])]
@@ -109,7 +109,7 @@ class TestMolecularOrbitals:
                 ),
             ),
             (
-                'make_restricted_open_shell',
+                'make_restricted_openshell',
                 'restricted_openshell',
                 (
                     np.array([[0.64, 0.48], [0.48, 0.36]]),
@@ -142,7 +142,7 @@ class TestMolecularOrbitals:
         [
             ('make_restricted', molorb.rest),
             ('make_unrestricted', molorb.unrest),
-            ('make_restricted_open_shell', molorb.restopen),
+            ('make_restricted_openshell', molorb.restopen),
         ],
     )
     def test_hdf5_roundtrip_and_label_validity(self, tmp_path, factory_name,
@@ -248,7 +248,7 @@ class TestMolecularOrbitals:
 
     def test_broadcast_with_comm_self(self):
 
-        mol_orbs = self.make_restricted_open_shell()
+        mol_orbs = self.make_restricted_openshell()
         broadcasted = mol_orbs.broadcast(MPI.COMM_SELF, root=0)
 
         assert broadcasted is not mol_orbs

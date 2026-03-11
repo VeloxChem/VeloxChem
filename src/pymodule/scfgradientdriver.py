@@ -963,28 +963,3 @@ class ScfGradientDriver(GradientDriver):
             scf_results.update(new_scf_results)
 
         return self.scf_driver.get_scf_energy()
-
-    def __deepcopy__(self, memo):
-        """
-        Implements deepcopy.
-
-        :param memo:
-            The memo dictionary for deepcopy.
-
-        :return:
-            A deepcopy of self.
-        """
-
-        new_grad_drv = ScfGradientDriver(self.comm, self.ostream)
-
-        for key, val in vars(self).items():
-            if isinstance(val, (MPI.Intracomm, OutputStream)):
-                pass
-            elif isinstance(val, XCFunctional):
-                new_grad_drv.key = XCFunctional(val)
-            elif isinstance(val, MolecularGrid):
-                new_grad_drv.key = MolecularGrid(val)
-            else:
-                new_grad_drv.key = deepcopy(val)
-
-        return new_grad_drv
