@@ -2303,11 +2303,10 @@ class MMForceFieldGenerator:
 
         # Attach QM-derived partial charges so the toolkit uses them rather
         # than computing its own.
-        charges_e = [
-            float(q) * off_unit.elementary_charge
-            for q in self.partial_charges
-        ]
-        off_mol.partial_charges = charges_e * off_unit.elementary_charge
+        off_mol.partial_charges = (
+            np.array([float(q) for q in self.partial_charges])
+            * off_unit.elementary_charge
+        )
 
         # ── Load Sage 2.0 and parametrize ─────────────────────────────────
         sage = OFFForceField('openff-2.0.0.offxml')
