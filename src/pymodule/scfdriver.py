@@ -679,9 +679,9 @@ class ScfDriver:
                                                     self.scf_type)
 
         if self.restart:
-            if self.acc_type == 'L2_C2DIIS':
+            if self.acc_type.upper() == 'L2_C2DIIS':
                 self.acc_type = 'C2DIIS'
-            elif self.acc_type == 'L2_DIIS':
+            elif self.acc_type.upper() == 'L2_DIIS':
                 self.acc_type = 'DIIS'
             if self.rank == mpi_master():
                 self._ref_mol_orbs = MolecularOrbitals.read_hdf5(

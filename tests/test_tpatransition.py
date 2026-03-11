@@ -11,7 +11,7 @@ from veloxchem.tpatransitiondriver import TpaTransitionDriver
 @pytest.mark.solvers
 class TestTpaTransition:
 
-    def run_scf(self, xcfun_label):
+    def run_scf(self, xcfun_label, ri_coulomb=False):
 
         molecule_string = """
             O  0.0           0.0  0.0
@@ -26,18 +26,20 @@ class TestTpaTransition:
 
         scf_drv = ScfRestrictedDriver()
         scf_drv.xcfun = xcfun_label
+        scf_drv.ri_coulomb = ri_coulomb
         scf_drv.conv_thresh = scf_conv_thresh
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(molecule, basis)
 
         return scf_results, molecule, basis
 
-    def run_tpatransition(self, xcfun_label, ref_results):
+    def run_tpatransition(self, xcfun_label, ref_results, ri_coulomb=False):
 
         tpa_nstates = 2
         tpa_conv_thresh = 1.0e-7
 
-        scf_results, molecule, ao_basis = self.run_scf(xcfun_label)
+        scf_results, molecule, ao_basis = self.run_scf(xcfun_label,
+                                                       ri_coulomb=ri_coulomb)
 
         tpa_drv = TpaTransitionDriver()
         tpa_drv.xcfun = xcfun_label
@@ -84,3 +86,11 @@ class TestTpaTransition:
             -0.18265658100098003: 41.94340887233736,
         }
         self.run_tpatransition('tpssh', ref_result)
+
+    def test_tpatransition_ri_blyp(self):
+
+        ref_result = {
+            -0.12580806392701718: 13.672823155898364,
+            -0.1710157238983142: 60.526749482300374,
+        }
+        self.run_tpatransition('blyp', ref_result, ri_coulomb=True)

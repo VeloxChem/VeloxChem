@@ -10,7 +10,7 @@ from veloxchem.lrsolver import LinearResponseSolver
 @pytest.mark.solvers
 class TestLR:
 
-    def run_lr(self, xcfun_label, ref_rsp_func, tol):
+    def run_lr(self, xcfun_label, ref_rsp_func, tol, ri_coulomb=False):
 
         xyz_string = """3
         xyz
@@ -26,6 +26,7 @@ class TestLR:
         scf_drv = ScfRestrictedDriver()
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label
+        scf_drv.ri_coulomb = ri_coulomb
         scf_drv.acc_type = 'l2_c2diis'
         scf_results = scf_drv.compute(mol, bas)
 
@@ -165,3 +166,28 @@ class TestLR:
         }
 
         self.run_lr('tpssh', ref_rsp_func, 1.0e-5)
+
+    def test_ri_blyp(self):
+
+        ref_rsp_func = {
+            ('x', 'x', 0.05): -3.28252412,
+            ('y', 'x', 0.05): -0.40522649,
+            ('z', 'x', 0.05): 0.05390479,
+            ('x', 'x', 0.06): -3.29747011,
+            ('y', 'x', 0.06): -0.40664672,
+            ('z', 'x', 0.06): 0.05379217,
+            ('x', 'y', 0.05): -0.40522650,
+            ('y', 'y', 0.05): -5.69997023,
+            ('z', 'y', 0.05): 0.61928204,
+            ('x', 'y', 0.06): -0.40664672,
+            ('y', 'y', 0.06): -5.72322129,
+            ('z', 'y', 0.06): 0.61924903,
+            ('x', 'z', 0.05): 0.05390479,
+            ('y', 'z', 0.05): 0.61928204,
+            ('z', 'z', 0.05): -7.18182779,
+            ('x', 'z', 0.06): 0.05379217,
+            ('y', 'z', 0.06): 0.61924903,
+            ('z', 'z', 0.06): -7.20519718,
+        }
+
+        self.run_lr('blyp', ref_rsp_func, 1.0e-5, ri_coulomb=True)

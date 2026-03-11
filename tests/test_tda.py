@@ -11,7 +11,13 @@ from veloxchem.tdaeigensolver import TdaEigenSolver
 @pytest.mark.solvers
 class TestTDA:
 
-    def run_tda(self, xcfun_label, basis_label, ref_exc_enes, ref_osc_str, tol):
+    def run_tda(self,
+                xcfun_label,
+                basis_label,
+                ref_exc_enes,
+                ref_osc_str,
+                tol,
+                ri_coulomb=False):
 
         xyz_string = """3
         xyz
@@ -26,6 +32,7 @@ class TestTDA:
         scf_drv = ScfRestrictedDriver()
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label
+        scf_drv.ri_coulomb = ri_coulomb
         scf_results = scf_drv.compute(mol, bas)
 
         lr_drv = TdaEigenSolver()
@@ -86,3 +93,20 @@ class TestTDA:
 
         self.run_tda('cam-b3lyp', 'def2-tzvp', ref_exc_enes, ref_osc_str,
                      1.0e-5)
+
+    def test_ri_blyp_svp(self):
+
+        # vlxtag: RKS, Absorption, TDA
+
+        ref_exc_enes = np.array(
+            [0.25974113, 0.33054867, 0.34244014, 0.41789336, 0.50103038])
+
+        ref_osc_str = np.array(
+            [0.016643, 0.000000, 0.081274, 0.066394, 0.293944])
+
+        self.run_tda('blyp',
+                     'def2-svp',
+                     ref_exc_enes,
+                     ref_osc_str,
+                     1.0e-5,
+                     ri_coulomb=True)

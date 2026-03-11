@@ -244,9 +244,9 @@ def ri_sanity_check(obj):
 
     if (ri_coulomb or ri_jk) and hasattr(obj, 'acc_type'):
         # RI uses plain DIIS variants
-        if obj.acc_type == 'L2_C2DIIS':
+        if obj.acc_type.upper() == 'L2_C2DIIS':
             obj.acc_type = 'C2DIIS'
-        elif obj.acc_type == 'L2_DIIS':
+        elif obj.acc_type.upper() == 'L2_DIIS':
             obj.acc_type = 'DIIS'
 
     if ri_coulomb and obj.ri_auxiliary_basis == 'def2-universal-jkfit':
