@@ -50,6 +50,7 @@ class EnsembleParser:
     :param ostream:
         The output stream.
     """
+
     def __init__(self, comm=None, ostream=None):
         """
         Initialize the EnsembleParser.
@@ -359,24 +360,24 @@ class EnsembleParser:
             - number_residues_npe (int):
                 Number of residues in the NPE region.
         """
-               
+
         if pe_cutoff is not None and npe_cutoff is not None:
             if float(npe_cutoff) < float(pe_cutoff):
                 raise ValueError("npe_cutoff must be >= pe_cutoff")
-            
+
         qm_charge = int(qm_charge)
         qm_multiplicity = int(qm_multiplicity)
 
-        if qm_multiplicity <=0:
+        if qm_multiplicity <= 0:
             raise ValueError("qm_multiplicity must be a positive integer")
 
-        if trajectory_file.lower().endswith('.pdb'):
+        if trajectory_file.lower().endswith(".pdb"):
             self.universe = mda.Universe(trajectory_file, guess_bonds=True)
         else:
             if topology_file is None:
                 raise ValueError("topology_file is required unless trajectory_file is a .pdb")
             self.universe = mda.Universe(topology_file, trajectory_file)
-        
+
         total_frames = len(self.universe.trajectory)
         self.ostream.print_blank()
 
@@ -400,10 +401,10 @@ class EnsembleParser:
                     start = traj_start
                 if end is None:
                     end = traj_end
-                
+
                 if float(end) < float(start):
                     raise ValueError("End time must be greater than or equal to start time")
-                
+
                 window_frames = []
                 for iframe in range(total_frames):
                     self.universe.trajectory[iframe]
@@ -425,13 +426,13 @@ class EnsembleParser:
                 num_snapshots = len(available_frames)
 
             if num_snapshots <= 0:
-                    raise ValueError("num_snapshots must be a positive integer")
+                raise ValueError("num_snapshots must be a positive integer")
 
             if num_snapshots > len(available_frames):
                 raise ValueError(
                     f"Requested number of snapshots ({num_snapshots}) exceeds "
                     f"available frames ({len(available_frames)})."
-                    )
+                )
 
             if num_snapshots == len(available_frames):
                 frame_indices = available_frames
@@ -465,7 +466,7 @@ class EnsembleParser:
         has_box = False
         try:
             self.universe.trajectory[0]
-            dims = getattr(self.universe.trajectory.ts, 'dimensions', None)
+            dims = getattr(self.universe.trajectory.ts, "dimensions", None)
             if dims is not None:
                 dims = np.asarray(dims, dtype=float)
                 if dims.size > 3 and np.all(dims[:3] > 0):
@@ -477,7 +478,7 @@ class EnsembleParser:
             transforms = [
                 transform.unwrap(qm_atoms),
                 transform.center_in_box(qm_atoms, wrap=True),
-                transform.wrap(env_atoms)
+                transform.wrap(env_atoms),
             ]
             self.universe.trajectory.add_transformations(*transforms)
 
@@ -492,8 +493,8 @@ class EnsembleParser:
             qm_coords = np.asarray(qm_atoms.positions, dtype=float).copy()
             qm_elements = np.asarray(
                 [guess_atom_element(n) for n in qm_atoms.names], dtype=object
-                )
-            
+            )
+
             pe_coords = empty_xyz
             pe_elements = empty_obj
             pe_resids = empty_int
