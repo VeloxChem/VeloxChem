@@ -332,6 +332,11 @@ class EnsembleParser:
                 Element symbols for each PE atom, shape (N_pe,).
             - pe_resids (numpy.ndarray):
                 Residue id for each PE atom, shape (N_pe,).
+            - pe_resindices (numpy.ndarray):
+                MDAnalysis residue index for each PE atom, shape (N_pe,).
+                This is unique per residue in the Universe and is used
+                internally to keep PE/NPE residue partitioning robust even
+                when `resid` values are reused across chains.
             - pe_resnames (numpy.ndarray):
                 Residue name for each PE atom, shape (N_pe,).
             - number_residues_pe (int):
@@ -344,6 +349,11 @@ class EnsembleParser:
                 Element symbols for each NPE atom, shape (N_npe,).
             - npe_resids (numpy.ndarray):
                 Residue id for each NPE atom, shape (N_npe,).
+            - npe_resindices (numpy.ndarray):
+                MDAnalysis residue index for each NPE atom, shape (N_npe,).
+                This is unique per residue in the Universe and is used
+                internally to keep PE/NPE residue partitioning robust even
+                when `resid` values are reused across chains.
             - npe_resnames (numpy.ndarray):
                 Residue name for each NPE atom, shape (N_npe,).
             - number_residues_npe (int):
@@ -487,6 +497,7 @@ class EnsembleParser:
             pe_coords = empty_xyz
             pe_elements = empty_obj
             pe_resids = empty_int
+            pe_resindices = empty_int
             pe_resnames = empty_obj
             number_residues_pe = 0
             pe_atom_names = empty_obj
@@ -494,18 +505,30 @@ class EnsembleParser:
             npe_coords = empty_xyz
             npe_elements = empty_obj
             npe_resids = empty_int
+            npe_resindices = empty_int
             npe_resnames = empty_obj
             number_residues_npe = 0
             npe_atom_names = empty_obj
 
             pe_region = None
 
+            pe_residx_unique = np.empty((0,), dtype=int)
+
             # PE selection
             if pe_cutoff is not None:
-                pe_region = self.universe.select_atoms(
-                    f"byres ({env_region_sel} and around {float(pe_cutoff)} group qm)",
+                pe_touch = self.universe.select_atoms(
+                    f"({env_region_sel} and around {float(pe_cutoff)} group qm)",
                     qm=qm_atoms,
                 ).difference(qm_atoms)
+
+                pe_residx_unique = np.unique(
+                    np.asarray(pe_touch.resindices, dtype=int)
+                )
+
+                if pe_residx_unique.size > 0:
+                    pe_region = env_atoms[np.isin(env_atoms.resindices, pe_residx_unique)]
+                else:
+                    pe_region = env_atoms[:0]
 
                 pe_coords = np.asarray(pe_region.positions, dtype=float).copy()
                 pe_atom_names = np.asarray(pe_region.names, dtype=object).copy()
@@ -513,30 +536,41 @@ class EnsembleParser:
                     [guess_atom_element(n) for n in pe_region.names], dtype=object
                 )
                 pe_resids = np.asarray(pe_region.resids, dtype=int).copy()
+                pe_resindices = np.asarray(pe_region.resindices, dtype=int).copy()
                 pe_resnames = np.asarray(pe_region.resnames, dtype=object).copy()
-                pe_residx = np.asarray(pe_region.resindices, dtype=int)
 
                 # Apply protonation-state residue renaming (GLH/ASH) if applicable
                 if prot_map and len(pe_resnames) > 0:
                     for ridx, newname in prot_map.items():
-                        pe_resnames[pe_residx == ridx] = newname
+                        pe_resnames[pe_resindices == ridx] = newname
 
                 # Apply terminal residue renaming (NASN/CASN, etc.) if applicable
                 if term_map and len(pe_resnames) > 0:
-                    pe_residx = np.asarray(pe_region.resindices, dtype=int)
                     for ridx, newname in term_map.items():
-                        pe_resnames[pe_residx == ridx] = newname
+                        pe_resnames[pe_resindices == ridx] = newname
 
                 number_residues_pe = int(pe_region.residues.n_residues)
 
             # NPE selection
             if npe_cutoff is not None:
-                outer_shell = self.universe.select_atoms(
-                    f"byres ({env_region_sel} and around {float(npe_cutoff)} group qm)",
+                npe_touch = self.universe.select_atoms(
+                    f"({env_region_sel} and around {float(npe_cutoff)} group qm)",
                     qm=qm_atoms,
                 ).difference(qm_atoms)
 
-                npe_region = outer_shell.difference(pe_region) if pe_region is not None else outer_shell
+                outer_residx_unique = np.unique(
+                    np.asarray(npe_touch.resindices, dtype=int)
+                )
+                npe_residx_unique = np.setdiff1d(
+                    outer_residx_unique,
+                    pe_residx_unique,
+                    assume_unique=False,
+                )
+
+                if npe_residx_unique.size > 0:
+                    npe_region = env_atoms[np.isin(env_atoms.resindices, npe_residx_unique)]
+                else:
+                    npe_region = env_atoms[:0]
 
                 npe_coords = np.asarray(npe_region.positions, dtype=float).copy()
                 npe_atom_names = np.asarray(npe_region.names, dtype=object).copy()
@@ -544,21 +578,20 @@ class EnsembleParser:
                     [guess_atom_element(n) for n in npe_region.names], dtype=object
                 )
                 npe_resids = np.asarray(npe_region.resids, dtype=int).copy()
+                npe_resindices = np.asarray(npe_region.resindices, dtype=int).copy()
                 npe_resnames = np.asarray(npe_region.resnames, dtype=object).copy()
-                npe_residx = np.asarray(npe_region.resindices, dtype=int)
 
                 # Apply protonation-state residue renaming (GLH/ASH) if applicable
                 if prot_map and len(npe_resnames) > 0:
                     for ridx, newname in prot_map.items():
-                        npe_resnames[npe_residx == ridx] = newname
+                        npe_resnames[npe_resindices == ridx] = newname
 
                 # Apply terminal residue renaming (NASN/CASN, etc.) if applicable
                 if term_map and len(npe_resnames) > 0:
-                    npe_residx = np.asarray(npe_region.resindices, dtype=int)
                     for ridx, newname in term_map.items():
-                        npe_resnames[npe_residx == ridx] = newname
+                        npe_resnames[npe_resindices == ridx] = newname
 
-                number_residues_npe = int(npe_region.residues.n_residues)                
+                number_residues_npe = int(npe_region.residues.n_residues)
 
             # If neither cutoff is set, interpret as all-qm
 
@@ -574,6 +607,7 @@ class EnsembleParser:
                     "pe_atom_names": pe_atom_names,
                     "pe_elements": pe_elements,
                     "pe_resids": pe_resids,
+                    "pe_resindices": pe_resindices,
                     "pe_resnames": pe_resnames,
                     "number_residues_pe": number_residues_pe,
 
@@ -581,6 +615,7 @@ class EnsembleParser:
                     "npe_atom_names": npe_atom_names,
                     "npe_elements": npe_elements,
                     "npe_resids": npe_resids,
+                    "npe_resindices": npe_resindices,
                     "npe_resnames": npe_resnames,
                     "number_residues_npe": number_residues_npe,
             }
