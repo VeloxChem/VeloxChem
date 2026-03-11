@@ -2241,9 +2241,10 @@ class MMForceFieldGenerator:
         Parametrize all bonded and nonbonded terms using the OpenFF 2.0
         (Sage) force field via the openff-toolkit.
 
-        Returns a tuple (atoms, bonds, angles, dihedrals, impropers) whose
-        structure is identical to what the individual populate_* methods
-        return, so the rest of create_topology() can consume them unchanged.
+        Returns a tuple (atoms, bonds, angles, dihedrals, rotatable_bonds,
+        impropers) whose structure is identical to what the individual
+        populate_* methods return, so the rest of create_topology() can
+        consume them unchanged.
 
         Unit conventions (same as GAFF path):
           - lengths       : nm
@@ -2269,24 +2270,17 @@ class MMForceFieldGenerator:
             )
 
         # ── Build an OpenFF Molecule from the VeloxChem molecule ──────────
-        # Use RDKit SMILES round-trip via element symbols + connectivity.
+        # Use element symbols from get_labels() converted to atomic numbers
+        # via RDKit's periodic table — avoids calling the non-existent
+        # elem_ids_to_numpy() method on the VeloxChem Molecule object.
 
-        elem_ids = self.molecule.elem_ids_to_numpy()
-        n_atoms  = self.molecule.number_of_atoms()
+        from rdkit import Chem
+        from rdkit.Chem import AllChem, GetPeriodicTable
 
-        # Build RDKit mol from connectivity matrix so we don't need a SMILES
-        try:
-            from rdkit import Chem
-            from rdkit.Chem import AllChem
-        except ImportError:
-            assert_msg_critical(
-                False,
-                'MMForceFieldGenerator: RDKit is required for '
-                'force_field = "openff-2.0". '
-                'Install with:  conda install -c conda-forge rdkit'
-            )
-
-        from veloxchem.molecularformula import get_element_symbol
+        _ptable = GetPeriodicTable()
+        labels = self.molecule.get_labels()
+        elem_ids = [_ptable.GetAtomicNumber(sym) for sym in labels]
+        n_atoms = self.molecule.number_of_atoms()
 
         rw = Chem.RWMol()
         for z in elem_ids:
@@ -2489,9 +2483,9 @@ class MMForceFieldGenerator:
                     dihedrals[(i, j, k, l)] = {
                         'type':          'Fourier',
                         'multiple':      True,
-                        'barriers':      barriers,
-                        'phases':        phases,
-                        'periodicities': periodicities,
+                        'barrier':       barriers,
+                        'phase':         phases,
+                        'periodicity':   periodicities,
                         'comment':       comment,
                     }
                 else:
@@ -2536,12 +2530,12 @@ class MMForceFieldGenerator:
                     ) * 180.0 / np.pi
                     key = (i, j, k, l)
                     impropers[key] = {
-                        'type':             'periodic',
-                        'barrier':          barrier,
-                        'phase':            phase_deg,
-                        'periodicity':      periodicity,
+                        'type':              'periodic',
+                        'barrier':           barrier,
+                        'phase':             phase_deg,
+                        'periodicity':       periodicity,
                         'improper_ordering': (1, 2, 3, 4),
-                        'comment':          f'openff improper center={center+1}',
+                        'comment':           f'openff improper center={center+1}',
                     }
 
         return atoms, bonds, angles, dihedrals, rotatable_bonds, impropers
