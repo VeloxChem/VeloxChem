@@ -839,10 +839,6 @@ class EnsembleDriver:
         :raises ValueError:
             If snapshot fields required to build NPE point charges are missing.
         """
-        if self.pe_model is None and self.npe_model is None:
-            raise RuntimeError(
-            "Models not set. Call set_env_models(pe_model=..., npe_model=...) first."
-            )
     
         if isinstance(snapshots, dict):
             snapshots = [snapshots]
@@ -856,15 +852,20 @@ class EnsembleDriver:
 
         potdir = Path(potdir)
 
-        # Detect whether we actually need PE / NPE
+        # Detect whether PE / NPE models are needed
         has_any_pe = any(np.asarray(s.get("pe_coords", [])).size > 0 for s in snapshots)
         has_any_npe = any(np.asarray(s.get("npe_coords", [])).size > 0 for s in snapshots)
 
+        # Only require environment models when corresponding environment atoms exist
         if has_any_pe and self.pe_model is None:
-            raise RuntimeError("Snapshots contain PE atoms but pe_model is not set. Call set_env_models(pe_model=...).")
+            raise RuntimeError(
+                "Snapshots contain PE atoms but pe_model is not set. " \
+                "Call set_env_models(pe_model=...).")
 
         if has_any_npe and self.npe_model is None:
-            raise RuntimeError("Snapshots contain NPE atoms but npe_model is not set. Call set_env_models(npe_model=...).")
+            raise RuntimeError(
+                "Snapshots contain NPE atoms but npe_model is not set. " \
+                "Call set_env_models(npe_model=...).")
 
         if write_pe_potfiles and has_any_pe:
             self.write_pot_files(snapshots, outdir=potdir)
