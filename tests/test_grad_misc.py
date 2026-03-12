@@ -244,6 +244,8 @@ class TestScfGradientDriverCoverage:
             grad_drv.compute_analytical_unrestricted(molecule, basis,
                                                      scf_results)
 
+    @pytest.mark.skipif(not DispersionModel.is_available(),
+                        reason='dftd4-python not available')
     def test_unrestricted_dispersion_gradient_matches_added_d4_component(self):
 
         molecule, basis = self.get_ch3_molecule_and_basis()
