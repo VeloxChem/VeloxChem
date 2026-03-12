@@ -3632,10 +3632,21 @@ class MMForceFieldGenerator:
             line_str += '   ptype   sigma         epsilon\n'
             f_itp.write(line_str)
             # For OPLS, opls_NNN types are already defined in the system-wide
-            # oplsaa.ff/ffnonbonded.itp and must NOT be redeclared in the
-            # molecule itp. For GAFF/UFF, types are non-standard and must be
+            # oplsaa.ff/ffnonbonded.itp and must NOT be redeclared here.
+            # For GAFF/UFF/OpenFF, types are molecule-specific and must be
             # declared explicitly.
-            if self.force_field not in ('opls', 'openff-2.0'):
+            if self.force_field == 'opls':
+                pass  # types defined in oplsaa.ff/ffnonbonded.itp
+            elif self.force_field == 'openff-2.0':
+                # Each OpenFF atom has a unique type (openff_N) carrying its
+                # own sigma/epsilon — write one line per atom directly.
+                for i, atom in self.atoms.items():
+                    line_str = '{:>3}{:>9}{:17.5f}{:9.5f}{:>4}'.format(
+                        atom['type'], atom['type'], 0., 0., 'A')
+                    line_str += '{:16.5e}{:14.5e}\n'.format(
+                        atom['sigma'], atom['epsilon'])
+                    f_itp.write(line_str)
+            else:
                 # TODO: Make unique_atom_types and atom['type'] more consistent
                 for at in self.unique_atom_types:
                     for i, atom in self.atoms.items():
