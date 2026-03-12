@@ -13,7 +13,7 @@ class TestCPP:
 
     def run_cpp(self,
                 xcfun_label,
-                cpp_property,
+                cpp_flag,
                 ref_x_data,
                 ref_y_data,
                 tol,
@@ -36,12 +36,11 @@ class TestCPP:
         scf_drv = ScfRestrictedDriver()
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label
-        scf_drv.acc_type = 'l2_c2diis'
         scf_results = scf_drv.compute(mol, bas)
 
         lr_drv = ComplexResponse()
         lr_drv.ostream.mute()
-        lr_drv.property = cpp_property
+        lr_drv.set_cpp_flag(cpp_flag)
         lr_drv.frequencies = list(ref_x_data)
         lr_drv.use_subcomms = use_subcomms
         lr_results = lr_drv.compute(mol, bas, scf_results)
@@ -57,25 +56,25 @@ class TestCPP:
         # vlxtag: RHF, Absorption, CPP
 
         xcfun_label = 'hf'
-        cpp_property = 'absorption'
+        cpp_flag = 'absorption'
         ref_x_data = [0.39, 0.40, 0.41]
         ref_y_data = [0.11359517, 0.34554765, 1.41940099]
 
-        self.run_cpp(xcfun_label, cpp_property, ref_x_data, ref_y_data, 1.0e-6)
+        self.run_cpp(xcfun_label, cpp_flag, ref_x_data, ref_y_data, 1.0e-6)
 
     def test_hf_ecd(self):
 
         # vlxtag: RHF, ECD, CPP
 
         xcfun_label = 'hf'
-        cpp_property = 'ecd'
+        cpp_flag = 'ecd'
         ref_x_data = [0.39, 0.40, 0.41]
         ref_y_data = [5.74701958, 35.38200618, -15.89867350]
 
-        self.run_cpp(xcfun_label, cpp_property, ref_x_data, ref_y_data, 1.0e-6)
+        self.run_cpp(xcfun_label, cpp_flag, ref_x_data, ref_y_data, 1.0e-6)
 
         self.run_cpp(xcfun_label,
-                     cpp_property,
+                     cpp_flag,
                      ref_x_data,
                      ref_y_data,
                      1.0e-6,
@@ -86,25 +85,25 @@ class TestCPP:
         # vlxtag: RKS, Absorption, CPP
 
         xcfun_label = 'b3lyp'
-        cpp_property = 'absorption'
+        cpp_flag = 'absorption'
         ref_x_data = [0.39, 0.40, 0.41]
         ref_y_data = [0.20856963, 0.21772352, 0.71434376]
 
-        self.run_cpp(xcfun_label, cpp_property, ref_x_data, ref_y_data, 1.0e-4)
+        self.run_cpp(xcfun_label, cpp_flag, ref_x_data, ref_y_data, 1.0e-4)
 
     def test_b3lyp_ecd(self):
 
         # vlxtag: RKS, ECD, CPP
 
         xcfun_label = 'b3lyp'
-        cpp_property = 'ecd'
+        cpp_flag = 'ecd'
         ref_x_data = [0.39, 0.40, 0.41]
         ref_y_data = [0.48472627, -1.18394788, -9.81377126]
 
-        self.run_cpp(xcfun_label, cpp_property, ref_x_data, ref_y_data, 1.0e-4)
+        self.run_cpp(xcfun_label, cpp_flag, ref_x_data, ref_y_data, 1.0e-4)
 
         self.run_cpp(xcfun_label,
-                     cpp_property,
+                     cpp_flag,
                      ref_x_data,
                      ref_y_data,
                      1.0e-4,

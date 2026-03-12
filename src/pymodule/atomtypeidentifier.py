@@ -178,22 +178,16 @@ class AtomTypeIdentifier:
 
         nonmetal_neighbor_count = 0
         for elem_id in neighbor_identifiers:
-            if not self.element_id_is_metal(elem_id):
+            if not ((elem_id in [3, 4, 11, 12, 13]) or
+                    (19 <= elem_id and elem_id <= 32) or
+                    (37 <= elem_id and elem_id <= 51) or
+                    (55 <= elem_id and elem_id <= 84) or
+                    (87 <= elem_id and elem_id <= 108)):
                 nonmetal_neighbor_count += 1
 
         return (self.atomic_symbols[atom_idx] == 'N' and
                 nonmetal_neighbor_count == 2)
 
-    def element_is_metal(self, element):
-        return self.element_id_is_metal(chemical_element_identifier(element))
-    
-    def element_id_is_metal(self, elem_id):
-        return ((elem_id in [3, 4, 11, 12, 13]) or
-            (19 <= elem_id and elem_id <= 31) or
-            (37 <= elem_id and elem_id <= 50) or
-            (55 <= elem_id and elem_id <= 83) or
-            (87 <= elem_id and elem_id <= 116))
-        
     def detect_closed_cyclic_structures(self):
         """
         Detects closed cyclic structures in a molecule and determines their
@@ -514,6 +508,7 @@ class AtomTypeIdentifier:
                         info, connected_symbols)
 
                     # Hydrogens based on the phosphorus type
+                    # If px then hx, else hp
                     for connected_atom_number in info['ConnectedAtomsNumbers']:
                         hydrogen_type = None
                         connected_atom_info, hydrogen_type = self.assign_hydrogen_phosphorus_type(
@@ -673,7 +668,7 @@ class AtomTypeIdentifier:
                                         phosphorus_type):
 
         if phosphorus_type is None:
-            self.ostream.print_warning(f"Phosphorus type is None for atom {connected_atom_number}, assigning hp to connected hydrogen.")
+            return None
 
         hydrogen_type = None
 
@@ -690,10 +685,8 @@ class AtomTypeIdentifier:
         phosphorus_type = None
 
         # hypervalent phosphorus, 4 subst.
-        if (info['NumConnectedAtoms'] == 4 ):
-            connected_to_metal = any([self.element_is_metal(elem.upper()) for elem in connected_symbols])
-            if 'O' in connected_symbols or connected_to_metal:
-                phosphorus_type = {'opls': 'opls_900P', 'gaff': 'p5'}
+        if (info['NumConnectedAtoms'] == 4 and 'O' in connected_symbols):
+            phosphorus_type = {'opls': 'opls_900P', 'gaff': 'p5'}
 
         # sp3 phosphorus, 3 subst.
         elif info['NumConnectedAtoms'] == 3:

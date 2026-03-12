@@ -396,33 +396,21 @@ class EnsembleDriver:
             self.npe_model = None
     
     @staticmethod
-    def _first_residue_atom_pattern(atom_names, residue_ids, resnames, target_resname: str) -> list[str]:
+    def _first_residue_atom_pattern(atom_names, resids, resnames, target_resname: str) -> list[str]:
         """
         Return atom_name pattern for one residue instance of target_resname,
         preserving the order in the arrays.
-        :param atom_names:
-            The array of atom names.
-        :param residue_ids:
-            The MDAnalysis 'resindex' array, which is unique per residue in the Universe.
-            'resid' values may be reused across chains and are therefore not robust enough for internal
-+           residue identity checks.
-        :param resnames:
-            The array of residue names.
-        :param target_resname:
-            The name of the target residue.
-        :return:
-            A list of atom names for the first instance of the target residue.
         """
         atom_names = np.asarray(atom_names, dtype=object)
-        residue_ids = np.asarray(residue_ids, dtype=int)
+        resids = np.asarray(resids, dtype=int)
         resnames = np.asarray(resnames, dtype=object)
 
         mask = (resnames == target_resname)
         if not np.any(mask):
             return []
 
-        first_residue_id = int(residue_ids[mask][0])
-        idx = np.where(mask & (residue_ids == first_residue_id))[0]
+        first_resid = int(resids[mask][0])
+        idx = np.where(mask & (resids == first_resid))[0]
         return [str(atom_names[i]) for i in idx]
 
     @staticmethod
@@ -653,83 +641,6 @@ class EnsembleDriver:
 
         return None
 
-    @staticmethod
-    def _ensure_no_split_residues_between_pe_and_npe(snap: dict):
-        """
-        Ensure that no residue is split across PE and NPE regions.
-        """
-        pe_ids = np.asarray(
-            snap.get("pe_resindices", snap.get("pe_resids", [])),
-            dtype=int,
-        )
-        npe_ids = np.asarray(
-            snap.get("npe_resindices", snap.get("npe_resids", [])),
-            dtype=int,
-        )
-
-        if pe_ids.size == 0 or npe_ids.size == 0:
-            return
-
-        shared = np.intersect1d(np.unique(pe_ids), np.unique(npe_ids))
-        if shared.size > 0:
-            frame = int(snap.get("frame", -1))
-            raise ValueError(
-                "Snapshot contains residues split between PE and NPE regions "
-                f"(frame {frame}, shared residue ids: {shared.tolist()}). "
-                "PE/NPE partitioning must be residue-exclusive."
-            )
-
-    @classmethod
-    def _validate_pe_residue_atom_patterns(cls, atom_names, residue_ids, resnames):
-        """
-        Validate that all PE residues sharing the same residue name also share the
-        same ordered atom-name pattern.
-
-        The current PE writer stores one @charges/@polarizabilities template per
-        residue name. If two residue instances with the same resname contain
-        different atom subsets, the generated .pot file becomes ambiguous and will
-        fail later.
-
-        :param cls:
-            The class object (used for calling the _first_residue_atom_pattern method).
-        :param atom_names:
-            The array of atom names for the PE atoms.
-        :param residue_ids:
-            The array of residue ids for the PE atoms (e.g., MDAnalysis resindex).
-        :param resnames:
-            The array of residue names for the PE atoms.
-        """
-        atom_names = np.asarray(atom_names, dtype=object)
-        residue_ids = np.asarray(residue_ids, dtype=int)
-        resnames = np.asarray(resnames, dtype=object)
-
-        if atom_names.size == 0:
-            return
-
-        for resn in np.unique(resnames):
-            mask = (resnames == resn)
-            unique_residue_ids = np.unique(residue_ids[mask])
-
-            if unique_residue_ids.size <= 1:
-                continue
-
-            ref_pattern = cls._first_residue_atom_pattern(
-                atom_names, residue_ids, resnames, str(resn)
-            )
-
-            for residue_id in unique_residue_ids[1:]:
-                idx = np.where(mask & (residue_ids == residue_id))[0]
-                cur_pattern = [str(atom_names[i]) for i in idx]
-                if cur_pattern != ref_pattern:
-                    raise ValueError(
-                        "Inconsistent PE atom pattern detected for residue name "
-                        f"'{resn}'. Residue id {int(unique_residue_ids[0])} has "
-                        f"pattern {ref_pattern}, while residue id {int(residue_id)} "
-                        f"has pattern {cur_pattern}. PE residues with the same "
-                        "residue name must contain the same ordered atom list."
-                    )
-
-
     def _build_point_charges(self, coords_ang, atom_names, resnames) -> np.ndarray | None:
         """
         Build point charges array expected by SCF driver: shape (6, N), coords in bohr.
@@ -822,10 +733,6 @@ class EnsembleDriver:
             pe_coords = np.asarray(snap.get("pe_coords", []), dtype=float)
             pe_elements = np.asarray(snap.get("pe_elements", []), dtype=object)
             pe_resids = np.asarray(snap.get("pe_resids", []), dtype=int)
-            pe_resindices = np.asarray(
-                snap.get("pe_resindices", snap.get("pe_resids", [])),
-                dtype=int,
-            )
             pe_resnames = np.asarray(snap.get("pe_resnames", []), dtype=object)
             pe_atom_names = np.asarray(snap.get("pe_atom_names", []), dtype=object)
 
@@ -837,19 +744,6 @@ class EnsembleDriver:
                     "pe_atom_names is missing or wrong length in snapshots. "
                     "Required for CP3/SEP when same element has different parameters."
                 )
-
-            if pe_resindices.size != pe_coords.shape[0]:
-                raise ValueError(
-                    "pe_resindices is missing or wrong length in snapshots. "
-                    "Required for robust residue-based PE validation and writing."
-                )
-
-            self._ensure_no_split_residues_between_pe_and_npe(snap)
-            self._validate_pe_residue_atom_patterns(
-                pe_atom_names,
-                pe_resindices,
-                pe_resnames,
-            )
 
             # Unique residue names
             resname_set = []
@@ -876,9 +770,7 @@ class EnsembleDriver:
                 for resn in resname_set:
                     if resn not in pe_db:
                         raise KeyError(f"No PE parameters for residue name '{resn}'")
-                    pattern_atoms = self._first_residue_atom_pattern(
-                        pe_atom_names, pe_resindices, pe_resnames, resn
-                    )
+                    pattern_atoms = self._first_residue_atom_pattern(pe_atom_names, pe_resids, pe_resnames, resn)
                     for atom in pattern_atoms:
                         resolved_atom = self._resolve_atom_name_for_pe_db(atom, pe_db[resn].keys())
                         if resolved_atom is None:
@@ -891,9 +783,7 @@ class EnsembleDriver:
 
                 fh.write("@polarizabilities\n")
                 for resn in resname_set:
-                    pattern_atoms = self._first_residue_atom_pattern(
-                        pe_atom_names, pe_resindices, pe_resnames, resn
-                    )
+                    pattern_atoms = self._first_residue_atom_pattern(pe_atom_names, pe_resids, pe_resnames, resn)
                     for atom in pattern_atoms:
                         resolved_atom = self._resolve_atom_name_for_pe_db(atom, pe_db[resn].keys())
                         if resolved_atom is None:
@@ -949,7 +839,11 @@ class EnsembleDriver:
         :raises ValueError:
             If snapshot fields required to build NPE point charges are missing.
         """
-   
+        if self.pe_model is None and self.npe_model is None:
+            raise RuntimeError(
+            "Models not set. Call set_env_models(pe_model=..., npe_model=...) first."
+            )
+    
         if isinstance(snapshots, dict):
             snapshots = [snapshots]
 
@@ -962,25 +856,15 @@ class EnsembleDriver:
 
         potdir = Path(potdir)
 
-        # Detect whether PE / NPE models are needed
+        # Detect whether we actually need PE / NPE
         has_any_pe = any(np.asarray(s.get("pe_coords", [])).size > 0 for s in snapshots)
         has_any_npe = any(np.asarray(s.get("npe_coords", [])).size > 0 for s in snapshots)
 
-        # Only require environment models when corresponding environment atoms exist
         if has_any_pe and self.pe_model is None:
-            raise RuntimeError(
-                "Snapshots contain PE atoms but pe_model is not set. "
-                "Call set_env_models(pe_model=...)."
-            )
+            raise RuntimeError("Snapshots contain PE atoms but pe_model is not set. Call set_env_models(pe_model=...).")
 
         if has_any_npe and self.npe_model is None:
-            raise RuntimeError(
-                "Snapshots contain NPE atoms but npe_model is not set. "
-                "Call set_env_models(npe_model=...)."
-            )
-
-        for snap in snapshots:
-            self._ensure_no_split_residues_between_pe_and_npe(snap)
+            raise RuntimeError("Snapshots contain NPE atoms but npe_model is not set. Call set_env_models(npe_model=...).")
 
         if write_pe_potfiles and has_any_pe:
             self.write_pot_files(snapshots, outdir=potdir)

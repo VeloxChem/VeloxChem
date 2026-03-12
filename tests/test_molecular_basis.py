@@ -46,7 +46,7 @@ class TestMolecularBasis:
             self.get_hydrogen_svp_1s(),
             self.get_hydrogen_svp_2s(),
             self.get_hydrogen_svp_1p()
-        ], 'DEF2-SVP', 1)
+        ], 'DEF2-SVP', '', 1)
 
     def get_oxygen_svp_1s(self):
 
@@ -107,13 +107,13 @@ class TestMolecularBasis:
             self.get_oxygen_svp_1p(),
             self.get_oxygen_svp_2p(),
             self.get_oxygen_svp_1d()
-        ], 'DEF2-SVP', 8)
+        ], 'DEF2-SVP', '', 8)
 
     def get_hydrogen_svp_red(self):
 
         return AtomBasis(
             [self.get_hydrogen_svp_1s(),
-             self.get_hydrogen_svp_2s()], 'DEF2-SVP(Valence)', 1)
+             self.get_hydrogen_svp_2s()], 'DEF2-SVP(Valence)', '', 1)
 
     def get_oxygen_svp_red(self):
 
@@ -123,7 +123,7 @@ class TestMolecularBasis:
             self.get_oxygen_svp_3s(),
             self.get_oxygen_svp_1p(),
             self.get_oxygen_svp_2p()
-        ], 'DEF2-SVP(Valence)', 8)
+        ], 'DEF2-SVP(Valence)', '', 8)
 
     def get_hydrogen_svpd(self):
 
@@ -132,7 +132,7 @@ class TestMolecularBasis:
             self.get_hydrogen_svp_2s(),
             self.get_hydrogen_svp_1p(),
             self.get_hydrogen_svp_2p()
-        ], 'DEF2-SVPD', 1)
+        ], 'DEF2-SVPD', '', 1)
 
     def get_h2o(self):
 

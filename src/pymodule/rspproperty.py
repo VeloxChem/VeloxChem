@@ -193,7 +193,7 @@ class ResponseProperty:
                     'absorption (cpp)',
                     'absorption(cpp)',
             ]:
-                self._rsp_driver.set_cpp_property('absorption')
+                self._rsp_driver.set_cpp_flag('absorption')
 
             elif self.prop_type in [
                     'circular dichroism spectrum',
@@ -202,7 +202,7 @@ class ResponseProperty:
                     'ecd (cpp)',
                     'ecd(cpp)',
             ]:
-                self._rsp_driver.set_cpp_property('ecd')
+                self._rsp_driver.set_cpp_flag('ecd')
 
         # Linear response C6 solver
         elif (self._rsp_dict['order'] == 'linear' and

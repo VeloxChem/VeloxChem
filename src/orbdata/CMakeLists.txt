@@ -3,8 +3,6 @@ target_sources(vlxobjs
     AODensityMatrix.cpp
     AOIndices.cpp
     AtomBasis.cpp
-    AtomCorePotential.cpp
-    BaseCorePotential.cpp
     BasisFunction.cpp
     BlockedGtoPairBlock.cpp
     GtoBlock.cpp

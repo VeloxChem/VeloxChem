@@ -69,7 +69,6 @@ class TestPolarizableEmbedding:
         scf_drv = ScfRestrictedDriver()
         scf_drv.embedding = self.get_embedding_dict(options_file)
         scf_drv.conv_thresh = 1.0e-8
-        scf_drv.acc_type = 'l2_c2diis'
 
         scf_drv.ostream.mute()
 

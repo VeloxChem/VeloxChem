@@ -116,8 +116,8 @@ class MOIntegralsDriver:
         mo_a = mol_orbs.alpha_to_numpy()
         mo_b = mol_orbs.beta_to_numpy()
 
-        nocc_a = molecule.number_of_alpha_occupied_orbitals(basis)
-        nocc_b = molecule.number_of_beta_occupied_orbitals(basis)
+        nocc_a = molecule.number_of_alpha_electrons()
+        nocc_b = molecule.number_of_beta_electrons()
 
         mo_occ_a = mo_a[:, :nocc_a].copy()
         mo_vir_a = mo_a[:, nocc_a:].copy()

@@ -198,9 +198,3 @@ CAtomCorePotential::number_of_core_electrons() const -> int
 {
     return _core_electrons;
 }
-
-auto
-CAtomCorePotential::is_empty() const -> bool
-{
-    return _projected_potentials.empty() && _local_potential.get_exponents().empty(); 
-}

@@ -38,7 +38,6 @@
 #include <vector>
 
 #include "BasisFunction.hpp"
-#include "AtomCorePotential.hpp"
 
 /// @brief Class CAtomBasis stores data about atom basis and provides set of
 /// methods for handling of atom basis data.
@@ -49,20 +48,13 @@ class CAtomBasis
     CAtomBasis();
 
     /// @brief The constructor with vector of basis functions, name of basis set,
-    /// ECP, and chemical element identifier.
+    /// ECP label, and chemical element identifier.
     /// @param functions The vector of basis functions.
     /// @param name The name of atom basis.
-    /// @param ecp_potential The ECP of atom basis.
+    /// @param ecp_label The label of ECP in atom basis.
     /// @param identifier The chemical element identifier.
-    CAtomBasis(const std::vector<CBasisFunction> &functions, const std::string &name, const CAtomCorePotential &ecp_potential, const int identifier);
+    CAtomBasis(const std::vector<CBasisFunction> &functions, const std::string &name, const std::string &ecp_label, const int identifier);
 
-    /// @brief The constructor with vector of basis functions, name of basis set,
-    /// ECP, and chemical element identifier.
-    /// @param functions The vector of basis functions.
-    /// @param name The name of atom basis.
-    /// @param identifier The chemical element identifier.
-    CAtomBasis(const std::vector<CBasisFunction> &functions, const std::string &name, const int identifier);
-    
     /// @brief The default copy constructor.
     /// @param other The atom basis to be copied.
     CAtomBasis(const CAtomBasis &other);
@@ -103,8 +95,8 @@ class CAtomBasis
     auto set_name(const std::string &name) -> void;
 
     /// @brief Sets effective core potential label of atom basis.
-    /// @param ecp_potential The ECP of atom basis.
-    auto set_ecp_potential(const CAtomCorePotential &ecp_potential) -> void;
+    /// @param label The label of effective core potential in atom basis.
+    auto set_ecp_label(const std::string &label) -> void;
 
     /// @brief Adds basis function to atom basis.
     /// @param function The basis function.
@@ -142,13 +134,13 @@ class CAtomBasis
     auto get_name() const -> std::string;
 
     /// @brief Gets effective core potential label of atom basis.
-    /// @return The ECP potential.
-    auto get_ecp_potential() const -> CAtomCorePotential;
+    /// @return The label of effective core potential.
+    auto get_ecp_label() const -> std::string;
 
-    /// @brief Checks if atom basis contains effective core potential.
+    /// @brief Checks if atom basis requires effective core potential.
     /// @return Trrue if atom basis contains effective core potential, False
     /// otherwise.
-    auto has_ecp() const -> bool;
+    auto need_ecp() const -> bool;
 
     /// @brief Gets maximum angular momentum of basis functions in atom basis.
     /// @return The maximum angular momentum.
@@ -199,8 +191,8 @@ class CAtomBasis
     /// @brief The name of atomic basis.
     std::string _name;
 
-    /// @brief The effective core potential of atomic basis.
-    CAtomCorePotential _ecp_potential;
+    /// @brief The effective core potential label of atomic basis.
+    std::string _ecp_label;
 
     /// @brief  identifier of chemical element.
     int _identifier;

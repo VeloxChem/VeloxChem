@@ -186,8 +186,7 @@ class MolecularOrbitals:
             ostream.print_header("Spin Restricted Orbitals")
             ostream.print_header("------------------------")
 
-            nalpha = molecule.number_of_alpha_occupied_orbitals(basis)
-            nbeta = molecule.number_of_beta_occupied_orbitals(basis)
+            nocc = molecule.number_of_electrons() // 2
 
             if isinstance(orb_inds, (np.ndarray, tuple, list)):
                 assert_msg_critical(
@@ -196,7 +195,7 @@ class MolecularOrbitals:
                 nstart, nend = max(0, orb_inds[0]), min(norb, orb_inds[1])
             else:
                 if not orb_inds:
-                    nstart, nend = max(0, nbeta - 5), min(norb, nalpha + 5)
+                    nstart, nend = max(0, nocc - 5), min(norb, nocc + 5)
                 else:
                     nstart, nend = 0, norb
 
@@ -217,7 +216,7 @@ class MolecularOrbitals:
             ostream.print_header("Spin Unrestricted Alpha Orbitals")
             ostream.print_header("--------------------------------")
 
-            nalpha = molecule.number_of_alpha_occupied_orbitals(basis)
+            nalpha = molecule.number_of_alpha_electrons()
 
             if isinstance(orb_inds, (np.ndarray, tuple, list)):
                 assert_msg_critical(
@@ -242,7 +241,7 @@ class MolecularOrbitals:
             ostream.print_header("Spin Unrestricted Beta Orbitals")
             ostream.print_header("-------------------------------")
 
-            nbeta = molecule.number_of_beta_occupied_orbitals(basis)
+            nbeta = molecule.number_of_beta_electrons()
 
             if isinstance(orb_inds, (np.ndarray, tuple, list)):
                 assert_msg_critical(

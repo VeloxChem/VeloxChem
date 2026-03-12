@@ -50,7 +50,6 @@ class EnsembleParser:
     :param ostream:
         The output stream.
     """
-
     def __init__(self, comm=None, ostream=None):
         """
         Initialize the EnsembleParser.
@@ -333,11 +332,6 @@ class EnsembleParser:
                 Element symbols for each PE atom, shape (N_pe,).
             - pe_resids (numpy.ndarray):
                 Residue id for each PE atom, shape (N_pe,).
-            - pe_resindices (numpy.ndarray):
-                MDAnalysis residue index for each PE atom, shape (N_pe,).
-                This is unique per residue in the Universe and is used
-                internally to keep PE/NPE residue partitioning robust even
-                when `resid` values are reused across chains.
             - pe_resnames (numpy.ndarray):
                 Residue name for each PE atom, shape (N_pe,).
             - number_residues_pe (int):
@@ -350,34 +344,29 @@ class EnsembleParser:
                 Element symbols for each NPE atom, shape (N_npe,).
             - npe_resids (numpy.ndarray):
                 Residue id for each NPE atom, shape (N_npe,).
-            - npe_resindices (numpy.ndarray):
-                MDAnalysis residue index for each NPE atom, shape (N_npe,).
-                This is unique per residue in the Universe and is used
-                internally to keep PE/NPE residue partitioning robust even
-                when `resid` values are reused across chains.
             - npe_resnames (numpy.ndarray):
                 Residue name for each NPE atom, shape (N_npe,).
             - number_residues_npe (int):
                 Number of residues in the NPE region.
         """
-
+               
         if pe_cutoff is not None and npe_cutoff is not None:
             if float(npe_cutoff) < float(pe_cutoff):
                 raise ValueError("npe_cutoff must be >= pe_cutoff")
-
+            
         qm_charge = int(qm_charge)
         qm_multiplicity = int(qm_multiplicity)
 
-        if qm_multiplicity <= 0:
+        if qm_multiplicity <=0:
             raise ValueError("qm_multiplicity must be a positive integer")
 
-        if trajectory_file.lower().endswith(".pdb"):
+        if trajectory_file.lower().endswith('.pdb'):
             self.universe = mda.Universe(trajectory_file, guess_bonds=True)
         else:
             if topology_file is None:
                 raise ValueError("topology_file is required unless trajectory_file is a .pdb")
             self.universe = mda.Universe(topology_file, trajectory_file)
-
+        
         total_frames = len(self.universe.trajectory)
         self.ostream.print_blank()
 
@@ -401,10 +390,10 @@ class EnsembleParser:
                     start = traj_start
                 if end is None:
                     end = traj_end
-
+                
                 if float(end) < float(start):
                     raise ValueError("End time must be greater than or equal to start time")
-
+                
                 window_frames = []
                 for iframe in range(total_frames):
                     self.universe.trajectory[iframe]
@@ -426,13 +415,13 @@ class EnsembleParser:
                 num_snapshots = len(available_frames)
 
             if num_snapshots <= 0:
-                raise ValueError("num_snapshots must be a positive integer")
+                    raise ValueError("num_snapshots must be a positive integer")
 
             if num_snapshots > len(available_frames):
                 raise ValueError(
                     f"Requested number of snapshots ({num_snapshots}) exceeds "
                     f"available frames ({len(available_frames)})."
-                )
+                    )
 
             if num_snapshots == len(available_frames):
                 frame_indices = available_frames
@@ -466,7 +455,7 @@ class EnsembleParser:
         has_box = False
         try:
             self.universe.trajectory[0]
-            dims = getattr(self.universe.trajectory.ts, "dimensions", None)
+            dims = getattr(self.universe.trajectory.ts, 'dimensions', None)
             if dims is not None:
                 dims = np.asarray(dims, dtype=float)
                 if dims.size > 3 and np.all(dims[:3] > 0):
@@ -478,7 +467,7 @@ class EnsembleParser:
             transforms = [
                 transform.unwrap(qm_atoms),
                 transform.center_in_box(qm_atoms, wrap=True),
-                transform.wrap(env_atoms),
+                transform.wrap(env_atoms)
             ]
             self.universe.trajectory.add_transformations(*transforms)
 
@@ -493,12 +482,11 @@ class EnsembleParser:
             qm_coords = np.asarray(qm_atoms.positions, dtype=float).copy()
             qm_elements = np.asarray(
                 [guess_atom_element(n) for n in qm_atoms.names], dtype=object
-            )
-
+                )
+            
             pe_coords = empty_xyz
             pe_elements = empty_obj
             pe_resids = empty_int
-            pe_resindices = empty_int
             pe_resnames = empty_obj
             number_residues_pe = 0
             pe_atom_names = empty_obj
@@ -506,30 +494,18 @@ class EnsembleParser:
             npe_coords = empty_xyz
             npe_elements = empty_obj
             npe_resids = empty_int
-            npe_resindices = empty_int
             npe_resnames = empty_obj
             number_residues_npe = 0
             npe_atom_names = empty_obj
 
             pe_region = None
 
-            pe_residx_unique = np.empty((0,), dtype=int)
-
             # PE selection
             if pe_cutoff is not None:
-                pe_touch = self.universe.select_atoms(
-                    f"({env_region_sel} and around {float(pe_cutoff)} group qm)",
+                pe_region = self.universe.select_atoms(
+                    f"byres ({env_region_sel} and around {float(pe_cutoff)} group qm)",
                     qm=qm_atoms,
                 ).difference(qm_atoms)
-
-                pe_residx_unique = np.unique(
-                    np.asarray(pe_touch.resindices, dtype=int)
-                )
-
-                if pe_residx_unique.size > 0:
-                    pe_region = env_atoms[np.isin(env_atoms.resindices, pe_residx_unique)]
-                else:
-                    pe_region = env_atoms[:0]
 
                 pe_coords = np.asarray(pe_region.positions, dtype=float).copy()
                 pe_atom_names = np.asarray(pe_region.names, dtype=object).copy()
@@ -537,41 +513,30 @@ class EnsembleParser:
                     [guess_atom_element(n) for n in pe_region.names], dtype=object
                 )
                 pe_resids = np.asarray(pe_region.resids, dtype=int).copy()
-                pe_resindices = np.asarray(pe_region.resindices, dtype=int).copy()
                 pe_resnames = np.asarray(pe_region.resnames, dtype=object).copy()
+                pe_residx = np.asarray(pe_region.resindices, dtype=int)
 
                 # Apply protonation-state residue renaming (GLH/ASH) if applicable
                 if prot_map and len(pe_resnames) > 0:
                     for ridx, newname in prot_map.items():
-                        pe_resnames[pe_resindices == ridx] = newname
+                        pe_resnames[pe_residx == ridx] = newname
 
                 # Apply terminal residue renaming (NASN/CASN, etc.) if applicable
                 if term_map and len(pe_resnames) > 0:
+                    pe_residx = np.asarray(pe_region.resindices, dtype=int)
                     for ridx, newname in term_map.items():
-                        pe_resnames[pe_resindices == ridx] = newname
+                        pe_resnames[pe_residx == ridx] = newname
 
                 number_residues_pe = int(pe_region.residues.n_residues)
 
             # NPE selection
             if npe_cutoff is not None:
-                npe_touch = self.universe.select_atoms(
-                    f"({env_region_sel} and around {float(npe_cutoff)} group qm)",
+                outer_shell = self.universe.select_atoms(
+                    f"byres ({env_region_sel} and around {float(npe_cutoff)} group qm)",
                     qm=qm_atoms,
                 ).difference(qm_atoms)
 
-                outer_residx_unique = np.unique(
-                    np.asarray(npe_touch.resindices, dtype=int)
-                )
-                npe_residx_unique = np.setdiff1d(
-                    outer_residx_unique,
-                    pe_residx_unique,
-                    assume_unique=False,
-                )
-
-                if npe_residx_unique.size > 0:
-                    npe_region = env_atoms[np.isin(env_atoms.resindices, npe_residx_unique)]
-                else:
-                    npe_region = env_atoms[:0]
+                npe_region = outer_shell.difference(pe_region) if pe_region is not None else outer_shell
 
                 npe_coords = np.asarray(npe_region.positions, dtype=float).copy()
                 npe_atom_names = np.asarray(npe_region.names, dtype=object).copy()
@@ -579,20 +544,21 @@ class EnsembleParser:
                     [guess_atom_element(n) for n in npe_region.names], dtype=object
                 )
                 npe_resids = np.asarray(npe_region.resids, dtype=int).copy()
-                npe_resindices = np.asarray(npe_region.resindices, dtype=int).copy()
                 npe_resnames = np.asarray(npe_region.resnames, dtype=object).copy()
+                npe_residx = np.asarray(npe_region.resindices, dtype=int)
 
                 # Apply protonation-state residue renaming (GLH/ASH) if applicable
                 if prot_map and len(npe_resnames) > 0:
                     for ridx, newname in prot_map.items():
-                        npe_resnames[npe_resindices == ridx] = newname
+                        npe_resnames[npe_residx == ridx] = newname
 
                 # Apply terminal residue renaming (NASN/CASN, etc.) if applicable
                 if term_map and len(npe_resnames) > 0:
+                    npe_residx = np.asarray(npe_region.resindices, dtype=int)
                     for ridx, newname in term_map.items():
-                        npe_resnames[npe_resindices == ridx] = newname
+                        npe_resnames[npe_residx == ridx] = newname
 
-                number_residues_npe = int(npe_region.residues.n_residues)
+                number_residues_npe = int(npe_region.residues.n_residues)                
 
             # If neither cutoff is set, interpret as all-qm
 
@@ -608,7 +574,6 @@ class EnsembleParser:
                     "pe_atom_names": pe_atom_names,
                     "pe_elements": pe_elements,
                     "pe_resids": pe_resids,
-                    "pe_resindices": pe_resindices,
                     "pe_resnames": pe_resnames,
                     "number_residues_pe": number_residues_pe,
 
@@ -616,7 +581,6 @@ class EnsembleParser:
                     "npe_atom_names": npe_atom_names,
                     "npe_elements": npe_elements,
                     "npe_resids": npe_resids,
-                    "npe_resindices": npe_resindices,
                     "npe_resnames": npe_resnames,
                     "number_residues_npe": number_residues_npe,
             }

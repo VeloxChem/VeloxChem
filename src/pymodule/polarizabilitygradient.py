@@ -1495,7 +1495,7 @@ class PolarizabilityGradient:
             lr_drv.frequencies = self.frequencies
             lr_drv.damping = self.damping
             # get absorption cross section from CPP calculations
-            lr_drv.property = 'absorption'
+            lr_drv.cpp_flag = 'absorption'
         else:
             lr_drv = LinearResponseSolver(self.comm, self.ostream)
             lr_drv.frequencies = self.frequencies

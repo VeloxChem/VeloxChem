@@ -103,7 +103,7 @@ class ComplexResponse(LinearSolver):
         self.b_operator = 'electric dipole'
         self.b_components = 'xyz'
 
-        self.property = None
+        self.cpp_flag = None
 
         self.frequencies = (0,)
         self.damping = 1000.0 / hartree_in_wavenumber()
@@ -132,26 +132,26 @@ class ComplexResponse(LinearSolver):
 
         super().update_settings(rsp_dict, method_dict)
 
-    def set_cpp_property(self, prop):
+    def set_cpp_flag(self, flag):
         """
-        Sets CPP property (absorption or ecd).
+        Sets CPP flag (absorption or ecd).
 
-        :param prop:
-            The CPP property (absorption or ecd).
+        :param flag:
+            The flag (absorption or ecd).
         """
 
-        assert_msg_critical(prop.lower() in ['absorption', 'ecd'],
-                            f'{type(self).__name__}: invalid CPP property')
+        assert_msg_critical(flag.lower() in ['absorption', 'ecd'],
+                            f'{type(self).__name__}: invalid CPP flag')
 
-        self.property = prop.lower()
+        self.cpp_flag = flag.lower()
 
-        if self.property == 'absorption':
+        if self.cpp_flag == 'absorption':
             self.a_operator = 'electric dipole'
             self.a_components = 'xyz'
             self.b_operator = 'electric dipole'
             self.b_components = 'xyz'
 
-        elif self.property == 'ecd':
+        elif self.cpp_flag == 'ecd':
             self.a_operator = 'magnetic dipole'
             self.a_components = 'xyz'
             self.b_operator = 'linear momentum'
@@ -342,9 +342,9 @@ class ComplexResponse(LinearSolver):
         self._dist_fock_ger = None
         self._dist_fock_ung = None
 
-        # make sure that cpp_property is properly set
-        if self.property is not None:
-            self.set_cpp_property(self.property)
+        # make sure that cpp_flag is properly set
+        if self.cpp_flag is not None:
+            self.set_cpp_flag(self.cpp_flag)
 
         # check molecule
         molecule_sanity_check(molecule)
@@ -960,10 +960,10 @@ class ComplexResponse(LinearSolver):
             A dictionary containing the spectrum.
         """
 
-        if self.property == 'absorption':
+        if self.cpp_flag == 'absorption':
             return self._get_absorption_spectrum(rsp_results, x_unit)
 
-        elif self.property == 'ecd':
+        elif self.cpp_flag == 'ecd':
             return self._get_ecd_spectrum(rsp_results, x_unit)
 
         return None
@@ -1116,7 +1116,7 @@ class ComplexResponse(LinearSolver):
             x_data = np.array(cpp_spec['x_data'])
             y_data = np.array(cpp_spec['y_data'])
 
-        if self.property == 'absorption':
+        if self.cpp_flag == 'absorption':
             assert_msg_critical(
                 '[a.u.]' in cpp_spec['y_label'],
                 f'{type(self).__name__}.plot: In valid unit in y_label')
@@ -1139,14 +1139,14 @@ class ComplexResponse(LinearSolver):
 
         y_max = np.max(np.abs(y_data))
 
-        if self.property == 'absorption':
+        if self.cpp_flag == 'absorption':
             # Note: use epsilon for absorption
             ax.set_ylabel(r'$\epsilon$ [L mol$^{-1}$ cm$^{-1}$]')
             ax.set_title("Absorption Spectrum")
 
             ax.set_ylim(0.0, y_max * 1.1)
 
-        elif self.property == 'ecd':
+        elif self.cpp_flag == 'ecd':
             ax.set_ylabel(r'$\Delta \epsilon$ [L mol$^{-1}$ cm$^{-1}$]')
             ax.set_title("ECD Spectrum")
 
@@ -1179,10 +1179,10 @@ class ComplexResponse(LinearSolver):
         if self.print_level > 1:
             self._print_response_functions(rsp_results, ostream)
 
-        if self.property == 'absorption':
+        if self.cpp_flag == 'absorption':
             self._print_absorption_results(rsp_results, ostream)
 
-        elif self.property == 'ecd':
+        elif self.cpp_flag == 'ecd':
             self._print_ecd_results(rsp_results, ostream)
 
     def _print_response_functions(self, rsp_results, ostream=None):
@@ -1391,13 +1391,13 @@ class ComplexResponse(LinearSolver):
             if spectrum is not None:
                 y_data = np.array(spectrum['y_data'])
 
-                if self.property == 'absorption':
+                if self.cpp_flag == 'absorption':
                     assert_msg_critical(
                         '[a.u.]' in spectrum['y_label'],
                         f'{type(self).__name__}.write_cpp_rsp_results_to_hdf5: '
                         + 'In valid unit in y_label')
                     ylabel = self.group_label + '/sigma'
-                elif self.property == 'ecd':
+                elif self.cpp_flag == 'ecd':
                     ylabel = self.group_label + '/delta-epsilon'
                 if ylabel in hf:
                     del hf[ylabel]
@@ -1432,8 +1432,8 @@ class ComplexResponse(LinearSolver):
             A dictionary containing property densities at given frequency.
         """
 
-        assert_msg_critical(self.property in ['absorption', 'ecd'],
-                            'get_cpp_property_densities: Invalid CPP property')
+        assert_msg_critical(self.cpp_flag in ['absorption', 'ecd'],
+                            'get_cpp_property_densities: Invalid cpp_flag')
 
         assert_msg_critical(
             ('x', w) in cpp_results['solutions'] and
@@ -1464,13 +1464,13 @@ class ComplexResponse(LinearSolver):
             mo_occ = scf_results['C_alpha'][:, :nocc].copy()
             mo_vir = scf_results['C_alpha'][:, nocc:].copy()
 
-            if self.property == 'absorption':
+            if self.cpp_flag == 'absorption':
                 # vector representation of absorption cross-section
                 vec = (a_prop_grad[0] * cpp_solution_vector_x +
                        a_prop_grad[1] * cpp_solution_vector_y +
                        a_prop_grad[2] * cpp_solution_vector_z).imag / 3.0
                 vec *= 4.0 * np.pi * w * fine_structure_constant()
-            elif self.property == 'ecd':
+            elif self.cpp_flag == 'ecd':
                 # vector representation of Delta epsilon
                 vec = (a_prop_grad[0] * cpp_solution_vector_x / w +
                        a_prop_grad[1] * cpp_solution_vector_y / w +

@@ -102,11 +102,6 @@ class ScfGradientDriver(GradientDriver):
             The dictionary containing converged SCF results.
         """
 
-        # TODO: enable ECP
-        assert_msg_critical(
-            not basis.has_ecp(),
-            f'{type(self).__name__}.compute: ECP is not yet supported')
-
         if scf_results is None:
             scf_results = self.scf_driver.scf_tensors
 

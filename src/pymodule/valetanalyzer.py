@@ -184,7 +184,7 @@ class ValetAnalyzer:
 
         # Get MO coefficients and orbital information
         mo = scf_results["C_alpha"]
-        nocc = self._molecule.number_of_alpha_occupied_orbitals(self._basis)
+        nocc = self._molecule.number_of_alpha_electrons()
         norb = mo.shape[1]
         nvir = norb - nocc
         mo_occ = mo[:, :nocc].copy()

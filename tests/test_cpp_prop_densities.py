@@ -11,14 +11,13 @@ from veloxchem.cppsolver import ComplexResponse
 @pytest.mark.solvers
 class TestCppPropertyDensities:
 
-    def run_cpp_prop_densities(self, mol, bas, xcfun_label, cpp_property,
+    def run_cpp_prop_densities(self, mol, bas, xcfun_label, cpp_flag,
                                cpp_frequencies, freq_prop_tuple, tol):
 
         # run SCF
 
         scf_drv = ScfRestrictedDriver()
         scf_drv.xcfun = xcfun_label
-        scf_drv.acc_type = 'l2_c2diis'
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(mol, bas)
 
@@ -26,7 +25,7 @@ class TestCppPropertyDensities:
 
         cpp_drv = ComplexResponse()
         cpp_drv.frequencies = cpp_frequencies
-        cpp_drv.property = cpp_property
+        cpp_drv.cpp_flag = cpp_flag
         cpp_drv.ostream.mute()
         cpp_results = cpp_drv.compute(mol, bas, scf_results)
 
@@ -77,13 +76,13 @@ class TestCppPropertyDensities:
 
         xcfun_label = 'bhandhlyp'
 
-        cpp_property = 'absorption'
+        cpp_flag = 'absorption'
         cpp_frequencies = np.round(np.arange(0.7, 0.8, 0.005), 4)
 
         freq_prop_tuple = (0.735, 7.46130779)
         tol = 1e-7
 
-        self.run_cpp_prop_densities(mol, bas, xcfun_label, cpp_property,
+        self.run_cpp_prop_densities(mol, bas, xcfun_label, cpp_flag,
                                     cpp_frequencies, freq_prop_tuple, tol)
 
     def test_cpp_prop_dens_ecd(self):
@@ -101,11 +100,11 @@ class TestCppPropertyDensities:
 
         xcfun_label = 'bhandhlyp'
 
-        cpp_property = 'ecd'
+        cpp_flag = 'ecd'
         cpp_frequencies = np.round(np.arange(0.3, 0.4, 0.005), 4)
 
         freq_prop_tuple = (0.380, -33.00280072)
         tol = 1e-7
 
-        self.run_cpp_prop_densities(mol, bas, xcfun_label, cpp_property,
+        self.run_cpp_prop_densities(mol, bas, xcfun_label, cpp_flag,
                                     cpp_frequencies, freq_prop_tuple, tol)
