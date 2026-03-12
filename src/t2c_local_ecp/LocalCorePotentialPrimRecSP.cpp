@@ -6,17 +6,19 @@ auto
 comp_prim_local_core_potential_sp(CSimdArray<double>& pbuffer, 
                                   const size_t idx_sp,
                                   const size_t idx_ss,
-                                  const CSimdArray<double>& factors) -> void
+                                  const CSimdArray<double>& factors,
+                                  const size_t idx_rb,
+                                  const size_t idx_zeta) -> void
 {
     const auto nelems = pbuffer.number_of_active_elements();
 
     // Set up R(RB) distances
 
-    auto rb_x = factors.data(8);
+    auto rb_x = factors.data(idx_rb);
 
-    auto rb_y = factors.data(9);
+    auto rb_y = factors.data(idx_rb + 1);
 
-    auto rb_z = factors.data(10);
+    auto rb_z = factors.data(idx_rb + 2);
 
     // Set up components of auxiliary buffer : SS
 

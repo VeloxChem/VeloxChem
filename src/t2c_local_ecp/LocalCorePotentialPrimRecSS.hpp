@@ -18,6 +18,8 @@ auto
 comp_prim_local_core_potential_ss(CSimdArray<double>& pbuffer,
                                   const size_t idx_ss,
                                   const CSimdArray<double>& factors,
+                                  const size_t idx_r,
+                                  const size_t idx_zeta,
                                   const TPoint<double>& r_a,
                                   const double a_exp,
                                   const double c_exp,

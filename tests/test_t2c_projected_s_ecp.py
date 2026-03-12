@@ -50,9 +50,7 @@ class TestProjectedSECPDriver:
         npyfile = str(here / 'data' / 'auh2.def2svp.au.ecp.only.s.npy')
         ref_mat = np.load(npyfile)
 
-        print(ref_mat.shape)
-        
-         # dimension of molecular basis
+        # dimension of molecular basis
         indexes = np.triu_indices(4)
         basdims = [0, 10, 25, 35, 42]
         

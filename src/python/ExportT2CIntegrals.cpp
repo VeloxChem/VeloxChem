@@ -56,6 +56,12 @@
 #include "LocalCorePotentialDriver.hpp"
 #include "ProjectedCorePotentialDriver.hpp"
 #include "CorePotentialDriver.hpp"
+#include "ProjectedCorePotentialGeomX00Driver.hpp"
+#include "ProjectedCorePotentialGeom0X0Driver.hpp"
+#include "LocalCorePotentialGeomX00Driver.hpp"
+#include "LocalCorePotentialGeomX0YDriver.hpp"
+#include "LocalCorePotentialGeom0X0Driver.hpp"
+#include "CorePotentialGradientDriver.hpp"
 
 namespace vlx_t2cintegrals {
 
@@ -475,6 +481,127 @@ export_t2cintegrals(py::module& m)
                const CMolecularBasis&      basis,
                const std::vector<int>&     atoms) -> CMatrix {
                return ecp_drv.compute(basis, molecule, atoms);
+            },
+             "Computes ECP matrix for given molecule, basis, vector of atoms.");
+    
+    // CProjectedCorePotentialGeom100Driver class
+    PyClass<CProjectedCorePotentialGeomX00Driver<1>>(m, "ProjectedECPGeom100Driver")
+        .def(py::init<>())
+        .def(
+            "compute",
+            [](const CProjectedCorePotentialGeomX00Driver<1>& geom_drv,
+               const CMolecule&                               molecule,
+               const CMolecularBasis&                         basis,
+               const CBaseCorePotential&                      ecp_potential,
+               const int                                      ecp_momentum,
+               const int                                      iatom)
+                -> CMatrices { return geom_drv.compute(basis, molecule, ecp_potential, ecp_momentum, iatom); },
+            "Computes projected core potential first derivatives matrices for given molecule, basis and selected atom.");
+    
+    // CLocalCorePotentialGeom100Driver class
+    PyClass<CLocalCorePotentialGeomX00Driver<1>>(m, "LocalECPGeom100Driver")
+        .def(py::init<>())
+        .def(
+            "compute",
+            [](const CLocalCorePotentialGeomX00Driver<1>& geom_drv,
+               const CMolecule&                           molecule,
+               const CMolecularBasis&                     basis,
+               const CBaseCorePotential&                  ecp_potential,
+               const int                                  iatom)
+                -> CMatrices { return geom_drv.compute(basis, molecule, ecp_potential, iatom); },
+            "Computes projected core potential first derivatives matrices for given molecule, basis and selected atom.");
+    
+    // CLocalCorePotentialGeom200Driver class
+    PyClass<CLocalCorePotentialGeomX00Driver<2>>(m, "LocalECPGeom200Driver")
+        .def(py::init<>())
+        .def(
+            "compute",
+            [](const CLocalCorePotentialGeomX00Driver<2>& geom_drv,
+               const CMolecule&                           molecule,
+               const CMolecularBasis&                     basis,
+               const CBaseCorePotential&                  ecp_potential,
+               const int                                  iatom)
+                -> CMatrices { return geom_drv.compute(basis, molecule, ecp_potential, iatom); },
+            "Computes projected core potential first derivatives matrices for given molecule, basis and selected atom.");
+    
+    // CLocalCorePotentialGeom101Driver class
+    PyClass<CLocalCorePotentialGeomX0YDriver<1, 1>>(m, "LocalECPGeom101Driver")
+        .def(py::init<>())
+        .def(
+            "compute",
+            [](const CLocalCorePotentialGeomX0YDriver<1, 1>& geom_drv,
+               const CMolecule&                           molecule,
+               const CMolecularBasis&                     basis,
+               const CBaseCorePotential&                  ecp_potential,
+               const int                                  iatom,
+               const int                                  jatom)
+                -> CMatrices { return geom_drv.compute(basis, molecule, ecp_potential, iatom, jatom); },
+            "Computes projected core potential first derivatives matrices for given molecule, basis and selected atoms.");
+    
+    // CLocalCorePotentialGeom010Driver class
+    PyClass<CLocalCorePotentialGeom0X0Driver<1>>(m, "LocalECPGeom010Driver")
+        .def(py::init<>())
+        .def(
+            "compute",
+            [](const CLocalCorePotentialGeom0X0Driver<1>& geom_drv,
+               const CMolecule&                           molecule,
+               const CMolecularBasis&                     basis,
+               const CBaseCorePotential&                  ecp_potential)
+                -> CMatrices { return geom_drv.compute(basis, molecule, ecp_potential); },
+            "Computes projected core potential first derivatives matrices for given molecule, basis.");
+    
+    // CProjectedCorePotentialGeom010Driver class
+    PyClass<CProjectedCorePotentialGeom0X0Driver<1>>(m, "ProjectedECPGeom010Driver")
+        .def(py::init<>())
+        .def(
+            "compute",
+            [](const CProjectedCorePotentialGeom0X0Driver<1>& geom_drv,
+               const CMolecule&                               molecule,
+               const CMolecularBasis&                         basis,
+               const CBaseCorePotential&                      ecp_potential,
+               const int                                      ecp_momentum)
+                -> CMatrices { return geom_drv.compute(basis, molecule, ecp_potential, ecp_momentum); },
+            "Computes projected core potential first derivatives matrices for given molecule, basis.");
+    
+    // CCorePotentialGradientDriver class
+    PyClass<CCorePotentialGradientDriver>(m, "ECPGradientDriver")
+        .def(py::init<>())
+        .def(
+            "compute_bra_grad",
+            [](const CCorePotentialGradientDriver& ecp_drv,
+               const CMolecule&            molecule,
+               const CMolecularBasis&      basis,
+               const CAtomCorePotential&   ecp_potential,
+               const int                   iatom) -> CMatrices {
+               return ecp_drv.compute_bra_grad(basis, molecule, ecp_potential, iatom);
+            },
+             "Computes ECP matrix for given molecule, basis, atom core potential.")
+        .def(
+            "compute_bra_grad",
+            [](const CCorePotentialGradientDriver& ecp_drv,
+               const CMolecule&                    molecule,
+               const CMolecularBasis&              basis,
+               const std::vector<int>&             atoms,
+               const int                           iatom) -> CMatrices {
+               return ecp_drv.compute_bra_grad(basis, molecule, atoms, iatom);
+            },
+             "Computes ECP matrix for given molecule, basis, vector of atoms.")
+        .def(
+            "compute_pot_grad",
+            [](const CCorePotentialGradientDriver& ecp_drv,
+               const CMolecule&            molecule,
+               const CMolecularBasis&      basis,
+               const CAtomCorePotential&   ecp_potential) -> CMatrices {
+               return ecp_drv.compute_pot_grad(basis, molecule, ecp_potential);
+            },
+             "Computes ECP matrix for given molecule, basis, atom core potential.")
+        .def(
+            "compute_pot_grad",
+            [](const CCorePotentialGradientDriver& ecp_drv,
+               const CMolecule&                    molecule,
+               const CMolecularBasis&              basis,
+               const int                           iatom) -> CMatrices {
+               return ecp_drv.compute_pot_grad(basis, molecule, iatom);
             },
              "Computes ECP matrix for given molecule, basis, vector of atoms.");
 }
