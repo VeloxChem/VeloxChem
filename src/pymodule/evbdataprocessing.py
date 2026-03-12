@@ -290,8 +290,14 @@ class EvbDataProcessing:
                             'scipy is required for EvbDataProcessing.')
 
         if fitting:
-            dGevb_smooth = scipy.signal.savgol_filter(
-                dGevb, self.smooth_window_size, self.smooth_polynomial_order)
+            try:
+                dGevb_smooth = scipy.signal.savgol_filter(
+                    dGevb, self.smooth_window_size, self.smooth_polynomial_order)
+            except ValueError:
+                self.ostream.print_warning(
+                    f"Could not apply Savitzky-Golay filter with window size {self.smooth_window_size} and polynomial order {self.smooth_polynomial_order}. Using unfiltered data for fitting."
+                )
+                dGevb_smooth = dGevb
         else:
             dGevb_smooth = dGevb
 
