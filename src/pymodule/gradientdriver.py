@@ -403,13 +403,15 @@ class GradientDriver:
 
         return tddft_xcgrad
 
-    def grad_nuc_contrib(self, molecule):
+    def grad_nuc_contrib(self, molecule, basis=None):
         """
         Calculates the contribution of the nuclear-nuclear repulsion
         to the analytical nuclear gradient.
 
         :param molecule:
             The molecule.
+        :param basis:
+            The optional AO basis set.
 
         :return:
             The nuclear contribution to the gradient.
@@ -426,6 +428,8 @@ class GradientDriver:
 
         # atomic charges
         nuclear_charges = molecule.get_element_ids()
+        if basis is not None:
+            nuclear_charges -= basis.get_number_of_ecp_core_electrons()
 
         # loop over all distinct atom pairs and add energy contribution
         for i in range(natm):
@@ -475,7 +479,7 @@ class GradientDriver:
         if self.numerical:
             title = 'Numerical '
         else:
-        	title = 'Analytical '
+            title = 'Analytical '
 
         title += 'Gradient (Hartree/Bohr)'
         self.ostream.print_header(title)
@@ -546,7 +550,7 @@ class GradientDriver:
             cur_str3 = 'Finite Difference Step Size     : '
             cur_str3 += str(self.delta_h) + ' a.u.'
         else:
-        	cur_str += 'Analytical'
+            cur_str += 'Analytical'
 
         self.ostream.print_blank()
         self.ostream.print_header(cur_str.ljust(str_width))

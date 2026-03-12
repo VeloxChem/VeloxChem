@@ -194,7 +194,12 @@ export_t2cintegrals(py::module& m)
             "compute",
             [](const CNuclearPotentialGeom0X0Driver<1>& geom_drv, const CMolecule& molecule, const CMolecularBasis& basis, const int iatom)
                 -> CMatrices { return geom_drv.compute(basis, molecule, iatom); },
-            "Computes nuclear potential derivatives matrices for given molecule, basis and selected atom.");
+            "Computes nuclear potential derivatives matrices for given molecule, basis and selected atom.")
+        .def(
+            "compute",
+            [](const CNuclearPotentialGeom0X0Driver<1>& geom_drv, const CMolecule& molecule, const CMolecularBasis& basis, const int iatom, const double alternative_charge)
+                -> CMatrices { return geom_drv.compute(basis, molecule, iatom, alternative_charge); },
+            "Computes nuclear potential derivatives matrices for given molecule, basis, selected atom and alternative nuclear charge (e.g. with ECP).");
     
     // CNuclearPotentialErfGeom010Driver class
     PyClass<CNuclearPotentialErfGeom0X0Driver<1>>(m, "NuclearPotentialErfGeom010Driver")
