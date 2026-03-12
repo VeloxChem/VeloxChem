@@ -214,13 +214,13 @@ class TestMolecularOrbitals:
         filename = tmp_path / 'broken_molecular_orbitals.h5'
 
         with h5py.File(filename, 'w') as handle:
-            handle.create_dataset('C_alpha', data=np.eye(2))
-            handle.create_dataset('E_alpha', data=np.zeros(2))
-            handle.create_dataset('occ_alpha', data=np.zeros(2))
-            handle.create_dataset('C_beta', data=np.eye(2))
+            handle.create_dataset('alpha_orbitals', data=np.eye(2))
+            handle.create_dataset('alpha_energies', data=np.zeros(2))
+            handle.create_dataset('alpha_occupations', data=np.zeros(2))
+            handle.create_dataset('beta_orbitals', data=np.eye(2))
             handle.create_dataset('scf_type', data=np.bytes_(['unrestricted']))
 
-        with pytest.raises(AssertionError, match='E_beta not found'):
+        with pytest.raises(AssertionError, match='beta_energies not found'):
             MolecularOrbitals.read_hdf5(str(filename))
 
     def test_create_nto_and_is_nto(self):

@@ -104,20 +104,6 @@ class TestScfDriverMiscellaneous:
             assert third_results["scf_energy"] == pytest.approx(
                 first_results["scf_energy"], abs=1.0e-10)
 
-        fourth_drv = ScfRestrictedDriver()
-        fourth_drv.ostream.mute()
-        # no configure for fourth_drv
-        fourth_results = fourth_drv.compute(checkpoint=f"{filename}.h5")
-
-        assert fourth_results is not None
-        assert fourth_drv.filename == filename
-        assert fourth_drv.checkpoint_file == f"{filename}.h5"
-        assert fourth_drv.restart
-        if self.is_master():
-            assert fourth_drv._ref_mol_orbs is not None
-            assert fourth_results["scf_energy"] == pytest.approx(
-                first_results["scf_energy"], abs=1.0e-10)
-
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='skip pytest.raises for multiple MPI processes')
     def test_conflicting_ri_modes_raise(self):

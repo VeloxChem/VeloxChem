@@ -472,30 +472,34 @@ class MolecularOrbitals:
         hf = h5py.File(fname, 'a')
 
         for key in [
-                prefix + 'C_alpha',
-                prefix + 'E_alpha',
-                prefix + 'occ_alpha',
-                prefix + 'C_beta',
-                prefix + 'E_beta',
-                prefix + 'occ_beta',
+                prefix + 'alpha_orbitals',
+                prefix + 'alpha_energies',
+                prefix + 'alpha_occupations',
+                prefix + 'beta_orbitals',
+                prefix + 'beta_energies',
+                prefix + 'beta_occupations',
                 prefix + 'scf_type',
         ]:
             if key in hf:
                 del hf[key]
 
-        hf.create_dataset(prefix + 'C_alpha', data=self.alpha_to_numpy())
-        hf.create_dataset(prefix + 'E_alpha', data=self.ea_to_numpy())
-        hf.create_dataset(prefix + 'occ_alpha', data=self.occa_to_numpy())
+        hf.create_dataset(prefix + 'alpha_orbitals', data=self.alpha_to_numpy())
+        hf.create_dataset(prefix + 'alpha_energies', data=self.ea_to_numpy())
+        hf.create_dataset(prefix + 'alpha_occupations',
+                          data=self.occa_to_numpy())
 
         if self._orbitals_type == molorb.unrest:
-            hf.create_dataset(prefix + 'C_beta', data=self.beta_to_numpy())
-            hf.create_dataset(prefix + 'E_beta', data=self.eb_to_numpy())
-            hf.create_dataset(prefix + 'occ_beta', data=self.occb_to_numpy())
+            hf.create_dataset(prefix + 'beta_orbitals',
+                              data=self.beta_to_numpy())
+            hf.create_dataset(prefix + 'beta_energies', data=self.eb_to_numpy())
+            hf.create_dataset(prefix + 'beta_occupations',
+                              data=self.occb_to_numpy())
             hf.create_dataset(prefix + 'scf_type',
                               data=np.bytes_(['unrestricted']))
 
         elif self._orbitals_type == molorb.restopen:
-            hf.create_dataset(prefix + 'occ_beta', data=self.occb_to_numpy())
+            hf.create_dataset(prefix + 'beta_occupations',
+                              data=self.occb_to_numpy())
             hf.create_dataset(prefix + 'scf_type',
                               data=np.bytes_(['restricted_openshell']))
 
@@ -528,7 +532,7 @@ class MolecularOrbitals:
 
         is_valid = True
 
-        for key in ['C_alpha', 'E_alpha', 'occ_alpha']:
+        for key in ['alpha_orbitals', 'alpha_energies', 'alpha_occupations']:
             key_in_hf = ((prefix + key) in hf)
             is_valid = (is_valid and key_in_hf)
 
@@ -557,44 +561,54 @@ class MolecularOrbitals:
 
         hf = h5py.File(fname, 'r')
 
-        scf_type = hf.get(prefix + 'scf_type')[0].decode('utf-8')
+        orbs_type = molorb.rest
 
-        if scf_type == 'restricted':
-            orbs_type = molorb.rest
-        elif scf_type == 'unrestricted':
-            orbs_type = molorb.unrest
-        elif scf_type == 'restricted_openshell':
-            orbs_type = molorb.restopen
-
-        for key in ['C_alpha', 'E_alpha', 'occ_alpha']:
+        for key in ['alpha_orbitals', 'alpha_energies', 'alpha_occupations']:
             assert_msg_critical((prefix + key) in hf,
                                 f'MolecularOrbitals.read_hdf5: {key} not found')
 
-        if orbs_type == molorb.unrest:
-            for key in ['C_beta', 'E_beta', 'occ_beta']:
+        if (prefix + 'beta_orbitals') in hf or (prefix + 'beta_energies') in hf:
+            orbs_type = molorb.unrest
+
+            for key in ['beta_orbitals', 'beta_energies', 'beta_occupations']:
                 assert_msg_critical(
                     (prefix + key) in hf,
                     f'MolecularOrbitals.read_hdf5: {key} not found')
 
-        elif orbs_type == molorb.restopen:
-            assert_msg_critical((prefix + 'occ_beta') in hf,
-                                f'MolecularOrbitals.read_hdf5: {key} not found')
+        elif (prefix + 'beta_occupations') in hf:
+            orbs_type = molorb.restopen
+
+        if (prefix + 'scf_type') in hf:
+            scf_type = hf.get(prefix + 'scf_type')[0].decode('utf-8')
+
+            err_scf_orbs_match = 'MolecularOrbitals.read_hdf5: '
+            err_scf_orbs_match += 'Inconsistent scf_type and orbs_type'
+
+            if scf_type == 'restricted':
+                assert_msg_critical(orbs_type == molorb.rest,
+                                    err_scf_orbs_match)
+            elif scf_type == 'unrestricted':
+                assert_msg_critical(orbs_type == molorb.unrest,
+                                    err_scf_orbs_match)
+            elif scf_type == 'restricted_openshell':
+                assert_msg_critical(orbs_type == molorb.restopen,
+                                    err_scf_orbs_match)
 
         orbs = []
         enes = []
         occs = []
 
-        orbs.append(np.array(hf.get(prefix + 'C_alpha')))
-        enes.append(np.array(hf.get(prefix + 'E_alpha')))
-        occs.append(np.array(hf.get(prefix + 'occ_alpha')))
+        orbs.append(np.array(hf.get(prefix + 'alpha_orbitals')))
+        enes.append(np.array(hf.get(prefix + 'alpha_energies')))
+        occs.append(np.array(hf.get(prefix + 'alpha_occupations')))
 
         if orbs_type == molorb.unrest:
-            orbs.append(np.array(hf.get(prefix + 'C_beta')))
-            enes.append(np.array(hf.get(prefix + 'E_beta')))
-            occs.append(np.array(hf.get(prefix + 'occ_beta')))
+            orbs.append(np.array(hf.get(prefix + 'beta_orbitals')))
+            enes.append(np.array(hf.get(prefix + 'beta_energies')))
+            occs.append(np.array(hf.get(prefix + 'beta_occupations')))
 
         elif orbs_type == molorb.restopen:
-            occs.append(np.array(hf.get(prefix + 'occ_beta')))
+            occs.append(np.array(hf.get(prefix + 'beta_occupations')))
 
         hf.close()
 
@@ -641,6 +655,15 @@ class MolecularOrbitals:
         match_scf_type = False
         if (prefix + 'scf_type') in hf:
             h5_scf_type = hf.get(prefix + 'scf_type')[0].decode('utf-8')
+            match_scf_type = (h5_scf_type == scf_type)
+        else:
+            if (prefix + 'beta_orbitals') in hf or (prefix +
+                                                    'beta_energies') in hf:
+                h5_scf_type = 'unrestricted'
+            elif (prefix + 'beta_occupations') in hf:
+                h5_scf_type = 'restricted_openshell'
+            else:
+                h5_scf_type = 'restricted'
             match_scf_type = (h5_scf_type == scf_type)
 
         hf.close()
