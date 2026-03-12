@@ -153,14 +153,13 @@ class EvbDriver():
             optimize_mol (bool): If True, does an xtb optimization of every provided molecule object before reparameterisation. Defaults to False.
             optimize_ff (bool): If True, does an mm optimization of the combined reactant and product after reparameterisation. Defaults to True.
         """
-        
+        self.ffbuilder.read_keywords(**kwargs)
 
         self.ffbuilder.water_model = self.water_model
 
         self.reactant, self.product, self.forming_bonds, self.breaking_bonds, self.reactants, self.products, self.product_mapping = self.ffbuilder.build_forcefields(
             reactant=reactant,
             product=product,
-            **kwargs
         )
 
     def build_systems(
@@ -702,8 +701,6 @@ class EvbDriver():
                         group.create_dataset(k, data=v)
                     elif isinstance(v, set):
                         group.create_dataset(k, data=list(v))
-                    elif isinstance(v, object):
-                        continue
                     else:
                         group[k] = v
 
@@ -881,7 +878,7 @@ class EvbDriver():
             conf = {
                 "name": "vacuum",
                 "temperature": self.temperature,
-                # "bonded_integration": True,
+                "bonded_integration": True,
                 "soft_core_coulomb_pes": True,
                 "soft_core_lj_pes": True,
                 "soft_core_coulomb_int": False,

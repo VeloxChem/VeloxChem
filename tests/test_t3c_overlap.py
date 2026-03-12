@@ -34,10 +34,10 @@ class TestThreeCenterOverlapDriver:
 
         h1_bas = AtomBasis([
             h1_1s,
-        ], 'MINI-A', 1)
+        ], 'MINI-A', '', 1)
         h2_bas = AtomBasis([
             h2_1s,
-        ], 'MINI-B', 1)
+        ], 'MINI-B', '', 1)
         bas = MolecularBasis([h1_bas, h2_bas], [0, 1])
 
         return mol, bas

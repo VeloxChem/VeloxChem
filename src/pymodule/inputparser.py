@@ -127,7 +127,7 @@ class InputParser:
                 if (not self.is_basis_set) and (line.startswith('@BASIS_SET') or
                                                 line.startswith('@ECP_SET')):
                     self.is_basis_set = True
-                    self.basis_set_name = line.split()[1]
+                    self.basis_set_name = line[10:].strip()
                     continue
 
                 # begin of group

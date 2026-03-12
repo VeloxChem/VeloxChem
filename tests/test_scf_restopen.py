@@ -24,11 +24,12 @@ class TestScfRestrictedOpenDriver:
         mol.set_multiplicity(mult)
 
         bas = MolecularBasis.read(mol, basis_label, ostream=None)
+        min_bas = MolecularBasis.read(mol, 'ao-start-guess', ostream=None)
 
         scf_drv = ScfRestrictedOpenDriver()
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label
-        scf_results = scf_drv.compute(mol, bas)
+        scf_results = scf_drv.compute(mol, bas, min_bas)
 
         if scf_drv.rank == mpi_master():
             assert abs(ref_scf_energy - scf_results['scf_energy']) < tol
@@ -57,32 +58,3 @@ class TestScfRestrictedOpenDriver:
 
         self.run_scf_restopen('tpssh', 1, 2, -75.9023473162, 1.0e-6)
         self.run_scf_restopen('tpssh', 0, 3, -76.0759108977, 1.0e-6)
-
-    def run_scf_restopen_with_ecp(self, xcfun_label, charge, mult,
-                                  ref_scf_energy, tol):
-
-        xyz_string = """2
-        xyz
-        H    0.000   1.550   0.000
-        Au   0.000   0.000   0.000
-        """
-        basis_label = 'def2-svp'
-
-        mol = Molecule.read_xyz_string(xyz_string)
-        mol.set_charge(charge)
-        mol.set_multiplicity(mult)
-
-        bas = MolecularBasis.read(mol, basis_label, ostream=None)
-
-        scf_drv = ScfRestrictedOpenDriver()
-        scf_drv.ostream.mute()
-        scf_drv.xcfun = xcfun_label
-        scf_drv.acc_type = 'diis'
-        scf_results = scf_drv.compute(mol, bas)
-
-        if scf_drv.rank == mpi_master():
-            assert abs(ref_scf_energy - scf_results['scf_energy']) < tol
-
-    def test_hf_with_ecp(self):
-
-        self.run_scf_restopen_with_ecp('hf', 1, 2, -135.0196479978, 1.0e-8)

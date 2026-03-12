@@ -377,7 +377,7 @@ class VibrationalAnalysis:
             self.print_vibrational_analysis(molecule)
 
             # create binary file and save vibrational analysis results
-            self._write_final_hdf5(molecule, ao_basis)
+            self._write_final_hdf5(molecule)
 
             return vib_results
         else:
@@ -729,7 +729,7 @@ class VibrationalAnalysis:
             lr_drv.update_settings(self.rsp_dict, self.method_dict)
             lr_drv.damping = polgrad_drv.damping
             # get absorption cross section from CPP calculations
-            lr_drv.property = 'absorption'
+            lr_drv.cpp_flag = 'absorption'
             # don't save the solution vectors
             lr_drv.save_solutions = False
             if 'frequencies' not in self.rsp_dict:
@@ -1178,22 +1178,20 @@ class VibrationalAnalysis:
             index for index, element in enumerate(lst) if element in targets
         ]
 
-    def _write_final_hdf5(self, molecule, basis=None):
+    def _write_final_hdf5(self, molecule):
         """
         Writes final HDF5 file that contains results
         from vibrational analysis
 
         :param molecule:
             The molecule.
-        :param basis:
-            Optional AO basis set object (for taking care of ECP core electrons).
         """
 
         if self.filename is not None:
             results_h5_file = f"{self.filename}.h5"
-            self.write_vib_results_to_hdf5(molecule, results_h5_file, basis)
+            self.write_vib_results_to_hdf5(molecule, results_h5_file)
 
-    def write_vib_results_to_hdf5(self, molecule, fname, basis=None):
+    def write_vib_results_to_hdf5(self, molecule, fname):
         """
         Writes vibrational analysis results to HDF5 file.
 
@@ -1201,8 +1199,6 @@ class VibrationalAnalysis:
             The molecule.
         :param fname:
             Name of the HDF5 file.
-        :param basis:
-            Optional AO basis set object (for taking care of ECP core electrons).
         """
 
         if not (fname and isinstance(fname, str) and Path(fname).is_file()):
@@ -1216,8 +1212,7 @@ class VibrationalAnalysis:
         nmodes = len(self.vib_frequencies)
         nfreqs = len(self.frequencies)
 
-        # TODO: take care of ECP core electrons
-        nuc_rep = molecule.nuclear_repulsion_energy(basis)
+        nuc_rep = molecule.nuclear_repulsion_energy()
         hf.create_dataset(vib_group + 'nuclear_repulsion', data=nuc_rep)
 
         hf.create_dataset(vib_group + "number_of_modes", data=np.array([nmodes]))

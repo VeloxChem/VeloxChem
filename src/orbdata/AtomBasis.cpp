@@ -45,31 +45,19 @@ CAtomBasis::CAtomBasis()
 
     , _name{}
 
-    , _ecp_potential(CAtomCorePotential())
+    , _ecp_label{}
 
     , _identifier{-1}
 {
 }
 
-CAtomBasis::CAtomBasis(const std::vector<CBasisFunction> &functions, const std::string &name, const CAtomCorePotential &ecp_potential, const int identifier)
+CAtomBasis::CAtomBasis(const std::vector<CBasisFunction> &functions, const std::string &name, const std::string &ecp_label, const int identifier)
 
     : _functions(functions)
 
     , _name(name)
 
-    , _ecp_potential(ecp_potential)
-
-    , _identifier(identifier)
-{
-}
-
-CAtomBasis::CAtomBasis(const std::vector<CBasisFunction> &functions, const std::string &name, const int identifier)
-
-    : _functions(functions)
-
-    , _name(name)
-
-    , _ecp_potential(CAtomCorePotential())
+    , _ecp_label(ecp_label)
 
     , _identifier(identifier)
 {
@@ -81,7 +69,7 @@ CAtomBasis::CAtomBasis(const CAtomBasis &other)
 
     , _name(other._name)
 
-    , _ecp_potential(other._ecp_potential)
+    , _ecp_label(other._ecp_label)
 
     , _identifier(other._identifier)
 {
@@ -93,7 +81,7 @@ CAtomBasis::CAtomBasis(CAtomBasis &&other) noexcept
 
     , _name(std::move(other._name))
 
-    , _ecp_potential(std::move(other._ecp_potential))
+    , _ecp_label(std::move(other._ecp_label))
 
     , _identifier(std::move(other._identifier))
 {
@@ -106,7 +94,7 @@ CAtomBasis::operator=(const CAtomBasis &other) -> CAtomBasis &
 
     _name = other._name;
 
-    _ecp_potential = other._ecp_potential;
+    _ecp_label = other._ecp_label;
 
     _identifier = other._identifier;
 
@@ -122,7 +110,7 @@ CAtomBasis::operator=(CAtomBasis &&other) noexcept -> CAtomBasis &
 
         _name = std::move(other._name);
 
-        _ecp_potential = std::move(other._ecp_potential);
+        _ecp_label = std::move(other._ecp_label);
 
         _identifier = std::move(other._identifier);
     }
@@ -141,7 +129,7 @@ CAtomBasis::operator==(const CAtomBasis &other) const -> bool
     {
         return false;
     }
-    else if (_ecp_potential != other._ecp_potential)
+    else if (_ecp_label != other._ecp_label)
     {
         return false;
     }
@@ -164,9 +152,9 @@ CAtomBasis::set_name(const std::string &name) -> void
 }
 
 auto
-CAtomBasis::set_ecp_potential(const CAtomCorePotential &ecp_potential) -> void
+CAtomBasis::set_ecp_label(const std::string &label) -> void
 {
-    _ecp_potential = ecp_potential;
+    _ecp_label = label;
 }
 
 auto
@@ -184,7 +172,7 @@ CAtomBasis::reduce_to_valence_basis() const -> CAtomBasis
 
     vbasis.set_name(_name + "(Valence)");
 
-    vbasis.set_ecp_potential(_ecp_potential);
+    vbasis.set_ecp_label(_ecp_label);
 
     const auto mang = chem_elem::max_angular_momentum(_identifier);
 
@@ -240,15 +228,15 @@ CAtomBasis::get_name() const -> std::string
 }
 
 auto
-CAtomBasis::get_ecp_potential() const -> CAtomCorePotential
+CAtomBasis::get_ecp_label() const -> std::string
 {
-    return _ecp_potential;
+    return _ecp_label;
 }
 
 auto
-CAtomBasis::has_ecp() const -> bool
+CAtomBasis::need_ecp() const -> bool
 {
-    return !(_ecp_potential.is_empty());
+    return !(_ecp_label.empty());
 }
 
 auto

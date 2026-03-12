@@ -42,7 +42,7 @@ namespace vxcfuncs {  // vxcfuncs namespace
 std::vector<std::string>
 getAvailableFunctionals()
 {
-    return std::vector<std::string>({"SLATER", "SLDA",   "B88X",    "BLYP",  "B3LYP",   "B3PW91", "BHANDH", "BHANDHLYP", "PBE",   "PBE0",   "REVPBE",
+    return std::vector<std::string>({"SLATER", "SLDA",   "B88X",    "BLYP",  "B3LYP",   "BHANDH", "BHANDHLYP", "PBE",   "PBE0",   "REVPBE",
                                      "BP86",   "PW91",   "MPW1K",   "OLYP",  "O3LYP",   "X3LYP",  "B97",       "B97-1", "B97-2",  "B97-3",
                                      "LRC-WPBEH", "CAM-B3LYP", "RCAM-B3LYP", "WB97X-D4", "WB97M-D4",
                                      "TPSS",   "TPSSH",  "REVTPSS", "PKZB",  "SCAN",    "RSCAN",  "R2SCAN",    "M05",   "M05-2X", "M06",
@@ -69,8 +69,6 @@ getExchangeCorrelationFunctional(const std::string &xcLabel)
         if (format::upper_case(xcLabel) == "BLYP") return CXCFunctional("BLYP", {"GGA_X_B88", "GGA_C_LYP"}, {1.0, 1.0});
 
         if (format::upper_case(xcLabel) == "B3LYP") return CXCFunctional("B3LYP", {"HYB_GGA_XC_B3LYP"}, {1.0});
-
-        if (format::upper_case(xcLabel) == "B3PW91") return CXCFunctional("B3PW91", {"HYB_GGA_XC_B3PW91"}, {1.0});
 
         if (format::upper_case(xcLabel) == "BHANDH") return CXCFunctional("BHANDH", {"LDA_X", "GGA_C_LYP"}, {0.5, 1.0}, 0.5);
 

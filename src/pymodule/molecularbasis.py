@@ -39,8 +39,6 @@ from .outputstream import OutputStream
 from .veloxchemlib import AtomBasis
 from .veloxchemlib import BasisFunction
 from .veloxchemlib import MolecularBasis
-from .veloxchemlib import BaseCorePotential
-from .veloxchemlib import AtomCorePotential
 from .veloxchemlib import tensor_order
 from .veloxchemlib import chemical_element_name
 from .veloxchemlib import chemical_element_identifier
@@ -151,96 +149,33 @@ def _read_atom_basis(basis_data, elem_id, basis_name):
             err_gc += 'General contraction format is currently not supported'
             assert_msg_critical(ncgto == 1, err_gc)
 
-        angl = tensor_order(shell_title[0])
-        npgto = int(shell_title[1])
+        if shell_title[0] == 'ECP':
+            atom_basis.set_ecp_label(shell_title)
+        else:
+            angl = tensor_order(shell_title[0])
+            npgto = int(shell_title[1])
 
-        expons = [0.0] * npgto
-        coeffs = [0.0] * npgto
+            expons = [0.0] * npgto
+            coeffs = [0.0] * npgto
 
-        for i in range(npgto):
-            prims = basis_data_copy.pop(0).split()
-            assert_msg_critical(
-                len(prims) == 2, 'Basis set parser: {}'.format(' '.join(prims)))
+            for i in range(npgto):
+                prims = basis_data_copy.pop(0).split()
+                assert_msg_critical(
+                    len(prims) == 2,
+                    'Basis set parser: {}'.format(' '.join(prims)))
 
-            expons[i] = float(prims[0])
-            coeffs[i] = float(prims[1])
+                expons[i] = float(prims[0])
+                coeffs[i] = float(prims[1])
 
-        bf = BasisFunction(expons, coeffs, angl)
-        bf.normalize()
+            bf = BasisFunction(expons, coeffs, angl)
+            bf.normalize()
 
-        atom_basis.add(bf)
+            atom_basis.add(bf)
 
     atom_basis.set_identifier(elem_id)
     atom_basis.set_name(basis_name.upper())
 
     return atom_basis
-
-
-def _read_atom_ecp(ecp_data, elem_id, basis_name):
-    """
-    Reads ECP data for single atom.
-
-    :param ecp_data:
-        List with atomic ECP data.
-    :param elem_id:
-        The chemical element identifier.
-    :param basis_name:
-        Name of the basis set.
-
-    :return:
-        The atom ECP.
-    """
-
-    ecp_data_copy = list(ecp_data)
-
-    ecp_num_elec = ecp_data_copy.pop(0).split()
-    assert_msg_critical(ecp_num_elec[0] == 'NELEC',
-                        'MolcularBasis.read: Incorrect ECP format')
-    ecp_num_elec = int(ecp_num_elec[1])
-
-    l_pot = None
-    p_pot = []
-    p_angl = []
-
-    while ecp_data_copy:
-        shell_title = ecp_data_copy.pop(0).split()
-        assert_msg_critical(
-            len(shell_title) == 2 or len(shell_title) == 3,
-            'Basis set parser: {}'.format(' '.join(shell_title)))
-
-        ecp_type = shell_title[0]
-        assert_msg_critical(ecp_type in ['UL', 'UP'],
-                            'MolcularBasis.read: Incorrect ECP type')
-
-        angl = tensor_order(shell_title[1])
-        npgto = int(shell_title[2])
-
-        radial_orders = [0] * npgto
-        expons = [0.0] * npgto
-        coeffs = [0.0] * npgto
-
-        for i in range(npgto):
-            prims = ecp_data_copy.pop(0).split()
-            assert_msg_critical(
-                len(prims) == 3, 'ECP parser: {}'.format(' '.join(prims)))
-
-            radial_orders[i] = int(prims[0])
-            expons[i] = float(prims[1])
-            coeffs[i] = float(prims[2])
-
-        if ecp_type == 'UL':
-            l_pot = BaseCorePotential(expons, coeffs, radial_orders)
-        elif ecp_type == 'UP':
-            p_pot.append(BaseCorePotential(expons, coeffs, radial_orders))
-            p_angl.append(angl)
-
-    assert_msg_critical(
-        (l_pot is not None and len(p_pot) > 0 and len(p_pot) == len(p_angl)),
-        'MolcularBasis.read: Inconsistency in atom ECP')
-
-    atom_ecp = AtomCorePotential(l_pot, p_pot, p_angl, ecp_num_elec)
-
-    return atom_ecp
 
 
 def _read_basis_file(basis_name, basis_path, ostream):
@@ -354,15 +289,6 @@ def _MolecularBasis_read(molecule,
         atom_basis_labels.append(bas_label)
         atom_basis_elements.append(bas_elem)
 
-    # need to check whether there are atoms that requires ECP
-    # for now hard-code for elem_id >= 37 for DEF2-ECP
-    need_def2_ecp = False
-    ecp_elem_id_mininum = 37
-    for idx, elem_id in enumerate(molecule.get_identifiers()):
-        if elem_id >= ecp_elem_id_mininum:
-            need_def2_ecp = True
-            break
-
     # read atom basis sets defined in molecule
     for atom_bas_label in set(atom_basis_labels):
         if atom_bas_label != '':
@@ -374,15 +300,10 @@ def _MolecularBasis_read(molecule,
         basis_dict[basis_name.upper()] = _read_basis_file(
             basis_name, basis_path, ostream)
 
-    # read ECP
-    if need_def2_ecp:
-        basis_dict['DEF2-ECP'] = _read_basis_file('DEF2-ECP', basis_path,
-                                                  ostream)
-
     mol_basis = MolecularBasis()
 
     for idx, elem_id in enumerate(molecule.get_identifiers()):
-        if basis_name.upper() in ['AO-START-GUESS', 'AO-START-GUESS-FOR-ECP']:
+        if basis_name.upper() == 'AO-START-GUESS':
             atom_bas_label = basis_name.upper()
         else:
             atom_bas_label = atom_basis_labels[idx].upper()
@@ -406,20 +327,6 @@ def _MolecularBasis_read(molecule,
 
             atom_basis = _read_atom_basis(basis_dict[atom_bas_label][basis_key],
                                           basis_elem_id, atom_bas_label)
-
-        if need_def2_ecp and elem_id >= ecp_elem_id_mininum:
-            if basis_name.upper() not in [
-                    'AO-START-GUESS', 'AO-START-GUESS-FOR-ECP'
-            ]:
-                assert_msg_critical(
-                    atom_bas_label.lower().startswith('def2-'),
-                    'MolecularBasis: ECP is only implemented for the def2- ' +
-                    'series basis set.')
-                elem_name = atom_basis_elements[idx]
-                ecp_key = 'atomecp_{}'.format(elem_name.lower())
-                atom_ecp = _read_atom_ecp(basis_dict['DEF2-ECP'][ecp_key],
-                                          elem_id, 'DEF2-ECP')
-                atom_basis.set_ecp_potential(atom_ecp)
 
         mol_basis.add(atom_basis)
 
@@ -543,12 +450,6 @@ def _MolecularBasis_get_string(self, title):
 
     mlabel = self.get_main_basis_label()
 
-    has_ecp = False
-    for abasis in self.basis_sets():
-        if abasis.has_ecp():
-            has_ecp = True
-            break
-
     label = 'Molecular Basis (' + title + ')'
     bas_str = f'{label:^60s}\n'
     label = (len(label) + 2) * "="
@@ -558,25 +459,14 @@ def _MolecularBasis_get_string(self, title):
     label = 'Contracted GTOs'
     bas_str += "  Atom " + f'{label:<26}'
     label = 'Primitive GTOs'
-    bas_str += f'{label:<30}'
-    if has_ecp:
-        label = 'Core Electrons'
-        bas_str += f'{label:<16}'
-    bas_str += '\n\n'
+    bas_str += f'{label:<30}\n\n'
 
     for abasis in self.basis_sets():
         if abasis.get_name() == mlabel:
             id_elem = abasis.get_identifier()
             bas_str += f'  {chemical_element_name(id_elem):<6s}'
             bas_str += f'{abasis.contraction_str():<26s}'
-            bas_str += f'{abasis.primitives_str():<30s}'
-            if abasis.has_ecp():
-                atom_ecp = abasis.get_ecp_potential()
-                n_core_elec = atom_ecp.number_of_core_electrons()
-                bas_str += f'{str(n_core_elec):<16s}'
-            elif has_ecp:
-                bas_str += f'{"":<16s}'
-            bas_str += '\n'
+            bas_str += f'{abasis.primitives_str():<30s}\n'
     bas_str += '\n'
 
     for abasis in self.basis_sets():
@@ -586,22 +476,12 @@ def _MolecularBasis_get_string(self, title):
             label = 'Contracted GTOs'
             bas_str += "  Atom " + f'{label:<26}'
             label = 'Primitive GTOs'
-            bas_str += f'{label:<30}'
-            if has_ecp:
-                label = 'Core Electrons'
-                bas_str += f'{label:<16}'
-            bas_str += '\n\n'
+            bas_str += f'{label:<30}\n\n'
             id_elem = abasis.get_identifier()
             bas_str += f'  {chemical_element_name(id_elem):<6s}'
             bas_str += f'{abasis.contraction_str():<26s}'
-            bas_str += f'{abasis.primitives_str():<30s}'
-            if abasis.has_ecp():
-                atom_ecp = abasis.get_ecp_potential()
-                n_core_elec = atom_ecp.number_of_core_electrons()
-                bas_str += f'{str(n_core_elec):<16s}'
-            else:
-                bas_str += f'{"":<16s}'
-            bas_str += '\n\n'
+            bas_str += f'{abasis.primitives_str():<30s}\n'
+            bas_str += '\n'
 
     label = 'Contracted Basis Functions : '
     label += f'{self.get_dimensions_of_basis()}'
@@ -613,54 +493,8 @@ def _MolecularBasis_get_string(self, title):
     return bas_str
 
 
-def _MolecularBasis_has_ecp(self):
-    """
-    Returns whether the molecular basis object contains ECP.
-
-    :return:
-        True if the molecular basis object contains ECP, False otherwise.
-    """
-
-    for atom_basis in self.basis_sets():
-        if atom_basis.has_ecp():
-            return True
-    return False
-
-
-def _MolecularBasis_get_number_of_ecp_core_electrons(self):
-    """
-    Computes number of ECP core electrons of the atoms.
-
-    :return:
-        A list of number of ECP core electrons for the atoms.
-    """
-
-    core_electrons = []
-    basis_sets = self.basis_sets()
-    for basis_index in self.basis_sets_indices():
-        atom_basis = basis_sets[basis_index]
-        if atom_basis.has_ecp():
-            atom_ecp = atom_basis.get_ecp_potential()
-            n_core_elec = atom_ecp.number_of_core_electrons()
-            assert_msg_critical(
-                n_core_elec >= 0,
-                'MolecularBasis.get_number_of_ecp_core_electrons: ECP core electron count must be non-negative'
-            )
-            assert_msg_critical(
-                n_core_elec % 2 == 0,
-                'MolecularBasis.get_number_of_ecp_core_electrons: ECP core electron count must be even'
-            )
-            core_electrons.append(n_core_elec)
-        else:
-            core_electrons.append(0)
-
-    return core_electrons
-
-
 MolecularBasis.read = _MolecularBasis_read
 MolecularBasis.read_dict = _MolecularBasis_read_dict
 MolecularBasis.get_avail_basis = _MolecularBasis_get_avail_basis
 MolecularBasis.get_string = _MolecularBasis_get_string
 MolecularBasis.info_str = _MolecularBasis_get_string
-MolecularBasis.has_ecp = _MolecularBasis_has_ecp
-MolecularBasis.get_number_of_ecp_core_electrons = _MolecularBasis_get_number_of_ecp_core_electrons

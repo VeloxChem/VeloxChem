@@ -53,9 +53,6 @@
 #include "OverlapGeomX0YDriver.hpp"
 #include "TwoCenterElectronRepulsionDriver.hpp"
 #include "TwoCenterElectronRepulsionGeomX00Driver.hpp"
-#include "LocalCorePotentialDriver.hpp"
-#include "ProjectedCorePotentialDriver.hpp"
-#include "CorePotentialDriver.hpp"
 
 namespace vlx_t2cintegrals {
 
@@ -426,57 +423,6 @@ export_t2cintegrals(py::module& m)
             [](const CTwoCenterElectronRepulsionGeomX00Driver<1>& geom_drv, const CMolecule& molecule, const CMolecularBasis& basis, const int iatom)
                 -> CMatrices { return geom_drv.compute(basis, molecule, iatom); },
             "Computes overlap first derivatives matrices for given molecule, basis and selected atom.");
-    
-    // CLocalCorePotentialDriver class
-    PyClass<CLocalCorePotentialDriver>(m, "LocalECPDriver")
-        .def(py::init<>())
-        .def(
-            "compute",
-            [](const CLocalCorePotentialDriver& ecp_drv,
-               const CMolecule&                 molecule,
-               const CMolecularBasis&           basis,
-               const CBaseCorePotential&        ecp_potential,
-               const int                        iatom) -> CMatrix {
-               return ecp_drv.compute(basis, molecule, ecp_potential, iatom);
-            },
-             "Computes local ECP matrix for given molecule, basis, base core potential.");
-    
-    // CProjectedCorePotentialDriver class
-    PyClass<CProjectedCorePotentialDriver>(m, "ProjectedECPDriver")
-        .def(py::init<>())
-        .def(
-            "compute",
-            [](const CProjectedCorePotentialDriver& ecp_drv,
-               const CMolecule&                     molecule,
-               const CMolecularBasis&               basis,
-               const CBaseCorePotential&            ecp_potential,
-               const int                            ecp_momentum,
-               const int                            iatom) -> CMatrix {
-               return ecp_drv.compute(basis, molecule, ecp_potential, ecp_momentum, iatom);
-            },
-             "Computes projected ECP matrix for given molecule, basis, base core potential.");
-    
-    // CCorePotentialDriver class
-    PyClass<CCorePotentialDriver>(m, "ECPDriver")
-        .def(py::init<>())
-        .def(
-            "compute",
-            [](const CCorePotentialDriver& ecp_drv,
-               const CMolecule&            molecule,
-               const CMolecularBasis&      basis,
-               const CAtomCorePotential&   ecp_potential) -> CMatrix {
-               return ecp_drv.compute(basis, molecule, ecp_potential);
-            },
-             "Computes ECP matrix for given molecule, basis, atom core potential.")
-        .def(
-            "compute",
-            [](const CCorePotentialDriver& ecp_drv,
-               const CMolecule&            molecule,
-               const CMolecularBasis&      basis,
-               const std::vector<int>&     atoms) -> CMatrix {
-               return ecp_drv.compute(basis, molecule, atoms);
-            },
-             "Computes ECP matrix for given molecule, basis, vector of atoms.");
 }
 
 }  // namespace vlx_t2cintegrals

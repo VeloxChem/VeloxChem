@@ -19,9 +19,8 @@ class TestScfVibrationalAnalysisDriver:
         h5file = str(here / 'data' / 'water_vib_scf.h5')
 
         task = MpiTask([inpfile, None])
-
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.acc_type = 'l2_c2diis'
+
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
         vib_settings = {

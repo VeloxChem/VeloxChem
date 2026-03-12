@@ -102,24 +102,8 @@ class TestExciton:
         exciton_dict['filename'] = task.input_dict['filename']
 
         exciton_drv = ExcitonModelDriver(task.mpi_comm, task.ostream)
-
-        # fragments: 3
-        # atoms_per_fragment: 3
-        # nstates: 2
-        # ct_nocc: 1
-        # ct_nvir: 1
-
-        # set attributes directly
-        exciton_drv.fragments = '3'
-        exciton_drv.atoms_per_fragment = '3'
-        exciton_drv.nstates = 2
-        exciton_drv.ct_nocc = 1
-        exciton_drv.ct_nvir = 1
-        exciton_drv.filename = exciton_dict['filename']
-        if 'xcfun' in method_dict:
-            exciton_drv.xcfun = method_dict['xcfun']
-
-        exciton_drv.compute(task.molecule, task.ao_basis)
+        exciton_drv.update_settings(exciton_dict, method_dict)
+        exciton_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
         if task.mpi_rank == mpi_master():
 
@@ -139,18 +123,8 @@ class TestExciton:
 
         task.mpi_comm.barrier()
 
-        # reset attributes and test update_settings
-        exciton_drv.fragments = None
-        exciton_drv.atoms_per_fragment = None
-        exciton_drv.nstates = None
-        exciton_drv.ct_nocc = None
-        exciton_drv.ct_nvir = None
-        exciton_drv.filename = None
-        exciton_drv.xcfun = None
-        exciton_drv.update_settings(exciton_dict, method_dict)
-
         exciton_drv.restart = True
-        exciton_drv.compute(task.molecule, task.ao_basis)
+        exciton_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
         if task.mpi_rank == mpi_master():
             assert np.max(np.abs(backup_H - exciton_drv.H)) < 1.0e-10
@@ -338,15 +312,18 @@ class TestExciton:
         molecule = Molecule.read_xyz_string(mol_xyz)
         basis = MolecularBasis.read(molecule, 'def2-svp')
 
+        exmod_settings = {
+            'fragments': '2',
+            'atoms_per_fragment': '6',
+            'charges': '0',
+            'nstates': '5',
+            'ct_nocc': '1',
+            'ct_nvir': '1',
+        }
+
+        method_settings = {}
         exmod_drv = ExcitonModelDriver()
-
-        exmod_drv.fragments = '2'
-        exmod_drv.atoms_per_fragment = '6'
-        exmod_drv.charges = '0'
-        exmod_drv.nstates = 5
-        exmod_drv.ct_nocc = 1
-        exmod_drv.ct_nvir = 1
-
+        exmod_drv.update_settings(exmod_settings, method_settings)
         exmod_drv.ostream.mute()
         exmod_drv.compute(molecule, basis)
 

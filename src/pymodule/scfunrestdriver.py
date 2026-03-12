@@ -42,7 +42,6 @@ from .molecularorbitals import MolecularOrbitals, molorb
 from .outputstream import OutputStream
 from .scfdriver import ScfDriver
 from .c2diis import CTwoDiis
-from .diis import Diis
 
 
 class ScfUnrestrictedDriver(ScfDriver):
@@ -206,10 +205,7 @@ class ScfUnrestrictedDriver(ScfDriver):
 
             if len(self._fock_matrices_alpha) > 1:
 
-                if self.acc_type.upper() in ['C2DIIS', 'L2_C2DIIS']:
-                    acc_diis = CTwoDiis()
-                elif self.acc_type.upper() in ['DIIS', 'L2_DIIS']:
-                    acc_diis = Diis()
+                acc_diis = CTwoDiis()
 
                 acc_diis.compute_error_vectors_unrestricted(
                     self._fock_matrices_alpha, self._fock_matrices_beta,
@@ -247,8 +243,7 @@ class ScfUnrestrictedDriver(ScfDriver):
 
         return (effmat_a, effmat_b)
 
-    def _gen_molecular_orbitals(self, molecule, ao_basis, eff_fock_mat,
-                                oao_mat):
+    def _gen_molecular_orbitals(self, molecule, eff_fock_mat, oao_mat):
         """
         Generates spin unrestricted molecular orbital by diagonalizing
         spin unrestricted open shell Fock/Kohn-Sham matrix. Overloaded base
@@ -256,8 +251,6 @@ class ScfUnrestrictedDriver(ScfDriver):
 
         :param molecule:
             The molecule.
-        :param ao_basis:
-            The AO basis set.
         :param eff_fock_mat:
             The effective Fock/Kohn-Sham matrix.
         :param oao_mat:
@@ -279,8 +272,8 @@ class ScfUnrestrictedDriver(ScfDriver):
             orb_coefs_a, eigs_a = self._delete_mos(orb_coefs_a, eigs_a)
             orb_coefs_b, eigs_b = self._delete_mos(orb_coefs_b, eigs_b)
 
-            occa = molecule.get_aufbau_alpha_occupation(eigs_a.size, ao_basis)
-            occb = molecule.get_aufbau_beta_occupation(eigs_b.size, ao_basis)
+            occa = molecule.get_aufbau_alpha_occupation(eigs_a.size)
+            occb = molecule.get_aufbau_beta_occupation(eigs_b.size)
 
             if self.pfon and (self.pfon_temperature > 0):
 
@@ -290,7 +283,7 @@ class ScfUnrestrictedDriver(ScfDriver):
                 kT = boltzmann_in_hartreeperkelvin() * self.pfon_temperature
                 inv_kT = 1.0 / kT
 
-                nocc_a = molecule.number_of_alpha_occupied_orbitals(ao_basis)
+                nocc_a = molecule.number_of_alpha_electrons()
                 e_fermi_a = 0.5 * (eigs_a[nocc_a - 1] + eigs_a[nocc_a])
                 idx_start_a = max(0, nocc_a - self.pfon_nocc)
                 idx_end_a = min(eigs_a.size, nocc_a + self.pfon_nvir)
@@ -309,7 +302,7 @@ class ScfUnrestrictedDriver(ScfDriver):
                     pfon_a[idx] *= pfon_scale_a
                     occa[idx] = pfon_a[idx]
 
-                nocc_b = molecule.number_of_beta_occupied_orbitals(ao_basis)
+                nocc_b = molecule.number_of_beta_electrons()
                 e_fermi_b = 0.5 * (eigs_b[nocc_b - 1] + eigs_b[nocc_b])
                 idx_start_b = max(0, nocc_b - self.pfon_nocc)
                 idx_end_b = min(eigs_b.size, nocc_b + self.pfon_nvir)

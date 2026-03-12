@@ -7,7 +7,6 @@ dependencies:
   - scikit-build
   - cxx-compiler
   - eigen
-  - libboost-headers
   - mpich
   - mpi4py
   - numpy

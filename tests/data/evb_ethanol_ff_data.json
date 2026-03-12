@@ -7,8 +7,7 @@
             "charge": -0.076588,
             "sigma": 0.3397709531243626,
             "epsilon": 0.4510352,
-            "equivalent_atom": "c3_00",
-            "comment": "GAFF"
+            "equivalent_atom": "c3_00"
         },
         "1": {
             "type": "c3",
@@ -17,8 +16,7 @@
             "charge": 0.403148,
             "sigma": 0.3397709531243626,
             "epsilon": 0.4510352,
-            "equivalent_atom": "c3_01",
-            "comment": "GAFF"
+            "equivalent_atom": "c3_01"
         },
         "2": {
             "type": "hc",
@@ -27,8 +25,7 @@
             "charge": 0.021926,
             "sigma": 0.2600176998764394,
             "epsilon": 0.0870272,
-            "equivalent_atom": "hc_00",
-            "comment": "GAFF"
+            "equivalent_atom": "hc_00"
         },
         "3": {
             "type": "hc",
@@ -37,8 +34,7 @@
             "charge": 0.021926,
             "sigma": 0.2600176998764394,
             "epsilon": 0.0870272,
-            "equivalent_atom": "hc_00",
-            "comment": "GAFF"
+            "equivalent_atom": "hc_00"
         },
         "4": {
             "type": "h1",
@@ -47,8 +43,7 @@
             "charge": -0.062361,
             "sigma": 0.24219972551363267,
             "epsilon": 0.0870272,
-            "equivalent_atom": "h1_00",
-            "comment": "GAFF"
+            "equivalent_atom": "h1_00"
         },
         "5": {
             "type": "h1",
@@ -57,8 +52,7 @@
             "charge": -0.062361,
             "sigma": 0.24219972551363267,
             "epsilon": 0.0870272,
-            "equivalent_atom": "h1_00",
-            "comment": "GAFF"
+            "equivalent_atom": "h1_00"
         },
         "6": {
             "type": "oh",
@@ -67,8 +61,7 @@
             "charge": -0.6578820000000001,
             "sigma": 0.3242871334030835,
             "epsilon": 0.389112,
-            "equivalent_atom": "oh_00",
-            "comment": "GAFF"
+            "equivalent_atom": "oh_00"
         },
         "7": {
             "type": "hc",
@@ -77,8 +70,7 @@
             "charge": 0.021926,
             "sigma": 0.2600176998764394,
             "epsilon": 0.0870272,
-            "equivalent_atom": "hc_00",
-            "comment": "GAFF"
+            "equivalent_atom": "hc_00"
         },
         "8": {
             "type": "ho",
@@ -87,8 +79,7 @@
             "charge": 0.390266,
             "sigma": 0.053792464601313685,
             "epsilon": 0.019664800000000003,
-            "equivalent_atom": "ho_00",
-            "comment": "GAFF"
+            "equivalent_atom": "ho_00"
         }
     },
     "bonds": {
@@ -114,7 +105,7 @@
             "type": "harmonic",
             "force_constant": 314553.11999999994,
             "equilibrium": 0.1097,
-            "comment": "c3-hc, broken in reaction"
+            "comment": "c3-hc"
         },
         "(1, 4)": {
             "type": "harmonic",
@@ -132,7 +123,7 @@
             "type": "harmonic",
             "force_constant": 245517.11999999994,
             "equilibrium": 0.1423,
-            "comment": "c3-oh, broken in reaction"
+            "comment": "c3-oh"
         },
         "(6, 8)": {
             "type": "harmonic",

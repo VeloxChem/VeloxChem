@@ -52,8 +52,6 @@ class SadGuessDriver:
 
         self._num_unpaired_electrons_on_atoms = []
 
-        self._has_ecp = False
-
     def set_number_of_unpaired_electrons_on_atoms(self, num_unpaired_electrons):
 
         self._num_unpaired_electrons_on_atoms = list(num_unpaired_electrons)
@@ -202,7 +200,8 @@ class SadGuessDriver:
             1.0, 1.0, 1.0, 1.0, 1.0
         ]
 
-    def _get_occ_5s(self, nocc):
+    @staticmethod
+    def _get_occ_5s(nocc):
         """
         Gets occupation numbers for 5s elements.
 
@@ -215,12 +214,6 @@ class SadGuessDriver:
 
         occ = max(0.0, nocc)
 
-        if self._has_ecp:
-            #   4s   5s   4p-1 4p0  4p+1
-            return [
-                1.0, occ, 1.0, 1.0, 1.0,
-            ]
-
         #   1s   2s   3s   4s   5s   2p-1 3p-1 4p-1 2p0  3p0  4p0  2p+1 3p+1
         #   4p+1 3d-2 3d-1 3d0  3d+1 3d+2
         return [
@@ -228,7 +221,8 @@ class SadGuessDriver:
             1.0, 1.0, 1.0, 1.0, 1.0, 1.0
         ]
 
-    def _get_occ_4d(self, nocc):
+    @staticmethod
+    def _get_occ_4d(nocc):
         """
         Gets occupation numbers for 4d elements.
 
@@ -241,12 +235,6 @@ class SadGuessDriver:
 
         occ = max(0.0, nocc)
 
-        if self._has_ecp:
-            #   4s   5s   4p-1 4p0  4p+1 4d-2 4d-1 4d0  4d+1 4d+2
-            return [
-                1.0, 1.0, 1.0, 1.0, 1.0, occ, occ, occ, occ, occ
-            ]
-
         #   1s   2s   3s   4s   5s   2p-1 3p-1 4p-1 2p0  3p0  4p0  2p+1 3p+1
         #   4p+1 3d-2 4d-2 3d-1 4d-1 3d0  4d0  3d+1 4d+1 3d+2 4d+2
         return [
@@ -254,7 +242,8 @@ class SadGuessDriver:
             1.0, 1.0, occ, 1.0, occ, 1.0, occ, 1.0, occ, 1.0, occ
         ]
 
-    def _get_occ_5s5p(self, nocc):
+    @staticmethod
+    def _get_occ_5s5p(nocc):
         """
         Gets occupation numbers for 5s5p elements.
 
@@ -267,12 +256,6 @@ class SadGuessDriver:
 
         occ = max(0.0, nocc)
 
-        if self._has_ecp:
-            #   4s   5s   4p-1 5p-1 4p0  5p0 4p+1 5p+1 4d-2 4d-1 4d0  4d+1 4d+2
-            return [
-                1.0, occ, 1.0, occ, 1.0, occ, 1.0, occ, 1.0, 1.0, 1.0, 1.0, 1.0
-            ]
-
         #   1s   2s   3s   4s   5s   2p-1 3p-1 4p-1 5p-1 2p0  3p0  4p0  5p0
         #   2p+1 3p+1 4p+1 5p+1 3d-2 4d-2 3d-1 4d-1 3d0  4d0  3d+1 4d+1 3d+2 4d+2
         return [
@@ -280,7 +263,8 @@ class SadGuessDriver:
             1.0, 1.0, 1.0, occ, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0
         ]
 
-    def _get_occ_6s(self, nocc):
+    @staticmethod
+    def _get_occ_6s(nocc):
         """
         Gets occupation numbers for 6s elements.
 
@@ -293,12 +277,6 @@ class SadGuessDriver:
 
         occ = max(0.0, nocc)
 
-        if self._has_ecp:
-            #   5s   6s   5p-1 5p0  5p+1
-            return [
-                1.0, occ, 1.0, 1.0, 1.0,
-            ]
-
         #   1s   2s   3s   4s   5s   6s   2p-1 3p-1 4p-1 5p-1 2p0  3p0  4p0
         #   5p0  2p+1 3p+1 4p+1 5p+1 3d-2 4d-2 3d-1 4d-1 3d0  4d0  3d+1 4d+1
         #   3d+2 4d+2
@@ -308,7 +286,8 @@ class SadGuessDriver:
             1.0, 1.0
         ]
 
-    def _get_occ_4f(self, nocc, elem_symbol=''):
+    @staticmethod
+    def _get_occ_4f(nocc):
         """
         Gets occupation numbers for 4f elements.
 
@@ -321,22 +300,6 @@ class SadGuessDriver:
 
         occ = max(0.0, nocc)
 
-        # TODO: 5d occupation for La/Ce/Gd? (also adjustment in AO-START-GUESS-FOR-ECP?)
-
-        if self._has_ecp and elem_symbol.capitalize() == 'La':
-            #   5s   6s   5p-1 5p0  5p+1 4f-3 4f-2 4f-1 4f0  4f+1 4f+2 4f+3
-            return [
-                1.0, 1.0, 1.0, 1.0, 1.0, occ, occ, occ, occ, occ, occ, occ
-            ]
-
-        if self._has_ecp:
-            #   4s   5s   6s   4p-1 5p-1 4p0  5p0  4p+1 5p+1 4d-2 4d-1 4d0  4d+1
-            #   4d+2 4f-3 4f-2 4f-1 4f0  4f+1 4f+2 4f+3
-            return [
-                1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-                1.0, occ, occ, occ, occ, occ, occ, occ
-            ]
-
         #   1s   2s   3s   4s   5s   6s   2p-1 3p-1 4p-1 5p-1 2p0  3p0  4p0
         #   5p0  2p+1 3p+1 4p+1 5p+1 3d-2 4d-2 3d-1 4d-1 3d0  4d0  3d+1 4d+1
         #   3d+2 4d+2 4f-3 4f-2 4f-1 4f0  4f+1 4f+2 4f+3
@@ -346,34 +309,19 @@ class SadGuessDriver:
             1.0, 1.0, occ, occ, occ, occ, occ, occ, occ
         ]
 
-    def _get_occ_5d(self, nocc, elem_symbol=''):
+    @staticmethod
+    def _get_occ_5d(nocc):
         """
         Gets occupation numbers for 5d elements.
 
         :param nocc:
             Number of 5d orbitals.
-        :param elem_symbol:
-            The element symbol.
 
         :return:
             List of occupation numbers.
         """
 
         occ = max(0.0, nocc)
-
-        if self._has_ecp and elem_symbol.capitalize() == 'Lu':
-            #   4s   5s   6s   4p-1 5p-1 4p0  5p0  4p+1 5p+1 4d-2 5d-2 4d-1 5d-1
-            #   4d0  5d0  4d+1 5d+1 4d+2 5d+2 4f-3 4f-2 4f-1 4f0  4f+1 4f+2 4f+3
-            return [
-                1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, occ, 1.0, occ,
-                1.0, occ, 1.0, occ, 1.0, occ, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0
-            ]
-
-        if self._has_ecp:
-            #   5s   6s   5p-1 5p0  5p+1 5d-2 5d-1 5d0  5d+1 5d+2
-            return [
-                1.0, 1.0, 1.0, 1.0, 1.0, occ, occ, occ, occ, occ,
-            ]
 
         #   1s   2s   3s   4s   5s   6s   2p-1 3p-1 4p-1 5p-1 2p0  3p0  4p0
         #   5p0  2p+1 3p+1 4p+1 5p+1 3d-2 4d-2 5d-2 3d-1 4d-1 5d-1 3d0  4d0
@@ -384,7 +332,8 @@ class SadGuessDriver:
             occ, 1.0, 1.0, occ, 1.0, 1.0, occ, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0
         ]
 
-    def _get_occ_6s6p(self, nocc):
+    @staticmethod
+    def _get_occ_6s6p(nocc):
         """
         Gets occupation numbers for 6s6p elements.
 
@@ -397,14 +346,8 @@ class SadGuessDriver:
 
         occ = max(0.0, nocc)
 
-        if self._has_ecp:
-            #   5s   6s   5p-1 6p-1 5p0  6p0  5p+1 6p+1 5d-2 5d-1 5d0  5d+1 5d+2
-            return [
-                1.0, occ, 1.0, occ, 1.0, occ, 1.0, occ, 1.0, 1.0, 1.0, 1.0, 1.0
-            ]
-
-        #   1s   2s   3s   4s   5s   6s   2p-1 3p-1 4p-1 5p-1 6p-1 2p0  3p0
-        #   4p0  5p0  6p0  2p+1 3p+1 4p+1 5p+1 6p+1 3d-2 4d-2 5d-2 3d-1 4d-1
+        #   1s   2s   3s   4s   5s   6s   2p-1 3p-1 4p-1 5p-1 6s-1 2p0  3p0
+        #   4p0  5p0  6s0  2p+1 3p+1 4p+1 5p+1 6s+1 3d-2 4d-2 5d-2 3d-1 4d-1
         #   5d-1 3d0  4d0  5d0  3d+1 4d+1 5d+1 3d+2 4d+2 5d+2 4f-3 4f-2 4f-1
         #   4f0  4f+1 4f+2 4f+3
         return [
@@ -428,8 +371,8 @@ class SadGuessDriver:
 
         occ = max(0.0, nocc)
 
-        #   1s   2s   3s   4s   5s   6s   7s   2p-1 3p-1 4p-1 5p-1 6p-1 2p0
-        #   3p0  4p0  5p0  6p0  2p+1 3p+1 4p+1 5p+1 6p+1 3d-2 4d-2 5d-2 3d-1
+        #   1s   2s   3s   4s   5s   6s   7s   2p-1 3p-1 4p-1 5p-1 6s-1 2p0
+        #   3p0  4p0  5p0  6s0  2p+1 3p+1 4p+1 5p+1 6s+1 3d-2 4d-2 5d-2 3d-1
         #   4d-1 5d-1 3d0  4d0  5d0  3d+1 4d+1 5d+1 3d+2 4d+2 5d+2 4f-3 4f-2
         #   4f-1 4f0  4f+1 4f+2 4f+3
         return [
@@ -453,8 +396,8 @@ class SadGuessDriver:
 
         occ = max(0.0, nocc)
 
-        #   1s   2s   3s   4s   5s   6s   7s   2p-1 3p-1 4p-1 5p-1 6p-1 2p0
-        #   3p0  4p0  5p0  6p0  2p+1 3p+1 4p+1 5p+1 6p+1 3d-2 4d-2 5d-2 3d-1
+        #   1s   2s   3s   4s   5s   6s   7s   2p-1 3p-1 4p-1 5p-1 6s-1 2p0
+        #   3p0  4p0  5p0  6s0  2p+1 3p+1 4p+1 5p+1 6s+1 3d-2 4d-2 5d-2 3d-1
         #   4d-1 5d-1 3d0  4d0  5d0  3d+1 4d+1 5d+1 3d+2 4d+2 5d+2 4f-3 5f-3
         #   4f-2 5f-2 4f-1 5f-1 4f0  5f0  4f+1 5f+1 4f+2 5f+2 4f+3 5f+3
         return [
@@ -669,10 +612,10 @@ class SadGuessDriver:
         elif elem_id == 56:
             return self._get_occ_6s(1.0 + nelec)
 
-        # La,Ce,Pr,Nd,Pm,Sm,Eu,Gd,Tb,Dy,Ho,Er,Tm,Yb
+        # La,Ce,Pr,Nd,Pm,Sm,Eu,Gb,Tb,Dy,Ho,Er,Tm,Yb
 
         elif elem_id == 57:
-            return self._get_occ_4f(1.0 / 14.0 + nelec / 7.0, elem_symbol='La')
+            return self._get_occ_4f(1.0 / 14.0 + nelec / 7.0)
 
         elif elem_id == 58:
             return self._get_occ_4f(2.0 / 14.0 + nelec / 7.0)
@@ -716,7 +659,7 @@ class SadGuessDriver:
         # Lu,Hf,Ta,W,Re,Os,Ir,Pt,Au,Hg
 
         elif elem_id == 71:
-            return self._get_occ_5d(0.1 + nelec / 5.0, elem_symbol='Lu')
+            return self._get_occ_5d(0.1 + nelec / 5.0)
 
         elif elem_id == 72:
             return self._get_occ_5d(0.2 + nelec / 5.0)
@@ -920,8 +863,6 @@ class SadGuessDriver:
             A tuple containing density matricies as numpy arrays.
         """
 
-        self._has_ecp = basis_2.has_ecp()
-
         natoms = molecule.number_of_atoms()
 
         ovl_drv = OverlapDriver()
@@ -1004,12 +945,6 @@ class SadGuessDriver:
             mat_s = np.linalg.multi_dot([block_12, block_22_inv, block_12.T])
 
             eigvals, eigvecs = np.linalg.eigh(mat_s)
-
-            num_eigs = sum(eigvals > 1e-12)  # hard-coded threshold
-            if num_eigs < eigvals.size:
-                eigvals = eigvals[-num_eigs:]
-                eigvecs = eigvecs[:, -num_eigs:]
-
             mat_m = np.linalg.multi_dot(
                 [eigvecs, np.diag(1.0 / np.sqrt(eigvals)), eigvecs.T])
 

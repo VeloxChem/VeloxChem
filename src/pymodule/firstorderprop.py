@@ -136,7 +136,6 @@ class FirstOrderProperties:
             # nuclear contribution
             coords = molecule.get_coordinates_in_bohr()
             nuclear_charges = molecule.get_element_ids()
-            nuclear_charges -= basis.get_number_of_ecp_core_electrons()
             nuclear_dipole = np.sum((coords - origin).T * nuclear_charges,
                                     axis=1)
 

@@ -40,7 +40,6 @@ target_link_libraries(vlxobjs
     OpenMP::OpenMP_CXX
     Math::LA
     Libxc::xc
-    Boost::headers
   )
 
 add_subdirectory(dft_func)
@@ -58,11 +57,9 @@ add_subdirectory(t2c_electron_repulsion)
 add_subdirectory(t2c_electron_repulsion_geom_X00)
 add_subdirectory(t2c_func)
 add_subdirectory(t2c_geometrical_derivatives)
-add_subdirectory(t2c_hrr_func)
 add_subdirectory(t2c_kinetic_energy)
 add_subdirectory(t2c_kinetic_energy_geom_X00)
 add_subdirectory(t2c_kinetic_energy_geom_X0Y)
-add_subdirectory(t2c_local_ecp)
 add_subdirectory(t2c_nuclear_potential)
 add_subdirectory(t2c_nuclear_potential_geom_0X0)
 add_subdirectory(t2c_nuclear_potential_geom_X00)
@@ -71,7 +68,6 @@ add_subdirectory(t2c_nuclear_potential_geom_XY0)
 add_subdirectory(t2c_overlap)
 add_subdirectory(t2c_overlap_geom_X00)
 add_subdirectory(t2c_overlap_geom_X0Y)
-add_subdirectory(t2c_projected_ecp)
 add_subdirectory(t3c_electron_repulsion)
 add_subdirectory(t3c_electron_repulsion_geom_0X0)
 add_subdirectory(t3c_electron_repulsion_geom_X00)
