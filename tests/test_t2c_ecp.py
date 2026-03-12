@@ -251,13 +251,13 @@ class TestECPDriver:
         
         #atom_pot = AtomCorePotential(lpot, [], [], 60);
         
-        print(bas_svp.info_str('TEST'))
+        #print(bas_svp.info_str('TEST'))
         
         ecp_drv = ECPDriver()
         ecp_mat = ecp_drv.compute(mol_aucl, bas_svp, atom_pot)
        
-        print(np.max(ecp_mat.full_matrix().to_numpy()))
+        #print(np.max(ecp_mat.full_matrix().to_numpy()))
         
-        print(np.min(ecp_mat.full_matrix().to_numpy()))
+        #print(np.min(ecp_mat.full_matrix().to_numpy()))
        
-        assert False
+        #assert False
