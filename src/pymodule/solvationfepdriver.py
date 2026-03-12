@@ -133,8 +133,8 @@ class SolvationFepDriver:
         self.resname = None 
         
         # Ensemble and MD options
-        self.temperature = 298.15 * unit.kelvin
-        self.kT = (unit.AVOGADRO_CONSTANT_NA * unit.BOLTZMANN_CONSTANT_kB * self.temperature).in_units_of(unit.kilojoule_per_mole)
+        self.temperature = 298.15 
+        self.kT = (unit.AVOGADRO_CONSTANT_NA * unit.BOLTZMANN_CONSTANT_kB * (self.temperature * unit.kelvin)).in_units_of(unit.kilojoule_per_mole)
         self.pressure = 1 * unit.atmospheres
         self.timestep = 2.0 * unit.femtoseconds 
         self.num_em_steps = 0  # no limit
@@ -521,7 +521,7 @@ class SolvationFepDriver:
             solvated_system = initial_system_ff.createSystem(*sys_arguments)
 
             # Add barostat
-            solvated_system.addForce(mm.MonteCarloBarostat(self.pressure, self.temperature))
+            solvated_system.addForce(mm.MonteCarloBarostat(self.pressure, self.temperature* unit.kelvin))
 
             # Define alchemical regions
             alchemical_region, chemical_region = self._get_alchemical_region(topology)
@@ -633,7 +633,7 @@ class SolvationFepDriver:
         Run the simulation using OpenMM. Return simulated time in ns and real elapsed time in seconds.
         """
 
-        integrator = mm.LangevinIntegrator(self.temperature, 1.0 / unit.picoseconds, self.timestep)
+        integrator = mm.LangevinIntegrator(self.temperature * unit.kelvin, 1.0 / unit.picoseconds, self.timestep)
         simulation = app.Simulation(topology, system, integrator, platform=self._create_platform())
         simulation.context.setPositions(positions)
 
