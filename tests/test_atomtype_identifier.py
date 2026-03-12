@@ -2036,3 +2036,145 @@ class TestAtomTypeIdentifier:
         self.run_atomtypeidentifier(xyz_string, expected_atomtypes,
                                     expected_equal_charges_list,
                                     expected_equiv_atoms)
+
+    def test_atomtypeidentifier_p5_metal(self):
+        xyz_string = """21
+        
+        Ni          0.404949797072       -0.442072927270       -1.012063991277                         
+        P           1.531578251553       -0.755100529128       -2.849710355845                         
+        H           2.881340131819       -1.275248436166       -2.864884343037                         
+        H           1.046175828680       -1.618368896667       -3.900242268757                         
+        H           1.828039644770        0.366121378567       -3.714139553932                         
+        P           1.687326152566        0.337445019965        0.569669260810                         
+        H           1.687488807548       -0.295937671143        1.870203536534                         
+        H           1.445496037511        1.669658431348        1.078329018046                         
+        H           3.125893116204        0.482620984507        0.511897240969                         
+        C          -2.047673394987        0.657494080354        0.290157321062                         
+        C          -2.627267762131        1.474875435681       -0.670648277792                         
+        C          -2.640644178131        1.067628217340       -2.045150796760                         
+        C          -2.099875596354       -0.152449351048       -2.431092283638                         
+        C          -1.447209372875       -1.003842582835       -1.462765579640                         
+        C          -1.404695434717       -0.588171995906       -0.067790672405                         
+        H          -2.096834115093        0.935355351904        1.356801053512                         
+        H          -3.107152218818        2.422239267563       -0.377513426694                         
+        H          -3.108574088143        1.717271023154       -2.802752726930                         
+        H          -2.167857588187       -0.495907705168       -3.475155282048                         
+        Cl         -1.457309995662       -2.794853183608       -1.833061215668                         
+        H          -1.277338981945       -1.351941364671        0.719487955696            
+        """
+        expected_atomtypes = {
+            'Ni1': {
+                'uff': 'Ni',
+                'gaff': 'Ni_unknown'
+            },
+            'P2': {
+                'opls': 'opls_900P',
+                'gaff': 'p5',
+                'uff': 'P'
+            },
+            'H3': {
+                'opls': 'opls_XXX',
+                'gaff': 'hp',
+                'uff': 'H'
+            },
+            'H4': {
+                'opls': 'opls_XXX',
+                'gaff': 'hp',
+                'uff': 'H'
+            },
+            'H5': {
+                'opls': 'opls_XXX',
+                'gaff': 'hp',
+                'uff': 'H'
+            },
+            'P6': {
+                'opls': 'opls_900P',
+                'gaff': 'p5',
+                'uff': 'P'
+            },
+            'H7': {
+                'opls': 'opls_XXX',
+                'gaff': 'hp',
+                'uff': 'H'
+            },
+            'H8': {
+                'opls': 'opls_XXX',
+                'gaff': 'hp',
+                'uff': 'H'
+            },
+            'H9': {
+                'opls': 'opls_XXX',
+                'gaff': 'hp',
+                'uff': 'H'
+            },
+            'C10': {
+                'opls': 'opls_141',
+                'gaff': 'c2',
+                'uff': 'C'
+            },
+            'C11': {
+                'opls': 'opls_XXX',
+                'gaff': 'ce',
+                'uff': 'C'
+            },
+            'C12': {
+                'opls': 'opls_XXX',
+                'gaff': 'ce',
+                'uff': 'C'
+            },
+            'C13': {
+                'opls': 'opls_141',
+                'gaff': 'c2',
+                'uff': 'C'
+            },
+            'C14': {
+                'opls': 'opls_CX',
+                'gaff': 'cx',
+                'uff': 'C'
+            },
+            'C15': {
+                'opls': 'opls_CX',
+                'gaff': 'cx',
+                'uff': 'C'
+            },
+            'H16': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'H17': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'H18': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'H19': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'Cl20': {
+                'opls': 'opls_XXX',
+                'gaff': 'cl',
+                'uff': 'Cl'
+            },
+            'H21': {
+                'opls': 'opls_140',
+                'gaff': 'hc',
+                'uff': 'H'
+            }
+        }
+        expected_equal_charges_list = [[2, 6], [3, 4, 5, 7, 8, 9]]
+        expected_equiv_atoms = [
+            'Ni_unknown_00', 'p5_00', 'hp_00', 'hp_00', 'hp_00', 'p5_00',
+            'hp_00', 'hp_00', 'hp_00', 'c2_00', 'ce_00', 'ce_01', 'c2_01',
+            'cx_00', 'cx_01', 'ha_00', 'ha_01', 'ha_02', 'ha_03', 'cl_00',
+            'hc_00'
+        ]
+        self.run_atomtypeidentifier(xyz_string, expected_atomtypes,
+                                    expected_equal_charges_list,
+                                    expected_equiv_atoms)

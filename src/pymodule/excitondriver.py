@@ -87,7 +87,7 @@ class ExcitonModelDriver:
         - eri_thresh: The electron repulsion integrals screening threshold.
         - dft: The flag for running DFT.
         - grid_level: The accuracy level of DFT grid.
-        - xcfun_label: The name of XC functional.
+        - xcfun: The name of XC functional.
         - scf_conv_thresh: The convergence threshold for the SCF driver.
         - scf_max_iter: The maximum number of SCF iterations.
         - nstates: The number of locally excited states for each monomer.
@@ -128,6 +128,11 @@ class ExcitonModelDriver:
         self.center_of_mass = None
         self.state_info = None
 
+        # input options
+        self.fragments = None
+        self.atoms_per_fragment = None
+        self.charges = None
+
         # exciton monomers
         self.monomers = None
         self.natoms = None
@@ -136,9 +141,9 @@ class ExcitonModelDriver:
         self.eri_thresh = 1.0e-12
 
         # dft settings
-        self.dft = False
+        self._dft = False
+        self.xcfun = None
         self.grid_level = None
-        self.xcfun_label = 'Undefined'
 
         # scf settings
         self.scf_conv_thresh = 1.0e-6
@@ -172,6 +177,14 @@ class ExcitonModelDriver:
         # input keywords
         self.input_keywords = {
             'exciton': {
+                'fragments':
+                    ('str', 'number of fragments (grouped by fragment size)'),
+                'atoms_per_fragment':
+                    ('str',
+                     'number of atoms in fragment (grouped by fragment size)'),
+                'charges':
+                    ('str',
+                     'net charges of fragments (grouped by fragment size)'),
                 'nstates': ('int', 'number of locally excited (LE) states'),
                 'ct_nocc': ('int', 'number of occupied MOs for CT states'),
                 'ct_nvir': ('int', 'number of unoccupied MOs for CT states'),
@@ -180,7 +193,6 @@ class ExcitonModelDriver:
                 'checkpoint_file': ('str', 'name of checkpoint file'),
             },
             'method_settings': {
-                'dft': ('bool', 'use DFT'),
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
                 'grid_level': ('int', 'accuracy level of DFT grid'),
             },
@@ -204,31 +216,6 @@ class ExcitonModelDriver:
         if method_dict is None:
             method_dict = {}
 
-        assert_msg_critical('fragments' in exciton_dict,
-                            'ExcitonModel: fragments not defined')
-
-        assert_msg_critical('atoms_per_fragment' in exciton_dict,
-                            'ExcitonModel: atoms_per_fragment not defined')
-
-        fragments = exciton_dict['fragments'].split(',')
-        atoms_per_fragment = exciton_dict['atoms_per_fragment'].split(',')
-
-        if 'charges' in exciton_dict:
-            charges = exciton_dict['charges'].split(',')
-        else:
-            charges = ['0.0'] * len(fragments)
-
-        assert_msg_critical(
-            len(fragments) == len(atoms_per_fragment) and
-            len(fragments) == len(charges),
-            'ExcitonModel: mismatch in fragment input')
-
-        self.natoms = []
-        self.charges = []
-        for n, x, q in zip(fragments, atoms_per_fragment, charges):
-            self.natoms += [int(x)] * int(n)
-            self.charges += [float(q)] * int(n)
-
         exciton_keywords = {
             key: val[0] for key, val in self.input_keywords['exciton'].items()
         }
@@ -249,11 +236,6 @@ class ExcitonModelDriver:
 
         # TODO: use _dft_sanity_check
 
-        if 'xcfun' in method_dict:
-            if 'dft' not in method_dict:
-                self.dft = True
-            self.xcfun_label = method_dict['xcfun']
-
         if 'potfile' in method_dict:
             errmsg = 'ExcitonModelDriver: The \'potfile\' keyword is not '
             errmsg += 'supported in exciton model calculation.'
@@ -265,6 +247,36 @@ class ExcitonModelDriver:
             errmsg += 'is not supported in exciton model calculation.'
             if self.rank == mpi_master():
                 assert_msg_critical(False, errmsg)
+
+    def _process_fragments_and_atoms(self):
+        """
+        Processes fragments and atoms_per_fragment inputs.
+        """
+
+        assert_msg_critical(self.fragments is not None,
+                            'ExcitonModel: fragments not defined')
+
+        assert_msg_critical(self.atoms_per_fragment is not None,
+                            'ExcitonModel: atoms_per_fragment not defined')
+
+        fragments = self.fragments.split(',')
+        atoms_per_fragment = self.atoms_per_fragment.split(',')
+
+        if self.charges is not None:
+            charges = self.charges.split(',')
+        else:
+            charges = ['0.0'] * len(fragments)
+
+        assert_msg_critical(
+            len(fragments) == len(atoms_per_fragment) and
+            len(fragments) == len(charges),
+            'ExcitonModel: mismatch in fragment input')
+
+        self.natoms = []
+        self._net_charges = []
+        for n, x, q in zip(fragments, atoms_per_fragment, charges):
+            self.natoms += [int(x)] * int(n)
+            self._net_charges += [float(q)] * int(n)
 
     @staticmethod
     def get_minimal_distance(mol_1, mol_2):
@@ -296,7 +308,7 @@ class ExcitonModelDriver:
 
         return math.sqrt(min_dist_2)
 
-    def compute(self, molecule, basis, min_basis=None):
+    def compute(self, molecule, basis):
         """
         Executes exciton model calculation and writes checkpoint file.
 
@@ -304,12 +316,20 @@ class ExcitonModelDriver:
             The molecule.
         :param basis:
             The AO basis set.
-        :param min_basis:
-            The minimal AO basis set.
         """
+
+        # TODO: enable ECP
+        assert_msg_critical(
+            not basis.has_ecp(),
+            f'{type(self).__name__}.compute: ECP is not yet supported')
 
         if self.checkpoint_file is None and self.filename is not None:
             self.checkpoint_file = f'{self.filename}_exciton.h5'
+
+        # process fragments
+        self._process_fragments_and_atoms()
+
+        self._dft = (self.xcfun is not None and self.xcfun.upper() != 'HF')
 
         # sanity check
         assert_msg_critical(
@@ -338,7 +358,7 @@ class ExcitonModelDriver:
             monomer_atomlists.append(atomlist)
 
             mol = molecule.slice(atomlist)
-            mol.set_charge(self.charges[ind])
+            mol.set_charge(self._net_charges[ind])
 
             assert_msg_critical(
                 mol.check_multiplicity(),
@@ -387,8 +407,8 @@ class ExcitonModelDriver:
         if self.rank == mpi_master():
             self.print_title(total_LE_states, total_CT_states)
 
-        if self.dft:
-            dft_func_label = self.xcfun_label
+        if self._dft:
+            dft_func_label = self.xcfun
             method_dict = {'xcfun': dft_func_label}
             if self.grid_level is not None:
                 method_dict.update({'grid_level': self.grid_level})
@@ -539,8 +559,8 @@ class ExcitonModelDriver:
                     CA = self.monomers[ind_A]['mo']
                     CB = self.monomers[ind_B]['mo']
 
-                    nocc_A = monomer_a.number_of_alpha_electrons()
-                    nocc_B = monomer_b.number_of_alpha_electrons()
+                    nocc_A = monomer_a.number_of_alpha_occupied_orbitals(bas_a)
+                    nocc_B = monomer_b.number_of_alpha_occupied_orbitals(bas_b)
                     nvir_A = CA.shape[1] - nocc_A
                     nvir_B = CB.shape[1] - nocc_B
 
@@ -1052,7 +1072,7 @@ class ExcitonModelDriver:
         magdip_ints = one_elec_ints['magnetic_dipole']
 
         mo = scf_results['C_alpha']
-        nocc = monomer.number_of_alpha_electrons()
+        nocc = monomer.number_of_alpha_occupied_orbitals(basis)
         nvir = mo.shape[1] - nocc
         mo_occ = mo[:, :nocc].copy()
         mo_vir = mo[:, nocc:].copy()
@@ -1122,8 +1142,8 @@ class ExcitonModelDriver:
         nao_A, nmo_A = mo_a.shape[0], mo_a.shape[1]
         nao_B, nmo_B = mo_b.shape[0], mo_b.shape[1]
 
-        nocc_A = monomer_a.number_of_alpha_electrons()
-        nocc_B = monomer_b.number_of_alpha_electrons()
+        nocc_A = monomer_a.number_of_alpha_occupied_orbitals(bas_a)
+        nocc_B = monomer_b.number_of_alpha_occupied_orbitals(bas_b)
         nvir_A = nmo_A - nocc_A
 
         nocc = nocc_A + nocc_B
@@ -1178,8 +1198,8 @@ class ExcitonModelDriver:
         npot_mat = self.comm.bcast(npot_mat, root=mpi_master())
 
         # dft grid
-        if self.dft:
-            xcfun = parse_xc_func(self.xcfun_label.upper())
+        if self._dft:
+            xcfun = parse_xc_func(self.xcfun.upper())
             grid_drv = GridDriver(self.comm)
             grid_level = (get_default_grid_level(xcfun)
                           if self.grid_level is None else self.grid_level)
@@ -1191,7 +1211,7 @@ class ExcitonModelDriver:
 
         # density matrix
         if self.rank == mpi_master():
-            nocc = dimer.number_of_alpha_electrons()
+            nocc = dimer.number_of_alpha_occupied_orbitals(basis)
             mo_occ = mo[:, :nocc].copy()
             dens = np.matmul(mo_occ, mo_occ.T)
         else:
@@ -1216,8 +1236,8 @@ class ExcitonModelDriver:
 
         fock_type = '2jk'
         exchange_scaling_factor = 1.0
-        if self.dft:
-            xcfun = parse_xc_func(self.xcfun_label.upper())
+        if self._dft:
+            xcfun = parse_xc_func(self.xcfun.upper())
             if xcfun.is_hybrid():
                 fock_type = '2jkx'
                 exchange_scaling_factor = xcfun.get_frac_exact_exchange()
@@ -1226,7 +1246,7 @@ class ExcitonModelDriver:
                 exchange_scaling_factor = 0.0
 
         # TODO: range-separated
-        need_omega = (self.dft and xcfun.is_range_separated())
+        need_omega = (self._dft and xcfun.is_range_separated())
         if need_omega:
             assert_msg_critical(
                 False, 'ExcitonModelDriver: Not implemented for' +
@@ -1244,7 +1264,7 @@ class ExcitonModelDriver:
 
         fock_mat_np = self.comm.reduce(fock_mat_np, root=mpi_master())
 
-        if self.dft:
+        if self._dft:
             xc_drv = XCIntegrator()
             # Note: vxc_mat will remain distributed across MPI processes.
             #       XC energy and Vxc matrix will be reduced separately.
@@ -1261,7 +1281,7 @@ class ExcitonModelDriver:
             fock = hcore + fock_mat_np
             dimer_energy = dimer.nuclear_repulsion_energy()
             dimer_energy += np.sum(dens * (hcore + fock))
-            if self.dft:
+            if self._dft:
                 dimer_energy += xc_ene
                 fock += xc_mat_np
             # compute Fock in MO basis
@@ -1279,7 +1299,7 @@ class ExcitonModelDriver:
             'screening': screening,
         }
 
-        if self.dft:
+        if self._dft:
             ret_dict.update({
                 'molgrid': dimer_molgrid,
                 'xcfun': xcfun,
@@ -1507,7 +1527,7 @@ class ExcitonModelDriver:
         tdens = []
 
         if self.rank == mpi_master():
-            nocc = dimer.number_of_alpha_electrons()
+            nocc = dimer.number_of_alpha_occupied_orbitals(basis)
             mo_occ = mo[:, :nocc].copy()
             mo_vir = mo[:, nocc:].copy()
             num_ci_vecs = len(ci_vectors)
@@ -1539,7 +1559,7 @@ class ExcitonModelDriver:
 
         fock_type = '2jk'
         exchange_scaling_factor = 1.0
-        if self.dft:
+        if self._dft:
             xcfun = dimer_prop['xcfun']
             if xcfun.is_hybrid():
                 fock_type = '2jkx'
@@ -1549,7 +1569,7 @@ class ExcitonModelDriver:
                 exchange_scaling_factor = 0.0
 
         # TODO: range-separated
-        need_omega = (self.dft and xcfun.is_range_separated())
+        need_omega = (self._dft and xcfun.is_range_separated())
         if need_omega:
             assert_msg_critical(
                 False, 'ExcitonModelDriver: Not implemented for' +
@@ -1574,7 +1594,7 @@ class ExcitonModelDriver:
 
             fock_arrays.append(fock_np)
 
-        if self.dft:
+        if self._dft:
             gs_dens = dimer_prop['density']
             dimer_molgrid = dimer_prop['molgrid']
 
@@ -1638,7 +1658,7 @@ class ExcitonModelDriver:
         linmom_ints = one_elec_ints['linear_momentum']
         magdip_ints = one_elec_ints['magnetic_dipole']
 
-        nocc = dimer.number_of_alpha_electrons()
+        nocc = dimer.number_of_alpha_occupied_orbitals(basis)
         mo_occ = mo[:, :nocc].copy()
         mo_vir = mo[:, nocc:].copy()
 

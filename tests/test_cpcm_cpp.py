@@ -13,7 +13,7 @@ class TestCPPCpcm:
 
     def run_cpp_cpcm(self,
                      xcfun_label,
-                     cpp_flag,
+                     cpp_property,
                      ref_x_data,
                      ref_y_data,
                      tol,
@@ -40,7 +40,7 @@ class TestCPPCpcm:
 
         lr_drv = ComplexResponse()
         lr_drv.ostream.mute()
-        lr_drv.set_cpp_flag(cpp_flag)
+        lr_drv.property = cpp_property
         lr_drv.frequencies = list(ref_x_data)
         lr_drv.solvation_model = 'cpcm'
         lr_drv.cpcm_grid_per_sphere = (110, 110)
@@ -58,23 +58,23 @@ class TestCPPCpcm:
         # vlxtag: RKS, Absorption, CPP, CPCM
 
         xcfun_label = 'b3lyp'
-        cpp_flag = 'absorption'
+        cpp_property = 'absorption'
         ref_x_data = [0.39, 0.40, 0.41]
         ref_y_data = [0.32158440, 0.66111297, 2.15027316]
 
-        self.run_cpp_cpcm(xcfun_label, cpp_flag, ref_x_data, ref_y_data, 1.0e-4)
+        self.run_cpp_cpcm(xcfun_label, cpp_property, ref_x_data, ref_y_data, 1.0e-4)
 
     def test_b3lyp_absorption_cpcm_noneq(self):
 
         # vlxtag: RKS, Absorption, CPP, CPCM
 
         xcfun_label = 'b3lyp'
-        cpp_flag = 'absorption'
+        cpp_property = 'absorption'
         ref_x_data = [0.39, 0.40, 0.41]
         ref_y_data = [0.23785824, 0.32046951, 1.27698344]
 
         self.run_cpp_cpcm(xcfun_label,
-                          cpp_flag,
+                          cpp_property,
                           ref_x_data,
                           ref_y_data,
                           1.0e-4,

@@ -1,0 +1,36 @@
+target_sources(vlxobjs
+  PRIVATE
+    T2CHrrABRecDD.cpp
+    T2CHrrABRecDF.cpp
+    T2CHrrABRecDG.cpp
+    T2CHrrABRecDH.cpp
+    T2CHrrABRecDI.cpp
+    T2CHrrABRecDP.cpp
+    T2CHrrABRecFD.cpp
+    T2CHrrABRecFF.cpp
+    T2CHrrABRecFG.cpp
+    T2CHrrABRecFH.cpp
+    T2CHrrABRecFP.cpp
+    T2CHrrABRecGD.cpp
+    T2CHrrABRecGF.cpp
+    T2CHrrABRecGG.cpp
+    T2CHrrABRecGP.cpp
+    T2CHrrABRecHD.cpp
+    T2CHrrABRecHF.cpp
+    T2CHrrABRecHP.cpp
+    T2CHrrABRecID.cpp
+    T2CHrrABRecIP.cpp
+    T2CHrrABRecKP.cpp
+    T2CHrrABRecPD.cpp
+    T2CHrrABRecPF.cpp
+    T2CHrrABRecPG.cpp
+    T2CHrrABRecPH.cpp
+    T2CHrrABRecPI.cpp
+    T2CHrrABRecPK.cpp
+    T2CHrrABRecPP.cpp
+  )
+
+target_include_directories(vlxobjs
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>
+  )
