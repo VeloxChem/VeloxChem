@@ -1,6 +1,7 @@
 target_sources(vlxobjs
   PRIVATE
     CorePotentialDriver.cpp
+    CorePotentialGradientDriver.cpp
     ProjectedCorePotentialDriver.cpp
     ProjectedCorePotentialPrimRecDDForD.cpp
     ProjectedCorePotentialPrimRecDDForF.cpp
@@ -17,6 +18,16 @@ target_sources(vlxobjs
     ProjectedCorePotentialPrimRecDGForG.cpp
     ProjectedCorePotentialPrimRecDGForP.cpp
     ProjectedCorePotentialPrimRecDGForS.cpp
+    ProjectedCorePotentialPrimRecDHForD.cpp
+    ProjectedCorePotentialPrimRecDHForF.cpp
+    ProjectedCorePotentialPrimRecDHForG.cpp
+    ProjectedCorePotentialPrimRecDHForP.cpp
+    ProjectedCorePotentialPrimRecDHForS.cpp
+    ProjectedCorePotentialPrimRecDIForD.cpp
+    ProjectedCorePotentialPrimRecDIForF.cpp
+    ProjectedCorePotentialPrimRecDIForG.cpp
+    ProjectedCorePotentialPrimRecDIForP.cpp
+    ProjectedCorePotentialPrimRecDIForS.cpp
     ProjectedCorePotentialPrimRecDPForD.cpp
     ProjectedCorePotentialPrimRecDPForF.cpp
     ProjectedCorePotentialPrimRecDPForG.cpp
@@ -42,6 +53,16 @@ target_sources(vlxobjs
     ProjectedCorePotentialPrimRecFGForG.cpp
     ProjectedCorePotentialPrimRecFGForP.cpp
     ProjectedCorePotentialPrimRecFGForS.cpp
+    ProjectedCorePotentialPrimRecFHForD.cpp
+    ProjectedCorePotentialPrimRecFHForF.cpp
+    ProjectedCorePotentialPrimRecFHForG.cpp
+    ProjectedCorePotentialPrimRecFHForP.cpp
+    ProjectedCorePotentialPrimRecFHForS.cpp
+    ProjectedCorePotentialPrimRecFIForD.cpp
+    ProjectedCorePotentialPrimRecFIForF.cpp
+    ProjectedCorePotentialPrimRecFIForG.cpp
+    ProjectedCorePotentialPrimRecFIForP.cpp
+    ProjectedCorePotentialPrimRecFIForS.cpp
     ProjectedCorePotentialPrimRecFPForD.cpp
     ProjectedCorePotentialPrimRecFPForF.cpp
     ProjectedCorePotentialPrimRecFPForG.cpp
@@ -67,6 +88,16 @@ target_sources(vlxobjs
     ProjectedCorePotentialPrimRecGGForG.cpp
     ProjectedCorePotentialPrimRecGGForP.cpp
     ProjectedCorePotentialPrimRecGGForS.cpp
+    ProjectedCorePotentialPrimRecGHForD.cpp
+    ProjectedCorePotentialPrimRecGHForF.cpp
+    ProjectedCorePotentialPrimRecGHForG.cpp
+    ProjectedCorePotentialPrimRecGHForP.cpp
+    ProjectedCorePotentialPrimRecGHForS.cpp
+    ProjectedCorePotentialPrimRecGIForD.cpp
+    ProjectedCorePotentialPrimRecGIForF.cpp
+    ProjectedCorePotentialPrimRecGIForG.cpp
+    ProjectedCorePotentialPrimRecGIForP.cpp
+    ProjectedCorePotentialPrimRecGIForS.cpp
     ProjectedCorePotentialPrimRecGPForD.cpp
     ProjectedCorePotentialPrimRecGPForF.cpp
     ProjectedCorePotentialPrimRecGPForG.cpp
@@ -77,6 +108,76 @@ target_sources(vlxobjs
     ProjectedCorePotentialPrimRecGSForG.cpp
     ProjectedCorePotentialPrimRecGSForP.cpp
     ProjectedCorePotentialPrimRecGSForS.cpp
+    ProjectedCorePotentialPrimRecHDForD.cpp
+    ProjectedCorePotentialPrimRecHDForF.cpp
+    ProjectedCorePotentialPrimRecHDForG.cpp
+    ProjectedCorePotentialPrimRecHDForP.cpp
+    ProjectedCorePotentialPrimRecHDForS.cpp
+    ProjectedCorePotentialPrimRecHFForD.cpp
+    ProjectedCorePotentialPrimRecHFForF.cpp
+    ProjectedCorePotentialPrimRecHFForG.cpp
+    ProjectedCorePotentialPrimRecHFForP.cpp
+    ProjectedCorePotentialPrimRecHFForS.cpp
+    ProjectedCorePotentialPrimRecHGForD.cpp
+    ProjectedCorePotentialPrimRecHGForF.cpp
+    ProjectedCorePotentialPrimRecHGForG.cpp
+    ProjectedCorePotentialPrimRecHGForP.cpp
+    ProjectedCorePotentialPrimRecHGForS.cpp
+    ProjectedCorePotentialPrimRecHHForD.cpp
+    ProjectedCorePotentialPrimRecHHForF.cpp
+    ProjectedCorePotentialPrimRecHHForG.cpp
+    ProjectedCorePotentialPrimRecHHForP.cpp
+    ProjectedCorePotentialPrimRecHHForS.cpp
+    ProjectedCorePotentialPrimRecHIForD.cpp
+    ProjectedCorePotentialPrimRecHIForF.cpp
+    ProjectedCorePotentialPrimRecHIForG.cpp
+    ProjectedCorePotentialPrimRecHIForP.cpp
+    ProjectedCorePotentialPrimRecHIForS.cpp
+    ProjectedCorePotentialPrimRecHPForD.cpp
+    ProjectedCorePotentialPrimRecHPForF.cpp
+    ProjectedCorePotentialPrimRecHPForG.cpp
+    ProjectedCorePotentialPrimRecHPForP.cpp
+    ProjectedCorePotentialPrimRecHPForS.cpp
+    ProjectedCorePotentialPrimRecHSForD.cpp
+    ProjectedCorePotentialPrimRecHSForF.cpp
+    ProjectedCorePotentialPrimRecHSForG.cpp
+    ProjectedCorePotentialPrimRecHSForP.cpp
+    ProjectedCorePotentialPrimRecHSForS.cpp
+    ProjectedCorePotentialPrimRecIDForD.cpp
+    ProjectedCorePotentialPrimRecIDForF.cpp
+    ProjectedCorePotentialPrimRecIDForG.cpp
+    ProjectedCorePotentialPrimRecIDForP.cpp
+    ProjectedCorePotentialPrimRecIDForS.cpp
+    ProjectedCorePotentialPrimRecIFForD.cpp
+    ProjectedCorePotentialPrimRecIFForF.cpp
+    ProjectedCorePotentialPrimRecIFForG.cpp
+    ProjectedCorePotentialPrimRecIFForP.cpp
+    ProjectedCorePotentialPrimRecIFForS.cpp
+    ProjectedCorePotentialPrimRecIGForD.cpp
+    ProjectedCorePotentialPrimRecIGForF.cpp
+    ProjectedCorePotentialPrimRecIGForG.cpp
+    ProjectedCorePotentialPrimRecIGForP.cpp
+    ProjectedCorePotentialPrimRecIGForS.cpp
+    ProjectedCorePotentialPrimRecIHForD.cpp
+    ProjectedCorePotentialPrimRecIHForF.cpp
+    ProjectedCorePotentialPrimRecIHForG.cpp
+    ProjectedCorePotentialPrimRecIHForP.cpp
+    ProjectedCorePotentialPrimRecIHForS.cpp
+    ProjectedCorePotentialPrimRecIIForD.cpp
+    ProjectedCorePotentialPrimRecIIForF.cpp
+    ProjectedCorePotentialPrimRecIIForG.cpp
+    ProjectedCorePotentialPrimRecIIForP.cpp
+    ProjectedCorePotentialPrimRecIIForS.cpp
+    ProjectedCorePotentialPrimRecIPForD.cpp
+    ProjectedCorePotentialPrimRecIPForF.cpp
+    ProjectedCorePotentialPrimRecIPForG.cpp
+    ProjectedCorePotentialPrimRecIPForP.cpp
+    ProjectedCorePotentialPrimRecIPForS.cpp
+    ProjectedCorePotentialPrimRecISForD.cpp
+    ProjectedCorePotentialPrimRecISForF.cpp
+    ProjectedCorePotentialPrimRecISForG.cpp
+    ProjectedCorePotentialPrimRecISForP.cpp
+    ProjectedCorePotentialPrimRecISForS.cpp
     ProjectedCorePotentialPrimRecPDForD.cpp
     ProjectedCorePotentialPrimRecPDForF.cpp
     ProjectedCorePotentialPrimRecPDForG.cpp
@@ -92,6 +193,16 @@ target_sources(vlxobjs
     ProjectedCorePotentialPrimRecPGForG.cpp
     ProjectedCorePotentialPrimRecPGForP.cpp
     ProjectedCorePotentialPrimRecPGForS.cpp
+    ProjectedCorePotentialPrimRecPHForD.cpp
+    ProjectedCorePotentialPrimRecPHForF.cpp
+    ProjectedCorePotentialPrimRecPHForG.cpp
+    ProjectedCorePotentialPrimRecPHForP.cpp
+    ProjectedCorePotentialPrimRecPHForS.cpp
+    ProjectedCorePotentialPrimRecPIForD.cpp
+    ProjectedCorePotentialPrimRecPIForF.cpp
+    ProjectedCorePotentialPrimRecPIForG.cpp
+    ProjectedCorePotentialPrimRecPIForP.cpp
+    ProjectedCorePotentialPrimRecPIForS.cpp
     ProjectedCorePotentialPrimRecPPForD.cpp
     ProjectedCorePotentialPrimRecPPForF.cpp
     ProjectedCorePotentialPrimRecPPForG.cpp
@@ -117,6 +228,16 @@ target_sources(vlxobjs
     ProjectedCorePotentialPrimRecSGForG.cpp
     ProjectedCorePotentialPrimRecSGForP.cpp
     ProjectedCorePotentialPrimRecSGForS.cpp
+    ProjectedCorePotentialPrimRecSHForD.cpp
+    ProjectedCorePotentialPrimRecSHForF.cpp
+    ProjectedCorePotentialPrimRecSHForG.cpp
+    ProjectedCorePotentialPrimRecSHForP.cpp
+    ProjectedCorePotentialPrimRecSHForS.cpp
+    ProjectedCorePotentialPrimRecSIForD.cpp
+    ProjectedCorePotentialPrimRecSIForF.cpp
+    ProjectedCorePotentialPrimRecSIForG.cpp
+    ProjectedCorePotentialPrimRecSIForP.cpp
+    ProjectedCorePotentialPrimRecSIForS.cpp
     ProjectedCorePotentialPrimRecSPForD.cpp
     ProjectedCorePotentialPrimRecSPForF.cpp
     ProjectedCorePotentialPrimRecSPForG.cpp
