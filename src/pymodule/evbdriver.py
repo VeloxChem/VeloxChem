@@ -96,7 +96,7 @@ class EvbDriver():
 
         self.t_label = int(time.time())
         self.water_model = 'cspce'
-        
+
         self.ffbuilder = ReactionForceFieldBuilder(ostream=self.ostream)
 
     def build_and_run_default_water_EVB(
@@ -153,15 +153,11 @@ class EvbDriver():
             optimize_mol (bool): If True, does an xtb optimization of every provided molecule object before reparameterisation. Defaults to False.
             optimize_ff (bool): If True, does an mm optimization of the combined reactant and product after reparameterisation. Defaults to True.
         """
-        
 
         self.ffbuilder.water_model = self.water_model
 
         self.reactant, self.product, self.forming_bonds, self.breaking_bonds, self.reactants, self.products, self.product_mapping = self.ffbuilder.build_forcefields(
-            reactant=reactant,
-            product=product,
-            **kwargs
-        )
+            reactant=reactant, product=product, **kwargs)
 
     def build_systems(
         self,
@@ -218,12 +214,12 @@ class EvbDriver():
         #Per configuration
         for conf in self.configurations:
             #create folders,
-            # todo make this go more automatic. Don't require providing a name
-            selfname = f"_{self.name}" if self.name is not None else ""
-            data_folder = f"EVB{selfname}_{conf['name']}_data_{self.t_label}"
+            # Todo: better folder naming
+            self_name = self.name if self.name is not None else "None"
+            data_folder = f"EVB{self_name}_{conf['name']}_data_{self.t_label}"
             while Path(data_folder).exists():
                 self.t_label += 1
-                data_folder = f"EVB{selfname}_{conf['name']}_data_{self.t_label}"
+                data_folder = f"EVB{self_name}_{conf['name']}_data_{self.t_label}"
 
             run_folder = str(Path(data_folder) / "run")
             conf["data_folder"] = data_folder
@@ -340,7 +336,8 @@ class EvbDriver():
         }
         if load_systems:
             sysbuilder = EvbSystemBuilder()
-            systems = sysbuilder.load_systems_from_xml(str(Path(data_folder) / "run"))
+            systems = sysbuilder.load_systems_from_xml(
+                str(Path(data_folder) / "run"))
             conf["systems"] = systems
         else:
             systems = []
@@ -365,9 +362,7 @@ class EvbDriver():
         platform=None,
         platform_properties=None,
     ):
-        """Run the the FEP calculations for all configurations in self.system_confs.
-
-        """
+        """Run the the FEP calculations for all configurations in self.system_confs."""
 
         for conf in self.system_confs:
             self.ostream.print_blank()
@@ -434,7 +429,7 @@ class EvbDriver():
         results = dp.compute(results, barrier, free_energy)
         self.results = results
         self.print_results()
-        # self._save_dict_as_h5(results, f"results_{self.name}")
+        self._save_dict_as_h5(results, f"results_{self.name}")
         self.ostream.flush()
         return self.results
 
@@ -696,10 +691,14 @@ class EvbDriver():
                         group.create_dataset(k, data=v)
                     elif isinstance(v, set):
                         group.create_dataset(k, data=list(v))
-                    elif isinstance(v, object):
-                        continue
                     else:
-                        group[k] = v
+                        try:
+                            group[k] = v
+                        except TypeError:
+                            self.ostream.print_warning(
+                                f"Could not save {k} with value {v} of type {type(v)}. Skipping this entry."
+                            )
+                            continue
 
             save_group(data, file)
 
