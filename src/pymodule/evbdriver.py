@@ -43,11 +43,11 @@ from .veloxchemlib import mpi_master
 from .molecule import Molecule
 from .outputstream import OutputStream
 from .mmforcefieldgenerator import MMForceFieldGenerator
-from .evbsystembuilder import EvbSystemBuilder
+from .reactionsystembuilder import ReactionSystemBuilder
 from .evbfepdriver import EvbFepDriver
 from .reaffbuilder import ReactionForceFieldBuilder
 from .evbdataprocessing import EvbDataProcessing
-from .evbsystembuilder import EvbForceGroup
+from .reactionsystembuilder import EvbForceGroup
 from .solvationbuilder import SolvationBuilder
 from .errorhandler import assert_msg_critical
 from .sanitychecks import molecule_sanity_check
@@ -110,7 +110,7 @@ class EvbDriver():
         self.ostream.print_header("Building forcefields")
         self.ostream.flush()
 
-        self.build_ff_from_molecules(
+        self.build_force_fields(
             reactant,
             product,
             ordered_input=True,
@@ -133,8 +133,14 @@ class EvbDriver():
 
         self.ostream.flush()
 
+    # Backwards compatibility for publication notebook: https://github.com/VeloxChem/vlx-notebook/blob/main/workflow/EVB.ipynb
+
     def build_ff_from_molecules(self, reactant: Molecule | list[Molecule],
                                 product: Molecule | list[Molecule], **kwargs):
+        self.build_force_fields(reactant, product, **kwargs)
+
+    def build_force_fields(self, reactant: Molecule | list[Molecule],
+                           product: Molecule | list[Molecule], **kwargs):
         """_summary_
 
         Args:
@@ -156,7 +162,7 @@ class EvbDriver():
 
         self.ffbuilder.water_model = self.water_model
 
-        self.reactant, self.product, self.forming_bonds, self.breaking_bonds, self.reactants, self.products, self.product_mapping = self.ffbuilder.build_forcefields(
+        self.reactant, self.product, self.forming_bonds, self.breaking_bonds, self.reactants, self.products, self.product_mapping = self.ffbuilder.build_force_fields(
             reactant=reactant, product=product, **kwargs)
 
     def build_systems(
@@ -250,7 +256,7 @@ class EvbDriver():
                 )
                 conf.pop("pressure")
             # build the system
-            system_builder = EvbSystemBuilder(ostream=self.ostream)
+            system_builder = ReactionSystemBuilder(ostream=self.ostream)
             system_builder.water_model = self.water_model
             self.ostream.print_blank()
             self.ostream.print_header(f"Building systems for {conf['name']}")
@@ -335,7 +341,7 @@ class EvbDriver():
             "Lambda": Lambda
         }
         if load_systems:
-            sysbuilder = EvbSystemBuilder()
+            sysbuilder = ReactionSystemBuilder()
             systems = sysbuilder.load_systems_from_xml(
                 str(Path(data_folder) / "run"))
             conf["systems"] = systems

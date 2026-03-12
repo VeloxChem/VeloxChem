@@ -61,7 +61,7 @@ except ImportError:
     pass
 
 
-class EvbSystemBuilder():
+class ReactionSystemBuilder():
 
     def __init__(self, comm=None, ostream=None):
         '''
@@ -112,7 +112,7 @@ class EvbSystemBuilder():
         self.solvent: str = None  #type: ignore
         self.padding: float = 1.5
         self.no_reactant: bool = False
-        self.E_field: list[float] = [0, 0, 0]
+        self.E_field: list[float] = [0, 0, 0]  # V/m
         self.neutralize: bool = False
 
         self.soft_core_coulomb_pes_static = False
@@ -140,6 +140,8 @@ class EvbSystemBuilder():
 
         self.k = 4.184 * hartree_in_kcalpermol() * 0.1 * bohr_in_angstrom(
         )  # Coulombic pre-factor
+        F = 96485.3321233100184  # C/mol, Faraday constant
+        self.E_field_factor = F * 10**-12  # Conversion factor from V/m to kJ/(e nm mol)
 
         self.deg_to_rad: float = np.pi / 180
 
@@ -376,11 +378,10 @@ class EvbSystemBuilder():
                 f"Reacting residue {residue.name} {residue.id} with {len(res_atoms)} atoms added to reaction_atoms"
             )
             self.ostream.flush()
-            
+
         for id in self.reactant.atoms.keys():
-            if  self.reactant.atoms[id].get('pdb') != 'sys':
+            if self.reactant.atoms[id].get('pdb') != 'sys':
                 self.reactant.atoms[id]['pdb'] = 'unmapped'
-                
 
         return system, topology, system_mol, reaction_atoms
 
@@ -1198,37 +1199,56 @@ class EvbSystemBuilder():
     def _interpolate_system(self, system, lambda_vec, nb_force, E_field_force):
         systems = {}
         rea_charge = [atom['charge'] for atom in self.reactant.atoms.values()]
-        rea_pdb_charge = [atom['charge'] for atom in self.reactant.atoms.values() if atom.get('pdb') != 'unmapped']
-        
-        if round(sum(rea_charge),5).is_integer() and len(rea_pdb_charge) > 0:
+        rea_pdb_charge = [
+            atom['charge'] for atom in self.reactant.atoms.values()
+            if atom.get('pdb') != 'unmapped'
+        ]
+
+        if round(sum(rea_charge), 5).is_integer() and len(rea_pdb_charge) > 0:
             rea_formal_charge = int(round(sum(rea_charge)))
             rea_offset = rea_formal_charge - sum(rea_pdb_charge)
             rea_offset_per_atom = rea_offset / len(rea_pdb_charge)
             if abs(rea_offset) > 0.01:
-                self.ostream.print_info(f"Total reactant charge is {rea_formal_charge} but charge sum of the pdb atoms is {sum(rea_pdb_charge)}")
-                self.ostream.print_info(f"Applying an offset of {rea_offset_per_atom:.4f} to {len(rea_pdb_charge)} reactant pdb atoms")
+                self.ostream.print_info(
+                    f"Total reactant charge is {rea_formal_charge} but charge sum of the pdb atoms is {sum(rea_pdb_charge)}"
+                )
+                self.ostream.print_info(
+                    f"Applying an offset of {rea_offset_per_atom:.4f} to {len(rea_pdb_charge)} reactant pdb atoms"
+                )
         elif len(rea_pdb_charge) == 0:
             rea_offset_per_atom = 0
         else:
             rea_offset_per_atom = 0
-            self.ostream.print_warning(f"Total reactant charge is {sum(rea_charge)} and is not sufficiently close to a whole number, skipping charge offset")
-        
+            self.ostream.print_warning(
+                f"Total reactant charge is {sum(rea_charge)} and is not sufficiently close to a whole number, skipping charge offset"
+            )
+
         pro_charge = [atom['charge'] for atom in self.product.atoms.values()]
-        pro_pdb_charge = [pro_atom['charge'] for rea_atom,pro_atom in zip(self.reactant.atoms.values(),self.product.atoms.values()) if rea_atom.get('pdb') != 'unmapped']
-        
-        if round(sum(pro_charge),5).is_integer() and len(pro_pdb_charge) > 0:
+        pro_pdb_charge = [
+            pro_atom['charge'] for rea_atom, pro_atom in zip(
+                self.reactant.atoms.values(), self.product.atoms.values())
+            if rea_atom.get('pdb') != 'unmapped'
+        ]
+
+        if round(sum(pro_charge), 5).is_integer() and len(pro_pdb_charge) > 0:
             pro_formal_charge = int(round(sum(pro_charge)))
             pro_offset = pro_formal_charge - sum(pro_pdb_charge)
             pro_offset_per_atom = pro_offset / len(pro_pdb_charge)
             if abs(pro_offset) > 0.01:
-                self.ostream.print_info(f"Total product charge is {pro_formal_charge} but charge sum of the pdb atoms is {sum(pro_pdb_charge)}")
-                self.ostream.print_info(f"Applying an offset of {pro_offset_per_atom:.4f} to {len(pro_pdb_charge)} product pdb atoms")
+                self.ostream.print_info(
+                    f"Total product charge is {pro_formal_charge} but charge sum of the pdb atoms is {sum(pro_pdb_charge)}"
+                )
+                self.ostream.print_info(
+                    f"Applying an offset of {pro_offset_per_atom:.4f} to {len(pro_pdb_charge)} product pdb atoms"
+                )
         elif len(pro_pdb_charge) == 0:
             pro_offset_per_atom = 0
         else:
             pro_offset_per_atom = 0
-            self.ostream.print_warning(f"Total product charge is {sum(pro_charge)} and is not sufficiently close to a whole number, skipping charge offset")
-        
+            self.ostream.print_warning(
+                f"Total product charge is {sum(pro_charge)} and is not sufficiently close to a whole number, skipping charge offset"
+            )
+
         for lam in lambda_vec:
             total_charge = 0
             if not self.no_reactant:
@@ -1542,11 +1562,13 @@ class EvbSystemBuilder():
         assert_msg_critical('openmm' in sys.modules,
                             'openmm is required for EvbSystemBuilder.')
 
-        E_field_force = mm.CustomExternalForce("-q*(Ex*x+Ey*y+Ez*z)")
+        E_field_force = mm.CustomExternalForce("-k*q*(Ex*x+Ey*y+Ez*z)")
         E_field_force.addGlobalParameter("Ex", E_field[0])
         E_field_force.addGlobalParameter("Ey", E_field[1])
         E_field_force.addGlobalParameter("Ez", E_field[2])
         E_field_force.addPerParticleParameter("q")
+        # Convert to molecular units
+        E_field_force.addGlobalParameter('k', self.E_field_factor)
         E_field_force.setName("Electric field")
         system.addForce(E_field_force)
         for i in range(system.getNumParticles()):
@@ -2203,9 +2225,8 @@ class EvbSystemBuilder():
             if i != base_particle:
                 exclusions.add(i)
             if current_level > 0:
-                EvbSystemBuilder._add_exclusions_to_set(bonded12, exclusions,
-                                                        base_particle, i,
-                                                        current_level - 1)
+                ReactionSystemBuilder._add_exclusions_to_set(
+                    bonded12, exclusions, base_particle, i, current_level - 1)
 
     def _create_constraint_forces(self, lam):
 

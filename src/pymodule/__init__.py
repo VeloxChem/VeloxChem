@@ -204,8 +204,8 @@ from .excitedstateanalysisdriver import ExcitedStateAnalysisDriver
 from .valetanalyzer import ValetAnalyzer
 from .evbdriver import EvbDriver
 from .reaffbuilder import ReactionForceFieldBuilder
-from .evbsystembuilder import EvbSystemBuilder
-from .evbsystembuilder import EvbForceGroup
+from .reactionsystembuilder import ReactionSystemBuilder
+from .reactionsystembuilder import EvbForceGroup
 from .evbfepdriver import EvbFepDriver
 from .evbdataprocessing import EvbDataProcessing
 from .evbreporter import EvbReporter

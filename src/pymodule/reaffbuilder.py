@@ -106,7 +106,7 @@ class ReactionForceFieldBuilder():
         # Can (should?) be scaled up to def2-TZVPPD, and if only we had our ECP's by now
         self.hessian_basis = 'def2-SV_P_'
 
-    def build_forcefields(
+    def build_force_fields(
         self,
         reactant: Molecule | list[Molecule],
         product: Molecule | list[Molecule],

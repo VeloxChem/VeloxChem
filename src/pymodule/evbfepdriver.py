@@ -42,7 +42,7 @@ from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
 from .evbreporter import EvbReporter
 from .errorhandler import assert_msg_critical
-from .evbsystembuilder import EvbForceGroup
+from .reactionsystembuilder import EvbForceGroup
 
 try:
     import openmm as mm
@@ -99,7 +99,7 @@ class EvbFepDriver():
         # See https://docs.openmm.org/latest/api-python/generated/openmm.openmm.VariableLangevinIntegrator.html
         self.langevin_tolerance = 0.001
 
-        self.NVT_integrator = "variable Langevin"
+        self.NVT_integrator = "Langevin"
 
         self.equil_NVT_steps = 50000
         self.equil_NPT_steps = 50000

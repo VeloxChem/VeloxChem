@@ -38,7 +38,7 @@ import sys
 
 from .veloxchemlib import mpi_master
 from .veloxchemlib import boltzmann_in_hartreeperkelvin, hartree_in_kjpermol
-from .evbsystembuilder import EvbForceGroup
+from .reactionsystembuilder import EvbForceGroup
 from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
 
@@ -292,7 +292,8 @@ class EvbDataProcessing:
         if fitting:
             try:
                 dGevb_smooth = scipy.signal.savgol_filter(
-                    dGevb, self.smooth_window_size, self.smooth_polynomial_order)
+                    dGevb, self.smooth_window_size,
+                    self.smooth_polynomial_order)
             except ValueError:
                 self.ostream.print_warning(
                     f"Could not apply Savitzky-Golay filter with window size {self.smooth_window_size} and polynomial order {self.smooth_polynomial_order}. Using unfiltered data for fitting."
