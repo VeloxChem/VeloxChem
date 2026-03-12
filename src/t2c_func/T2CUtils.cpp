@@ -721,16 +721,14 @@ comp_i_vals(CSimdArray<double>& values, const int order, const CSimdArray<double
     
     for (size_t i = 0; i < nelems; i++)
     {
-//        if (const double fact = fargs[i]; fact > 150.0)
-//        {
-//            f0vals[i] = 0.0;
-//        }
-//        else
-//        {
-        const double fact = fargs[i];
-        
-        f0vals[i] = bessel_il_scaled(0, fact) * std::exp(fact);
-        //}
+        if (const double fact = fargs[i]; fact > 150.0)
+        {
+            f0vals[i] = 0.0;
+        }
+        else
+        {
+            f0vals[i] = bessel_il_scaled(0, fact) * std::exp(fact);
+        }
     }
     
     if (order == 0) return;
@@ -741,12 +739,11 @@ comp_i_vals(CSimdArray<double>& values, const int order, const CSimdArray<double
     
     for (size_t i = 0; i < nelems; i++)
     {
-//        if (const double fact = fargs[i]; fact > 150.0)
-//        {
-//            f1vals[i] = 0.0;
-//        }
-//        else
-        if (const double fact = fargs[i]; fact <= 1.0e-12)
+        if (const double fact = fargs[i]; fact > 150.0)
+        {
+            f1vals[i] = 0.0;
+        }
+        else if (fact <= 1.0e-12)
         {
             f1vals[i] = 1.0 / 3.0;
         }
@@ -764,12 +761,11 @@ comp_i_vals(CSimdArray<double>& values, const int order, const CSimdArray<double
     
     for (size_t i = 0; i < nelems; i++)
     {
-//        if (const double fact = fargs[i]; fact > 150.0)
-//        {
-//            f1vals[i] = 0.0;
-//        }
-//        else
-        if (const double fact = fargs[i]; fact <= 1.0e-12)
+        if (const double fact = fargs[i]; fact > 150.0)
+        {
+            f1vals[i] = 0.0;
+        }
+        else if (fact <= 1.0e-12)
         {
             f2vals[i] = 1.0/ 15.0;
         }
@@ -793,12 +789,11 @@ comp_i_vals(CSimdArray<double>& values, const int order, const CSimdArray<double
         
         for (size_t i = 0; i < nelems; i++)
         {
-//            if (const double fact = fargs[i]; fact > 150.0)
-//            {
-//                f1vals[i] = 0.0;
-//            }
-//            else
-            if (const double fact = fargs[i]; fact <= 1.0e-12)
+            if (const double fact = fargs[i]; fact > 150.0)
+            {
+                f1vals[i] = 0.0;
+            }
+            else if (fact <= 1.0e-12)
             {
                 fvals[i] = 1.0 / n2fact;
             }
