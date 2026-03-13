@@ -259,8 +259,8 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
         orb_ene_b = self.comm.bcast(orb_ene_b, root=mpi_master())
 
         norb = orb_ene_a.shape[0]
-        nocc_a = molecule.number_of_alpha_electrons()
-        nocc_b = molecule.number_of_beta_electrons()
+        nocc_a = molecule.number_of_alpha_occupied_orbitals(basis)
+        nocc_b = molecule.number_of_beta_occupied_orbitals(basis)
 
         # check number of excited states, core excitation, restricted subspace
         assert_msg_critical(
@@ -1141,8 +1141,14 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
 
         final = {}
 
+        # number of excitations to be excluded from initial guess
+        guess_excl_nstates = n_excl_states * 2
+
+        # total number of excitations in initial guess
+        guess_nstates = nstates * 2
+
         for k, (i, a) in enumerate(
-                sorted(w_a, key=w_a.get)[n_excl_states:nstates]):
+                sorted(w_a, key=w_a.get)[guess_excl_nstates:guess_nstates]):
             if self.rank == mpi_master():
                 ia = excitations_a.index((i, a))
 
@@ -1175,7 +1181,7 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
         k_offset = len(final)
 
         for k, (j, b) in enumerate(
-                sorted(w_b, key=w_b.get)[n_excl_states:nstates]):
+                sorted(w_b, key=w_b.get)[guess_excl_nstates:guess_nstates]):
             if self.rank == mpi_master():
                 jb = excitations_b.index((j, b))
 

@@ -112,3 +112,39 @@ class TestRPA:
             [0.020158, 0.000000, 0.085796, 0.074117, 0.272050])
 
         self.run_rpa('tpssh', 'def2-svp', ref_exc_enes, ref_osc_str, 1.0e-5)
+
+    def run_rpa_with_ecp(self, ref_exc_enes, ref_osc_str, tol):
+
+        xyz_string = """2
+        xyz
+        Au 0 0 0
+        Au 0 0 2.88
+        """
+        mol = Molecule.read_xyz_string(xyz_string)
+
+        bas = MolecularBasis.read(mol, 'def2-svp', ostream=None)
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_results = scf_drv.compute(mol, bas)
+
+        lr_drv = LinearResponseEigenSolver()
+        lr_drv.ostream.mute()
+        lr_drv.nstates = 3
+        lr_results = lr_drv.compute(mol, bas, scf_results)
+
+        if lr_drv.rank == mpi_master():
+            assert np.max(np.abs(ref_exc_enes -
+                                 lr_results['eigenvalues'])) < tol
+            assert np.max(
+                np.abs(ref_osc_str -
+                       lr_results['oscillator_strengths'])) < 1.0e-4
+
+    def test_hf_with_ecp(self):
+
+        # vlxtag: RHF, Absorption, TDHF
+
+        ref_exc_enes = np.array([0.10859702, 0.15291543, 0.16111886])
+        ref_osc_str = np.array([0.4439, 0.0000, 0.0025])
+
+        self.run_rpa_with_ecp(ref_exc_enes, ref_osc_str, 1.0e-6)

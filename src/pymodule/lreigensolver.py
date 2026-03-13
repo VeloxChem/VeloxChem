@@ -279,7 +279,7 @@ class LinearResponseEigenSolver(LinearSolver):
             orb_ene = None
         orb_ene = self.comm.bcast(orb_ene, root=mpi_master())
         norb = orb_ene.shape[0]
-        nocc = molecule.number_of_alpha_electrons()
+        nocc = molecule.number_of_alpha_occupied_orbitals(basis)
 
         # check number of excited states, core excitation, restricted subspace
         assert_msg_critical(self.nstates <= nocc * (norb - nocc),
@@ -1116,7 +1116,15 @@ class LinearResponseEigenSolver(LinearSolver):
         n_exc = len(excitations)
 
         final = {}
-        for k, (i, a) in enumerate(sorted(w, key=w.get)[n_excl_states:nstates]):
+
+        # number of excitations to be excluded from initial guess
+        guess_excl_nstates = n_excl_states * 2
+
+        # total number of excitations in initial guess
+        guess_nstates = nstates * 2
+
+        for k, (i, a) in enumerate(
+                sorted(w, key=w.get)[guess_excl_nstates:guess_nstates]):
             if self.rank == mpi_master():
                 ia = excitations.index((i, a))
 
@@ -1294,7 +1302,7 @@ class LinearResponseEigenSolver(LinearSolver):
             orb_ene = None
         orb_ene = self.comm.bcast(orb_ene, root=mpi_master())
         norb = orb_ene.shape[0]
-        nocc = molecule.number_of_alpha_electrons()
+        nocc = molecule.number_of_alpha_occupied_orbitals(basis)
 
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
