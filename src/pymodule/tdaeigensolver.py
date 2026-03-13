@@ -264,7 +264,7 @@ class TdaEigenSolver(LinearSolver):
         if self.rank == mpi_master():
             orb_ene = scf_results['E_alpha']
             norb = orb_ene.shape[0]
-            nocc = molecule.number_of_alpha_electrons()
+            nocc = molecule.number_of_alpha_occupied_orbitals(basis)
 
             # check nstates, core excitation, restricted subspace
             assert_msg_critical(
@@ -340,7 +340,7 @@ class TdaEigenSolver(LinearSolver):
 
             if i >= n_restart_iterations:
                 tdens = self._get_trans_densities(trial_mat, scf_results,
-                                                  molecule)
+                                                  molecule, basis)
                 fock = self._comp_lr_fock(tdens, molecule, basis, eri_dict,
                                           dft_dict, pe_dict, profiler)
 
@@ -352,7 +352,7 @@ class TdaEigenSolver(LinearSolver):
 
                 if i >= n_restart_iterations:
                     sig_mat = self._get_sigmas(fock, scf_results, molecule,
-                                               trial_mat)
+                                               basis, trial_mat)
                 else:
                     istart = i * self.nstates
                     iend = (i + 1) * self.nstates
@@ -361,7 +361,8 @@ class TdaEigenSolver(LinearSolver):
                     sig_mat = np.copy(rst_sig_mat[:, istart:iend])
                     trial_mat = np.copy(rst_trial_mat[:, istart:iend])
 
-                self.solver.add_iteration_data(sig_mat, trial_mat, i)
+                self.solver.add_iteration_data(sig_mat, trial_mat, i,
+                                               self.nstates)
 
                 trial_mat = self.solver.compute(diag_mat)
 
@@ -650,12 +651,18 @@ class TdaEigenSolver(LinearSolver):
             w = {ia: w for ia, w in zip(excitations, excitation_energies)}
 
             diag_mat = np.array(excitation_energies)
-            trial_mat = np.zeros((n_exc, self.nstates))
 
-            for s, (i, a) in enumerate(sorted(w, key=w.get)[:self.nstates]):
+            trial_mat = np.zeros((n_exc, 0))
+
+            # total number of excitations in initial guess
+            guess_nstates = self.nstates * 2
+
+            for i, a in sorted(w, key=w.get)[:guess_nstates]:
                 if self.rank == mpi_master():
                     ia = excitations.index((i, a))
-                    trial_mat[ia, s] = 1.0
+                    trial_mat_single_col = np.zeros((n_exc, 1))
+                    trial_mat_single_col[ia, 0] = 1.0
+                    trial_mat = np.hstack((trial_mat, trial_mat_single_col))
 
             return diag_mat, trial_mat
 
@@ -678,7 +685,7 @@ class TdaEigenSolver(LinearSolver):
         self._is_converged = self.comm.bcast(self._is_converged,
                                              root=mpi_master())
 
-    def _get_trans_densities(self, trial_mat, tensors, molecule):
+    def _get_trans_densities(self, trial_mat, tensors, molecule, basis):
         """
         Computes the transition densities.
 
@@ -688,6 +695,8 @@ class TdaEigenSolver(LinearSolver):
             The dictionary of tensors from converged SCF wavefunction.
         :param molecule:
             The molecule.
+        :param basis:
+            The AO basis set.
 
         :return:
             The transition density matrix.
@@ -696,7 +705,7 @@ class TdaEigenSolver(LinearSolver):
         # form transition densities
 
         if self.rank == mpi_master():
-            nocc = molecule.number_of_alpha_electrons()
+            nocc = molecule.number_of_alpha_occupied_orbitals(basis)
             norb = tensors['C_alpha'].shape[1]
             nvir = norb - nocc
 
@@ -733,7 +742,7 @@ class TdaEigenSolver(LinearSolver):
 
         return tdens
 
-    def _get_sigmas(self, fock, tensors, molecule, trial_mat):
+    def _get_sigmas(self, fock, tensors, molecule, basis, trial_mat):
         """
         Computes the sigma vectors.
 
@@ -743,6 +752,8 @@ class TdaEigenSolver(LinearSolver):
             The dictionary of tensors from converged SCF wavefunction.
         :param molecule:
             The molecule.
+        :param basis:
+            The AO basis set.
         :param trial_mat:
             The trial vectors as 2D Numpy array.
 
@@ -750,7 +761,7 @@ class TdaEigenSolver(LinearSolver):
             The sigma vectors as 2D Numpy array.
         """
 
-        nocc = molecule.number_of_alpha_electrons()
+        nocc = molecule.number_of_alpha_occupied_orbitals(basis)
         norb = tensors['C_alpha'].shape[1]
         nvir = norb - nocc
 

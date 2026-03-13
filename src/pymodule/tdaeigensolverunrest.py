@@ -247,8 +247,8 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
 
             norb = orb_ene_a.shape[0]
 
-            nocc_a = molecule.number_of_alpha_electrons()
-            nocc_b = molecule.number_of_beta_electrons()
+            nocc_a = molecule.number_of_alpha_occupied_orbitals(basis)
+            nocc_b = molecule.number_of_beta_occupied_orbitals(basis)
 
             # check nstates, core excitation, restricted subspace
             assert_msg_critical(
@@ -343,10 +343,12 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
                 tdens_a = self._get_trans_densities(trial_mat,
                                                     scf_results,
                                                     molecule,
+                                                    basis,
                                                     spin='alpha')
                 tdens_b = self._get_trans_densities(trial_mat,
                                                     scf_results,
                                                     molecule,
+                                                    basis,
                                                     spin='beta')
                 fock = self._comp_lr_fock_unrestricted(
                     (tdens_a, tdens_b), molecule, basis, eri_dict, dft_dict,
@@ -360,7 +362,7 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
 
                 if i >= n_restart_iterations:
                     sig_mat = self._get_sigmas(fock, scf_results, molecule,
-                                               trial_mat)
+                                               basis, trial_mat)
                 else:
                     istart = i * self.nstates
                     iend = (i + 1) * self.nstates
@@ -369,7 +371,8 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
                     sig_mat = np.copy(rst_sig_mat[:, istart:iend])
                     trial_mat = np.copy(rst_trial_mat[:, istart:iend])
 
-                self.solver.add_iteration_data(sig_mat, trial_mat, i)
+                self.solver.add_iteration_data(sig_mat, trial_mat, i,
+                                               self.nstates)
 
                 # need to manually update solver's neigenpairs for unrestricted
                 self.solver.neigenpairs = self.nstates
@@ -701,13 +704,16 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
 
             trial_mat = np.zeros((n_exc_a + n_exc_b, 0))
 
-            for s, (i, a) in enumerate(sorted(w_a, key=w_a.get)[:self.nstates]):
+            # total number of excitations in initial guess
+            guess_nstates = self.nstates * 2
+
+            for i, a in sorted(w_a, key=w_a.get)[:guess_nstates]:
                 ia = excitations_a.index((i, a))
                 trial_mat_a = np.zeros((n_exc_a + n_exc_b, 1))
                 trial_mat_a[ia, 0] = 1.0
                 trial_mat = np.hstack((trial_mat, trial_mat_a))
 
-            for s, (j, b) in enumerate(sorted(w_b, key=w_b.get)[:self.nstates]):
+            for j, b in sorted(w_b, key=w_b.get)[:guess_nstates]:
                 jb = excitations_b.index((j, b))
                 trial_mat_b = np.zeros((n_exc_a + n_exc_b, 1))
                 trial_mat_b[jb + n_exc_a, 0] = 1.0
@@ -734,7 +740,12 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
         self._is_converged = self.comm.bcast(self._is_converged,
                                              root=mpi_master())
 
-    def _get_trans_densities(self, trial_mat, tensors, molecule, spin='alpha'):
+    def _get_trans_densities(self,
+                             trial_mat,
+                             tensors,
+                             molecule,
+                             basis,
+                             spin='alpha'):
         """
         Computes the transition densities.
 
@@ -744,6 +755,10 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
             The dictionary of tensors from converged SCF wavefunction.
         :param molecule:
             The molecule.
+        :param basis:
+            The AO basis set.
+        :param spin:
+            The spin.
 
         :return:
             The transition density matrix.
@@ -753,10 +768,10 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
 
         if self.rank == mpi_master():
             if spin == 'alpha':
-                nocc = molecule.number_of_alpha_electrons()
+                nocc = molecule.number_of_alpha_occupied_orbitals(basis)
                 mo_key = 'C_alpha'
             elif spin == 'beta':
-                nocc = molecule.number_of_beta_electrons()
+                nocc = molecule.number_of_beta_occupied_orbitals(basis)
                 mo_key = 'C_beta'
 
             norb = tensors[mo_key].shape[1]
@@ -768,7 +783,7 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
                 mo_occ = tensors[mo_key][:, :nocc].copy()
             mo_vir = tensors[mo_key][:, nocc:].copy()
 
-            nocc_a = molecule.number_of_alpha_electrons()
+            nocc_a = molecule.number_of_alpha_occupied_orbitals(basis)
             if self.core_excitation:
                 n_ov_a = self.num_core_orbitals * (norb - nocc_a)
             else:
@@ -796,7 +811,7 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
 
         return tdens
 
-    def _get_sigmas(self, fock, tensors, molecule, trial_mat):
+    def _get_sigmas(self, fock, tensors, molecule, basis, trial_mat):
         """
         Computes the sigma vectors.
 
@@ -806,6 +821,8 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
             The dictionary of tensors from converged SCF wavefunction.
         :param molecule:
             The molecule.
+        :param basis:
+            The AO basis set.
         :param trial_mat:
             The trial vectors as 2D Numpy array.
 
@@ -813,8 +830,8 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
             The sigma vectors as 2D Numpy array.
         """
 
-        nocc_a = molecule.number_of_alpha_electrons()
-        nocc_b = molecule.number_of_beta_electrons()
+        nocc_a = molecule.number_of_alpha_occupied_orbitals(basis)
+        nocc_b = molecule.number_of_beta_occupied_orbitals(basis)
 
         norb = tensors['C_alpha'].shape[1]
 

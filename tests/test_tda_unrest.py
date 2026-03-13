@@ -56,3 +56,42 @@ class TestUnrestrictedTDA:
         ])
 
         self.run_tda('cam-b3lyp', 'def2-svp', ref_exc_enes, ref_osc_str, 1.0e-5)
+
+    def run_tda_with_ecp(self, ref_exc_enes, ref_osc_str, tol):
+
+        xyz_string = """2
+        xyz
+        Au 0 0 0
+        H  0 0 1.55
+        """
+        mol = Molecule.read_xyz_string(xyz_string)
+        mol.set_charge(1)
+        mol.set_multiplicity(2)
+
+        bas = MolecularBasis.read(mol, 'def2-svp', ostream=None)
+
+        scf_drv = ScfUnrestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_results = scf_drv.compute(mol, bas)
+
+        lr_drv = TdaUnrestrictedEigenSolver()
+        lr_drv.ostream.mute()
+        lr_drv.nstates = 5
+        lr_results = lr_drv.compute(mol, bas, scf_results)
+
+        if lr_drv.rank == mpi_master():
+            assert np.max(np.abs(ref_exc_enes -
+                                 lr_results['eigenvalues'])) < tol
+            assert np.max(
+                np.abs(ref_osc_str -
+                       lr_results['oscillator_strengths'])) < 1.0e-4
+
+    def test_hf_with_ecp(self):
+
+        # vlxtag: UHF, Absorption, TDA
+
+        ref_exc_enes = np.array(
+            [0.08351815, 0.08351815, 0.10137196, 0.10137196, 0.15068886])
+        ref_osc_str = np.array([0.0000, 0.0000, 0.0002, 0.0002, 0.0089])
+
+        self.run_tda_with_ecp(ref_exc_enes, ref_osc_str, 1.0e-6)

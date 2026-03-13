@@ -110,3 +110,39 @@ class TestTDA:
                      ref_osc_str,
                      1.0e-5,
                      ri_coulomb=True)
+
+    def run_tda_with_ecp(self, ref_exc_enes, ref_osc_str, tol):
+
+        xyz_string = """2
+        xyz
+        Au 0 0 0
+        Au 0 0 2.88
+        """
+        mol = Molecule.read_xyz_string(xyz_string)
+
+        bas = MolecularBasis.read(mol, 'def2-svp', ostream=None)
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_results = scf_drv.compute(mol, bas)
+
+        lr_drv = TdaEigenSolver()
+        lr_drv.ostream.mute()
+        lr_drv.nstates = 3
+        lr_results = lr_drv.compute(mol, bas, scf_results)
+
+        if lr_drv.rank == mpi_master():
+            assert np.max(np.abs(ref_exc_enes -
+                                 lr_results['eigenvalues'])) < tol
+            assert np.max(
+                np.abs(ref_osc_str -
+                       lr_results['oscillator_strengths'])) < 1.0e-4
+
+    def test_hf_with_ecp(self):
+
+        # vlxtag: RHF, Absorption, CIS
+
+        ref_exc_enes = np.array([0.11555805, 0.15539632, 0.16343183])
+        ref_osc_str = np.array([0.6238, 0.0000, 0.0027])
+
+        self.run_tda_with_ecp(ref_exc_enes, ref_osc_str, 1.0e-6)
