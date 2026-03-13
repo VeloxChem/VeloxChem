@@ -32,12 +32,12 @@
 
 USE_CUDA := true
 
-CUDA_LIB_DIR := /path/to/cuda/lib64
-LIBXC_HOME   := /path/to/libxc
+CUDA_LIB_DIR := /usr/local/cuda-12.4/lib64
+LIBXC_HOME   := /home/yuch4126/VeloxChem.cuda/dependencies/libxc
 
 CXX    := g++
 PYTHON := python3
-DEVCC  := nvcc -gencode arch=compute_80,code=sm_80
+DEVCC  := nvcc -gencode arch=compute_89,code=sm_89
 
 CXX_REL_FLG := -fopenmp -std=c++17 -O3 -Wall
 CXX_DEB_FLG := -fopenmp -std=c++17 -O3 -Wall -g

@@ -107,6 +107,85 @@ computeBoysFunction(double* values, const double fa, const uint32_t N, const dou
     }
 }
 
+__device__ static void
+computeBoysFunction_f(
+    float* values,
+    const float fa,
+    const uint32_t N,
+    const float* bf_table,
+    const float* ft)
+{
+    // Note: 847 = 121 * 7
+    const float* bf_data = bf_table + N * 847;
+
+    uint32_t pnt = (fa > 1.0e5f)
+                     ? 1000000
+                     : static_cast<uint32_t>(10.0f * fa + 0.5f);
+
+    if (pnt < 121)
+    {
+        const float w  = fa - 0.1f * pnt;
+        const float w2 = w * w;
+        const float w4 = w2 * w2;
+
+        values[N] =
+              bf_data[pnt * 7 + 0]
+            + bf_data[pnt * 7 + 1] * w
+            + bf_data[pnt * 7 + 2] * w2
+            + bf_data[pnt * 7 + 3] * w2 * w
+            + bf_data[pnt * 7 + 4] * w4
+            + bf_data[pnt * 7 + 5] * w4 * w
+            + bf_data[pnt * 7 + 6] * w4 * w2;
+
+        const float f2a = fa + fa;
+        const float fx  = expf(-fa);
+
+        for (uint32_t j = 0; j < N; j++)
+        {
+            values[N - j - 1] =
+                ft[N - j - 1] * (f2a * values[N - j] + fx);
+        }
+    }
+    else
+    {
+        const float fia = 1.0f / fa;
+        float pf = 0.5f * fia;
+
+        values[0] = (float)MATH_CONST_HALF_SQRT_PI * sqrtf(fia);
+
+        if (pnt < 921)
+        {
+            const float fia2 = fia * fia;
+
+            const float f =
+                  0.4999489092f * fia
+                - 0.2473631686f * fia2
+                + 0.3211809090f * fia2 * fia
+                - 0.3811559346f * fia2 * fia2;
+
+            const float fx = expf(-fa);
+
+            values[0] -= f * fx;
+
+            const float rterm = pf * fx;
+
+            for (uint32_t j = 1; j <= N; j++)
+            {
+                values[j] = pf * values[j - 1] - rterm;
+                pf += fia;
+            }
+        }
+        else
+        {
+            for (uint32_t j = 1; j <= N; j++)
+            {
+                values[j] = pf * values[j - 1];
+                pf += fia;
+            }
+        }
+    }
+}
+
 }  // namespace gpu
 
 #endif /* BoysFuncGPU_hpp */

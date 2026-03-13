@@ -3411,6 +3411,2734 @@ computeCoulombFockPPPP(double*         mat_J,
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
+computeCoulombFockPPPP_ori(double*         mat_J,
+                       const double*   p_prim_info,
+                       const uint32_t  p_prim_count,
+                       const double*   pp_mat_D,
+                       const double*   pp_mat_Q_local,
+                       const double*   pp_mat_Q,
+                       const uint32_t* pp_first_inds_local,
+                       const uint32_t* pp_second_inds_local,
+                       const double*   pp_pair_data_local,
+                       const uint32_t  pp_prim_pair_count_local,
+                       const uint32_t* pp_first_inds,
+                       const uint32_t* pp_second_inds,
+                       const double*   pp_pair_data,
+                       const uint32_t  pp_prim_pair_count,
+                       const double*   boys_func_table,
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
+{
+    // each thread row scans over [ij|??] and sum up to a primitive J matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
+
+    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   delta[3][3];
+
+    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double PA_0, PB_0;
+    uint32_t i, j, a0, b0;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+    }
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+
+    __syncthreads();
+
+    if (ij < pp_prim_pair_count_local)
+    {
+        i = pp_first_inds_local[ij];
+        j = pp_second_inds_local[ij];
+
+        a_i = p_prim_info[i / 3 + p_prim_count * 0];
+
+        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
+        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
+        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+
+        a_j = p_prim_info[j / 3 + p_prim_count * 0];
+
+        r_j[0] = p_prim_info[j / 3 + p_prim_count * 2];
+        r_j[1] = p_prim_info[j / 3 + p_prim_count * 3];
+        r_j[2] = p_prim_info[j / 3 + p_prim_count * 4];
+
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
+        S_ij_00 = pp_pair_data_local[ij];
+
+        a0 = i % 3;
+        b0 = j % 3;
+
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+
+    }
+
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    {
+        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+
+        if ((ij >= pp_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(pp_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        {
+            break;
+        }
+
+        const auto k = pp_first_inds[kl];
+        const auto l = pp_second_inds[kl];
+
+        const auto a_k = p_prim_info[k / 3 + p_prim_count * 0];
+
+        const double r_k[3] = {p_prim_info[k / 3 + p_prim_count * 2],
+                               p_prim_info[k / 3 + p_prim_count * 3],
+                               p_prim_info[k / 3 + p_prim_count * 4]};
+
+        const auto a_l = p_prim_info[l / 3 + p_prim_count * 0];
+
+        const double r_l[3] = {p_prim_info[l / 3 + p_prim_count * 2],
+                               p_prim_info[l / 3 + p_prim_count * 3],
+                               p_prim_info[l / 3 + p_prim_count * 4]};
+
+        const auto S_kl_00 = pp_pair_data[kl];
+
+        const auto c0 = k % 3;
+        const auto d0 = l % 3;
+
+        // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
+        // J. Chem. Phys. 84, 3963-3974 (1986)
+
+        const auto S2 = a_k + a_l;
+
+        const auto inv_S2 = 1.0 / S2;
+        const auto inv_S4 = 1.0 / (S1 + S2);
+
+        const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                              (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                              (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+        const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
+
+        const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
+
+        double F4_t[5];
+
+        gpu::computeBoysFunction(F4_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
+
+        const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+        const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+
+        const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
+                + F4_t[0] * (
+
+                    0.5 * inv_S1 * (
+                        +QC_0*QD_0*delta[a0][b0]
+                    )
+
+                    + 0.5 * inv_S2 * (
+                        +PA_0*PB_0*delta[c0][d0]
+                    )
+
+                    + (
+                        +PA_0*PB_0*QC_0*QD_0
+                    )
+
+                    + 0.25 * inv_S1 * inv_S2 * (
+                        +delta[a0][b0]*delta[c0][d0]
+                    )
+
+                )
+
+                + F4_t[1] * (
+
+                    (-0.25) * inv_S1 * inv_S4 * (
+                        +delta[a0][b0]*delta[c0][d0]
+                    )
+
+                    + (-0.25) * inv_S2 * inv_S4 * (
+                        +delta[a0][b0]*delta[c0][d0]
+                    )
+
+                    + (-0.5) * S1 * inv_S2 * inv_S4 * (
+                        +PA_0*PB_0*delta[c0][d0]
+                    )
+
+                    + (-0.5) * S2 * inv_S1 * inv_S4 * (
+                        +QC_0*QD_0*delta[a0][b0]
+                    )
+
+                    + 0.5 * inv_S4 * (
+                        +PA_0*QD_0*delta[b0][c0]
+
+                        +delta[c0][d0]*(PA_0*PQ[b0] + PB_0*PQ[a0])
+
+                        +PB_0*QD_0*delta[a0][c0] + QC_0*(PA_0*delta[b0][d0] + PB_0*delta[a0][d0])
+
+                        +delta[a0][b0]*(-PQ[c0]*QD_0 - PQ[d0]*QC_0)
+                    )
+
+                    + S1 * inv_S4 * (
+                        +PA_0*PB_0*(-PQ[c0]*QD_0 - PQ[d0]*QC_0)
+                    )
+
+                    + S2 * inv_S4 * (
+                        +QC_0*QD_0*(PA_0*PQ[b0] + PB_0*PQ[a0])
+                    )
+
+                )
+
+                + F4_t[2] * (
+
+                    0.5 * S1 * inv_S4 * inv_S4 * (
+                        +delta[c0][d0]*(-PA_0*PQ[b0] - PB_0*PQ[a0])
+
+                        -PA_0*(PQ[c0]*delta[b0][d0] + PQ[d0]*delta[b0][c0]) - PB_0*(PQ[c0]*delta[a0][d0] + PQ[d0]*delta[a0][c0])
+
+                        +PQ[c0]*PQ[d0]*delta[a0][b0]
+                    )
+
+                    + 0.5 * S2 * inv_S4 * inv_S4 * (
+                        +PQ[a0]*QD_0*delta[b0][c0]
+
+                        +PQ[b0]*QD_0*delta[a0][c0] + QC_0*(PQ[a0]*delta[b0][d0] + PQ[b0]*delta[a0][d0])
+
+                        +delta[a0][b0]*(PQ[c0]*QD_0 + PQ[d0]*QC_0)
+
+                        +PQ[a0]*PQ[b0]*delta[c0][d0]
+                    )
+
+                    + S1 * S1 * inv_S4 * inv_S4 * (
+                        +PA_0*PB_0*PQ[c0]*PQ[d0]
+                    )
+
+                    + S1 * S2 * inv_S4 * inv_S4 * (
+                        -(PA_0*PQ[b0] + PB_0*PQ[a0])*(PQ[c0]*QD_0 + PQ[d0]*QC_0)
+                    )
+
+                    + S2 * S2 * inv_S4 * inv_S4 * (
+                        +PQ[a0]*PQ[b0]*QC_0*QD_0
+                    )
+
+                    + 0.25 * inv_S4 * inv_S4 * (
+                        +delta[a0][b0]*delta[c0][d0] + delta[a0][c0]*delta[b0][d0] + delta[a0][d0]*delta[b0][c0]
+                    )
+
+                )
+
+                + F4_t[3] * (
+
+                    (-0.5) * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * (
+                        +PQ[a0]*PQ[b0]*delta[c0][d0]
+
+                        +PQ[c0]*(PQ[a0]*delta[b0][d0] + PQ[b0]*delta[a0][d0] + PQ[d0]*delta[a0][b0]) + PQ[d0]*(PQ[a0]*delta[b0][c0] + PQ[b0]*delta[a0][c0])
+                    )
+
+                    + S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * (
+                        +PQ[c0]*PQ[d0]*(PA_0*PQ[b0] + PB_0*PQ[a0])
+                    )
+
+                    + S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * (
+                        +PQ[a0]*PQ[b0]*(-PQ[c0]*QD_0 - PQ[d0]*QC_0)
+                    )
+
+                )
+
+                + F4_t[4] * (
+
+                    S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
+                        +PQ[a0]*PQ[b0]*PQ[c0]*PQ[d0]
+                    )
+
+                )
+
+                );
+
+        // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
+        //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
+        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+
+    }
+
+    __syncthreads();
+
+    if ((threadIdx.y == 0) && (ij < pp_prim_pair_count_local))
+    {
+        double J_ij = 0.0;
+
+        for (uint32_t n = 0; n < TILE_DIM; n++)
+        {
+            J_ij += ERIs[n][threadIdx.x];
+        }
+
+        mat_J[ij] += J_ij;
+    }
+}
+
+// using double in both if and else branch
+__global__ void __launch_bounds__(TILE_SIZE_J)
+computeCoulombFockPPPP_MP_alld(double*         mat_J,
+                       const double*   p_prim_info,
+                       const uint32_t  p_prim_count,
+                       const double*   pp_mat_D,
+                       const double*   pp_mat_Q_local,
+                       const double*   pp_mat_Q,
+                       const uint32_t* pp_first_inds_local,
+                       const uint32_t* pp_second_inds_local,
+                       const double*   pp_pair_data_local,
+                       const uint32_t  pp_prim_pair_count_local,
+                       const uint32_t* pp_first_inds,
+                       const uint32_t* pp_second_inds,
+                       const double*   pp_pair_data,
+                       const uint32_t  pp_prim_pair_count,
+                       const double*   boys_func_table,
+                       const double*   boys_func_ft,
+                       const double    eri_threshold,
+                       const uint32_t*  cut_ij_tile,
+                       const double    tau_precision)
+{
+    // each thread row scans over [ij|??] and sum up to a primitive J matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
+
+    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   delta[3][3];
+
+    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+
+    const uint32_t ij_tile = blockIdx.x;
+    const uint32_t cut = cut_ij_tile[ij_tile];
+
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double PA_0, PB_0;
+    uint32_t i, j, a0, b0;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+    }
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+
+    __syncthreads();
+
+    if (ij < pp_prim_pair_count_local)
+    {
+        i = pp_first_inds_local[ij];
+        j = pp_second_inds_local[ij];
+
+        a_i = p_prim_info[i / 3 + p_prim_count * 0];
+
+        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
+        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
+        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+
+        a_j = p_prim_info[j / 3 + p_prim_count * 0];
+
+        r_j[0] = p_prim_info[j / 3 + p_prim_count * 2];
+        r_j[1] = p_prim_info[j / 3 + p_prim_count * 3];
+        r_j[2] = p_prim_info[j / 3 + p_prim_count * 4];
+
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
+        S_ij_00 = pp_pair_data_local[ij];
+
+        a0 = i % 3;
+        b0 = j % 3;
+
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+
+    }
+
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    {
+        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+
+        if ((ij >= pp_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(pp_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        {
+            break;
+        }
+
+        // ====== 新增：按 m 与 cut 分段 ======
+        if ((int)m < cut) {
+            const auto k = pp_first_inds[kl];
+            const auto l = pp_second_inds[kl];
+
+            const auto a_k = p_prim_info[k / 3 + p_prim_count * 0];
+
+            const double r_k[3] = {p_prim_info[k / 3 + p_prim_count * 2],
+                                p_prim_info[k / 3 + p_prim_count * 3],
+                                p_prim_info[k / 3 + p_prim_count * 4]};
+
+            const auto a_l = p_prim_info[l / 3 + p_prim_count * 0];
+
+            const double r_l[3] = {p_prim_info[l / 3 + p_prim_count * 2],
+                                p_prim_info[l / 3 + p_prim_count * 3],
+                                p_prim_info[l / 3 + p_prim_count * 4]};
+
+            const auto S_kl_00 = pp_pair_data[kl];
+
+            const auto c0 = k % 3;
+            const auto d0 = l % 3;
+
+            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
+            // J. Chem. Phys. 84, 3963-3974 (1986)
+
+            const auto S2 = a_k + a_l;
+
+            const auto inv_S2 = 1.0 / S2;
+            const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
+
+            const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
+
+            double F4_t[5];
+
+            gpu::computeBoysFunction(F4_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
+
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+
+            const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
+                    + F4_t[0] * (
+
+                        0.5 * inv_S1 * (
+                            +QC_0*QD_0*delta[a0][b0]
+                        )
+
+                        + 0.5 * inv_S2 * (
+                            +PA_0*PB_0*delta[c0][d0]
+                        )
+
+                        + (
+                            +PA_0*PB_0*QC_0*QD_0
+                        )
+
+                        + 0.25 * inv_S1 * inv_S2 * (
+                            +delta[a0][b0]*delta[c0][d0]
+                        )
+
+                    )
+
+                    + F4_t[1] * (
+
+                        (-0.25) * inv_S1 * inv_S4 * (
+                            +delta[a0][b0]*delta[c0][d0]
+                        )
+
+                        + (-0.25) * inv_S2 * inv_S4 * (
+                            +delta[a0][b0]*delta[c0][d0]
+                        )
+
+                        + (-0.5) * S1 * inv_S2 * inv_S4 * (
+                            +PA_0*PB_0*delta[c0][d0]
+                        )
+
+                        + (-0.5) * S2 * inv_S1 * inv_S4 * (
+                            +QC_0*QD_0*delta[a0][b0]
+                        )
+
+                        + 0.5 * inv_S4 * (
+                            +PA_0*QD_0*delta[b0][c0]
+
+                            +delta[c0][d0]*(PA_0*PQ[b0] + PB_0*PQ[a0])
+
+                            +PB_0*QD_0*delta[a0][c0] + QC_0*(PA_0*delta[b0][d0] + PB_0*delta[a0][d0])
+
+                            +delta[a0][b0]*(-PQ[c0]*QD_0 - PQ[d0]*QC_0)
+                        )
+
+                        + S1 * inv_S4 * (
+                            +PA_0*PB_0*(-PQ[c0]*QD_0 - PQ[d0]*QC_0)
+                        )
+
+                        + S2 * inv_S4 * (
+                            +QC_0*QD_0*(PA_0*PQ[b0] + PB_0*PQ[a0])
+                        )
+
+                    )
+
+                    + F4_t[2] * (
+
+                        0.5 * S1 * inv_S4 * inv_S4 * (
+                            +delta[c0][d0]*(-PA_0*PQ[b0] - PB_0*PQ[a0])
+
+                            -PA_0*(PQ[c0]*delta[b0][d0] + PQ[d0]*delta[b0][c0]) - PB_0*(PQ[c0]*delta[a0][d0] + PQ[d0]*delta[a0][c0])
+
+                            +PQ[c0]*PQ[d0]*delta[a0][b0]
+                        )
+
+                        + 0.5 * S2 * inv_S4 * inv_S4 * (
+                            +PQ[a0]*QD_0*delta[b0][c0]
+
+                            +PQ[b0]*QD_0*delta[a0][c0] + QC_0*(PQ[a0]*delta[b0][d0] + PQ[b0]*delta[a0][d0])
+
+                            +delta[a0][b0]*(PQ[c0]*QD_0 + PQ[d0]*QC_0)
+
+                            +PQ[a0]*PQ[b0]*delta[c0][d0]
+                        )
+
+                        + S1 * S1 * inv_S4 * inv_S4 * (
+                            +PA_0*PB_0*PQ[c0]*PQ[d0]
+                        )
+
+                        + S1 * S2 * inv_S4 * inv_S4 * (
+                            -(PA_0*PQ[b0] + PB_0*PQ[a0])*(PQ[c0]*QD_0 + PQ[d0]*QC_0)
+                        )
+
+                        + S2 * S2 * inv_S4 * inv_S4 * (
+                            +PQ[a0]*PQ[b0]*QC_0*QD_0
+                        )
+
+                        + 0.25 * inv_S4 * inv_S4 * (
+                            +delta[a0][b0]*delta[c0][d0] + delta[a0][c0]*delta[b0][d0] + delta[a0][d0]*delta[b0][c0]
+                        )
+
+                    )
+
+                    + F4_t[3] * (
+
+                        (-0.5) * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * (
+                            +PQ[a0]*PQ[b0]*delta[c0][d0]
+
+                            +PQ[c0]*(PQ[a0]*delta[b0][d0] + PQ[b0]*delta[a0][d0] + PQ[d0]*delta[a0][b0]) + PQ[d0]*(PQ[a0]*delta[b0][c0] + PQ[b0]*delta[a0][c0])
+                        )
+
+                        + S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * (
+                            +PQ[c0]*PQ[d0]*(PA_0*PQ[b0] + PB_0*PQ[a0])
+                        )
+
+                        + S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * (
+                            +PQ[a0]*PQ[b0]*(-PQ[c0]*QD_0 - PQ[d0]*QC_0)
+                        )
+
+                    )
+
+                    + F4_t[4] * (
+
+                        S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
+                            +PQ[a0]*PQ[b0]*PQ[c0]*PQ[d0]
+                        )
+
+                    )
+
+                    );
+
+            // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
+            //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+        }else{
+            {
+                // all double
+                const auto k = pp_first_inds[kl];
+                const auto l = pp_second_inds[kl];
+
+                const auto a_k = p_prim_info[k / 3 + p_prim_count * 0];
+
+                const double r_k[3] = {p_prim_info[k / 3 + p_prim_count * 2],
+                                    p_prim_info[k / 3 + p_prim_count * 3],
+                                    p_prim_info[k / 3 + p_prim_count * 4]};
+
+                const auto a_l = p_prim_info[l / 3 + p_prim_count * 0];
+
+                const double r_l[3] = {p_prim_info[l / 3 + p_prim_count * 2],
+                                    p_prim_info[l / 3 + p_prim_count * 3],
+                                    p_prim_info[l / 3 + p_prim_count * 4]};
+
+                const auto S_kl_00 = pp_pair_data[kl];
+
+                const auto c0 = k % 3;
+                const auto d0 = l % 3;
+
+                // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
+                // J. Chem. Phys. 84, 3963-3974 (1986)
+
+                const auto S2 = a_k + a_l;
+
+                const auto inv_S2 = 1.0 / S2;
+                const auto inv_S4 = 1.0 / (S1 + S2);
+
+                const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                    (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                    (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+                const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
+
+                const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
+
+                double F4_t[5];
+
+                gpu::computeBoysFunction(F4_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
+
+                const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+
+                const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
+                        + F4_t[0] * (
+
+                            0.5 * inv_S1 * (
+                                +QC_0*QD_0*delta[a0][b0]
+                            )
+
+                            + 0.5 * inv_S2 * (
+                                +PA_0*PB_0*delta[c0][d0]
+                            )
+
+                            + (
+                                +PA_0*PB_0*QC_0*QD_0
+                            )
+
+                            + 0.25 * inv_S1 * inv_S2 * (
+                                +delta[a0][b0]*delta[c0][d0]
+                            )
+
+                        )
+
+                        + F4_t[1] * (
+
+                            (-0.25) * inv_S1 * inv_S4 * (
+                                +delta[a0][b0]*delta[c0][d0]
+                            )
+
+                            + (-0.25) * inv_S2 * inv_S4 * (
+                                +delta[a0][b0]*delta[c0][d0]
+                            )
+
+                            + (-0.5) * S1 * inv_S2 * inv_S4 * (
+                                +PA_0*PB_0*delta[c0][d0]
+                            )
+
+                            + (-0.5) * S2 * inv_S1 * inv_S4 * (
+                                +QC_0*QD_0*delta[a0][b0]
+                            )
+
+                            + 0.5 * inv_S4 * (
+                                +PA_0*QD_0*delta[b0][c0]
+
+                                +delta[c0][d0]*(PA_0*PQ[b0] + PB_0*PQ[a0])
+
+                                +PB_0*QD_0*delta[a0][c0] + QC_0*(PA_0*delta[b0][d0] + PB_0*delta[a0][d0])
+
+                                +delta[a0][b0]*(-PQ[c0]*QD_0 - PQ[d0]*QC_0)
+                            )
+
+                            + S1 * inv_S4 * (
+                                +PA_0*PB_0*(-PQ[c0]*QD_0 - PQ[d0]*QC_0)
+                            )
+
+                            + S2 * inv_S4 * (
+                                +QC_0*QD_0*(PA_0*PQ[b0] + PB_0*PQ[a0])
+                            )
+
+                        )
+
+                        + F4_t[2] * (
+
+                            0.5 * S1 * inv_S4 * inv_S4 * (
+                                +delta[c0][d0]*(-PA_0*PQ[b0] - PB_0*PQ[a0])
+
+                                -PA_0*(PQ[c0]*delta[b0][d0] + PQ[d0]*delta[b0][c0]) - PB_0*(PQ[c0]*delta[a0][d0] + PQ[d0]*delta[a0][c0])
+
+                                +PQ[c0]*PQ[d0]*delta[a0][b0]
+                            )
+
+                            + 0.5 * S2 * inv_S4 * inv_S4 * (
+                                +PQ[a0]*QD_0*delta[b0][c0]
+
+                                +PQ[b0]*QD_0*delta[a0][c0] + QC_0*(PQ[a0]*delta[b0][d0] + PQ[b0]*delta[a0][d0])
+
+                                +delta[a0][b0]*(PQ[c0]*QD_0 + PQ[d0]*QC_0)
+
+                                +PQ[a0]*PQ[b0]*delta[c0][d0]
+                            )
+
+                            + S1 * S1 * inv_S4 * inv_S4 * (
+                                +PA_0*PB_0*PQ[c0]*PQ[d0]
+                            )
+
+                            + S1 * S2 * inv_S4 * inv_S4 * (
+                                -(PA_0*PQ[b0] + PB_0*PQ[a0])*(PQ[c0]*QD_0 + PQ[d0]*QC_0)
+                            )
+
+                            + S2 * S2 * inv_S4 * inv_S4 * (
+                                +PQ[a0]*PQ[b0]*QC_0*QD_0
+                            )
+
+                            + 0.25 * inv_S4 * inv_S4 * (
+                                +delta[a0][b0]*delta[c0][d0] + delta[a0][c0]*delta[b0][d0] + delta[a0][d0]*delta[b0][c0]
+                            )
+
+                        )
+
+                        + F4_t[3] * (
+
+                            (-0.5) * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * (
+                                +PQ[a0]*PQ[b0]*delta[c0][d0]
+
+                                +PQ[c0]*(PQ[a0]*delta[b0][d0] + PQ[b0]*delta[a0][d0] + PQ[d0]*delta[a0][b0]) + PQ[d0]*(PQ[a0]*delta[b0][c0] + PQ[b0]*delta[a0][c0])
+                            )
+
+                            + S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * (
+                                +PQ[c0]*PQ[d0]*(PA_0*PQ[b0] + PB_0*PQ[a0])
+                            )
+
+                            + S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * (
+                                +PQ[a0]*PQ[b0]*(-PQ[c0]*QD_0 - PQ[d0]*QC_0)
+                            )
+
+                        )
+
+                        + F4_t[4] * (
+
+                            S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
+                                +PQ[a0]*PQ[b0]*PQ[c0]*PQ[d0]
+                            )
+
+                        )
+
+                        );
+
+                // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
+                //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
+                ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+            }
+            }
+    }
+
+    __syncthreads();
+
+    if ((threadIdx.y == 0) && (ij < pp_prim_pair_count_local))
+    {
+        double J_ij = 0.0;
+
+        for (uint32_t n = 0; n < TILE_DIM; n++)
+        {
+            J_ij += ERIs[n][threadIdx.x];
+        }
+
+        mat_J[ij] += J_ij;
+    }
+}
+
+// Mixed precision PPPP
+__global__ void __launch_bounds__(TILE_SIZE_J)
+computeCoulombFockPPPP_MP_inside_cast(double*         mat_J,
+                       const double*   p_prim_info,
+                       const uint32_t  p_prim_count,
+                       const double*   pp_mat_D,
+                       const double*   pp_mat_Q_local,
+                       const double*   pp_mat_Q,
+                       const uint32_t* pp_first_inds_local,
+                       const uint32_t* pp_second_inds_local,
+                       const double*   pp_pair_data_local,
+                       const uint32_t  pp_prim_pair_count_local,
+                       const uint32_t* pp_first_inds,
+                       const uint32_t* pp_second_inds,
+                       const double*   pp_pair_data,
+                       const uint32_t  pp_prim_pair_count,
+                       const double*   boys_func_table,
+                       const double*   boys_func_ft,
+                       const float*    boys_func_table_f,
+                       const float*    boys_func_ft_f,
+                       const double    eri_threshold,
+                       const uint32_t*  cut_ij_tile,
+                       const double    tau_precision
+                    )
+{
+    // each thread row scans over [ij|??] and sum up to a primitive J matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
+
+    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   delta[3][3];
+
+    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+
+    const uint32_t ij_tile = blockIdx.x;
+    const uint32_t cut = cut_ij_tile[ij_tile];
+
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double PA_0, PB_0;
+    uint32_t i, j, a0, b0;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+    }
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+
+    __syncthreads();
+
+    if (ij < pp_prim_pair_count_local)
+    {
+        i = pp_first_inds_local[ij];
+        j = pp_second_inds_local[ij];
+
+        a_i = p_prim_info[i / 3 + p_prim_count * 0];
+
+        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
+        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
+        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+
+        a_j = p_prim_info[j / 3 + p_prim_count * 0];
+
+        r_j[0] = p_prim_info[j / 3 + p_prim_count * 2];
+        r_j[1] = p_prim_info[j / 3 + p_prim_count * 3];
+        r_j[2] = p_prim_info[j / 3 + p_prim_count * 4];
+
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
+        S_ij_00 = pp_pair_data_local[ij];
+
+        a0 = i % 3;
+        b0 = j % 3;
+
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+
+    }
+
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    {
+        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+
+        if ((ij >= pp_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(pp_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        {
+            break;
+        }
+
+        // ====== 新增：按 m 与 cut 分段 ======
+        if ((int)m < cut) {
+            const auto k = pp_first_inds[kl];
+            const auto l = pp_second_inds[kl];
+
+            const auto a_k = p_prim_info[k / 3 + p_prim_count * 0];
+
+            const double r_k[3] = {p_prim_info[k / 3 + p_prim_count * 2],
+                                p_prim_info[k / 3 + p_prim_count * 3],
+                                p_prim_info[k / 3 + p_prim_count * 4]};
+
+            const auto a_l = p_prim_info[l / 3 + p_prim_count * 0];
+
+            const double r_l[3] = {p_prim_info[l / 3 + p_prim_count * 2],
+                                p_prim_info[l / 3 + p_prim_count * 3],
+                                p_prim_info[l / 3 + p_prim_count * 4]};
+
+            const auto S_kl_00 = pp_pair_data[kl];
+
+            const auto c0 = k % 3;
+            const auto d0 = l % 3;
+
+            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
+            // J. Chem. Phys. 84, 3963-3974 (1986)
+
+            const auto S2 = a_k + a_l;
+
+            const auto inv_S2 = 1.0 / S2;
+            const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
+
+            const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
+
+            double F4_t[5];
+
+            gpu::computeBoysFunction(F4_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
+
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+
+            const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
+                    + F4_t[0] * (
+
+                        0.5 * inv_S1 * (
+                            +QC_0*QD_0*delta[a0][b0]
+                        )
+
+                        + 0.5 * inv_S2 * (
+                            +PA_0*PB_0*delta[c0][d0]
+                        )
+
+                        + (
+                            +PA_0*PB_0*QC_0*QD_0
+                        )
+
+                        + 0.25 * inv_S1 * inv_S2 * (
+                            +delta[a0][b0]*delta[c0][d0]
+                        )
+
+                    )
+
+                    + F4_t[1] * (
+
+                        (-0.25) * inv_S1 * inv_S4 * (
+                            +delta[a0][b0]*delta[c0][d0]
+                        )
+
+                        + (-0.25) * inv_S2 * inv_S4 * (
+                            +delta[a0][b0]*delta[c0][d0]
+                        )
+
+                        + (-0.5) * S1 * inv_S2 * inv_S4 * (
+                            +PA_0*PB_0*delta[c0][d0]
+                        )
+
+                        + (-0.5) * S2 * inv_S1 * inv_S4 * (
+                            +QC_0*QD_0*delta[a0][b0]
+                        )
+
+                        + 0.5 * inv_S4 * (
+                            +PA_0*QD_0*delta[b0][c0]
+
+                            +delta[c0][d0]*(PA_0*PQ[b0] + PB_0*PQ[a0])
+
+                            +PB_0*QD_0*delta[a0][c0] + QC_0*(PA_0*delta[b0][d0] + PB_0*delta[a0][d0])
+
+                            +delta[a0][b0]*(-PQ[c0]*QD_0 - PQ[d0]*QC_0)
+                        )
+
+                        + S1 * inv_S4 * (
+                            +PA_0*PB_0*(-PQ[c0]*QD_0 - PQ[d0]*QC_0)
+                        )
+
+                        + S2 * inv_S4 * (
+                            +QC_0*QD_0*(PA_0*PQ[b0] + PB_0*PQ[a0])
+                        )
+
+                    )
+
+                    + F4_t[2] * (
+
+                        0.5 * S1 * inv_S4 * inv_S4 * (
+                            +delta[c0][d0]*(-PA_0*PQ[b0] - PB_0*PQ[a0])
+
+                            -PA_0*(PQ[c0]*delta[b0][d0] + PQ[d0]*delta[b0][c0]) - PB_0*(PQ[c0]*delta[a0][d0] + PQ[d0]*delta[a0][c0])
+
+                            +PQ[c0]*PQ[d0]*delta[a0][b0]
+                        )
+
+                        + 0.5 * S2 * inv_S4 * inv_S4 * (
+                            +PQ[a0]*QD_0*delta[b0][c0]
+
+                            +PQ[b0]*QD_0*delta[a0][c0] + QC_0*(PQ[a0]*delta[b0][d0] + PQ[b0]*delta[a0][d0])
+
+                            +delta[a0][b0]*(PQ[c0]*QD_0 + PQ[d0]*QC_0)
+
+                            +PQ[a0]*PQ[b0]*delta[c0][d0]
+                        )
+
+                        + S1 * S1 * inv_S4 * inv_S4 * (
+                            +PA_0*PB_0*PQ[c0]*PQ[d0]
+                        )
+
+                        + S1 * S2 * inv_S4 * inv_S4 * (
+                            -(PA_0*PQ[b0] + PB_0*PQ[a0])*(PQ[c0]*QD_0 + PQ[d0]*QC_0)
+                        )
+
+                        + S2 * S2 * inv_S4 * inv_S4 * (
+                            +PQ[a0]*PQ[b0]*QC_0*QD_0
+                        )
+
+                        + 0.25 * inv_S4 * inv_S4 * (
+                            +delta[a0][b0]*delta[c0][d0] + delta[a0][c0]*delta[b0][d0] + delta[a0][d0]*delta[b0][c0]
+                        )
+
+                    )
+
+                    + F4_t[3] * (
+
+                        (-0.5) * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * (
+                            +PQ[a0]*PQ[b0]*delta[c0][d0]
+
+                            +PQ[c0]*(PQ[a0]*delta[b0][d0] + PQ[b0]*delta[a0][d0] + PQ[d0]*delta[a0][b0]) + PQ[d0]*(PQ[a0]*delta[b0][c0] + PQ[b0]*delta[a0][c0])
+                        )
+
+                        + S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * (
+                            +PQ[c0]*PQ[d0]*(PA_0*PQ[b0] + PB_0*PQ[a0])
+                        )
+
+                        + S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * (
+                            +PQ[a0]*PQ[b0]*(-PQ[c0]*QD_0 - PQ[d0]*QC_0)
+                        )
+
+                    )
+
+                    + F4_t[4] * (
+
+                        S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
+                            +PQ[a0]*PQ[b0]*PQ[c0]*PQ[d0]
+                        )
+
+                    )
+
+                    );
+
+            // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
+            //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+        }else{
+            // 可以抽成函数用template
+            auto f_2f = [](double x) -> float { return (float)x; };
+
+            const auto k = pp_first_inds[kl];
+            const auto l = pp_second_inds[kl];
+
+            const float a_k_f = f_2f(p_prim_info[k / 3 + p_prim_count * 0]);
+
+            const float r_k_f[3] = {
+                f_2f(p_prim_info[k / 3 + p_prim_count * 2]),
+                f_2f(p_prim_info[k / 3 + p_prim_count * 3]),
+                f_2f(p_prim_info[k / 3 + p_prim_count * 4])
+            };
+
+            const float a_l_f = f_2f(p_prim_info[l / 3 + p_prim_count * 0]);
+
+            const float r_l_f[3] = {
+                f_2f(p_prim_info[l / 3 + p_prim_count * 2]),
+                f_2f(p_prim_info[l / 3 + p_prim_count * 3]),
+                f_2f(p_prim_info[l / 3 + p_prim_count * 4])
+            };
+
+            const float S_ij_00_f = f_2f(pp_pair_data_local[ij]);
+            const float S_kl_00_f = f_2f(pp_pair_data[kl]);
+
+            const auto c0 = k % 3;
+            const auto d0 = l % 3;
+
+            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
+            // J. Chem. Phys. 84, 3963-3974 (1986)
+
+            const float S2_f    = a_k_f + a_l_f;
+
+            const float inv_S2_f = 1.0f / S2_f;
+
+            const float S1_f     = f_2f(S1);
+            const float inv_S1_f = f_2f(inv_S1);
+            const float inv_S4_f = 1.0f / (S1_f + S2_f);
+
+            float PQ_f[3] = {
+                (a_k_f * r_k_f[0] + a_l_f * r_l_f[0]) * inv_S2_f - (f_2f(a_i) * f_2f(r_i[0]) + f_2f(a_j) * f_2f(r_j[0])) * inv_S1_f,
+                (a_k_f * r_k_f[1] + a_l_f * r_l_f[1]) * inv_S2_f - (f_2f(a_i) * f_2f(r_i[1]) + f_2f(a_j) * f_2f(r_j[1])) * inv_S1_f,
+                (a_k_f * r_k_f[2] + a_l_f * r_l_f[2]) * inv_S2_f - (f_2f(a_i) * f_2f(r_i[2]) + f_2f(a_j) * f_2f(r_j[2])) * inv_S1_f
+            };
+
+            const float r2_PQ_f = PQ_f[0]*PQ_f[0] + PQ_f[1]*PQ_f[1] + PQ_f[2]*PQ_f[2];
+
+            const float Lambda_f = sqrtf(4.0f * S1_f * S2_f * (float)MATH_CONST_INV_PI * inv_S4_f);
+
+            // // ---- Boys: keep existing double routine, but feed it float-derived args ----
+            // double F4_d[5];
+            // gpu::computeBoysFunction(
+            //     F4_d,
+            //     (double)(S1_f * S2_f * inv_S4_f * r2_PQ_f),
+            //     4,
+            //     boys_func_table,
+            //     boys_func_ft
+            // );
+            // const float F4_f[5] = {
+            //     (float)F4_d[0], (float)F4_d[1], (float)F4_d[2], (float)F4_d[3], (float)F4_d[4]
+            // };
+
+            // FP32 Boys function
+            float F4_f[5];
+            gpu::computeBoysFunction_f(
+                F4_f,
+                S1_f * S2_f * inv_S4_f * r2_PQ_f,
+                4,
+                boys_func_table_f,
+                boys_func_ft_f
+            );
+
+            // ---- QC/QD in float ----
+            const float QC_0_f = (a_l_f * inv_S2_f) * (r_l_f[c0] - r_k_f[c0]);
+            const float QD_0_f = (-a_k_f * inv_S2_f) * (r_l_f[d0] - r_k_f[d0]);
+
+            // ---- delta to float (important: avoid implicit double ops) ----
+            const float d_ab = (float)delta[a0][b0];
+            const float d_cd = (float)delta[c0][d0];
+            const float d_bc = (float)delta[b0][c0];
+            const float d_ac = (float)delta[a0][c0];
+            const float d_bd = (float)delta[b0][d0];
+            const float d_ad = (float)delta[a0][d0];
+
+            const float PA_0_f    = f_2f(PA_0);
+            const float PB_0_f    = f_2f(PB_0);
+            
+            // ---- eri formula in float ----
+            const float eri_ijkl_f = Lambda_f * S_ij_00_f * S_kl_00_f * (
+
+                + F4_f[0] * (
+
+                    0.5f * inv_S1_f * (
+                        +QC_0_f*QD_0_f*d_ab
+                    )
+
+                    + 0.5f * inv_S2_f * (
+                        +PA_0_f*PB_0_f*d_cd
+                    )
+
+                    + (
+                        +PA_0_f*PB_0_f*QC_0_f*QD_0_f
+                    )
+
+                    + 0.25f * inv_S1_f * inv_S2_f * (
+                        +d_ab*d_cd
+                    )
+
+                )
+
+                + F4_f[1] * (
+
+                    (-0.25f) * inv_S1_f * inv_S4_f * (
+                        +d_ab*d_cd
+                    )
+
+                    + (-0.25f) * inv_S2_f * inv_S4_f * (
+                        +d_ab*d_cd
+                    )
+
+                    + (-0.5f) * S1_f * inv_S2_f * inv_S4_f * (
+                        +PA_0_f*PB_0_f*d_cd
+                    )
+
+                    + (-0.5f) * S2_f * inv_S1_f * inv_S4_f * (
+                        +QC_0_f*QD_0_f*d_ab
+                    )
+
+                    + 0.5f * inv_S4_f * (
+                        +PA_0_f*QD_0_f*d_bc
+
+                        +d_cd*(PA_0_f*PQ_f[b0] + PB_0_f*PQ_f[a0])
+
+                        +PB_0_f*QD_0_f*d_ac + QC_0_f*(PA_0_f*d_bd + PB_0_f*d_ad)
+
+                        +d_ab*(-PQ_f[c0]*QD_0_f - PQ_f[d0]*QC_0_f)
+                    )
+
+                    + S1_f * inv_S4_f * (
+                        +PA_0_f*PB_0_f*(-PQ_f[c0]*QD_0_f - PQ_f[d0]*QC_0_f)
+                    )
+
+                    + S2_f * inv_S4_f * (
+                        +QC_0_f*QD_0_f*(PA_0_f*PQ_f[b0] + PB_0_f*PQ_f[a0])
+                    )
+
+                )
+
+                + F4_f[2] * (
+
+                    0.5f * S1_f * inv_S4_f * inv_S4_f * (
+                        +d_cd*(-PA_0_f*PQ_f[b0] - PB_0_f*PQ_f[a0])
+
+                        -PA_0_f*(PQ_f[c0]*d_bd + PQ_f[d0]*d_bc) - PB_0_f*(PQ_f[c0]*d_ad + PQ_f[d0]*d_ac)
+
+                        +PQ_f[c0]*PQ_f[d0]*d_ab
+                    )
+
+                    + 0.5f * S2_f * inv_S4_f * inv_S4_f * (
+                        +PQ_f[a0]*QD_0_f*d_bc
+
+                        +PQ_f[b0]*QD_0_f*d_ac + QC_0_f*(PQ_f[a0]*d_bd + PQ_f[b0]*d_ad)
+
+                        +d_ab*(PQ_f[c0]*QD_0_f + PQ_f[d0]*QC_0_f)
+
+                        +PQ_f[a0]*PQ_f[b0]*d_cd
+                    )
+
+                    + S1_f * S1_f * inv_S4_f * inv_S4_f * (
+                        +PA_0_f*PB_0_f*PQ_f[c0]*PQ_f[d0]
+                    )
+
+                    + S1_f * S2_f * inv_S4_f * inv_S4_f * (
+                        -(PA_0_f*PQ_f[b0] + PB_0_f*PQ_f[a0])*(PQ_f[c0]*QD_0_f + PQ_f[d0]*QC_0_f)
+                    )
+
+                    + S2_f * S2_f * inv_S4_f * inv_S4_f * (
+                        +PQ_f[a0]*PQ_f[b0]*QC_0_f*QD_0_f
+                    )
+
+                    + 0.25f * inv_S4_f * inv_S4_f * (
+                        +d_ab*d_cd + d_ac*d_bd + d_ad*d_bc
+                    )
+
+                )
+
+                + F4_f[3] * (
+
+                    (-0.5f) * S1_f * S2_f * inv_S4_f * inv_S4_f * inv_S4_f * (
+                        +PQ_f[a0]*PQ_f[b0]*d_cd
+
+                        +PQ_f[c0]*(PQ_f[a0]*d_bd + PQ_f[b0]*d_ad + PQ_f[d0]*d_ab)
+                        +PQ_f[d0]*(PQ_f[a0]*d_bc + PQ_f[b0]*d_ac)
+                    )
+
+                    + S1_f * S1_f * S2_f * inv_S4_f * inv_S4_f * inv_S4_f * (
+                        +PQ_f[c0]*PQ_f[d0]*(PA_0_f*PQ_f[b0] + PB_0_f*PQ_f[a0])
+                    )
+
+                    + S1_f * S2_f * S2_f * inv_S4_f * inv_S4_f * inv_S4_f * (
+                        +PQ_f[a0]*PQ_f[b0]*(-PQ_f[c0]*QD_0_f - PQ_f[d0]*QC_0_f)
+                    )
+
+                )
+
+                + F4_f[4] * (
+
+                    S1_f * S1_f * S2_f * S2_f * inv_S4_f * inv_S4_f * inv_S4_f * inv_S4_f * (
+                        +PQ_f[a0]*PQ_f[b0]*PQ_f[c0]*PQ_f[d0]
+                    )
+
+                )
+
+            );
+
+            // ---- multiply by D and symmetry in float ----
+            const float D_f   = f_2f(pp_mat_D[kl]);
+            const float sym_f = (k != l) ? 2.0f : 1.0f;
+
+            const float contrib_f = eri_ijkl_f * D_f * sym_f;
+
+            // ---- accumulate in double ----
+            ERIs[threadIdx.y][threadIdx.x] += (double)contrib_f;
+        }
+    }
+
+    __syncthreads();
+
+    if ((threadIdx.y == 0) && (ij < pp_prim_pair_count_local))
+    {
+        double J_ij = 0.0;
+
+        for (uint32_t n = 0; n < TILE_DIM; n++)
+        {
+            J_ij += ERIs[n][threadIdx.x];
+        }
+
+        mat_J[ij] += J_ij;
+    }
+}
+
+// Mixed precision PPPP
+__global__ void __launch_bounds__(TILE_SIZE_J)
+computeCoulombFockPPPP_MP(double*         mat_J,
+                       const double*   p_prim_info,
+                       const uint32_t  p_prim_count,
+                       const double*   pp_mat_D,
+                       const double*   pp_mat_Q_local,
+                       const double*   pp_mat_Q,
+                       const uint32_t* pp_first_inds_local,
+                       const uint32_t* pp_second_inds_local,
+                       const double*   pp_pair_data_local,
+                       const uint32_t  pp_prim_pair_count_local,
+                       const uint32_t* pp_first_inds,
+                       const uint32_t* pp_second_inds,
+                       const double*   pp_pair_data,
+                       const uint32_t  pp_prim_pair_count,
+                       const double*   boys_func_table,
+                       const double*   boys_func_ft,
+                       const double    eri_threshold,
+                       const uint32_t*  cut_ij_tile,
+                       const double    tau_precision,
+                       //float 
+                       const float*   p_prim_info_f,
+                       const float*   pp_mat_D_f,
+                       const float*   pp_mat_Q_local_f,
+                       const float*   pp_mat_Q_f,
+                       const float*   pp_pair_data_local_f,
+                       const float*   pp_pair_data_f,
+                       const float*   boys_func_table_f,
+                       const float*   boys_func_ft_f
+                    )
+{
+    // each thread row scans over [ij|??] and sum up to a primitive J matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
+
+    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   delta[3][3];
+
+    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+
+    const uint32_t ij_tile = blockIdx.x;
+    const uint32_t cut = cut_ij_tile[ij_tile];
+
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double PA_0, PB_0;
+    uint32_t i, j, a0, b0;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+    }
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+
+    __syncthreads();
+
+    if (ij < pp_prim_pair_count_local)
+    {
+        i = pp_first_inds_local[ij];
+        j = pp_second_inds_local[ij];
+
+        a_i = p_prim_info[i / 3 + p_prim_count * 0];
+
+        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
+        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
+        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+
+        a_j = p_prim_info[j / 3 + p_prim_count * 0];
+
+        r_j[0] = p_prim_info[j / 3 + p_prim_count * 2];
+        r_j[1] = p_prim_info[j / 3 + p_prim_count * 3];
+        r_j[2] = p_prim_info[j / 3 + p_prim_count * 4];
+
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
+        S_ij_00 = pp_pair_data_local[ij];
+
+        a0 = i % 3;
+        b0 = j % 3;
+
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+
+    }
+
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    {
+        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+
+        if ((ij >= pp_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(pp_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        {
+            break;
+        }
+
+        // ====== 新增：按 m 与 cut 分段 ======
+        if ((int)m < cut) {
+            const auto k = pp_first_inds[kl];
+            const auto l = pp_second_inds[kl];
+
+            const auto a_k = p_prim_info[k / 3 + p_prim_count * 0];
+
+            const double r_k[3] = {p_prim_info[k / 3 + p_prim_count * 2],
+                                p_prim_info[k / 3 + p_prim_count * 3],
+                                p_prim_info[k / 3 + p_prim_count * 4]};
+
+            const auto a_l = p_prim_info[l / 3 + p_prim_count * 0];
+
+            const double r_l[3] = {p_prim_info[l / 3 + p_prim_count * 2],
+                                p_prim_info[l / 3 + p_prim_count * 3],
+                                p_prim_info[l / 3 + p_prim_count * 4]};
+
+            const auto S_kl_00 = pp_pair_data[kl];
+
+            const auto c0 = k % 3;
+            const auto d0 = l % 3;
+
+            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
+            // J. Chem. Phys. 84, 3963-3974 (1986)
+
+            const auto S2 = a_k + a_l;
+
+            const auto inv_S2 = 1.0 / S2;
+            const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
+
+            const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
+
+            double F4_t[5];
+
+            gpu::computeBoysFunction(F4_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
+
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+
+            const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
+                    + F4_t[0] * (
+
+                        0.5 * inv_S1 * (
+                            +QC_0*QD_0*delta[a0][b0]
+                        )
+
+                        + 0.5 * inv_S2 * (
+                            +PA_0*PB_0*delta[c0][d0]
+                        )
+
+                        + (
+                            +PA_0*PB_0*QC_0*QD_0
+                        )
+
+                        + 0.25 * inv_S1 * inv_S2 * (
+                            +delta[a0][b0]*delta[c0][d0]
+                        )
+
+                    )
+
+                    + F4_t[1] * (
+
+                        (-0.25) * inv_S1 * inv_S4 * (
+                            +delta[a0][b0]*delta[c0][d0]
+                        )
+
+                        + (-0.25) * inv_S2 * inv_S4 * (
+                            +delta[a0][b0]*delta[c0][d0]
+                        )
+
+                        + (-0.5) * S1 * inv_S2 * inv_S4 * (
+                            +PA_0*PB_0*delta[c0][d0]
+                        )
+
+                        + (-0.5) * S2 * inv_S1 * inv_S4 * (
+                            +QC_0*QD_0*delta[a0][b0]
+                        )
+
+                        + 0.5 * inv_S4 * (
+                            +PA_0*QD_0*delta[b0][c0]
+
+                            +delta[c0][d0]*(PA_0*PQ[b0] + PB_0*PQ[a0])
+
+                            +PB_0*QD_0*delta[a0][c0] + QC_0*(PA_0*delta[b0][d0] + PB_0*delta[a0][d0])
+
+                            +delta[a0][b0]*(-PQ[c0]*QD_0 - PQ[d0]*QC_0)
+                        )
+
+                        + S1 * inv_S4 * (
+                            +PA_0*PB_0*(-PQ[c0]*QD_0 - PQ[d0]*QC_0)
+                        )
+
+                        + S2 * inv_S4 * (
+                            +QC_0*QD_0*(PA_0*PQ[b0] + PB_0*PQ[a0])
+                        )
+
+                    )
+
+                    + F4_t[2] * (
+
+                        0.5 * S1 * inv_S4 * inv_S4 * (
+                            +delta[c0][d0]*(-PA_0*PQ[b0] - PB_0*PQ[a0])
+
+                            -PA_0*(PQ[c0]*delta[b0][d0] + PQ[d0]*delta[b0][c0]) - PB_0*(PQ[c0]*delta[a0][d0] + PQ[d0]*delta[a0][c0])
+
+                            +PQ[c0]*PQ[d0]*delta[a0][b0]
+                        )
+
+                        + 0.5 * S2 * inv_S4 * inv_S4 * (
+                            +PQ[a0]*QD_0*delta[b0][c0]
+
+                            +PQ[b0]*QD_0*delta[a0][c0] + QC_0*(PQ[a0]*delta[b0][d0] + PQ[b0]*delta[a0][d0])
+
+                            +delta[a0][b0]*(PQ[c0]*QD_0 + PQ[d0]*QC_0)
+
+                            +PQ[a0]*PQ[b0]*delta[c0][d0]
+                        )
+
+                        + S1 * S1 * inv_S4 * inv_S4 * (
+                            +PA_0*PB_0*PQ[c0]*PQ[d0]
+                        )
+
+                        + S1 * S2 * inv_S4 * inv_S4 * (
+                            -(PA_0*PQ[b0] + PB_0*PQ[a0])*(PQ[c0]*QD_0 + PQ[d0]*QC_0)
+                        )
+
+                        + S2 * S2 * inv_S4 * inv_S4 * (
+                            +PQ[a0]*PQ[b0]*QC_0*QD_0
+                        )
+
+                        + 0.25 * inv_S4 * inv_S4 * (
+                            +delta[a0][b0]*delta[c0][d0] + delta[a0][c0]*delta[b0][d0] + delta[a0][d0]*delta[b0][c0]
+                        )
+
+                    )
+
+                    + F4_t[3] * (
+
+                        (-0.5) * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * (
+                            +PQ[a0]*PQ[b0]*delta[c0][d0]
+
+                            +PQ[c0]*(PQ[a0]*delta[b0][d0] + PQ[b0]*delta[a0][d0] + PQ[d0]*delta[a0][b0]) + PQ[d0]*(PQ[a0]*delta[b0][c0] + PQ[b0]*delta[a0][c0])
+                        )
+
+                        + S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * (
+                            +PQ[c0]*PQ[d0]*(PA_0*PQ[b0] + PB_0*PQ[a0])
+                        )
+
+                        + S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * (
+                            +PQ[a0]*PQ[b0]*(-PQ[c0]*QD_0 - PQ[d0]*QC_0)
+                        )
+
+                    )
+
+                    + F4_t[4] * (
+
+                        S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
+                            +PQ[a0]*PQ[b0]*PQ[c0]*PQ[d0]
+                        )
+
+                    )
+
+                    );
+
+            // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
+            //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+        }else{
+            // 可以抽成函数用template
+
+            const auto k = pp_first_inds[kl];
+            const auto l = pp_second_inds[kl];
+
+            const float a_k_f = p_prim_info_f[k / 3 + p_prim_count * 0];
+
+            const float r_k_f[3] = {
+                p_prim_info_f[k / 3 + p_prim_count * 2],
+                p_prim_info_f[k / 3 + p_prim_count * 3],
+                p_prim_info_f[k / 3 + p_prim_count * 4]
+            };
+
+            const float a_l_f = p_prim_info_f[l / 3 + p_prim_count * 0];
+
+            const float r_l_f[3] = {
+                p_prim_info_f[l / 3 + p_prim_count * 2],
+                p_prim_info_f[l / 3 + p_prim_count * 3],
+                p_prim_info_f[l / 3 + p_prim_count * 4]
+            };
+
+            const float S_ij_00_f = pp_pair_data_local_f[ij];
+            const float S_kl_00_f = pp_pair_data_f[kl];
+
+            const auto c0 = k % 3;
+            const auto d0 = l % 3;
+
+            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
+            // J. Chem. Phys. 84, 3963-3974 (1986)
+
+            const float S2_f     = a_k_f + a_l_f;
+            const float inv_S2_f = 1.0f / S2_f;
+
+            const float S1_f     = (float)S1;
+            const float inv_S1_f = (float)inv_S1;
+            const float inv_S4_f = 1.0f / (S1_f + S2_f);
+
+            const float a_i_f = (float)a_i;
+            const float a_j_f = (float)a_j;
+
+            const float r_i_f[3] = { (float)r_i[0], (float)r_i[1], (float)r_i[2] };
+            const float r_j_f[3] = { (float)r_j[0], (float)r_j[1], (float)r_j[2] };
+
+            float PQ_f[3] = {
+                (a_k_f * r_k_f[0] + a_l_f * r_l_f[0]) * inv_S2_f
+                    - (a_i_f * r_i_f[0] + a_j_f * r_j_f[0]) * inv_S1_f,
+
+                (a_k_f * r_k_f[1] + a_l_f * r_l_f[1]) * inv_S2_f
+                    - (a_i_f * r_i_f[1] + a_j_f * r_j_f[1]) * inv_S1_f,
+
+                (a_k_f * r_k_f[2] + a_l_f * r_l_f[2]) * inv_S2_f
+                    - (a_i_f * r_i_f[2] + a_j_f * r_j_f[2]) * inv_S1_f
+            };
+
+            const float r2_PQ_f =
+                PQ_f[0]*PQ_f[0] + PQ_f[1]*PQ_f[1] + PQ_f[2]*PQ_f[2];
+
+            const float Lambda_f =
+                sqrtf(4.0f * S1_f * S2_f * (float)MATH_CONST_INV_PI * inv_S4_f);
+
+            // // ---- Boys: keep existing double routine, but feed it float-derived args ----
+            // double F4_d[5];
+            // gpu::computeBoysFunction(
+            //     F4_d,
+            //     (double)(S1_f * S2_f * inv_S4_f * r2_PQ_f),
+            //     4,
+            //     boys_func_table,
+            //     boys_func_ft
+            // );
+            // const float F4_f[5] = {
+            //     (float)F4_d[0], (float)F4_d[1], (float)F4_d[2], (float)F4_d[3], (float)F4_d[4]
+            // };
+
+            // FP32 Boys function
+            float F4_f[5];
+            gpu::computeBoysFunction_f(
+                F4_f,
+                S1_f * S2_f * inv_S4_f * r2_PQ_f,
+                4,
+                boys_func_table_f,
+                boys_func_ft_f
+            );
+
+            // ---- QC/QD in float ----
+            const float QC_0_f = (a_l_f * inv_S2_f) * (r_l_f[c0] - r_k_f[c0]);
+            const float QD_0_f = (-a_k_f * inv_S2_f) * (r_l_f[d0] - r_k_f[d0]);
+
+            // ---- delta to float (important: avoid implicit double ops) ----
+            const float d_ab = (float)delta[a0][b0];
+            const float d_cd = (float)delta[c0][d0];
+            const float d_bc = (float)delta[b0][c0];
+            const float d_ac = (float)delta[a0][c0];
+            const float d_bd = (float)delta[b0][d0];
+            const float d_ad = (float)delta[a0][d0];
+
+            const float PA_0_f = (float)PA_0;
+            const float PB_0_f = (float)PB_0;
+            
+            // ---- eri formula in float ----
+            const float eri_ijkl_f = Lambda_f * S_ij_00_f * S_kl_00_f * (
+
+                + F4_f[0] * (
+
+                    0.5f * inv_S1_f * (
+                        +QC_0_f*QD_0_f*d_ab
+                    )
+
+                    + 0.5f * inv_S2_f * (
+                        +PA_0_f*PB_0_f*d_cd
+                    )
+
+                    + (
+                        +PA_0_f*PB_0_f*QC_0_f*QD_0_f
+                    )
+
+                    + 0.25f * inv_S1_f * inv_S2_f * (
+                        +d_ab*d_cd
+                    )
+
+                )
+
+                + F4_f[1] * (
+
+                    (-0.25f) * inv_S1_f * inv_S4_f * (
+                        +d_ab*d_cd
+                    )
+
+                    + (-0.25f) * inv_S2_f * inv_S4_f * (
+                        +d_ab*d_cd
+                    )
+
+                    + (-0.5f) * S1_f * inv_S2_f * inv_S4_f * (
+                        +PA_0_f*PB_0_f*d_cd
+                    )
+
+                    + (-0.5f) * S2_f * inv_S1_f * inv_S4_f * (
+                        +QC_0_f*QD_0_f*d_ab
+                    )
+
+                    + 0.5f * inv_S4_f * (
+                        +PA_0_f*QD_0_f*d_bc
+
+                        +d_cd*(PA_0_f*PQ_f[b0] + PB_0_f*PQ_f[a0])
+
+                        +PB_0_f*QD_0_f*d_ac + QC_0_f*(PA_0_f*d_bd + PB_0_f*d_ad)
+
+                        +d_ab*(-PQ_f[c0]*QD_0_f - PQ_f[d0]*QC_0_f)
+                    )
+
+                    + S1_f * inv_S4_f * (
+                        +PA_0_f*PB_0_f*(-PQ_f[c0]*QD_0_f - PQ_f[d0]*QC_0_f)
+                    )
+
+                    + S2_f * inv_S4_f * (
+                        +QC_0_f*QD_0_f*(PA_0_f*PQ_f[b0] + PB_0_f*PQ_f[a0])
+                    )
+
+                )
+
+                + F4_f[2] * (
+
+                    0.5f * S1_f * inv_S4_f * inv_S4_f * (
+                        +d_cd*(-PA_0_f*PQ_f[b0] - PB_0_f*PQ_f[a0])
+
+                        -PA_0_f*(PQ_f[c0]*d_bd + PQ_f[d0]*d_bc) - PB_0_f*(PQ_f[c0]*d_ad + PQ_f[d0]*d_ac)
+
+                        +PQ_f[c0]*PQ_f[d0]*d_ab
+                    )
+
+                    + 0.5f * S2_f * inv_S4_f * inv_S4_f * (
+                        +PQ_f[a0]*QD_0_f*d_bc
+
+                        +PQ_f[b0]*QD_0_f*d_ac + QC_0_f*(PQ_f[a0]*d_bd + PQ_f[b0]*d_ad)
+
+                        +d_ab*(PQ_f[c0]*QD_0_f + PQ_f[d0]*QC_0_f)
+
+                        +PQ_f[a0]*PQ_f[b0]*d_cd
+                    )
+
+                    + S1_f * S1_f * inv_S4_f * inv_S4_f * (
+                        +PA_0_f*PB_0_f*PQ_f[c0]*PQ_f[d0]
+                    )
+
+                    + S1_f * S2_f * inv_S4_f * inv_S4_f * (
+                        -(PA_0_f*PQ_f[b0] + PB_0_f*PQ_f[a0])*(PQ_f[c0]*QD_0_f + PQ_f[d0]*QC_0_f)
+                    )
+
+                    + S2_f * S2_f * inv_S4_f * inv_S4_f * (
+                        +PQ_f[a0]*PQ_f[b0]*QC_0_f*QD_0_f
+                    )
+
+                    + 0.25f * inv_S4_f * inv_S4_f * (
+                        +d_ab*d_cd + d_ac*d_bd + d_ad*d_bc
+                    )
+
+                )
+
+                + F4_f[3] * (
+
+                    (-0.5f) * S1_f * S2_f * inv_S4_f * inv_S4_f * inv_S4_f * (
+                        +PQ_f[a0]*PQ_f[b0]*d_cd
+
+                        +PQ_f[c0]*(PQ_f[a0]*d_bd + PQ_f[b0]*d_ad + PQ_f[d0]*d_ab)
+                        +PQ_f[d0]*(PQ_f[a0]*d_bc + PQ_f[b0]*d_ac)
+                    )
+
+                    + S1_f * S1_f * S2_f * inv_S4_f * inv_S4_f * inv_S4_f * (
+                        +PQ_f[c0]*PQ_f[d0]*(PA_0_f*PQ_f[b0] + PB_0_f*PQ_f[a0])
+                    )
+
+                    + S1_f * S2_f * S2_f * inv_S4_f * inv_S4_f * inv_S4_f * (
+                        +PQ_f[a0]*PQ_f[b0]*(-PQ_f[c0]*QD_0_f - PQ_f[d0]*QC_0_f)
+                    )
+
+                )
+
+                + F4_f[4] * (
+
+                    S1_f * S1_f * S2_f * S2_f * inv_S4_f * inv_S4_f * inv_S4_f * inv_S4_f * (
+                        +PQ_f[a0]*PQ_f[b0]*PQ_f[c0]*PQ_f[d0]
+                    )
+
+                )
+
+            );
+
+            // ---- multiply by D and symmetry in float ----
+            const float D_f = pp_mat_D_f[kl];
+            const float sym_f = (k != l) ? 2.0f : 1.0f;
+            const float contrib_f = eri_ijkl_f * D_f * sym_f;
+
+            // ---- accumulate in double ----
+            ERIs[threadIdx.y][threadIdx.x] += (double)contrib_f;
+        }
+    }
+
+    __syncthreads();
+
+    if ((threadIdx.y == 0) && (ij < pp_prim_pair_count_local))
+    {
+        double J_ij = 0.0;
+
+        for (uint32_t n = 0; n < TILE_DIM; n++)
+        {
+            J_ij += ERIs[n][threadIdx.x];
+        }
+
+        mat_J[ij] += J_ij;
+    }
+}
+
+// FP64 PPPP
+__global__ void __launch_bounds__(TILE_SIZE_J)
+computeCoulombFockPPPP_FP64(double*         mat_J,
+                       const double*   p_prim_info,
+                       const uint32_t  p_prim_count,
+                       const double*   pp_mat_D,
+                       const uint32_t* pp_first_inds_local,
+                       const uint32_t* pp_second_inds_local,
+                       const double*   pp_pair_data_local,
+                       const uint32_t  pp_prim_pair_count_local,
+                       const uint32_t* pp_first_inds,
+                       const uint32_t* pp_second_inds,
+                       const double*   pp_pair_data,
+                       const uint32_t  pp_prim_pair_count,
+                       const double*   boys_func_table,
+                       const double*   boys_func_ft,
+                       const double    eri_threshold,
+                       const uint32_t*  prec_cut_ij_tile
+                    )
+{
+    // each thread row scans over [ij|??] and sum up to a primitive J matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
+
+    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   delta[3][3];
+
+    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+
+    const uint32_t ij_tile = blockIdx.x;
+    const uint32_t prec_cut = prec_cut_ij_tile[ij_tile];
+
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double PA_0, PB_0;
+    uint32_t i, j, a0, b0;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+    }
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+
+    __syncthreads();
+
+    if (ij < pp_prim_pair_count_local)
+    {
+        i = pp_first_inds_local[ij];
+        j = pp_second_inds_local[ij];
+
+        a_i = p_prim_info[i / 3 + p_prim_count * 0];
+
+        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
+        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
+        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+
+        a_j = p_prim_info[j / 3 + p_prim_count * 0];
+
+        r_j[0] = p_prim_info[j / 3 + p_prim_count * 2];
+        r_j[1] = p_prim_info[j / 3 + p_prim_count * 3];
+        r_j[2] = p_prim_info[j / 3 + p_prim_count * 4];
+
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
+        S_ij_00 = pp_pair_data_local[ij];
+
+        a0 = i % 3;
+        b0 = j % 3;
+
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+
+    }
+
+    for (uint32_t m = 0; m < prec_cut; m++)
+    {
+        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+
+        // float bound =
+        //     pp_mat_Q_local_f[ij] *
+        //     pp_mat_Q_f[kl] *
+        //     pp_mat_D_f[kl];
+        
+        // if ((ij >= pp_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(bound) <= (float)eri_threshold))
+        // {
+        //     break;
+        // }
+        
+        if ((ij >= pp_prim_pair_count_local) || (kl >= pp_prim_pair_count))
+        {
+            break;
+        }
+
+        
+        const auto k = pp_first_inds[kl];
+        const auto l = pp_second_inds[kl];
+
+        const auto a_k = p_prim_info[k / 3 + p_prim_count * 0];
+
+        const double r_k[3] = {p_prim_info[k / 3 + p_prim_count* 2],
+                            p_prim_info[k / 3 + p_prim_count * 3],
+                            p_prim_info[k / 3 + p_prim_count * 4]};
+
+        const auto a_l = p_prim_info[l / 3 + p_prim_count * 0];
+
+        const double r_l[3] = {p_prim_info[l / 3 + p_prim_count* 2],
+                                p_prim_info[l / 3 + p_prim_count * 3],
+                                p_prim_info[l / 3 + p_prim_count * 4]};
+
+        const auto S_kl_00 = pp_pair_data[kl];
+
+        const auto c0 = k % 3;
+        const auto d0 = l % 3;
+
+        // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
+        // J. Chem. Phys. 84, 3963-3974 (1986)
+
+        const auto S2 = a_k + a_l;
+
+        const auto inv_S2 = 1.0 / S2;
+        const auto inv_S4 = 1.0 / (S1 + S2);
+
+        const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) *inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                            (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                            (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+        const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2]* PQ[2];
+
+        const auto Lambda = sqrt(4.0 * S1 * S2 *MATH_CONST_INV_PI * inv_S4);
+
+        double F4_t[5];
+
+        gpu::computeBoysFunction(F4_t, S1 * S2 * inv_S4 * r2_PQ,4, boys_func_table, boys_func_ft);
+
+        const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+        const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+
+        const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
+                + F4_t[0] * (
+
+                    0.5 * inv_S1 * (
+                        +QC_0*QD_0*delta[a0][b0]
+                    )
+
+                    + 0.5 * inv_S2 * (
+                        +PA_0*PB_0*delta[c0][d0]
+                    )
+
+                    + (
+                        +PA_0*PB_0*QC_0*QD_0
+                    )
+
+                    + 0.25 * inv_S1 * inv_S2 * (
+                        +delta[a0][b0]*delta[c0][d0]
+                    )
+
+                )
+
+                + F4_t[1] * (
+
+                    (-0.25) * inv_S1 * inv_S4 * (
+                        +delta[a0][b0]*delta[c0][d0]
+                    )
+
+                    + (-0.25) * inv_S2 * inv_S4 * (
+                        +delta[a0][b0]*delta[c0][d0]
+                    )
+
+                    + (-0.5) * S1 * inv_S2 * inv_S4 * (
+                        +PA_0*PB_0*delta[c0][d0]
+                    )
+
+                    + (-0.5) * S2 * inv_S1 * inv_S4 * (
+                        +QC_0*QD_0*delta[a0][b0]
+                    )
+
+                    + 0.5 * inv_S4 * (
+                        +PA_0*QD_0*delta[b0][c0]
+
+                        +delta[c0][d0]*(PA_0*PQ[b0] + PB_0*PQ[a0])
+
+                        +PB_0*QD_0*delta[a0][c0] + QC_0*(PA_0*delta[b0][d0] + PB_0*delta[a0][d0])
+
+                        +delta[a0][b0]*(-PQ[c0]*QD_0 - PQ[d0]*QC_0)
+                    )
+
+                    + S1 * inv_S4 * (
+                        +PA_0*PB_0*(-PQ[c0]*QD_0 - PQ[d0]*QC_0)
+                    )
+
+                    + S2 * inv_S4 * (
+                        +QC_0*QD_0*(PA_0*PQ[b0] + PB_0*PQ[a0])
+                    )
+
+                )
+
+                + F4_t[2] * (
+
+                    0.5 * S1 * inv_S4 * inv_S4 * (
+                        +delta[c0][d0]*(-PA_0*PQ[b0] - PB_0*PQ[a0])
+
+                        -PA_0*(PQ[c0]*delta[b0][d0] + PQ[d0]*delta[b0][c0]) - PB_0*(PQ[c0]*delta[a0][d0] + PQ[d0]*delta[a0][c0])
+
+                        +PQ[c0]*PQ[d0]*delta[a0][b0]
+                    )
+
+                    + 0.5 * S2 * inv_S4 * inv_S4 * (
+                        +PQ[a0]*QD_0*delta[b0][c0]
+
+                        +PQ[b0]*QD_0*delta[a0][c0] + QC_0*(PQ[a0]*delta[b0][d0] + PQ[b0]*delta[a0][d0])
+
+                        +delta[a0][b0]*(PQ[c0]*QD_0 + PQ[d0]*QC_0)
+
+                        +PQ[a0]*PQ[b0]*delta[c0][d0]
+                    )
+
+                    + S1 * S1 * inv_S4 * inv_S4 * (
+                        +PA_0*PB_0*PQ[c0]*PQ[d0]
+                    )
+
+                    + S1 * S2 * inv_S4 * inv_S4 * (
+                        -(PA_0*PQ[b0] + PB_0*PQ[a0])*(PQ[c0]*QD_0 + PQ[d0]*QC_0)
+                    )
+
+                    + S2 * S2 * inv_S4 * inv_S4 * (
+                        +PQ[a0]*PQ[b0]*QC_0*QD_0
+                    )
+
+                    + 0.25 * inv_S4 * inv_S4 * (
+                        +delta[a0][b0]*delta[c0][d0] + delta[a0][c0]*delta[b0][d0] + delta[a0][d0]*delta[b0][c0]
+                    )
+
+                )
+
+                + F4_t[3] * (
+
+                    (-0.5) * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * (
+                        +PQ[a0]*PQ[b0]*delta[c0][d0]
+
+                        +PQ[c0]*(PQ[a0]*delta[b0][d0] + PQ[b0]*delta[a0][d0] + PQ[d0]*delta[a0][b0]) + PQ[d0]*(PQ[a0]*delta[b0][c0] + PQ[b0]*delta[a0][c0])
+                    )
+
+                    + S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * (
+                        +PQ[c0]*PQ[d0]*(PA_0*PQ[b0] + PB_0*PQ[a0])
+                    )
+
+                    + S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * (
+                        +PQ[a0]*PQ[b0]*(-PQ[c0]*QD_0 - PQ[d0]*QC_0)
+                    )
+
+                )
+
+                + F4_t[4] * (
+
+                    S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
+                        +PQ[a0]*PQ[b0]*PQ[c0]*PQ[d0]
+                    )
+
+                )
+
+                );
+
+        // NOTE: doubling for off-diagonal elements of D due tok<=>l symmetry
+        //       (static_cast<double>(k != l) + 1.0) == (k ==l ? 1.0 : 2.0)
+        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+    }
+
+    __syncthreads();
+
+    if ((threadIdx.y == 0) && (ij < pp_prim_pair_count_local))
+    {
+        double J_ij = 0.0;
+
+        for (uint32_t n = 0; n < TILE_DIM; n++)
+        {
+            J_ij += ERIs[n][threadIdx.x];
+        }
+
+        mat_J[ij] += J_ij;
+    }
+}
+
+// FP32 PPPP
+__global__ void __launch_bounds__(TILE_SIZE_J)
+computeCoulombFockPPPP_FP32_old(double*         mat_J,
+                       const double*   p_prim_info,
+                       const uint32_t  p_prim_count,
+                       const double*   pp_mat_D,
+                       const double*   pp_mat_Q_local,
+                       const double*   pp_mat_Q,
+                       const uint32_t* pp_first_inds_local,
+                       const uint32_t* pp_second_inds_local,
+                       const double*   pp_pair_data_local,
+                       const uint32_t  pp_prim_pair_count_local,
+                       const uint32_t* pp_first_inds,
+                       const uint32_t* pp_second_inds,
+                       const double*   pp_pair_data,
+                       const uint32_t  pp_prim_pair_count,
+                       const double*   boys_func_table,
+                       const double*   boys_func_ft,
+                       const double    eri_threshold,
+                       const uint32_t*  cut_ij_tile,
+                       const double    tau_precision,
+                       //float 
+                       const float*   p_prim_info_f,
+                       const float*   pp_mat_D_f,
+                       // 可以也不用了
+                       const float*   pp_mat_Q_local_f,
+                       const float*   pp_mat_Q_f,
+
+                       const float*   pp_pair_data_local_f,
+                       const float*   pp_pair_data_f,
+                       const float*   boys_func_table_f,
+                       const float*   boys_func_ft_f
+                    )
+{
+    // each thread row scans over [ij|??] and sum up to a primitive J matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
+
+    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ float   delta_f[3][3];
+
+    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+
+    const uint32_t ij_tile = blockIdx.x;
+    const uint32_t cut = cut_ij_tile[ij_tile];
+
+    float a_i_f, a_j_f, r_i_f[3], r_j_f[3], S_ij_00_f, S1_f, inv_S1_f;
+    float PA_0_f, PB_0_f;
+    uint32_t i, j, a0, b0;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        delta_f[0][0] = 1.0f; delta_f[0][1] = 0.0f; delta_f[0][2] = 0.0f;
+        delta_f[1][0] = 0.0f; delta_f[1][1] = 1.0f; delta_f[1][2] = 0.0f;
+        delta_f[2][0] = 0.0f; delta_f[2][1] = 0.0f; delta_f[2][2] = 1.0f;
+    }
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+
+    __syncthreads();
+
+    if (ij < pp_prim_pair_count_local)
+    {
+        i = pp_first_inds_local[ij];
+        j = pp_second_inds_local[ij];
+
+        a_i_f = p_prim_info_f[i / 3 + p_prim_count * 0];
+
+        r_i_f[0] = p_prim_info_f[i / 3 + p_prim_count * 2];
+        r_i_f[1] = p_prim_info_f[i / 3 + p_prim_count * 3];
+        r_i_f[2] = p_prim_info_f[i / 3 + p_prim_count * 4];
+
+        a_j_f = p_prim_info_f[j / 3 + p_prim_count * 0];
+
+        r_j_f[0] = p_prim_info_f[j / 3 + p_prim_count * 2];
+        r_j_f[1] = p_prim_info_f[j / 3 + p_prim_count * 3];
+        r_j_f[2] = p_prim_info_f[j / 3 + p_prim_count * 4];
+
+        S1_f = a_i_f + a_j_f;
+        inv_S1_f = 1.0f / S1_f; // 内存读/fast-math(GH200 1.9x极限 1.7x稳妥)  -》 双精度除法
+        inv_S1_f = (float) (1.0 / (double)S1_f);
+
+        S_ij_00_f = pp_pair_data_local_f[ij];
+
+        a0 = i % 3;
+        b0 = j % 3;
+
+        PA_0_f = (a_j_f * inv_S1_f) * (r_j_f[a0] - r_i_f[a0]);
+        PB_0_f = (-a_i_f * inv_S1_f) * (r_j_f[b0] - r_i_f[b0]);
+    }
+
+    // cut1 < m < cut2
+    for (uint32_t m = cut; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    {
+        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+
+        // float bound =
+        //     pp_mat_Q_local_f[ij] *
+        //     pp_mat_Q_f[kl] *
+        //     pp_mat_D_f[kl];
+        
+        // if ((ij >= pp_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(bound) <= (float)eri_threshold))
+        // {
+        //     break;
+        // }
+        
+        // 有了cut2 最后一个条件就不用了
+        if ((ij >= pp_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(pp_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        {
+            break;
+        }
+
+        
+        // 可以抽成函数用template
+
+        const auto k = pp_first_inds[kl];
+        const auto l = pp_second_inds[kl];
+
+        const float a_k_f = p_prim_info_f[k / 3 + p_prim_count *0];
+
+        const float r_k_f[3] = {
+            p_prim_info_f[k / 3 + p_prim_count * 2],
+            p_prim_info_f[k / 3 + p_prim_count * 3],
+            p_prim_info_f[k / 3 + p_prim_count * 4]
+        };
+
+        const float a_l_f = p_prim_info_f[l / 3 + p_prim_count *0];
+
+        const float r_l_f[3] = {
+            p_prim_info_f[l / 3 + p_prim_count * 2],
+            p_prim_info_f[l / 3 + p_prim_count * 3],
+            p_prim_info_f[l / 3 + p_prim_count * 4]
+        };
+
+        // const float S_ij_00_f = pp_pair_data_local_f[ij];
+        const float S_kl_00_f = pp_pair_data_f[kl];
+
+        const auto c0 = k % 3;
+        const auto d0 = l % 3;
+
+        // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
+        // J. Chem. Phys. 84, 3963-3974 (1986)
+
+        const float S2_f     = a_k_f + a_l_f;
+        const float inv_S2_f = 1.0f / S2_f;
+
+        const float inv_S4_f = 1.0f / (S1_f + S2_f);
+
+        float PQ_f[3] = {
+            (a_k_f * r_k_f[0] + a_l_f * r_l_f[0]) * inv_S2_f
+                - (a_i_f * r_i_f[0] + a_j_f * r_j_f[0]) * inv_S1_f,
+
+            (a_k_f * r_k_f[1] + a_l_f * r_l_f[1]) * inv_S2_f
+                - (a_i_f * r_i_f[1] + a_j_f * r_j_f[1]) * inv_S1_f,
+
+            (a_k_f * r_k_f[2] + a_l_f * r_l_f[2]) * inv_S2_f
+                - (a_i_f * r_i_f[2] + a_j_f * r_j_f[2]) * inv_S1_f
+        };
+
+        const float r2_PQ_f =
+            PQ_f[0]*PQ_f[0] + PQ_f[1]*PQ_f[1] + PQ_f[2]*PQ_f[2];
+
+        const float Lambda_f =
+            sqrtf(4.0f * S1_f * S2_f * MATH_CONST_INV_PI_F * inv_S4_f);
+
+        // // ---- Boys: keep existing double routine, but feedit float-derived args ----
+        // double F4_d[5];
+        // gpu::computeBoysFunction(
+        //     F4_d,
+        //     (double)(S1_f * S2_f * inv_S4_f * r2_PQ_f),
+        //     4,
+        //     boys_func_table,
+        //     boys_func_ft
+        // );
+        // const float F4_f[5] = {
+        //     (float)F4_d[0], (float)F4_d[1], (float)F4_d[2],(float)F4_d[3], (float)F4_d[4]
+        // };
+
+        // FP32 Boys function
+        float F4_f[5];
+        gpu::computeBoysFunction_f(
+            F4_f,
+            S1_f * S2_f * inv_S4_f * r2_PQ_f,
+            4,
+            boys_func_table_f,
+            boys_func_ft_f
+        );
+
+        // ---- QC/QD in float ----
+        const float QC_0_f = (a_l_f * inv_S2_f) * (r_l_f[c0] -r_k_f[c0]);
+        const float QD_0_f = (-a_k_f * inv_S2_f) * (r_l_f[d0] -r_k_f[d0]);
+
+        // 后面code中直接用delta[][], 不用d_xx
+        const float d_ab = delta_f[a0][b0];
+        const float d_cd = delta_f[c0][d0];
+        const float d_bc = delta_f[b0][c0];
+        const float d_ac = delta_f[a0][c0];
+        const float d_bd = delta_f[b0][d0];
+        const float d_ad = delta_f[a0][d0];
+        
+        // ---- eri formula in float ----
+        const float eri_ijkl_f = Lambda_f * S_ij_00_f *S_kl_00_f * (
+
+            + F4_f[0] * (
+
+                0.5f * inv_S1_f * (
+                    +QC_0_f*QD_0_f*d_ab
+                )
+
+                + 0.5f * inv_S2_f * (
+                    +PA_0_f*PB_0_f*d_cd
+                )
+
+                + (
+                    +PA_0_f*PB_0_f*QC_0_f*QD_0_f
+                )
+
+                + 0.25f * inv_S1_f * inv_S2_f * (
+                    +d_ab*d_cd
+                )
+
+            )
+
+            + F4_f[1] * (
+
+                (-0.25f) * inv_S1_f * inv_S4_f * (
+                    +d_ab*d_cd
+                )
+
+                + (-0.25f) * inv_S2_f * inv_S4_f * (
+                    +d_ab*d_cd
+                )
+
+                + (-0.5f) * S1_f * inv_S2_f * inv_S4_f * (
+                    +PA_0_f*PB_0_f*d_cd
+                )
+
+                + (-0.5f) * S2_f * inv_S1_f * inv_S4_f * (
+                    +QC_0_f*QD_0_f*d_ab
+                )
+
+                + 0.5f * inv_S4_f * (
+                    +PA_0_f*QD_0_f*d_bc
+
+                    +d_cd*(PA_0_f*PQ_f[b0] + PB_0_f*PQ_f[a0])
+
+                    +PB_0_f*QD_0_f*d_ac + QC_0_f*(PA_0_f*d_bd + PB_0_f*d_ad)
+
+                    +d_ab*(-PQ_f[c0]*QD_0_f - PQ_f[d0]*QC_0_f)
+                )
+
+                + S1_f * inv_S4_f * (
+                    +PA_0_f*PB_0_f*(-PQ_f[c0]*QD_0_f - PQ_f[d0]*QC_0_f)
+                )
+
+                + S2_f * inv_S4_f * (
+                    +QC_0_f*QD_0_f*(PA_0_f*PQ_f[b0] + PB_0_f*PQ_f[a0])
+                )
+
+            )
+
+            + F4_f[2] * (
+
+                0.5f * S1_f * inv_S4_f * inv_S4_f * (
+                    +d_cd*(-PA_0_f*PQ_f[b0] - PB_0_f*PQ_f[a0])
+
+                    -PA_0_f*(PQ_f[c0]*d_bd + PQ_f[d0]*d_bc) - PB_0_f*(PQ_f[c0]*d_ad + PQ_f[d0]*d_ac)
+
+                    +PQ_f[c0]*PQ_f[d0]*d_ab
+                )
+
+                + 0.5f * S2_f * inv_S4_f * inv_S4_f * (
+                    +PQ_f[a0]*QD_0_f*d_bc
+
+                    +PQ_f[b0]*QD_0_f*d_ac + QC_0_f*(PQ_f[a0]*d_bd + PQ_f[b0]*d_ad)
+
+                    +d_ab*(PQ_f[c0]*QD_0_f + PQ_f[d0]*QC_0_f)
+
+                    +PQ_f[a0]*PQ_f[b0]*d_cd
+                )
+
+                + S1_f * S1_f * inv_S4_f * inv_S4_f * (
+                    +PA_0_f*PB_0_f*PQ_f[c0]*PQ_f[d0]
+                )
+
+                + S1_f * S2_f * inv_S4_f * inv_S4_f * (
+                    -(PA_0_f*PQ_f[b0] + PB_0_f*PQ_f[a0])*(PQ_f[c0]*QD_0_f + PQ_f[d0]*QC_0_f)
+                )
+
+                + S2_f * S2_f * inv_S4_f * inv_S4_f * (
+                    +PQ_f[a0]*PQ_f[b0]*QC_0_f*QD_0_f
+                )
+
+                + 0.25f * inv_S4_f * inv_S4_f * (
+                    +d_ab*d_cd + d_ac*d_bd + d_ad*d_bc
+                )
+
+            )
+
+            + F4_f[3] * (
+
+                (-0.5f) * S1_f * S2_f * inv_S4_f * inv_S4_f * inv_S4_f * (
+                    +PQ_f[a0]*PQ_f[b0]*d_cd
+
+                    +PQ_f[c0]*(PQ_f[a0]*d_bd + PQ_f[b0]*d_ad + PQ_f[d0]*d_ab)
+                    +PQ_f[d0]*(PQ_f[a0]*d_bc + PQ_f[b0]*d_ac)
+                )
+
+                + S1_f * S1_f * S2_f * inv_S4_f * inv_S4_f * inv_S4_f * (
+                    +PQ_f[c0]*PQ_f[d0]*(PA_0_f*PQ_f[b0] + PB_0_f*PQ_f[a0])
+                )
+
+                + S1_f * S2_f * S2_f * inv_S4_f * inv_S4_f * inv_S4_f * (
+                    +PQ_f[a0]*PQ_f[b0]*(-PQ_f[c0]*QD_0_f - PQ_f[d0]*QC_0_f)
+                )
+
+            )
+
+            + F4_f[4] * (
+
+                S1_f * S1_f * S2_f * S2_f * inv_S4_f * inv_S4_f * inv_S4_f * inv_S4_f * (
+                    +PQ_f[a0]*PQ_f[b0]*PQ_f[c0]*PQ_f[d0]
+                )
+
+            )
+
+        );
+
+        // ---- multiply by D and symmetry in float ----
+        const float D_f = pp_mat_D_f[kl];
+        const float sym_f = (k != l) ? 2.0f : 1.0f;
+        const float contrib_f = eri_ijkl_f * D_f * sym_f;
+
+        // ---- accumulate in double ----
+        ERIs[threadIdx.y][threadIdx.x] += (double)contrib_f;
+    }
+
+    __syncthreads();
+
+    if ((threadIdx.y == 0) && (ij < pp_prim_pair_count_local))
+    {
+        double J_ij = 0.0;
+
+        for (uint32_t n = 0; n < TILE_DIM; n++)
+        {
+            J_ij += ERIs[n][threadIdx.x];
+        }
+
+        mat_J[ij] += J_ij;
+    }
+}
+
+// FP32 PPPP
+__global__ void __launch_bounds__(TILE_SIZE_J)
+computeCoulombFockPPPP_FP32(double*         mat_J,
+                       const float*    p_prim_info_f,
+                       const uint32_t  p_prim_count,
+                       const float*    pp_mat_D_f,
+                       const uint32_t* pp_first_inds_local,
+                       const uint32_t* pp_second_inds_local,
+                       const float*    pp_pair_data_local_f,
+                       const uint32_t  pp_prim_pair_count_local,
+                       const uint32_t* pp_first_inds,
+                       const uint32_t* pp_second_inds,
+                       const float*    pp_pair_data_f,
+                       const uint32_t  pp_prim_pair_count,
+                       const float*    boys_func_table_f,
+                       const float*    boys_func_ft_f,
+                       const uint32_t*  prec_cut_ij_tile,
+                       const uint32_t*  screen_cut_ij_tile
+                    )
+{
+    // each thread row scans over [ij|??] and sum up to a primitive J matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
+
+    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ float   delta_f[3][3];
+
+    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+
+    const uint32_t ij_tile = blockIdx.x;
+    const uint32_t prec_cut = prec_cut_ij_tile[ij_tile];
+    const uint32_t screen_cut = screen_cut_ij_tile[ij_tile];
+
+    float a_i_f, a_j_f, r_i_f[3], r_j_f[3], S_ij_00_f, S1_f, inv_S1_f;
+    float PA_0_f, PB_0_f;
+    uint32_t i, j, a0, b0;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        delta_f[0][0] = 1.0f; delta_f[0][1] = 0.0f; delta_f[0][2] = 0.0f;
+        delta_f[1][0] = 0.0f; delta_f[1][1] = 1.0f; delta_f[1][2] = 0.0f;
+        delta_f[2][0] = 0.0f; delta_f[2][1] = 0.0f; delta_f[2][2] = 1.0f;
+    }
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
+
+    __syncthreads();
+
+    if (ij < pp_prim_pair_count_local)
+    {
+        i = pp_first_inds_local[ij];
+        j = pp_second_inds_local[ij];
+
+        a_i_f = p_prim_info_f[i / 3 + p_prim_count * 0];
+
+        r_i_f[0] = p_prim_info_f[i / 3 + p_prim_count * 2];
+        r_i_f[1] = p_prim_info_f[i / 3 + p_prim_count * 3];
+        r_i_f[2] = p_prim_info_f[i / 3 + p_prim_count * 4];
+
+        a_j_f = p_prim_info_f[j / 3 + p_prim_count * 0];
+
+        r_j_f[0] = p_prim_info_f[j / 3 + p_prim_count * 2];
+        r_j_f[1] = p_prim_info_f[j / 3 + p_prim_count * 3];
+        r_j_f[2] = p_prim_info_f[j / 3 + p_prim_count * 4];
+
+        S1_f = a_i_f + a_j_f;
+        // inv_S1_f = 1.0f / S1_f; // 内存读/fast-math(GH200 1.9x极限 1.7x稳妥)  -》 双精度除法
+        inv_S1_f = (float) (1.0 / (double)S1_f);
+
+        S_ij_00_f = pp_pair_data_local_f[ij];
+
+        a0 = i % 3;
+        b0 = j % 3;
+
+        PA_0_f = (a_j_f * inv_S1_f) * (r_j_f[a0] - r_i_f[a0]);
+        PB_0_f = (-a_i_f * inv_S1_f) * (r_j_f[b0] - r_i_f[b0]);
+    }
+
+    // cut1 < m < cut2
+    for (uint32_t m = prec_cut; m < screen_cut; m++)
+    {
+        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+        
+        // 有了cut2 最后一个条件就不用了
+        if ((ij >= pp_prim_pair_count_local) || (kl >= pp_prim_pair_count) )
+        {
+            break;
+        }
+
+        
+        // 可以抽成函数用template
+
+        const auto k = pp_first_inds[kl];
+        const auto l = pp_second_inds[kl];
+
+        const float a_k_f = p_prim_info_f[k / 3 + p_prim_count *0];
+
+        const float r_k_f[3] = {
+            p_prim_info_f[k / 3 + p_prim_count * 2],
+            p_prim_info_f[k / 3 + p_prim_count * 3],
+            p_prim_info_f[k / 3 + p_prim_count * 4]
+        };
+
+        const float a_l_f = p_prim_info_f[l / 3 + p_prim_count *0];
+
+        const float r_l_f[3] = {
+            p_prim_info_f[l / 3 + p_prim_count * 2],
+            p_prim_info_f[l / 3 + p_prim_count * 3],
+            p_prim_info_f[l / 3 + p_prim_count * 4]
+        };
+
+        // const float S_ij_00_f = pp_pair_data_local_f[ij];
+        const float S_kl_00_f = pp_pair_data_f[kl];
+
+        const auto c0 = k % 3;
+        const auto d0 = l % 3;
+
+        // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
+        // J. Chem. Phys. 84, 3963-3974 (1986)
+
+        const float S2_f     = a_k_f + a_l_f;
+        const float inv_S2_f = 1.0f / S2_f;
+
+        const float inv_S4_f = 1.0f / (S1_f + S2_f);
+
+        float PQ_f[3] = {
+            (a_k_f * r_k_f[0] + a_l_f * r_l_f[0]) * inv_S2_f
+                - (a_i_f * r_i_f[0] + a_j_f * r_j_f[0]) * inv_S1_f,
+
+            (a_k_f * r_k_f[1] + a_l_f * r_l_f[1]) * inv_S2_f
+                - (a_i_f * r_i_f[1] + a_j_f * r_j_f[1]) * inv_S1_f,
+
+            (a_k_f * r_k_f[2] + a_l_f * r_l_f[2]) * inv_S2_f
+                - (a_i_f * r_i_f[2] + a_j_f * r_j_f[2]) * inv_S1_f
+        };
+
+        const float r2_PQ_f =
+            PQ_f[0]*PQ_f[0] + PQ_f[1]*PQ_f[1] + PQ_f[2]*PQ_f[2];
+
+        const float Lambda_f =
+            sqrtf(4.0f * S1_f * S2_f * MATH_CONST_INV_PI_F * inv_S4_f);
+
+        // // ---- Boys: keep existing double routine, but feedit float-derived args ----
+        // double F4_d[5];
+        // gpu::computeBoysFunction(
+        //     F4_d,
+        //     (double)(S1_f * S2_f * inv_S4_f * r2_PQ_f),
+        //     4,
+        //     boys_func_table,
+        //     boys_func_ft
+        // );
+        // const float F4_f[5] = {
+        //     (float)F4_d[0], (float)F4_d[1], (float)F4_d[2],(float)F4_d[3], (float)F4_d[4]
+        // };
+
+        // FP32 Boys function
+        float F4_f[5];
+        gpu::computeBoysFunction_f(
+            F4_f,
+            S1_f * S2_f * inv_S4_f * r2_PQ_f,
+            4,
+            boys_func_table_f,
+            boys_func_ft_f
+        );
+
+        // ---- QC/QD in float ----
+        const float QC_0_f = (a_l_f * inv_S2_f) * (r_l_f[c0] -r_k_f[c0]);
+        const float QD_0_f = (-a_k_f * inv_S2_f) * (r_l_f[d0] -r_k_f[d0]);
+
+        // ---- eri formula in float ----
+        const float eri_ijkl_f = Lambda_f * S_ij_00_f * S_kl_00_f * (
+
+            + F4_f[0] * (
+
+                0.5f * inv_S1_f * (
+                    +QC_0_f * QD_0_f * delta_f[a0][b0]
+                )
+
+                + 0.5f * inv_S2_f * (
+                    +PA_0_f * PB_0_f * delta_f[c0][d0]
+                )
+
+                + (
+                    +PA_0_f * PB_0_f * QC_0_f * QD_0_f
+                )
+
+                + 0.25f * inv_S1_f * inv_S2_f * (
+                    +delta_f[a0][b0] * delta_f[c0][d0]
+                )
+
+            )
+
+            + F4_f[1] * (
+
+                (-0.25f) * inv_S1_f * inv_S4_f * (
+                    +delta_f[a0][b0] * delta_f[c0][d0]
+                )
+
+                + (-0.25f) * inv_S2_f * inv_S4_f * (
+                    +delta_f[a0][b0] * delta_f[c0][d0]
+                )
+
+                + (-0.5f) * S1_f * inv_S2_f * inv_S4_f * (
+                    +PA_0_f * PB_0_f * delta_f[c0][d0]
+                )
+
+                + (-0.5f) * S2_f * inv_S1_f * inv_S4_f * (
+                    +QC_0_f * QD_0_f * delta_f[a0][b0]
+                )
+
+                + 0.5f * inv_S4_f * (
+                    +PA_0_f * QD_0_f * delta_f[b0][c0]
+
+                    +delta_f[c0][d0] * (PA_0_f * PQ_f[b0] + PB_0_f * PQ_f[a0])
+
+                    +PB_0_f * QD_0_f * delta_f[a0][c0]
+                    +QC_0_f * (PA_0_f * delta_f[b0][d0] + PB_0_f * delta_f[a0][d0])
+
+                    +delta_f[a0][b0] * (-PQ_f[c0] * QD_0_f - PQ_f[d0] * QC_0_f)
+                )
+
+                + S1_f * inv_S4_f * (
+                    +PA_0_f * PB_0_f * (-PQ_f[c0] * QD_0_f - PQ_f[d0] * QC_0_f)
+                )
+
+                + S2_f * inv_S4_f * (
+                    +QC_0_f * QD_0_f * (PA_0_f * PQ_f[b0] + PB_0_f * PQ_f[a0])
+                )
+
+            )
+
+            + F4_f[2] * (
+
+                0.5f * S1_f * inv_S4_f * inv_S4_f * (
+                    +delta_f[c0][d0] * (-PA_0_f * PQ_f[b0] - PB_0_f * PQ_f[a0])
+
+                    -PA_0_f * (PQ_f[c0] * delta_f[b0][d0] + PQ_f[d0] * delta_f[b0][c0])
+                    -PB_0_f * (PQ_f[c0] * delta_f[a0][d0] + PQ_f[d0] * delta_f[a0][c0])
+
+                    +PQ_f[c0] * PQ_f[d0] * delta_f[a0][b0]
+                )
+
+                + 0.5f * S2_f * inv_S4_f * inv_S4_f * (
+                    +PQ_f[a0] * QD_0_f * delta_f[b0][c0]
+
+                    +PQ_f[b0] * QD_0_f * delta_f[a0][c0]
+                    +QC_0_f * (PQ_f[a0] * delta_f[b0][d0] + PQ_f[b0] * delta_f[a0][d0])
+
+                    +delta_f[a0][b0] * (PQ_f[c0] * QD_0_f + PQ_f[d0] * QC_0_f)
+
+                    +PQ_f[a0] * PQ_f[b0] * delta_f[c0][d0]
+                )
+
+                + S1_f * S1_f * inv_S4_f * inv_S4_f * (
+                    +PA_0_f * PB_0_f * PQ_f[c0] * PQ_f[d0]
+                )
+
+                + S1_f * S2_f * inv_S4_f * inv_S4_f * (
+                    -(PA_0_f * PQ_f[b0] + PB_0_f * PQ_f[a0]) *
+                    (PQ_f[c0] * QD_0_f + PQ_f[d0] * QC_0_f)
+                )
+
+                + S2_f * S2_f * inv_S4_f * inv_S4_f * (
+                    +PQ_f[a0] * PQ_f[b0] * QC_0_f * QD_0_f
+                )
+
+                + 0.25f * inv_S4_f * inv_S4_f * (
+                    +delta_f[a0][b0] * delta_f[c0][d0]
+                    +delta_f[a0][c0] * delta_f[b0][d0]
+                    +delta_f[a0][d0] * delta_f[b0][c0]
+                )
+
+            )
+
+            + F4_f[3] * (
+
+                (-0.5f) * S1_f * S2_f * inv_S4_f * inv_S4_f * inv_S4_f * (
+                    +PQ_f[a0] * PQ_f[b0] * delta_f[c0][d0]
+
+                    +PQ_f[c0] * (PQ_f[a0] * delta_f[b0][d0]
+                                + PQ_f[b0] * delta_f[a0][d0]
+                                + PQ_f[d0] * delta_f[a0][b0])
+
+                    +PQ_f[d0] * (PQ_f[a0] * delta_f[b0][c0]
+                                + PQ_f[b0] * delta_f[a0][c0])
+                )
+
+                + S1_f * S1_f * S2_f * inv_S4_f * inv_S4_f * inv_S4_f * (
+                    +PQ_f[c0] * PQ_f[d0] *
+                    (PA_0_f * PQ_f[b0] + PB_0_f * PQ_f[a0])
+                )
+
+                + S1_f * S2_f * S2_f * inv_S4_f * inv_S4_f * inv_S4_f * (
+                    +PQ_f[a0] * PQ_f[b0] *
+                    (-PQ_f[c0] * QD_0_f - PQ_f[d0] * QC_0_f)
+                )
+
+            )
+
+            + F4_f[4] * (
+
+                S1_f * S1_f * S2_f * S2_f *
+                inv_S4_f * inv_S4_f * inv_S4_f * inv_S4_f * (
+                    +PQ_f[a0] * PQ_f[b0] * PQ_f[c0] * PQ_f[d0]
+                )
+
+            )
+        );
+
+        // ---- multiply by D and symmetry in float ----
+        const float D_f = pp_mat_D_f[kl];
+        const float sym_f = (k != l) ? 2.0f : 1.0f;
+        const float contrib_f = eri_ijkl_f * D_f * sym_f;
+
+        // ---- accumulate in double ----
+        ERIs[threadIdx.y][threadIdx.x] += (double)contrib_f;
+    }
+
+    __syncthreads();
+
+    if ((threadIdx.y == 0) && (ij < pp_prim_pair_count_local))
+    {
+        double J_ij = 0.0;
+
+        for (uint32_t n = 0; n < TILE_DIM; n++)
+        {
+            J_ij += ERIs[n][threadIdx.x];
+        }
+
+        mat_J[ij] += J_ij;
+    }
+}
+
+__global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockPPPD(double*         mat_J,
                        const double*   p_prim_info,
                        const uint32_t  p_prim_count,
