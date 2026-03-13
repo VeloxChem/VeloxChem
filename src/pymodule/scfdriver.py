@@ -1513,14 +1513,17 @@ class ScfDriver:
             ecp_atom_inds = [
                 idx for idx, nelec in enumerate(core_electrons) if nelec > 0
             ]
-            # TODO: distribute ecp atoms over MPI ranks
+
+            ave, res = divmod(len(ecp_atom_inds), self.nodes)
+            counts = [ave + 1 if p < res else ave for p in range(self.nodes)]
+            start = sum(counts[:self.rank])
+            end = sum(counts[:self.rank + 1])
+            local_ecp_atom_inds = ecp_atom_inds[start:end]
+
             ecp_t0 = tm.time()
-            if self.rank == mpi_master():
-                ecp_mat = ecp_drv.compute(molecule, ao_basis, ecp_atom_inds)
-                ecp_mat = ecp_mat.to_numpy()
-            else:
-                ecp_mat = None
-            ecp_mat = self.comm.bcast(ecp_mat, root=mpi_master())
+            ecp_mat = ecp_drv.compute(molecule, ao_basis, local_ecp_atom_inds)
+            ecp_mat = self.comm.reduce(ecp_mat.to_numpy(), root=mpi_master())
+
             if self.print_level > 1:
                 self.ostream.print_info(
                     'Effective core potential matrix computed in ' +
