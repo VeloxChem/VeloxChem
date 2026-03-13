@@ -125,6 +125,11 @@ class CphfSolver(LinearSolver):
             of the CPHF equations.
         """
 
+        # TODO: enable ECP
+        assert_msg_critical(
+            not basis.has_ecp(),
+            f'{type(self).__name__}.compute: ECP is not yet supported')
+
         if self.norm_thresh is None:
             self.norm_thresh = self.conv_thresh * 1.0e-6
         if self.lindep_thresh is None:
@@ -325,6 +330,11 @@ class CphfSolver(LinearSolver):
             and an auxiliary Fock matrix (oo block of the CPHF coefficients
             contracted with the two-electron integrals).
         """
+
+        # TODO: enable ECP
+        assert_msg_critical(
+            not basis.has_ecp(),
+            f'{type(self).__name__}.compute: ECP is not yet supported')
 
         if self.norm_thresh is None:
             self.norm_thresh = self.conv_thresh * 1.0e-6
