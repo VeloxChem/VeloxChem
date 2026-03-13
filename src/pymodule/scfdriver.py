@@ -73,8 +73,7 @@ from .sanitychecks import (molecule_sanity_check, dft_sanity_check,
                            solvation_model_sanity_check)
 from .errorhandler import assert_msg_critical
 from .checkpoint import (create_hdf5, write_scf_results_to_hdf5,
-                         write_cpcm_charges, read_cpcm_charges,
-                         read_molecule_and_basis)
+                         write_cpcm_charges, read_cpcm_charges)
 
 
 class ScfDriver:
@@ -557,11 +556,7 @@ class ScfDriver:
                 'with polarizable embedding')
             # Note: we allow restarting SCF with point charges
 
-    def compute(self,
-                molecule=None,
-                basis=None,
-                min_basis=None,
-                checkpoint=None):
+    def compute(self, molecule, basis, min_basis=None):
         """
         Performs SCF calculation using molecular data.
 
@@ -571,43 +566,7 @@ class ScfDriver:
             The AO basis set.
         :param min_basis:
             The minimal AO basis set.
-        :param checkpoint:
-            The checkpoint file to restart from.
         """
-
-        if checkpoint is None:
-            # No checkpoint provided via argument.
-            # Run normal SCF calculation using molecule and basis.
-            # This may still be a restarted SCF calculation if
-            # `checkpoint_file` or `filename` is properly set.
-            assert_msg_critical(
-                molecule is not None and basis is not None,
-                'ScfDriver.compute: Need valid molecule and basis')
-        else:
-            # Checkpoint provided via argument.
-            # Restart SCF calculation using checkpoint.
-            assert_msg_critical(
-                molecule is None and basis is None and min_basis is None,
-                'ScfDriver.compute: Please only provide checkpoint ' +
-                'when restarting SCF')
-            checkpoint = str(checkpoint)
-            assert_msg_critical(
-                Path(checkpoint).is_file(),
-                'ScfDriver.compute: Checkpoint does not exist')
-            assert_msg_critical(
-                Path(checkpoint).suffix == '.h5',
-                'ScfDriver.compute: Checkpoint must be a .h5 file')
-            self.restart = True
-            # To avoid inconsistency across MPI ranks
-            if self.rank == mpi_master():
-                molecule, basis = read_molecule_and_basis(checkpoint)
-                self.checkpoint_file = checkpoint
-            molecule = self.comm.bcast(molecule, root=mpi_master())
-            basis = self.comm.bcast(basis, root=mpi_master())
-            self.checkpoint_file = self.comm.bcast(self.checkpoint_file,
-                                                   root=mpi_master())
-            if checkpoint.endswith('_scf.h5'):
-                self.filename = checkpoint[:-len('_scf.h5')]
 
         profiler = Profiler()
 

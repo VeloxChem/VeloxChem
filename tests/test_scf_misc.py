@@ -9,6 +9,7 @@ from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.dispersionmodel import DispersionModel
+from veloxchem.checkpoint import read_molecule_and_basis
 
 
 @pytest.mark.solvers
@@ -92,11 +93,20 @@ class TestScfDriverMiscellaneous:
 
         third_drv = ScfRestrictedDriver()
         third_drv.ostream.mute()
-        # no configure for third_drv
-        third_results = third_drv.compute(checkpoint=str(checkpoint_file))
+
+        # reconstruct molecule and basis
+        if self.is_master():
+            new_molecule, new_basis = read_molecule_and_basis(
+                str(checkpoint_file))
+        else:
+            new_molecule, new_basis = None, None
+        new_molecule = third_drv.comm.bcast(new_molecule, root=mpi_master())
+        new_basis = third_drv.comm.bcast(new_basis, root=mpi_master())
+        third_drv, third_results = self.run_hf_scf(
+            new_molecule, new_basis,
+            lambda drv: setattr(drv, "filename", filename))
 
         assert third_results is not None
-        assert third_drv.filename == filename
         assert third_drv.checkpoint_file == str(checkpoint_file)
         assert third_drv.restart
         if self.is_master():
