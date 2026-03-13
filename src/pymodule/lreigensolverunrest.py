@@ -1142,10 +1142,10 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
         final = {}
 
         # number of excitations to be excluded from initial guess
-        guess_excl_nstates = n_excl_states * 2
+        guess_excl_nstates = n_excl_states * 3
 
         # total number of excitations in initial guess
-        guess_nstates = nstates * 2
+        guess_nstates = nstates * 3
 
         for k, (i, a) in enumerate(
                 sorted(w_a, key=w_a.get)[guess_excl_nstates:guess_nstates]):

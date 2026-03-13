@@ -705,7 +705,7 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
             trial_mat = np.zeros((n_exc_a + n_exc_b, 0))
 
             # total number of excitations in initial guess
-            guess_nstates = self.nstates * 2
+            guess_nstates = self.nstates * 3
 
             for i, a in sorted(w_a, key=w_a.get)[:guess_nstates]:
                 ia = excitations_a.index((i, a))

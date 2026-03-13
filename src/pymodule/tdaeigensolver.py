@@ -655,7 +655,7 @@ class TdaEigenSolver(LinearSolver):
             trial_mat = np.zeros((n_exc, 0))
 
             # total number of excitations in initial guess
-            guess_nstates = self.nstates * 2
+            guess_nstates = self.nstates * 3
 
             for i, a in sorted(w, key=w.get)[:guess_nstates]:
                 if self.rank == mpi_master():
