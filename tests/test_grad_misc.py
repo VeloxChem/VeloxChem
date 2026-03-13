@@ -14,7 +14,7 @@ from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
 
 
 @pytest.mark.solvers
-class TestScfGradientDriverCoverage:
+class TestScfGradientDriverMiscellaneous:
 
     @staticmethod
     def get_h2_molecule_and_basis():
