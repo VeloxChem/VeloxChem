@@ -1227,8 +1227,6 @@ class VibrationalAnalysis:
                               nmodes, natm, 3)))
 
         hf.create_dataset(vib_group + 'hessian', data=self.hessian)
-        hf.create_dataset(vib_group + 'dipole_gradient',
-                          data=self.dipole_gradient)
         hf.create_dataset(vib_group + 'vib_frequencies',
                           data=np.array(self.vib_frequencies))
         hf.create_dataset(vib_group + 'force_constants',
@@ -1236,6 +1234,8 @@ class VibrationalAnalysis:
         hf.create_dataset(vib_group + 'reduced_masses',
                           data=np.array(self.reduced_masses))
         if self.do_ir:
+            hf.create_dataset(vib_group + 'dipole_gradient',
+                             data=self.dipole_gradient)
             hf.create_dataset(vib_group + 'ir_intensities',
                               data=np.array(self.ir_intensities))
 
@@ -1246,6 +1246,9 @@ class VibrationalAnalysis:
                               data=np.array(self.frequencies))
             ra = [s for s in self.raman_activities]
             hf.create_dataset(vib_group + 'raman_activities', data=np.array(ra))
+            polgrad = [self.polarizability_gradient[a] for a in self.polarizability_gradient.keys()]
+            hf.create_dataset(vib_group + 'polarizability_gradient',
+                            data=np.array(polgrad))
 
             raman_type = 'normal'
             if self.do_resonance_raman:
