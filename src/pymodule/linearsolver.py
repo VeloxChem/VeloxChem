@@ -403,11 +403,6 @@ class LinearSolver:
             The dictionary of ERI information.
         """
 
-        # TODO: enable ECP
-        assert_msg_critical(
-            not basis.has_ecp(),
-            f'{type(self).__name__}.compute: ECP is not yet supported')
-
         # TODO: enable RI-JK
         assert_msg_critical(
             not self.ri_jk,
@@ -785,7 +780,7 @@ class LinearSolver:
             mo = scf_results['C_alpha']
             fa = scf_results['F_alpha']
 
-            nocc = molecule.number_of_alpha_electrons()
+            nocc = molecule.number_of_alpha_occupied_orbitals(basis)
             norb = mo.shape[1]
 
             if getattr(self, 'core_excitation', False):
@@ -1288,7 +1283,7 @@ class LinearSolver:
             mo = scf_results['C_alpha']
             fa = scf_results['F_alpha']
 
-            nocc = molecule.number_of_alpha_electrons()
+            nocc = molecule.number_of_alpha_occupied_orbitals(basis)
             norb = mo.shape[1]
 
             if getattr(self, 'core_excitation', False):
@@ -2058,8 +2053,8 @@ class LinearSolver:
             fa = scf_results['F_alpha']
             fb = scf_results['F_beta']
 
-            nocc_a = molecule.number_of_alpha_electrons()
-            nocc_b = molecule.number_of_beta_electrons()
+            nocc_a = molecule.number_of_alpha_occupied_orbitals(basis)
+            nocc_b = molecule.number_of_beta_occupied_orbitals(basis)
 
             norb = mo_a.shape[1]
 
@@ -2890,10 +2885,10 @@ class LinearSolver:
 
             if spin == 'alpha':
                 mo = scf_results['C_alpha']
-                nocc = molecule.number_of_alpha_electrons()
+                nocc = molecule.number_of_alpha_occupied_orbitals(basis)
             elif spin == 'beta':
                 mo = scf_results['C_beta']
-                nocc = molecule.number_of_beta_electrons()
+                nocc = molecule.number_of_beta_occupied_orbitals(basis)
             norb = mo.shape[1]
 
             factor = np.sqrt(2.0)
@@ -3042,10 +3037,10 @@ class LinearSolver:
 
             if spin == 'alpha':
                 mo = scf_results['C_alpha']
-                nocc = molecule.number_of_alpha_electrons()
+                nocc = molecule.number_of_alpha_occupied_orbitals(basis)
             elif spin == 'beta':
                 mo = scf_results['C_beta']
-                nocc = molecule.number_of_beta_electrons()
+                nocc = molecule.number_of_beta_occupied_orbitals(basis)
             norb = mo.shape[1]
 
             factor = np.sqrt(2.0)
@@ -3569,9 +3564,9 @@ class LinearSolver:
             nocc = self.num_core_orbitals + self.num_valence_orbitals
         else:
             if nto_spin == '' or nto_spin == 'alpha':
-                nocc = molecule.number_of_alpha_electrons()
+                nocc = molecule.number_of_alpha_occupied_orbitals(basis)
             elif nto_spin == 'beta':
-                nocc = molecule.number_of_beta_electrons()
+                nocc = molecule.number_of_beta_occupied_orbitals(basis)
         nvir = nto_mo.number_of_mos() - nocc
         if getattr(self, 'restricted_subspace', False):
             nvir = self.num_virtual_orbitals

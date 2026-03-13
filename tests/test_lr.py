@@ -191,3 +191,47 @@ class TestLR:
         }
 
         self.run_lr('blyp', ref_rsp_func, 1.0e-5, ri_coulomb=True)
+
+    def run_lr_with_ecp(self, ref_rsp_func, tol):
+
+        xyz_string = """3
+        xyz
+        Hg   0.00  0.00  0.00
+        Cl   0.00  0.00  2.35
+        Cl   0.00  0.10 -2.40
+        """
+        mol = Molecule.read_xyz_string(xyz_string)
+
+        basis_label = 'def2-svp'
+        bas = MolecularBasis.read(mol, basis_label, ostream=None)
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_results = scf_drv.compute(mol, bas)
+
+        lr_drv = LinearResponseSolver()
+        lr_drv.ostream.mute()
+        lr_results = lr_drv.compute(mol, bas, scf_results)
+
+        if lr_drv.rank == mpi_master():
+            max_diff = 0.0
+            for key, val in lr_results['response_functions'].items():
+                ref_val = ref_rsp_func[key]
+                max_diff = max(max_diff, abs(val - ref_val))
+            assert max_diff < tol
+
+    def test_hf_with_ecp(self):
+
+        ref_rsp_func = {
+            ('x', 'x', 0.0): -27.35540784,
+            ('y', 'x', 0.0): 0.00000000,
+            ('z', 'x', 0.0): 0.00000000,
+            ('x', 'y', 0.0): 0.00000000,
+            ('y', 'y', 0.0): -27.40381961,
+            ('z', 'y', 0.0): 1.06711071,
+            ('x', 'z', 0.0): 0.00000000,
+            ('y', 'z', 0.0): 1.06711071,
+            ('z', 'z', 0.0): -76.97515361,
+        }
+
+        self.run_lr_with_ecp(ref_rsp_func, 1.0e-5)
