@@ -24,6 +24,7 @@
 
 from math import cos
 
+import builtins
 from networkx import node_clique_number
 from mpi4py import MPI
 import numpy as np
@@ -43,7 +44,7 @@ import random
 from time import time
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
-from contextlib import redirect_stderr
+from contextlib import redirect_stderr, contextmanager
 from io import StringIO
 
 from .molecule import Molecule
@@ -53,6 +54,7 @@ from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
 from .solvationbuilder import SolvationBuilder
 from .optimizationdriver import OptimizationDriver
+from .profiler import Profiler
 
 # Drivers
 from .scfrestdriver import ScfRestrictedDriver
@@ -81,6 +83,21 @@ try:
     import openmm.unit as unit
 except ImportError:
     pass
+
+
+def _rank_root_print(*args, **kwargs):
+    """
+    Print only on MPI root rank to avoid delayed/duplicated worker stdout noise.
+    Falls back to normal print when MPI rank detection is unavailable.
+    """
+    try:
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+            builtins.print(*args, **kwargs)
+    except Exception:
+        builtins.print(*args, **kwargs)
+
+
+print = _rank_root_print
 
 
 # --- put the custom reporter here ---
@@ -154,10 +171,27 @@ class IMDatabasePointCollecter:
             else:
                 ostream = OutputStream(None)
 
-        # mpi information
+        # MPI communicators
+        # self.comm remains the external communicator used by legacy code paths.
+        # self._mpi_ctrl_comm is a dedicated duplicate used by the root-worker
+        # control plane (STEP/STOP).
+        # self._mpi_interp_comm is a separate duplicate used by interpolation
+        # preload collectives. Keeping them separate prevents cross-talk between
+        # control messages and interpolation payload broadcasts.
         self.comm = comm
-        self.rank = self.comm.Get_rank()
-        self.nodes = self.comm.Get_size()
+        try:
+            self._mpi_ctrl_comm = self.comm.Dup()
+        except Exception:
+            self._mpi_ctrl_comm = self.comm
+
+        try:
+            self._mpi_interp_comm = self.comm.Dup()
+        except Exception:
+            self._mpi_interp_comm = self._mpi_ctrl_comm
+
+        # MPI information (based on control communicator)
+        self.rank = self._mpi_ctrl_comm.Get_rank()
+        self.nodes = self._mpi_ctrl_comm.Get_size()
 
         # output stream
         self.ostream = ostream
@@ -290,6 +324,28 @@ class IMDatabasePointCollecter:
         self.linking_atom_distance = 1.0705 
 
         self.eq_bond_force_constants = None
+
+        # Runtime profiling controls (optional, default off).
+        self.profile_runtime_timing = False
+        self.profile_runtime_print_interval = 0
+        self.profile_interpolation_timing = False
+        self.profile_interpolation_print_summary = True
+        self._qmmm_runtime_profiler = None
+        self._qmmm_runtime_totals = {}
+        self._qmmm_runtime_step = {}
+        self._qmmm_runtime_steps = 0
+
+        self.mpi_control_plane_enabled = (self.nodes > 1)
+        self.mpi_root_worker_mode = (self.nodes > 1)
+        self.mpi_reload_from_hdf5 = True
+        self.mpi_debug_sync = False
+
+        # command IDs
+        self._MPI_CMD_STEP = 1
+        self._MPI_CMD_STOP = 2
+
+        # roots requiring dataset reload on worker ranks
+        self._mpi_pending_sync_roots = set()
             
     # Method to generate OpenMM system from VeloxChem objects
     def system_from_molecule(self,
@@ -327,6 +383,8 @@ class IMDatabasePointCollecter:
         self.positions = molecule.get_coordinates_in_angstrom()
         self.labels = molecule.get_labels()
         self.root_z_matrix = z_matrix
+        has_multiple_ranks = (self.nodes > 1)
+        do_io_on_rank = (not has_multiple_ranks) or self._mpi_is_root()
 
         # Options for the QM region if it's required.
         # TODO: Take this if else tree to a separate method.
@@ -342,7 +400,8 @@ class IMDatabasePointCollecter:
                 qm_atoms = list(range(len(self.labels)))
                 self._create_QM_residue(ff_gen, 
                                         qm_atoms, 
-                                        filename)
+                                        filename,
+                                        write_xml=do_io_on_rank)
 
             elif isinstance (qm_atoms, list):
                 if qm_atoms == list(range(len(self.labels))):
@@ -351,19 +410,26 @@ class IMDatabasePointCollecter:
                     self.ostream.flush()
                     self._create_QM_residue(ff_gen,
                                             qm_atoms,
-                                            filename)
+                                            filename,
+                                            write_xml=do_io_on_rank)
                 msg = 'QM/MM partition inside the molecule'
                 self.ostream.print_info(msg)
                 self.ostream.flush()
                 self._create_QM_subregion(ff_gen,
                                           qm_atoms, 
                                           molecule, 
-                                          filename)
+                                          filename,
+                                          write_xml=do_io_on_rank)
 
-            ff_gen.write_pdb(f'{filename}.pdb', 'QMR')
+            if do_io_on_rank:
+                ff_gen.write_pdb(f'{filename}.pdb', 'QMR')
 
         elif qm_atoms is None:
-            ff_gen.write_openmm_files(filename, residue_name)
+            if do_io_on_rank:
+                ff_gen.write_openmm_files(filename, residue_name)
+
+        if has_multiple_ranks:
+            self._mpi_ctrl_comm.Barrier()
 
         # TODO: Incorporate the SystemBuilder here to avoid using the Modeller.
         if solvent == 'gas':
@@ -375,14 +441,19 @@ class IMDatabasePointCollecter:
         if solvent != 'gas':
             # Solvate the molecule using the SystemBuilder
             phase = 'periodic'
-            sys_builder = SolvationBuilder()
-            sys_builder.solvate(solute=molecule, 
-                                solvent=solvent,
-                                padding=self.padding,
-                                equilibrate=True,
-                                constraint_solute=True
-                                )
-            sys_builder.write_openmm_files(solute_ff=ff_gen)
+            if do_io_on_rank:
+                sys_builder = SolvationBuilder()
+                sys_builder.solvate(solute=molecule, 
+                                    solvent=solvent,
+                                    padding=self.padding,
+                                    equilibrate=True,
+                                    constraint_solute=True
+                                    )
+                sys_builder.write_openmm_files(solute_ff=ff_gen)
+
+            if has_multiple_ranks:
+                self._mpi_ctrl_comm.Barrier()
+
             if solvent == 'spce':
                 self.water_ff = 'spce.xml'
                 forcefield_files = [f'{filename}.xml', self.parent_ff, self.water_ff]
@@ -421,31 +492,286 @@ class IMDatabasePointCollecter:
             # self.qm_stabilizer(ff_gen)
         
         # Write the system to a xml file (for debugging purposes)
-        with open(f'{filename}_system.xml', 'w') as f:
-            f.write(mm.XmlSerializer.serialize(self.system))
-            msg = f'System parameters written to {filename}_system.xml'
-            self.ostream.print_info(msg)
-            self.ostream.flush()
+        if do_io_on_rank:
+            with open(f'{filename}_system.xml', 'w') as f:
+                f.write(mm.XmlSerializer.serialize(self.system))
+                msg = f'System parameters written to {filename}_system.xml'
+                self.ostream.print_info(msg)
+                self.ostream.flush()
 
         # Write the system to a pdb file (for debugging purposes)
-        if phase == 'gas':
-            app.PDBFile.writeFile(self.pdb.topology, 
-                                  self.positions, 
-                                  open(f'{filename}_system.pdb', 'w'))
-            msg = f'System coordinates written to {filename}_system.pdb'
-            self.ostream.print_info(msg)
-            self.ostream.flush()
+        if do_io_on_rank:
+            if phase == 'gas':
+                app.PDBFile.writeFile(self.pdb.topology, 
+                                      self.positions, 
+                                      open(f'{filename}_system.pdb', 'w'))
+                msg = f'System coordinates written to {filename}_system.pdb'
+                self.ostream.print_info(msg)
+                self.ostream.flush()
 
-        elif phase == 'periodic':
-            app.PDBFile.writeFile(self.pdb.topology, 
-                                  self.pdb.positions, 
-                                  open(f'{filename}_system.pdb', 'w'))
-            msg = f'System coordinates written to {filename}_system.pdb'
-            self.ostream.print_info(msg)
-            self.ostream.flush()
+            elif phase == 'periodic':
+                app.PDBFile.writeFile(self.pdb.topology, 
+                                      self.pdb.positions, 
+                                      open(f'{filename}_system.pdb', 'w'))
+                msg = f'System coordinates written to {filename}_system.pdb'
+                self.ostream.print_info(msg)
+                self.ostream.flush()
         
         self.phase = phase
 
+    def _refresh_interpolation_driver_caches(self, root):
+        """
+        Refreshes both legacy runtime cache and MPI preload cache for one root.
+        Call this after any datapoint/symmetry update.
+        """
+        driver = self.impes_drivers[root]
+        driver.mark_runtime_data_cache_dirty()
+        driver.prepare_runtime_data_cache(force=True)
+        if getattr(driver, 'mpi_engine', None) is not None:
+            driver.mpi_engine.mark_dirty()
+            # In root-worker mode, defer preload rebuild until synchronized compute
+            # to avoid standalone collectives desynchronizing the worker control loop.
+            if not (self._mpi_is_active() and self.mpi_root_worker_mode):
+                driver.mpi_engine.preload_static_data(force=True)
+        self._mpi_mark_root_dirty(root)
+    
+    def _mpi_is_active(self):
+        return bool(self.nodes > 1 and self.mpi_control_plane_enabled)
+
+    def _mpi_is_root(self):
+        return self.rank == mpi_master()
+
+    def _mpi_mark_root_dirty(self, root):
+        if self._mpi_is_active() and self.mpi_root_worker_mode:
+            self._mpi_pending_sync_roots.add(int(root))
+
+    def _mpi_bcast_control(self, message):
+        if not self._mpi_is_active():
+            return message
+        return self._mpi_ctrl_comm.bcast(message if self._mpi_is_root() else None, root=mpi_master())
+
+    def _mpi_decode_cmd(self, cmd_obj):
+        if isinstance(cmd_obj, np.ndarray):
+            arr = np.asarray(cmd_obj)
+            if arr.size == 1:
+                return int(arr.reshape(-1)[0])
+            raise RuntimeError(
+                f"MPI control-channel desync on rank {self.rank}: expected scalar command, "
+                f"got ndarray shape={arr.shape} dtype={arr.dtype}")
+
+        if isinstance(cmd_obj, (int, np.integer)):
+            return int(cmd_obj)
+
+        raise RuntimeError(
+            f"MPI control-channel desync on rank {self.rank}: expected int command, "
+            f"got {type(cmd_obj).__name__}")
+
+    def _run_qmmm_worker_service(self):
+        """
+        Worker-side MPI service loop.
+        Receives STEP messages from rank 0 and executes interpolation compute only.
+        """
+        expected_step_idx = 0
+        while True:
+            msg = self._mpi_bcast_control(None)
+            if not isinstance(msg, dict):
+                raise RuntimeError(
+                    f"MPI control-channel desync on worker rank {self.rank}: "
+                    f"unexpected message type={type(msg).__name__}")
+            if 'cmd' not in msg:
+                raise RuntimeError(
+                    f"MPI control-channel desync on worker rank {self.rank}: "
+                    f"control dict missing 'cmd'; keys={list(msg.keys())}")
+
+            cmd = self._mpi_decode_cmd(msg['cmd'])
+            if cmd == self._MPI_CMD_STOP:
+                break
+            if cmd != self._MPI_CMD_STEP:
+                raise RuntimeError(f"Unknown MPI command {cmd} on worker rank {self.rank}")
+
+            step_idx_obj = msg.get('step_idx', None)
+            if step_idx_obj is not None:
+                step_idx = self._mpi_decode_cmd(step_idx_obj)
+                if step_idx != expected_step_idx:
+                    raise RuntimeError(
+                        f"MPI STEP index mismatch on worker rank {self.rank}: "
+                        f"expected {expected_step_idx}, got {step_idx}")
+                expected_step_idx += 1
+
+            if 'qm_positions_nm' not in msg:
+                raise RuntimeError(
+                    f"MPI STEP message missing 'qm_positions_nm' on worker rank {self.rank}")
+
+            sync_roots = msg.get('sync_roots', [])
+            qm_positions_nm = msg['qm_positions_nm']
+            self._mpi_worker_compute_step(qm_positions_nm, sync_roots)
+
+    def _mpi_collect_driver_objects_for_root_local_work(self):
+        objs = []
+        drv_dict = getattr(self, 'drivers', None)
+        if isinstance(drv_dict, dict):
+            for key in ('gs', 'es'):
+                drv_val = drv_dict.get(key)
+                if isinstance(drv_val, (list, tuple)):
+                    for obj in drv_val:
+                        if obj is not None:
+                            objs.append(obj)
+                elif drv_val is not None:
+                    objs.append(drv_val)
+        return objs
+
+    def _mpi_apply_comm_override(self, obj, comm, saved, seen):
+        if obj is None:
+            return
+
+        obj_id = id(obj)
+        if obj_id in seen:
+            return
+        seen.add(obj_id)
+
+        def _record_and_set(target, attr_name, new_value):
+            try:
+                old_value = getattr(target, attr_name)
+            except Exception:
+                return
+            try:
+                setattr(target, attr_name, new_value)
+            except Exception:
+                return
+            saved.append((target, attr_name, old_value))
+
+        # Update both public and private communicator/rank/size fields.
+        for comm_attr in ('comm', '_comm'):
+            if hasattr(obj, comm_attr):
+                _record_and_set(obj, comm_attr, comm)
+
+        for rank_attr in ('rank', '_rank'):
+            if hasattr(obj, rank_attr):
+                _record_and_set(obj, rank_attr, comm.Get_rank())
+
+        for size_attr in ('nodes', '_nodes', 'size', '_size', 'nnodes', '_nnodes'):
+            if hasattr(obj, size_attr):
+                _record_and_set(obj, size_attr, comm.Get_size())
+
+        # Recurse through nested veloxchem objects and container members.
+        if isinstance(obj, dict):
+            iterable = obj.values()
+        elif isinstance(obj, (list, tuple, set)):
+            iterable = obj
+        else:
+            iterable = getattr(obj, '__dict__', {}).values()
+
+        for child in iterable:
+            if child is None:
+                continue
+            if isinstance(child, (str, bytes, int, float, complex, bool, np.ndarray)):
+                continue
+            child_mod = getattr(getattr(child, '__class__', None), '__module__', '')
+            if child_mod.startswith('veloxchem') or isinstance(child, (dict, list, tuple, set)):
+                self._mpi_apply_comm_override(child, comm, saved, seen)
+
+    @staticmethod
+    def _mpi_restore_comm_override(saved):
+        for target, attr_name, old_value in reversed(saved):
+            try:
+                setattr(target, attr_name, old_value)
+            except Exception:
+                pass
+
+    @contextmanager
+    def _mpi_root_local_qm_context(self, extra_objects=None):
+        """
+        Temporarily forces auxiliary QM drivers to run on COMM_SELF.
+
+        This avoids deadlocks when rank 0 performs point-check/add-point
+        QM/optimization work while worker ranks are blocked in the
+        root-worker control service loop.
+        """
+
+        if not (self._mpi_is_active() and self.mpi_root_worker_mode and self._mpi_is_root()):
+            yield
+            return
+
+        saved = []
+        seen = set()
+        local_comm = MPI.COMM_SELF
+
+        for obj in self._mpi_collect_driver_objects_for_root_local_work():
+            self._mpi_apply_comm_override(obj, local_comm, saved, seen)
+
+        if extra_objects is not None:
+            for obj in extra_objects:
+                self._mpi_apply_comm_override(obj, local_comm, saved, seen)
+
+        try:
+            yield
+        finally:
+            self._mpi_restore_comm_override(saved)
+
+    def _compute_energy_mpi_safe(self, qm_driver, molecule, basis=None):
+        with self._mpi_root_local_qm_context(extra_objects=[qm_driver]):
+            if self._mpi_is_active() and self.mpi_root_worker_mode and self._mpi_is_root() and hasattr(qm_driver, "comm"):
+                if qm_driver.comm.Get_size() != 1:
+                    raise RuntimeError("Root-local MPI override failed for QM energy driver (comm size != 1).")
+            return self.compute_energy(qm_driver, molecule, basis)
+
+    def _compute_gradient_mpi_safe(self, grad_driver, molecule, basis=None, scf_results=None, rsp_results=None):
+        with self._mpi_root_local_qm_context(extra_objects=[grad_driver]):
+            if self._mpi_is_active() and self.mpi_root_worker_mode and self._mpi_is_root() and hasattr(grad_driver, "comm"):
+                if grad_driver.comm.Get_size() != 1:
+                    raise RuntimeError("Root-local MPI override failed for QM gradient driver (comm size != 1).")
+            return self.compute_gradient(grad_driver, molecule, basis, scf_results, rsp_results)
+
+    def _compute_hessian_mpi_safe(self, hess_driver, molecule, basis=None):
+        with self._mpi_root_local_qm_context(extra_objects=[hess_driver]):
+            if self._mpi_is_active() and self.mpi_root_worker_mode and self._mpi_is_root() and hasattr(hess_driver, "comm"):
+                if hess_driver.comm.Get_size() != 1:
+                    raise RuntimeError("Root-local MPI override failed for QM hessian driver (comm size != 1).")
+            return self.compute_hessian(hess_driver, molecule, basis)
+
+    def _opt_compute_mpi_safe(self, opt_drv, molecule, *compute_args):
+        with self._mpi_root_local_qm_context(extra_objects=[opt_drv]):
+            if self._mpi_is_active() and self.mpi_root_worker_mode and self._mpi_is_root() and hasattr(opt_drv, "comm"):
+                if opt_drv.comm.Get_size() != 1:
+                    raise RuntimeError("Root-local MPI override failed for OptimizationDriver (comm size != 1).")
+            return opt_drv.compute(molecule, *compute_args)
+
+
+    def _ensure_interp_engine_comm(self, driver):
+        engine = getattr(driver, 'mpi_engine', None)
+        if engine is None:
+            return
+
+        if getattr(engine, 'comm', None) is self._mpi_interp_comm:
+            return
+
+        engine.comm = self._mpi_interp_comm
+        engine.rank = self._mpi_interp_comm.Get_rank()
+        engine.size = self._mpi_interp_comm.Get_size()
+    def _interp_compute_root_local_serial(self, driver, molecule):
+        """
+        Runs InterpolationDriver.compute in a root-local serial-safe mode.
+
+        In root-worker MPI mode, this is used for auxiliary/root-only logic
+        (point checks, constrained point generation) where workers are parked
+        in the control loop. MPI preload collectives must be disabled here.
+        """
+        if not (self._mpi_is_active() and self.mpi_root_worker_mode and self._mpi_is_root()):
+            self._ensure_interp_engine_comm(driver)
+            driver.compute(molecule)
+            return
+
+        self._ensure_interp_engine_comm(driver)
+        old_collective = bool(getattr(driver, 'mpi_collective_compute_active', False))
+        old_preload_enabled = bool(getattr(driver, 'mpi_preload_enabled', False))
+
+        try:
+            driver.mpi_collective_compute_active = False
+            driver.mpi_preload_enabled = False
+            driver.compute(molecule)
+        finally:
+            driver.mpi_collective_compute_active = old_collective
+            driver.mpi_preload_enabled = old_preload_enabled
 
     def compute_tetrahedral_anchor(self, positions, Cbeta, Calpha, Hbeta1, Hbeta2, bond_length=0.109):
         def normalize(v):
@@ -474,8 +800,6 @@ class IMDatabasePointCollecter:
 
         anchor = rC + bond_length * vghost
         return anchor
-
-
     def add_bias_force(self, atoms, force_constant, target=0.109, anchor=False):
         """
         Method to add a biasing force to the system.
@@ -780,12 +1104,406 @@ class IMDatabasePointCollecter:
         if 'bond_threshold' in dynamics_settings:
             self.bond_threshold = float(dynamics_settings['bond_threshold'])
 
+        if 'profile_runtime_timing' in dynamics_settings:
+            self.profile_runtime_timing = bool(dynamics_settings['profile_runtime_timing'])
+        if 'profile_runtime_print_interval' in dynamics_settings:
+            self.profile_runtime_print_interval = int(dynamics_settings['profile_runtime_print_interval'])
+        if 'profile_interpolation_timing' in dynamics_settings:
+            self.profile_interpolation_timing = bool(dynamics_settings['profile_interpolation_timing'])
+        if 'profile_interpolation_print_summary' in dynamics_settings:
+            self.profile_interpolation_print_summary = bool(
+                dynamics_settings['profile_interpolation_print_summary'])
+        if 'mpi_control_plane_enabled' in dynamics_settings:
+            self.mpi_control_plane_enabled = bool(dynamics_settings['mpi_control_plane_enabled'])
+        if 'mpi_root_worker_mode' in dynamics_settings:
+            self.mpi_root_worker_mode = bool(dynamics_settings['mpi_root_worker_mode'])
+        if 'mpi_reload_from_hdf5' in dynamics_settings:
+            self.mpi_reload_from_hdf5 = bool(dynamics_settings['mpi_reload_from_hdf5'])
+        if 'mpi_debug_sync' in dynamics_settings:
+            self.mpi_debug_sync = bool(dynamics_settings['mpi_debug_sync'])
+
+    def _build_run_qmmm_runtime_cache(self):
+        """
+        Builds cached constants used during the QM/MM integration loop.
+        """
+
+        energy_unit = unit.kilojoules_per_mole
+        gas_constant = unit.MOLAR_GAS_CONSTANT_R.value_in_unit(energy_unit / unit.kelvin)
+
+        return {
+            'energy_unit': energy_unit,
+            'qm_mm_groups': {1, 2},
+            'mm_groups': {3, 4, 5, 6, 7},
+            'dof': self.system.getNumParticles() * 3 - self.system.getNumConstraints(),
+            'has_temp_method': hasattr(self.integrator, 'computeSystemTemperature'),
+            'gas_constant': gas_constant
+        }
+
+    def _initialize_runtime_profilers(self):
+        """
+        Initializes run-time profilers for QM/MM loop and interpolation drivers.
+        """
+
+        if not self.profile_runtime_timing:
+            self._qmmm_runtime_profiler = None
+            self._qmmm_runtime_totals = {}
+            self._qmmm_runtime_step = {}
+            self._qmmm_runtime_steps = 0
+            return
+
+        self._qmmm_runtime_profiler = Profiler({'timing': True})
+        self._qmmm_runtime_profiler.set_timing_key('run_qmmm')
+        self._qmmm_runtime_totals = {}
+        self._qmmm_runtime_step = {}
+        self._qmmm_runtime_steps = 0
+
+    def _add_runtime_timing(self, label, dt):
+        """
+        Adds timing value to QM/MM profiling aggregates.
+        """
+
+        if not self.profile_runtime_timing or self._qmmm_runtime_profiler is None:
+            return
+
+        self._qmmm_runtime_profiler.add_timing_info(label, dt)
+        self._qmmm_runtime_totals[label] = self._qmmm_runtime_totals.get(label, 0.0) + dt
+        self._qmmm_runtime_step[label] = self._qmmm_runtime_step.get(label, 0.0) + dt
+
+    def _finalize_runtime_step(self):
+        """
+        Finalizes one profiled timestep.
+        """
+
+        if not self.profile_runtime_timing or self._qmmm_runtime_profiler is None:
+            return
+
+        self._qmmm_runtime_steps += 1
+        self._qmmm_runtime_step = {}
+
+    def _print_qmmm_runtime_profile_summary(self):
+        """
+        Prints runtime breakdown for one average QM/MM timestep.
+        """
+
+        if not self.profile_runtime_timing or self._qmmm_runtime_steps == 0:
+            return
+
+        steps = self._qmmm_runtime_steps
+        totals = self._qmmm_runtime_totals
+        avg_step = totals.get('step.total', 0.0) / steps
+        avg_update_forces = totals.get('step.update_forces', 0.0) / steps
+        avg_impes = totals.get('update_gradient_and_energy.impes_compute_total', 0.0) / steps
+        avg_integrator = totals.get('step.integrator', 0.0) / steps
+        avg_observables = totals.get('step.observables', 0.0) / steps
+
+        def pct(value):
+            return (100.0 * value / avg_step) if avg_step > 0.0 else 0.0
+
+        print('QM/MM runtime profiler summary (average per timestep)')
+        print(f'  steps_profiled: {steps}')
+        print(f'  timestep.total: {avg_step:.6f} s')
+        print(f'  timestep.update_forces: {avg_update_forces:.6f} s ({pct(avg_update_forces):.1f}%)')
+        print(f'  timestep.integrator_step: {avg_integrator:.6f} s ({pct(avg_integrator):.1f}%)')
+        print(f'  timestep.observables: {avg_observables:.6f} s ({pct(avg_observables):.1f}%)')
+        print(f'  impes_driver.compute_total: {avg_impes:.6f} s ({pct(avg_impes):.1f}%)')
+
+        root_keys = sorted(
+            key for key in totals if key.startswith('update_gradient_and_energy.impes_compute_root_')
+        )
+        for key in root_keys:
+            avg_val = totals[key] / steps
+            print(f'  {key.split(".")[-1]}: {avg_val:.6f} s ({pct(avg_val):.1f}%)')
+
+    def _print_interpolation_runtime_profile_summary(self):
+        """
+        Prints bottleneck summary from InterpolationDriver runtime profiler.
+        """
+
+        if not self.profile_interpolation_timing or not self.profile_interpolation_print_summary:
+            return
+        if not isinstance(self.impes_drivers, dict):
+            return
+
+        for root in self.roots_to_follow:
+            driver = self.impes_drivers.get(root)
+            if driver is None:
+                continue
+            summary = driver.get_runtime_profile_summary()
+            if not summary['enabled'] or summary['calls'] == 0:
+                continue
+
+            totals = summary['totals']
+            calls = summary['calls']
+            compute_total = totals.get('compute.total', 0.0)
+            avg_compute = compute_total / calls if calls > 0 else 0.0
+
+            print(f'InterpolationDriver profiler summary (root={root})')
+            print(f'  compute.calls: {calls}')
+            print(f'  compute.total: {compute_total:.6f} s (avg {avg_compute:.6f} s/call)')
+
+            hot_labels = [
+                'compute.prepare_state',
+                'compute.define_impes_coordinate',
+                'compute.define_impes_coordinate.define_internal_coordinates',
+                'compute.define_impes_coordinate.calculate_b_matrix',
+                'compute.define_impes_coordinate.compute_internal_coordinates_values',
+                'compute.load_qm_data_points',
+                'compute.prepare_runtime_cache',
+                'compute.shepard_interpolation',
+                'shepard.total',
+                'shepard.distance_scan',
+                'shepard.point_eval_loop',
+                'shepard.compute_potential',
+                'shepard.assembly',
+                'shepard.filter_close_points',
+            ]
+            for label in hot_labels:
+                if label in totals:
+                    avg_val = totals[label] / calls
+                    pct_compute = (100.0 * totals[label] / compute_total) if compute_total > 0.0 else 0.0
+                    print(f'  {label}: total {totals[label]:.6f} s, avg {avg_val:.6f} s/call ({pct_compute:.1f}% of compute.total)')
+
+    def _collect_step_observables_reference(self, context, runtime_cache):
+        """
+        Reference observable collection using Quantity arithmetic.
+        This mirrors the original implementation for verification.
+        """
+
+        energy_unit = runtime_cache['energy_unit']
+        dof = runtime_cache['dof']
+
+        qm = self.get_qm_potential_energy()
+        qm_mm = context.getState(
+            getEnergy=True,
+            groups=runtime_cache['qm_mm_groups']).getPotentialEnergy()
+        mm = context.getState(
+            getEnergy=True,
+            groups=runtime_cache['mm_groups']).getPotentialEnergy()
+
+        pot = qm * energy_unit + qm_mm + mm
+        kinetic = context.getState(getEnergy=True).getKineticEnergy()
+
+        if runtime_cache['has_temp_method']:
+            temp = self.integrator.computeSystemTemperature().value_in_unit(unit.kelvin)
+        else:
+            temp = (2 * kinetic / (dof * unit.MOLAR_GAS_CONSTANT_R)).value_in_unit(unit.kelvin)
+
+        total = pot + kinetic
+
+        return {
+            'qm': float(qm),
+            'qm_mm': qm_mm.value_in_unit(energy_unit),
+            'mm': mm.value_in_unit(energy_unit),
+            'potential': pot.value_in_unit(energy_unit),
+            'kinetic': kinetic.value_in_unit(energy_unit),
+            'temperature': float(temp),
+            'total': total.value_in_unit(energy_unit),
+        }
+
+    def _collect_step_observables_optimized(self, context, runtime_cache):
+        """
+        Optimized observable collection avoiding repeated Quantity arithmetic.
+        """
+
+        energy_unit = runtime_cache['energy_unit']
+
+        qm = float(self.current_energy)
+        qm_mm = context.getState(
+            getEnergy=True,
+            groups=runtime_cache['qm_mm_groups']).getPotentialEnergy().value_in_unit(energy_unit)
+        mm = context.getState(
+            getEnergy=True,
+            groups=runtime_cache['mm_groups']).getPotentialEnergy().value_in_unit(energy_unit)
+        kinetic = context.getState(getEnergy=True).getKineticEnergy().value_in_unit(energy_unit)
+
+        potential = qm + qm_mm + mm
+
+        if runtime_cache['has_temp_method']:
+            temperature = self.integrator.computeSystemTemperature().value_in_unit(unit.kelvin)
+        else:
+            temperature = (2.0 * kinetic) / (runtime_cache['dof'] * runtime_cache['gas_constant'])
+
+        total = potential + kinetic
+
+        return {
+            'qm': qm,
+            'qm_mm': qm_mm,
+            'mm': mm,
+            'potential': potential,
+            'kinetic': kinetic,
+            'temperature': float(temperature),
+            'total': total,
+        }
+
+    def _append_step_observables(self, observables):
+        """
+        Appends per-step observables to trajectory history.
+        """
+
+        self.qm_potentials.append(observables['qm'])
+        self.qm_mm_interaction_energies.append(observables['qm_mm'])
+        self.mm_potentials.append(observables['mm'])
+        self.total_potentials.append(observables['potential'])
+        self.kinetic_energies.append(observables['kinetic'])
+        self.temperatures.append(observables['temperature'])
+        self.total_energies.append(observables['total'])
+
+        self.gloabal_sim_informations['temperatures'].append(observables['temperature'])
+        self.gloabal_sim_informations['state'].append(self.current_state)
+        if self.coordinates_xyz:
+            self.gloabal_sim_informations['coordinates_ang'].append(self.coordinates_xyz[-1])
+        else:
+            self.gloabal_sim_informations['coordinates_ang'].append(None)
+
+    def _update_qmmm_verification_stats(self, reference, optimized, stats, step, atol, rtol, fail_fast):
+        """
+        Compares optimized and reference per-step observables.
+        """
+
+        keys = ('qm', 'qm_mm', 'mm', 'potential', 'kinetic', 'temperature', 'total')
+        mismatch = []
+
+        for key in keys:
+            ref = float(reference[key])
+            opt = float(optimized[key])
+            abs_diff = abs(ref - opt)
+            rel_diff = abs_diff / max(abs(ref), 1.0e-15)
+
+            stats['max_abs'][key] = max(stats['max_abs'][key], abs_diff)
+            stats['max_rel'][key] = max(stats['max_rel'][key], rel_diff)
+
+            if abs_diff > (atol + rtol * abs(ref)):
+                mismatch.append((key, ref, opt, abs_diff, rel_diff))
+
+        if mismatch:
+            stats['num_mismatch_steps'] += 1
+            if fail_fast:
+                mismatch_txt = ', '.join(
+                    f"{key}: ref={ref:.12e}, opt={opt:.12e}, abs={abs_diff:.3e}, rel={rel_diff:.3e}"
+                    for key, ref, opt, abs_diff, rel_diff in mismatch
+                )
+                raise RuntimeError(
+                    f'run_qmmm verification failed at step {step}: {mismatch_txt}'
+                )
+
+            if stats['num_mismatch_steps'] <= 5:
+                print(f'Verification warning at step {step}: {len(mismatch)} field(s) differ above tolerance')
+
+    def _print_run_qmmm_step(self, step, timestep, observables, save_freq):
+        """
+        Prints per-step simulation diagnostics.
+        """
+
+        if step % save_freq != 0:
+            return
+
+        print(f"Step: {step} / {self.nsteps} Time: {round((step * timestep) / 1000, 2)} ps")
+        print('Potential Energy QM region:', observables['qm'], 'kJ/mol')
+        print('Potential Energy MM region:', observables['mm'])
+        print('QM/MM Interaction Energy:', observables['qm_mm'])
+        print('Total Potential Energy:', observables['potential'])
+        print('Kinetic Energy:', observables['kinetic'])
+        print('Temperature:', observables['temperature'], 'K')
+        print('Total Energy:', observables['total'], '±', np.std(self.total_energies), 'kJ/mol')
+        for root in self.roots_to_follow:
+            print('Current Density', self.density_around_data_point[0][root], '-->', self.desired_datpoint_density, self.unadded_cycles)
+        print('Current State (PES):', self.current_state)
+        print('-' * 60)
+
+    def _print_run_qmmm_verification_summary(self, stats, atol, rtol):
+        """
+        Prints max observed deviations between reference and optimized observables.
+        """
+
+        print('run_qmmm verification summary')
+        print(f'Tolerances: atol={atol:.3e}, rtol={rtol:.3e}')
+        print(f'Steps with mismatch above tolerance: {stats["num_mismatch_steps"]}')
+        for key in ('qm', 'qm_mm', 'mm', 'potential', 'kinetic', 'temperature', 'total'):
+            print(
+                f'  {key}: max_abs={stats["max_abs"][key]:.3e}, '
+                f'max_rel={stats["max_rel"][key]:.3e}'
+            )
+
     
-    
-    def run_qmmm(self):
+    def _reload_interpolation_root_from_hdf5(self, root, inv_sqrt_masses):
+        driver_object = self.impes_drivers[root]
+
+        im_labels, _ = driver_object.read_labels()
+
+        self.qm_data_point_dict[root] = []
+        self.qm_symmetry_datapoint_dict[root] = {}
+        self.qm_energies_dict[root] = []
+        self.sorted_state_spec_im_labels[root] = []
+
+        old_label = None
+        for label in im_labels:
+            if '_symmetry' not in label:
+                qm_data_point = InterpolationDatapoint(self.root_z_matrix[root])
+                qm_data_point.update_settings(self.interpolation_settings[root])
+                qm_data_point.read_hdf5(self.interpolation_settings[root]['imforcefield_file'], label)
+                qm_data_point.inv_sqrt_masses = inv_sqrt_masses
+
+                self.qm_data_point_dict[root].append(qm_data_point)
+                self.qm_energies_dict[root].append(qm_data_point.energy)
+                self.sorted_state_spec_im_labels[root].append(label)
+
+                old_label = qm_data_point.point_label
+                self.qm_symmetry_datapoint_dict[root][old_label] = [qm_data_point]
+            else:
+                sym_dp = InterpolationDatapoint(self.root_z_matrix[root])
+                sym_dp.update_settings(self.interpolation_settings[root])
+                sym_dp.read_hdf5(self.interpolation_settings[root]['imforcefield_file'], label)
+                self.qm_symmetry_datapoint_dict[root][old_label].append(sym_dp)
+
+
+        driver_object.qm_symmetry_data_points = self.qm_symmetry_datapoint_dict[root]
+        driver_object.qm_data_points = self.qm_data_point_dict[root]
+        driver_object.labels = self.sorted_state_spec_im_labels[root]
+
+        if len(self.qm_data_point_dict[root]) > 0:
+            driver_object.impes_coordinate.eq_bond_lengths = self.qm_data_point_dict[root][0].eq_bond_lengths
+
+        driver_object.mark_runtime_data_cache_dirty()
+        driver_object.prepare_runtime_data_cache(force=True)
+
+        use_mpi_preload = bool(self.interpolation_settings[root].get('use_mpi_preload', False))
+        # In root-worker mode, avoid immediate preload collectives here; rebuild lazily
+        # in synchronized compute path on the next step.
+        force_rebuild_preload = not (self._mpi_is_active() and self.mpi_root_worker_mode)
+        driver_object.set_mpi_preload_engine(
+            comm=self._mpi_interp_comm,
+            enabled=(use_mpi_preload and self.nodes > 1),
+            force_rebuild=force_rebuild_preload,
+        )
+
+        driver_object._mpi_preload_enabled_config = bool(getattr(driver_object, 'mpi_preload_enabled', False))
+        self._ensure_interp_engine_comm(driver_object)
+        # In root-worker mode, keep preload disabled outside synchronized compute
+        # phases to prevent root-only branches from emitting collective packets.
+        if self._mpi_is_active() and self.mpi_root_worker_mode:
+            driver_object.mpi_preload_enabled = False
+
+
+    def run_qmmm(self,
+                 verify_optimized=False,
+                 verification_atol=1.0e-8,
+                 verification_rtol=1.0e-6,
+                 verification_fail_fast=False,
+                 use_optimized_observables=True):
         """
         Runs a QM/MM simulation using OpenMM, storing the trajectory and simulation data.
 
+        :param verify_optimized:
+            If True, computes both reference and optimized observables per step and compares them.
+        :param verification_atol:
+            Absolute tolerance used for reference-vs-optimized checks.
+        :param verification_rtol:
+            Relative tolerance used for reference-vs-optimized checks.
+        :param verification_fail_fast:
+            If True, raises RuntimeError on the first mismatch above tolerance.
+        :param use_optimized_observables:
+            If True, stores observables from the optimized collector.
+            If False, stores observables from the legacy/reference collector.
         """
 
         assert_msg_critical('openmm' in sys.modules, 'OpenMM is required for IMDatabasePointCollecter.')
@@ -812,98 +1530,112 @@ class IMDatabasePointCollecter:
         self.total_energies = []
         self.coordinates_xyz = []
 
-        save_freq = self.nsteps // self.snapshots if self.snapshots else self.nsteps
+        save_freq = max(1, self.nsteps // self.snapshots) if self.snapshots else max(1, self.nsteps)
 
-        # Create or update the integrator
-        if self.integrator is None:
-            new_integrator = self._create_integrator()
-        else:
-            new_integrator = self.integrator
+        is_worker_service_rank = (
+            self._mpi_is_active() and self.mpi_root_worker_mode and (not self._mpi_is_root())
+        )
 
         self.topology = self.pdb.topology
 
         self.positions = self.pdb.positions
+        self._topology_atom_labels = [atom.element.symbol for atom in self.topology.atoms()]
 
-        # Compute anchor from geometry
-        if self.bias_force_reaction_prop is not None:
-
-            if self.bias_force_reaction_prop[3]:
-
-            
-                ghost_index = self.system.addParticle(0.0)
-
-                self.add_bias_force((self.bias_force_reaction_prop[0][0], ghost_index), self.bias_force_reaction_prop[1], anchor=self.bias_force_reaction_prop[3])
-
-                
-                Cbeta, Calpha, H1beta, H2beta = self.bias_force_reaction_idx[0], self.bias_force_reaction_idx[1], self.bias_force_reaction_idx[2],self.bias_force_reaction_idx[3]
-                anchor = self.compute_tetrahedral_anchor(self.positions, Cbeta, Calpha, H1beta, H2beta)
-    
-            
-                anchor_pos = np.array(anchor) * unit.nanometer
-
-                self.positions = list(self.positions) + [anchor_pos]
-
+        if not is_worker_service_rank:
+            # Create or update the integrator
+            if self.integrator is None:
+                new_integrator = self._create_integrator()
             else:
-                self.add_bias_force(self.bias_force_reaction_prop[0], self.bias_force_reaction_prop[1], self.bias_force_reaction_prop[2])   
-        
-        self.simulation = app.Simulation(self.topology, self.system, new_integrator)
+                new_integrator = self.integrator
 
-        # Load the state if a restart file is provided
-        if self.load_system is not None:
-            self.simulation.loadState(self.load_system)
-        
-        else:
-            self.simulation.context.setPositions(self.positions)
+            # Compute anchor from geometry
+            if self.bias_force_reaction_prop is not None:
+                if self.bias_force_reaction_prop[3]:
+                    ghost_index = self.system.addParticle(0.0)
+                    self.add_bias_force(
+                        (self.bias_force_reaction_prop[0][0], ghost_index),
+                        self.bias_force_reaction_prop[1],
+                        anchor=self.bias_force_reaction_prop[3])
 
-            # Set initial velocities if the ensemble is NVT or NPT
+                    Cbeta, Calpha, H1beta, H2beta = (
+                        self.bias_force_reaction_idx[0],
+                        self.bias_force_reaction_idx[1],
+                        self.bias_force_reaction_idx[2],
+                        self.bias_force_reaction_idx[3],
+                    )
+                    anchor = self.compute_tetrahedral_anchor(
+                        self.positions, Cbeta, Calpha, H1beta, H2beta)
+                    anchor_pos = np.array(anchor) * unit.nanometer
+                    self.positions = list(self.positions) + [anchor_pos]
+                else:
+                    self.add_bias_force(
+                        self.bias_force_reaction_prop[0],
+                        self.bias_force_reaction_prop[1],
+                        self.bias_force_reaction_prop[2])
+
+            self.simulation = app.Simulation(self.topology, self.system, new_integrator)
+
+            # Load the state if a restart file is provided
+            if self.load_system is not None:
+                self.simulation.loadState(self.load_system)
+            else:
+                self.simulation.context.setPositions(self.positions)
+
+                # Set initial velocities if the ensemble is NVT or NPT
+                if self.ensemble in ['NVT', 'NPT']:
+                    self.simulation.context.setVelocitiesToTemperature(self.temperature)
+                # else:
+                #     self.simulation.context.setVelocitiesToTemperature(150 * unit.kelvin)
+            self.start_velocities = self.simulation.context.getState(getVelocities=True).getVelocities()
+
+            # Set up reporting
+            self.simulation.reporters.clear()
+            if self.bias_force_reaction_prop is not None and self.bias_force_reaction_prop[3]:
+                self.simulation.reporters.append(GhostSafePDBReporter(self.out_file, save_freq))
+            else:
+                self.simulation.reporters.append(app.PDBReporter(self.out_file, save_freq))
+
+            # Print header
+            print('QM/MM Simulation Parameters')
+            print('=' * 60)
+            print('QM Driver:', self.driver_flag)
+            print('Ensemble:', self.ensemble)
+            print('Integration method:', new_integrator.__class__.__name__)
             if self.ensemble in ['NVT', 'NPT']:
-                self.simulation.context.setVelocitiesToTemperature(self.temperature)
-            # else:
-            #     self.simulation.context.setVelocitiesToTemperature(150 * unit.kelvin)
-        self.start_velocities = self.simulation.context.getState(getVelocities=True).getVelocities()
-        # Set up reporting
-        self.simulation.reporters.clear()
-
-        if self.bias_force_reaction_prop is not None and self.bias_force_reaction_prop[3]:
-            self.simulation.reporters.append(GhostSafePDBReporter(self.out_file, save_freq))
+                print('Temperature:', self.temperature, 'K')
+                if self.ensemble == 'NPT':
+                    print('Pressure:', self.pressure, 'atm')
+            print('Friction:', self.friction, '1/ps')
+            print('Timestep:', self.timestep, 'fs')
+            print('Total simulation time in ns:', self.nsteps * timestep / 1e6)
+            print('=' * 60)
         else:
-            self.simulation.reporters.append(app.PDBReporter(self.out_file, save_freq))
-
-
-        # Print header
-        print('QM/MM Simulation Parameters')
-        print('=' * 60)
-        print('QM Driver:', self.driver_flag)
-        print('Ensemble:', self.ensemble)
-        print('Integration method:', new_integrator.__class__.__name__)
-        if self.ensemble in ['NVT', 'NPT']:
-            print('Temperature:', self.temperature, 'K')
-            if self.ensemble == 'NPT':
-                print('Pressure:', self.pressure, 'atm')
-        print('Friction:', self.friction, '1/ps')
-        print('Timestep:', self.timestep, 'fs')
-        print('Total simulation time in ns:', self.nsteps * timestep / 1e6)
-        print('=' * 60)
+            new_integrator = None
+            self.simulation = None
+            self.start_velocities = None
 
         self.last_point_added = 0
         self.cycle_iteration = self.unadded_cycles
-        
-        print('current datapoints around the given starting structure', self.desired_datpoint_density, self.density_around_data_point[0], self.density_around_data_point[1], '\n allowed derivation from the given structure', self.allowed_molecule_deviation, '\n ---------------------------------------')
+
         self.allowed_molecules = {root: {'molecules': [], 'qm_energies': [], 'im_energies':[], 'qm_gradients':[], 'distances': []} for root in self.roots_to_follow}
-        openmm_coordinate = self.simulation.context.getState(getPositions=True).getPositions()
-        self.coordinates = [openmm_coordinate]
+
+        if not is_worker_service_rank:
+            print('current datapoints around the given starting structure', self.desired_datpoint_density, self.density_around_data_point[0], self.density_around_data_point[1], '\n allowed derivation from the given structure', self.allowed_molecule_deviation, '\n ---------------------------------------')
+            openmm_coordinate = self.simulation.context.getState(getPositions=True).getPositions()
+            self.coordinates = [openmm_coordinate]
+        else:
+            self.coordinates = []
+
         self.coordinates_xyz = []
         self.gradients = []
         self.velocities = []
         self.velocities_np = []
-        self.velocities_np.append(self.simulation.context.getState(getVelocities=True).getVelocities(True))
+        if not is_worker_service_rank:
+            self.velocities_np.append(self.simulation.context.getState(getVelocities=True).getVelocities(True))
 
         self.impes_drivers = []
-        
-        state_spec_dict = {'pot_energies':[], 'gradients':[]}
 
-
-        self.gloabal_sim_informations = {f'state_{root}':state_spec_dict for root in self.roots_to_follow}
+        self.gloabal_sim_informations = {f'state_{root}':{'pot_energies':[], 'gradients':[]} for root in self.roots_to_follow}
         self.gloabal_sim_informations['coordinates_ang'] = []
         self.gloabal_sim_informations['state'] = []
         self.gloabal_sim_informations['temperatures'] = []
@@ -940,6 +1672,10 @@ class IMDatabasePointCollecter:
             # Initialize the object
             driver_object = InterpolationDriver(self.root_z_matrix[root])
             driver_object.update_settings(self.interpolation_settings[root])
+            driver_object.enable_runtime_profiling(
+                enabled=self.profile_interpolation_timing,
+                reset=True,
+                print_summary=False)
             # print('Interpolation driver settings updated for root', root, self.eq_bond_force_constants)
             
             driver_object.impes_coordinate.inv_sqrt_masses = inv_sqrt_masses
@@ -954,9 +1690,6 @@ class IMDatabasePointCollecter:
             driver_object.use_symmetry = self.use_symmetry
 
             if len(self.sampled_molecules[root]['molecules']) != 0 and self.add_gpr_model:
-                
-                internal_coordaintes = []
-                dE_gpr = []
 
 
                 # Last molecule only
@@ -999,38 +1732,9 @@ class IMDatabasePointCollecter:
                 driver_object.gpr_intdriver = gpr_driver 
             
 
-            im_labels, _ = driver_object.read_labels()
-            print('beginning labels', im_labels, self.add_gpr_model)
-            self.qm_data_points = []
-            self.qm_energies = []
-            old_label = None
-
-            for label in im_labels:
-                if '_symmetry' not in label:
-                    qm_data_point = InterpolationDatapoint(self.root_z_matrix[root])
-                    qm_data_point.update_settings(self.interpolation_settings[root])
-                    qm_data_point.read_hdf5(self.interpolation_settings[root]['imforcefield_file'], label)
-                    print(qm_data_point.eq_bond_lengths)
-                    qm_data_point.inv_sqrt_masses = inv_sqrt_masses
-                    self.qm_energies_dict[root].append(qm_data_point.energy)
-                    self.qm_data_point_dict[root].append(qm_data_point)
-
-                    self.sorted_state_spec_im_labels[root].append(label)
-                    self.prev_dens_of_points[root] += 1
-                    old_label = qm_data_point.point_label
-                    driver_object.qm_symmetry_data_points[old_label] = [qm_data_point]
-                    self.qm_symmetry_datapoint_dict[root][old_label] = [qm_data_point]
-
-                else:
-                    symmetry_data_point = InterpolationDatapoint(self.root_z_matrix[root])
-                    symmetry_data_point.update_settings(self.interpolation_settings[root])
-                    symmetry_data_point.read_hdf5(self.interpolation_settings[root]['imforcefield_file'], label)
-                    
-                    driver_object.qm_symmetry_data_points[old_label].append(symmetry_data_point)
-                    self.qm_symmetry_datapoint_dict[root][old_label].append(symmetry_data_point)
-                    
-            driver_object.impes_coordinate.eq_bond_lengths = self.qm_data_point_dict[root][0].eq_bond_lengths
-            print(driver_object.qm_symmetry_data_points)       
+            self.impes_drivers[root] = driver_object
+            self._reload_interpolation_root_from_hdf5(root, inv_sqrt_masses)
+            self.prev_dens_of_points[root] = len(self.qm_data_point_dict[root])
             # Set the object as an attribute of the instance
             setattr(self, attribute_name, driver_object)
             # Append the object to the list
@@ -1041,92 +1745,151 @@ class IMDatabasePointCollecter:
  
         self.swap_back = True
         self.prev_state = self.current_state
-        start_time = time()
         self.step = 0 
         self.prev_dE_gpr = 0.0
         self.last_gpr_addition = 0
 
+        if self._mpi_is_active() and self.mpi_root_worker_mode:
+            self._mpi_pending_sync_roots.clear()
+            # Ensure all initialization-time MPI collectives have completed
+            # before starting the control-channel STEP/STOP loop.
+            self._mpi_ctrl_comm.Barrier()
+            if self._mpi_interp_comm is not self._mpi_ctrl_comm:
+                self._mpi_interp_comm.Barrier()
+            if not self._mpi_is_root():
+                self._run_qmmm_worker_service()
+                return None
+
+        start_time = time()
+        runtime_cache = self._build_run_qmmm_runtime_cache()
+        self._initialize_runtime_profilers()
+        verification_stats = None
+        if verify_optimized:
+            verification_stats = {
+                'num_mismatch_steps': 0,
+                'max_abs': {
+                    'qm': 0.0,
+                    'qm_mm': 0.0,
+                    'mm': 0.0,
+                    'potential': 0.0,
+                    'kinetic': 0.0,
+                    'temperature': 0.0,
+                    'total': 0.0,
+                },
+                'max_rel': {
+                    'qm': 0.0,
+                    'qm_mm': 0.0,
+                    'mm': 0.0,
+                    'potential': 0.0,
+                    'kinetic': 0.0,
+                    'temperature': 0.0,
+                    'total': 0.0,
+                },
+            }
+
         for step in range(self.nsteps):
 
+            step_t0 = time()
+
+            force_t0 = time()
+
+            if self._mpi_is_active() and self.mpi_root_worker_mode and self._mpi_is_root():
+                qm_positions_nm = np.array([
+                    p.value_in_unit(unit.nanometer)
+                    for p in self.simulation.context.getState(getPositions=True).getPositions()
+                ])[self.qm_atoms]
+
+                sync_roots = sorted(self._mpi_pending_sync_roots)
+                self._mpi_pending_sync_roots.clear()
+
+                if self.mpi_reload_from_hdf5 and len(sync_roots) > 0:
+                    for root_sync in sync_roots:
+                        self._reload_interpolation_root_from_hdf5(root_sync, self.inv_sqrt_masses)
+
+                self._mpi_bcast_control({
+                    'cmd': self._MPI_CMD_STEP,
+                    'step_idx': int(step),
+                    'qm_positions_nm': np.asarray(qm_positions_nm, dtype=np.float64),
+                    'sync_roots': sync_roots,
+                })
+
             self.update_forces(self.simulation.context)
+            self._add_runtime_timing('step.update_forces', time() - force_t0)
 
-            
-            # Potential energies
-            # QM region
-            qm = self.get_qm_potential_energy()
-            self.qm_potentials.append(qm)
+            obs_t0 = time()
+            reference_observables = None
+            optimized_observables = None
 
-            # QM/MM interactions
-            qm_mm = self.simulation.context.getState(getEnergy=True, groups={1,2}).getPotentialEnergy()
-            self.qm_mm_interaction_energies.append(qm_mm.value_in_unit(unit.kilojoules_per_mole))
+            if verify_optimized or not use_optimized_observables:
+                reference_observables = self._collect_step_observables_reference(
+                    self.simulation.context,
+                    runtime_cache)
+            if verify_optimized or use_optimized_observables:
+                optimized_observables = self._collect_step_observables_optimized(
+                    self.simulation.context,
+                    runtime_cache)
 
-            # MM region 
-            mm = self.simulation.context.getState(getEnergy=True, groups={3,4,5,6,7}).getPotentialEnergy()
-            self.mm_potentials.append(mm.value_in_unit(unit.kilojoules_per_mole))
-
-            # Total potential energy
-            pot = qm * unit.kilojoules_per_mole + qm_mm + mm
-            self.total_potentials.append(pot.value_in_unit(unit.kilojoules_per_mole))
-
-            # Kinetic energy
-            kinetic = self.simulation.context.getState(getEnergy=True).getKineticEnergy()
-            self.kinetic_energies.append(kinetic.value_in_unit(unit.kilojoules_per_mole))
-
-            # Temperature
-            dof = self.system.getNumParticles() * 3 - self.system.getNumConstraints()
-            if hasattr(self.integrator, 'computeSystemTemperature'):
-                temp = self.integrator.computeSystemTemperature().value_in_unit(unit.kelvin)
+            if use_optimized_observables:
+                observables = optimized_observables
             else:
-                temp = (2 * kinetic / (dof * unit.MOLAR_GAS_CONSTANT_R)).value_in_unit(unit.kelvin)
-            self.temperatures.append(temp)
-    
-            # Total energy
-            total = pot + kinetic
-            self.total_energies.append(total.value_in_unit(unit.kilojoules_per_mole))
+                observables = reference_observables
 
-            self.gloabal_sim_informations['temperatures'].append(temp)
-            self.gloabal_sim_informations['state'].append(self.current_state)
-            self.gloabal_sim_informations['coordinates_ang'].append(self.coordinates_xyz[-1])
+            if verify_optimized:
+                self._update_qmmm_verification_stats(
+                    reference_observables,
+                    optimized_observables,
+                    verification_stats,
+                    step,
+                    verification_atol,
+                    verification_rtol,
+                    verification_fail_fast)
 
-            # Information output
-            if step % save_freq == 0:
-                
-                print(f"Step: {step} / {self.nsteps} Time: {round((step * timestep) / 1000, 2)} ps")
-                print('Potential Energy QM region:', qm, 'kJ/mol')
-                print('Potential Energy MM region:', mm)
-                print('QM/MM Interaction Energy:', qm_mm)
-                print('Total Potential Energy:', pot)
-                print('Kinetic Energy:', kinetic)
-                print('Temperature:', temp, 'K')
-                print('Total Energy:', total, '±', np.std(self.total_energies), 'kJ/mol')
-                for root in self.roots_to_follow:
-                    print('Current Density', self.density_around_data_point[0][root], '-->', self.desired_datpoint_density, self.unadded_cycles)   
-                print('Current State (PES):', self.current_state) 
-                print('-' * 60)   
+            self._append_step_observables(observables)
+            self._print_run_qmmm_step(step, timestep, observables, save_freq)
+            self._add_runtime_timing('step.observables', time() - obs_t0)
 
             self.step += 1
 
             # self._update_induction_embedding(phase == 'periodic')
+            integ_t0 = time()
             self.simulation.step(1)
+            self._add_runtime_timing('step.integrator', time() - integ_t0)
             self.prev_state = self.current_state
+            self._add_runtime_timing('step.total', time() - step_t0)
+            self._finalize_runtime_step()
+            if (self.profile_runtime_timing and self.profile_runtime_print_interval > 0
+                    and (step + 1) % self.profile_runtime_print_interval == 0):
+                self._print_qmmm_runtime_profile_summary()
             
+            reached_target_density = False
             for root in self.roots_to_follow:
                 if self.density_around_data_point[0][root] >= self.desired_datpoint_density and self.expansion:
-                    step = self.nsteps
+                    reached_target_density = True
                     break
+            if reached_target_density:
+                break
             
             if not self.expansion:
                 if len(self.expansion_molecules) >= 20:
                     break
 
             if self.unadded_cycles == 0:
-                step = self.nsteps
                 break
+
+        if self._mpi_is_active() and self.mpi_root_worker_mode and self._mpi_is_root():
+            self._mpi_bcast_control({'cmd': self._MPI_CMD_STOP})
 
         end_time = time()
         elapsed_time = end_time - start_time
         elapsed_time_days = elapsed_time / (24 * 3600)
         performance = (self.nsteps * timestep / 1e6) / elapsed_time_days
+        if verify_optimized:
+            self._print_run_qmmm_verification_summary(
+                verification_stats,
+                verification_atol,
+                verification_rtol)
+        self._print_qmmm_runtime_profile_summary()
+        self._print_interpolation_runtime_profile_summary()
         self.output_file_writer(self.summary_output)
         print('QM/MM simulation completed!')
         print(f'Number of steps: {self.nsteps}')
@@ -1145,6 +1908,43 @@ class IMDatabasePointCollecter:
         print(f'Elapsed time: {int(elapsed_time // 60)} minutes, {int(elapsed_time % 60)} seconds')
         print(f'Performance: {performance:.2f} ns/day')
         print(f'Trajectory saved as {self.out_file}')
+
+        if verify_optimized:
+            return verification_stats
+        return None
+
+    def run_qmmm_legacy(self,
+                        verify_against_optimized=False,
+                        verification_atol=1.0e-8,
+                        verification_rtol=1.0e-6,
+                        verification_fail_fast=False):
+        """
+        Legacy QM/MM integration entry point.
+        Uses the reference observable collection path from the original implementation.
+        """
+
+        return self.run_qmmm(
+            verify_optimized=verify_against_optimized,
+            verification_atol=verification_atol,
+            verification_rtol=verification_rtol,
+            verification_fail_fast=verification_fail_fast,
+            use_optimized_observables=False)
+
+    def run_qmmm_and_verify(self,
+                            verification_atol=1.0e-8,
+                            verification_rtol=1.0e-6,
+                            verification_fail_fast=False):
+        """
+        Convenience wrapper to run QM/MM dynamics and compare optimized vs reference
+        per-step observable collection.
+        """
+
+        return self.run_qmmm(
+            verify_optimized=True,
+            verification_atol=verification_atol,
+            verification_rtol=verification_rtol,
+            verification_fail_fast=verification_fail_fast,
+            use_optimized_observables=True)
 
 
     # Post-simulation analysis methods
@@ -1372,7 +2172,8 @@ class IMDatabasePointCollecter:
                            ff_gen,
                            qm_atoms, 
                            filename='qm_region', 
-                           residue_name='QMR'):
+                           residue_name='QMR',
+                           write_xml=True):
         """
         This method creates an xml file for a QM region.
         The xml file only contains atomtypes, residue, and nonbonded parameters.
@@ -1387,6 +2188,9 @@ class IMDatabasePointCollecter:
             Name of the residue. Default is 'QMR'
         """
         self.qm_atoms = qm_atoms
+        if not write_xml:
+            return
+
         atoms = ff_gen.atoms
         bonds = ff_gen.bonds
 
@@ -1438,7 +2242,13 @@ class IMDatabasePointCollecter:
         self.ostream.print_info(f'QM region parameters written to {filename}.xml')
         self.ostream.flush()
         
-    def _create_QM_subregion(self, ff_gen, qm_atoms, molecule, filename='qm_region', residue_name='QMR'):
+    def _create_QM_subregion(self,
+                             ff_gen,
+                             qm_atoms,
+                             molecule,
+                             filename='qm_region',
+                             residue_name='QMR',
+                             write_xml=True):
         """
         Creates the xml file for a molecule with a QM region.
 
@@ -1468,7 +2278,8 @@ class IMDatabasePointCollecter:
             qm_connected.extend(np.where(connectivity_matrix[i])[0])
         qm_connected = list(set(qm_connected) - set(qm_atoms))
         self.linking_atoms = qm_connected
-        print('Linking atoms indices:', qm_connected)
+        if write_xml:
+            print('Linking atoms indices:', qm_connected)
 
         # Get the broken bonds between the QM and MM regions
         self.broken_bonds = []
@@ -1486,9 +2297,14 @@ class IMDatabasePointCollecter:
         # Order the atoms
         qm_atoms.sort()
         self.qm_atoms = qm_atoms
-        print('QM subregion (self.qm_atoms):', self.qm_atoms)
+        if write_xml:
+            print('QM subregion (self.qm_atoms):', self.qm_atoms)
         self.mm_subregion = mm_atoms
-        print('MM subregion:(self.mm_subregion)', self.mm_subregion)
+        if write_xml:
+            print('MM subregion:(self.mm_subregion)', self.mm_subregion)
+
+        if not write_xml:
+            return
 
         atoms = ff_gen.atoms
         bonds = ff_gen.bonds
@@ -1993,18 +2809,145 @@ class IMDatabasePointCollecter:
                                     params['barrier'] * unit.kilojoule_per_mole * self.scaling_factor)
         self.system.addForce(improper_force)
 
-    def update_gradient_and_energy(self, new_positions):
-        """
-        Updates and returns the gradient and potential energy of the QM region.
+    # def update_gradient_and_energy(self, new_positions):
+    #     """
+    #     Updates and returns the gradient and potential energy of the QM region.
 
-        :param new_positions:
-            The new positions of the atoms in the QM region.
-        :return:
-            The gradient and potential energy of the QM region.
-        """
+    #     :param new_positions:
+    #         The new positions of the atoms in the QM region.
+    #     :return:
+    #         The gradient and potential energy of the QM region.
+    #     """
+    #     ug_t0 = time()
 
-        # self.coordinates_xyz.append(new_positions * 10)
-        positions_ang = new_positions * 10 
+    #     # self.coordinates_xyz.append(new_positions * 10)
+    #     positions_ang = new_positions * 10 
+
+    #     atom_labels = getattr(self, '_topology_atom_labels', None)
+    #     if atom_labels is None:
+    #         atom_labels = [atom.element.symbol for atom in self.topology.atoms()]
+    #         self._topology_atom_labels = atom_labels
+
+    #     new_molecule = None
+    #     # Check if there is a QM/MM partition in the system
+    #     if self.mm_subregion is not None:
+    #         # Create a molecule with a link atom (H)
+    #         # The linking atom is defined in self.linking_atoms
+    #         # It need to be changed to a H atom at 1.0 angstrom
+    #         # The QM region is defined in self.qm_atoms
+
+    #         qm_atom_labels = []
+    #         for i in self.qm_atoms:
+    #             # Change the linking atom to H
+    #             if i in self.linking_atoms:
+    #                 qm_atom_labels.append('H')
+    #             else:
+    #                 qm_atom_labels.append(atom_labels[i])
+
+            
+    #         # Change the positions of the linking atoms to 1.0 angstrom
+    #         for atom1, atom2 in self.broken_bonds:
+
+    #             current_distance = np.linalg.norm(positions_ang[atom1] - positions_ang[atom2])
+    #             # Change the position of the linking atom to 1.0 angstrom
+    #             # By construction, the first atom is the linking atom
+    #             direction = (positions_ang[atom2] - positions_ang[atom1]) / current_distance
+    #             positions_ang[atom1] = positions_ang[atom2] - direction * self.linking_atom_distance
+
+    #         new_molecule = Molecule(qm_atom_labels, positions_ang, units="angstrom")
+    #         new_molecule.set_charge(self.molecule.get_charge())
+    #         new_molecule.set_multiplicity(self.molecule.get_multiplicity())
+
+    #     else:
+    #         # Atom labels for the QM region
+    #         qm_atom_labels = [atom_labels[i] for i in self.qm_atoms]
+    #         new_molecule = Molecule(qm_atom_labels, positions_ang, units="angstrom")
+    #         new_molecule.set_charge(self.molecule.get_charge())
+    #         new_molecule.set_multiplicity(self.molecule.get_multiplicity())
+    #         self.unique_molecules.append(new_molecule)
+        
+    #     for root in self.roots_to_follow:
+    #         driver = self.impes_drivers[root]
+    #         if driver.qm_data_points is not self.qm_data_point_dict[root]:
+    #             driver.qm_data_points = self.qm_data_point_dict[root]
+    #         driver.prepare_runtime_data_cache()
+    #         compute_t0 = time()
+    #         driver.compute(new_molecule)
+    #         compute_dt = time() - compute_t0
+    #         self._add_runtime_timing(
+    #             f'update_gradient_and_energy.impes_compute_root_{root}',
+    #             compute_dt)
+    #         self._add_runtime_timing(
+    #             'update_gradient_and_energy.impes_compute_total',
+    #             compute_dt)
+
+    #     if self.nstates > 1:
+    #         for root_1 in range(0, self.nstates):
+    #             for root_2 in range(root_1 + 1, self.nstates):
+
+    #                 potential_kjmol = self.impes_drivers[self.roots_to_follow[root_1]].impes_coordinate.energy * hartree_in_kcalpermol() * 4.184
+    #                 potential_kjmol_2 = self.impes_drivers[self.roots_to_follow[root_2]].impes_coordinate.energy * hartree_in_kcalpermol() * 4.184
+    #                 self.transition_information.append((self.roots_to_follow[root_1], self.roots_to_follow[root_2], potential_kjmol - potential_kjmol_2))
+    #                 print(f'compare the energies between roots: {self.roots_to_follow[root_1]} -> {self.roots_to_follow[root_2]}', potential_kjmol_2 - potential_kjmol)
+
+    #                 if self.calc_NAC == True and np.linalg.norm(self.velocities_np[-1]) > 0.0:
+    #                     current_NAC = self.impes_drivers[self.roots_to_follow[root_1]].impes_coordinate.NAC.flatten()
+    #                     current_velocitites = self.velocities_np[-1].flatten() * 4.566180e-4
+
+    #                     hopping_potential = np.exp(-abs((np.pi/(4)) * (( self.impes_drivers[self.roots_to_follow[root_2]].impes_coordinate.energy - self.impes_drivers[self.roots_to_follow[root_1]].impes_coordinate.energy ) / np.linalg.multi_dot([current_NAC, current_velocitites]))))
+    #                     print('#######################', '\n\n', hopping_potential, potential_kjmol_2 - potential_kjmol, '\n\n', '#######################')
+
+    #                 if potential_kjmol_2 - potential_kjmol < 5 and self.swap_back:
+    #                     # Choose a random integer between 0 and 1
+    #                     random_integer = random.randint(0, 1)
+    #                     self.swap_back = False
+    #                     random_integer = 1.0
+    #                     if random_integer == 1 and self.current_state == self.roots_to_follow[root_1]:
+    #                         self.current_state = self.roots_to_follow[root_2]
+    #                     elif random_integer == 1 and self.current_state == self.roots_to_follow[root_2]:
+    #                         self.current_state = self.roots_to_follow[root_1]
+    #                     break
+
+        
+    #     else:
+    #         self.current_state = self.roots_to_follow[0]
+
+    #     if self.excitation_pulse is not None and len(self.roots_to_follow) > 1 and self.point_checker == self.excitation_pulse[0] and self.current_state != self.excitation_pulse[1] and self.swap_back:
+    #         self.current_state = self.excitation_pulse[1]
+            
+
+    #     potential_kjmol = self.impes_drivers[self.current_state].impes_coordinate.energy * hartree_in_kcalpermol() * 4.184
+    #     self.current_gradient = self.impes_drivers[self.current_state].impes_coordinate.gradient
+
+    #     self.current_energy = potential_kjmol
+                        
+    #         # Potential energy is in Hartree, convert to kJ/mol
+            
+    #     self._add_runtime_timing('update_gradient_and_energy.total', time() - ug_t0)
+
+    #     return self.current_gradient, potential_kjmol
+    
+    def update_gradient_and_energy(self, new_positions, collective_mode=None):
+        ug_t0 = time()
+        new_molecule = self._build_qm_molecule_from_positions(new_positions)
+        if collective_mode is None:
+            collective_mode = bool(self._mpi_is_active() and self.mpi_root_worker_mode)
+        self._compute_all_roots_for_molecule(
+            new_molecule,
+            collective_mode=bool(collective_mode))
+        self._postprocess_root_state_selection()
+        self._add_runtime_timing('update_gradient_and_energy.total', time() - ug_t0)
+        potential_kjmol = self.impes_drivers[self.current_state].impes_coordinate.energy * hartree_in_kcalpermol() * 4.184
+        self.current_gradient = self.impes_drivers[self.current_state].impes_coordinate.gradient
+        self.current_energy = potential_kjmol
+        return self.current_gradient, potential_kjmol
+    
+    def _build_qm_molecule_from_positions(self, positions):
+        positions_ang = positions * 10 
+        atom_labels = getattr(self, '_topology_atom_labels', None)
+        if atom_labels is None:
+            atom_labels = [atom.element.symbol for atom in self.topology.atoms()]
+            self._topology_atom_labels = atom_labels
 
         new_molecule = None
         # Check if there is a QM/MM partition in the system
@@ -2013,9 +2956,6 @@ class IMDatabasePointCollecter:
             # The linking atom is defined in self.linking_atoms
             # It need to be changed to a H atom at 1.0 angstrom
             # The QM region is defined in self.qm_atoms
-
-            # Create a molecule with the new positions
-            atom_labels = [atom.element.symbol for atom in self.topology.atoms()]
 
             qm_atom_labels = []
             for i in self.qm_atoms:
@@ -2041,28 +2981,57 @@ class IMDatabasePointCollecter:
 
         else:
             # Atom labels for the QM region
-            atom_labels = [atom.element.symbol for atom in self.topology.atoms()]
             qm_atom_labels = [atom_labels[i] for i in self.qm_atoms]
             new_molecule = Molecule(qm_atom_labels, positions_ang, units="angstrom")
             new_molecule.set_charge(self.molecule.get_charge())
             new_molecule.set_multiplicity(self.molecule.get_multiplicity())
-            self.unique_molecules.append(new_molecule)
+            if not (self._mpi_is_active() and self.mpi_root_worker_mode and (not self._mpi_is_root())):
+                self.unique_molecules.append(new_molecule)
+
+        return new_molecule
         
+    
+    def _compute_all_roots_for_molecule(self, molecule, collective_mode=None):
+        if collective_mode is None:
+            collective_mode = bool(self._mpi_is_active() and self.mpi_root_worker_mode)
+        collective_mode = bool(collective_mode)
+
         for root in self.roots_to_follow:
-            self.impes_drivers[root].qm_data_points = self.qm_data_point_dict[root]
-            self.impes_drivers[root].compute(new_molecule)
+            driver = self.impes_drivers[root]
+            self._ensure_interp_engine_comm(driver)
+            if driver.qm_data_points is not self.qm_data_point_dict[root]:
+                driver.qm_data_points = self.qm_data_point_dict[root]
+            driver.prepare_runtime_data_cache()
 
-            # report = self.impes_drivers[root].validate_shepard_parallel(
-            #     molecule=new_molecule,
-            #     max_workers=None,   # or e.g. 8
-            #     atol=1e-10,
-            #     rtol=1e-8,
-            #     restore_serial=True
-            # )
-            # print(report["all_close"], report)
+            preload_config = bool(getattr(driver, '_mpi_preload_enabled_config', getattr(driver, 'mpi_preload_enabled', False)))
 
+            # Enable preload only while root+workers are in the synchronized
+            # compute phase. Outside this phase, keep it disabled.
+            if self._mpi_is_active() and self.mpi_root_worker_mode:
+                driver.mpi_preload_enabled = bool(preload_config and collective_mode)
+            else:
+                driver.mpi_preload_enabled = preload_config
 
+            driver.mpi_collective_compute_active = collective_mode
+            compute_t0 = time()
+            try:
+                driver.compute(molecule)
+            finally:
+                driver.mpi_collective_compute_active = False
+                if self._mpi_is_active() and self.mpi_root_worker_mode:
+                    driver.mpi_preload_enabled = False
+                else:
+                    driver.mpi_preload_enabled = preload_config
 
+            compute_dt = time() - compute_t0
+            self._add_runtime_timing(
+                f'update_gradient_and_energy.impes_compute_root_{root}',
+                compute_dt)
+            self._add_runtime_timing(
+                'update_gradient_and_energy.impes_compute_total',
+                compute_dt)
+    
+    def _postprocess_root_state_selection(self):
         if self.nstates > 1:
             for root_1 in range(0, self.nstates):
                 for root_2 in range(root_1 + 1, self.nstates):
@@ -2096,20 +3065,19 @@ class IMDatabasePointCollecter:
 
         if self.excitation_pulse is not None and len(self.roots_to_follow) > 1 and self.point_checker == self.excitation_pulse[0] and self.current_state != self.excitation_pulse[1] and self.swap_back:
             self.current_state = self.excitation_pulse[1]
-            
-
-        potential_kjmol = self.impes_drivers[self.current_state].impes_coordinate.energy * hartree_in_kcalpermol() * 4.184
-        self.current_gradient = self.impes_drivers[self.current_state].impes_coordinate.gradient
-
-        self.current_energy = potential_kjmol
-                        
-            # Potential energy is in Hartree, convert to kJ/mol
-            
-
-        return self.current_gradient, potential_kjmol
 
 
-    def update_gradient(self, new_positions):
+    def _mpi_worker_compute_step(self, qm_positions_nm, sync_roots):
+        if self.mpi_reload_from_hdf5:
+            for root in sync_roots:
+                self._reload_interpolation_root_from_hdf5(root, self.inv_sqrt_masses)
+
+        # qm_positions_nm is shape (n_qm_atoms, 3)
+        new_molecule = self._build_qm_molecule_from_positions(np.asarray(qm_positions_nm, dtype=np.float64))
+        self._compute_all_roots_for_molecule(new_molecule, collective_mode=True)
+
+
+    def update_gradient(self, new_positions, collective_mode=None):
         """
         Updates and returns the gradient of the QM region.
 
@@ -2118,7 +3086,9 @@ class IMDatabasePointCollecter:
         :return:
             The gradient of the QM region.
         """
-        gradient, _ = self.update_gradient_and_energy(new_positions)
+        gradient, _ = self.update_gradient_and_energy(
+            new_positions,
+            collective_mode=collective_mode)
 
         return gradient
 
@@ -2132,18 +3102,34 @@ class IMDatabasePointCollecter:
 
         assert_msg_critical('openmm' in sys.modules, 'OpenMM is required for IMDatabasePointCollecter.')
 
-        conversion_factor = (4.184 * hartree_in_kcalpermol() * 10.0 / bohr_in_angstrom()) * unit.kilojoule_per_mole / unit.nanometer
+        if not hasattr(self, '_gradient_to_force_factor'):
+            self._gradient_to_force_factor = (
+                (4.184 * hartree_in_kcalpermol() * 10.0 / bohr_in_angstrom())
+                * unit.kilojoule_per_mole / unit.nanometer
+            )
+        conversion_factor = self._gradient_to_force_factor
+        atom_labels = getattr(self, '_topology_atom_labels', None)
+        if atom_labels is None:
+            atom_labels = [atom.element.symbol for atom in self.topology.atoms()]
+            self._topology_atom_labels = atom_labels
+
+        qm_force = getattr(self, '_qm_external_force', None)
+        if qm_force is None:
+            qm_force = self.system.getForce(self.qm_force_index)
+            self._qm_external_force = qm_force
+
         new_positions = context.getState(getPositions=True).getPositions()
         
         # Update the forces of the QM region
         qm_positions = np.array([new_positions[i].value_in_unit(unit.nanometer) for i in self.qm_atoms])
 
         self.velocities_np.append(context.getState(getVelocities=True).getVelocities(True))
+        gradient_t0 = time()
         gradient = self.update_gradient(qm_positions)
+        self._add_runtime_timing('update_forces.update_gradient', time() - gradient_t0)
 
         positions_ang = (qm_positions) * 10
 
-        atom_labels = [atom.element.symbol for atom in self.topology.atoms()]
         qm_atom_labels = [atom_labels[i] for i in self.qm_atoms]
 
         new_molecule = Molecule(qm_atom_labels, positions_ang, units="angstrom")
@@ -2178,12 +3164,14 @@ class IMDatabasePointCollecter:
             self.gradients.append(gradient)
             
             if self.skipping_value == 0 and self.point_checker + 1 > self.collect_qm_points:
-        
-                mean_bond_rmsd = np.mean(np.array(self.impes_drivers[self.current_state].bond_rmsd))
-                mean_angle_rmsd = np.mean(np.array(self.impes_drivers[self.current_state].angle_rmsd))
-                mean_dihedral_rmsd = np.mean(np.array(self.impes_drivers[self.current_state].dihedral_rmsd))
-                
+                bond_rmsd_values = np.asarray(self.impes_drivers[self.current_state].bond_rmsd, dtype=np.float64)
+                angle_rmsd_values = np.asarray(self.impes_drivers[self.current_state].angle_rmsd, dtype=np.float64)
+                dihedral_rmsd_values = np.asarray(self.impes_drivers[self.current_state].dihedral_rmsd, dtype=np.float64)
 
+                mean_bond_rmsd = float(np.mean(bond_rmsd_values)) if bond_rmsd_values.size else 0.0
+                mean_angle_rmsd = float(np.mean(angle_rmsd_values)) if angle_rmsd_values.size else 0.0
+                mean_dihedral_rmsd = float(np.mean(dihedral_rmsd_values)) if dihedral_rmsd_values.size else 0.0
+                
                 if mean_bond_rmsd > 0.01 or mean_angle_rmsd > 0.01 or mean_dihedral_rmsd > 1.0:
 
                     K = 5  # Number of closest previous matches to cache
@@ -2281,8 +3269,8 @@ class IMDatabasePointCollecter:
                 if self.skipping_value < 0:
                     self.skipping_value = 0
             
-            if self.step % 50 == 0:
-                self.add_a_point = True
+            # if self.step % 50 == 0 and self.step > self.collect_qm_points:
+            #     self.add_a_point = True
             
             if self.current_state != self.prev_state:
                 self.add_a_point = True
@@ -2291,7 +3279,9 @@ class IMDatabasePointCollecter:
             self.last_gpr_addition += 1
 
             if self.add_a_point == True:
+                pcorr_t0 = time()
                 self.point_correlation_check(new_molecule)
+                self._add_runtime_timing('update_forces.point_correlation_check', time() - pcorr_t0)
                 self.last_gpr_addition = 0
             if self.point_checker == 0:            
                 
@@ -2314,12 +3304,11 @@ class IMDatabasePointCollecter:
                 new_positions = context.getState(getPositions=True).getPositions()
                 qm_positions = np.array([new_positions[i].value_in_unit(unit.nanometer) for i in self.qm_atoms])
                 positions_ang = (qm_positions) * 10
-                atom_labels = [atom.element.symbol for atom in self.topology.atoms()]
                 qm_atom_labels = [atom_labels[i] for i in self.qm_atoms]
                 new_molecule = Molecule(qm_atom_labels, positions_ang, units="angstrom")
                 new_molecule.set_charge(self.molecule.get_charge())
                 new_molecule.set_multiplicity(self.molecule.get_multiplicity())
-                gradient_2 = self.update_gradient(qm_positions)
+                gradient_2 = self.update_gradient(qm_positions, collective_mode=False)
                 
                 force = -np.array(gradient_2) * conversion_factor
             
@@ -2337,8 +3326,8 @@ class IMDatabasePointCollecter:
             self.state_specific_molecules[self.current_state].append(new_molecule)
             for i, atom_idx in enumerate(self.qm_atoms):
           
-                self.system.getForce(self.qm_force_index).setParticleParameters(i, atom_idx, force[i])
-            self.system.getForce(self.qm_force_index).updateParametersInContext(context)
+                qm_force.setParticleParameters(i, atom_idx, force[i])
+            qm_force.updateParametersInContext(context)
 
 
             for root in self.roots_to_follow:
@@ -2358,19 +3347,18 @@ class IMDatabasePointCollecter:
             new_positions = context.getState(getPositions=True).getPositions()
             qm_positions = np.array([new_positions[i].value_in_unit(unit.nanometer) for i in self.qm_atoms])
             positions_ang = (qm_positions) * 10
-            atom_labels = [atom.element.symbol for atom in self.topology.atoms()]
             qm_atom_labels = [atom_labels[i] for i in self.qm_atoms]
             new_molecule = Molecule(qm_atom_labels, positions_ang, units="angstrom")
             new_molecule.set_charge(self.molecule.get_charge())
             new_molecule.set_multiplicity(self.molecule.get_multiplicity())
-            gradient_2 = self.update_gradient(qm_positions)
+            gradient_2 = self.update_gradient(qm_positions, collective_mode=False)
             force = -np.array(gradient_2) * conversion_factor
             
             self.state_specific_molecules[self.current_state].append(new_molecule)
             self.coordinates_xyz.append(qm_positions * 10)
             for i, atom_idx in enumerate(self.qm_atoms):
-                self.system.getForce(self.qm_force_index).setParticleParameters(i, atom_idx, force[i])
-            self.system.getForce(self.qm_force_index).updateParametersInContext(context)
+                qm_force.setParticleParameters(i, atom_idx, force[i])
+            qm_force.updateParametersInContext(context)
 
         if self.current_state < self.prev_state and 1 == 2:
             
@@ -2479,13 +3467,13 @@ class IMDatabasePointCollecter:
                 current_basis = MolecularBasis.read(molecule, self.basis_set_label['es'])
             
    
-            qm_energy, scf_results, rsp_results = self.compute_energy(drivers[0], molecule, current_basis)
+            qm_energy, scf_results, rsp_results = self._compute_energy_mpi_safe(drivers[0], molecule, current_basis)
             
             if isinstance(drivers[0], LinearResponseEigenSolver) or isinstance(drivers[0], TdaEigenSolver):
                 qm_energy = qm_energy[mask]
 
 
-            gradients = self.compute_gradient(drivers[1], molecule, current_basis, scf_results, rsp_results)
+            gradients = self._compute_gradient_mpi_safe(drivers[1], molecule, current_basis, scf_results, rsp_results)
 
             for e_idx in range(len(qm_energy)):
                 masses = molecule.get_masses().copy()
@@ -2497,30 +3485,13 @@ class IMDatabasePointCollecter:
 
                 gradient_difference = (grad - self.impes_drivers[self.roots_to_follow[identification_state + e_idx]].impes_coordinate.gradient) * hartree_in_kcalpermol() * bohr_in_angstrom()
                 rmsd_gradient    = np.sqrt((gradient_difference**2).mean())
-
                 
-
-                impes_coordinate = InterpolationDatapoint(self.root_z_matrix[self.current_state])
-                impes_coordinate.update_settings(self.interpolation_settings[self.current_state])
-                impes_coordinate.eq_bond_lengths = self.qm_data_point_dict[self.current_state][0].eq_bond_lengths
-                impes_coordinate.cartesian_coordinates = molecule.get_coordinates_in_bohr()
-                impes_coordinate.imp_int_coordinates = []
-                impes_coordinate.inv_sqrt_masses = inv_sqrt_masses
-                impes_coordinate.energy = qm_energy[e_idx]
-                impes_coordinate.gradient = (inv_sqrt_masses * grad.reshape(-1)).reshape(grad.shape)
-                impes_coordinate.define_internal_coordinates()
-                impes_coordinate.compute_internal_coordinates_values()
-                impes_coordinate.transform_gradient_to_internal_coordinates()
-                
-                # print('internal gradient', impes_coordinate.internal_gradient - self.impes_drivers[self.roots_to_follow[identification_state + e_idx]].impes_coordinate.internal_gradient)
-
                 cos_theta = 1.0
                 if rmsd_gradient > 0.5 and energy_difference > 0.01:
                     
                     gq = grad.ravel()
                     gi = self.impes_drivers[self.roots_to_follow[identification_state + e_idx]].impes_coordinate.gradient.ravel()
-                    
-                    # print('gq', gq, 'gi', gi)
+
                     cos_theta = 0.0
                     significant_mask = (np.abs(gq) > 1e-4) | (np.abs(gi) > 1e-4)
                     if np.sum(significant_mask) == 0:
@@ -2536,8 +3507,6 @@ class IMDatabasePointCollecter:
                         cos_theta = 1.0
                     
                     cos_theta = np.dot(gq_clean, gi_clean) / (norm_gq_clean * norm_gi_clean)
-                # cos_theta_old = np.dot(gq, gi) / (np.linalg.norm(gq) * np.linalg.norm(gi))
-                # print('gq', cos_theta, cos_theta_old)
                 
                 print('Energy difference', energy_difference, energy_difference * hartree_in_kcalpermol(), 'kcal/mol', 'energy differences rmsd', energy_difference / natms * hartree_in_kcalpermol())
                 print('gradients alignment', cos_theta, 'rmsd gradient', rmsd_gradient, 'kcal/mol/angstrom')
@@ -2789,7 +3758,8 @@ class IMDatabasePointCollecter:
                                                     root)
                 self.last_added = len(self.allowed_molecules[root]['molecules'])
 
-
+            print(self.use_opt_confidence_radius[0], len(self.allowed_molecules[self.current_state]['molecules']) >= 10, self.density_around_data_point[0][self.current_state] > 1, self.density_around_data_point[0][self.current_state] % 1 == 0, self.prev_dens_of_points[self.current_state] != self.density_around_data_point[0][self.current_state])
+            
             if self.use_opt_confidence_radius[0] and len(self.allowed_molecules[self.current_state]['molecules']) >= 10 and self.density_around_data_point[0][self.current_state] > 1 and self.density_around_data_point[0][self.current_state] % 1 == 0 and self.prev_dens_of_points[self.current_state] != self.density_around_data_point[0][self.current_state]:
                 self.prev_dens_of_points[self.current_state] = self.density_around_data_point[0][self.current_state]        
                 trust_radius = None
@@ -2832,6 +3802,8 @@ class IMDatabasePointCollecter:
                         print(self.sorted_state_spec_im_labels[self.current_state][idx])
                         self.qm_data_point_dict[self.current_state][idx].update_confidence_radius(self.interpolation_settings[self.current_state]['imforcefield_file'], self.sorted_state_spec_im_labels[self.current_state][idx], trust_radius)
                         self.qm_data_point_dict[self.current_state][idx].confidence_radius = trust_radius
+                    
+                    self._refresh_interpolation_driver_caches(self.current_state)
 
 
                 self.add_a_point = False
@@ -2873,7 +3845,7 @@ class IMDatabasePointCollecter:
             if self.identfy_relevant_int_coordinates[0]:  
                 for state_to_optim in addition_of_state_specific_points:                  
                     optimized_molecule = molecule
-                    self.impes_drivers[state_to_optim].compute(molecule)
+                    self._interp_compute_root_local_serial(self.impes_drivers[state_to_optim], molecule)
                     current_weights = self.impes_drivers[state_to_optim].weights
                     weights = [value for _, value in current_weights.items()]
                     used_labels = [label_idx for label_idx, _ in current_weights.items()]
@@ -2899,7 +3871,7 @@ class IMDatabasePointCollecter:
                     while not corr_new_dp_distrib:
                         print('CONSTRAINTS', primary_constraint, backup_constraint, ranked_block)
                         if state_to_optim == 0 and isinstance(self.drivers['gs'][0], ScfRestrictedDriver) or state_to_optim == 0 and isinstance(self.drivers['gs'][0], ScfUnrestrictedDriver):
-                            _, scf_tensors, rsp_results = self.compute_energy(self.drivers['gs'][0], molecule, current_basis)
+                            _, scf_tensors, rsp_results = self._compute_energy_mpi_safe(self.drivers['gs'][0], molecule, current_basis)
         
                             opt_drv = OptimizationDriver(self.drivers['gs'][0])
                             opt_drv.ostream.mute()
@@ -2934,7 +3906,7 @@ class IMDatabasePointCollecter:
                                     opt_constraint_list.append(opt_constraint)
                             
                             opt_drv.constraints = opt_constraint_list
-                            opt_results = opt_drv.compute(molecule, current_basis, scf_tensors)
+                            opt_results = self._opt_compute_mpi_safe(opt_drv, molecule, current_basis, scf_tensors)
                             optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
                             optimized_molecule.set_charge(molecule.get_charge())
                             optimized_molecule.set_multiplicity(molecule.get_multiplicity())
@@ -2978,7 +3950,7 @@ class IMDatabasePointCollecter:
                                     opt_constraint_list.append(opt_constraint)
                             opt_drv.constraints = opt_constraint_list
                             
-                            opt_results = opt_drv.compute(molecule)
+                            opt_results = self._opt_compute_mpi_safe(opt_drv, molecule)
                             optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
                             optimized_molecule.set_charge(molecule.get_charge())
                             optimized_molecule.set_multiplicity(molecule.get_multiplicity())
@@ -2988,7 +3960,7 @@ class IMDatabasePointCollecter:
                                 
                             self.drivers['es'][1].state_deriv_index = [state_to_optim]
                             opt_drv = OptimizationDriver(self.drivers['es'][1])
-                            _, _, rsp_results = self.compute_energy(self.drivers['es'][0], molecule, current_basis)
+                            _, _, rsp_results = self._compute_energy_mpi_safe(self.drivers['es'][0], molecule, current_basis)
                             opt_drv.ostream.mute()
                             
                             opt_constraint_list = []
@@ -3023,7 +3995,7 @@ class IMDatabasePointCollecter:
                             opt_drv.constraints = opt_constraint_list
                             self.drivers['es'][3].ostream.mute()
                             self.drivers['es'][0].ostream.mute()
-                            opt_results = opt_drv.compute(molecule, current_basis, self.drivers['es'][3], self.drivers['es'][0], rsp_results)
+                            opt_results = self._opt_compute_mpi_safe(opt_drv, molecule, current_basis, self.drivers['es'][3], self.drivers['es'][0], rsp_results)
                             excitated_roots = [root for root in self.roots_to_follow if root != 0]
                             self.drivers['es'][1].state_deriv_index = excitated_roots
                             optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
@@ -3310,14 +4282,14 @@ class IMDatabasePointCollecter:
                         root_to_follow_calc = mol_basis[4]           
                         drivers[1].state_deriv_index = root_to_follow_calc 
                 
-                energies, scf_results, rsp_results = self.compute_energy(drivers[0], mol_basis[0], mol_basis[1])
+                energies, scf_results, rsp_results = self._compute_energy_mpi_safe(drivers[0], mol_basis[0], mol_basis[1])
                 
                 if isinstance(drivers[0], LinearResponseEigenSolver) or isinstance(drivers[0], TdaEigenSolver):
                     energies = energies[mol_basis[4]]
 
-                gradients = self.compute_gradient(drivers[1], mol_basis[0], mol_basis[1], scf_results, rsp_results)
+                gradients = self._compute_gradient_mpi_safe(drivers[1], mol_basis[0], mol_basis[1], scf_results, rsp_results)
                 
-                hessians = self.compute_hessian(drivers[2], mol_basis[0], mol_basis[1])
+                hessians = self._compute_hessian_mpi_safe(drivers[2], mol_basis[0], mol_basis[1])
                 masses = mol_basis[0].get_masses().copy()
                 masses_cart = np.repeat(masses, 3)
                 inv_sqrt_masses = 1.0 / np.sqrt(masses_cart)
@@ -3442,8 +4414,9 @@ class IMDatabasePointCollecter:
                         impes_coordinate.point_label = category_label
                         self.qm_energies_dict[mol_basis[4][number]].append(energies[number])
                         
-                        self.impes_drivers[mol_basis[4][number]].qm_data_points = self.qm_data_point_dict[self.current_state]
-                        self.impes_drivers[mol_basis[4][number]].labels = self.sorted_state_spec_im_labels[self.current_state]
+                        self.impes_drivers[mol_basis[4][number]].qm_data_points = self.qm_data_point_dict[mol_basis[4][number]]
+                        self.impes_drivers[mol_basis[4][number]].labels = self.sorted_state_spec_im_labels[mol_basis[4][number]]
+                        self._refresh_interpolation_driver_caches(mol_basis[4][number])
                         print('I am writing the file', category_label, self.interpolation_settings[mol_basis[4][number]]['imforcefield_file'])
                     
                         self.density_around_data_point[0][mol_basis[4][number]] += 1
@@ -3452,13 +4425,15 @@ class IMDatabasePointCollecter:
                         
                         self.qm_symmetry_datapoint_dict[mol_basis[4][number]][category_label].append(impes_coordinate)
                         self.impes_drivers[mol_basis[4][number]].qm_symmetry_data_points[category_label].append(impes_coordinate)
+                        self._refresh_interpolation_driver_caches(mol_basis[4][number])
 
                     
                     impes_coordinate.confidence_radius = self.use_opt_confidence_radius[2]
 
                     print('data list', len(self.allowed_molecules[mol_basis[4][number]]['molecules']))
                     
-                    impes_coordinate.write_hdf5(self.interpolation_settings[mol_basis[4][number]]['imforcefield_file'], new_label)
+                    if self._mpi_is_root() or (not self._mpi_is_active()):
+                        impes_coordinate.write_hdf5(self.interpolation_settings[mol_basis[4][number]]['imforcefield_file'], new_label)
                     # if mol_basis[5]:
                     #     if self.use_opt_confidence_radius[0] and len(self.allowed_molecules[self.current_state]['molecules']) >= 10:
                             
@@ -3540,7 +4515,7 @@ class IMDatabasePointCollecter:
                     drivers[1].state_deriv_index = org_roots
 
             if self.current_state in self.opt_mols_org_mol_swap:
-                self.impes_drivers[self.current_state].compute(self.opt_mols_org_mol_swap[self.current_state])
+                self._interp_compute_root_local_serial(self.impes_drivers[self.current_state], self.opt_mols_org_mol_swap[self.current_state])
                 print(self.impes_drivers[self.current_state].weights, self.impes_drivers[self.current_state].get_energy(), self.opt_mols_org_mol_swap[self.current_state].get_xyz_string())
 
         
@@ -3573,9 +4548,9 @@ class IMDatabasePointCollecter:
             opt_drv.constraints = self._build_opt_constraint_list(constraints, index_offset=index_offset)
 
         if compute_args is None:
-            opt_results = opt_drv.compute(molecule)
+            opt_results = self._opt_compute_mpi_safe(opt_drv, molecule)
         else:
-            opt_results = opt_drv.compute(molecule, *compute_args)
+            opt_results = self._opt_compute_mpi_safe(opt_drv, molecule, *compute_args)
 
         if source_molecule is None:
             source_molecule = molecule
@@ -3646,7 +4621,6 @@ class IMDatabasePointCollecter:
                 ftol = 1e-4
                 maxiter = 140
 
-            print('sym datapoints', sym_datapoints)
              
             opt = AlphaOptimizer(z_matrix, impes_dict, sym_dict, sym_datapoints, dps,
                  geom_list, E_ref_list, G_ref_list, exponent_p_q,
@@ -3744,7 +4718,7 @@ class IMDatabasePointCollecter:
             if len(symmetry_group) == 3:
 
                 # angles_to_set[symmetry_group_dihedral_list[0]] = ([0.0, np.pi/3.0])
-                angles_to_set[tuple(symmetry_group_dihedral_list[0])] = ([0.0, np.pi/6.0, np.pi/3.0, 2.0*np.pi/3.0])
+                angles_to_set[tuple(symmetry_group_dihedral_list[0])] = ([0.0, np.pi/6.0, np.pi/3.0, np.pi/2.0])
 
                 periodicities[tuple(symmetry_group_dihedral_list[0])] = 3
 

@@ -28,6 +28,9 @@ import itertools
 import os
 import random
 import h5py
+import builtins
+
+from mpi4py import MPI
 
 from contextlib import redirect_stderr
 from io import StringIO
@@ -66,10 +69,25 @@ import openmm.app as app
 import openmm.unit as unit
 from .molecule import Molecule
 from .errorhandler import assert_msg_critical
-from. veloxchemlib import hartree_in_kcalpermol, bohr_in_angstrom
+from .veloxchemlib import mpi_master, hartree_in_kcalpermol, bohr_in_angstrom
 
 with redirect_stderr(StringIO()) as fg_err:
     import geometric
+
+
+def _rank_root_print(*args, **kwargs):
+    """
+    Print only on MPI root rank to avoid delayed/duplicated worker stdout noise.
+    Falls back to normal print when MPI rank detection is unavailable.
+    """
+    try:
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+            builtins.print(*args, **kwargs)
+    except Exception:
+        builtins.print(*args, **kwargs)
+
+
+print = _rank_root_print
 
 
 class IMForceFieldGenerator:
@@ -315,6 +333,15 @@ class IMForceFieldGenerator:
         self.use_opt_confidence_radius = [False, 'single', 0.5, 0.3]
 
         self.imp_int_coordinates = []
+
+        self.profile_runtime_timing = False
+        self.profile_interpolation_timing = False
+        
+        self.use_mpi_preload = True
+        self.mpi_control_plane_enabled = True
+        self.mpi_root_worker_mode = True
+        self.mpi_reload_from_hdf5 = True
+        self.mpi_debug_sync = False
 
 
     def _build_opt_constraint_list(self, constraints, index_offset=1):
@@ -703,7 +730,8 @@ class IMForceFieldGenerator:
                                     'use_inverse_bond_length':self.use_inverse_bond_length,
                                     'use_eq_bond_length':self.use_eq_bond_length,
                                     'use_cosine_dihedral':self.use_cosine_dihedral,
-                                    'use_tc_weights':self.use_tc_weights
+                                    'use_tc_weights':self.use_tc_weights,
+                                    'use_mpi_preload': self.use_mpi_preload
                                 }
                 
             self.dynamics_settings = {  'drivers':self.drivers,
@@ -714,7 +742,12 @@ class IMForceFieldGenerator:
                                         'snapshots':self.snapshots, 'trajectory_file':self.trajectory_file, 'reference_struc_energy_file':self.reference_struc_energy_file,
                                         'desired_datapoint_density':self.desired_point_density, 'converged_cycle': self.converged_cycle, 
                                         'energy_threshold':self.energy_threshold, 'grad_rmsd_thrsh': self.gradient_rmsd_thrsh, 'force_orient_thrsh':self.force_orient_thrsh,
-                                        'NAC':False, 'load_system': None, 'collect_qm_points_from':self.start_collect, 'roots_to_follow':self.roots_to_follow, 'excitation_pulse':self.excitation_pulse}
+                                        'NAC':False, 'load_system': None, 'collect_qm_points_from':self.start_collect, 'roots_to_follow':self.roots_to_follow, 'excitation_pulse':self.excitation_pulse,
+                                        'profile_runtime_timing': self.profile_runtime_timing, 'profile_interpolation_timing': self.profile_interpolation_timing,
+                                        'mpi_control_plane_enabled': self.mpi_control_plane_enabled,
+                                        'mpi_root_worker_mode': self.mpi_root_worker_mode,
+                                        'mpi_reload_from_hdf5': self.mpi_reload_from_hdf5,
+                                        'mpi_debug_sync': self.mpi_debug_sync}
             
             files_to_add_conf = []
             molecules_to_add_info = []
@@ -981,7 +1014,8 @@ class IMForceFieldGenerator:
                                 'use_inverse_bond_length':self.use_inverse_bond_length,
                                 'use_eq_bond_length':self.use_eq_bond_length,
                                 'use_cosine_dihedral':self.use_cosine_dihedral,
-                                'use_tc_weights':self.use_tc_weights
+                                'use_tc_weights':self.use_tc_weights,
+                                'use_mpi_preload': self.use_mpi_preload
                             }
 
             self.dynamics_settings = {  'drivers':self.drivers,
@@ -992,7 +1026,12 @@ class IMForceFieldGenerator:
                                         'snapshots':self.snapshots, 'trajectory_file':self.trajectory_file, 'reference_struc_energy_file':self.reference_struc_energy_file,
                                         'desired_datapoint_density':self.desired_point_density, 'converged_cycle': self.converged_cycle, 
                                         'energy_threshold':self.energy_threshold, 'grad_rmsd_thrsh': self.gradient_rmsd_thrsh, 'force_orient_thrsh':self.force_orient_thrsh,
-                                        'NAC':False, 'load_system': None, 'collect_qm_points_from':self.start_collect, 'roots_to_follow':self.roots_to_follow}
+                                        'NAC':False, 'load_system': None, 'collect_qm_points_from':self.start_collect, 'roots_to_follow':self.roots_to_follow,
+                                        'profile_runtime_timing': self.profile_runtime_timing, 'profile_interpolation_timing': self.profile_interpolation_timing,
+                                        'mpi_control_plane_enabled': self.mpi_control_plane_enabled,
+                                        'mpi_root_worker_mode': self.mpi_root_worker_mode,
+                                        'mpi_reload_from_hdf5': self.mpi_reload_from_hdf5,
+                                        'mpi_debug_sync': self.mpi_debug_sync}
             
             files_to_add_conf = []
             molecules_to_add_info = []
@@ -1345,7 +1384,9 @@ class IMForceFieldGenerator:
                                 im_database_driver.allowed_molecule_deviation = self.allowed_deviation
 
                             im_database_driver.update_settings(self.dynamics_settings, self.states_interpolation_settings)
-                            im_database_driver.run_qmmm()
+                            # im_database_driver.run_qmmm()
+                            stats = im_database_driver.run_qmmm()
+
                             # self.density_of_datapoints[key] = im_database_driver.density_around_data_point
                             # individual impes run objects
                             self.qm_energies.append(im_database_driver.qm_potentials)
@@ -1356,6 +1397,7 @@ class IMForceFieldGenerator:
                             self.unique_molecules.append(im_database_driver.allowed_molecules)
                         
                         entries = list(self.molecules_along_rp.values())
+
                         self.confirm_database_quality(molecule, basis=states_basis, im_settings=self.states_interpolation_settings, given_molecular_strucutres=self.state_specific_molecules)
 
             
@@ -2285,16 +2327,20 @@ class IMForceFieldGenerator:
                     cur_molecule.set_charge(molecule.get_charge())
                     cur_molecule.set_multiplicity(molecule.get_multiplicity())
                     dihedral_to_change = []
-                    constraints = outside_constraints
+                    constraints = []
+                    constraints.extend(outside_constraints)
                     for dihedral, angle in molecule_config.items():
-                        opt_dihedral_angle = molecule.get_dihedral([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1], 'radian')
-     
-                        print('Dihedral creation', dihedral, opt_dihedral_angle, angle)
                         
-                        cur_molecule.set_dihedral([dihedral[0], dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1], opt_dihedral_angle + angle, 'radian')
-                        dihedral_to_change.append([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1])
-                        constraint = f"freeze dihedral {dihedral[0]} {dihedral[1]} {dihedral[2]} {dihedral[3]}"
-                        constraints.append(constraint)
+                        dihedral_p_1 = [dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1]
+                        print('dihedral to change', dihedral_p_1)
+                        opt_dihedral_angle = molecule.get_dihedral(dihedral_p_1, 'radian')
+     
+                        print('Dihedral creation', dihedral, opt_dihedral_angle + angle, angle)
+                        
+                        cur_molecule.set_dihedral(dihedral_p_1, opt_dihedral_angle + angle, 'radian')
+                        dihedral_to_change.append(dihedral_p_1)
+
+                        constraints.append(dihedral_p_1)
                     
                         if self.symmetry_information is not None:
                             print('opt_dihedral_angle', opt_dihedral_angle)
@@ -2311,7 +2357,7 @@ class IMForceFieldGenerator:
                                         self.drivers['gs'][1],
                                         cur_molecule,
                                         constraints=constraints,
-                                        index_offset=1,
+                                        index_offset=0,
                                         compute_args=(current_basis, scf_results),
                                         source_molecule=molecule
                                     )
@@ -2322,11 +2368,12 @@ class IMForceFieldGenerator:
                                         self.drivers['gs'][1],
                                         cur_molecule,
                                         constraints=constraints,
-                                        index_offset=1,
+                                        index_offset=0,
                                         source_molecule=molecule
                                     )
                         cur_molecule = optimized_molecule
                     print('Optimized molecule', cur_molecule.get_xyz_string())
+                    print('Here is the angle 4,1,2,3',  cur_molecule.get_dihedral((4,1,2,3), 'radian'))
                     current_basis = MolecularBasis.read(cur_molecule, basis.get_main_basis_label())
 
                     adjusted_molecule['gs'].append((cur_molecule, current_basis, periodicites[dihedral],  dihedral_to_change, entries[2], symmetry_point))
@@ -2469,7 +2516,7 @@ class IMForceFieldGenerator:
                             eq_bond_length.append(0.0)
                     eq_bond_length = [2.724954366417468, 1.8341168646042718, 1.8341161804706632]
 
-                    
+                    print('Here is the angle 4,1,2,3',  mol_basis[0].get_dihedral((4,1,2,3), 'radian'))
                     impes_coordinate = InterpolationDatapoint(z_matrix)
                     impes_coordinate.eq_bond_lengths = eq_bond_length
                     impes_coordinate.update_settings(interpolation_settings[mol_basis[4][number]])
@@ -2628,7 +2675,7 @@ class IMForceFieldGenerator:
             if len(symmetry_group) == 3:
 
                 # angles_to_set[symmetry_group_dihedral_list[0]] = ([0.0, np.pi/3.0])
-                angles_to_set[tuple(symmetry_group_dihedral_list[0])] = ([0.0, np.pi/6.0, np.pi/3.0, 2.0*np.pi/3.0])
+                angles_to_set[tuple(symmetry_group_dihedral_list[0])] = ([0.0, np.pi/6.0, np.pi/3.0, np.pi/2.0])
 
                 periodicities[tuple(symmetry_group_dihedral_list[0])] = 3
                 dihedral_groups[3][tuple(symmetry_group_dihedral_list[0][1:3])] = [tuple(sorted(element, reverse=False)) for element in symmetry_group_dihedral_list]

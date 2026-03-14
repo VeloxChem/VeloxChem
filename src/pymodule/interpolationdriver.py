@@ -31,6 +31,7 @@ from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 import math
 import random
+from time import time
 import torch
 import gpytorch
 from typing import List, Tuple, Dict, Any, Optional
@@ -49,7 +50,8 @@ from .veloxchemlib import mpi_master
 from. veloxchemlib import hartree_in_kcalpermol, bohr_in_angstrom
 from .errorhandler import assert_msg_critical
 from .inputparser import (parse_input, print_keywords, print_attributes)
-from .gprinterpolationdriver import GPRInterpolationDriver
+
+from .interpolation_preload_mpi import InterpolationMPIPreloadEngine, StepPacket
 
 with redirect_stderr(StringIO()) as fg_err:
     import geometric
@@ -89,21 +91,21 @@ class InterpolationDriver():
         Initializes the IMPES driver.
         """
 
-        # if comm is None:
-        #     comm = MPI.COMM_WORLD
+        if comm is None:
+            comm = MPI.COMM_WORLD
 
-        # if ostream is None:
-        #     if comm.Get_rank() == mpi_master():
-        #         ostream = OutputStream(sys.stdout)
-        #     else:
-        #         ostream = OutputStream(None)
+        if ostream is None:
+            if comm.Get_rank() == mpi_master():
+                ostream = OutputStream(sys.stdout)
+            else:
+                ostream = OutputStream(None)
 
-        # # MPI information
-        # self.comm = comm
-        # self.rank = self.comm.Get_rank()
-        # self.nodes = self.comm.Get_size()
-        # ostream = OutputStream(sys.stdout)
-        # self.ostream = ostream
+        # MPI information
+        self.comm = comm
+        self.rank = self.comm.Get_rank()
+        self.nodes = self.comm.Get_size()
+        ostream = OutputStream(sys.stdout)
+        self.ostream = ostream
 
         # Create InterpolationDatapoint, z-matrix required!
         self.impes_coordinate = InterpolationDatapoint(z_matrix)#, self.comm,self.ostream)
@@ -167,6 +169,27 @@ class InterpolationDriver():
         self.use_cosine_dihedral = False
         self.use_tc_weights = True
 
+        # Optional runtime profiling for interpolation bottleneck analysis.
+        self.runtime_profile_enabled = False
+        self.runtime_profile_print = False
+        self.runtime_profile_profiler = None
+        self.runtime_profile_totals = {}
+        self.runtime_profile_last = {}
+        self.runtime_profile_calls = 0
+
+        # Optional runtime cache for symmetry-expanded task evaluation.
+        self.runtime_data_cache_enabled = True
+        self._runtime_data_cache_dirty = True
+        self._symmetry_task_cache = {}
+
+        self.mpi_preload_enabled = True
+        self.mpi_preload_force_fallback_serial = True
+        # True only while root/worker synchronized timestep compute is running.
+        # Root-only helper computations must not enter MPI collectives.
+        self.mpi_collective_compute_active = False
+        self.mpi_engine = None
+
+
 
         self._input_keywords = {
             'im_settings': {
@@ -183,6 +206,7 @@ class InterpolationDriver():
                     'use_eq_bond_length': ('bool', 'whether to use eq bond lengths in the Z-matrix'),
                     'use_cosine_dihedral':('bool', 'wether to use cosine and sin for the diehdral in the Z-matrix'),
                     'use_tc_weights':('bool', 'weither to use target coustomized weights'),
+                    'use_mpi_preload': ('bool', 'enable MPI preload backend for compute_potential'),
                 'labels': ('seq_fixed_str', 'the list of QM data point labels'),
             }
         }
@@ -213,6 +237,204 @@ class InterpolationDriver():
 
         if self.interpolation_type == 'shepard' and self.exponent_q is None:
             self.exponent_q = self.exponent_p / 2.0
+
+    def enable_runtime_profiling(self, enabled=True, reset=True, print_summary=False):
+        """
+        Enables/disables lightweight runtime profiling for compute() calls.
+
+        :param enabled:
+            If True, timing data are collected.
+        :param reset:
+            If True, clear previous timing accumulators.
+        :param print_summary:
+            If True, print a short summary from compute().
+        """
+
+        self.runtime_profile_enabled = bool(enabled)
+        self.runtime_profile_print = bool(print_summary)
+
+        if not self.runtime_profile_enabled:
+            self.runtime_profile_profiler = None
+            return
+
+        if self.runtime_profile_profiler is None or reset:
+            self.runtime_profile_profiler = Profiler({'timing': True})
+            self.runtime_profile_profiler.set_timing_key('InterpolationDriver.compute')
+            self.runtime_profile_totals = {}
+            self.runtime_profile_last = {}
+            self.runtime_profile_calls = 0
+
+    def _add_runtime_timing(self, label, dt):
+        """
+        Adds timing information to interpolation runtime profile.
+        """
+
+        if not self.runtime_profile_enabled or self.runtime_profile_profiler is None:
+            return
+
+        self.runtime_profile_profiler.add_timing_info(label, dt)
+        self.runtime_profile_totals[label] = self.runtime_profile_totals.get(label, 0.0) + dt
+        self.runtime_profile_last[label] = self.runtime_profile_last.get(label, 0.0) + dt
+
+    def get_runtime_profile_summary(self):
+        """
+        Returns interpolation runtime profiling data.
+        """
+
+        return {
+            'enabled': self.runtime_profile_enabled,
+            'calls': self.runtime_profile_calls,
+            'totals': dict(self.runtime_profile_totals),
+            'last': dict(self.runtime_profile_last),
+        }
+
+    def mark_runtime_data_cache_dirty(self):
+        """
+        Marks the flattened symmetry task cache as outdated.
+        """
+
+        self._runtime_data_cache_dirty = True
+
+        if self.mpi_engine is not None:
+            self.mpi_engine.mark_dirty()
+    
+    def set_mpi_preload_engine(self, comm=None, enabled=True, force_rebuild=True):
+
+        if comm is None:
+            comm = self.comm
+        self.mpi_preload_enabled = bool(enabled)
+
+        if (not self.mpi_preload_enabled) or comm is None or comm.Get_size() <= 1:
+            self.mpi_engine = None
+            return
+        
+        self.mpi_engine = InterpolationMPIPreloadEngine(self, comm)
+        if force_rebuild:
+            self.mpi_engine.preload_static_data(force=True)
+        else:
+            # Defer collective preload to first synchronized compute call.
+            self.mpi_engine.mark_dirty()
+
+    def prepare_runtime_data_cache(self, force=False):
+        """
+        Pre-builds flattened symmetry task entries from symmetry datapoints.
+
+        Each entry is a tuple ``(symmetry_data_point, mask0, mask)`` used by
+        potential evaluation. The expensive object/mask traversal is done once
+        and reused across timesteps.
+        """
+
+        if not self.runtime_data_cache_enabled:
+            self._symmetry_task_cache = {}
+            self._runtime_data_cache_dirty = False
+            return
+
+        if (not force) and (not self._runtime_data_cache_dirty):
+            return
+
+        cache = {}
+
+        for dp_label, symmetry_data_points in (self.qm_symmetry_data_points or {}).items():
+            entries = []
+            for symmetry_data_point in symmetry_data_points:
+                masks = getattr(symmetry_data_point, 'mapping_masks', None)
+                if masks is None:
+                    continue
+
+                masks_arr = np.asarray(masks, dtype=np.int64)
+                if masks_arr.ndim == 1:
+                    masks_arr = masks_arr.reshape(1, -1)
+                if masks_arr.shape[0] == 0:
+                    continue
+
+                mask0 = np.ascontiguousarray(masks_arr[0], dtype=np.int64)
+                for mask in masks_arr:
+                    entries.append(
+                        (symmetry_data_point, mask0,
+                         np.ascontiguousarray(mask, dtype=np.int64)))
+            cache[dp_label] = entries
+
+        self._symmetry_task_cache = cache
+        self._runtime_data_cache_dirty = False
+
+        if self.mpi_engine is not None:
+            self.mpi_engine.mark_dirty()
+    
+    def compute_potential_mpi(self, data_point, org_int_coords):
+        """
+        MPI-preload path for one datapoint label.
+        Falls back to serial compute_potential when MPI preload is not active.
+        """
+        if (not self.mpi_preload_enabled) or self.mpi_engine is None:
+            return self.compute_potential(data_point, org_int_coords)
+
+        # Guard against unsynchronized root-only calls (e.g. trust-radius/
+        # diagnostics/point-management code paths). In those paths workers are
+        # blocked on the control loop and cannot join collectives safely.
+        if not self.mpi_collective_compute_active:
+            if self.mpi_preload_force_fallback_serial:
+                return self.compute_potential(data_point, org_int_coords)
+            raise RuntimeError(
+                "MPI preload collective compute requested outside synchronized "
+                "collective context. Set mpi_collective_compute_active=True "
+                "only for matched all-rank compute phases."
+            )
+
+        packet = None
+        if self.rank == mpi_master():
+            packet = StepPacket(
+                org_int_coords=np.asarray(org_int_coords, dtype=np.float64),
+                b_matrix=np.asarray(self.impes_coordinate.b_matrix, dtype=np.float64),
+                use_cosine_dihedral=bool(self.use_cosine_dihedral),
+            )
+
+        mpi_t0 = time()
+        pes, grad, rmsd_diag = self.mpi_engine.compute_label_bcast(
+            data_point.point_label,
+            packet,
+            root=mpi_master(),
+        )
+        self._add_runtime_timing('compute.mpi.compute_label', time() - mpi_t0)
+
+        if self.rank == mpi_master() and isinstance(rmsd_diag, dict):
+            self.bond_rmsd.append(float(rmsd_diag.get('bond_mean', 0.0)))
+            self.angle_rmsd.append(float(rmsd_diag.get('angle_mean', 0.0)))
+            self.dihedral_rmsd.append(float(rmsd_diag.get('dihedral_mean', 0.0)))
+
+        return pes, grad, 0.0
+
+    def _get_symmetry_task_entries(self, dp_label):
+        """
+        Returns flattened symmetry task entries for one datapoint label.
+        """
+
+        if self.runtime_data_cache_enabled:
+            self.prepare_runtime_data_cache()
+            cached_entries = self._symmetry_task_cache.get(dp_label)
+            if cached_entries is not None:
+                return cached_entries
+
+        entries = []
+        symmetry_data_points = (self.qm_symmetry_data_points or {}).get(dp_label, [])
+
+        for symmetry_data_point in symmetry_data_points:
+            masks = getattr(symmetry_data_point, 'mapping_masks', None)
+            if masks is None:
+                continue
+
+            masks_arr = np.asarray(masks, dtype=np.int64)
+            if masks_arr.ndim == 1:
+                masks_arr = masks_arr.reshape(1, -1)
+            if masks_arr.shape[0] == 0:
+                continue
+
+            mask0 = np.ascontiguousarray(masks_arr[0], dtype=np.int64)
+            for mask in masks_arr:
+                entries.append(
+                    (symmetry_data_point, mask0,
+                     np.ascontiguousarray(mask, dtype=np.int64)))
+  
+        return entries
 
     def read_labels(self):
         """
@@ -292,8 +514,16 @@ class InterpolationDriver():
             :param coordinates:
                 a numpy array of Cartesian coordinates.
         """
-
-        self.impes_coordinate.reset_coordinates_impes_driver(coordinates)
+        if self.runtime_profile_enabled:
+            timing_info = {}
+            self.impes_coordinate.reset_coordinates_impes_driver(
+                coordinates,
+                timing_info=timing_info)
+            for key, dt in timing_info.items():
+                self._add_runtime_timing(
+                    f'compute.define_impes_coordinate.{key}', dt)
+        else:
+            self.impes_coordinate.reset_coordinates_impes_driver(coordinates)
 
     def compute(self, molecule):
         """Computes the energy and gradient by interpolation
@@ -309,28 +539,59 @@ class InterpolationDriver():
                 if this parameter is None, all datapoints from fname will be
                 used.
         """
-        
+        compute_t0 = time()
+        if self.runtime_profile_enabled:
+            self.runtime_profile_last = {}
+
+        prep_t0 = time()
         self.bond_rmsd = []
         self.angle_rmsd = []
         self.dihedral_rmsd = []
-        self.molecule = molecule
-        
 
-        self.distance_molecule = Molecule.from_xyz_string(molecule.get_xyz_string())
-   
+        self.molecule = molecule 
+        # self.distance_molecule = Molecule.from_xyz_string(xyz_string)
+
+        self._add_runtime_timing('compute.prepare_state', time() - prep_t0)
+
+        define_t0 = time()
         self.define_impes_coordinate(molecule.get_coordinates_in_bohr())
+        self._add_runtime_timing('compute.define_impes_coordinate', time() - define_t0)
 
+        load_t0 = time()
         if self.qm_data_points is None:
             self.qm_data_points = self.read_qm_data_points()
+        self._add_runtime_timing('compute.load_qm_data_points', time() - load_t0)
+
+        if self.runtime_data_cache_enabled and self._runtime_data_cache_dirty:
+            cache_t0 = time()
+            self.prepare_runtime_data_cache()
+            self._add_runtime_timing('compute.prepare_runtime_cache', time() - cache_t0)
 
         if self.interpolation_type == 'simple':
+            interp_t0 = time()
             self.simple_interpolation()
+            self._add_runtime_timing('compute.simple_interpolation', time() - interp_t0)
         elif self.interpolation_type == 'shepard':
+            interp_t0 = time()
             self.shepard_interpolation()
+            self._add_runtime_timing('compute.shepard_interpolation', time() - interp_t0)
         else:
             errtxt = "Unrecognized interpolation type: "
             errtxt += self.interpolation_type
             raise ValueError(errtxt)
+
+        self._add_runtime_timing('compute.total', time() - compute_t0)
+        if self.runtime_profile_enabled:
+            self.runtime_profile_calls += 1
+
+        if self.runtime_profile_enabled and self.runtime_profile_print:
+            total = self.runtime_profile_last.get('compute.total', 0.0)
+            shep = self.runtime_profile_last.get('compute.shepard_interpolation', 0.0)
+            if total > 0.0:
+                print(
+                    f"[InterpolationDriver] compute.total={total:.6f}s "
+                    f"(shepard={shep:.6f}s, {100.0 * shep / total:.1f}% )"
+                )
 
     def simple_interpolation(self):
         """Performs a simple interpolation.
@@ -447,6 +708,7 @@ class InterpolationDriver():
             to be used for interpolation (which have been calculated
             quantum mechanically).
         """
+        shepard_t0 = time()
 
         def numerical_gradient(f, X, dp, eps=1e-6):
             """
@@ -520,6 +782,7 @@ class InterpolationDriver():
         
         self.calc_optim_trust_radius = True
         
+        distance_scan_t0 = time()
         if self.weightfunction_type == 'cartesian':
             for i, data_point in enumerate(self.qm_data_points[:]):
                 
@@ -553,13 +816,18 @@ class InterpolationDriver():
                 if abs(distance) < min_distance:
                     min_distance = abs(distance)
                 distances_and_gradients.append((distance, dihedral_dist, i, denominator, weight_gradient, distance_vec))
+        self._add_runtime_timing('shepard.distance_scan', time() - distance_scan_t0)
         
+        filter_t0 = time()
         close_distances = None
         close_distances = [
             (self.qm_data_points[index], distance, dihedral_dist, denom, wg, distance_vec, index) 
             for distance, dihedral_dist, index, denom, wg, distance_vec in distances_and_gradients 
             if abs(distance) <= min_distance + self.distance_thrsh + 1000]
+        self._add_runtime_timing('shepard.filter_close_points', time() - filter_t0)
 
+        eval_loop_t0 = time()
+        compute_potential_acc = 0.0
         for qm_data_point, distance, dihedral_dist, denominator_cart, weight_grad_cart, distance_vector, label_idx in close_distances:
             
             weight_cart = 1.0 / (denominator_cart)
@@ -567,7 +835,12 @@ class InterpolationDriver():
             sum_weights_cart += weight_cart
             sum_weight_gradients_cart += weight_grad_cart
 
-            potential, gradient_mw, r_i = self.compute_potential(qm_data_point, self.impes_coordinate.internal_coordinates_values)
+            potential_t0 = time()
+            potential, gradient_mw, r_i = self.compute_potential_mpi(
+               qm_data_point,
+               self.impes_coordinate.internal_coordinates_values,
+            )
+            compute_potential_acc += time() - potential_t0
             gradient = sqrt_masses * gradient_mw.reshape(-1)
             gradient = gradient.reshape(gradient_mw.shape)
             gradients.append(gradient)
@@ -580,7 +853,10 @@ class InterpolationDriver():
             self.potentials.append(potential)
             self.gradients.append(gradient)
             weight_gradients_cart.append(weight_grad_cart)
+        self._add_runtime_timing('shepard.point_eval_loop', time() - eval_loop_t0)
+        self._add_runtime_timing('shepard.compute_potential', compute_potential_acc)
            
+        assembly_t0 = time()
         # --- initialise accumulators -------------------------------------------------
         self.impes_coordinate.energy    = 0.0
         self.impes_coordinate.gradient  = np.zeros((natms, 3))
@@ -615,6 +891,8 @@ class InterpolationDriver():
         # print('weights', self.weights)
         # self.sum_of_weights      = W_i.sum()          # if you really need it later
         self.averaged_int_dist   = np.tensordot(W_i, averaged_int_dists, axes=1)
+        self._add_runtime_timing('shepard.assembly', time() - assembly_t0)
+        self._add_runtime_timing('shepard.total', time() - shepard_t0)
 
     def shepard_interpolation_paral(self, max_workers=None):
         """Performs Shepard interpolation with parallelized datapoint-distance evaluation.
@@ -892,77 +1170,322 @@ class InterpolationDriver():
 
         return qm_data_points
 
-    def te_weight_general(self, theta, periodicity=1):
+
+    def _get_symmetry_torsion_meta(self):
         """
-        General smooth gate function centered at 0 and 2π.
-        
-        Parameters
-        ----------
-        theta : float
-            Input angle (in radians).
-        periodicity : int or float
-            Controls the angular width of the smoothing zone: width = π / periodicity.
+        Prepares row-index metadata for vectorized torsion handling.
+
+        :returns:
+            Dict containing dihedral start index, symmetry-center mapping and
+            row indices for periodicity-3 and periodicity-2 contributions.
+        """
+
+        dihedral_start = self.symmetry_information[-1][1]
+        sym3_keys = tuple(self.symmetry_information[7][3].keys())
+        sym3_key_to_idx = {key: idx for idx, key in enumerate(sym3_keys)}
+        sym2_set = {tuple(sorted(entry)) for entry in self.symmetry_information[7][2]}
+
+        sym3_rows = []
+        sym3_center_ids = []
+        sym2_rows = []
+
+        for row_idx, element in enumerate(self.impes_coordinate.z_matrix[dihedral_start:], start=dihedral_start):
+            center = tuple(element[1:3])
+            if center in sym3_key_to_idx:
+                sym3_rows.append(row_idx)
+                sym3_center_ids.append(sym3_key_to_idx[center])
+            elif tuple(sorted(element)) in sym2_set:
+                sym2_rows.append(row_idx)
+
+        return {
+            'dihedral_start': dihedral_start,
+            'sym3_keys': sym3_keys,
+            'sym3_rows': np.asarray(sym3_rows, dtype=np.int64),
+            'sym3_center_ids': np.asarray(sym3_center_ids, dtype=np.int64),
+            'sym2_rows': np.asarray(sym2_rows, dtype=np.int64),
+        }
+    
+    def _build_symmetry_phase_candidates(self, dp_label, torsion_meta):
+        """
+        Build cheap phase-labeled symmetry candidates.
 
         Returns
         -------
-        weight : float
-            A value between 0 and 1, smoothly falling from 1 to 0 over the defined window.
+        candidates : list of dict
+            Each dict contains:
+            - symmetry_data_point
+            - mask0
+            - mask
+            - candidate_full_phases
         """
-        def _smoother(t):
-            """Quintic smoother-step kernel (C² on 0 ≤ t ≤ 1)."""
-            return 6*t**5 - 15*t**4 + 10*t**3
+        symmetry_task_entries = self._get_symmetry_task_entries(dp_label)
+        candidates = []
 
-        width = np.pi / periodicity
-        x = np.mod(theta, 2*np.pi)
+        for symmetry_data_point, mask0, mask in symmetry_task_entries:
+            candidate_full_phases = self._compute_collective_methyl_phases_full(
+                symmetry_data_point.internal_coordinates_values[mask],
+                torsion_meta
+            )
 
-        if x <= width:
-            t = 1.0 - x / width
-            return _smoother(t)
-        elif x >= 2*np.pi - width:
-            t = 1.0 - (2*np.pi - x) / width
-            return _smoother(t)
-        else:
-            return 0.0
-        
-    def te_weight_gradient_general(self, theta, b_matrix_col, periodicity=1):
+            candidates.append({
+                "symmetry_data_point": symmetry_data_point,
+                "mask0": mask0,
+                "mask": mask,
+                "candidate_full_phases": candidate_full_phases,
+            })
+
+        return candidates
+
+    def _vectorized_symmetry_dihedral_terms(self, dist_org, dist_correlation, b_matrix, torsion_meta):
         """
-        Gradient of the general te_weight function, scaled by the B-matrix column.
+        Computes symmetry dihedral weights and derivatives in vectorized form.
+
+        :param dist_org:
+            Internal-coordinate displacement before dihedral sin transform.
+        :param dist_correlation:
+            Correlation displacement array updated in-place for selected rows.
+        :param b_matrix:
+            Current B matrix.
+        :param torsion_meta:
+            Metadata prepared by ``_get_symmetry_torsion_meta``.
+
+        :returns:
+            Tuple of scalar/array accumulators required in compute_potential.
+        """
+
+        # phase construction section
+        ncart = b_matrix.shape[1]
+        n_sym3 = len(torsion_meta['sym3_keys'])
+        sym3_rows = torsion_meta['sym3_rows']
+        center_ids = torsion_meta['sym3_center_ids']
         
+        phases = np.zeros(n_sym3, dtype=np.float64)
+        if sym3_rows.size == 0:
+         return phases
+
+        theta = dist_org[sym3_rows]  # radians
+
+        # Fold threefold symmetry into the phase average
+        exp_3theta = np.exp(1j * 3.0 * theta)
+
+        z_real = np.bincount(center_ids, weights=exp_3theta.real, minlength=n_sym3)
+        z_imag = np.bincount(center_ids, weights=exp_3theta.imag, minlength=n_sym3)
+        counts = np.bincount(center_ids, minlength=n_sym3)
+
+        z_real /= np.maximum(counts, 1)
+        z_imag /= np.maximum(counts, 1)
+
+        phases_3 = np.arctan2(z_imag, z_real)
+        phases = phases_3 / 3.0
+
+        ncart = b_matrix.shape[1]
+
+        n_sym3 = len(torsion_meta['sym3_keys'])
+        sum_sym_3_dihedral_cos = np.zeros(n_sym3, dtype=np.float64)
+        sum_sym_3_dihedral_prime_cos = np.zeros((n_sym3, ncart), dtype=np.float64)
+
+        sym3_rows = torsion_meta['sym3_rows']
+        if sym3_rows.size > 0:
+            theta3 = dist_org[sym3_rows]
+
+            dist_correlation[sym3_rows] = 0.0
+
+            cos_terms = 2.0 * (1.0 - np.cos(theta3))
+            sin_terms = 2.0 * np.sin(theta3)
+            center_ids = torsion_meta['sym3_center_ids']
+
+            sum_sym_3_dihedral_cos += np.bincount(
+                center_ids, weights=cos_terms, minlength=n_sym3)
+                
+
+            sin_b = sin_terms[:, None] * b_matrix[sym3_rows, :]
+            np.add.at(sum_sym_3_dihedral_prime_cos, center_ids, sin_b)
+
+        return (
+                sum_sym_3_dihedral_cos,
+                sum_sym_3_dihedral_prime_cos)
+
+    def _compute_collective_methyl_phases_sym3(self, int_coords, torsion_meta, s=0):
+        """
+        Compute one threefold-symmetry-adapted phase per methyl center.
+        int_coords must contain absolute torsion values in radians.
+        """
+        sym3_rows = torsion_meta['sym3_rows']
+        center_ids = torsion_meta['sym3_center_ids']
+        n_sym3 = len(torsion_meta['sym3_keys'])
+
+        phases = np.zeros(n_sym3, dtype=np.float64)
+
+        if sym3_rows.size == 0:
+            return phases
+
+        theta = int_coords[sym3_rows]
+
+        exp_3theta = np.exp(1j * theta)
+
+        z_real = np.bincount(center_ids, weights=exp_3theta.real, minlength=n_sym3)
+        z_imag = np.bincount(center_ids, weights=exp_3theta.imag, minlength=n_sym3)
+        counts = np.bincount(center_ids, minlength=n_sym3)
+
+        z_real /= np.maximum(counts, 1)
+        z_imag /= np.maximum(counts, 1)
+
+        phases_3 = np.arctan2(z_imag, z_real)
+        phases = phases_3 + (2.0 * np.pi / 3.0) * s
+        return phases
+
+    def _build_grouped_symmetry_signatures(self, int_coords, torsion_meta):
+        """
+        Build one torsion signature block per methyl rotor.
+
         Parameters
         ----------
-        theta : float
-            Input angle (in radians).
-        b_matrix_col : np.ndarray
-            The relevant column of the B-matrix (Cartesian direction).
-        periodicity : int or float
-            Controls the angular width of the smoothing zone: width = π / periodicity.
+        int_coords : np.ndarray
+            Absolute internal coordinates in radians.
+        torsion_meta : dict
+            Must contain:
+            - 'sym3_rows'
+            - 'sym3_center_ids'
+            - 'sym3_keys'
 
         Returns
         -------
-        gradient : np.ndarray
-            Weighted gradient vector (same shape as b_matrix_col).
+        grouped : list[np.ndarray]
+            grouped[r] is the torsion signature block for methyl rotor r.
         """
-        def _smoother_prime(t):
-            """Derivative of the quintic smoother-step kernel."""
-            return 30*t**4 - 60*t**3 + 30*t**2
+        sym3_rows = torsion_meta['sym3_rows']
+        center_ids = torsion_meta['sym3_center_ids']
+        n_sym3 = len(torsion_meta['sym3_keys'])
 
-        width = np.pi / periodicity
-        x = np.mod(theta, 2*np.pi)
+        grouped = []
+        for rid in range(n_sym3):
+            rows_r = sym3_rows[center_ids == rid]
+            grouped.append(np.asarray(int_coords[rows_r], dtype=np.float64).copy())
 
-        wprime = 0.0  # default if outside the taper zones
+        return grouped
+    
+    def _build_grouped_symmetry_brows(self, torsion_meta):
+        sym3_rows = torsion_meta['sym3_rows']
+        center_ids = torsion_meta['sym3_center_ids']
+        n_sym3 = len(torsion_meta['sym3_keys'])
 
-        if x <= width:
-            t = 1.0 - x / width
-            dt_dθ = -1.0 / width
-            wprime = _smoother_prime(t) * dt_dθ
+        grouped = []
+        for rid in range(n_sym3):
+            rows_r = sym3_rows[center_ids == rid]
+            grouped.append(self.impes_coordinate.b_matrix[rows_r, :].copy())
 
-        elif x >= 2*np.pi - width:
-            t = 1.0 - (2*np.pi - x) / width
-            dt_dθ = 1.0 / width
-            wprime = _smoother_prime(t) * dt_dθ
+        return grouped
+    
+    def _grouped_signature_distance_and_gradient(
+        self,
+        grouped_current,
+        grouped_candidate,
+        grouped_brows,
+        rotor_weights=None
+    ):
+        """
+        Returns
+        -------
+        d2_total : float
+            Weighted grouped signature distance.
+        grad_d2 : np.ndarray, shape (ncart,)
+            Cartesian gradient of d2_total.
+        """
+        n_rotors = len(grouped_current)
+        ncart = grouped_brows[0].shape[1] if n_rotors > 0 else self.impes_coordinate.b_matrix.shape[1]
 
-        return wprime * b_matrix_col
+        if rotor_weights is None:
+            rotor_weights = np.ones(n_rotors, dtype=np.float64)
 
+        d2_total = 0.0
+        grad_total = np.zeros(ncart, dtype=np.float64)
+        w_total = 0.0
+
+        for rid in range(n_rotors):
+            sig_c = grouped_current[rid]
+            sig_r = grouped_candidate[rid]
+            brows = grouped_brows[rid]   # shape (m_r, ncart)
+
+            delta = sig_c - sig_r
+            terms = 2.0 * (1.0 - np.cos(delta))
+            d2_r = np.mean(terms)
+
+            grad_terms = 2.0 * np.sin(delta)[:, None] * brows
+            grad_r = np.mean(grad_terms, axis=0)
+
+            wr = rotor_weights[rid]
+            d2_total += wr * d2_r
+            grad_total += wr * grad_r
+            w_total += wr
+        
+        d2_total /= max(w_total, 1e-12)
+        grad_total /= max(w_total, 1e-12)
+
+        return d2_total, grad_total
+    
+    def _signature_inverse_weight_and_gradient(
+        self,
+        d2,
+        grad_d2,
+        confidence_radius=1.5,
+        power=2,
+        eps=1e-12
+    ):
+        """
+        Raw inverse-distance-like weight and its gradient.
+        """
+        rho2 = max(confidence_radius**2, eps)
+        x = d2 / rho2 + eps
+
+        w = 1.0 / (2.0 * (x ** power))
+        dw_dd2 = -(power / (2.0 * rho2)) * (x ** (-(power + 1)))
+
+        grad_w = dw_dd2 * grad_d2
+        return w, grad_w
+    
+    def _normalized_signature_weights(self, d2_array, confidence_radius=1.0, power=1,
+                                  eps=1e-12, exact_tol=1e-10):
+        """
+        Shepard-like normalized inverse-distance weights.
+        """
+        d2_array = np.asarray(d2_array, dtype=np.float64)
+        idx_best = int(np.argmin(d2_array))
+        d2_min = d2_array[idx_best]
+
+        if d2_min < exact_tol:
+            w = np.zeros_like(d2_array)
+            w[idx_best] = 1.0
+            return w
+
+        x = d2_array / max(confidence_radius**2, eps)
+        raw = 1.0 / ((x + eps) ** power + (x + eps) ** power)
+
+        S = raw.sum()
+        if S < eps:
+            w = np.zeros_like(raw)
+            w[idx_best] = 1.0
+            return w
+
+        return raw / S
+    
+    def _compute_two_rotor_phase_distance(self, current_phases, reference_phases, rotor_weights=None):
+        """
+        current_phases:   shape (2,)
+        reference_phases: shape (2,)
+        rotor_weights:    optional shape (2,)
+        """
+        delta = current_phases - reference_phases   # shape (2,)
+        mism = 2.0 * (1.0 - np.cos(delta))                   # shape (2,)
+
+        
+        
+        if rotor_weights is not None:
+            return np.sum(rotor_weights * mism)
+        
+        if np.sum(mism) == 0.0:
+            return 1e-8
+        return np.sum(mism)
+        
 
     def compute_potential(self, data_point, org_int_coords):
         """Calculates the potential energy surface at self.impes_coordinate
@@ -978,183 +1501,266 @@ class InterpolationDriver():
         # print(len(self.qm_symmetry_data_points))
         dp_label = data_point.point_label 
         
-        if len(self.qm_symmetry_data_points[dp_label]) > 1 and self.use_symmetry:
+        symmetry_data_points = (self.qm_symmetry_data_points or {}).get(dp_label, [])
+        use_symmetry_branch = (len(symmetry_data_points) > 1 and self.use_symmetry)
 
-            symmetry_data_points = self.qm_symmetry_data_points[dp_label]
+        symmetry_task_entries = ()
+        if use_symmetry_branch:
+            symmetry_task_entries = self._get_symmetry_task_entries(dp_label)
+            use_symmetry_branch = len(symmetry_task_entries) > 0
 
-            symmetry_weights = []
+        if use_symmetry_branch:
+
             potentials = []
             pot_gradients = []
-            symmetry_weight_gradients = []
             hessian_error = []
 
-            symmetry_weights_cos = []
-            symmetry_weight_gradients_cos = []
+            symmetry_weights_local = []
+            symmetry_weight_gradients_local = []
+            candidate_phase_vectors = []
+
             r_cut = 1.5
+            torsion_meta = self._get_symmetry_torsion_meta()
+            dihedral_start = torsion_meta['dihedral_start']
+            b_matrix = self.impes_coordinate.b_matrix
 
-            for idx, symmetry_data_point in enumerate(symmetry_data_points):
-                # if i == 0:
-                #     symmetry_data_point.confidence_radius = 1.5
-                energy = symmetry_data_point.energy
-                masks = symmetry_data_point.mapping_masks
+            # # Current full methyl-rotor phases
+            # current_full_phases = self._compute_collective_methyl_phases_sym3(
+            #     org_int_coords.copy(),
+            #     torsion_meta
+            # )
 
-
-                # dihedral_maps = []
-                # for key in self.symmetry_information[7][3]:
-
-                #     if tuple(sorted(key[1:3])) not in dihedral_maps:
-                        
-                #         dihedral_maps.append(tuple(sorted(key[1:3])))
-
-                # print(self.symmetry_information[7][3])
-                # exit()
-                for ww, mask in enumerate(masks[:]):
-                    
-                    sum_sym_3_dihedral_cos = {key: 0.0 for key in self.symmetry_information[7][3].keys()}
-                    sum_sym_3_dihedral_prime_cos = {key :np.zeros_like(data_point.cartesian_coordinates.reshape(-1)) for key in self.symmetry_information[7][3].keys()}
-
-                    grad = symmetry_data_point.internal_gradient.copy()
-                    grad[masks[0]] = grad[mask]
-
-                    hessian = symmetry_data_point.internal_hessian.copy()
-                    hessian[np.ix_(masks[0], masks[0])] = hessian[np.ix_(mask, mask)]
-
-
-                    dist_org = (org_int_coords.copy() - symmetry_data_point.internal_coordinates_values[mask])
-
-                    # print('mask', (org_int_coords.copy(), symmetry_data_point.internal_coordinates_values[mask]))
-
-                    dist_check = (org_int_coords.copy() - symmetry_data_point.internal_coordinates_values[mask])
-                    dist_correlation = (org_int_coords.copy() - symmetry_data_point.internal_coordinates_values[mask])
-
-                    sum_sym_dihedral = 0.0
-                    sum_sym_dihedral_prime = np.zeros_like(data_point.cartesian_coordinates.reshape(-1))
-
-                    dihedral_start = self.symmetry_information[-1][1]
-                    if not self.use_cosine_dihedral:
-
-                        dist_check[dihedral_start:] = np.sin(dist_org[dihedral_start:])
-                    
-                    dist_correlation[dihedral_start:] = dist_check[dihedral_start:]
-
-                    for i, element in enumerate(self.impes_coordinate.z_matrix[dihedral_start:], start=dihedral_start): 
-
-                        if element[1:3] in self.symmetry_information[7][3]:                                       
+            current_grouped = self._build_grouped_symmetry_signatures(org_int_coords.copy(), torsion_meta)
+            grouped_brows = self._build_grouped_symmetry_brows(torsion_meta)
             
-                            sum_sym_dihedral += self.te_weight_general(dist_org[i], 3)
-                            sum_sym_dihedral_prime += self.te_weight_gradient_general(dist_org[i], self.impes_coordinate.b_matrix[i,:], 3)
-                            dist_correlation[i] = 0.0
-                            sum_sym_3_dihedral_cos[element[1:3]] += 2.0 * (1.0 - np.cos(dist_org[i]))
-                            sum_sym_3_dihedral_prime_cos[element[1:3]] += 2.0 * np.sin( dist_org[i]) * self.impes_coordinate.b_matrix[i, :]
+            cand_grouped_signitures = []
+            candidate_labels = []
+  
 
-                        elif tuple(sorted(element)) in self.symmetry_information[7][2]:
-                            
-                            sum_sym_dihedral += self.te_weight_general(dist_org[i], 2)
-                            sum_sym_dihedral_prime += self.te_weight_gradient_general(dist_org[i], self.impes_coordinate.b_matrix[i,:], 2)      
-                            dist_correlation[i] = 0.0
+            # reset diagnostics if needed
+            self.bond_rmsd = []
+            self.angle_rmsd = []
+            self.dihedral_rmsd = []
 
-                        # print('sum sym dihedral', sum_sym_dihedral)
-                    
-                    # print('\n\n')
-                    self.bond_rmsd.append(np.sqrt(np.mean(np.sum((dist_org[:self.symmetry_information[-1][0]])**2))))
-                    self.angle_rmsd.append(np.sqrt(np.mean(np.sum(dist_org[self.symmetry_information[-1][0]:self.symmetry_information[-1][1]]**2))))
-                    self.dihedral_rmsd.append(np.sqrt(np.mean(np.sum(dist_correlation[self.symmetry_information[-1][1]:]**2))))
-                    
-                    combined_weights = []
-                    combined_weights_derivative = []
+            # ----------------------------------------
+            # Full loop over all (datapoint, mask) candidates
+            # ----------------------------------------
+            # counter = 0
+            for symmetry_data_point, mask0, mask in symmetry_task_entries:
+                energy = symmetry_data_point.energy
 
-                    for key, entry in sum_sym_3_dihedral_cos.items():
-                        if entry >= r_cut**2:
-                            # Outside the trust radius: weight and force are EXACTLY zero
-                            combined_weights.append(0.0)
-                            
-                            combined_weights_derivative.append(np.zeros((natm, 3)))
-                        else:
-                            # Inside the trust radius: evaluate the smooth polynomial dome
-                            decay_term = 1.0 - (entry / r_cut**2)
-                            
-                            combined_weights.append(decay_term**3)
-                            
-                            grad_factor = (-3.0 / r_cut**2) * (decay_term**2)
-                            grad_matrix = grad_factor * sum_sym_3_dihedral_prime_cos[key].reshape(natm, 3)
-                            
-                            combined_weights_derivative.append(grad_matrix)
-
-                    
-                    W_total = np.prod(combined_weights)
-                 
-                    grad_W_total = np.zeros((natm, 3))
-
-                    for I in range(len(sum_sym_3_dihedral_cos.keys())):
-                        # Calculate the product of all scalar weights EXCEPT the current one (J != I)
-                        # Using a generator expression handles any number of rotors automatically
-                        prod_other_w = np.prod([combined_weights[J] for J in range(len(sum_sym_3_dihedral_cos.keys())) if J != I])
-                        
-                        # Add this rotor's contribution to the total multidimensional gradient
-                        grad_W_total += combined_weights_derivative[I] * prod_other_w
-
-                    # Now append W_total and grad_W_total to your global lists for the normalization step
-                    symmetry_weights_cos.append(W_total)
+                # dp_mol = Molecule(self.molecule.get_labels(), symmetry_data_point.cartesian_coordinates, 'bohr')
 
 
-                    symmetry_weight_gradients_cos.append(grad_W_total)
+                # if (mask == mask0).all():
+                #     counter = 0
+                # else:
+                #     counter += 1
+                # # mask-specific full phase vector for this candidate
+                # candidate_full_phases = self._compute_collective_methyl_phases_sym3(
+                #     symmetry_data_point.internal_coordinates_values[mask],
+                #     torsion_meta, counter
+                # )
+                candidate_full_grouped = self._build_grouped_symmetry_signatures(
+                    symmetry_data_point.internal_coordinates_values[mask],
+                    torsion_meta
+                )
 
-                    # symmetry_weights_cos.append((1.0 - sum_sym_dihedral_cos/r_cut**2)**3)
-                    # symmetry_weight_gradients_cos.append((-3.0/r_cut**2 * (1.0 - sum_sym_dihedral_cos/r_cut**2)**2) * sum_sym_dihedral_prime_cos.reshape(natm, 3))
+                cand_grouped_signitures.append(candidate_full_grouped)
+                candidate_labels.append((symmetry_data_point.point_label, tuple(mask)))
+                # candidate_phase_vectors.append(candidate_full_phases)
 
-                    # if sum_sym_dihedral == 0.0:
-                    #     continue
+                # reshuffle derivatives
+                grad = symmetry_data_point.internal_gradient.copy()
+                grad[mask0] = grad[mask]
 
-                    symmetry_weights.append(sum_sym_dihedral**4)
+                hessian = symmetry_data_point.internal_hessian.copy()
+                hessian[np.ix_(mask0, mask0)] = hessian[np.ix_(mask, mask)]
 
+                dist_org = org_int_coords.copy() - symmetry_data_point.internal_coordinates_values[mask]
+                dist_check = org_int_coords.copy() - symmetry_data_point.internal_coordinates_values[mask]
+                dist_correlation = org_int_coords.copy() - symmetry_data_point.internal_coordinates_values[mask]
 
-                    symmetry_weight_gradients.append(4 * sum_sym_dihedral**3 * sum_sym_dihedral_prime.reshape(natm, 3))
+                if not self.use_cosine_dihedral:
+                    dist_check[dihedral_start:] = np.sin(dist_org[dihedral_start:])
 
-                    pes = (energy + np.matmul(dist_check.T, grad) +
-                        0.5 * np.linalg.multi_dot([dist_check.T, hessian, dist_check]))
+                dist_correlation[dihedral_start:] = dist_check[dihedral_start:]
 
-                    # hessian_error.append(np.sqrt(abs(np.linalg.multi_dot([dist_check.T, pinv_cut(hessian), dist_check]))))
+                # (
+                #     sum_sym_3_dihedral_cos,
+                #     sum_sym_3_dihedral_prime_cos
+                # ) = self._vectorized_symmetry_dihedral_terms(
+                #     dist_org,
+                #     dist_correlation,
+                #     b_matrix,
+                #     torsion_meta
+                # )
 
-                    potentials.append(pes)
-                    dist_hessian = np.matmul(dist_check.T, hessian)
+                self.bond_rmsd.append(
+                    np.sqrt(np.mean(np.sum((dist_org[:self.symmetry_information[-1][0]])**2)))
+                )
+                self.angle_rmsd.append(
+                    np.sqrt(np.mean(np.sum(dist_org[self.symmetry_information[-1][0]:self.symmetry_information[-1][1]]**2)))
+                )
+                self.dihedral_rmsd.append(
+                    np.sqrt(np.mean(np.sum(dist_correlation[self.symmetry_information[-1][1]:]**2)))
+                )
 
-                    if not self.use_cosine_dihedral:
+                # current local support factor from your symmetry dihedral terms
+                combined_weights = []
+                combined_weights_derivative = []
 
-                        cos_dist = np.cos(dist_org[dihedral_start:])
-                        grad[dihedral_start:] *= cos_dist
-                        dist_hessian[dihedral_start:] *= cos_dist
-                    
-                    pes_prime = (np.matmul(self.impes_coordinate.b_matrix.T, (grad + dist_hessian))).reshape(natm, 3)
-                    pot_gradients.append(pes_prime)
+                # for idx, entry in enumerate(sum_sym_3_dihedral_cos):
+                #     if entry >= r_cut**2:
+                #         combined_weights.append(0.0)
+                #         combined_weights_derivative.append(np.zeros((natm, 3)))
+                #     else:
+                #         decay_term = 1.0 - (entry / r_cut**2)
+                #         combined_weights.append(decay_term**3)
 
+                #         grad_factor = (-3.0 / r_cut**2) * (decay_term**2)
+                #         grad_matrix = grad_factor * sum_sym_3_dihedral_prime_cos[idx].reshape(natm, 3)
+                #         combined_weights_derivative.append(grad_matrix)
 
-            w_i       = np.asarray(symmetry_weights_cos,          dtype=np.float64)       
-            grad_w_i  = np.asarray(symmetry_weight_gradients_cos, dtype=np.float64)       
+                # W_local = np.prod(combined_weights) if combined_weights else 1.0
 
-            S         = w_i.sum()                              
-            sum_grad_w = grad_w_i.sum(axis=0)                  
+                # grad_W_local = np.zeros((natm, 3))
+                # for I in range(len(combined_weights)):
+                #     prod_other_w = np.prod([
+                #         combined_weights[J]
+                #         for J in range(len(combined_weights))
+                #         if J != I
+                #     ])
+                #     grad_W_local += combined_weights_derivative[I] * prod_other_w
 
-            W_i       = w_i / S                             
-            grad_W_i  = (grad_w_i * S - w_i[:, None, None] * sum_grad_w) / S**2    # (m, natm, 3)
+                # symmetry_weights_local.append(W_local)
+                # symmetry_weight_gradients_local.append(grad_W_local)
 
+                # Taylor model
+                pes_i = (
+                    energy
+                    + np.matmul(dist_check.T, grad)
+                    + 0.5 * np.linalg.multi_dot([dist_check.T, hessian, dist_check])
+                )
+                potentials.append(pes_i)
 
-            U_i       = np.asarray(potentials,        dtype=np.float64)            # energies     (m,)
-            grad_U_i  = np.asarray(pot_gradients,     dtype=np.float64)            # gradients    (m, natm, 3)
+                dist_hessian = np.matmul(dist_check.T, hessian)
 
-            pes       = np.dot(W_i, U_i)                      # Σ Wᵢ Uᵢ
+                if not self.use_cosine_dihedral:
+                    cos_dist = np.cos(dist_org[dihedral_start:])
+                    grad[dihedral_start:] *= cos_dist
+                    dist_hessian[dihedral_start:] *= cos_dist
 
-            grad_pes  = ( np.tensordot(W_i,      grad_U_i, axes=1) +   # Σ Wᵢ ∇Uᵢ
-                        np.tensordot(U_i,   grad_W_i, axes=1) )       # Σ Uᵢ ∇Wᵢ
-            # grad_pes shape: (natm, 3)
+                pes_prime_i = np.matmul(b_matrix.T, (grad + dist_hessian)).reshape(natm, 3)
+                pot_gradients.append(pes_prime_i)
 
-            for j, Wi in enumerate(W_i):
-                self.bond_rmsd[j]     *= Wi
-                self.angle_rmsd[j]    *= Wi
-                self.dihedral_rmsd[j] *= Wi
+            # ----------------------------------------
+            # Phase weights for ALL candidates
+            # ----------------------------------------
+            # candidate_phase_vectors = np.asarray(candidate_phase_vectors, dtype=np.float64)
 
-            gradient = grad_pes           # this is what the caller expects
-            return pes, gradient, hessian_error
+            # d2_phase = np.array([
+            #     self._compute_two_rotor_phase_distance(current_full_phases, cand_phases)
+            #     for cand_phases in candidate_phase_vectors
+            # ], dtype=np.float64)
+
+            # w_phase = np.exp(-80.0 * d2_phase)
+            # w_phase_inv = 1.0/((d2_phase/0.5)**4 + (d2_phase/0.5)**4)
+
+            raw_w = []
+            raw_grad_w = []
+
+            for cand_grouped in cand_grouped_signitures:
+                d2_i, grad_d2_i = self._grouped_signature_distance_and_gradient(
+                    current_grouped,
+                    cand_grouped,
+                    grouped_brows
+                )
         
+                w_i, grad_w_i = self._signature_inverse_weight_and_gradient(
+                    d2_i,
+                    grad_d2_i,
+                    confidence_radius=1.0,
+                    power=2,
+                    eps=1e-12
+                )
+
+                raw_w.append(w_i)
+                raw_grad_w.append(grad_w_i.reshape(natm, 3))
+
+            # Diagnostics
+            # print("current_full_phases =", current_full_phases)
+            # print("candidate_phase_vectors =", candidate_phase_vectors)
+            # print("d2_phase =", d2_phase)
+            # print("w_phase =", w_phase)
+            # print("w_phase_inv =", w_phase_inv)
+
+            # ----------------------------------------
+            # Final combined weights
+            # ----------------------------------------
+            w_i_sig = np.asarray(raw_w, dtype=np.float64)
+            grad_w_i_sig = np.asarray(raw_grad_w, dtype=np.float64)
+
+            # w_i_local = np.asarray(symmetry_weights_local, dtype=np.float64)
+            # grad_w_i_local = np.asarray(symmetry_weight_gradients_local, dtype=np.float64)
+
+            # Combined candidate weight
+  
+            # w_i_inv = w_phase_inv
+
+            # S = w_i_local.sum()
+            # S_inv = w_i_inv.sum()
+            S_sig = w_i_sig.sum()
+            # if S < 1e-14:
+            #     # fallback to nearest phase candidate
+            #     idx_best = int(np.argmin(d2_phase))
+            #     w_i_local = np.zeros_like(w_i_local)
+            #     w_i_local[idx_best] = 1.0
+            #     S = 1.0
+
+            # NOTE:
+            # Here we only include gradient of local support, not gradient of w_phase.
+            # Good enough for testing selection logic; not fully exact yet.
+            # grad_w_i = w_phase[:, None, None]
+
+            # sum_grad_w = grad_w_i_local.sum(axis=0)
+            sum_grad_w_sig = grad_w_i_sig.sum(axis=0)
+
+
+            # W_i = w_i_local / S
+            # W_i_inv = w_i_inv / S_inv
+            W_i_sig = w_i_sig / S_sig
+            # grad_W_i = (grad_w_i_local * S - w_i_local[:, None, None] * sum_grad_w) / (S**2)
+            grad_W_i_sig = (grad_w_i_sig * S_sig - w_i_sig[:, None, None] * sum_grad_w_sig) / (S_sig**2)
+
+
+            # print("w_local =", W_i)
+            # print("combined raw weights =", w_i)
+            # print("normalized weights =", W_i)
+            # print("normalized weights invers =", W_i_inv)
+
+
+            U_i = np.asarray(potentials, dtype=np.float64)
+            grad_U_i = np.asarray(pot_gradients, dtype=np.float64)
+
+            pes = np.dot(W_i_sig, U_i)
+
+            grad_pes = (
+                np.tensordot(W_i_sig, grad_U_i, axes=1)
+                + np.tensordot(U_i, grad_W_i_sig, axes=1)
+            )
+
+            # Vectorized: apply the normalized weights elementwise to the RMSD diagnostics.
+            # This avoids the explicit Python loop and leverages NumPy broadcasting.
+   
+            # self.bond_rmsd = np.asarray(self.bond_rmsd, dtype=np.float64) * W_i_sig
+            # self.angle_rmsd = np.asarray(self.angle_rmsd, dtype=np.float64) * W_i_sig
+            # self.dihedral_rmsd = np.asarray(self.dihedral_rmsd, dtype=np.float64) * W_i_sig
+
+            gradient = grad_pes
+ 
+            return pes, gradient, hessian_error
+
         else:
             hessian_error = 0.0
             energy = data_point.energy
@@ -1162,30 +1768,29 @@ class InterpolationDriver():
             hessian = data_point.internal_hessian.copy()
             dist_org = (org_int_coords.copy() - data_point.internal_coordinates_values)
             dist_check = (org_int_coords.copy() - data_point.internal_coordinates_values)
-            
+
             dihedral_start = self.symmetry_information[-1][1]
             if not self.use_cosine_dihedral:
                 dist_check[dihedral_start:] = np.sin(dist_org[dihedral_start:])
-            
 
-      
             self.bond_rmsd.append(np.sqrt(np.mean(np.sum((dist_org[:self.symmetry_information[-1][0]])**2))))
             self.angle_rmsd.append(np.sqrt(np.mean(np.sum(dist_org[self.symmetry_information[-1][0]:self.symmetry_information[-1][1]]**2))))
             self.dihedral_rmsd.append(np.sqrt(np.mean(np.sum(dist_check[self.symmetry_information[-1][1]:]**2))))
 
-            pes = (energy + np.matmul(dist_check.T, grad) +
-                        0.5 * np.linalg.multi_dot([dist_check.T, hessian, dist_check]))
+            pes = (
+                energy
+                + np.matmul(dist_check.T, grad)
+                + 0.5 * np.linalg.multi_dot([dist_check.T, hessian, dist_check])
+            )
 
             dist_hessian_eff = np.matmul(dist_check.T, hessian)
-
 
             if not self.use_cosine_dihedral:
                 cos_dist = np.cos(dist_org[dihedral_start:])
                 grad[dihedral_start:] *= cos_dist
                 dist_hessian_eff[dihedral_start:] *= cos_dist
 
-
-            pes_prime = (np.matmul(self.impes_coordinate.b_matrix.T, (grad + dist_hessian_eff))).reshape(natm, 3)
+            pes_prime = np.matmul(self.impes_coordinate.b_matrix.T, (grad + dist_hessian_eff)).reshape(natm, 3)
 
             return pes, pes_prime, (grad + dist_hessian_eff)
 
@@ -1200,9 +1805,14 @@ class InterpolationDriver():
         natm = data_point.cartesian_coordinates.shape[0]
         dp_label = data_point.point_label
 
-        if len(self.qm_symmetry_data_points[dp_label]) > 1 and self.use_symmetry:
+        symmetry_data_points = (self.qm_symmetry_data_points or {}).get(dp_label, [])
+        use_symmetry_branch = (len(symmetry_data_points) > 1 and self.use_symmetry)
+        symmetry_task_entries = ()
+        if use_symmetry_branch:
+            symmetry_task_entries = self._get_symmetry_task_entries(dp_label)
+            use_symmetry_branch = len(symmetry_task_entries) > 0
 
-            symmetry_data_points = self.qm_symmetry_data_points[dp_label]
+        if use_symmetry_branch:
 
             symmetry_weights = []
             potentials = []
@@ -1214,22 +1824,16 @@ class InterpolationDriver():
             symmetry_weight_gradients_cos = []
             r_cut = 1.5
 
-            dihedral_start = self.symmetry_information[-1][1]
+            torsion_meta = self._get_symmetry_torsion_meta()
+            dihedral_start = torsion_meta['dihedral_start']
             bond_end = self.symmetry_information[-1][0]
             angle_end = self.symmetry_information[-1][1]
-            sym3_keys = tuple(self.symmetry_information[7][3].keys())
-            sym3_dict = self.symmetry_information[7][3]
-            sym2_set = set(self.symmetry_information[7][2])
+            b_matrix = self.impes_coordinate.b_matrix
 
             def evaluate_symmetry_mask_task(task):
                 symmetry_data_point, mask0, mask = task
 
                 energy = symmetry_data_point.energy
-                sum_sym_3_dihedral_cos = {key: 0.0 for key in sym3_keys}
-                sum_sym_3_dihedral_prime_cos = {
-                    key: np.zeros_like(data_point.cartesian_coordinates.reshape(-1))
-                    for key in sym3_keys
-                }
 
                 grad = symmetry_data_point.internal_gradient.copy()
                 grad[mask0] = grad[mask]
@@ -1244,30 +1848,17 @@ class InterpolationDriver():
                 dist_correlation = (org_int_coords.copy() -
                                     symmetry_data_point.internal_coordinates_values[mask])
 
-                sum_sym_dihedral = 0.0
-                sum_sym_dihedral_prime = np.zeros_like(
-                    data_point.cartesian_coordinates.reshape(-1))
-
                 dist_check[dihedral_start:] = np.sin(dist_org[dihedral_start:])
                 dist_correlation[dihedral_start:] = dist_check[dihedral_start:]
 
-                for i, element in enumerate(self.impes_coordinate.z_matrix[dihedral_start:],
-                                            start=dihedral_start):
-
-                    if element[1:3] in sym3_dict:
-                        sum_sym_dihedral += self.te_weight_general(dist_org[i], 3)
-                        sum_sym_dihedral_prime += self.te_weight_gradient_general(
-                            dist_org[i], self.impes_coordinate.b_matrix[i, :], 3)
-                        dist_correlation[i] = 0.0
-                        sum_sym_3_dihedral_cos[element[1:3]] += 2.0 * (1.0 - np.cos(dist_org[i]))
-                        sum_sym_3_dihedral_prime_cos[element[1:3]] += (
-                            2.0 * np.sin(dist_org[i]) * self.impes_coordinate.b_matrix[i, :])
-
-                    elif tuple(sorted(element)) in sym2_set:
-                        sum_sym_dihedral += self.te_weight_general(dist_org[i], 2)
-                        sum_sym_dihedral_prime += self.te_weight_gradient_general(
-                            dist_org[i], self.impes_coordinate.b_matrix[i, :], 2)
-                        dist_correlation[i] = 0.0
+                (sum_sym_dihedral,
+                 sum_sym_dihedral_prime,
+                 sum_sym_3_dihedral_cos,
+                 sum_sym_3_dihedral_prime_cos) = self._vectorized_symmetry_dihedral_terms(
+                     dist_org,
+                     dist_correlation,
+                     b_matrix,
+                     torsion_meta)
 
                 bond_rmsd = np.sqrt(np.mean(np.sum((dist_org[:bond_end])**2)))
                 angle_rmsd = np.sqrt(np.mean(np.sum(dist_org[bond_end:angle_end]**2)))
@@ -1275,7 +1866,7 @@ class InterpolationDriver():
 
                 combined_weights = []
                 combined_weights_derivative = []
-                for key, entry in sum_sym_3_dihedral_cos.items():
+                for idx, entry in enumerate(sum_sym_3_dihedral_cos):
                     if entry >= r_cut**2:
                         combined_weights.append(0.0)
                         combined_weights_derivative.append(np.zeros((natm, 3)))
@@ -1283,14 +1874,14 @@ class InterpolationDriver():
                         decay_term = 1.0 - (entry / r_cut**2)
                         combined_weights.append(decay_term**3)
                         grad_factor = (-3.0 / r_cut**2) * (decay_term**2)
-                        grad_matrix = grad_factor * sum_sym_3_dihedral_prime_cos[key].reshape(natm, 3)
+                        grad_matrix = grad_factor * sum_sym_3_dihedral_prime_cos[idx].reshape(natm, 3)
                         combined_weights_derivative.append(grad_matrix)
 
-                W_total = np.prod(combined_weights)
+                W_total = np.prod(combined_weights) if combined_weights else 1.0
                 grad_W_total = np.zeros((natm, 3))
-                for I in range(len(sum_sym_3_dihedral_cos.keys())):
+                for I in range(len(combined_weights)):
                     prod_other_w = np.prod(
-                        [combined_weights[J] for J in range(len(sum_sym_3_dihedral_cos.keys()))
+                        [combined_weights[J] for J in range(len(combined_weights))
                          if J != I])
                     grad_W_total += combined_weights_derivative[I] * prod_other_w
 
@@ -1307,20 +1898,18 @@ class InterpolationDriver():
                 dist_hessian[dihedral_start:] *= cos_dist
 
                 pes_prime = (
-                    np.matmul(self.impes_coordinate.b_matrix.T, (grad + dist_hessian))).reshape(natm, 3)
+                    np.matmul(b_matrix.T, (grad + dist_hessian))).reshape(natm, 3)
 
                 return (W_total, grad_W_total, pes_local, pes_prime,
                         bond_rmsd, angle_rmsd, dihedral_rmsd,
                         symmetry_weight, symmetry_weight_gradient)
 
             def evaluate_all_symmetry_tasks():
-                tasks = []
-                for symmetry_data_point in symmetry_data_points:
-                    masks = symmetry_data_point.mapping_masks
-                    for mask in masks[:]:
-                        tasks.append((symmetry_data_point, masks[0], mask))
+                tasks = symmetry_task_entries
 
                 n_tasks = len(tasks)
+                if n_tasks == 0:
+                    return []
                 workers = max_workers
                 if workers is None:
                     workers = os.cpu_count() or 1
