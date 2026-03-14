@@ -314,9 +314,6 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
 
         # read initial guess from restart file
 
-        n_restart_vectors = 0
-        n_restart_iterations = 0
-
         if self.restart:
             if self.rank == mpi_master():
                 rst_trial_mat, rst_sig_mat = read_rsp_hdf5(
@@ -324,42 +321,48 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
                     molecule, basis, dft_dict, pe_dict, self.ostream)
                 self.restart = (rst_trial_mat is not None and
                                 rst_sig_mat is not None)
-                if rst_trial_mat is not None:
-                    n_restart_vectors = rst_trial_mat.shape[1]
 
                 # TODO: handle restarting with different number of states
 
             self.restart = self.comm.bcast(self.restart, root=mpi_master())
-            n_restart_vectors = self.comm.bcast(n_restart_vectors,
-                                                root=mpi_master())
-            n_restart_iterations = n_restart_vectors // self.nstates
-            if n_restart_vectors % self.nstates != 0:
-                n_restart_iterations += 1
+
+        if self.restart:
+            if self.rank == mpi_master():
+                self.solver.add_iteration_data(rst_sig_mat, rst_trial_mat,
+                                               self.nstates)
+                trial_mat = self.solver.compute(diag_mat)
 
         profiler.check_memory_usage('Initial guess')
 
         # start TDA iteration
 
-        for i in range(n_restart_iterations + self.max_iter):
+        for i in range(self.max_iter):
+
+            # in case of restart, check convergence at first iteration
+            if self.restart and i == 0:
+                self._check_convergence()
+                if self._is_converged:
+                    if self.rank == mpi_master():
+                        self._print_iter_data(i)
+                    break
 
             profiler.set_timing_key(f'Iteration {i + 1}')
 
             # perform linear transformation of trial vectors
 
-            if i >= n_restart_iterations:
-                tdens_a = self._get_trans_densities(trial_mat,
-                                                    scf_results,
-                                                    molecule,
-                                                    basis,
-                                                    spin='alpha')
-                tdens_b = self._get_trans_densities(trial_mat,
-                                                    scf_results,
-                                                    molecule,
-                                                    basis,
-                                                    spin='beta')
-                fock = self._comp_lr_fock_unrestricted(
-                    (tdens_a, tdens_b), molecule, basis, eri_dict, dft_dict,
-                    pe_dict, profiler)
+            tdens_a = self._get_trans_densities(trial_mat,
+                                                scf_results,
+                                                molecule,
+                                                basis,
+                                                spin='alpha')
+            tdens_b = self._get_trans_densities(trial_mat,
+                                                scf_results,
+                                                molecule,
+                                                basis,
+                                                spin='beta')
+            fock = self._comp_lr_fock_unrestricted((tdens_a, tdens_b), molecule,
+                                                   basis, eri_dict, dft_dict,
+                                                   pe_dict, profiler)
 
             profiler.start_timer('ReducedSpace')
 
@@ -367,22 +370,10 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
 
             if self.rank == mpi_master():
 
-                if i >= n_restart_iterations:
-                    sig_mat = self._get_sigmas(fock, scf_results, molecule,
-                                               basis, trial_mat)
-                else:
-                    istart = i * self.nstates
-                    iend = (i + 1) * self.nstates
-                    if iend > n_restart_vectors:
-                        iend = n_restart_vectors
-                    sig_mat = np.copy(rst_sig_mat[:, istart:iend])
-                    trial_mat = np.copy(rst_trial_mat[:, istart:iend])
+                sig_mat = self._get_sigmas(fock, scf_results, molecule, basis,
+                                           trial_mat)
 
-                self.solver.add_iteration_data(sig_mat, trial_mat, i,
-                                               self.nstates)
-
-                # need to manually update solver's neigenpairs for unrestricted
-                self.solver.neigenpairs = self.nstates
+                self.solver.add_iteration_data(sig_mat, trial_mat, self.nstates)
 
                 trial_mat = self.solver.compute(diag_mat)
 
@@ -402,7 +393,7 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
 
             # write checkpoint file
 
-            if (self.rank == mpi_master() and i >= n_restart_iterations):
+            if self.rank == mpi_master():
                 trials = self.solver.trial_matrices
                 sigmas = self.solver.sigma_matrices
                 write_rsp_hdf5(self.checkpoint_file, [trials, sigmas],
@@ -712,7 +703,8 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
             trial_mat = np.zeros((n_exc_a + n_exc_b, 0))
 
             # total number of excitations in initial guess
-            guess_nstates = self._get_initial_guess_size_for_excitations(self.nstates)
+            guess_nstates = self._get_initial_guess_size_for_excitations(
+                self.nstates)
 
             for i, a in sorted(w_a, key=w_a.get)[:guess_nstates]:
                 ia = excitations_a.index((i, a))
