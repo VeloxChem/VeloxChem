@@ -34,7 +34,6 @@ from mpi4py import MPI
 from copy import deepcopy
 import numpy as np
 import time as tm
-import h5py
 import sys
 
 from .oneeints import compute_electric_dipole_integrals
@@ -989,48 +988,6 @@ class LinearResponseEigenSolver(LinearSolver):
         else:
             # not converged
             return {}
-
-    def _add_nstates_to_checkpoint(self):
-        """
-        Add nstates to checkpoint file.
-        """
-
-        if self.checkpoint_file is None:
-            return
-
-        if self.rank == mpi_master():
-            hf = h5py.File(self.checkpoint_file, 'a')
-            key = 'nstates'
-            if key in hf:
-                del hf[key]
-            hf.create_dataset(key, data=np.array([self.nstates]))
-            hf.close()
-
-        self.comm.barrier()
-
-    def _read_nstates_from_checkpoint(self):
-        """
-        Read nstates from checkpoint file.
-
-        :return:
-            The number of states.
-        """
-
-        if self.checkpoint_file is None:
-            return None
-
-        nstates = None
-
-        if self.rank == mpi_master():
-            hf = h5py.File(self.checkpoint_file, 'r')
-            key = 'nstates'
-            if key in hf:
-                nstates = np.array(hf.get(key))[0]
-            hf.close()
-
-        nstates = self.comm.bcast(nstates, root=mpi_master())
-
-        return nstates
 
     @staticmethod
     def get_full_solution_vector(solution):

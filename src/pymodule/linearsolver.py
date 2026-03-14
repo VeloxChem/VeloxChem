@@ -35,6 +35,7 @@ import numpy as np
 import time as tm
 import math
 import sys
+import h5py
 
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import MolecularGrid, XCIntegrator
@@ -676,6 +677,52 @@ class LinearSolver:
             return (
                 self.guess_scaling_threshold * self.initial_guess_multiplier +
                 (nstates - self.guess_scaling_threshold))
+
+    def _add_nstates_to_checkpoint(self):
+        """
+        Add nstates to checkpoint file.
+        """
+
+        # For RPA/TDA
+
+        if self.checkpoint_file is None:
+            return
+
+        if self.rank == mpi_master():
+            hf = h5py.File(self.checkpoint_file, 'a')
+            key = 'nstates'
+            if key in hf:
+                del hf[key]
+            hf.create_dataset(key, data=np.array([self.nstates]))
+            hf.close()
+
+        self.comm.barrier()
+
+    def _read_nstates_from_checkpoint(self):
+        """
+        Read nstates from checkpoint file.
+
+        :return:
+            The number of excited states.
+        """
+
+        # For RPA/TDA
+
+        if self.checkpoint_file is None:
+            return None
+
+        nstates = None
+
+        if self.rank == mpi_master():
+            hf = h5py.File(self.checkpoint_file, 'r')
+            key = 'nstates'
+            if key in hf:
+                nstates = np.array(hf.get(key))[0]
+            hf.close()
+
+        nstates = self.comm.bcast(nstates, root=mpi_master())
+
+        return nstates
 
     def compute(self, molecule, basis, scf_results, v_grad=None):
         """
