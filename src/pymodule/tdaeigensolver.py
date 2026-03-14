@@ -117,6 +117,8 @@ class TdaEigenSolver(LinearSolver):
 
         self.initial_guess_multiplier = 3
         self.guess_scaling_threshold = 10
+        self.max_subspace_dim = None
+        self.collapse_nvec = None
 
         self.core_excitation = False
         self.num_core_orbitals = 0
@@ -145,6 +147,10 @@ class TdaEigenSolver(LinearSolver):
                 ('int', 'multiplier for initial guess size'),
             'guess_scaling_threshold':
                 ('int', 'threshold for guess size to increase linearly'),
+            'max_subspace_dim':
+                ('int', 'maximum Davidson reduced-space dimension'),
+            'collapse_nvec':
+                ('int', 'number of Davidson vectors kept after collapse'),
             'core_excitation': ('bool', 'compute core-excited states'),
             'num_core_orbitals': ('int', 'number of involved core-orbitals'),
             'restricted_subspace':
@@ -312,7 +318,8 @@ class TdaEigenSolver(LinearSolver):
 
         # block Davidson algorithm setup
 
-        self.solver = BlockDavidsonSolver()
+        self.solver = BlockDavidsonSolver(self.max_subspace_dim,
+                                          self.collapse_nvec)
 
         # read initial guess from restart file
 
@@ -982,6 +989,12 @@ class TdaEigenSolver(LinearSolver):
         """
 
         # iteration header
+
+        if self.solver.collapsed_subspace:
+            exec_str = 'Collapsed reduced space: {:d}->{:d}'.format(
+                self.solver.collapsed_from_dim, self.solver.collapsed_to_dim)
+            self.ostream.print_info(exec_str)
+            self.ostream.print_blank()
 
         exec_str = ' *** Iteration: ' + (str(iteration + 1)).rjust(3)
         exec_str += ' * Reduced Space: '

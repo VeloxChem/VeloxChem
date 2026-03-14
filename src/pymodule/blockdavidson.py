@@ -49,7 +49,7 @@ class BlockDavidsonSolver:
         - trial_matrices: The trial vectors in matrix format {X_0, X_1,...}.
     """
 
-    def __init__(self):
+    def __init__(self, max_subspace_dim=None, collapse_nvec=None):
         """
         Initializes block Davidson sover to default setup.
         """
@@ -68,6 +68,12 @@ class BlockDavidsonSolver:
 
         # Ritz data
         self.ritz_vectors = None
+        # subspace restart setup
+        self.max_subspace_dim = max_subspace_dim
+        self.collapse_nvec = collapse_nvec
+        self.collapsed_subspace = False
+        self.collapsed_from_dim = None
+        self.collapsed_to_dim = None
 
     def add_iteration_data(self, sig_mat, trial_mat, neigenpairs):
         """
@@ -107,6 +113,12 @@ class BlockDavidsonSolver:
         """
 
         self.comp_residual_vectors()
+        self.collapsed_subspace = False
+        self.collapsed_from_dim = None
+        self.collapsed_to_dim = None
+
+        if self.should_collapse():
+            self.collapse_subspace()
 
         tvecs = self.comp_trial_vectors(diag_mat)
         tvecs = self.project_trial_vectors(tvecs)
@@ -142,6 +154,20 @@ class BlockDavidsonSolver:
 
         return self.trial_matrices.shape[1]
 
+    def should_collapse(self):
+        """
+        Checks whether the reduced-space basis should be collapsed.
+
+        :return:
+            True if the reduced-space dimension exceeds the collapse threshold.
+        """
+
+        max_subspace_dim = self._get_max_subspace_dim()
+
+        return (self.trial_matrices is not None and
+                max_subspace_dim is not None and
+                self.reduced_space_size() > max_subspace_dim)
+
     def max_min_residual_norms(self):
         """
         Determines maximum and minumum residual norms within set of requested
@@ -175,7 +201,6 @@ class BlockDavidsonSolver:
         reigs, rvecs = np.linalg.eigh(rlmat)
         yvecs = rvecs[:, :self.neigenpairs].copy()
         self.residual_eigs = reigs[:self.neigenpairs]
-
         self.ritz_vectors = np.matmul(self.trial_matrices, yvecs)
 
         self.residual_matrices = self.ritz_vectors.copy()
@@ -184,6 +209,53 @@ class BlockDavidsonSolver:
         self.residual_matrices -= np.matmul(self.sigma_matrices, yvecs)
 
         self.residual_norms = np.linalg.norm(self.residual_matrices, axis=0)
+
+    def collapse_subspace(self):
+        """
+        Collapses the reduced space to the leading Ritz vectors.
+        """
+
+        keep_dim = self._get_collapse_nvec()
+        keep_dim = min(keep_dim, self.reduced_space_size())
+
+        rlmat = np.matmul(self.trial_matrices.T, self.sigma_matrices)
+        reigs, rvecs = np.linalg.eigh(rlmat)
+        coeffs = rvecs[:, :keep_dim].copy()
+
+        self.collapsed_subspace = True
+        self.collapsed_from_dim = self.reduced_space_size()
+        self.collapsed_to_dim = keep_dim
+
+        self.trial_matrices = np.matmul(self.trial_matrices, coeffs)
+        self.sigma_matrices = np.matmul(self.sigma_matrices, coeffs)
+
+        # Preserve the current Ritz and residual information for the requested
+        # eigenpairs in the collapsed basis.
+        self.ritz_vectors = self.trial_matrices[:, :self.neigenpairs].copy()
+        self.residual_eigs = reigs[:self.neigenpairs]
+
+    def _get_max_subspace_dim(self):
+        """
+        Gets the maximum allowed reduced-space dimension.
+        """
+
+        if self.max_subspace_dim is not None:
+            return self.max_subspace_dim
+
+        if self.neigenpairs is None:
+            return None
+
+        return 8 * self.neigenpairs
+
+    def _get_collapse_nvec(self):
+        """
+        Gets the number of vectors retained when collapsing the subspace.
+        """
+
+        if self.collapse_nvec is not None:
+            return max(self.neigenpairs, self.collapse_nvec)
+
+        return 2 * self.neigenpairs
 
     def comp_trial_vectors(self, diag_mat):
         """
