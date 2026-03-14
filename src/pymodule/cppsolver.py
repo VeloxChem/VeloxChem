@@ -107,6 +107,12 @@ class ComplexResponse(LinearSolver):
 
         self.frequencies = (0,)
         self.damping = 1000.0 / hartree_in_wavenumber()
+        self.max_subspace_dim = None
+        self.collapse_nvec = None
+
+        self.collapsed_subspace = False
+        self.collapsed_from_dim = None
+        self.collapsed_to_dim = None
 
         self._input_keywords['response'].update({
             'a_operator': ('str_lower', 'A operator'),
@@ -115,6 +121,10 @@ class ComplexResponse(LinearSolver):
             'b_components': ('str_lower', 'Cartesian components of B operator'),
             'frequencies': ('seq_range', 'frequencies'),
             'damping': ('float', 'damping parameter'),
+            'max_subspace_dim':
+                ('int', 'maximum reduced-space dimension before collapse'),
+            'collapse_nvec':
+                ('int', 'number of solution states kept after collapse'),
         })
 
     def update_settings(self, rsp_dict, method_dict=None):
@@ -530,7 +540,11 @@ class ComplexResponse(LinearSolver):
             profiler.start_timer('ReducedSpace')
 
             xvs = []
+            current_solutions = {}
             self._cur_iter = iteration
+            self.collapsed_subspace = False
+            self.collapsed_from_dim = None
+            self.collapsed_to_dim = None
 
             n_ger = self._dist_bger.shape(1)
             n_ung = self._dist_bung.shape(1)
@@ -542,162 +556,18 @@ class ComplexResponse(LinearSolver):
             for op, w in op_freq_keys:
                 if (iteration == 0 or
                         relative_residual_norm[(op, w)] > self.conv_thresh):
-
-                    grad_rg = dist_grad[(op, w)].get_column(0)
-                    grad_ru = dist_grad[(op, w)].get_column(1)
-                    grad_iu = dist_grad[(op, w)].get_column(2)
-                    grad_ig = dist_grad[(op, w)].get_column(3)
-
-                    # projections onto gerade and ungerade subspaces:
-
-                    g_realger = self._dist_bger.matmul_AtB(grad_rg, 2.0)
-                    g_imagger = self._dist_bger.matmul_AtB(grad_ig, 2.0)
-                    g_realung = self._dist_bung.matmul_AtB(grad_ru, 2.0)
-                    g_imagung = self._dist_bung.matmul_AtB(grad_iu, 2.0)
-
-                    # creating gradient and matrix for linear equation
-
-                    size = 2 * (n_ger + n_ung)
-
-                    if self.rank == mpi_master():
-
-                        # gradient
-
-                        g = np.zeros(size)
-
-                        g[:n_ger] = g_realger[:]
-                        g[n_ger:n_ger + n_ung] = g_realung[:]
-                        g[n_ger + n_ung:size - n_ger] = -g_imagung[:]
-                        g[size - n_ger:] = -g_imagger[:]
-
-                        # matrix
-
-                        mat = np.zeros((size, size))
-
-                        # filling E2gg
-
-                        mat[:n_ger, :n_ger] = e2gg[:, :]
-                        mat[size - n_ger:, size - n_ger:] = -e2gg[:, :]
-
-                        # filling E2uu
-
-                        mat[n_ger:n_ger + n_ung,
-                            n_ger:n_ger + n_ung] = e2uu[:, :]
-
-                        mat[n_ger + n_ung:size - n_ger,
-                            n_ger + n_ung:size - n_ger] = -e2uu[:, :]
-
-                        # filling S2ug
-
-                        mat[n_ger:n_ger + n_ung, :n_ger] = -w * s2ug[:, :]
-
-                        mat[n_ger + n_ung:size - n_ger, :n_ger] = d * s2ug[:, :]
-
-                        mat[n_ger:n_ger + n_ung, size - n_ger:] = d * s2ug[:, :]
-
-                        mat[n_ger + n_ung:size - n_ger,
-                            size - n_ger:] = w * s2ug[:, :]
-
-                        # filling S2ug.T (interchanging of row and col)
-
-                        mat[:n_ger, n_ger:n_ger + n_ung] = -w * s2ug.T[:, :]
-
-                        mat[:n_ger,
-                            n_ger + n_ung:size - n_ger] = d * s2ug.T[:, :]
-
-                        mat[size - n_ger:,
-                            n_ger:n_ger + n_ung] = d * s2ug.T[:, :]
-
-                        mat[size - n_ger:,
-                            n_ger + n_ung:size - n_ger] = w * s2ug.T[:, :]
-
-                        # solving matrix equation
-
-                        c = safe_solve(mat, g)
-                    else:
-                        c = None
-                    c = self.comm.bcast(c, root=mpi_master())
-
-                    # extracting the 4 components of c...
-
-                    c_realger = c[:n_ger]
-                    c_realung = c[n_ger:n_ger + n_ung]
-                    c_imagung = c[n_ger + n_ung:size - n_ger]
-                    c_imagger = c[size - n_ger:]
-
-                    # ...and projecting them onto respective subspace
-
-                    x_realger = self._dist_bger.matmul_AB_no_gather(c_realger)
-                    x_realung = self._dist_bung.matmul_AB_no_gather(c_realung)
-                    x_imagung = self._dist_bung.matmul_AB_no_gather(c_imagung)
-                    x_imagger = self._dist_bger.matmul_AB_no_gather(c_imagger)
-
-                    # composing E2 matrices projected onto solution subspace
-
-                    e2realger = self._dist_e2bger.matmul_AB_no_gather(c_realger)
-                    e2imagger = self._dist_e2bger.matmul_AB_no_gather(c_imagger)
-                    e2realung = self._dist_e2bung.matmul_AB_no_gather(c_realung)
-                    e2imagung = self._dist_e2bung.matmul_AB_no_gather(c_imagung)
+                    solve_data = self._solve_reduced_problem(
+                        op, w, n_ger, n_ung, e2gg, e2uu, s2ug, dist_grad,
+                        v_grad)
+                    x = solve_data['solution']
+                    r = solve_data['residual']
+                    current_solutions[(op, w)] = x
 
                     if self.nonlinear:
-                        fock_realger = self._dist_fock_ger.matmul_AB_no_gather(
-                            c_realger)
-                        fock_imagger = self._dist_fock_ger.matmul_AB_no_gather(
-                            c_imagger)
-                        fock_realung = self._dist_fock_ung.matmul_AB_no_gather(
-                            c_realung)
-                        fock_imagung = self._dist_fock_ung.matmul_AB_no_gather(
-                            c_imagung)
+                        focks[(op, w)] = solve_data['fock']
 
-                        fock_full_data = (
-                            fock_realger.data + fock_realung.data - 1j *
-                            (fock_imagger.data + fock_imagung.data))
-
-                        focks[(op, w)] = DistributedArray(fock_full_data,
-                                                          self.comm,
-                                                          distribute=False)
-
-                    # calculating the residual components
-
-                    s2realger = x_realger.data
-                    s2imagger = x_imagger.data
-                    s2realung = x_realung.data
-                    s2imagung = x_imagung.data
-
-                    r_realger = (e2realger.data - w * s2realung +
-                                 d * s2imagung - grad_rg.data)
-                    r_realung = (e2realung.data - w * s2realger +
-                                 d * s2imagger - grad_ru.data)
-                    r_imagung = (-e2imagung.data + w * s2imagger +
-                                 d * s2realger + grad_iu.data)
-                    r_imagger = (-e2imagger.data + w * s2imagung +
-                                 d * s2realung + grad_ig.data)
-
-                    r_data = np.hstack((
-                        r_realger.reshape(-1, 1),
-                        r_realung.reshape(-1, 1),
-                        r_imagung.reshape(-1, 1),
-                        r_imagger.reshape(-1, 1),
-                    ))
-
-                    r = DistributedArray(r_data, self.comm, distribute=False)
-
-                    # calculating relative residual norm
-                    # for convergence check
-
-                    x_data = np.hstack((
-                        x_realger.data.reshape(-1, 1),
-                        x_realung.data.reshape(-1, 1),
-                        x_imagung.data.reshape(-1, 1),
-                        x_imagger.data.reshape(-1, 1),
-                    ))
-
-                    x = DistributedArray(x_data, self.comm, distribute=False)
-
-                    x_full = self.get_full_solution_vector(x)
                     if self.rank == mpi_master():
-                        xv = np.dot(x_full, v_grad[(op, w)])
-                        xvs.append((op, w, xv))
+                        xvs.append((op, w, solve_data['property']))
 
                     r_norms_2 = 2.0 * r.squared_norm(axis=0)
                     x_norms_2 = 2.0 * x.squared_norm(axis=0)
@@ -752,6 +622,20 @@ class ComplexResponse(LinearSolver):
 
             if self.is_converged:
                 break
+
+            active_keys = list(residuals.keys())
+            if active_keys and self._should_collapse_subspace():
+                self._collapse_current_subspace(active_keys, current_solutions,
+                                                relative_residual_norm,
+                                                molecule, basis, scf_results,
+                                                eri_dict, dft_dict, pe_dict,
+                                                profiler)
+                if self.rank == mpi_master():
+                    collapse_str = 'Collapsed reduced space: {:d}->{:d}'.format(
+                        self.collapsed_from_dim, self.collapsed_to_dim)
+                    self.ostream.print_info(collapse_str)
+                    self.ostream.print_blank()
+                    self.ostream.flush()
 
             profiler.start_timer('Orthonorm.')
 
@@ -916,6 +800,242 @@ class ComplexResponse(LinearSolver):
             return x_real + 1j * x_imag
         else:
             return None
+
+    def _reduced_space_size(self):
+        """
+        Gets the total reduced-space dimension across both parity sectors.
+        """
+
+        return self._dist_bger.shape(1) + self._dist_bung.shape(1)
+
+    def _get_max_subspace_dim(self):
+        """
+        Gets the maximum allowed reduced-space dimension before collapse.
+        """
+
+        if self.max_subspace_dim is not None:
+            return self.max_subspace_dim
+
+        return 8 * len(self.b_components) * max(1, len(self.frequencies))
+
+    def _get_collapse_nvec(self):
+        """
+        Gets the number of solution states retained during collapse.
+        """
+
+        nreq = len(self.b_components) * max(1, len(self.frequencies))
+
+        if self.collapse_nvec is not None:
+            return max(nreq, self.collapse_nvec)
+
+        return 2 * nreq
+
+    def _should_collapse_subspace(self):
+        """
+        Checks whether the reduced-space basis should be collapsed.
+        """
+
+        return self._reduced_space_size() > self._get_max_subspace_dim()
+
+    def _orthonormalize_collapsed_space(self, vectors):
+        """
+        Removes linear dependence and orthonormalizes a collapsed basis.
+
+        :param vectors:
+            The distributed half-sized basis vectors.
+
+        :return:
+            The orthonormalized basis.
+        """
+
+        if vectors.data.size == 0:
+            return vectors
+
+        vectors = self._remove_linear_dependence_half_size(
+            vectors, self.lindep_thresh)
+        vectors = self._orthogonalize_gram_schmidt_half_size(vectors)
+        vectors = self._normalize_half_size(vectors)
+
+        return vectors
+
+    def _solve_reduced_problem(self, op, w, n_ger, n_ung, e2gg, e2uu, s2ug,
+                               dist_grad, v_grad):
+        """
+        Solves one reduced CPP linear system and forms the corresponding
+        solution, residual, and projected property.
+        """
+
+        grad_rg = dist_grad[(op, w)].get_column(0)
+        grad_ru = dist_grad[(op, w)].get_column(1)
+        grad_iu = dist_grad[(op, w)].get_column(2)
+        grad_ig = dist_grad[(op, w)].get_column(3)
+
+        g_realger = self._dist_bger.matmul_AtB(grad_rg, 2.0)
+        g_imagger = self._dist_bger.matmul_AtB(grad_ig, 2.0)
+        g_realung = self._dist_bung.matmul_AtB(grad_ru, 2.0)
+        g_imagung = self._dist_bung.matmul_AtB(grad_iu, 2.0)
+
+        size = 2 * (n_ger + n_ung)
+
+        if self.rank == mpi_master():
+            g = np.zeros(size)
+
+            g[:n_ger] = g_realger[:]
+            g[n_ger:n_ger + n_ung] = g_realung[:]
+            g[n_ger + n_ung:size - n_ger] = -g_imagung[:]
+            g[size - n_ger:] = -g_imagger[:]
+
+            mat = np.zeros((size, size))
+
+            mat[:n_ger, :n_ger] = e2gg[:, :]
+            mat[size - n_ger:, size - n_ger:] = -e2gg[:, :]
+
+            mat[n_ger:n_ger + n_ung, n_ger:n_ger + n_ung] = e2uu[:, :]
+            mat[n_ger + n_ung:size - n_ger,
+                n_ger + n_ung:size - n_ger] = -e2uu[:, :]
+
+            mat[n_ger:n_ger + n_ung, :n_ger] = -w * s2ug[:, :]
+            mat[n_ger + n_ung:size - n_ger, :n_ger] = self.damping * s2ug[:, :]
+            mat[n_ger:n_ger + n_ung, size - n_ger:] = self.damping * s2ug[:, :]
+            mat[n_ger + n_ung:size - n_ger, size - n_ger:] = w * s2ug[:, :]
+
+            mat[:n_ger, n_ger:n_ger + n_ung] = -w * s2ug.T[:, :]
+            mat[:n_ger,
+                n_ger + n_ung:size - n_ger] = self.damping * s2ug.T[:, :]
+            mat[size - n_ger:,
+                n_ger:n_ger + n_ung] = self.damping * s2ug.T[:, :]
+            mat[size - n_ger:,
+                n_ger + n_ung:size - n_ger] = w * s2ug.T[:, :]
+
+            c = safe_solve(mat, g)
+        else:
+            c = None
+        c = self.comm.bcast(c, root=mpi_master())
+
+        c_realger = c[:n_ger]
+        c_realung = c[n_ger:n_ger + n_ung]
+        c_imagung = c[n_ger + n_ung:size - n_ger]
+        c_imagger = c[size - n_ger:]
+
+        x_realger = self._dist_bger.matmul_AB_no_gather(c_realger)
+        x_realung = self._dist_bung.matmul_AB_no_gather(c_realung)
+        x_imagung = self._dist_bung.matmul_AB_no_gather(c_imagung)
+        x_imagger = self._dist_bger.matmul_AB_no_gather(c_imagger)
+
+        e2realger = self._dist_e2bger.matmul_AB_no_gather(c_realger)
+        e2imagger = self._dist_e2bger.matmul_AB_no_gather(c_imagger)
+        e2realung = self._dist_e2bung.matmul_AB_no_gather(c_realung)
+        e2imagung = self._dist_e2bung.matmul_AB_no_gather(c_imagung)
+
+        fock = None
+        if self.nonlinear:
+            fock_realger = self._dist_fock_ger.matmul_AB_no_gather(c_realger)
+            fock_imagger = self._dist_fock_ger.matmul_AB_no_gather(c_imagger)
+            fock_realung = self._dist_fock_ung.matmul_AB_no_gather(c_realung)
+            fock_imagung = self._dist_fock_ung.matmul_AB_no_gather(c_imagung)
+
+            fock_full_data = (
+                fock_realger.data + fock_realung.data -
+                1j * (fock_imagger.data + fock_imagung.data))
+
+            fock = DistributedArray(fock_full_data,
+                                    self.comm,
+                                    distribute=False)
+
+        s2realger = x_realger.data
+        s2imagger = x_imagger.data
+        s2realung = x_realung.data
+        s2imagung = x_imagung.data
+
+        r_realger = (e2realger.data - w * s2realung + self.damping * s2imagung
+                     - grad_rg.data)
+        r_realung = (e2realung.data - w * s2realger + self.damping * s2imagger
+                     - grad_ru.data)
+        r_imagung = (-e2imagung.data + w * s2imagger +
+                     self.damping * s2realger + grad_iu.data)
+        r_imagger = (-e2imagger.data + w * s2imagung +
+                     self.damping * s2realung + grad_ig.data)
+
+        r_data = np.hstack((
+            r_realger.reshape(-1, 1),
+            r_realung.reshape(-1, 1),
+            r_imagung.reshape(-1, 1),
+            r_imagger.reshape(-1, 1),
+        ))
+
+        r = DistributedArray(r_data, self.comm, distribute=False)
+
+        x_data = np.hstack((
+            x_realger.data.reshape(-1, 1),
+            x_realung.data.reshape(-1, 1),
+            x_imagung.data.reshape(-1, 1),
+            x_imagger.data.reshape(-1, 1),
+        ))
+
+        x = DistributedArray(x_data, self.comm, distribute=False)
+
+        x_full = self.get_full_solution_vector(x)
+        if self.rank == mpi_master():
+            xv = np.dot(x_full, v_grad[(op, w)])
+        else:
+            xv = None
+
+        return {
+            'coeffs': c,
+            'solution': x,
+            'residual': r,
+            'property': xv,
+            'fock': fock,
+        }
+
+    def _collapse_current_subspace(self, active_keys, solutions, residual_norms,
+                                   molecule, basis, scf_results, eri_dict,
+                                   dft_dict, pe_dict, profiler):
+        """
+        Collapses the reduced space to a basis built from the largest
+        unconverged solution vectors and rebuilds associated sigma data.
+        """
+
+        ranked_keys = sorted(active_keys,
+                             key=lambda key: residual_norms[key],
+                             reverse=True)
+        keep_keys = ranked_keys[:min(self._get_collapse_nvec(),
+                                     len(ranked_keys))]
+
+        prev_dim = self._reduced_space_size()
+
+        ger_cols = []
+        ung_cols = []
+        for key in keep_keys:
+            x = solutions[key]
+            ger_cols.append(x.data[:, 0].copy())
+            ger_cols.append(x.data[:, 3].copy())
+            ung_cols.append(x.data[:, 1].copy())
+            ung_cols.append(x.data[:, 2].copy())
+
+        if ger_cols:
+            ger_mat = np.array(ger_cols).T
+        else:
+            ger_mat = np.zeros((self._dist_bger.shape(0), 0))
+
+        if ung_cols:
+            ung_mat = np.array(ung_cols).T
+        else:
+            ung_mat = np.zeros((self._dist_bung.shape(0), 0))
+
+        new_bger = DistributedArray(ger_mat, self.comm, distribute=False)
+        new_bung = DistributedArray(ung_mat, self.comm, distribute=False)
+
+        new_bger = self._orthonormalize_collapsed_space(new_bger)
+        new_bung = self._orthonormalize_collapsed_space(new_bung)
+
+        self._clear_subspace_data()
+        self._e2n_half_size(new_bger, new_bung, molecule, basis, scf_results,
+                            eri_dict, dft_dict, pe_dict, profiler)
+
+        self.collapsed_subspace = True
+        self.collapsed_from_dim = prev_dim
+        self.collapsed_to_dim = self._reduced_space_size()
 
     def _print_iteration(self, relative_residual_norm, xvs):
         """
