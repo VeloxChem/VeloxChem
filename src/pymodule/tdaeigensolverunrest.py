@@ -35,6 +35,7 @@ from copy import deepcopy
 import numpy as np
 import time as tm
 import sys
+import h5py
 
 from .veloxchemlib import XCFunctional, MolecularGrid
 from .veloxchemlib import mpi_master, rotatory_strength_in_cgs
@@ -321,15 +322,67 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
                     molecule, basis, dft_dict, pe_dict, self.ostream)
                 self.restart = (rst_trial_mat is not None and
                                 rst_sig_mat is not None)
-
-                # TODO: handle restarting with different number of states
-
             self.restart = self.comm.bcast(self.restart, root=mpi_master())
 
         if self.restart:
             if self.rank == mpi_master():
                 self.solver.add_iteration_data(rst_sig_mat, rst_trial_mat,
                                                self.nstates)
+
+            checkpoint_nstates = self._read_nstates_from_checkpoint()
+
+            # print warning if nstates is not present in the restart file
+            if checkpoint_nstates is None:
+                self.ostream.print_warning(
+                    'Could not find the nstates key in the checkpoint file.')
+                self.ostream.print_blank()
+                self.ostream.print_info(
+                    'Assuming that nstates is not changed before and after ' +
+                    'the restart.')
+                self.ostream.print_blank()
+                self.ostream.flush()
+
+            # generate necessary initial guesses if more states are requested
+            # in a restart calculation
+            elif checkpoint_nstates < self.nstates:
+                self.ostream.print_info(
+                    'Generating initial guesses for ' +
+                    f'{self.nstates - checkpoint_nstates} more states...')
+                self.ostream.print_blank()
+
+                diag_mat_not_used, trial_mat = self._gen_trial_vectors(
+                    molecule, (orb_ene_a, orb_ene_b), (nocc_a, nocc_b),
+                    checkpoint_nstates)
+
+                # project out trial vector components already in reduced space
+                if self.rank == mpi_master():
+                    trial_mat = self.solver.project_trial_vectors(trial_mat)
+                    n_trials = trial_mat.shape[1]
+                else:
+                    n_trials = None
+                n_trials = self.comm.bcast(n_trials, root=mpi_master())
+
+                if n_trials > 0:
+                    tdens_a = self._get_trans_densities(trial_mat,
+                                                        scf_results,
+                                                        molecule,
+                                                        basis,
+                                                        spin='alpha')
+                    tdens_b = self._get_trans_densities(trial_mat,
+                                                        scf_results,
+                                                        molecule,
+                                                        basis,
+                                                        spin='beta')
+                    fock = self._comp_lr_fock_unrestricted(
+                        (tdens_a, tdens_b), molecule, basis, eri_dict, dft_dict,
+                        pe_dict, profiler)
+                    if self.rank == mpi_master():
+                        sig_mat = self._get_sigmas(fock, scf_results, molecule,
+                                                   basis, trial_mat)
+                        self.solver.add_iteration_data(sig_mat, trial_mat,
+                                                       self.nstates)
+
+            if self.rank == mpi_master():
                 trial_mat = self.solver.compute(diag_mat)
 
         profiler.check_memory_usage('Initial guess')
@@ -399,6 +452,7 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
                 write_rsp_hdf5(self.checkpoint_file, [trials, sigmas],
                                ['TDA_trials', 'TDA_sigmas'], molecule, basis,
                                dft_dict, pe_dict, self.ostream)
+            self._add_nstates_to_checkpoint()
 
             # finish TDA after convergence
 
@@ -648,7 +702,49 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
             # not converged
             return {}
 
-    def _gen_trial_vectors(self, molecule, orb_ene, nocc):
+    def _add_nstates_to_checkpoint(self):
+        """
+        Add nstates to checkpoint file.
+        """
+
+        if self.checkpoint_file is None:
+            return
+
+        if self.rank == mpi_master():
+            hf = h5py.File(self.checkpoint_file, 'a')
+            key = 'nstates'
+            if key in hf:
+                del hf[key]
+            hf.create_dataset(key, data=np.array([self.nstates]))
+            hf.close()
+
+        self.comm.barrier()
+
+    def _read_nstates_from_checkpoint(self):
+        """
+        Read nstates from checkpoint file.
+
+        :return:
+            The number of states.
+        """
+
+        if self.checkpoint_file is None:
+            return None
+
+        nstates = None
+
+        if self.rank == mpi_master():
+            hf = h5py.File(self.checkpoint_file, 'r')
+            key = 'nstates'
+            if key in hf:
+                nstates = np.array(hf.get(key))[0]
+            hf.close()
+
+        nstates = self.comm.bcast(nstates, root=mpi_master())
+
+        return nstates
+
+    def _gen_trial_vectors(self, molecule, orb_ene, nocc, n_excl_states=0):
         """
         Generates set of TDA trial vectors for given number of excited states
         by selecting primitive excitations wirh lowest approximate energies
@@ -660,6 +756,9 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
             The orbital energies.
         :param nocc:
             The number of occupied orbitals.
+        :param n_excl_states:
+            Number of states to exclude. Useful for generating initial guess
+            for a restarting calculation that requests more states.
 
         :return:
             tuple (approximate diagonal of symmetric A, set of trial vectors).
@@ -702,17 +801,23 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
 
             trial_mat = np.zeros((n_exc_a + n_exc_b, 0))
 
+            # number of excitations to be excluded from initial guess
+            guess_excl_nstates = self._get_initial_guess_size_for_excitations(
+                n_excl_states)
+
             # total number of excitations in initial guess
             guess_nstates = self._get_initial_guess_size_for_excitations(
                 self.nstates)
 
-            for i, a in sorted(w_a, key=w_a.get)[:guess_nstates]:
+            for i, a in sorted(w_a,
+                               key=w_a.get)[guess_excl_nstates:guess_nstates]:
                 ia = excitations_a.index((i, a))
                 trial_mat_a = np.zeros((n_exc_a + n_exc_b, 1))
                 trial_mat_a[ia, 0] = 1.0
                 trial_mat = np.hstack((trial_mat, trial_mat_a))
 
-            for j, b in sorted(w_b, key=w_b.get)[:guess_nstates]:
+            for j, b in sorted(w_b,
+                               key=w_b.get)[guess_excl_nstates:guess_nstates]:
                 jb = excitations_b.index((j, b))
                 trial_mat_b = np.zeros((n_exc_a + n_exc_b, 1))
                 trial_mat_b[jb + n_exc_a, 0] = 1.0
