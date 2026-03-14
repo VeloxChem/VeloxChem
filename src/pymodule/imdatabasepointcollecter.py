@@ -346,7 +346,25 @@ class IMDatabasePointCollecter:
 
         # roots requiring dataset reload on worker ranks
         self._mpi_pending_sync_roots = set()
-            
+        
+
+    def _create_platform(self):
+        """
+        Creates an OpenMM platform.
+
+        Returns:
+            OpenMM Platform.
+        """
+
+        if self.platform is None:
+            return None
+        else:
+            platform = mm.Platform.getPlatformByName(self.platform)
+            if self.openmm_platform == "CPU":
+                platform.setPropertyDefaultValue("Threads", "1")
+            return platform
+        
+
     # Method to generate OpenMM system from VeloxChem objects
     def system_from_molecule(self,
                              molecule,
@@ -905,7 +923,7 @@ class IMDatabasePointCollecter:
         topology = self.modeller.topology if self.phase in ['water', 'periodic'] else self.pdb.topology
         self.positions = self.modeller.positions if self.phase in ['water', 'periodic'] else self.pdb.positions
 
-        self.simulation = app.Simulation(topology, self.system, self.integrator)
+        self.simulation = app.Simulation(topology, self.system, self.integrator,  platform=self._create_platform())
         self.simulation.context.setPositions(self.positions)
         self.simulation.context.setVelocitiesToTemperature(self.temperature)
 
@@ -1573,7 +1591,7 @@ class IMDatabasePointCollecter:
                         self.bias_force_reaction_prop[1],
                         self.bias_force_reaction_prop[2])
 
-            self.simulation = app.Simulation(self.topology, self.system, new_integrator)
+            self.simulation = app.Simulation(self.topology, self.system, new_integrator, platform=self._create_platform())
 
             # Load the state if a restart file is provided
             if self.load_system is not None:
