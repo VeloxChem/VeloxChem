@@ -114,6 +114,9 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
         # excited states information
         self.nstates = 3
 
+        self.initial_guess_multiplier = 3
+        self.guess_scaling_threshold = 10
+
         self.core_excitation = False
         self.num_core_orbitals = 0
 
@@ -132,6 +135,10 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
 
         self._input_keywords['response'].update({
             'nstates': ('int', 'number of excited states'),
+            'initial_guess_multiplier':
+                ('int', 'multiplier for initial guess size'),
+            'guess_scaling_threshold':
+                ('int', 'threshold for guess size to increase linearly'),
             'core_excitation': ('bool', 'compute core-excited states'),
             'num_core_orbitals': ('int', 'number of involved core-orbitals'),
             'nto': ('bool', 'analyze natural transition orbitals'),
@@ -705,7 +712,7 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
             trial_mat = np.zeros((n_exc_a + n_exc_b, 0))
 
             # total number of excitations in initial guess
-            guess_nstates = self.nstates * 3
+            guess_nstates = self._get_initial_guess_size_for_excitations(self.nstates)
 
             for i, a in sorted(w_a, key=w_a.get)[:guess_nstates]:
                 ia = excitations_a.index((i, a))

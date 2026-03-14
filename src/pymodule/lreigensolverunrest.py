@@ -112,6 +112,9 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
 
         self.nstates = 3
 
+        self.initial_guess_multiplier = 3
+        self.guess_scaling_threshold = 10
+
         self.core_excitation = False
         self.num_core_orbitals = 0
 
@@ -129,6 +132,10 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
 
         self._input_keywords['response'].update({
             'nstates': ('int', 'number of excited states'),
+            'initial_guess_multiplier':
+                ('int', 'multiplier for initial guess size'),
+            'guess_scaling_threshold':
+                ('int', 'threshold for guess size to increase linearly'),
             'core_excitation': ('bool', 'compute core-excited states'),
             'num_core_orbitals': ('int', 'number of involved core-orbitals'),
             'nto': ('bool', 'analyze natural transition orbitals'),
@@ -352,13 +359,23 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
                                                 (orb_ene_a, orb_ene_b),
                                                 (nocc_a, nocc_b), norb,
                                                 checkpoint_nstates)
-                bger, bung = self._setup_trials(igs, None, self._dist_bger,
-                                                self._dist_bung)
 
-                profiler.set_timing_key('Preparation')
+                if igs:
+                    bger, bung = self._setup_trials(igs, None, self._dist_bger,
+                                                    self._dist_bung)
 
-                self._e2n_half_size(bger, bung, molecule, basis, scf_results,
-                                    eri_dict, dft_dict, pe_dict, profiler)
+                    profiler.set_timing_key('Preparation')
+
+                    self._e2n_half_size(bger,
+                                        bung,
+                                        molecule,
+                                        basis,
+                                        scf_results,
+                                        eri_dict,
+                                        dft_dict,
+                                        pe_dict,
+                                        profiler,
+                                        method_type='unrestricted')
 
         # generate initial guess from scratch
         else:
@@ -838,6 +855,9 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
                     'not yet implemented for excited state absorption')
 
                 if self.esa:
+                    if self.rank == mpi_master():
+                        esa_results = []
+                    """
                     if self.esa_from_state is None:
                         source_states = list(range(self.nstates))
                     else:
@@ -895,6 +915,7 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
                                 'oscillator_strength': esa_osc_str,
                                 'transition_dipole': esa_trans_dipole,
                             })
+                    """
 
                 if self.rank == mpi_master():
                     for ind, comp in enumerate('xyz'):
@@ -1142,10 +1163,11 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
         final = {}
 
         # number of excitations to be excluded from initial guess
-        guess_excl_nstates = n_excl_states * 3
+        guess_excl_nstates = self._get_initial_guess_size_for_excitations(
+            n_excl_states)
 
         # total number of excitations in initial guess
-        guess_nstates = nstates * 3
+        guess_nstates = self._get_initial_guess_size_for_excitations(nstates)
 
         for k, (i, a) in enumerate(
                 sorted(w_a, key=w_a.get)[guess_excl_nstates:guess_nstates]):

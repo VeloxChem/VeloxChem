@@ -112,6 +112,9 @@ class LinearResponseEigenSolver(LinearSolver):
 
         self.nstates = 3
 
+        self.initial_guess_multiplier = 3
+        self.guess_scaling_threshold = 10
+
         self.core_excitation = False
         self.num_core_orbitals = 0
 
@@ -135,6 +138,10 @@ class LinearResponseEigenSolver(LinearSolver):
 
         self._input_keywords['response'].update({
             'nstates': ('int', 'number of excited states'),
+            'initial_guess_multiplier':
+                ('int', 'multiplier for initial guess size'),
+            'guess_scaling_threshold':
+                ('int', 'threshold for guess size to increase linearly'),
             'core_excitation': ('bool', 'compute core-excited states'),
             'num_core_orbitals': ('int', 'number of involved core-orbitals'),
             'restricted_subspace':
@@ -364,13 +371,15 @@ class LinearResponseEigenSolver(LinearSolver):
 
                 igs = self._initial_excitations(self.nstates, orb_ene, nocc,
                                                 norb, checkpoint_nstates)
-                bger, bung = self._setup_trials(igs, None, self._dist_bger,
-                                                self._dist_bung)
+                if igs:
+                    bger, bung = self._setup_trials(igs, None, self._dist_bger,
+                                                    self._dist_bung)
 
-                profiler.set_timing_key('Preparation')
+                    profiler.set_timing_key('Preparation')
 
-                self._e2n_half_size(bger, bung, molecule, basis, scf_results,
-                                    eri_dict, dft_dict, pe_dict, profiler)
+                    self._e2n_half_size(bger, bung, molecule, basis,
+                                        scf_results, eri_dict, dft_dict,
+                                        pe_dict, profiler)
 
         # generate initial guess from scratch
         else:
@@ -423,6 +432,12 @@ class LinearResponseEigenSolver(LinearSolver):
                 ses = np.linalg.multi_dot([s2ug.T, e2uu_inv, s2ug])
 
                 evals, evecs = np.linalg.eigh(e2gg)
+
+                num_eigs = sum(evals > 1e-12)  # hard-coded threshold
+                if num_eigs < evals.size:
+                    evals = evals[-num_eigs:]
+                    evecs = evecs[:, -num_eigs:]
+
                 tmat = np.linalg.multi_dot(
                     [evecs, np.diag(1.0 / np.sqrt(evals)), evecs.T])
                 ses_tilde = np.linalg.multi_dot([tmat.T, ses, tmat])
@@ -1118,10 +1133,11 @@ class LinearResponseEigenSolver(LinearSolver):
         final = {}
 
         # number of excitations to be excluded from initial guess
-        guess_excl_nstates = n_excl_states * 3
+        guess_excl_nstates = self._get_initial_guess_size_for_excitations(
+            n_excl_states)
 
         # total number of excitations in initial guess
-        guess_nstates = nstates * 3
+        guess_nstates = self._get_initial_guess_size_for_excitations(nstates)
 
         for k, (i, a) in enumerate(
                 sorted(w, key=w.get)[guess_excl_nstates:guess_nstates]):

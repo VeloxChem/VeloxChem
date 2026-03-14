@@ -64,6 +64,7 @@ class TestCTNumbers:
         tda_drv = TdaEigenSolver()
         tda_drv.ostream.mute()
         tda_drv.nstates = 2
+        tda_drv.initial_guess_multiplier = 1
         tda_results = tda_drv.compute(molecule, basis, scf_results)
 
         exc_drv = ExcitedStateAnalysisDriver()
@@ -149,6 +150,7 @@ class TestCTNumbers:
         lreig_drv = LinearResponseEigenSolver()
         lreig_drv.ostream.mute()
         lreig_drv.nstates = 2
+        lreig_drv.initial_guess_multiplier = 1
         lreig_results = lreig_drv.compute(molecule, basis, scf_results)
 
         exc_drv = ExcitedStateAnalysisDriver()

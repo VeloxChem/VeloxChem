@@ -656,6 +656,27 @@ class LinearSolver:
         else:
             self._dist_fock_ung.append(fock_ung, axis=1)
 
+    def _get_initial_guess_size_for_excitations(self, nstates):
+        """
+        Gets the initial guess size for initial excitations.
+
+        :param nstates:
+            The number of states requested.
+        :return:
+            The size of the initial guess.
+        """
+
+        # For RPA/TDA
+
+        if nstates <= self.guess_scaling_threshold:
+            # small nstates: guess size increases as multiple of nstates
+            return nstates * self.initial_guess_multiplier
+        else:
+            # large nstates: guess size increases as 1x nstates
+            return (
+                self.guess_scaling_threshold * self.initial_guess_multiplier +
+                (nstates - self.guess_scaling_threshold))
+
     def compute(self, molecule, basis, scf_results, v_grad=None):
         """
         Solves for the linear equations.
