@@ -625,17 +625,20 @@ class ComplexResponse(LinearSolver):
 
             active_keys = list(residuals.keys())
             if active_keys and self._should_collapse_subspace():
+                self.ostream.print_info('Collapsing reduced space...')
+                self.ostream.print_blank()
+
                 self._collapse_current_subspace(active_keys, current_solutions,
                                                 relative_residual_norm,
                                                 molecule, basis, scf_results,
                                                 eri_dict, dft_dict, pe_dict,
                                                 profiler)
-                if self.rank == mpi_master():
-                    collapse_str = 'Collapsed reduced space: {:d}->{:d}'.format(
-                        self.collapsed_from_dim, self.collapsed_to_dim)
-                    self.ostream.print_info(collapse_str)
-                    self.ostream.print_blank()
-                    self.ostream.flush()
+
+                collapse_str = 'Collapsed reduced space: {:d}->{:d}'.format(
+                    self.collapsed_from_dim, self.collapsed_to_dim)
+                self.ostream.print_info(collapse_str)
+                self.ostream.print_blank()
+                self.ostream.flush()
 
             profiler.start_timer('Orthonorm.')
 
@@ -816,7 +819,7 @@ class ComplexResponse(LinearSolver):
         if self.max_subspace_dim is not None:
             return self.max_subspace_dim
 
-        return 8 * len(self.b_components) * max(1, len(self.frequencies))
+        return 20 * len(self.b_components) * max(1, len(self.frequencies))
 
     def _get_collapse_nvec(self):
         """
@@ -904,8 +907,7 @@ class ComplexResponse(LinearSolver):
                 n_ger + n_ung:size - n_ger] = self.damping * s2ug.T[:, :]
             mat[size - n_ger:,
                 n_ger:n_ger + n_ung] = self.damping * s2ug.T[:, :]
-            mat[size - n_ger:,
-                n_ger + n_ung:size - n_ger] = w * s2ug.T[:, :]
+            mat[size - n_ger:, n_ger + n_ung:size - n_ger] = w * s2ug.T[:, :]
 
             c = safe_solve(mat, g)
         else:
@@ -934,23 +936,20 @@ class ComplexResponse(LinearSolver):
             fock_realung = self._dist_fock_ung.matmul_AB_no_gather(c_realung)
             fock_imagung = self._dist_fock_ung.matmul_AB_no_gather(c_imagung)
 
-            fock_full_data = (
-                fock_realger.data + fock_realung.data -
-                1j * (fock_imagger.data + fock_imagung.data))
+            fock_full_data = (fock_realger.data + fock_realung.data - 1j *
+                              (fock_imagger.data + fock_imagung.data))
 
-            fock = DistributedArray(fock_full_data,
-                                    self.comm,
-                                    distribute=False)
+            fock = DistributedArray(fock_full_data, self.comm, distribute=False)
 
         s2realger = x_realger.data
         s2imagger = x_imagger.data
         s2realung = x_realung.data
         s2imagung = x_imagung.data
 
-        r_realger = (e2realger.data - w * s2realung + self.damping * s2imagung
-                     - grad_rg.data)
-        r_realung = (e2realung.data - w * s2realger + self.damping * s2imagger
-                     - grad_ru.data)
+        r_realger = (e2realger.data - w * s2realung + self.damping * s2imagung -
+                     grad_rg.data)
+        r_realung = (e2realung.data - w * s2realger + self.damping * s2imagger -
+                     grad_ru.data)
         r_imagung = (-e2imagung.data + w * s2imagger +
                      self.damping * s2realger + grad_iu.data)
         r_imagger = (-e2imagger.data + w * s2imagung +
@@ -999,8 +998,10 @@ class ComplexResponse(LinearSolver):
         ranked_keys = sorted(active_keys,
                              key=lambda key: residual_norms[key],
                              reverse=True)
-        keep_keys = ranked_keys[:min(self._get_collapse_nvec(),
-                                     len(ranked_keys))]
+        keep_keys = ranked_keys[:min(
+            self._get_collapse_nvec(),
+            len(ranked_keys),
+        )]
 
         prev_dim = self._reduced_space_size()
 

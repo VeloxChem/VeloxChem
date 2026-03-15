@@ -527,15 +527,18 @@ class LinearResponseEigenSolver(LinearSolver):
                 break
 
             if self._should_collapse_subspace():
+                self.ostream.print_info('Collapsing reduced space...')
+                self.ostream.print_blank()
+
                 self._collapse_current_subspace(c_ger_all, c_ung_all, molecule,
                                                 basis, scf_results, eri_dict,
                                                 dft_dict, pe_dict, profiler)
-                if self.rank == mpi_master():
-                    collapse_str = 'Collapsed reduced space: {:d}->{:d}'.format(
-                        self.collapsed_from_dim, self.collapsed_to_dim)
-                    self.ostream.print_info(collapse_str)
-                    self.ostream.print_blank()
-                    self.ostream.flush()
+
+                collapse_str = 'Collapsed reduced space: {:d}->{:d}'.format(
+                    self.collapsed_from_dim, self.collapsed_to_dim)
+                self.ostream.print_info(collapse_str)
+                self.ostream.print_blank()
+                self.ostream.flush()
 
             profiler.start_timer('Orthonorm.')
 
@@ -1004,7 +1007,7 @@ class LinearResponseEigenSolver(LinearSolver):
         if self.max_subspace_dim is not None:
             return self.max_subspace_dim
 
-        return 8 * self.nstates
+        return 20 * self.nstates
 
     def _get_collapse_nvec(self):
         """
@@ -1106,15 +1109,8 @@ class LinearResponseEigenSolver(LinearSolver):
 
         return vectors
 
-    def _collapse_current_subspace(self,
-                                   c_ger,
-                                   c_ung,
-                                   molecule,
-                                   basis,
-                                   scf_results,
-                                   eri_dict,
-                                   dft_dict,
-                                   pe_dict,
+    def _collapse_current_subspace(self, c_ger, c_ung, molecule, basis,
+                                   scf_results, eri_dict, dft_dict, pe_dict,
                                    profiler):
         """
         Collapses the reduced space to retained Ritz vectors and rebuilds
@@ -1149,11 +1145,6 @@ class LinearResponseEigenSolver(LinearSolver):
         """
 
         width = 92
-        if self.collapsed_subspace:
-            collapse_str = 'Collapsed reduced space: {:d}->{:d}'.format(
-                self.collapsed_from_dim, self.collapsed_to_dim)
-            self.ostream.print_info(collapse_str)
-            self.ostream.print_blank()
 
         output_header = '*** Iteration:   {} '.format(self._cur_iter + 1)
         output_header += '* Residuals (Max,Min): '
