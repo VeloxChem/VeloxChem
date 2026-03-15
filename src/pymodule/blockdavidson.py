@@ -245,7 +245,7 @@ class BlockDavidsonSolver:
         if self.neigenpairs is None:
             return None
 
-        return 8 * self.neigenpairs
+        return 20 * self.neigenpairs
 
     def _get_collapse_nvec(self):
         """
