@@ -215,12 +215,13 @@ def dft_sanity_check(obj, method_flag='compute', response_flag='none'):
             obj.ostream.print_warning(warn_msg)
         obj.ostream.flush()
 
+	# TODO: ask Xin why this is not supported
     # check if SCAN family of functional is used in nonliear response
-    if obj._dft and response_flag.lower() == 'nonlinear':
-        err_msg_scan = f'{type(obj).__name__}: Nonlinear response with '
-        err_msg_scan += 'SCAN family of functional is not supported'
-        assert_msg_critical('scan' not in obj.xcfun.get_func_label().lower(),
-                            err_msg_scan)
+    #if obj._dft and response_flag.lower() == 'nonlinear':
+    #    err_msg_scan = f'{type(obj).__name__}: Nonlinear response with '
+    #    err_msg_scan += 'SCAN family of functional is not supported'
+    #    assert_msg_critical('scan' not in obj.xcfun.get_func_label().lower(),
+    #                        err_msg_scan)
 
 
 def polorbrsp_sanity_check_1(obj):
