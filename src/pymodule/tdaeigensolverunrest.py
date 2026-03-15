@@ -158,8 +158,6 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
             'cube_points': ('seq_fixed_int', 'number of cubic grid points'),
         })
 
-        self._input_keywords['response'].pop('lindep_thresh', None)
-
     def update_settings(self, rsp_dict, method_dict=None):
         """
         Updates response and method settings in TDA excited states computation.
@@ -211,6 +209,9 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
             A dictionary containing eigenvalues, eigenvectors, transition
             dipole moments, oscillator strengths and rotatory strengths.
         """
+
+        if self.lindep_thresh is None:
+            self.lindep_thresh = self.conv_thresh * 1.0e-2
 
         # check molecule
         molecule_sanity_check(molecule)
@@ -317,7 +318,8 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
         # block Davidson algorithm setup
 
         self.solver = BlockDavidsonSolver(self.max_subspace_dim,
-                                          self.collapse_nvec)
+                                          self.collapse_nvec,
+                                          self.lindep_thresh)
 
         # read initial guess from restart file
 
