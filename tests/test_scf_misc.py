@@ -10,6 +10,7 @@ from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.dispersionmodel import DispersionModel
 from veloxchem.checkpoint import read_molecule_and_basis
+from veloxchem.inputparser import unparse_input, read_unparsed_input_from_hdf5
 
 
 @pytest.mark.solvers
@@ -113,6 +114,62 @@ class TestScfDriverMiscellaneous:
             assert third_drv._ref_mol_orbs is not None
             assert third_results["scf_energy"] == pytest.approx(
                 first_results["scf_energy"], abs=1.0e-10)
+
+    def test_checkpoint_writes_input_groups(self, tmp_path):
+
+        molecule, basis = self.get_water_and_basis()
+        filename = str(tmp_path / "water_keywords")
+        checkpoint_file = Path(f"{filename}_scf.h5")
+
+        comm = MPI.COMM_WORLD
+        filename = comm.bcast(filename, root=mpi_master())
+        checkpoint_file = comm.bcast(checkpoint_file, root=mpi_master())
+
+        def configure(driver):
+            driver.filename = filename
+            driver.max_iter = 37
+            driver.density_damping = True
+            driver.xcfun = 'blyp'
+            driver.ri_coulomb = True
+            driver.ri_auxiliary_basis = 'def2-universal-jkfit'
+            driver.ri_metric_threshold = 1.0e-10
+            driver.solvation_model = 'cpcm'
+            driver.cpcm_custom_vdw_radii = ('Mg', '2.0', '1', '1.0')
+
+        scf_drv, scf_results = self.run_hf_scf(molecule, basis, configure)
+
+        assert scf_results is not None
+        assert scf_drv.checkpoint_file == str(checkpoint_file)
+
+        scf_keywords = {
+            key: val[0] for key, val in scf_drv._input_keywords["scf"].items()
+        }
+        method_keywords = {
+            key: val[0]
+            for key, val in scf_drv._input_keywords["method_settings"].items()
+        }
+
+        expected_scf = unparse_input(scf_drv, scf_keywords)
+        expected_method = unparse_input(scf_drv, method_keywords)
+
+        if self.is_master():
+            assert checkpoint_file.is_file()
+            scf_input = read_unparsed_input_from_hdf5(str(checkpoint_file),
+                                                      group_name="scf_settings")
+            method_input = read_unparsed_input_from_hdf5(
+                str(checkpoint_file), group_name="method_settings")
+            assert scf_input == expected_scf
+            assert method_input == expected_method
+
+            new_drv = ScfRestrictedDriver()
+            new_drv.ostream.mute()
+            new_drv.update_settings(scf_input, method_input)
+
+            for key in scf_keywords:
+                assert getattr(new_drv, key) == getattr(scf_drv, key)
+
+            for key in method_keywords:
+                assert getattr(new_drv, key) == getattr(scf_drv, key)
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='skip pytest.raises for multiple MPI processes')

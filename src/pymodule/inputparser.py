@@ -39,6 +39,7 @@ import h5py
 import sys
 import re
 
+from .veloxchemlib import XCFunctional
 from .veloxchemlib import mpi_master
 from .errorhandler import assert_msg_critical
 
@@ -494,6 +495,9 @@ def unparse_input(obj, keyword_types):
         if val is None:
             input_dictionary[key] = None
 
+        elif isinstance(val, XCFunctional):
+            input_dictionary[key] = val.get_func_label()
+
         elif keyword_type in ['str', 'str_upper', 'str_lower']:
             input_dictionary[key] = str(val)
 
@@ -546,7 +550,7 @@ def write_unparsed_input_to_hdf5(fname, input_dictionary, group_name='input'):
 
         for key, val in input_dictionary.items():
             if val is None:
-                dset = group.create_dataset(key, shape=(0, ), dtype=string_type)
+                dset = group.create_dataset(key, shape=(0,), dtype=string_type)
                 dset.attrs['value_type'] = 'none'
 
             elif isinstance(val, str):
@@ -584,8 +588,7 @@ def read_unparsed_input_from_hdf5(fname, group_name='input'):
     with h5py.File(fname, 'r') as h5f:
         assert_msg_critical(
             group_name in h5f,
-            f'read_unparsed_input_from_hdf5: group \'{group_name}\' not found'
-        )
+            f'read_unparsed_input_from_hdf5: group \'{group_name}\' not found')
 
         group = h5f[group_name]
 

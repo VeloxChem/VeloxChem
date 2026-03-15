@@ -66,7 +66,8 @@ from .cpcmdriver import CpcmDriver
 from .smddriver import SmdDriver
 from .dispersionmodel import DispersionModel
 from .inputparser import (parse_input, print_keywords, print_attributes,
-                          get_random_string_parallel)
+                          get_random_string_parallel, unparse_input,
+                          write_unparsed_input_to_hdf5)
 from .dftutils import get_default_grid_level, print_xc_reference
 from .sanitychecks import (molecule_sanity_check, dft_sanity_check,
                            ri_sanity_check, pe_sanity_check,
@@ -1357,6 +1358,24 @@ class ScfDriver:
                 if self._cpcm:
                     write_cpcm_charges(self.checkpoint_file,
                                        self.cpcm_drv._cpcm_q)
+
+                scf_keywords = {
+                    key: val[0]
+                    for key, val in self._input_keywords['scf'].items()
+                }
+                method_keywords = {
+                    key: val[0] for key, val in
+                    self._input_keywords['method_settings'].items()
+                }
+
+                write_unparsed_input_to_hdf5(self.checkpoint_file,
+                                             unparse_input(self, scf_keywords),
+                                             group_name='scf_settings')
+                write_unparsed_input_to_hdf5(self.checkpoint_file,
+                                             unparse_input(
+                                                 self, method_keywords),
+                                             group_name='method_settings')
+
                 self.ostream.print_blank()
                 self.ostream.print_info('Checkpoint written to file: ' +
                                         self.checkpoint_file)

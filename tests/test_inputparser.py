@@ -193,7 +193,7 @@ def test_unparsed_input_hdf5_roundtrip(tmpdir):
 
     h5file = str(Path(tmpdir) / 'input.h5')
 
-    write_unparsed_input_to_hdf5(h5file, input_dictionary)
-    recovered = read_unparsed_input_from_hdf5(h5file)
+    write_unparsed_input_to_hdf5(h5file, input_dictionary, group_name='test')
+    recovered = read_unparsed_input_from_hdf5(h5file, group_name='test')
 
     assert recovered == input_dictionary
