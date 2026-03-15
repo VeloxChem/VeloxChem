@@ -8,6 +8,7 @@ from veloxchem.veloxchemlib import mpi_master
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
+from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
 from veloxchem.dispersionmodel import DispersionModel
 from veloxchem.checkpoint import read_molecule_and_basis
 from veloxchem.inputparser import unparse_input, read_unparsed_input_from_hdf5
@@ -212,6 +213,22 @@ class TestScfDriverMiscellaneous:
             assert np.max(
                 np.abs(third_results['D_alpha'] -
                        scf_results['D_alpha'])) < 1e-8
+
+        # test restart_exact with a different scf_type
+
+        fourth_drv = ScfUnrestrictedDriver()
+        fourth_drv.ostream.mute()
+        fourth_drv.checkpoint_file = str(checkpoint_file)
+
+        new_molecule, new_basis = read_molecule_and_basis(str(checkpoint_file))
+        new_molecule.set_charge(1)
+        new_molecule.set_multiplicity(2)
+
+        fourth_results_not_used = fourth_drv.compute(new_molecule,
+                                                     new_basis,
+                                                     restart_exact=True)
+
+        assert not fourth_drv.restart
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='skip pytest.raises for multiple MPI processes')

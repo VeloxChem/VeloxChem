@@ -609,9 +609,10 @@ class ScfDriver:
                                                    root=mpi_master())
             checkpoint_method_input = self.comm.bcast(checkpoint_method_input,
                                                       root=mpi_master())
+            # remove restart option from checkpoint_scf_input before calling
+            # update_settings, since we are already doing restart
+            checkpoint_scf_input.pop('restart', None)
             self.update_settings(checkpoint_scf_input, checkpoint_method_input)
-            # self.restart should be True and we don't want it to be overwritten
-            self.restart = True
 
         # check molecule
         molecule_sanity_check(molecule, self.scf_type)
