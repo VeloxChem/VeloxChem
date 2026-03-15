@@ -1255,6 +1255,12 @@ class VibrationalAnalysis:
                 raman_type = 'resonance'
             hf.create_dataset(vib_group + 'raman_type', data=np.bytes_([raman_type]))
 
+        valstr = 'Vibrational analysis results written to file: '
+        valstr += fname
+        self.ostream.print_info(valstr)
+        self.ostream.print_blank()
+        self.ostream.flush()
+
         hf.close()
 
     def print_header(self):
