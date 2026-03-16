@@ -1,5 +1,5 @@
 """
-vlx_builder.py
+molecule_toolkit.py
 ====================
 A unified toolkit for building and modifying molecules in VeloxChem.
 
@@ -527,8 +527,8 @@ class MoleculeToolkit:
         def nh2_h(n, metal, c_back, rnorm, h=1.01):
             vnm = (metal - n) / np.linalg.norm(metal - n)
             vnc = (c_back - n) / np.linalg.norm(c_back - n)
-            
-            bis = vnm + vnc            
+
+            bis = vnm + vnc
             bis = bis/np.linalg.norm(bis) if np.linalg.norm(bis)>1e-9 \
    else np.cross(vnm, rnorm)
             bis /= np.linalg.norm(bis)
@@ -736,6 +736,106 @@ class MoleculeToolkit:
 
     # ------------------------------------------------------------------
 
+    def add_bidentate_rigid(
+        self,
+        complex_mol,
+        metal_idx: int,
+        ligand_mol,
+        idx1: int,
+        idx2: int,
+        target_vec1,
+        target_vec2,
+        bond_length: float = 2.0,
+        bond_length2: float = None,
+    ):
+        """
+        Place a rigid/aromatic bidentate ligand (bipy, phen, ppy, acac…).
+
+        The ligand is split at the bond between the two donor-containing
+        fragments (e.g. the inter-ring C–C bond in bipy).  Each fragment is
+        placed independently via body-centroid rotation — identical to
+        :meth:`add_monodentate_ligand` — so each donor lands exactly at its
+        target position with no backbone atoms unphysically close to the metal.
+        The inter-fragment bond will be slightly stretched; the QM optimiser
+        restores it.
+
+        For flexible N-C-C-N donors (en) use :meth:`add_universal_bidentate`.
+
+        Parameters
+        ----------
+        idx1, idx2      : 1-based donor atom indices in *ligand_mol*
+        target_vec1/2   : direction vectors from metal to each donor site
+        bond_length     : M–donor₁ distance
+        bond_length2    : M–donor₂ distance (defaults to *bond_length*)
+        """
+        metal_idx = self._i(metal_idx)
+        idx1 = self._i(idx1)
+        idx2 = self._i(idx2)
+        assert metal_idx < complex_mol.number_of_atoms()
+        if bond_length2 is None:
+            bond_length2 = bond_length
+
+        c_labels = list(complex_mol.get_labels())
+        c_coords = np.array(complex_mol.get_coordinates_in_angstrom(),
+                            dtype=float)
+        l_labels = list(ligand_mol.get_labels())
+        l_coords = np.array(ligand_mol.get_coordinates_in_angstrom(),
+                            dtype=float)
+        n_lig = len(l_labels)
+
+        m_pos = c_coords[metal_idx]
+        t1 = np.array(target_vec1, dtype=float)
+        t1 /= np.linalg.norm(t1)
+        t2 = np.array(target_vec2, dtype=float)
+        t2 /= np.linalg.norm(t2)
+        target1 = m_pos + t1 * bond_length
+        target2 = m_pos + t2 * bond_length2
+
+        # Build ligand connectivity and split at the inter-donor bond
+        G = nx.Graph()
+        for i in range(n_lig):
+            G.add_node(i)
+        for i in range(n_lig):
+            for j in range(i + 1, n_lig):
+                r = self._cov_radius(l_labels[i]) + self._cov_radius(
+                    l_labels[j])
+                if np.linalg.norm(l_coords[i] - l_coords[j]) < 1.3 * r:
+                    G.add_edge(i, j)
+
+        path = nx.shortest_path(G, idx1, idx2)
+        mid = len(path) // 2
+        G.remove_edge(path[mid - 1], path[mid])
+        frag1 = set(nx.node_connected_component(G, idx1))
+        frag2 = set(nx.node_connected_component(G, idx2))
+
+        def place_fragment(frag_indices, donor_idx, target_pos, target_unit):
+            frag = sorted(frag_indices)
+            f_coords = l_coords[frag].copy()
+            loc_donor = frag.index(donor_idx)
+            f_coords -= f_coords[loc_donor]
+            others = [i for i in range(len(frag)) if i != loc_donor]
+            if others:
+                body = np.mean(f_coords[others], axis=0)
+                body /= np.linalg.norm(body)
+                f_coords = f_coords @ self.get_rotation_matrix(
+                    body, target_unit).T
+            f_coords += target_pos
+            return frag, f_coords
+
+        frag1_idx, frag1_coords = place_fragment(frag1, idx1, target1, t1)
+        frag2_idx, frag2_coords = place_fragment(frag2, idx2, target2, t2)
+
+        l_final = l_coords.copy()
+        for li, gi in enumerate(frag1_idx):
+            l_final[gi] = frag1_coords[li]
+        for li, gi in enumerate(frag2_idx):
+            l_final[gi] = frag2_coords[li]
+
+        return vlx.Molecule(c_labels + l_labels, np.vstack([c_coords, l_final]),
+                            'angstrom')
+
+    # ------------------------------------------------------------------
+
     def add_pi_ligand(
         self,
         complex_mol,
@@ -757,12 +857,9 @@ class MoleculeToolkit:
           … or any other set of atoms the user specifies.
 
         *target_vec* points from the metal toward the **centroid** of the
-        π-bonding atoms (i.e. it defines where the middle of the π system
-        ends up, not any individual carbon).  The ligand plane is oriented
-        perpendicular to this vector.
-
-        After placement a 360-step torsion scan rotates the ligand around
-        *target_vec* to minimise steric clash with the existing complex.
+        π-bonding atoms.  The ligand plane is oriented perpendicular to this
+        vector.  After placement a 360-step torsion scan rotates the ligand
+        around *target_vec* to minimise steric clash with the existing complex.
 
         Parameters
         ----------
@@ -793,11 +890,7 @@ class MoleculeToolkit:
         centroid = np.mean(l_coords[pi_idx_0], axis=0)
         l_coords -= centroid  # centroid now at origin
 
-        # --- Step 2: orient ligand plane perpendicular to target_vec -------
-        # The pi-atom centroid should sit at m_pos + t_unit * bond_length,
-        # with all pi atoms equidistant from the metal.
-        # We need the normal of the pi-atom plane to align with t_unit.
-
+        # Step 2: orient ligand plane perpendicular to target_vec
         if len(pi_idx_0) >= 3:
             # Fit a plane through the pi atoms via SVD
             pts = l_coords[pi_idx_0]  # centroid already at origin
@@ -832,35 +925,13 @@ class MoleculeToolkit:
                     pi_normal = -pi_normal
 
         pi_normal /= np.linalg.norm(pi_normal)
+        l_coords = l_coords @ self.get_rotation_matrix(pi_normal, t_unit).T
 
-        # Rotate so pi_normal aligns with t_unit (metal approaches from above)
-        R = self.get_rotation_matrix(pi_normal, t_unit)
-        l_coords = l_coords @ R.T
-
-        # --- Step 3: translate centroid to target position -----------------
-        # Each pi atom should be at bond_length from the metal.
-        # Place centroid at m_pos + t_unit * d, where d is chosen so that
-        # each pi atom is exactly bond_length from the metal.
-        # For a regular polygon the centroid is at radius r from each vertex,
-        # so d = sqrt(bond_length^2 - r^2) where r = distance from centroid
-        # to any pi atom (after rotation).
+        # Step 3: translate so each π atom is at bond_length from the metal
         pi_coords_rot = l_coords[pi_idx_0]
-        # r_centroid: average distance from centroid to each pi atom (in the ligand plane)
-        # Since we already centred on the centroid and rotated, the pi atoms lie
-        # in the plane perpendicular to t_unit. Their distance from the centroid
-        # (origin) is purely in-plane.
         r_centroid = np.mean(np.linalg.norm(pi_coords_rot, axis=1))
-
-        # The metal sits at distance bond_length from each pi atom.
-        # Each pi atom is at distance r_centroid from the centroid in-plane,
-        # and at distance d along t_unit from the centroid.
-        # So: bond_length^2 = r_centroid^2 + d^2  =>  d = sqrt(bl^2 - r^2)
-        # Guard against r >= bond_length (unphysical input).
-        if r_centroid >= bond_length:
-            d = 0.0
-        else:
-            d = np.sqrt(bond_length**2 - r_centroid**2)
-
+        d = 0.0 if r_centroid >= bond_length else np.sqrt(bond_length**2 -
+                                                          r_centroid**2)
         l_coords += m_pos + t_unit * d
 
         # --- Step 4: torsion scan around target_vec to orient the ligand ----
@@ -893,10 +964,6 @@ class MoleculeToolkit:
             steric = min(dists) if dists else 0.0
 
             if is_eta2 and len(c_coords) > 1:
-                # Geometric score: C=C should be perpendicular to the M–L
-                # vectors of existing ligands (parallel to the coordination plane).
-                # We maximise the minimum |sin(angle)| between C=C and each M–L,
-                # which equals 1 when C=C is perpendicular to all M–L vectors.
                 trial_cc = R_ax @ cc_axis
                 ml_vecs = [
                     c_coords[j] - m_pos for j in range(len(c_coords))
@@ -1241,16 +1308,10 @@ class MoleculeToolkit:
 
         *obj* may be:
         * a SMILES string with ``*`` marking the attachment point, or
-        * a VeloxChem Molecule (``index`` is the bonding atom, 0-based).
+        * a VeloxChem Molecule (``index`` is the bonding atom).
 
-        For SMILES input the ``*`` atom is located explicitly — it need not be
-        first in the string.  The atom bonded to ``*`` is the join atom; ``*``
-        itself is removed and the exit vector points along the bond that was
-        ``*``→join.  One H on the join atom is also removed to make room for
-        the new bond.
-
-        For VeloxChem Molecule input, one H is removed from *index*; the exit
-        vector points from *index* toward that removed H.
+        One H is removed from the bonding atom; ``exit_vec`` is the vector
+        that pointed from the bonding atom toward that removed H.
         """
         if isinstance(obj, str):
             # ── Locate the * atom and its neighbor before embedding ───────
@@ -1319,7 +1380,7 @@ class MoleculeToolkit:
 
             return f_labels, f_coords, new_join, exit_vec
 
-        # ── VeloxChem Molecule path (unchanged) ───────────────────────────
+        # VeloxChem Molecule path
         labels = list(obj.get_labels())
         coords = np.array(obj.get_coordinates_in_angstrom())
         h_idx = next(
@@ -1331,8 +1392,7 @@ class MoleculeToolkit:
             exit_vec = coords[h_idx] - coords[index]
             labels.pop(h_idx)
             coords = np.delete(coords, h_idx, axis=0)
-            if index > h_idx:
-                index -= 1
+            if index > h_idx: index -= 1
         else:
             nbs = [
                 coords[i] for i in range(len(coords))
@@ -1598,7 +1658,8 @@ class MoleculeToolkit:
                     curr += 1
             output['molecules'].append(
                 vlx.Molecule(new_labels, np.array(new_coords), 'angstrom'))
-            output['radical_indices'].append(old_to_new[rad_idx])
+            output['radical_indices'].append(
+                old_to_new[rad_idx] + 1)  # 1-based (VeloxChem convention)
 
         return output
 

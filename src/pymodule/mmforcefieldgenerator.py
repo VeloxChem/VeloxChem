@@ -2241,9 +2241,10 @@ class MMForceFieldGenerator:
         Parametrize all bonded and nonbonded terms using the OpenFF 2.0
         (Sage) force field via the openff-toolkit.
 
-        Returns a tuple (atoms, bonds, angles, dihedrals, impropers) whose
-        structure is identical to what the individual populate_* methods
-        return, so the rest of create_topology() can consume them unchanged.
+        Returns a tuple (atoms, bonds, angles, dihedrals, rotatable_bonds,
+        impropers) whose structure is identical to what the individual
+        populate_* methods return, so the rest of create_topology() can
+        consume them unchanged.
 
         Unit conventions (same as GAFF path):
           - lengths       : nm
@@ -2269,71 +2270,57 @@ class MMForceFieldGenerator:
             )
 
         # ── Build an OpenFF Molecule from the VeloxChem molecule ──────────
-        # Use RDKit SMILES round-trip via element symbols + connectivity.
+        # Uses only VeloxChem Molecule data — no RDKit required.
+        # Atomic numbers come from the 'periodictable' package (a lightweight
+        # stdlib-style package already present in the openff environment).
 
-        elem_ids = self.molecule.elem_ids_to_numpy()
-        n_atoms  = self.molecule.number_of_atoms()
+        labels  = self.molecule.get_labels()
+        n_atoms = self.molecule.number_of_atoms()
 
-        # Build RDKit mol from connectivity matrix so we don't need a SMILES
-        try:
-            from rdkit import Chem
-            from rdkit.Chem import AllChem
-        except ImportError:
-            assert_msg_critical(
-                False,
-                'MMForceFieldGenerator: RDKit is required for '
-                'force_field = "openff-2.0". '
-                'Install with:  conda install -c conda-forge rdkit'
+        # element symbol -> atomic number (covers all elements in organic/bio FF use)
+        _sym_to_z = {
+            'H': 1, 'He': 2, 'Li': 3, 'Be': 4, 'B': 5, 'C': 6, 'N': 7,
+            'O': 8, 'F': 9, 'Ne': 10, 'Na': 11, 'Mg': 12, 'Al': 13, 'Si': 14,
+            'P': 15, 'S': 16, 'Cl': 17, 'Ar': 18, 'K': 19, 'Ca': 20,
+            'Fe': 26, 'Co': 27, 'Ni': 28, 'Cu': 29, 'Zn': 30,
+            'Br': 35, 'I': 53,
+        }
+
+        off_mol = OFFMolecule()
+        for symbol in labels:
+            off_mol.add_atom(
+                atomic_number=_sym_to_z[symbol],
+                formal_charge=0,
+                is_aromatic=False,
             )
-
-        from veloxchem.molecularformula import get_element_symbol
-
-        rw = Chem.RWMol()
-        for z in elem_ids:
-            rw.AddAtom(Chem.Atom(int(z)))
 
         for (i, j) in bond_indices:
             bo = int(round(self.connectivity_matrix[i, j]))
-            bt = {
-                1: Chem.BondType.SINGLE,
-                2: Chem.BondType.DOUBLE,
-                3: Chem.BondType.TRIPLE,
-            }.get(bo, Chem.BondType.SINGLE)
-            rw.AddBond(i, j, bt)
-
-        mol_rdkit = rw.GetMol()
-        # Assign stereo / aromaticity so openff-toolkit perceives correctly
-        Chem.SanitizeMol(mol_rdkit)
-
-        off_mol = OFFMolecule.from_rdkit(mol_rdkit, allow_undefined_stereo=True)
-
+            off_mol.add_bond(
+                atom1=i,
+                atom2=j,
+                bond_order=bo,
+                is_aromatic=False,
+            )
         # Attach QM-derived partial charges so the toolkit uses them rather
         # than computing its own.
-        charges_e = [
-            float(q) * off_unit.elementary_charge
-            for q in self.partial_charges
-        ]
-        off_mol.partial_charges = charges_e * off_unit.elementary_charge
+        off_mol.partial_charges = (
+            np.array([float(q) for q in self.partial_charges])
+            * off_unit.elementary_charge
+        )
 
         # ── Load Sage 2.0 and parametrize ─────────────────────────────────
         sage = OFFForceField('openff-2.0.0.offxml')
-        interchange = sage.create_interchange(off_mol.to_topology())
+        # Pass off_mol as charge_from_molecules so the interchange uses
+        # the QM-derived partial_charges already set on the molecule and
+        # never falls through to AM1BCC / AmberTools charge computation.
+        interchange = sage.create_interchange(
+            off_mol.to_topology(),
+            charge_from_molecules=[off_mol],
+        )
 
-        # Extract parameter collections from the Interchange object
-        bond_params     = interchange['Bonds'].potentials
-        angle_params    = interchange['Angles'].potentials
-        proper_params   = interchange['ProperTorsions'].potentials
-        improper_params = interchange['ImproperTorsions'].potentials
-        vdw_params      = interchange['vdW'].potentials
-
-        # Helper: retrieve a potential by its topology key
-        def _get_potential(collection, top_key):
-            pot_key = collection.key_map.get(top_key)
-            if pot_key is None:
-                return None
-            return collection.potentials.get(pot_key)
-
-        # Rebuild key_maps indexed by sorted atom-index tuples for fast lookup
+        # Build lookup maps from the Interchange key_map collections,
+        # indexed by atom-index tuples for fast lookup during assembly.
         bond_map     = {}
         for tk, pk in interchange['Bonds'].key_map.items():
             idx = tuple(sorted(tk.atom_indices))
@@ -2464,24 +2451,16 @@ class MMForceFieldGenerator:
                 barriers      = []
                 phases        = []
                 periodicities = []
+                # Each entry in pots is one potential with plain
+                # 'periodicity', 'k', 'phase' keys (no numeric suffix) —
+                # openff-interchange stores one potential per term.
                 for pot in pots:
                     p = pot.parameters
-                    n_terms = sum(
-                        1 for key in p if key.startswith('periodicity')
+                    periodicities.append(int(p['periodicity'].magnitude))
+                    barriers.append(float(p['k'].to('kilojoule/mole').magnitude))
+                    phases.append(
+                        float(p['phase'].to('radian').magnitude) * 180.0 / np.pi
                     )
-                    for idx in range(1, n_terms + 1):
-                        periodicity = int(p[f'periodicity{idx}'].magnitude)
-                        # kcal/mol -> kJ/mol, and OpenFF k is already half-barrier
-                        barrier     = float(
-                            p[f'k{idx}'].to('kilojoule/mole').magnitude
-                        )
-                        phase_rad   = float(
-                            p[f'phase{idx}'].to('radian').magnitude
-                        )
-                        phase_deg   = phase_rad * 180.0 / np.pi
-                        barriers.append(barrier)
-                        phases.append(phase_deg)
-                        periodicities.append(periodicity)
 
                 multiple = len(barriers) > 1
                 comment  = f'openff proper {i+1}-{j+1}-{k+1}-{l+1}'
@@ -2489,9 +2468,9 @@ class MMForceFieldGenerator:
                     dihedrals[(i, j, k, l)] = {
                         'type':          'Fourier',
                         'multiple':      True,
-                        'barriers':      barriers,
-                        'phases':        phases,
-                        'periodicities': periodicities,
+                        'barrier':       barriers,
+                        'phase':         phases,
+                        'periodicity':   periodicities,
                         'comment':       comment,
                     }
                 else:
@@ -2520,29 +2499,41 @@ class MMForceFieldGenerator:
                     rotatable_bonds.append((j, k))
 
         # ── improper dihedrals ────────────────────────────────────────────
+        # Accumulate all terms per (i,j,k,l) key before storing, so that
+        # multi-term impropers are not silently truncated to their last term.
+        _improper_terms = {}   # (i,j,k,l) -> lists of (barrier, phase, periodicity)
         impropers = {}
         for center, entries in improper_map.items():
             for atom_inds, pot in entries:
                 i, j, k, l = atom_inds   # center is i in OpenFF improper
                 p           = pot.parameters
-                n_terms     = sum(1 for key in p if key.startswith('periodicity'))
-                for idx in range(1, n_terms + 1):
-                    periodicity = int(p[f'periodicity{idx}'].magnitude)
-                    barrier     = float(
-                        p[f'k{idx}'].to('kilojoule/mole').magnitude
-                    )
-                    phase_deg   = float(
-                        p[f'phase{idx}'].to('radian').magnitude
-                    ) * 180.0 / np.pi
-                    key = (i, j, k, l)
-                    impropers[key] = {
-                        'type':             'periodic',
-                        'barrier':          barrier,
-                        'phase':            phase_deg,
-                        'periodicity':      periodicity,
-                        'improper_ordering': (1, 2, 3, 4),
-                        'comment':          f'openff improper center={center+1}',
-                    }
+                # Each pot has plain 'periodicity', 'k', 'phase' keys.
+                key = (i, j, k, l)
+                if key not in _improper_terms:
+                    _improper_terms[key] = {'barriers': [], 'phases': [], 'periodicities': [], 'center': center}
+                _improper_terms[key]['barriers'].append(
+                    float(p['k'].to('kilojoule/mole').magnitude)
+                )
+                _improper_terms[key]['phases'].append(
+                    float(p['phase'].to('radian').magnitude) * 180.0 / np.pi
+                )
+                _improper_terms[key]['periodicities'].append(
+                    int(p['periodicity'].magnitude)
+                )
+
+        for key, terms in _improper_terms.items():
+            i, j, k, l = key
+            center      = terms['center']
+            multiple    = len(terms['barriers']) > 1
+            impropers[key] = {
+                'type':              'periodic',
+                'multiple':          multiple,
+                'barrier':           terms['barriers'] if multiple else terms['barriers'][0],
+                'phase':             terms['phases']   if multiple else terms['phases'][0],
+                'periodicity':       terms['periodicities'] if multiple else terms['periodicities'][0],
+                'improper_ordering': (1, 2, 3, 4),
+                'comment':           f'openff improper center={center+1}',
+            }
 
         return atoms, bonds, angles, dihedrals, rotatable_bonds, impropers
 
@@ -3641,10 +3632,21 @@ class MMForceFieldGenerator:
             line_str += '   ptype   sigma         epsilon\n'
             f_itp.write(line_str)
             # For OPLS, opls_NNN types are already defined in the system-wide
-            # oplsaa.ff/ffnonbonded.itp and must NOT be redeclared in the
-            # molecule itp. For GAFF/UFF, types are non-standard and must be
+            # oplsaa.ff/ffnonbonded.itp and must NOT be redeclared here.
+            # For GAFF/UFF/OpenFF, types are molecule-specific and must be
             # declared explicitly.
-            if self.force_field not in ('opls', 'openff-2.0'):
+            if self.force_field == 'opls':
+                pass  # types defined in oplsaa.ff/ffnonbonded.itp
+            elif self.force_field == 'openff-2.0':
+                # Each OpenFF atom has a unique type (openff_N) carrying its
+                # own sigma/epsilon — write one line per atom directly.
+                for i, atom in self.atoms.items():
+                    line_str = '{:>3}{:>9}{:17.5f}{:9.5f}{:>4}'.format(
+                        atom['type'], atom['type'], 0., 0., 'A')
+                    line_str += '{:16.5e}{:14.5e}\n'.format(
+                        atom['sigma'], atom['epsilon'])
+                    f_itp.write(line_str)
+            else:
                 # TODO: Make unique_atom_types and atom['type'] more consistent
                 for at in self.unique_atom_types:
                     for i, atom in self.atoms.items():
