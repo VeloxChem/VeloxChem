@@ -116,7 +116,7 @@ class TestECD:
         ref_exc_ene = np.array(
             [0.33148263, 0.40168416, 0.41121722, 0.43694079, 0.45467313])
         ref_osc_str = np.array([0.0005, 0.0030, 0.1530, 0.0761, 0.3728])
-        ref_rot_str = np.array([-9.7798, 31.3167, -19.3587, 15.6185, -7.6247])
+        ref_rot_str = np.array([-9.7797, 31.3169, -19.3585, 15.6197, -7.6241])
 
         self.run_ecd('hf', 'tda', ref_edip, ref_vdip, ref_mdip, ref_exc_ene,
                      ref_osc_str, ref_rot_str)

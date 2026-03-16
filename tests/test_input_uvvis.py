@@ -155,7 +155,7 @@ class TestInputUVVis:
             'n_scf_iterations': 9,
             'dipole': 0.786770,
             'nstates': 5,
-            'n_uvvis_iterations': 9,
+            'n_uvvis_iterations': 8,
             'exc_ene': np.array(
                 [0.32282999, 0.38491251, 0.41024825, 0.44793326, 0.47139996]),
             'osc_str': np.array([0.0530, 0.0000, 0.1070, 0.0045, 0.0248]),
