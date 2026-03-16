@@ -122,6 +122,10 @@ class OptimizationEngine(geometric.engine.Engine):
             new_mol = Molecule()
         new_mol = self.comm.bcast(new_mol, root=mpi_master())
 
+        title_txt = 'Optimization Step'
+        self.grad_drv.ostream.print_header(title_txt)
+        self.grad_drv.ostream.print_header('=' * (len(title_txt) + 2))
+        self.grad_drv.ostream.print_blank()
         self.grad_drv.ostream.print_info('Computing energy and gradient...')
         self.grad_drv.ostream.flush()
 

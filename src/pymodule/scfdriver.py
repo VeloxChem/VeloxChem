@@ -66,7 +66,9 @@ from .cpcmdriver import CpcmDriver
 from .smddriver import SmdDriver
 from .dispersionmodel import DispersionModel
 from .inputparser import (parse_input, print_keywords, print_attributes,
-                          get_random_string_parallel)
+                          get_random_string_parallel, unparse_input,
+                          write_unparsed_input_to_hdf5,
+                          read_unparsed_input_from_hdf5)
 from .dftutils import get_default_grid_level, print_xc_reference
 from .sanitychecks import (molecule_sanity_check, dft_sanity_check,
                            ri_sanity_check, pe_sanity_check,
@@ -556,7 +558,7 @@ class ScfDriver:
                 'with polarizable embedding')
             # Note: we allow restarting SCF with point charges
 
-    def compute(self, molecule, basis, min_basis=None):
+    def compute(self, molecule, basis, min_basis=None, restart_exact=False):
         """
         Performs SCF calculation using molecular data.
 
@@ -586,6 +588,31 @@ class ScfDriver:
 
         if self.filename is not None and self.checkpoint_file is None:
             self.checkpoint_file = f'{self.filename}_scf.h5'
+
+        # validate checkpoint file
+        if self.restart:
+            self.restart = self.validate_checkpoint(molecule.get_element_ids(),
+                                                    basis.get_label(),
+                                                    self.scf_type)
+
+        # read SCF and method settings, if restart_exact is requested
+        if self.restart and restart_exact:
+            if self.rank == mpi_master():
+                checkpoint_scf_input = read_unparsed_input_from_hdf5(
+                    self.checkpoint_file, group_name="scf_settings")
+                checkpoint_method_input = read_unparsed_input_from_hdf5(
+                    self.checkpoint_file, group_name="method_settings")
+            else:
+                checkpoint_scf_input = None
+                checkpoint_method_input = None
+            checkpoint_scf_input = self.comm.bcast(checkpoint_scf_input,
+                                                   root=mpi_master())
+            checkpoint_method_input = self.comm.bcast(checkpoint_method_input,
+                                                      root=mpi_master())
+            # remove restart option from checkpoint_scf_input before calling
+            # update_settings, since we are already doing restart
+            checkpoint_scf_input.pop('restart', None)
+            self.update_settings(checkpoint_scf_input, checkpoint_method_input)
 
         # check molecule
         molecule_sanity_check(molecule, self.scf_type)
@@ -629,11 +656,6 @@ class ScfDriver:
 
         # check print level (verbosity of output)
         self.print_level = max(1, min(self.print_level, 3))
-
-        if self.restart:
-            self.restart = self.validate_checkpoint(molecule.get_element_ids(),
-                                                    basis.get_label(),
-                                                    self.scf_type)
 
         if self.restart:
             if self.acc_type.upper() == 'L2_C2DIIS':
@@ -1357,6 +1379,24 @@ class ScfDriver:
                 if self._cpcm:
                     write_cpcm_charges(self.checkpoint_file,
                                        self.cpcm_drv._cpcm_q)
+
+                scf_keywords = {
+                    key: val[0]
+                    for key, val in self._input_keywords['scf'].items()
+                }
+                method_keywords = {
+                    key: val[0] for key, val in
+                    self._input_keywords['method_settings'].items()
+                }
+
+                write_unparsed_input_to_hdf5(self.checkpoint_file,
+                                             unparse_input(self, scf_keywords),
+                                             group_name='scf_settings')
+                write_unparsed_input_to_hdf5(self.checkpoint_file,
+                                             unparse_input(
+                                                 self, method_keywords),
+                                             group_name='method_settings')
+
                 self.ostream.print_blank()
                 self.ostream.print_info('Checkpoint written to file: ' +
                                         self.checkpoint_file)

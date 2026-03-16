@@ -58,7 +58,7 @@ class TestBlockDavidsonSolver:
             self.build_diagonal_problem())
         solver.add_iteration_data(sigma_mat[:, :2], trial_mat[:, :2], 2)
 
-        assert solver._get_max_subspace_dim() == 16
+        assert solver._get_max_subspace_dim() == 40
         assert solver._get_collapse_nvec() == 4
         assert not solver.should_collapse()
 

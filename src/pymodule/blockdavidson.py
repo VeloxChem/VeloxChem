@@ -49,7 +49,10 @@ class BlockDavidsonSolver:
         - trial_matrices: The trial vectors in matrix format {X_0, X_1,...}.
     """
 
-    def __init__(self, max_subspace_dim=None, collapse_nvec=None):
+    def __init__(self,
+                 max_subspace_dim=None,
+                 collapse_nvec=None,
+                 lindep_thresh=1.0e-6):
         """
         Initializes block Davidson sover to default setup.
         """
@@ -74,6 +77,9 @@ class BlockDavidsonSolver:
         self.collapsed_subspace = False
         self.collapsed_from_dim = None
         self.collapsed_to_dim = None
+
+        # linear dependency threshold
+        self.lindep_thresh = lindep_thresh
 
     def add_iteration_data(self, sig_mat, trial_mat, neigenpairs):
         """
@@ -245,7 +251,7 @@ class BlockDavidsonSolver:
         if self.neigenpairs is None:
             return None
 
-        return 8 * self.neigenpairs
+        return 20 * self.neigenpairs
 
     def _get_collapse_nvec(self):
         """
@@ -289,7 +295,7 @@ class BlockDavidsonSolver:
         tvecs = tvecs - np.matmul(self.trial_matrices,
                                   np.matmul(self.trial_matrices.T, tvecs))
 
-        tvecs = LinearSolver.remove_linear_dependence(tvecs, 1.0e-6)
+        tvecs = LinearSolver.remove_linear_dependence(tvecs, self.lindep_thresh)
         tvecs = LinearSolver.orthogonalize_gram_schmidt(tvecs)
         tvecs = LinearSolver.normalize(tvecs)
 
