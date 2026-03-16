@@ -527,7 +527,9 @@ class MoleculeToolkit:
         def nh2_h(n, metal, c_back, rnorm, h=1.01):
             vnm = (metal - n) / np.linalg.norm(metal - n)
             vnc = (c_back - n) / np.linalg.norm(c_back - n)
-            bis = vnm + vnc            bis = bis/np.linalg.norm(bis) if np.linalg.norm(bis)>1e-9 \
+            
+            bis = vnm + vnc            
+            bis = bis/np.linalg.norm(bis) if np.linalg.norm(bis)>1e-9 \
    else np.cross(vnm, rnorm)
             bis /= np.linalg.norm(bis)
             ang = np.radians(55)
@@ -537,7 +539,8 @@ class MoleculeToolkit:
         def ch2_h(c, na, nb, rnorm, h=1.09):
             v1 = (na - c) / np.linalg.norm(na - c)
             v2 = (nb - c) / np.linalg.norm(nb - c)
-            bis = v1 + v2            bis = bis/np.linalg.norm(bis) if np.linalg.norm(bis)>1e-9 \
+            bis = v1 + v2
+            bis = bis/np.linalg.norm(bis) if np.linalg.norm(bis)>1e-9 \
      else np.cross(v1, rnorm)
             bis /= np.linalg.norm(bis)
             ang = np.radians(55)

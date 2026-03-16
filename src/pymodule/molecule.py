@@ -395,7 +395,7 @@ def _Molecule_read_xyz_string(xyz):
 
 
 @staticmethod
-def _Molecule_from_dict(mol_dict):
+def _Molecule_from_input_dict(mol_dict):
     """
     Reads molecule from a dictionary.
 
