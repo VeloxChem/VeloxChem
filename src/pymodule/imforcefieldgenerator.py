@@ -756,6 +756,7 @@ class IMForceFieldGenerator:
                         _, ts_molecule = self.determine_atom_transfer_reaction_path([conformers_plus_ts[0][dih_key][-2][0]], [conformers_plus_ts[0][dih_key][-1][0]], scf=False)
                         
                         
+                        
                         ts_molecule.set_dihedral((3,4,6,10), np.pi/2, 'radian')
                         conformers_plus_ts[0][dih_key].append((ts_molecule, 'transition'))
                         
@@ -1238,19 +1239,31 @@ class IMForceFieldGenerator:
                                         current_basis = MolecularBasis.read(mol, states_basis['gs'])
 
                                         scf_results_mpi = _collective_call_inline_style(comm, rank, root, 'Energy calcualtion', self.compute_energy, self.drivers['gs'][0], mol, current_basis)
+                                        scf_results = scf_results_mpi[1]
+                                        # _, scf_results, _ = self.compute_energy(self.drivers['gs'][0], mol, current_basis)
 
-                                        _, scf_results, _ = self.compute_energy(self.drivers['gs'][0], mol, current_basis)
-
-                                        optimized_molecule, opt_results = self._run_optimization(
-                                            self.drivers['gs'][0],
+                                        opt_results_mpi = _collective_call_inline_style(comm, rank, root, 'optimization tag', self._run_optimization, self.drivers['gs'][0],
                                             mol,
                                             constraints=constraints_global,
                                             transition=transition,
                                             index_offset=0,
                                             compute_args=(current_basis, scf_results),
                                             source_molecule=molecule,
-                                        )
-                                        energy = opt_results['opt_energies'][-1]
+                                            )
+                                        
+                                        opt_results = opt_results_mpi[1]
+                                        optimized_molecule = opt_results_mpi[0]
+
+                                        # optimized_molecule, opt_results = self._run_optimization(
+                                        #     self.drivers['gs'][0],
+                                        #     mol,
+                                        #     constraints=constraints_global,
+                                        #     transition=transition,
+                                        #     index_offset=0,
+                                        #     compute_args=(current_basis, scf_results),
+                                        #     source_molecule=molecule,
+                                        # )
+                                        # energy = opt_results['opt_energies'][-1]
 
                                         current_basis = MolecularBasis.read(optimized_molecule, states_basis['gs'])
                                         current_molecule_to_add_info.append((optimized_molecule, current_basis, self.roots_to_follow, constraints_global))
@@ -1259,15 +1272,38 @@ class IMForceFieldGenerator:
 
                                     elif  self.roots_to_follow[0] == 0 and isinstance(self.drivers['gs'][0], XtbDriver):
 
-                                        current_basis = MolecularBasis.read(mol, states_basis['gs'])
-                                        optimized_molecule, opt_results = self._run_optimization(
-                                            self.drivers['gs'][0],
+                                        # scf_results_mpi = _collective_call_inline_style(comm, rank, root, 'Energy calcualtion', self.compute_energy, self.drivers['gs'][0], molecule, current_basis)
+
+
+
+                                        # optimized_molecule, opt_results = self._run_optimization(
+                                        #     self.drivers['gs'][0],
+                                        #     molecule,
+                                        #     constraints=self.use_minimized_structures[1],
+                                        #     index_offset=0,
+                                        # )
+                                        # energy = opt_results['opt_energies'][-1]
+                                        
+                                        opt_results_mpi = _collective_call_inline_style(comm, rank, root, 'optimization tag', self._run_optimization, self.drivers['gs'][0],
                                             mol,
                                             constraints=constraints_global,
                                             transition=transition,
-                                            index_offset=0,
-                                        )
-                                        energy = opt_results['opt_energies'][-1]
+                                            index_offset=0)
+                                        
+                                        opt_results = opt_results_mpi[1]
+                                        optimized_molecule = opt_results_mpi[0]
+
+                                        print('Optimization enegiers', opt_results['opt_energies'][-1] * hartree_in_kcalpermol())
+
+                                        # current_basis = MolecularBasis.read(mol, states_basis['gs'])
+                                        # optimized_molecule, opt_results = self._run_optimization(
+                                        #     self.drivers['gs'][0],
+                                        #     mol,
+                                        #     constraints=constraints_global,
+                                        #     transition=transition,
+                                        #     index_offset=0,
+                                        # )
+                                        # energy = opt_results['opt_energies'][-1]
 
                                         current_basis = MolecularBasis.read(optimized_molecule, states_basis['gs'])
                                         current_molecule_to_add_info.append((optimized_molecule, current_basis, self.roots_to_follow, constraints_global))
@@ -1306,8 +1342,11 @@ class IMForceFieldGenerator:
                         if len(molecules_to_add_info) == 0:
 
                             molecules_to_add_info.append(current_molecule_to_add_info[0])
+
                         self.add_point(current_molecule_to_add_info, self.states_interpolation_settings, symmetry_information=self.symmetry_information)
 
+            
+            
             elif not self.add_conformal_structures and not os.path.exists(imforcefieldfile):
         
                 molecules_to_add_info = []

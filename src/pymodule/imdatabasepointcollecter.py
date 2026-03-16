@@ -867,7 +867,9 @@ class IMDatabasePointCollecter:
             self.system.addForce(force)
         elif len(atoms) == 4:
             target_rad = target * np.pi / 180
-            msg = f'Adding torsion force between atoms {atoms[0]}, {atoms[1]}, {atoms[2]}, and {atoms[3]} with force constant {force_constant}.'        
+            print(atoms)
+            raise SystemExit(0)
+            msg = f'Adding torsion force between atoms {atoms[0] - 1}, {atoms[1] - 1}, {atoms[2] -1}, and {atoms[3] - 1} with force constant {force_constant}.'        
             self.ostream.print_info(msg)
             self.ostream.flush()
             force = mm.CustomTorsionForce('0.5*k*(theta-theta0)^2')
@@ -1590,6 +1592,7 @@ class IMDatabasePointCollecter:
                         self.bias_force_reaction_prop[0],
                         self.bias_force_reaction_prop[1],
                         self.bias_force_reaction_prop[2])
+                        
 
             self.simulation = app.Simulation(self.topology, self.system, new_integrator, platform=self._create_platform())
 
