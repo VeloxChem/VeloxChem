@@ -69,6 +69,8 @@ from .veloxchemlib import LocalECPGeom100Driver
 from .veloxchemlib import LocalECPGeom200Driver
 from .veloxchemlib import LocalECPGeom101Driver
 from .veloxchemlib import LocalECPGeom010Driver
+from .veloxchemlib import LocalECPGeom020Driver
+from .veloxchemlib import LocalECPGeom110Driver
 from .veloxchemlib import ProjectedECPDriver
 from .veloxchemlib import ProjectedECPGeom100Driver
 from .veloxchemlib import ECPDriver

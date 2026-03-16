@@ -61,6 +61,7 @@
 #include "LocalCorePotentialGeomX00Driver.hpp"
 #include "LocalCorePotentialGeomX0YDriver.hpp"
 #include "LocalCorePotentialGeom0X0Driver.hpp"
+#include "LocalCorePotentialGeomXY0Driver.hpp"
 #include "CorePotentialGradientDriver.hpp"
 
 namespace vlx_t2cintegrals {
@@ -562,6 +563,31 @@ export_t2cintegrals(py::module& m)
                const int                                      ecp_momentum)
                 -> CMatrices { return geom_drv.compute(basis, molecule, ecp_potential, ecp_momentum); },
             "Computes projected core potential first derivatives matrices for given molecule, basis.");
+    
+    // CLocalCorePotentialGeom020Driver class
+    PyClass<CLocalCorePotentialGeom0X0Driver<2>>(m, "LocalECPGeom020Driver")
+        .def(py::init<>())
+        .def(
+            "compute",
+            [](const CLocalCorePotentialGeom0X0Driver<2>& geom_drv,
+               const CMolecule&                           molecule,
+               const CMolecularBasis&                     basis,
+               const CBaseCorePotential&                  ecp_potential)
+                -> CMatrices { return geom_drv.compute(basis, molecule, ecp_potential); },
+            "Computes projected core potential first derivatives matrices for given molecule, basis.");
+    
+    // CLocalCorePotentialGeom110Driver class
+    PyClass<CLocalCorePotentialGeomXY0Driver<1, 1>>(m, "LocalECPGeom110Driver")
+        .def(py::init<>())
+        .def(
+            "compute",
+            [](const CLocalCorePotentialGeomXY0Driver<1, 1>& geom_drv,
+               const CMolecule&                              molecule,
+               const CMolecularBasis&                        basis,
+               const CBaseCorePotential&                     ecp_potential,
+               const int                                     iatom)
+                -> CMatrices { return geom_drv.compute(basis, molecule, ecp_potential, iatom); },
+            "Computes projected core potential first derivatives matrices for given molecule, basis and selected atoms.");
     
     // CCorePotentialGradientDriver class
     PyClass<CCorePotentialGradientDriver>(m, "ECPGradientDriver")
