@@ -17,7 +17,8 @@ class TestCPP:
                 ref_x_data,
                 ref_y_data,
                 tol,
-                use_subcomms=False):
+                use_subcomms=False,
+                max_subspace_dim=None):
 
         xyz_string = """6
         xyz
@@ -44,6 +45,7 @@ class TestCPP:
         lr_drv.property = cpp_property
         lr_drv.frequencies = list(ref_x_data)
         lr_drv.use_subcomms = use_subcomms
+        lr_drv.max_subspace_dim = max_subspace_dim
         lr_results = lr_drv.compute(mol, bas, scf_results)
 
         if lr_drv.rank == mpi_master():
@@ -61,7 +63,12 @@ class TestCPP:
         ref_x_data = [0.39, 0.40, 0.41]
         ref_y_data = [0.11359517, 0.34554765, 1.41940099]
 
-        self.run_cpp(xcfun_label, cpp_property, ref_x_data, ref_y_data, 1.0e-6)
+        self.run_cpp(xcfun_label,
+                     cpp_property,
+                     ref_x_data,
+                     ref_y_data,
+                     1.0e-6,
+                     max_subspace_dim=120)
 
     def test_hf_ecd(self):
 

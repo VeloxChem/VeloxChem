@@ -11,7 +11,13 @@ from veloxchem.lreigensolver import LinearResponseEigenSolver
 @pytest.mark.solvers
 class TestRPA:
 
-    def run_rpa(self, xcfun_label, basis_label, ref_exc_enes, ref_osc_str, tol):
+    def run_rpa(self,
+                xcfun_label,
+                basis_label,
+                ref_exc_enes,
+                ref_osc_str,
+                tol,
+                max_subspace_dim=None):
 
         xyz_string = """3
         xyz
@@ -31,6 +37,7 @@ class TestRPA:
         lr_drv = LinearResponseEigenSolver()
         lr_drv.ostream.mute()
         lr_drv.nstates = 5
+        lr_drv.max_subspace_dim = max_subspace_dim
         lr_results = lr_drv.compute(mol, bas, scf_results)
 
         if lr_drv.rank == mpi_master():
@@ -50,7 +57,12 @@ class TestRPA:
         ref_osc_str = np.array(
             [0.023665, 0.000000, 0.097765, 0.086454, 0.291919])
 
-        self.run_rpa('hf', 'def2-svp', ref_exc_enes, ref_osc_str, 1.0e-6)
+        self.run_rpa('hf',
+                     'def2-svp',
+                     ref_exc_enes,
+                     ref_osc_str,
+                     1.0e-6,
+                     max_subspace_dim=50)
 
     def test_slda_svp(self):
 

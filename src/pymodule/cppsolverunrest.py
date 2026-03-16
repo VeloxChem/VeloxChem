@@ -946,7 +946,7 @@ class ComplexResponseUnrestricted(LinearSolver):
         if self.max_subspace_dim is not None:
             return self.max_subspace_dim
 
-        return 8 * len(self.b_components) * max(1, len(self.frequencies))
+        return 20 * len(self.b_components) * max(1, len(self.frequencies))
 
     def _get_collapse_nvec(self):
         """

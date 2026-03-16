@@ -17,7 +17,8 @@ class TestTDA:
                 ref_exc_enes,
                 ref_osc_str,
                 tol,
-                ri_coulomb=False):
+                ri_coulomb=False,
+                max_subspace_dim=None):
 
         xyz_string = """3
         xyz
@@ -38,6 +39,7 @@ class TestTDA:
         lr_drv = TdaEigenSolver()
         lr_drv.ostream.mute()
         lr_drv.nstates = 5
+        lr_drv.max_subspace_dim = max_subspace_dim
         lr_results = lr_drv.compute(mol, bas, scf_results)
 
         if lr_drv.rank == mpi_master():
@@ -56,7 +58,12 @@ class TestTDA:
 
         ref_osc_str = np.array([0.0229, 0.0000, 0.1039, 0.0975, 0.3060])
 
-        self.run_tda('hf', 'def2-svp', ref_exc_enes, ref_osc_str, 1.0e-6)
+        self.run_tda('hf',
+                     'def2-svp',
+                     ref_exc_enes,
+                     ref_osc_str,
+                     1.0e-6,
+                     max_subspace_dim=30)
 
     def test_b3lyp_svp(self):
 
