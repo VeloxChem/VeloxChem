@@ -763,7 +763,7 @@ comp_i_vals(CSimdArray<double>& values, const int order, const CSimdArray<double
     {
         if (const double fact = fargs[i]; fact > 150.0)
         {
-            f1vals[i] = 0.0;
+            f2vals[i] = 0.0;
         }
         else if (fact <= 1.0e-12)
         {
@@ -791,7 +791,7 @@ comp_i_vals(CSimdArray<double>& values, const int order, const CSimdArray<double
         {
             if (const double fact = fargs[i]; fact > 150.0)
             {
-                f1vals[i] = 0.0;
+                fvals[i] = 0.0;
             }
             else if (fact <= 1.0e-12)
             {

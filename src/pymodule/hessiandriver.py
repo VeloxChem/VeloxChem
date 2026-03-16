@@ -128,7 +128,7 @@ class HessianDriver:
                 'memory_profiling': ('bool', 'whether to profile memory'),
                 'memory_tracing': ('bool', 'whether to trace memory'),
                 'print_level': ('int', 'verbosity of output (1-3)'),
-                },
+            },
             'method_settings': {
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
                 'grid_level': ('int', 'accuracy level of DFT grid'),
@@ -458,11 +458,12 @@ class HessianDriver:
                                      (2.0 * self.delta_h))
                     if self.do_dipole_gradient:
                         if self.rank == mpi_master():
-                            dipole_gradient[i, d] = ((dipmom_plus - dipmom_minus) /
-                                                     (2.0 * self.delta_h))
+                            dipole_gradient[i,
+                                            d] = ((dipmom_plus - dipmom_minus) /
+                                                  (2.0 * self.delta_h))
 
         # save energy for thermodynamics
-        # and restore scf_tensors to results for the original geometry.
+        # and restore scf_results to results for the original geometry.
         self.elec_energy = self.compute_energy(molecule, *args)
 
         # save Hessian in the usual shape

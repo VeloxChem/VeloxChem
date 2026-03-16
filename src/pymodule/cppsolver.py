@@ -46,7 +46,7 @@ from .profiler import Profiler
 from .distributedarray import DistributedArray
 from .linearsolver import LinearSolver
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           dft_sanity_check, pe_sanity_check,
+                           ri_sanity_check, dft_sanity_check, pe_sanity_check,
                            solvation_model_sanity_check)
 from .errorhandler import assert_msg_critical, safe_solve
 from .checkpoint import (check_rsp_hdf5, write_rsp_solution_with_multiple_keys)
@@ -310,6 +310,11 @@ class ComplexResponse(LinearSolver):
             a non-linear response module.
         """
 
+        # TODO: enable ECP
+        assert_msg_critical(
+            not basis.has_ecp(),
+            f'{type(self).__name__}.compute: ECP is not yet supported')
+
         # take care of quadrupole components
         if self.is_quadrupole(self.a_operator):
             if isinstance(self.a_components, str):
@@ -355,6 +360,9 @@ class ComplexResponse(LinearSolver):
         # update checkpoint_file after scf_results_sanity_check
         if self.filename is not None and self.checkpoint_file is None:
             self.checkpoint_file = f'{self.filename}_rsp.h5'
+
+        # check RI setup
+        ri_sanity_check(self)
 
         # check dft setup
         dft_sanity_check(self, 'compute')

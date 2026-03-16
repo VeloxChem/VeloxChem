@@ -34,33 +34,24 @@ from mpi4py import MPI
 import numpy as np
 import time as tm
 import math
-import sys
 
 from .veloxchemlib import XCIntegrator, MolecularGrid
 from .veloxchemlib import T4CScreener
-from .veloxchemlib import TwoCenterElectronRepulsionDriver
-from .veloxchemlib import SubMatrix
 from .veloxchemlib import mpi_master
 from .veloxchemlib import make_matrix, mat_t
 from .matrix import Matrix
-from .molecularbasis import MolecularBasis
 from .aodensitymatrix import AODensityMatrix
 from .griddriver import GridDriver
 from .rifockdriver import RIFockDriver
 from .fockdriver import FockDriver
 from .linearsolver import LinearSolver
 from .distributedarray import DistributedArray
-from .sanitychecks import dft_sanity_check
+from .sanitychecks import dft_sanity_check, ri_sanity_check
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input, print_keywords, print_attributes
 from .dftutils import get_default_grid_level
 from .batchsize import get_batch_size
 from .batchsize import get_number_of_batches
-
-try:
-    from scipy.linalg import lu_factor, lu_solve
-except ImportError:
-    pass
 
 
 class NonlinearSolver:
@@ -111,7 +102,9 @@ class NonlinearSolver:
 
         # RI-J
         self.ri_coulomb = False
+        self.ri_jk = False
         self.ri_auxiliary_basis = 'def2-universal-jfit'
+        self.ri_metric_threshold = 1.0e-12
         self._ri_drv = None
 
         # dft
@@ -283,6 +276,8 @@ class NonlinearSolver:
 
         parse_input(self, method_keywords, method_dict)
 
+        ri_sanity_check(self)
+
         dft_sanity_check(self, 'update_settings', 'nonlinear')
 
         if self.potfile is not None:
@@ -315,6 +310,11 @@ class NonlinearSolver:
             not basis.has_ecp(),
             f'{type(self).__name__}.compute: ECP is not yet supported')
 
+        # TODO: enable RI-JK
+        assert_msg_critical(
+            not self.ri_jk,
+            f'{type(self).__name__}.compute: RI-JK is not yet supported')
+
         if self.rank == mpi_master():
             screening = T4CScreener()
             screening.partition(basis, molecule, 'eri')
@@ -324,7 +324,8 @@ class NonlinearSolver:
 
         if self.ri_coulomb:
             self._ri_drv = RIFockDriver(self.comm, self.ostream)
-            self._ri_drv.prepare_buffers(molecule, basis,
+            self._ri_drv.prepare_buffers(molecule,
+                                         basis,
                                          self.ri_auxiliary_basis,
                                          verbose=False)
 
@@ -332,13 +333,13 @@ class NonlinearSolver:
             'screening': screening,
         }
 
-    def _init_dft(self, molecule, scf_tensors):
+    def _init_dft(self, molecule, scf_results):
         """
         Initializes DFT.
 
         :param molecule:
             The molecule.
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
 
         :return:
@@ -355,7 +356,7 @@ class NonlinearSolver:
 
             if self.rank == mpi_master():
                 # Note: make gs_density a tuple
-                gs_density = (scf_tensors['D_alpha'].copy(),)
+                gs_density = (scf_results['D_alpha'].copy(),)
             else:
                 gs_density = None
             gs_density = self.comm.bcast(gs_density, root=mpi_master())
@@ -372,7 +373,7 @@ class NonlinearSolver:
             'dft_func_label': dft_func_label,
         }
 
-    def compute(self, molecule, basis, scf_tensors):
+    def compute(self, molecule, basis, scf_results):
         """
         Solves for the nonlinear response functions.
 
@@ -380,7 +381,7 @@ class NonlinearSolver:
             The molecule.
         :param basis:
             The AO basis.
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
 
         :return:

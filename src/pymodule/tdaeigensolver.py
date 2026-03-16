@@ -53,7 +53,7 @@ from .oneeints import (compute_electric_dipole_integrals,
                        compute_linear_momentum_integrals,
                        compute_angular_momentum_integrals)
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           dft_sanity_check, pe_sanity_check,
+                           ri_sanity_check, dft_sanity_check, pe_sanity_check,
                            solvation_model_sanity_check)
 from .errorhandler import assert_msg_critical
 from .checkpoint import (read_rsp_hdf5, write_rsp_hdf5, write_rsp_solution,
@@ -115,6 +115,9 @@ class TdaEigenSolver(LinearSolver):
         # excited states information
         self.nstates = 3
 
+        self.initial_guess_multiplier = 3
+        self.guess_scaling_threshold = 10
+
         self.core_excitation = False
         self.num_core_orbitals = 0
 
@@ -138,6 +141,10 @@ class TdaEigenSolver(LinearSolver):
 
         self._input_keywords['response'].update({
             'nstates': ('int', 'number of excited states'),
+            'initial_guess_multiplier':
+                ('int', 'multiplier for initial guess size'),
+            'guess_scaling_threshold':
+                ('int', 'threshold for guess size to increase linearly'),
             'core_excitation': ('bool', 'compute core-excited states'),
             'num_core_orbitals': ('int', 'number of involved core-orbitals'),
             'restricted_subspace':
@@ -221,6 +228,9 @@ class TdaEigenSolver(LinearSolver):
         if self.filename is not None and self.checkpoint_file is None:
             self.checkpoint_file = f'{self.filename}_rsp.h5'
 
+        # check RI setup
+        ri_sanity_check(self)
+
         # check dft setup
         dft_sanity_check(self, 'compute')
 
@@ -261,7 +271,7 @@ class TdaEigenSolver(LinearSolver):
         if self.rank == mpi_master():
             orb_ene = scf_results['E_alpha']
             norb = orb_ene.shape[0]
-            nocc = molecule.number_of_alpha_electrons()
+            nocc = molecule.number_of_alpha_occupied_orbitals(basis)
 
             # check nstates, core excitation, restricted subspace
             assert_msg_critical(
@@ -306,9 +316,6 @@ class TdaEigenSolver(LinearSolver):
 
         # read initial guess from restart file
 
-        n_restart_vectors = 0
-        n_restart_iterations = 0
-
         if self.restart:
             if self.rank == mpi_master():
                 rst_trial_mat, rst_sig_mat = read_rsp_hdf5(
@@ -316,30 +323,81 @@ class TdaEigenSolver(LinearSolver):
                     molecule, basis, dft_dict, pe_dict, self.ostream)
                 self.restart = (rst_trial_mat is not None and
                                 rst_sig_mat is not None)
-                if rst_trial_mat is not None:
-                    n_restart_vectors = rst_trial_mat.shape[1]
             self.restart = self.comm.bcast(self.restart, root=mpi_master())
-            n_restart_vectors = self.comm.bcast(n_restart_vectors,
-                                                root=mpi_master())
-            n_restart_iterations = n_restart_vectors // self.nstates
-            if n_restart_vectors % self.nstates != 0:
-                n_restart_iterations += 1
+
+        if self.restart:
+            if self.rank == mpi_master():
+                self.solver.add_iteration_data(rst_sig_mat, rst_trial_mat,
+                                               self.nstates)
+
+            checkpoint_nstates = self._read_nstates_from_checkpoint()
+
+            # print warning if nstates is not present in the restart file
+            if checkpoint_nstates is None:
+                self.ostream.print_warning(
+                    'Could not find the nstates key in the checkpoint file.')
+                self.ostream.print_blank()
+                self.ostream.print_info(
+                    'Assuming that nstates is not changed before and after ' +
+                    'the restart.')
+                self.ostream.print_blank()
+                self.ostream.flush()
+
+            # generate necessary initial guesses if more states are requested
+            # in a restart calculation
+            elif checkpoint_nstates < self.nstates:
+                self.ostream.print_info(
+                    'Generating initial guesses for ' +
+                    f'{self.nstates - checkpoint_nstates} more states...')
+                self.ostream.print_blank()
+
+                diag_mat_not_used, trial_mat = self._gen_trial_vectors(
+                    molecule, orb_ene, nocc, checkpoint_nstates)
+
+                # project out trial vector components already in reduced space
+                if self.rank == mpi_master():
+                    trial_mat = self.solver.project_trial_vectors(trial_mat)
+                    n_trials = trial_mat.shape[1]
+                else:
+                    n_trials = None
+                n_trials = self.comm.bcast(n_trials, root=mpi_master())
+
+                if n_trials > 0:
+                    tdens = self._get_trans_densities(trial_mat, scf_results,
+                                                      molecule, basis)
+                    fock = self._comp_lr_fock(tdens, molecule, basis, eri_dict,
+                                              dft_dict, pe_dict, profiler)
+                    if self.rank == mpi_master():
+                        sig_mat = self._get_sigmas(fock, scf_results, molecule,
+                                                   basis, trial_mat)
+                        self.solver.add_iteration_data(sig_mat, trial_mat,
+                                                       self.nstates)
+
+            if self.rank == mpi_master():
+                trial_mat = self.solver.compute(diag_mat)
 
         profiler.check_memory_usage('Initial guess')
 
         # start TDA iteration
 
-        for i in range(n_restart_iterations + self.max_iter):
+        for i in range(self.max_iter):
+
+            # in case of restart, check convergence at first iteration
+            if self.restart and i == 0:
+                self._check_convergence()
+                if self._is_converged:
+                    if self.rank == mpi_master():
+                        self._print_iter_data(i)
+                    break
 
             profiler.set_timing_key(f'Iteration {i + 1}')
 
             # perform linear transformation of trial vectors
 
-            if i >= n_restart_iterations:
-                tdens = self._get_trans_densities(trial_mat, scf_results,
-                                                  molecule)
-                fock = self._comp_lr_fock(tdens, molecule, basis, eri_dict,
-                                          dft_dict, pe_dict, profiler)
+            tdens = self._get_trans_densities(trial_mat, scf_results, molecule,
+                                              basis)
+            fock = self._comp_lr_fock(tdens, molecule, basis, eri_dict,
+                                      dft_dict, pe_dict, profiler)
 
             profiler.start_timer('ReducedSpace')
 
@@ -347,18 +405,10 @@ class TdaEigenSolver(LinearSolver):
 
             if self.rank == mpi_master():
 
-                if i >= n_restart_iterations:
-                    sig_mat = self._get_sigmas(fock, scf_results, molecule,
-                                               trial_mat)
-                else:
-                    istart = i * self.nstates
-                    iend = (i + 1) * self.nstates
-                    if iend > n_restart_vectors:
-                        iend = n_restart_vectors
-                    sig_mat = np.copy(rst_sig_mat[:, istart:iend])
-                    trial_mat = np.copy(rst_trial_mat[:, istart:iend])
+                sig_mat = self._get_sigmas(fock, scf_results, molecule, basis,
+                                           trial_mat)
 
-                self.solver.add_iteration_data(sig_mat, trial_mat, i)
+                self.solver.add_iteration_data(sig_mat, trial_mat, self.nstates)
 
                 trial_mat = self.solver.compute(diag_mat)
 
@@ -378,12 +428,13 @@ class TdaEigenSolver(LinearSolver):
 
             # write checkpoint file
 
-            if (self.rank == mpi_master() and i >= n_restart_iterations):
+            if self.rank == mpi_master():
                 trials = self.solver.trial_matrices
                 sigmas = self.solver.sigma_matrices
                 write_rsp_hdf5(self.checkpoint_file, [trials, sigmas],
                                ['TDA_trials', 'TDA_sigmas'], molecule, basis,
                                dft_dict, pe_dict, self.ostream)
+            self._add_nstates_to_checkpoint()
 
             # finish TDA after convergence
 
@@ -485,7 +536,7 @@ class TdaEigenSolver(LinearSolver):
                     nto_label = f'NTO_S{s + 1}'
                     if final_h5_fname is not None:
                         nto_mo.write_hdf5(final_h5_fname,
-                                          label=f'rsp/nto/{nto_label}')
+                                          label=f'rsp/nto/{nto_label}_')
                 else:
                     nto_mo = MolecularOrbitals()
                 nto_mo = nto_mo.broadcast(self.comm, root=mpi_master())
@@ -599,7 +650,7 @@ class TdaEigenSolver(LinearSolver):
             # not converged
             return {}
 
-    def _gen_trial_vectors(self, molecule, orb_ene, nocc):
+    def _gen_trial_vectors(self, molecule, orb_ene, nocc, n_excl_states=0):
         """
         Generates set of TDA trial vectors for given number of excited states
         by selecting primitive excitations wirh lowest approximate energies
@@ -611,6 +662,9 @@ class TdaEigenSolver(LinearSolver):
             The orbital energies.
         :param nocc:
             The number of occupied orbitals.
+        :param n_excl_states:
+            Number of states to exclude. Useful for generating initial guess
+            for a restarting calculation that requests more states.
 
         :return:
             tuple (approximate diagonal of symmetric A, set of trial vectors).
@@ -647,12 +701,23 @@ class TdaEigenSolver(LinearSolver):
             w = {ia: w for ia, w in zip(excitations, excitation_energies)}
 
             diag_mat = np.array(excitation_energies)
-            trial_mat = np.zeros((n_exc, self.nstates))
 
-            for s, (i, a) in enumerate(sorted(w, key=w.get)[:self.nstates]):
+            trial_mat = np.zeros((n_exc, 0))
+
+            # number of excitations to be excluded from initial guess
+            guess_excl_nstates = self._get_initial_guess_size_for_excitations(
+                n_excl_states)
+
+            # total number of excitations in initial guess
+            guess_nstates = self._get_initial_guess_size_for_excitations(
+                self.nstates)
+
+            for i, a in sorted(w, key=w.get)[guess_excl_nstates:guess_nstates]:
                 if self.rank == mpi_master():
                     ia = excitations.index((i, a))
-                    trial_mat[ia, s] = 1.0
+                    trial_mat_single_col = np.zeros((n_exc, 1))
+                    trial_mat_single_col[ia, 0] = 1.0
+                    trial_mat = np.hstack((trial_mat, trial_mat_single_col))
 
             return diag_mat, trial_mat
 
@@ -675,7 +740,7 @@ class TdaEigenSolver(LinearSolver):
         self._is_converged = self.comm.bcast(self._is_converged,
                                              root=mpi_master())
 
-    def _get_trans_densities(self, trial_mat, tensors, molecule):
+    def _get_trans_densities(self, trial_mat, tensors, molecule, basis):
         """
         Computes the transition densities.
 
@@ -685,6 +750,8 @@ class TdaEigenSolver(LinearSolver):
             The dictionary of tensors from converged SCF wavefunction.
         :param molecule:
             The molecule.
+        :param basis:
+            The AO basis set.
 
         :return:
             The transition density matrix.
@@ -693,7 +760,7 @@ class TdaEigenSolver(LinearSolver):
         # form transition densities
 
         if self.rank == mpi_master():
-            nocc = molecule.number_of_alpha_electrons()
+            nocc = molecule.number_of_alpha_occupied_orbitals(basis)
             norb = tensors['C_alpha'].shape[1]
             nvir = norb - nocc
 
@@ -730,7 +797,7 @@ class TdaEigenSolver(LinearSolver):
 
         return tdens
 
-    def _get_sigmas(self, fock, tensors, molecule, trial_mat):
+    def _get_sigmas(self, fock, tensors, molecule, basis, trial_mat):
         """
         Computes the sigma vectors.
 
@@ -740,6 +807,8 @@ class TdaEigenSolver(LinearSolver):
             The dictionary of tensors from converged SCF wavefunction.
         :param molecule:
             The molecule.
+        :param basis:
+            The AO basis set.
         :param trial_mat:
             The trial vectors as 2D Numpy array.
 
@@ -747,7 +816,7 @@ class TdaEigenSolver(LinearSolver):
             The sigma vectors as 2D Numpy array.
         """
 
-        nocc = molecule.number_of_alpha_electrons()
+        nocc = molecule.number_of_alpha_occupied_orbitals(basis)
         norb = tensors['C_alpha'].shape[1]
         nvir = norb - nocc
 

@@ -9,6 +9,7 @@ from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.dispersionmodel import DispersionModel
+from veloxchem.checkpoint import read_molecule_and_basis
 
 
 @pytest.mark.solvers
@@ -66,6 +67,11 @@ class TestScfDriverMiscellaneous:
         filename = str(tmp_path / "water_restart")
         checkpoint_file = Path(f"{filename}_scf.h5")
 
+        # To avoid inconsistency across MPI ranks
+        comm = MPI.COMM_WORLD
+        filename = comm.bcast(filename, root=mpi_master())
+        checkpoint_file = comm.bcast(checkpoint_file, root=mpi_master())
+
         first_drv, first_results = self.run_hf_scf(
             molecule, basis, lambda drv: setattr(drv, "filename", filename))
 
@@ -83,6 +89,29 @@ class TestScfDriverMiscellaneous:
         if self.is_master():
             assert second_drv._ref_mol_orbs is not None
             assert second_results["scf_energy"] == pytest.approx(
+                first_results["scf_energy"], abs=1.0e-10)
+
+        third_drv = ScfRestrictedDriver()
+        third_drv.ostream.mute()
+
+        # reconstruct molecule and basis
+        if self.is_master():
+            new_molecule, new_basis = read_molecule_and_basis(
+                str(checkpoint_file))
+        else:
+            new_molecule, new_basis = None, None
+        new_molecule = third_drv.comm.bcast(new_molecule, root=mpi_master())
+        new_basis = third_drv.comm.bcast(new_basis, root=mpi_master())
+        third_drv, third_results = self.run_hf_scf(
+            new_molecule, new_basis,
+            lambda drv: setattr(drv, "filename", filename))
+
+        assert third_results is not None
+        assert third_drv.checkpoint_file == str(checkpoint_file)
+        assert third_drv.restart
+        if self.is_master():
+            assert third_drv._ref_mol_orbs is not None
+            assert third_results["scf_energy"] == pytest.approx(
                 first_results["scf_energy"], abs=1.0e-10)
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
@@ -161,3 +190,29 @@ class TestScfDriverMiscellaneous:
 
         assert scf_results is None
         assert not scf_drv.is_converged
+
+    def test_scf_results_being_independent(self):
+
+        molecule, basis = self.get_water_and_basis()
+
+        scf_drv, scf_results = self.run_hf_scf(molecule, basis)
+
+        if self.is_master():
+            ref_energy = scf_results["scf_energy"]
+            scf_results["scf_energy"] = 0.0
+
+            ref_C_alpha = scf_results["C_alpha"].copy()
+            scf_results["C_alpha"][:, :] = 0.0
+
+            assert scf_results is not scf_drv.scf_results
+            assert scf_results["C_alpha"] is not scf_drv.scf_results["C_alpha"]
+
+            assert ref_energy == scf_drv.scf_results["scf_energy"]
+            assert 0.0 == np.max(
+                np.abs(ref_C_alpha - scf_drv.scf_results["C_alpha"]))
+
+            assert 0.0 == scf_results["scf_energy"]
+            assert 0.0 == np.max(np.abs(scf_results["C_alpha"]))
+
+            assert 0.0 != scf_drv.scf_results["scf_energy"]
+            assert 0.0 != np.max(np.abs(scf_drv.scf_results["C_alpha"]))

@@ -371,7 +371,7 @@ class ResponseProperty:
 
         self._rsp_driver.print_keywords()
 
-    def compute(self, molecule, basis, scf_tensors):
+    def compute(self, molecule, basis, scf_results):
         """
         Computes response property/spectroscopy.
 
@@ -379,12 +379,12 @@ class ResponseProperty:
             The molecule.
         :param basis:
             The AO basis set.
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
         """
 
         self._rsp_property = self._rsp_driver.compute(molecule, basis,
-                                                      scf_tensors)
+                                                      scf_results)
 
     @property
     def rsp_driver(self):

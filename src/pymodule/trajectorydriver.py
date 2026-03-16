@@ -464,7 +464,7 @@ class TrajectoryDriver:
             # run response for spectrum
             abs_spec = Absorption({'nstates': self.nstates}, self.method_dict)
             abs_spec.init_driver(local_comm, ostream)
-            abs_spec.compute(qm_mol, qm_basis, scf_drv.scf_tensors)
+            abs_spec.compute(qm_mol, qm_basis, scf_drv.scf_results)
 
             if local_rank == mpi_master():
                 excitation_energies = abs_spec.get_property('eigenvalues')

@@ -167,7 +167,7 @@ class ScfHessianDriver(HessianDriver):
         })
 
         if scf_results is None:
-            scf_results = self.scf_driver.scf_tensors
+            scf_results = self.scf_driver.scf_results
 
         # Save the electronic energy
         self.elec_energy = self.scf_driver.get_scf_energy()
@@ -236,7 +236,7 @@ class ScfHessianDriver(HessianDriver):
 
         # sanity checks
         molecule_sanity_check(molecule)
-        scf_results_sanity_check(self, self.scf_driver.scf_tensors)
+        scf_results_sanity_check(self, self.scf_driver.scf_results)
         dft_sanity_check(self, 'compute')
 
         # use determine_xc_hessian_grid_level here to ensure early exit for
@@ -256,14 +256,14 @@ class ScfHessianDriver(HessianDriver):
         # Preparation
 
         natm = molecule.number_of_atoms()
-        scf_tensors = self.scf_driver.scf_tensors
+        scf_results = self.scf_driver.scf_results
 
         if self.rank == mpi_master():
-            density = scf_tensors['D_alpha']
-            mo = scf_tensors['C_alpha']
+            density = scf_results['D_alpha']
+            mo = scf_results['C_alpha']
             nocc = molecule.number_of_alpha_electrons()
             mo_occ = mo[:, :nocc]
-            mo_energies = scf_tensors['E_alpha']
+            mo_energies = scf_results['E_alpha']
             eocc = mo_energies[:nocc]
             omega_ao = -np.linalg.multi_dot([mo_occ, np.diag(eocc), mo_occ.T])
 
@@ -307,7 +307,7 @@ class ScfHessianDriver(HessianDriver):
         for key in cphf_keywords:
             setattr(cphf_solver, key, getattr(self, key))
 
-        cphf_solver.compute(molecule, ao_basis, scf_tensors, atom_pairs)
+        cphf_solver.compute(molecule, ao_basis, scf_results, atom_pairs)
 
         cphf_solution_dict = cphf_solver.cphf_results
         dist_cphf_ov = cphf_solution_dict['dist_cphf_ov']
@@ -926,19 +926,19 @@ class ScfHessianDriver(HessianDriver):
         # Preparation
 
         natm = molecule.number_of_atoms()
-        scf_tensors = self.scf_driver.scf_tensors
+        scf_results = self.scf_driver.scf_results
 
         if self.rank == mpi_master():
-            density_a = scf_tensors['D_alpha']
-            density_b = scf_tensors['D_beta']
-            mo_a = scf_tensors['C_alpha']
-            mo_b = scf_tensors['C_beta']
+            density_a = scf_results['D_alpha']
+            density_b = scf_results['D_beta']
+            mo_a = scf_results['C_alpha']
+            mo_b = scf_results['C_beta']
             nocc_a = molecule.number_of_alpha_electrons()
             nocc_b = molecule.number_of_beta_electrons()
             mo_occ_a = mo_a[:, :nocc_a]
             mo_occ_b = mo_b[:, :nocc_b]
-            orb_ene_a = scf_tensors['E_alpha']
-            orb_ene_b = scf_tensors['E_beta']
+            orb_ene_a = scf_results['E_alpha']
+            orb_ene_b = scf_results['E_beta']
             eocc_a = orb_ene_a[:nocc_a]
             eocc_b = orb_ene_b[:nocc_b]
             omega_ao_a = -np.linalg.multi_dot(
@@ -989,7 +989,7 @@ class ScfHessianDriver(HessianDriver):
         for key in cphf_keywords:
             setattr(cphf_solver, key, getattr(self, key))
 
-        cphf_solver.compute(molecule, ao_basis, scf_tensors, atom_pairs)
+        cphf_solver.compute(molecule, ao_basis, scf_results, atom_pairs)
 
         cphf_solution_dict = cphf_solver.cphf_results
         dist_cphf_ov = cphf_solution_dict['dist_cphf_ov']
@@ -1625,9 +1625,9 @@ class ScfHessianDriver(HessianDriver):
             dipole_gradient[2, :, :] = np.vstack(
                 (natm_zeros, natm_zeros, nuclear_charges)).T
 
-            scf_tensors = self.scf_driver.scf_tensors
-            density = scf_tensors['D_alpha']
-            mo = scf_tensors['C_alpha']
+            scf_results = self.scf_driver.scf_results
+            density = scf_results['D_alpha']
+            mo = scf_results['C_alpha']
             nocc = molecule.number_of_alpha_electrons()
             mo_occ = mo[:, :nocc]
             mo_vir = mo[:, nocc:]
@@ -1737,12 +1737,12 @@ class ScfHessianDriver(HessianDriver):
             dipole_gradient[2, :, :] = np.vstack(
                 (natm_zeros, natm_zeros, nuclear_charges)).T
 
-            scf_tensors = self.scf_driver.scf_tensors
-            density_a = scf_tensors['D_alpha']
-            density_b = scf_tensors['D_beta']
+            scf_results = self.scf_driver.scf_results
+            density_a = scf_results['D_alpha']
+            density_b = scf_results['D_beta']
             density = density_a + density_b
-            mo_a = scf_tensors['C_alpha']
-            mo_b = scf_tensors['C_beta']
+            mo_a = scf_results['C_alpha']
+            mo_b = scf_results['C_beta']
             nocc_a = molecule.number_of_alpha_electrons()
             nocc_b = molecule.number_of_beta_electrons()
             mo_occ_a = mo_a[:, :nocc_a]
@@ -1891,7 +1891,7 @@ class ScfHessianDriver(HessianDriver):
         """
         # First-order properties for gradient of dipole moment
         prop = FirstOrderProperties(self.comm, self.ostream)
-        scf_results = self.scf_driver.scf_tensors
+        scf_results = self.scf_driver.scf_results
         prop.compute_scf_prop(molecule, basis, scf_results)
         if self.rank == mpi_master():
             dipole_moment = prop.get_property('dipole moment')

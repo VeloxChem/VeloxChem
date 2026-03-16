@@ -418,6 +418,7 @@ class OptimizationDriver:
             final_mol = self.comm.bcast(final_mol, root=mpi_master())
 
             opt_results = {'final_geometry': final_mol.get_xyz_string()}
+            opt_results['final_molecule'] = final_mol
 
             if self.rank == mpi_master():
                 self.grad_drv.ostream.print_info(

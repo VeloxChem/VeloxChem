@@ -611,7 +611,7 @@ class TpaFullDriver(TpaDriver):
         return {'f_iso_x': f_iso_x, 'f_iso_y': f_iso_y, 'f_iso_z': f_iso_z}
 
     def get_Nxy(self, w, d_a_mo, X, fock_dict, Nx, nocc, norb, molecule,
-                ao_basis, scf_tensors):
+                ao_basis, scf_results):
         """
         Computes all the second-order response vectors needed for the isotropic
         cubic response computation
@@ -634,7 +634,7 @@ class TpaFullDriver(TpaDriver):
             The molecule.
         :param basis:
             The AO basis.
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
 
         :return:
@@ -674,7 +674,7 @@ class TpaFullDriver(TpaDriver):
 
         # commutpute second-order response vectors
 
-        N_total_results = N_total_drv.compute(molecule, ao_basis, scf_tensors,
+        N_total_results = N_total_drv.compute(molecule, ao_basis, scf_results,
                                               xy_dict)
 
         self._is_converged = (self._is_converged and N_total_drv.is_converged)

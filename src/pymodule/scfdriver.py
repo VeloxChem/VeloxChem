@@ -33,6 +33,7 @@
 from pathlib import Path
 from datetime import datetime
 from collections import deque
+from copy import deepcopy
 import numpy as np
 import time as tm
 import math
@@ -68,7 +69,8 @@ from .inputparser import (parse_input, print_keywords, print_attributes,
                           get_random_string_parallel)
 from .dftutils import get_default_grid_level, print_xc_reference
 from .sanitychecks import (molecule_sanity_check, dft_sanity_check,
-                           pe_sanity_check, solvation_model_sanity_check)
+                           ri_sanity_check, pe_sanity_check,
+                           solvation_model_sanity_check)
 from .errorhandler import assert_msg_critical
 from .checkpoint import (create_hdf5, write_scf_results_to_hdf5,
                          write_cpcm_charges, read_cpcm_charges)
@@ -528,6 +530,8 @@ class ScfDriver:
 
         parse_input(self, method_keywords, method_dict)
 
+        ri_sanity_check(self)
+
         dft_sanity_check(self, 'update_settings')
 
         pe_sanity_check(self, method_dict)
@@ -552,13 +556,13 @@ class ScfDriver:
                 'with polarizable embedding')
             # Note: we allow restarting SCF with point charges
 
-    def compute(self, molecule, ao_basis, min_basis=None):
+    def compute(self, molecule, basis, min_basis=None):
         """
         Performs SCF calculation using molecular data.
 
         :param molecule:
             The molecule.
-        :param ao_basis:
+        :param basis:
             The AO basis set.
         :param min_basis:
             The minimal AO basis set.
@@ -567,7 +571,7 @@ class ScfDriver:
         profiler = Profiler()
 
         if min_basis is None:
-            if ao_basis.has_ecp():
+            if basis.has_ecp():
                 min_basis_label = 'AO-START-GUESS-FOR-ECP'
             else:
                 min_basis_label = 'AO-START-GUESS'
@@ -583,27 +587,11 @@ class ScfDriver:
         if self.filename is not None and self.checkpoint_file is None:
             self.checkpoint_file = f'{self.filename}_scf.h5'
 
-        # check RI
-        # for now, force DIIS for RI
-        # TODO: double check
-        if self.ri_coulomb or self.ri_jk:
-            if self.acc_type == 'L2_C2DIIS':
-                self.acc_type = 'C2DIIS'
-            elif self.acc_type == 'L2_DIIS':
-                self.acc_type = 'DIIS'
-
-            assert_msg_critical(
-                not (self.ri_coulomb and self.ri_jk),
-                'ScfDriver: please use either ri_coulomb or ri_jk, not both.')
-
-            if self.ri_coulomb and self.ri_auxiliary_basis == 'def2-universal-jkfit':
-                self.ri_auxiliary_basis = 'def2-universal-jfit'
-
-            if self.ri_jk and self.ri_auxiliary_basis == 'def2-universal-jfit':
-                self.ri_auxiliary_basis = 'def2-universal-jkfit'
-
         # check molecule
         molecule_sanity_check(molecule, self.scf_type)
+
+        # check RI setup
+        ri_sanity_check(self)
 
         # check dft setup
         dft_sanity_check(self, 'compute')
@@ -644,20 +632,20 @@ class ScfDriver:
 
         if self.restart:
             self.restart = self.validate_checkpoint(molecule.get_element_ids(),
-                                                    ao_basis.get_label(),
+                                                    basis.get_label(),
                                                     self.scf_type)
 
         if self.restart:
-            if self.acc_type == 'L2_C2DIIS':
+            if self.acc_type.upper() == 'L2_C2DIIS':
                 self.acc_type = 'C2DIIS'
-            elif self.acc_type == 'L2_DIIS':
+            elif self.acc_type.upper() == 'L2_DIIS':
                 self.acc_type = 'DIIS'
             if self.rank == mpi_master():
                 self._ref_mol_orbs = MolecularOrbitals.read_hdf5(
                     self.checkpoint_file)
 
         # nuclear repulsion energy
-        self._nuc_energy = molecule.nuclear_repulsion_energy(ao_basis)
+        self._nuc_energy = molecule.nuclear_repulsion_energy(basis)
 
         if self.rank == mpi_master():
             self._print_header()
@@ -758,7 +746,7 @@ class ScfDriver:
 
             self._embedding_drv = PolarizableEmbeddingSCF(
                 molecule=molecule,
-                ao_basis=ao_basis,
+                ao_basis=basis,
                 options=self.embedding,
                 comm=self.comm)
 
@@ -915,7 +903,7 @@ class ScfDriver:
                     den_mat = self.gen_initial_density_restart(molecule)
                 else:
                     den_mat = self.gen_initial_density_sad(
-                        molecule, ao_basis, min_basis)
+                        molecule, basis, min_basis)
             else:
                 den_mat = None
             den_mat = self.comm.bcast(den_mat, root=mpi_master())
@@ -927,7 +915,7 @@ class ScfDriver:
                 self.cpcm_drv._cpcm_q = self.comm.bcast(self.cpcm_drv._cpcm_q,
                                                         root=mpi_master())
 
-            self._comp_diis(molecule, ao_basis, min_basis, den_mat, profiler)
+            self._comp_diis(molecule, basis, min_basis, den_mat, profiler)
 
         # two level DIIS method
         if self.acc_type.upper() in ['L2_C2DIIS', 'L2_DIIS']:
@@ -941,7 +929,7 @@ class ScfDriver:
             old_max_iter = self.max_iter
             self.max_iter = 5
 
-            val_basis = ao_basis.reduce_to_valence_basis()
+            val_basis = basis.reduce_to_valence_basis()
             if self.rank == mpi_master():
                 den_mat = self.gen_initial_density_sad(molecule, val_basis,
                                                        min_basis)
@@ -959,11 +947,11 @@ class ScfDriver:
 
             if self.rank == mpi_master():
                 den_mat = self.gen_initial_density_proj(
-                    molecule, ao_basis, val_basis, self._molecular_orbitals)
+                    molecule, basis, val_basis, self._molecular_orbitals)
             else:
                 den_mat = None
             den_mat = self.comm.bcast(den_mat, root=mpi_master())
-            self._comp_diis(molecule, ao_basis, val_basis, den_mat, profiler)
+            self._comp_diis(molecule, basis, val_basis, den_mat, profiler)
 
         self._fock_matrices_alpha.clear()
         self._fock_matrices_beta.clear()
@@ -984,15 +972,15 @@ class ScfDriver:
         if self.rank == mpi_master():
             self._print_scf_energy()
 
-            s2 = self.compute_s2(molecule, ao_basis, self.scf_results)
+            s2 = self.compute_s2(molecule, basis, self.scf_results)
             self._print_ground_state(molecule, s2)
 
             if self.print_level == 2:
-                self.molecular_orbitals.print_orbitals(molecule, ao_basis, None,
+                self.molecular_orbitals.print_orbitals(molecule, basis, None,
                                                        self.ostream)
             if self.print_level == 3:
                 self.molecular_orbitals.print_orbitals(
-                    molecule, ao_basis,
+                    molecule, basis,
                     (0, self.molecular_orbitals.number_of_mos()), self.ostream)
 
             if self.print_level > 1:
@@ -1000,7 +988,7 @@ class ScfDriver:
 
             self.ostream.flush()
 
-        return self.scf_results
+        return deepcopy(self.scf_results)
 
     def gen_initial_density_sad(self, molecule, ao_basis, min_basis):
         """
@@ -1333,18 +1321,18 @@ class ScfDriver:
                 name_string = get_random_string_parallel(self.comm)
                 base_fname = 'vlx_' + name_string
             self.checkpoint_file = f'{base_fname}_scf.h5'
-        self.write_checkpoint(molecule.get_element_ids(), basis.get_label())
+        self.write_checkpoint(molecule, basis)
 
         self.comm.barrier()
 
-    def write_checkpoint(self, nuclear_charges, basis_set):
+    def write_checkpoint(self, molecule, basis):
         """
         Writes molecular orbitals to checkpoint file.
 
-        :param nuclear_charges:
-            The nuclear charges.
-        :param basis_set:
-            Name of the basis set.
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
         """
 
         if self._skip_writing_h5:
@@ -1352,8 +1340,20 @@ class ScfDriver:
 
         if self.rank == mpi_master():
             if self.checkpoint_file and isinstance(self.checkpoint_file, str):
-                self.molecular_orbitals.write_hdf5(self.checkpoint_file,
-                                                   nuclear_charges, basis_set)
+                if self._dft:
+                    xc_label = self.xcfun.get_func_label()
+                else:
+                    xc_label = 'HF'
+
+                if self._pe:
+                    with open(str(self.pe_options['potfile']), 'r') as f_pot:
+                        potfile_text = '\n'.join(f_pot.readlines())
+                else:
+                    potfile_text = ''
+
+                create_hdf5(self.checkpoint_file, molecule, basis, xc_label,
+                            potfile_text)
+                self.molecular_orbitals.write_hdf5(self.checkpoint_file)
                 if self._cpcm:
                     write_cpcm_charges(self.checkpoint_file,
                                        self.cpcm_drv._cpcm_q)
@@ -1513,14 +1513,17 @@ class ScfDriver:
             ecp_atom_inds = [
                 idx for idx, nelec in enumerate(core_electrons) if nelec > 0
             ]
-            # TODO: distribute ecp atoms over MPI ranks
+
+            ave, res = divmod(len(ecp_atom_inds), self.nodes)
+            counts = [ave + 1 if p < res else ave for p in range(self.nodes)]
+            start = sum(counts[:self.rank])
+            end = sum(counts[:self.rank + 1])
+            local_ecp_atom_inds = ecp_atom_inds[start:end]
+
             ecp_t0 = tm.time()
-            if self.rank == mpi_master():
-                ecp_mat = ecp_drv.compute(molecule, ao_basis, ecp_atom_inds)
-                ecp_mat = ecp_mat.to_numpy()
-            else:
-                ecp_mat = None
-            ecp_mat = self.comm.bcast(ecp_mat, root=mpi_master())
+            ecp_mat = ecp_drv.compute(molecule, ao_basis, local_ecp_atom_inds)
+            ecp_mat = self.comm.reduce(ecp_mat.to_numpy(), root=mpi_master())
+
             if self.print_level > 1:
                 self.ostream.print_info(
                     'Effective core potential matrix computed in ' +
@@ -1748,8 +1751,7 @@ class ScfDriver:
                     self._graceful_exit(molecule, ao_basis)
 
         if not self._first_step:
-            self.write_checkpoint(molecule.get_element_ids(),
-                                  ao_basis.get_label())
+            self.write_checkpoint(molecule, ao_basis)
 
         if (not self._first_step) and self.is_converged:
 
@@ -1906,7 +1908,7 @@ class ScfDriver:
         self.ostream.print_info('Preparing for a graceful termination...')
         self.ostream.flush()
 
-        self.write_checkpoint(molecule.get_element_ids(), basis.get_label())
+        self.write_checkpoint(molecule, basis)
 
         self.ostream.print_blank()
         self.ostream.print_info('...done.')

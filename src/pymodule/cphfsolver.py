@@ -42,9 +42,7 @@ from .distributedarray import DistributedArray
 from .subcommunicators import SubCommunicators
 from .linearsolver import LinearSolver
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           dft_sanity_check, pe_sanity_check,
-                           solvation_model_sanity_check,
-                           rsp_results_solvation_sanity_check)
+                           ri_sanity_check, dft_sanity_check, pe_sanity_check)
 from .errorhandler import assert_msg_critical, safe_solve
 from .inputparser import parse_input
 from .checkpoint import write_rsp_hdf5, check_rsp_hdf5
@@ -108,7 +106,7 @@ class CphfSolver(LinearSolver):
 
         parse_input(self, cphf_keywords, cphf_dict)
 
-    def compute_solution_vectors(self, molecule, basis, scf_tensors, dist_rhs,
+    def compute_solution_vectors(self, molecule, basis, scf_results, dist_rhs,
                                  eri_dict, dft_dict, pe_dict):
         """
         Performs CPHF calculation for a specific atom of a molecule and a basis set.
@@ -117,7 +115,7 @@ class CphfSolver(LinearSolver):
             The molecule.
         :param basis:
             The AO basis set.
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
         :param dist_rhs:
             The right-hand side as a list of distributed arrays.
@@ -126,6 +124,11 @@ class CphfSolver(LinearSolver):
             A dictionary containing the RHS and solution (ov block)
             of the CPHF equations.
         """
+
+        # TODO: enable ECP
+        assert_msg_critical(
+            not basis.has_ecp(),
+            f'{type(self).__name__}.compute: ECP is not yet supported')
 
         if self.norm_thresh is None:
             self.norm_thresh = self.conv_thresh * 1.0e-6
@@ -145,7 +148,7 @@ class CphfSolver(LinearSolver):
         molecule_sanity_check(molecule)
 
         # check SCF results
-        scf_results_sanity_check(self, scf_tensors)
+        scf_results_sanity_check(self, scf_results)
 
         # update checkpoint_file after scf_results_sanity_check
         if self.filename is not None and self.checkpoint_file is None:
@@ -154,6 +157,9 @@ class CphfSolver(LinearSolver):
               self.checkpoint_file.endswith('_rsp.h5')):
             self.checkpoint_file = (self.checkpoint_file[:-len('_rsp.h5')] +
                                     '_orbrsp.h5')
+
+        # check RI setup
+        ri_sanity_check(self)
 
         # check dft setup
         dft_sanity_check(self, 'compute')
@@ -168,13 +174,13 @@ class CphfSolver(LinearSolver):
                 self.print_cphf_header('Coupled-Perturbed Hartree-Fock Solver')
 
         if self.rank == mpi_master():
-            mo_energies = scf_tensors['E_alpha']
+            mo_energies = scf_results['E_alpha']
             # nmo is sometimes different than nao (because of linear
             # dependencies which get removed during SCF)
             nmo = mo_energies.shape[0]
             nocc = molecule.number_of_alpha_electrons()
             nvir = nmo - nocc
-            nao = scf_tensors['C_alpha'].shape[0]
+            nao = scf_results['C_alpha'].shape[0]
             eocc = mo_energies[:nocc]
             evir = mo_energies[nocc:]
             eov = eocc.reshape(-1, 1) - evir
@@ -207,7 +213,7 @@ class CphfSolver(LinearSolver):
         dist_trials = self.setup_trials(molecule, dist_precond, dist_rhs)
 
         # construct the sigma (E*t) vectors
-        self.build_sigmas(molecule, basis, scf_tensors, dist_trials, eri_dict,
+        self.build_sigmas(molecule, basis, scf_results, dist_trials, eri_dict,
                           dft_dict, pe_dict)
 
         # lists that will hold the solutions and residuals
@@ -291,7 +297,7 @@ class CphfSolver(LinearSolver):
             n_new_trials = self.comm.bcast(n_new_trials, root=mpi_master())
 
             # update sigma vectors
-            self.build_sigmas(molecule, basis, scf_tensors, new_trials,
+            self.build_sigmas(molecule, basis, scf_results, new_trials,
                               eri_dict, dft_dict, pe_dict)
 
         # converged?
@@ -304,7 +310,7 @@ class CphfSolver(LinearSolver):
         # only return the solution
         return solutions
 
-    def compute(self, molecule, basis, scf_tensors, *args):
+    def compute(self, molecule, basis, scf_results, *args):
         """
         Performs CPHF calculation for a molecule and a basis set.
 
@@ -312,7 +318,7 @@ class CphfSolver(LinearSolver):
             The molecule.
         :param basis:
             The AO basis set.
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
         :param *args:
             Additional arguments, same as in compute_rhs.
@@ -325,6 +331,11 @@ class CphfSolver(LinearSolver):
             contracted with the two-electron integrals).
         """
 
+        # TODO: enable ECP
+        assert_msg_critical(
+            not basis.has_ecp(),
+            f'{type(self).__name__}.compute: ECP is not yet supported')
+
         if self.norm_thresh is None:
             self.norm_thresh = self.conv_thresh * 1.0e-6
         if self.lindep_thresh is None:
@@ -334,9 +345,9 @@ class CphfSolver(LinearSolver):
         self.print_level = max(1, min(self.print_level, 3))
 
         self.cphf_results = self.compute_subspace_solver(
-            molecule, basis, scf_tensors, *args)
+            molecule, basis, scf_results, *args)
 
-    def compute_subspace_solver(self, molecule, basis, scf_tensors, *args):
+    def compute_subspace_solver(self, molecule, basis, scf_results, *args):
         """
         Performs CPHF calculation for a molecule and a basis set.
 
@@ -344,7 +355,7 @@ class CphfSolver(LinearSolver):
             The molecule.
         :param basis:
             The AO basis set.
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
 
         :return:
@@ -364,7 +375,7 @@ class CphfSolver(LinearSolver):
         molecule_sanity_check(molecule)
 
         # check SCF results
-        scf_results_sanity_check(self, scf_tensors)
+        scf_results_sanity_check(self, scf_results)
 
         # update checkpoint_file after scf_results_sanity_check
         if self.filename is not None and self.checkpoint_file is None:
@@ -373,6 +384,9 @@ class CphfSolver(LinearSolver):
               self.checkpoint_file.endswith('_rsp.h5')):
             self.checkpoint_file = (self.checkpoint_file[:-len('_rsp.h5')] +
                                     '_orbrsp.h5')
+
+        # check RI setup
+        ri_sanity_check(self)
 
         # check dft setup
         dft_sanity_check(self, 'compute')
@@ -384,7 +398,7 @@ class CphfSolver(LinearSolver):
         eri_dict = self._init_eri(molecule, basis)
 
         # DFT information
-        dft_dict = self._init_dft(molecule, scf_tensors)
+        dft_dict = self._init_dft(molecule, scf_results)
 
         # PE information
         pe_dict = self._init_pe(molecule, basis)
@@ -392,7 +406,7 @@ class CphfSolver(LinearSolver):
         # CPCM_information
         self._init_cpcm(molecule)
 
-        cphf_rhs_dict = self.compute_rhs(molecule, basis, scf_tensors, eri_dict,
+        cphf_rhs_dict = self.compute_rhs(molecule, basis, scf_results, eri_dict,
                                          dft_dict, pe_dict, *args)
 
         # Print after sanity checks in compute_rhs
@@ -409,7 +423,7 @@ class CphfSolver(LinearSolver):
         self.dist_trials = None
         self.dist_sigmas = None
 
-        dist_precond = self._get_precond(molecule, basis, scf_tensors,
+        dist_precond = self._get_precond(molecule, basis, scf_results,
                                          self._method_type)
 
         orbrsp_vector_labels = [
@@ -435,7 +449,7 @@ class CphfSolver(LinearSolver):
             profiler.set_timing_key('Preparation')
 
             # construct the sigma (E*t) vectors
-            self.build_sigmas(molecule, basis, scf_tensors, dist_trials,
+            self.build_sigmas(molecule, basis, scf_results, dist_trials,
                               eri_dict, dft_dict, pe_dict, profiler,
                               self._method_type)
 
@@ -558,7 +572,7 @@ class CphfSolver(LinearSolver):
                                                 pe_dict, orbrsp_vector_labels)
 
             # update sigma vectors
-            self.build_sigmas(molecule, basis, scf_tensors, new_trials,
+            self.build_sigmas(molecule, basis, scf_results, new_trials,
                               eri_dict, dft_dict, pe_dict, profiler,
                               self._method_type)
 
@@ -594,7 +608,7 @@ class CphfSolver(LinearSolver):
     def build_sigmas(self,
                      molecule,
                      basis,
-                     scf_tensors,
+                     scf_results,
                      dist_trials,
                      eri_dict,
                      dft_dict,
@@ -609,7 +623,7 @@ class CphfSolver(LinearSolver):
             The molecule.
         :param basis:
             The basis set.
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from a converged SCF calculation.
         :param dist_trials:
             The trial vectors as a list of distributed arrays.
@@ -627,7 +641,7 @@ class CphfSolver(LinearSolver):
 
         if self.use_subcomms:
             if method_type == 'restricted':
-                self.build_sigmas_subcomms(molecule, basis, scf_tensors,
+                self.build_sigmas_subcomms(molecule, basis, scf_results,
                                            dist_trials, eri_dict, dft_dict,
                                            pe_dict, profiler)
             else:
@@ -637,18 +651,18 @@ class CphfSolver(LinearSolver):
                     'Cannot use subcomms for unrestricted case.')
         else:
             if method_type == 'restricted':
-                self.build_sigmas_single_comm(molecule, basis, scf_tensors,
+                self.build_sigmas_single_comm(molecule, basis, scf_results,
                                               dist_trials, eri_dict, dft_dict,
                                               pe_dict, profiler)
             else:
                 self.build_sigmas_single_comm_unrestricted(
-                    molecule, basis, scf_tensors, dist_trials, eri_dict,
+                    molecule, basis, scf_results, dist_trials, eri_dict,
                     dft_dict, pe_dict, profiler)
 
     def build_sigmas_subcomms(self,
                               molecule,
                               basis,
-                              scf_tensors,
+                              scf_results,
                               dist_trials,
                               eri_dict,
                               dft_dict,
@@ -663,15 +677,15 @@ class CphfSolver(LinearSolver):
             The molecule.
         :param basis:
             The AO basis set.
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
         :param dist_trials:
             Distributed array of trial vectors
         """
 
         if self.rank == mpi_master():
-            mo = scf_tensors['C_alpha']
-            mo_energies = scf_tensors['E_alpha']
+            mo = scf_results['C_alpha']
+            mo_energies = scf_results['E_alpha']
             # nmo is sometimes different than nao (because of linear
             # dependencies which get removed during SCF)
             nmo = mo_energies.shape[0]
@@ -954,7 +968,7 @@ class CphfSolver(LinearSolver):
     def build_sigmas_single_comm(self,
                                  molecule,
                                  basis,
-                                 scf_tensors,
+                                 scf_results,
                                  dist_trials,
                                  eri_dict,
                                  dft_dict,
@@ -969,7 +983,7 @@ class CphfSolver(LinearSolver):
             The molecule.
         :param basis:
             The AO basis set.
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
         :param dist_trials:
             Distributed array of trial vectors
@@ -978,9 +992,9 @@ class CphfSolver(LinearSolver):
         prep_t0 = tm.time()
 
         if self.rank == mpi_master():
-            mo = scf_tensors['C_alpha']
+            mo = scf_results['C_alpha']
             nao = basis.get_dimension_of_basis()
-            mo_energies = scf_tensors['E_alpha']
+            mo_energies = scf_results['E_alpha']
             # nmo is sometimes different than nao (because of linear
             # dependencies which get removed during SCF)
             nmo = mo_energies.shape[0]
@@ -1104,7 +1118,7 @@ class CphfSolver(LinearSolver):
     def build_sigmas_single_comm_unrestricted(self,
                                               molecule,
                                               basis,
-                                              scf_tensors,
+                                              scf_results,
                                               dist_trials,
                                               eri_dict,
                                               dft_dict,
@@ -1119,7 +1133,7 @@ class CphfSolver(LinearSolver):
             The molecule.
         :param basis:
             The AO basis set.
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
         :param dist_trials:
             Distributed array of trial vectors
@@ -1128,11 +1142,11 @@ class CphfSolver(LinearSolver):
         prep_t0 = tm.time()
 
         if self.rank == mpi_master():
-            mo_a = scf_tensors['C_alpha']
-            mo_b = scf_tensors['C_beta']
+            mo_a = scf_results['C_alpha']
+            mo_b = scf_results['C_beta']
             nao = basis.get_dimension_of_basis()
-            orb_ene_a = scf_tensors['E_alpha']
-            orb_ene_b = scf_tensors['E_beta']
+            orb_ene_a = scf_results['E_alpha']
+            orb_ene_b = scf_results['E_beta']
             nocc_a = molecule.number_of_alpha_electrons()
             nocc_b = molecule.number_of_beta_electrons()
             mo_occ_a = mo_a[:, :nocc_a]
@@ -1282,7 +1296,7 @@ class CphfSolver(LinearSolver):
     def _get_precond(self,
                      molecule,
                      basis,
-                     scf_tensors,
+                     scf_results,
                      method_type="restricted"):
         """
         Construct the preconditioners.
@@ -1291,7 +1305,7 @@ class CphfSolver(LinearSolver):
             The molecule.
         :param basis:
             The basis set.
-        :param scf_tensors:
+        :param scf_results:
             The SCF tensors.
         :param method_type:
             The type of method (restricted, unresticted).
@@ -1300,8 +1314,8 @@ class CphfSolver(LinearSolver):
             The distributed preconditioners.
         """
         if self.rank == mpi_master():
-            orb_ene_a = scf_tensors['E_alpha']
-            orb_ene_b = scf_tensors['E_beta']
+            orb_ene_a = scf_results['E_alpha']
+            orb_ene_b = scf_results['E_beta']
             nocc_a = molecule.number_of_alpha_electrons()
             nocc_b = molecule.number_of_beta_electrons()
             eocc_a = orb_ene_a[:nocc_a]
@@ -1416,7 +1430,7 @@ class CphfSolver(LinearSolver):
         self._is_converged = self.comm.bcast(self.is_converged,
                                              root=mpi_master())
 
-    def compute_rhs(self, molecule, basis, scf_tensors, eri_dict, dft_dict,
+    def compute_rhs(self, molecule, basis, scf_results, eri_dict, dft_dict,
                     pe_dict, *args):
         """
         Computes the right hand side for the CPHF equations for
@@ -1426,7 +1440,7 @@ class CphfSolver(LinearSolver):
             The molecule.
         :param basis:
             The AO basis set.
-        :param scf_tensors:
+        :param scf_results:
             The tensors from the converged SCF calculation.
 
         :returns:

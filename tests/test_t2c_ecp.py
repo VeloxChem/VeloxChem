@@ -23,6 +23,17 @@ class TestECPDriver:
 
         return mol, bas
         
+    def get_aucl_svp_data(self):
+
+        auclstr = """
+            Au 0.000   0.000   0.000
+            Cl 0.000   2.550   0.000
+        """
+        mol = Molecule.read_str(auclstr)
+        bas = MolecularBasis.read(mol, 'def2-svp')
+
+        return mol, bas
+        
     def get_gdh3_svp_data(self):
 
         gdh3str = """
@@ -215,3 +226,38 @@ class TestECPDriver:
         fref = SubMatrix([0, 0, 144, 144])
         fref.set_values(np.ascontiguousarray(ref_mat))
         assert fmat == fref
+
+    def test_ecp_aucl_svp(self):
+
+        mol_aucl, bas_svp = self.get_aucl_svp_data()
+        
+        lpot = BaseCorePotential([4.78982000, 2.39491000],
+                                 [30.49008890, 5.17107381],
+                                 [2, 2])
+        
+        spot = BaseCorePotential([ 13.20510000,  6.60255000,   4.78982000,  2.39491000],
+                                 [426.84667920, 37.00708285, -30.49008890, -5.17107381],
+                                 [2, 2, 2, 2])
+                                 
+        ppot = BaseCorePotential([ 10.45202000, 5.22601000, 4.78982000, 2.39491000],
+                                 [261.19958038, 26.96249604, -30.49008890, -5.17107381],
+                                 [2, 2, 2, 2])
+                                 
+        dpot = BaseCorePotential([7.85110000, 3.92555000, 4.78982000, 2.39491000],
+                                 [124.79066561, 16.30072573, -30.49008890, -5.17107381],
+                                 [2, 2, 2, 2])
+        
+        atom_pot = AtomCorePotential(lpot, [spot, ppot, dpot], [0, 1, 2], 60);
+        
+        #atom_pot = AtomCorePotential(lpot, [], [], 60);
+        
+        #print(bas_svp.info_str('TEST'))
+        
+        ecp_drv = ECPDriver()
+        ecp_mat = ecp_drv.compute(mol_aucl, bas_svp, atom_pot)
+       
+        #print(np.max(ecp_mat.full_matrix().to_numpy()))
+        
+        #print(np.min(ecp_mat.full_matrix().to_numpy()))
+       
+        #assert False

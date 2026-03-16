@@ -1,6 +1,7 @@
 from mpi4py import MPI
 from pathlib import Path
 from textwrap import dedent
+import re
 import numpy as np
 import pickle
 import pytest
@@ -223,9 +224,11 @@ class TestMolecule:
                         reason='skip pytest.raises for multiple MPI processes')
     def test_read_xyz_file_missing_file(self, tmp_path):
 
+        # Note: use re.escape to avoid "incomplete escape \U" error on Windows
         missing_path = tmp_path / 'missing.xyz'
-        with pytest.raises(AssertionError,
-                           match=f'xyzfile {missing_path} does not exist'):
+        with pytest.raises(
+                AssertionError,
+                match=re.escape(f'xyzfile {missing_path} does not exist')):
             Molecule.read_xyz_file(missing_path)
 
     def test_read_gro_file_element_guessing(self, tmp_path):
