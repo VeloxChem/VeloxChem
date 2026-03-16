@@ -55,9 +55,32 @@ except ImportError:
 class TdaEigenSolverBase(LinearSolver):
     """
     Thin shared scaffold for restricted and unrestricted TDA eigensolvers.
+
+    :param comm:
+        The MPI communicator.
+    :param ostream:
+        The output stream.
+
+    Instance variables
+        - nstates: The number of excited states to be determined.
+        - core_excitation: The flag for computing core-excited states.
+        - num_core_orbitals: The number of core-orbitals involved in
+          the core-excited states.
+        - solver: The eigenvalues solver.
+        - nto: The flag for natural transition orbital analysis.
+        - nto_pairs: The number of NTO pairs in NTO analysis.
+        - detach_attach: The flag for detachment/attachment density analysis.
+        - cube_origin: The origin of cubic grid points.
+        - cube_stepsize: The step size of cubic grid points in X, Y and Z
+          directions.
+        - cube_points: The number of cubic grid points in X, Y and Z directions.
     """
 
     def __init__(self, comm=None, ostream=None):
+        """
+        Initializes TDA excited states computation drived to default setup.
+        """
+
         if comm is None:
             comm = MPI.COMM_WORLD
 
@@ -117,6 +140,15 @@ class TdaEigenSolverBase(LinearSolver):
         })
 
     def update_settings(self, rsp_dict, method_dict=None):
+        """
+        Updates response and method settings in TDA excited states computation.
+
+        :param rsp_dict:
+            The dictionary of response input.
+        :param method_dict:
+            The dictionary of method settings.
+        """
+
         if method_dict is None:
             method_dict = {}
 
@@ -141,6 +173,14 @@ class TdaEigenSolverBase(LinearSolver):
             self.detach_attach = True
 
     def _check_convergence(self):
+        """
+        Checks convergence of excitation energies and set convergence flag on
+        all processes within MPI communicator.
+
+        :param iteration:
+            The current excited states solver iteration.
+        """
+
         self._is_converged = False
 
         if self.rank == mpi_master():
@@ -150,6 +190,18 @@ class TdaEigenSolverBase(LinearSolver):
                                              root=mpi_master())
 
     def _comp_onee_integrals(self, molecule, basis):
+        """
+        Computes one-electron integrals.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+
+        :return:
+            The one-electron integrals.
+        """
+
         dipole_mats = compute_electric_dipole_integrals(molecule, basis,
                                                         [0.0, 0.0, 0.0])
         linmom_mats = compute_linear_momentum_integrals(molecule, basis)
@@ -186,6 +238,13 @@ class TdaEigenSolverBase(LinearSolver):
         return integrals
 
     def _print_iter_data(self, iteration):
+        """
+        Prints excited states solver iteration data to output stream.
+
+        :param iteration:
+            The current excited states solver iteration.
+        """
+
         if self.solver.collapsed_subspace:
             exec_str = 'Collapsed reduced space: {:d}->{:d}'.format(
                 self.solver.collapsed_from_dim, self.solver.collapsed_to_dim)
@@ -212,6 +271,23 @@ class TdaEigenSolverBase(LinearSolver):
 
     def _write_final_hdf5(self, final_h5_fname, molecule, basis, dft_func_label,
                           potfile_text, eigvecs):
+        """
+        Writes final HDF5 that contains TDA solution vectors.
+
+        :param final_h5_fname:
+            The name of the final hdf5 file.
+        :param molecule:
+            The molecule.
+        :param ao_basis:
+            The AO basis set.
+        :param dft_func_label:
+            The name of DFT functional.
+        :param potfile_text:
+            The content of potential file for polarizable embedding.
+        :param eigvecs:
+            The TDA eigenvectors (in columns).
+        """
+
         if (not self.save_solutions) or (final_h5_fname is None):
             return
 
@@ -224,6 +300,13 @@ class TdaEigenSolverBase(LinearSolver):
         self.ostream.print_blank()
 
     def _print_results(self, results):
+        """
+        Prints results to output stream.
+
+        :param results:
+            The dictionary containing response results.
+        """
+
         self._print_transition_dipoles(
             'Electric Transition Dipole Moments (dipole length, a.u.)',
             results['electric_transition_dipoles'])
@@ -241,6 +324,16 @@ class TdaEigenSolverBase(LinearSolver):
         self._print_excitation_details('Character of excitations:', results)
 
     def __deepcopy__(self, memo):
+        """
+        Implements deepcopy.
+
+        :param memo:
+            The memo dictionary for deepcopy.
+
+        :return:
+            A deepcopy of self.
+        """
+
         new_rsp_drv = type(self)(self.comm, self.ostream)
 
         for key, val in vars(self).items():
@@ -261,6 +354,19 @@ class TdaEigenSolverBase(LinearSolver):
                  broadening_value=(1000.0 / hartree_in_wavenumber() *
                                    hartree_in_ev()),
                  ax=None):
+        """
+        Plot the X-ray absorption spectrum from the response calculation.
+
+        :param rsp_results:
+            The dictionary containing the linear response results.
+        :param broadening_type:
+            The type of broadening to use. Either 'lorentzian' or 'gaussian'.
+        :param broadening_value:
+            The broadening value in eV.
+        :param ax:
+            The matplotlib axis to plot on.
+        """
+
         assert_msg_critical(
             not getattr(self, 'restricted_subspace', False),
             'Plotting spectrum for restricted_subspace is not implemented.')
@@ -279,6 +385,19 @@ class TdaEigenSolverBase(LinearSolver):
                     broadening_value=(1000.0 / hartree_in_wavenumber() *
                                       hartree_in_ev()),
                     ax=None):
+        """
+        Plot the UV-Vis absorption spectrum from the response calculation.
+
+        :param rsp_results:
+            The dictionary containing the linear response results.
+        :param broadening_type:
+            The type of broadening to use. Either 'lorentzian' or 'gaussian'.
+        :param broadening_value:
+            The broadening value in eV.
+        :param ax:
+            The matplotlib axis to plot on.
+        """
+
         assert_msg_critical(
             not getattr(self, 'restricted_subspace', False),
             'Plotting spectrum for restricted_subspace is not implemented.')
@@ -297,6 +416,19 @@ class TdaEigenSolverBase(LinearSolver):
                  broadening_value=(1000.0 / hartree_in_wavenumber() *
                                    hartree_in_ev()),
                  ax=None):
+        """
+        Plot the X-ray CD spectrum from the response calculation.
+
+        :param rsp_results:
+            The dictionary containing linear response results.
+        :param broadening_type:
+            The type of broadening to use. Either 'lorentzian' or 'gaussian'.
+        :param broadening_value:
+            The broadening value in eV.
+        :param ax:
+            The matplotlib axis to plot on.
+        """
+
         assert_msg_critical(
             not getattr(self, 'restricted_subspace', False),
             'Plotting spectrum for restricted_subspace is not implemented.')
@@ -315,6 +447,19 @@ class TdaEigenSolverBase(LinearSolver):
                  broadening_value=(1000.0 / hartree_in_wavenumber() *
                                    hartree_in_ev()),
                  ax=None):
+        """
+        Plot the CD spectrum from the response calculation.
+
+        :param rsp_results:
+            The dictionary containing linear response results.
+        :param broadening_type:
+            The type of broadening to use. Either 'lorentzian' or 'gaussian'.
+        :param broadening_value:
+            The broadening value in eV.
+        :param ax:
+            The matplotlib axis to plot on.
+        """
+
         assert_msg_critical(
             not getattr(self, 'restricted_subspace', False),
             'Plotting spectrum for restricted_subspace is not implemented.')
@@ -333,6 +478,20 @@ class TdaEigenSolverBase(LinearSolver):
              broadening_value=(1000.0 / hartree_in_wavenumber() *
                                hartree_in_ev()),
              plot_type="electronic"):
+        """
+        Plot the absorption or ECD spectrum from the response calculation.
+
+        :param rsp_results:
+            The dictionary containing linear response results.
+        :param broadening_type:
+            The type of broadening to use. 'lorentzian' or 'gaussian'.
+        :param broadening_value:
+            The broadening value in eV.
+        :param plot_type:
+            The type of plot to generate. 'uv', 'xas', 'ecd', 'xcd', or
+            'electronic'.
+        """
+
         assert_msg_critical('matplotlib' in sys.modules,
                             'matplotlib is required.')
 
