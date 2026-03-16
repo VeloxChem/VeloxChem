@@ -1024,6 +1024,10 @@ class LinearResponseEigenSolver(LinearSolver):
         Checks whether the reduced-space basis should be collapsed.
         """
 
+        # for now, disable collapse of subspace in nonlinear response
+        if self.nonlinear:
+            return False
+
         return self._reduced_space_size() > self._get_max_subspace_dim()
 
     def _solve_reduced_space(self, nroots):
