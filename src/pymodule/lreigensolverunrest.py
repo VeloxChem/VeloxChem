@@ -113,6 +113,8 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
 
         self.initial_guess_multiplier = 3
         self.guess_scaling_threshold = 10
+        self.max_subspace_dim = None
+        self.collapse_nvec = None
 
         self.core_excitation = False
         self.num_core_orbitals = 0
@@ -129,12 +131,20 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
         self.esa = False
         self.esa_from_state = None
 
+        self.collapsed_subspace = False
+        self.collapsed_from_dim = None
+        self.collapsed_to_dim = None
+
         self._input_keywords['response'].update({
             'nstates': ('int', 'number of excited states'),
             'initial_guess_multiplier':
                 ('int', 'multiplier for initial guess size'),
             'guess_scaling_threshold':
                 ('int', 'threshold for guess size to increase linearly'),
+            'max_subspace_dim':
+                ('int', 'maximum reduced-space dimension before collapse'),
+            'collapse_nvec':
+                ('int', 'number of Ritz states kept after collapse'),
             'core_excitation': ('bool', 'compute core-excited states'),
             'num_core_orbitals': ('int', 'number of involved core-orbitals'),
             'nto': ('bool', 'analyze natural transition orbitals'),
@@ -416,54 +426,15 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
             profiler.start_timer('ReducedSpace')
 
             self._cur_iter = iteration
+            self.collapsed_subspace = False
+            self.collapsed_from_dim = None
+            self.collapsed_to_dim = None
 
-            e2gg = self._dist_bger.matmul_AtB(self._dist_e2bger)
-            e2uu = self._dist_bung.matmul_AtB(self._dist_e2bung)
-            s2ug = self._dist_bung.matmul_AtB(self._dist_bger)
-
-            if self.rank == mpi_master():
-
-                # Equations:
-                # E[2] X_g - w S[2] X_u = 0
-                # E[2] X_u - w S[2] X_g = 0
-
-                # Solutions:
-                # (S_gu (E_uu)^-1 S_ug) X_g = 1/w^2 E_gg X_g
-                # X_u = w (E_uu)^-1 S_ug X_g
-
-                evals, evecs = np.linalg.eigh(e2uu)
-                e2uu_inv = np.linalg.multi_dot(
-                    [evecs, np.diag(1.0 / evals), evecs.T])
-                ses = np.linalg.multi_dot([s2ug.T, e2uu_inv, s2ug])
-
-                evals, evecs = np.linalg.eigh(e2gg)
-                tmat = np.linalg.multi_dot(
-                    [evecs, np.diag(1.0 / np.sqrt(evals)), evecs.T])
-                ses_tilde = np.linalg.multi_dot([tmat.T, ses, tmat])
-
-                evals, evecs = np.linalg.eigh(ses_tilde)
-                p = list(reversed(evals.argsort()))
-                evals = evals[p]
-                evecs = evecs[:, p]
-
-                wn = 1.0 / np.sqrt(evals[:self.nstates])
-                c_ger = np.matmul(tmat, evecs[:, :self.nstates].copy())
-                c_ung = wn * np.linalg.multi_dot([e2uu_inv, s2ug, c_ger])
-
-                for k in range(self.nstates):
-                    c_ger_k = c_ger[:, k].copy()
-                    c_ung_k = c_ung[:, k].copy()
-                    norm = np.sqrt(
-                        np.linalg.multi_dot([c_ung_k.T, s2ug, c_ger_k]) +
-                        np.linalg.multi_dot([c_ger_k.T, s2ug.T, c_ung_k]))
-                    c_ger[:, k] /= norm
-                    c_ung[:, k] /= norm
-            else:
-                wn = None
-                c_ger, c_ung = None, None
-            wn = self.comm.bcast(wn, root=mpi_master())
-            c_ger = self.comm.bcast(c_ger, root=mpi_master())
-            c_ung = self.comm.bcast(c_ung, root=mpi_master())
+            nroots = max(self.nstates, self._get_collapse_nvec())
+            wn_all, c_ger_all, c_ung_all = self._solve_reduced_space(nroots)
+            wn = wn_all[:self.nstates].copy()
+            c_ger = c_ger_all[:, :self.nstates].copy()
+            c_ung = c_ung_all[:, :self.nstates].copy()
 
             for k in range(self.nstates):
                 w = wn[k]
@@ -550,6 +521,20 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
 
             if self.is_converged:
                 break
+
+            if self._should_collapse_subspace():
+                self.ostream.print_info('Collapsing reduced space...')
+                self.ostream.print_blank()
+
+                self._collapse_current_subspace(c_ger_all, c_ung_all, molecule,
+                                                basis, scf_results, eri_dict,
+                                                dft_dict, pe_dict, profiler)
+
+                collapse_str = 'Collapsed reduced space: {:d}->{:d}'.format(
+                    self.collapsed_from_dim, self.collapsed_to_dim)
+                self.ostream.print_info(collapse_str)
+                self.ostream.print_blank()
+                self.ostream.flush()
 
             profiler.start_timer('Orthonorm.')
 
@@ -1032,6 +1017,151 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
             return x_ger_full + x_ung_full
         else:
             return None
+
+    def _reduced_space_size(self):
+        """
+        Gets the total reduced-space dimension across both parity sectors.
+        """
+
+        return self._dist_bger.shape(1) + self._dist_bung.shape(1)
+
+    def _get_max_subspace_dim(self):
+        """
+        Gets the maximum allowed reduced-space dimension before collapse.
+        """
+
+        if self.max_subspace_dim is not None:
+            return self.max_subspace_dim
+
+        # note an extra factor of 2 for ger/ung
+        return 20 * self.nstates * 2
+
+    def _get_collapse_nvec(self):
+        """
+        Gets the number of Ritz states retained during collapse.
+        """
+
+        if self.collapse_nvec is not None:
+            return max(self.nstates, self.collapse_nvec)
+
+        return 2 * self.nstates
+
+    def _should_collapse_subspace(self):
+        """
+        Checks whether the reduced-space basis should be collapsed.
+        """
+
+        return self._reduced_space_size() > self._get_max_subspace_dim()
+
+    def _solve_reduced_space(self, nroots):
+        """
+        Solves the reduced-space eigenvalue problem.
+
+        :param nroots:
+            The number of Ritz pairs to retain from the reduced problem.
+
+        :return:
+            Tuple of excitation energies and gerade/ungerade coefficients.
+        """
+
+        e2gg = self._dist_bger.matmul_AtB(self._dist_e2bger)
+        e2uu = self._dist_bung.matmul_AtB(self._dist_e2bung)
+        s2ug = self._dist_bung.matmul_AtB(self._dist_bger)
+
+        if self.rank == mpi_master():
+
+            evals, evecs = np.linalg.eigh(e2uu)
+            e2uu_inv = np.linalg.multi_dot(
+                [evecs, np.diag(1.0 / evals), evecs.T])
+            ses = np.linalg.multi_dot([s2ug.T, e2uu_inv, s2ug])
+
+            evals, evecs = np.linalg.eigh(e2gg)
+            tmat = np.linalg.multi_dot(
+                [evecs, np.diag(1.0 / np.sqrt(evals)), evecs.T])
+            ses_tilde = np.linalg.multi_dot([tmat.T, ses, tmat])
+
+            evals, evecs = np.linalg.eigh(ses_tilde)
+            p = list(reversed(evals.argsort()))
+            evals = evals[p]
+            evecs = evecs[:, p]
+
+            nroots = min(nroots, evals.size)
+            wn = 1.0 / np.sqrt(evals[:nroots])
+            c_ger = np.matmul(tmat, evecs[:, :nroots].copy())
+            c_ung = wn * np.linalg.multi_dot([e2uu_inv, s2ug, c_ger])
+
+            for k in range(nroots):
+                c_ger_k = c_ger[:, k].copy()
+                c_ung_k = c_ung[:, k].copy()
+                norm = np.sqrt(
+                    np.linalg.multi_dot([c_ung_k.T, s2ug, c_ger_k]) +
+                    np.linalg.multi_dot([c_ger_k.T, s2ug.T, c_ung_k]))
+                c_ger[:, k] /= norm
+                c_ung[:, k] /= norm
+        else:
+            wn = None
+            c_ger = None
+            c_ung = None
+
+        wn = self.comm.bcast(wn, root=mpi_master())
+        c_ger = self.comm.bcast(c_ger, root=mpi_master())
+        c_ung = self.comm.bcast(c_ung, root=mpi_master())
+
+        return wn, c_ger, c_ung
+
+    def _orthonormalize_collapsed_space(self, vectors):
+        """
+        Removes linear dependence and orthonormalizes a collapsed basis.
+
+        :param vectors:
+            The distributed half-sized basis vectors.
+
+        :return:
+            The orthonormalized basis.
+        """
+
+        if vectors.data.size == 0:
+            return vectors
+
+        vectors = self._remove_linear_dependence_half_size(
+            vectors, self.lindep_thresh)
+        vectors = self._orthogonalize_gram_schmidt_half_size(vectors)
+        vectors = self._normalize_half_size(vectors)
+
+        return vectors
+
+    def _collapse_current_subspace(self, c_ger, c_ung, molecule, basis,
+                                   scf_results, eri_dict, dft_dict, pe_dict,
+                                   profiler):
+        """
+        Collapses the reduced space to retained Ritz vectors and rebuilds
+        associated sigma data.
+        """
+
+        keep_nvec = min(self._get_collapse_nvec(), c_ger.shape[1])
+        prev_dim = self._reduced_space_size()
+
+        new_bger = self._dist_bger.matmul_AB_no_gather(c_ger[:, :keep_nvec])
+        new_bung = self._dist_bung.matmul_AB_no_gather(c_ung[:, :keep_nvec])
+
+        new_bger = self._orthonormalize_collapsed_space(new_bger)
+        new_bung = self._orthonormalize_collapsed_space(new_bung)
+
+        self._clear_subspace_data()
+        self._e2n_half_size(new_bger,
+                            new_bung,
+                            molecule,
+                            basis,
+                            scf_results,
+                            eri_dict,
+                            dft_dict,
+                            pe_dict,
+                            profiler,
+                            method_type='unrestricted')
+
+        self.collapsed_subspace = True
+        self.collapsed_from_dim = prev_dim
+        self.collapsed_to_dim = self._reduced_space_size()
 
     def _print_iteration(self, relative_residual_norm, ws):
         """

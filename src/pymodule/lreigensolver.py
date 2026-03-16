@@ -1007,7 +1007,8 @@ class LinearResponseEigenSolver(LinearSolver):
         if self.max_subspace_dim is not None:
             return self.max_subspace_dim
 
-        return 20 * self.nstates
+        # note an extra factor of 2 for ger/ung
+        return 20 * self.nstates * 2
 
     def _get_collapse_nvec(self):
         """
