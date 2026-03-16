@@ -1,5 +1,5 @@
 """
-vlx_builder.py
+molecule_toolkit.py
 ====================
 A unified toolkit for building and modifying molecules in VeloxChem.
 
@@ -676,191 +676,6 @@ class MoleculeToolkit:
 
     # ------------------------------------------------------------------
 
-    def add_pi_ligand(
-        self,
-        complex_mol,
-        metal_idx: int,
-        ligand_mol,
-        pi_indices: list,
-        target_vec,
-        bond_length: float = 2.1,
-    ):
-        """
-        Place a π ligand so the metal sits above the centroid of the π-bonding
-        atoms at *bond_length*, equidistant from all of them.
-
-        Works for any hapticity:
-          η² — alkene (2 atoms), alkyne (2 atoms)
-          η³ — allyl  (3 atoms)
-          η⁵ — Cp     (5 atoms)
-          η⁶ — arene  (6 atoms)
-          … or any other set of atoms the user specifies.
-
-        *target_vec* points from the metal toward the **centroid** of the
-        π-bonding atoms (i.e. it defines where the middle of the π system
-        ends up, not any individual carbon).  The ligand plane is oriented
-        perpendicular to this vector.
-
-        After placement a 360-step torsion scan rotates the ligand around
-        *target_vec* to minimise steric clash with the existing complex.
-
-        Parameters
-        ----------
-        complex_mol : current complex
-        metal_idx   : 1-based index of the metal in *complex_mol*
-        ligand_mol  : the π ligand
-        pi_indices  : 1-based indices of the π-bonding atoms in *ligand_mol*
-                      (e.g. [1, 2] for ethylene, [1,2,3,4,5] for Cp)
-        target_vec  : direction from metal to the centroid of the π system
-        bond_length : M–C distance in Å (applied equally to every π atom)
-        """
-        assert len(pi_indices) >= 2, "Need at least 2 pi_indices"
-        metal_idx  = self._i(metal_idx)
-        pi_idx_0   = [self._i(i) for i in pi_indices]   # 0-based internally
-
-        c_labels = list(complex_mol.get_labels())
-        c_coords = np.array(complex_mol.get_coordinates_in_angstrom(), dtype=float)
-        l_labels = list(ligand_mol.get_labels())
-        l_coords = np.array(ligand_mol.get_coordinates_in_angstrom(), dtype=float)
-
-        m_pos   = c_coords[metal_idx]
-        t_unit  = np.array(target_vec, dtype=float)
-        t_unit /= np.linalg.norm(t_unit)
-
-        # --- Step 1: centre ligand on the pi-atom centroid -----------------
-        centroid  = np.mean(l_coords[pi_idx_0], axis=0)
-        l_coords -= centroid          # centroid now at origin
-
-        # --- Step 2: orient ligand plane perpendicular to target_vec -------
-        # The pi-atom centroid should sit at m_pos + t_unit * bond_length,
-        # with all pi atoms equidistant from the metal.
-        # We need the normal of the pi-atom plane to align with t_unit.
-
-        if len(pi_idx_0) >= 3:
-            # Fit a plane through the pi atoms via SVD
-            pts      = l_coords[pi_idx_0]     # centroid already at origin
-            _, _, Vt = np.linalg.svd(pts)
-            pi_normal = Vt[-1]                # smallest singular vector = normal
-        else:
-            # For η²: fit the molecular plane through ALL ligand atoms via SVD.
-            # The normal to this plane is the π-lobe direction.
-            all_pts   = l_coords - np.mean(l_coords, axis=0)
-            _, _, Vt  = np.linalg.svd(all_pts)
-            pi_normal = Vt[-1]                # normal to the molecular plane
-
-            # SVD sign is arbitrary — ensure the normal points AWAY from the
-            # substituent hydrogens (i.e. toward the empty π face).
-            # The H atoms bonded to the pi carbons lie in the molecular plane;
-            # their centroid relative to the C=C midpoint has no out-of-plane
-            # component, so we instead check: the normal should point away from
-            # the average position of all non-pi atoms (the H substituents).
-            non_pi    = [i for i in range(len(l_labels)) if i not in pi_idx_0]
-            if non_pi:
-                h_centroid = np.mean(l_coords[non_pi], axis=0)
-                # h_centroid is in the molecular plane; pi_normal should point
-                # perpendicular to the molecular plane, but we enforce that it
-                # is not accidentally biased toward H by checking the component
-                # along the C=C-to-H in-plane direction.
-                # Simply: the correct π face is the one where the metal would
-                # see the C=C bond end-on — pi_normal is already perpendicular
-                # to the molecular plane, so both signs are equally valid for
-                # the actual binding face. We pick the sign consistently by
-                # aligning with target_vec (the user's intended approach direction).
-                if np.dot(pi_normal, np.array(target_vec, dtype=float)) < 0:
-                    pi_normal = -pi_normal
-
-        pi_normal /= np.linalg.norm(pi_normal)
-
-        # Rotate so pi_normal aligns with t_unit (metal approaches from above)
-        R = self.get_rotation_matrix(pi_normal, t_unit)
-        l_coords = l_coords @ R.T
-
-        # --- Step 3: translate centroid to target position -----------------
-        # Each pi atom should be at bond_length from the metal.
-        # Place centroid at m_pos + t_unit * d, where d is chosen so that
-        # each pi atom is exactly bond_length from the metal.
-        # For a regular polygon the centroid is at radius r from each vertex,
-        # so d = sqrt(bond_length^2 - r^2) where r = distance from centroid
-        # to any pi atom (after rotation).
-        pi_coords_rot = l_coords[pi_idx_0]
-        # r_centroid: average distance from centroid to each pi atom (in the ligand plane)
-        # Since we already centred on the centroid and rotated, the pi atoms lie
-        # in the plane perpendicular to t_unit. Their distance from the centroid
-        # (origin) is purely in-plane.
-        r_centroid = np.mean(np.linalg.norm(pi_coords_rot, axis=1))
-
-        # The metal sits at distance bond_length from each pi atom.
-        # Each pi atom is at distance r_centroid from the centroid in-plane,
-        # and at distance d along t_unit from the centroid.
-        # So: bond_length^2 = r_centroid^2 + d^2  =>  d = sqrt(bl^2 - r^2)
-        # Guard against r >= bond_length (unphysical input).
-        if r_centroid >= bond_length:
-            d = 0.0
-        else:
-            d = np.sqrt(bond_length**2 - r_centroid**2)
-
-        l_coords += m_pos + t_unit * d
-
-        # --- Step 4: torsion scan around target_vec to orient the ligand ----
-        # For η²: align the C=C (or π-bond) axis to be parallel to the
-        # coordination plane of the existing complex, and minimise steric clash.
-        # For ηⁿ (n≥3): only steric clash matters (the ring is symmetric).
-        pivot = m_pos + t_unit * d
-        axis  = t_unit
-
-        # Pre-compute the C=C bond axis (for η² geometric alignment)
-        is_eta2 = (len(pi_idx_0) == 2)
-        if is_eta2:
-            cc_axis = l_coords[pi_idx_0[1]] - l_coords[pi_idx_0[0]]
-            cc_axis /= np.linalg.norm(cc_axis)
-
-        best_angle, best_score = 0.0, -1e9
-        for deg in np.linspace(0, 360, 360, endpoint=False):
-            angle = np.radians(deg)
-            K     = np.array([[0, -axis[2], axis[1]],
-                               [axis[2], 0, -axis[0]],
-                               [-axis[1], axis[0], 0]])
-            R_ax  = np.eye(3) + np.sin(angle)*K + (1-np.cos(angle))*(K@K)
-            trial = pivot + (l_coords - pivot) @ R_ax.T
-
-            # Steric score: minimum distance to existing complex atoms
-            dists = [np.linalg.norm(trial[i] - c_coords[j])
-                     for i in range(len(trial))
-                     for j in range(len(c_coords)) if j != metal_idx]
-            steric = min(dists) if dists else 0.0
-
-            if is_eta2 and len(c_coords) > 1:
-                # Geometric score: C=C should be perpendicular to the M–L
-                # vectors of existing ligands (parallel to the coordination plane).
-                # We maximise the minimum |sin(angle)| between C=C and each M–L,
-                # which equals 1 when C=C is perpendicular to all M–L vectors.
-                trial_cc = R_ax @ cc_axis
-                ml_vecs  = [c_coords[j] - m_pos for j in range(len(c_coords))
-                            if j != metal_idx]
-                if ml_vecs:
-                    sins = [np.sqrt(max(0., 1. - np.dot(trial_cc,
-                                v/np.linalg.norm(v))**2)) for v in ml_vecs]
-                    geom = min(sins)
-                else:
-                    geom = 1.0
-                score = steric + 2.0 * geom   # weight geometric term
-            else:
-                score = steric
-
-            if score > best_score:
-                best_score = score; best_angle = angle
-
-        K      = np.array([[0, -axis[2], axis[1]],
-                            [axis[2], 0, -axis[0]],
-                            [-axis[1], axis[0], 0]])
-        R_best = np.eye(3) + np.sin(best_angle)*K + (1-np.cos(best_angle))*(K@K)
-        l_coords = pivot + (l_coords - pivot) @ R_best.T
-
-        return vlx.Molecule(c_labels + l_labels,
-                            np.vstack([c_coords, l_coords]), 'angstrom')
-
-    # ------------------------------------------------------------------
-
     def add_bidentate_rigid(
         self,
         complex_mol,
@@ -949,6 +764,131 @@ class MoleculeToolkit:
 
         return vlx.Molecule(c_labels + l_labels,
                             np.vstack([c_coords, l_final]), 'angstrom')
+
+    # ------------------------------------------------------------------
+
+    def add_pi_ligand(
+        self,
+        complex_mol,
+        metal_idx: int,
+        ligand_mol,
+        pi_indices: list,
+        target_vec,
+        bond_length: float = 2.1,
+    ):
+        """
+        Place a π ligand so the metal sits above the centroid of the π-bonding
+        atoms at *bond_length*, equidistant from all of them.
+
+        Works for any hapticity:
+          η² — alkene (2 atoms), alkyne (2 atoms)
+          η³ — allyl  (3 atoms)
+          η⁵ — Cp     (5 atoms)
+          η⁶ — arene  (6 atoms)
+          … or any other set of atoms the user specifies.
+
+        *target_vec* points from the metal toward the **centroid** of the
+        π-bonding atoms.  The ligand plane is oriented perpendicular to this
+        vector.  After placement a 360-step torsion scan rotates the ligand
+        around *target_vec* to minimise steric clash with the existing complex.
+
+        Parameters
+        ----------
+        complex_mol : current complex
+        metal_idx   : 1-based index of the metal in *complex_mol*
+        ligand_mol  : the π ligand
+        pi_indices  : 1-based indices of the π-bonding atoms in *ligand_mol*
+                      (e.g. [1, 2] for ethylene, [1,2,3,4,5] for Cp)
+        target_vec  : direction from metal to the centroid of the π system
+        bond_length : M–C distance in Å (applied equally to every π atom)
+        """
+        assert len(pi_indices) >= 2, "Need at least 2 pi_indices"
+        metal_idx = self._i(metal_idx)
+        pi_idx_0  = [self._i(i) for i in pi_indices]   # 0-based internally
+
+        c_labels = list(complex_mol.get_labels())
+        c_coords = np.array(complex_mol.get_coordinates_in_angstrom(), dtype=float)
+        l_labels = list(ligand_mol.get_labels())
+        l_coords = np.array(ligand_mol.get_coordinates_in_angstrom(), dtype=float)
+
+        m_pos  = c_coords[metal_idx]
+        t_unit = np.array(target_vec, dtype=float)
+        t_unit /= np.linalg.norm(t_unit)
+
+        # Step 1: centre ligand on the pi-atom centroid
+        centroid  = np.mean(l_coords[pi_idx_0], axis=0)
+        l_coords -= centroid
+
+        # Step 2: orient ligand plane perpendicular to target_vec
+        if len(pi_idx_0) >= 3:
+            pts       = l_coords[pi_idx_0]
+            _, _, Vt  = np.linalg.svd(pts)
+            pi_normal = Vt[-1]
+        else:
+            # η²: fit molecular plane via SVD over all ligand atoms
+            all_pts   = l_coords - np.mean(l_coords, axis=0)
+            _, _, Vt  = np.linalg.svd(all_pts)
+            pi_normal = Vt[-1]
+            # Pick the sign consistent with the user's approach direction
+            if np.dot(pi_normal, t_unit) < 0:
+                pi_normal = -pi_normal
+
+        pi_normal /= np.linalg.norm(pi_normal)
+        l_coords   = l_coords @ self.get_rotation_matrix(pi_normal, t_unit).T
+
+        # Step 3: translate so each π atom is at bond_length from the metal
+        pi_coords_rot = l_coords[pi_idx_0]
+        r_centroid    = np.mean(np.linalg.norm(pi_coords_rot, axis=1))
+        d = 0.0 if r_centroid >= bond_length else np.sqrt(bond_length**2 - r_centroid**2)
+        l_coords += m_pos + t_unit * d
+
+        # Step 4: torsion scan around target_vec to minimise steric clash
+        pivot  = m_pos + t_unit * d
+        axis   = t_unit
+        is_eta2 = (len(pi_idx_0) == 2)
+        if is_eta2:
+            cc_axis  = l_coords[pi_idx_0[1]] - l_coords[pi_idx_0[0]]
+            cc_axis /= np.linalg.norm(cc_axis)
+
+        best_angle, best_score = 0.0, -1e9
+        for deg in np.linspace(0, 360, 360, endpoint=False):
+            angle = np.radians(deg)
+            K     = np.array([[0, -axis[2], axis[1]],
+                               [axis[2], 0, -axis[0]],
+                               [-axis[1], axis[0], 0]])
+            R_ax  = np.eye(3) + np.sin(angle)*K + (1-np.cos(angle))*(K@K)
+            trial = pivot + (l_coords - pivot) @ R_ax.T
+
+            dists  = [np.linalg.norm(trial[i] - c_coords[j])
+                      for i in range(len(trial))
+                      for j in range(len(c_coords)) if j != metal_idx]
+            steric = min(dists) if dists else 0.0
+
+            if is_eta2 and len(c_coords) > 1:
+                trial_cc = R_ax @ cc_axis
+                ml_vecs  = [c_coords[j] - m_pos for j in range(len(c_coords))
+                            if j != metal_idx]
+                if ml_vecs:
+                    sins = [np.sqrt(max(0., 1. - np.dot(trial_cc,
+                                v/np.linalg.norm(v))**2)) for v in ml_vecs]
+                    geom = min(sins)
+                else:
+                    geom = 1.0
+                score = steric + 2.0 * geom
+            else:
+                score = steric
+
+            if score > best_score:
+                best_score = score; best_angle = angle
+
+        K      = np.array([[0, -axis[2], axis[1]],
+                            [axis[2], 0, -axis[0]],
+                            [-axis[1], axis[0], 0]])
+        R_best = np.eye(3) + np.sin(best_angle)*K + (1-np.cos(best_angle))*(K@K)
+        l_coords = pivot + (l_coords - pivot) @ R_best.T
+
+        return vlx.Molecule(c_labels + l_labels,
+                            np.vstack([c_coords, l_coords]), 'angstrom')
 
     # ------------------------------------------------------------------
 
@@ -1143,100 +1083,43 @@ class MoleculeToolkit:
 
         *obj* may be:
         * a SMILES string with ``*`` marking the attachment point, or
-        * a VeloxChem Molecule (``index`` is the bonding atom, 0-based).
+        * a VeloxChem Molecule (``index`` is the bonding atom).
 
-        For SMILES input the ``*`` atom is located explicitly — it need not be
-        first in the string.  The atom bonded to ``*`` is the join atom; ``*``
-        itself is removed and the exit vector points along the bond that was
-        ``*``→join.  One H on the join atom is also removed to make room for
-        the new bond.
-
-        For VeloxChem Molecule input, one H is removed from *index*; the exit
-        vector points from *index* toward that removed H.
+        One H is removed from the bonding atom; ``exit_vec`` is the vector
+        that pointed from the bonding atom toward that removed H.
         """
         if isinstance(obj, str):
-            # ── Locate the * atom and its neighbor before embedding ───────
-            mol_star = Chem.MolFromSmiles(obj)
-            if mol_star is None:
-                raise ValueError(f"Invalid SMILES: {obj!r}")
+            full = obj.replace('*', '[H]')
+            mol  = Chem.MolFromSmiles(full); mol = Chem.AddHs(mol)
+            AllChem.EmbedMolecule(mol, AllChem.ETKDG())
+            conf   = mol.GetConformer().GetPositions()
+            labels = [a.GetSymbol() for a in mol.GetAtoms()]
+            # First heavy atom is the join point
+            join   = next(i for i, a in enumerate(mol.GetAtoms()) if a.GetSymbol() != 'H')
+            h_nb   = next(n.GetIdx() for n in mol.GetAtoms()[join].GetNeighbors()
+                          if n.GetSymbol() == 'H')
+            exit_vec = conf[h_nb] - conf[join]
+            f_lab = [l for i, l in enumerate(labels) if i != h_nb]
+            f_coo = np.delete(conf, h_nb, axis=0)
+            new_join = join if join < h_nb else join - 1
+            return f_lab, f_coo, new_join, exit_vec
 
-            # Find * atom and its single neighbor (the true join atom)
-            star_atom = next(
-                (a for a in mol_star.GetAtoms() if a.GetSymbol() == '*'), None)
-            if star_atom is None:
-                raise ValueError(f"SMILES {obj!r} contains no '*' anchor atom")
-            star_idx_in_mol = star_atom.GetIdx()
-            nbs = list(star_atom.GetNeighbors())
-            if not nbs:
-                raise ValueError(f"'*' atom in {obj!r} has no neighbors")
-            if len(nbs) > 1:
-                raise ValueError(
-                    f"'*' atom in {obj!r} has {len(nbs)} neighbors — "
-                    f"'*' must be exocyclic (pendant), not a ring atom itself. "
-                    f"For a ring attachment use e.g. 'C1CC(*)CCC1' not 'C1CC*CCC1'."
-                )
-            join_heavy = nbs[0].GetIdx()   # neighbor of * in the mol without H
-
-            # Tag the join atom with map number 1 so we can find it after
-            # RDKit canonicalises the SMILES when we remove *.
-            edit = Chem.RWMol(mol_star)
-            edit.GetAtomWithIdx(join_heavy).SetAtomMapNum(1)
-            # Remove the * atom — must remove higher index first to keep join_heavy valid
-            edit.RemoveAtom(star_idx_in_mol)
-            tagged_smi = Chem.MolToSmiles(edit.GetMol())
-
-            # Parse the *-free SMILES and embed
-            mol_clean = Chem.MolFromSmiles(tagged_smi)
-            mol_clean = Chem.AddHs(mol_clean)
-            AllChem.EmbedMolecule(mol_clean, AllChem.ETKDG())
-            conf       = mol_clean.GetConformer().GetPositions()
-            labels_all = [a.GetSymbol() for a in mol_clean.GetAtoms()]
-
-            # Find join atom by map number 1
-            join_idx = next(
-                i for i, a in enumerate(mol_clean.GetAtoms())
-                if a.GetAtomMapNum() == 1)
-            mol_clean.GetAtomWithIdx(join_idx).SetAtomMapNum(0)
-
-            # Find an H bonded to join to define the exit vector
-            join_atom = mol_clean.GetAtomWithIdx(join_idx)
-            h_nb_idx  = next(
-                (n.GetIdx() for n in join_atom.GetNeighbors()
-                 if n.GetSymbol() == 'H'), None)
-            if h_nb_idx is None:
-                # No H on join atom — point away from all neighbors
-                nb_pos   = np.mean(
-                    [conf[n.GetIdx()] for n in join_atom.GetNeighbors()], axis=0)
-                exit_vec = conf[join_idx] - nb_pos
-            else:
-                exit_vec = conf[h_nb_idx] - conf[join_idx]
-
-            # Remove that H
-            keep     = [i for i in range(len(labels_all)) if i != h_nb_idx]
-            f_labels = [labels_all[i] for i in keep]
-            f_coords = conf[keep]
-            new_join = join_idx - (1 if h_nb_idx is not None and h_nb_idx < join_idx else 0)
-
-            return f_labels, f_coords, new_join, exit_vec
-
-        # ── VeloxChem Molecule path (unchanged) ───────────────────────────
+        # VeloxChem Molecule path
         labels = list(obj.get_labels())
         coords = np.array(obj.get_coordinates_in_angstrom())
         h_idx  = next(
             (i for i, (l, p) in enumerate(zip(labels, coords))
-             if l == 'H' and np.linalg.norm(p - coords[index]) < 1.3),
+             if l == 'H' and np.linalg.norm(p-coords[index]) < 1.3),
             -1,
         )
         if h_idx != -1:
             exit_vec = coords[h_idx] - coords[index]
-            labels.pop(h_idx)
-            coords = np.delete(coords, h_idx, axis=0)
-            if index > h_idx:
-                index -= 1
+            labels.pop(h_idx); coords = np.delete(coords, h_idx, axis=0)
+            if index > h_idx: index -= 1
         else:
             nbs      = [coords[i] for i in range(len(coords))
-                        if i != index and np.linalg.norm(coords[i] - coords[index]) < 1.8]
-            exit_vec = -np.mean([n - coords[index] for n in nbs], axis=0) if nbs \
+                        if i != index and np.linalg.norm(coords[i]-coords[index]) < 1.8]
+            exit_vec = -np.mean([n-coords[index] for n in nbs], axis=0) if nbs \
                        else np.array([0., 0., 1.])
         return labels, coords, index, exit_vec
 
@@ -1397,10 +1280,11 @@ class MoleculeToolkit:
                     new_labels.append(labels[i]); new_coords.append(coords[i])
                     old_to_new[i] = curr; curr += 1
 
-            pruned    = vlx.Molecule(new_labels, np.array(new_coords), 'angstrom')
-            new_anch  = old_to_new[anchor_idx]
+            pruned   = vlx.Molecule(new_labels, np.array(new_coords), 'angstrom')
+            # old_to_new yields 0-based positions; add 1 for VeloxChem's 1-based convention
+            new_anch = old_to_new[anchor_idx] + 1
             tmp_lab, _, _, _ = self._prepare_organic_fragment(new_smiles)
-            dist      = bond_length or self._bond_defaults.get(tmp_lab[0], 1.54)
+            dist     = bond_length or self._bond_defaults.get(tmp_lab[0], 1.54)
             final_mol = self.link_at_vector(pruned, new_smiles, new_anch, exit_vec, dist)
             results['molecules'].append(final_mol)
             results['radical_indices'].append(new_anch)
@@ -1467,7 +1351,7 @@ class MoleculeToolkit:
                     old_to_new[i] = curr; curr += 1
             output['molecules'].append(
                 vlx.Molecule(new_labels, np.array(new_coords), 'angstrom'))
-            output['radical_indices'].append(old_to_new[rad_idx])
+            output['radical_indices'].append(old_to_new[rad_idx] + 1)  # 1-based (VeloxChem convention)
 
         return output
 
