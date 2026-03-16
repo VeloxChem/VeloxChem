@@ -339,6 +339,7 @@ class TdaEigenSolverBase(LinearSolver):
         for key, val in vars(self).items():
             if isinstance(val, (MPI.Intracomm, OutputStream)):
                 continue
+
             if isinstance(val, XCFunctional):
                 setattr(new_rsp_drv, key, XCFunctional(val))
             elif isinstance(val, MolecularGrid):
@@ -517,6 +518,7 @@ class TdaEigenSolverBase(LinearSolver):
                           broadening_value=broadening_value)
         elif plot_type.lower() == "electronic":
             fig, axs = plt.subplots(2, 1, figsize=(8, 10))
+            # Increase the height space between subplots
             fig.subplots_adjust(hspace=0.3)
 
             if self.core_excitation:

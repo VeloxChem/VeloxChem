@@ -384,8 +384,9 @@ class LinearResponseEigenSolverBase(LinearSolver):
 
         for key, val in vars(self).items():
             if isinstance(val, (MPI.Intracomm, OutputStream)):
-                pass
-            elif isinstance(val, XCFunctional):
+                continue
+
+            if isinstance(val, XCFunctional):
                 new_rsp_drv.key = XCFunctional(val)
             elif isinstance(val, MolecularGrid):
                 new_rsp_drv.key = MolecularGrid(val)
@@ -525,6 +526,15 @@ class LinearResponseEigenSolverBase(LinearSolver):
                  ax=None):
         """
         Plot the X-ray absorption spectrum from the response calculation.
+
+        :param rsp_results:
+            The dictionary containing the linear response results.
+        :param broadening_type:
+            The type of broadening to use. Either 'lorentzian' or 'gaussian'.
+        :param broadening_value:
+            The broadening value in eV.
+        :param ax:
+            The matplotlib axis to plot on.
         """
 
         assert_msg_critical(
@@ -547,6 +557,15 @@ class LinearResponseEigenSolverBase(LinearSolver):
                     ax=None):
         """
         Plot the UV-Vis absorption spectrum from the response calculation.
+
+        :param rsp_results:
+            The dictionary containing the linear response results.
+        :param broadening_type:
+            The type of broadening to use. Either 'lorentzian' or 'gaussian'.
+        :param broadening_value:
+            The broadening value in eV.
+        :param ax:
+            The matplotlib axis to plot on.
         """
 
         assert_msg_critical(
@@ -569,6 +588,15 @@ class LinearResponseEigenSolverBase(LinearSolver):
                  ax=None):
         """
         Plot the X-ray CD spectrum from the response calculation.
+
+        :param rsp_results:
+            The dictionary containing linear response results.
+        :param broadening_type:
+            The type of broadening to use. Either 'lorentzian' or 'gaussian'.
+        :param broadening_value:
+            The broadening value in eV.
+        :param ax:
+            The matplotlib axis to plot on.
         """
 
         assert_msg_critical(
@@ -591,6 +619,15 @@ class LinearResponseEigenSolverBase(LinearSolver):
                  ax=None):
         """
         Plot the CD spectrum from the response calculation.
+
+        :param rsp_results:
+            The dictionary containing linear response results.
+        :param broadening_type:
+            The type of broadening to use. Either 'lorentzian' or 'gaussian'.
+        :param broadening_value:
+            The broadening value in eV.
+        :param ax:
+            The matplotlib axis to plot on.
         """
 
         assert_msg_critical(
@@ -613,6 +650,16 @@ class LinearResponseEigenSolverBase(LinearSolver):
              plot_type="electronic"):
         """
         Plot the absorption or ECD spectrum from the response calculation.
+
+        :param rsp_results:
+            The dictionary containing linear response results.
+        :param broadening_type:
+            The type of broadening to use. 'lorentzian' or 'gaussian'.
+        :param broadening_value:
+            The broadening value in eV.
+        :param plot_type:
+            The type of plot to generate. 'uv', 'xas', 'ecd', 'xcd', or
+            'electronic'.
         """
 
         assert_msg_critical('matplotlib' in sys.modules,
@@ -648,18 +695,15 @@ class LinearResponseEigenSolverBase(LinearSolver):
                               broadening_type=broadening_type,
                               broadening_value=broadening_value,
                               ax=axs[0])
-
                 self.plot_xcd(rsp_results,
                               broadening_type=broadening_type,
                               broadening_value=broadening_value,
                               ax=axs[1])
-
             else:
                 self.plot_uv_vis(rsp_results,
                                  broadening_type=broadening_type,
                                  broadening_value=broadening_value,
                                  ax=axs[0])
-
                 self.plot_ecd(rsp_results,
                               broadening_type=broadening_type,
                               broadening_value=broadening_value,
