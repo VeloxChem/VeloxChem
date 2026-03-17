@@ -65,6 +65,7 @@
 #include "LocalCorePotentialGeom0X0Driver.hpp"
 #include "LocalCorePotentialGeomXY0Driver.hpp"
 #include "CorePotentialGradientDriver.hpp"
+#include "CorePotentialHessianDriver.hpp"
 
 namespace vlx_t2cintegrals {
 
@@ -688,6 +689,51 @@ export_t2cintegrals(py::module& m)
                return ecp_drv.compute_pot_grad(basis, molecule, iatom);
             },
              "Computes ECP matrix for given molecule, basis, vector of atoms.");
+    
+    // CCorePotentialHessianDriver class
+    PyClass<CCorePotentialHessianDriver>(m, "ECPHessianDriver")
+        .def(py::init<>())
+        .def(
+            "compute_geom_200",
+            [](const CCorePotentialHessianDriver& ecp_drv,
+               const CMolecule&                   molecule,
+               const CMolecularBasis&             basis,
+               const std::vector<int>&            atoms,
+               const int                          iatom) -> CMatrices {
+               return ecp_drv.compute_geom_200(basis, molecule, atoms, iatom);
+            },
+             "Computes ECP matrix for given molecule, basis, vector of atoms.")
+        .def(
+            "compute_geom_101",
+            [](const CCorePotentialHessianDriver& ecp_drv,
+               const CMolecule&                   molecule,
+               const CMolecularBasis&             basis,
+               const std::vector<int>&            atoms,
+               const int                          iatom,
+               const int                          jatom) -> CMatrices {
+               return ecp_drv.compute_geom_101(basis, molecule, atoms, iatom, jatom);
+            },
+             "Computes ECP matrix for given molecule, basis, vector of atoms.")
+        .def(
+            "compute_geom_110",
+            [](const CCorePotentialHessianDriver& ecp_drv,
+               const CMolecule&                   molecule,
+               const CMolecularBasis&             basis,
+               const int                          iatom,
+               const int                          jatom) -> CMatrices {
+               return ecp_drv.compute_geom_110(basis, molecule, iatom, jatom);
+            },
+             "Computes ECP matrix for given molecule, basis, vector of atoms.")
+        .def(
+            "compute_geom_020",
+            [](const CCorePotentialHessianDriver& ecp_drv,
+               const CMolecule&                   molecule,
+               const CMolecularBasis&             basis,
+               const int                          iatom) -> CMatrices {
+               return ecp_drv.compute_geom_020(basis, molecule, iatom);
+            },
+             "Computes ECP matrix for given molecule, basis, vector of atoms.");
+        
 }
 
 }  // namespace vlx_t2cintegrals
