@@ -135,17 +135,11 @@ class CphfSolver(LinearSolver):
         if self.lindep_thresh is None:
             self.lindep_thresh = self.conv_thresh * 1.0e-2
 
-        # sanity check
-        nalpha = molecule.number_of_alpha_electrons()
-        nbeta = molecule.number_of_beta_electrons()
-        assert_msg_critical(
-            nalpha == nbeta,
-            'CphfSolver: not implemented for unrestricted case')
-
         self.start_time = tm.time()
 
         # check molecule
-        molecule_sanity_check(molecule)
+        # this special method is only implemented for restricted case
+        molecule_sanity_check(molecule, 'restricted')
 
         # check SCF results
         scf_results_sanity_check(self, scf_results)
@@ -368,6 +362,11 @@ class CphfSolver(LinearSolver):
             'memory_profiling': self.memory_profiling,
             'memory_tracing': self.memory_tracing,
         })
+
+        if self.norm_thresh is None:
+            self.norm_thresh = self.conv_thresh * 1.0e-6
+        if self.lindep_thresh is None:
+            self.lindep_thresh = self.conv_thresh * 1.0e-2
 
         self.start_time = tm.time()
 
