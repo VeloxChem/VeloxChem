@@ -501,6 +501,20 @@ export_t2cintegrals(py::module& m)
                 -> CMatrices { return geom_drv.compute(basis, molecule, ecp_potential, ecp_momentum, iatom); },
             "Computes projected core potential first derivatives matrices for given molecule, basis and selected atom.");
     
+    // CProjectedCorePotentialGeom200Driver class
+    PyClass<CProjectedCorePotentialGeomX00Driver<2>>(m, "ProjectedECPGeom200Driver")
+        .def(py::init<>())
+        .def(
+            "compute",
+            [](const CProjectedCorePotentialGeomX00Driver<2>& geom_drv,
+               const CMolecule&                               molecule,
+               const CMolecularBasis&                         basis,
+               const CBaseCorePotential&                      ecp_potential,
+               const int                                      ecp_momentum,
+               const int                                      iatom)
+                -> CMatrices { return geom_drv.compute(basis, molecule, ecp_potential, ecp_momentum, iatom); },
+            "Computes projected core potential first derivatives matrices for given molecule, basis and selected atom.");
+    
     // CLocalCorePotentialGeom100Driver class
     PyClass<CLocalCorePotentialGeomX00Driver<1>>(m, "LocalECPGeom100Driver")
         .def(py::init<>())

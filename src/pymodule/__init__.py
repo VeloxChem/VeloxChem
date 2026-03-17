@@ -73,6 +73,7 @@ from .veloxchemlib import LocalECPGeom020Driver
 from .veloxchemlib import LocalECPGeom110Driver
 from .veloxchemlib import ProjectedECPDriver
 from .veloxchemlib import ProjectedECPGeom100Driver
+from .veloxchemlib import ProjectedECPGeom200Driver
 from .veloxchemlib import ECPDriver
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import FockGeom1000Driver
