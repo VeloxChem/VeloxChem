@@ -254,7 +254,7 @@ class C6Driver(LinearSolver):
         self._dist_e2bung = None
 
         # check molecule
-        molecule_sanity_check(molecule)
+        molecule_sanity_check(molecule, 'restricted')
 
         # check SCF results
         scf_results_sanity_check(self, scf_results)
@@ -297,13 +297,6 @@ class C6Driver(LinearSolver):
                                n_points=self.n_points)
 
         self.start_time = tm.time()
-
-        # sanity check
-        nalpha = molecule.number_of_alpha_electrons()
-        nbeta = molecule.number_of_beta_electrons()
-        assert_msg_critical(nalpha == nbeta,
-                            'C6Driver: not implemented for unrestricted case')
-
         if self.rank == mpi_master():
             orb_ene = scf_results['E_alpha']
         else:

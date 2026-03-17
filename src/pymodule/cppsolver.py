@@ -139,7 +139,7 @@ class ComplexResponseSolver(ComplexResponseSolverBase):
             self.set_cpp_property(self.property)
 
         # check molecule
-        molecule_sanity_check(molecule)
+        molecule_sanity_check(molecule, 'restricted')
         # check SCF results
         scf_results_sanity_check(self, scf_results)
 
@@ -172,14 +172,6 @@ class ComplexResponseSolver(ComplexResponseSolverBase):
                                n_freqs=len(self.frequencies))
 
         self.start_time = tm.time()
-
-        # sanity check
-        nalpha = molecule.number_of_alpha_electrons()
-        nbeta = molecule.number_of_beta_electrons()
-        assert_msg_critical(
-            nalpha == nbeta,
-            f'{type(self).__name__}: not implemented for unrestricted case')
-
         if self.rank == mpi_master():
             orb_ene = scf_results['E_alpha']
         else:

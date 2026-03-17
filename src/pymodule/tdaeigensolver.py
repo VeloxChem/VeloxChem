@@ -121,7 +121,7 @@ class TdaEigenSolver(TdaEigenSolverBase):
             self.lindep_thresh = self.conv_thresh * 1.0e-2
 
         # check molecule
-        molecule_sanity_check(molecule)
+        molecule_sanity_check(molecule, 'restricted')
 
         # check SCF results
         scf_results_sanity_check(self, scf_results)
@@ -159,15 +159,6 @@ class TdaEigenSolver(TdaEigenSolverBase):
         # set start time
 
         self.start_time = tm.time()
-
-        # sanity check
-
-        nalpha = molecule.number_of_alpha_electrons()
-        nbeta = molecule.number_of_beta_electrons()
-        assert_msg_critical(
-            nalpha == nbeta,
-            f'{type(self).__name__}: not implemented for unrestricted case')
-
         # prepare molecular orbitals
 
         if self.rank == mpi_master():
