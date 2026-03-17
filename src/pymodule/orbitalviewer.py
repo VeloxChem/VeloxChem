@@ -398,6 +398,16 @@ class OrbitalViewer:
 
         if isinstance(mo_inp, str):
             if (label and isinstance(label, str)):
+                # for backward compatibility, check and update label
+                if label.startswith('rsp/') and (
+                        not label.startswith('rsp/nto/')):
+                    new_label = label.replace('rsp/', 'rsp/nto/')
+                    if MolecularOrbitals.check_label_validity(
+                            mo_inp, new_label):
+                        label = new_label
+                    elif MolecularOrbitals.check_label_validity(
+                            mo_inp, new_label + '_'):
+                        label = new_label + '_'
                 mo_object = MolecularOrbitals.read_hdf5(mo_inp, label=label)
             else:
                 mo_object = MolecularOrbitals.read_hdf5(mo_inp)
@@ -410,13 +420,16 @@ class OrbitalViewer:
 
         self._is_uhf = (mo_object.get_orbitals_type() == molorb.unrest)
 
+        nalpha = molecule.number_of_alpha_occupied_orbitals(self._basis)
+        nbeta = molecule.number_of_beta_occupied_orbitals(self._basis)
+
         # i_orb is an instance variable accessed by MultiPsi
-        self._i_orb = molecule.number_of_alpha_electrons() - 1
+        self._i_orb = nalpha - 1
         self._mo_coefs = mo_object.alpha_to_numpy()
 
         # In some cases (for example NTOs) the number of orbitals is less than
         # the number of electrons. In this case, print the middle orbital
-        if self._mo_coefs.shape[1] < molecule.number_of_alpha_electrons():
+        if self._mo_coefs.shape[1] < nalpha:
             self._i_orb = self._mo_coefs.shape[1] // 2
         if self._is_uhf:
             self._mo_coefs_beta = mo_object.beta_to_numpy()
@@ -434,9 +447,6 @@ class OrbitalViewer:
         self._this_plot += self._plt_iso_one
         self._this_plot += self._plt_iso_two
         self._this_plot.display()
-
-        nalpha = molecule.number_of_alpha_electrons()
-        nbeta = molecule.number_of_beta_electrons()
 
         # Create orbital list:
         orb_ene = mo_object.ea_to_numpy()
@@ -770,6 +780,16 @@ class OrbitalViewer:
 
         if isinstance(mo_inp, str):
             if (label and isinstance(label, str)):
+                # for backward compatibility, check and update label
+                if label.startswith('rsp/') and (
+                        not label.startswith('rsp/nto/')):
+                    new_label = label.replace('rsp/', 'rsp/nto/')
+                    if MolecularOrbitals.check_label_validity(
+                            mo_inp, new_label):
+                        label = new_label
+                    elif MolecularOrbitals.check_label_validity(
+                            mo_inp, new_label + '_'):
+                        label = new_label + '_'
                 mo_object = MolecularOrbitals.read_hdf5(mo_inp, label=label)
             else:
                 mo_object = MolecularOrbitals.read_hdf5(mo_inp)
@@ -782,21 +802,21 @@ class OrbitalViewer:
 
         self._is_uhf = (mo_object.get_orbitals_type() == molorb.unrest)
 
+        nalpha = molecule.number_of_alpha_occupied_orbitals(self._basis)
+        nbeta = molecule.number_of_beta_occupied_orbitals(self._basis)
+
         # i_orb is an instance variable accessed by MultiPsi
-        self._i_orb = molecule.number_of_alpha_electrons() - 1
+        self._i_orb = nalpha - 1
         self._mo_coefs = mo_object.alpha_to_numpy()
 
         # In some cases (for example NTOs) the number of orbitals is less than
         # the number of electrons. In this case, print the middle orbital
-        if self._mo_coefs.shape[1] < molecule.number_of_alpha_electrons():
+        if self._mo_coefs.shape[1] < nalpha:
             self._i_orb = self._mo_coefs.shape[1] // 2
         if self._is_uhf:
             self._mo_coefs_beta = mo_object.beta_to_numpy()
         else:
             self._mo_coefs_beta = self._mo_coefs
-
-        nalpha = molecule.number_of_alpha_electrons()
-        nbeta = molecule.number_of_beta_electrons()
 
         # Create orbital list:
         orb_ene = mo_object.ea_to_numpy()

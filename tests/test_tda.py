@@ -11,7 +11,13 @@ from veloxchem.tdaeigensolver import TdaEigenSolver
 @pytest.mark.solvers
 class TestTDA:
 
-    def run_tda(self, xcfun_label, basis_label, ref_exc_enes, ref_osc_str, tol):
+    def run_tda(self,
+                xcfun_label,
+                basis_label,
+                ref_exc_enes,
+                ref_osc_str,
+                tol,
+                ri_coulomb=False):
 
         xyz_string = """3
         xyz
@@ -26,6 +32,7 @@ class TestTDA:
         scf_drv = ScfRestrictedDriver()
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label
+        scf_drv.ri_coulomb = ri_coulomb
         scf_results = scf_drv.compute(mol, bas)
 
         lr_drv = TdaEigenSolver()
@@ -86,3 +93,102 @@ class TestTDA:
 
         self.run_tda('cam-b3lyp', 'def2-tzvp', ref_exc_enes, ref_osc_str,
                      1.0e-5)
+
+    def test_ri_blyp_svp(self):
+
+        # vlxtag: RKS, Absorption, TDA
+
+        ref_exc_enes = np.array(
+            [0.25974113, 0.33054867, 0.34244014, 0.41789336, 0.50103038])
+
+        ref_osc_str = np.array(
+            [0.016643, 0.000000, 0.081274, 0.066394, 0.293944])
+
+        self.run_tda('blyp',
+                     'def2-svp',
+                     ref_exc_enes,
+                     ref_osc_str,
+                     1.0e-5,
+                     ri_coulomb=True)
+
+    def run_tda_with_ecp(self, ref_exc_enes, ref_osc_str, tol):
+
+        xyz_string = """2
+        xyz
+        Au 0 0 0
+        Au 0 0 2.88
+        """
+        mol = Molecule.read_xyz_string(xyz_string)
+
+        bas = MolecularBasis.read(mol, 'def2-svp', ostream=None)
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_results = scf_drv.compute(mol, bas)
+
+        lr_drv = TdaEigenSolver()
+        lr_drv.ostream.mute()
+        lr_drv.nstates = 3
+        lr_results = lr_drv.compute(mol, bas, scf_results)
+
+        if lr_drv.rank == mpi_master():
+            assert np.max(np.abs(ref_exc_enes -
+                                 lr_results['eigenvalues'])) < tol
+            assert np.max(
+                np.abs(ref_osc_str -
+                       lr_results['oscillator_strengths'])) < 1.0e-4
+
+    def test_hf_with_ecp(self):
+
+        # vlxtag: RHF, Absorption, CIS
+
+        ref_exc_enes = np.array([0.11555805, 0.15539632, 0.16343183])
+        ref_osc_str = np.array([0.6238, 0.0000, 0.0027])
+
+        self.run_tda_with_ecp(ref_exc_enes, ref_osc_str, 1.0e-6)
+
+    def test_checkpoint_and_restart(self, tmp_path):
+
+        xyz_string = """3
+        xyz
+        O   -0.1858140  -1.1749469   0.7662596
+        H   -0.1285513  -0.8984365   1.6808606
+        H   -0.0582782  -0.3702550   0.2638279
+        """
+        mol = Molecule.read_xyz_string(xyz_string)
+        bas = MolecularBasis.read(mol, 'def2-svp', ostream=None)
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+
+        filename = str(tmp_path / "water_restart")
+        # To avoid inconsistency across MPI ranks
+        filename = scf_drv.comm.bcast(filename, root=mpi_master())
+
+        scf_drv.filename = filename
+        scf_results = scf_drv.compute(mol, bas)
+
+        lr_drv = TdaEigenSolver()
+        lr_drv.filename = filename
+        lr_drv.ostream.mute()
+
+        lr_drv.nstates = 5
+        lr_results_not_used = lr_drv.compute(mol, bas, scf_results)
+
+        lr_drv.restart = True
+        lr_drv.nstates = 10
+        lr_results_first = lr_drv.compute(mol, bas, scf_results)
+
+        lr_drv.restart = False
+        lr_drv.nstates = 10
+        lr_results_second = lr_drv.compute(mol, bas, scf_results)
+
+        if scf_drv.rank == mpi_master():
+            for key in [
+                    'eigenvalues',
+                    'oscillator_strengths',
+                    'rotatory_strengths',
+            ]:
+                assert np.max(
+                    np.abs(lr_results_first[key] -
+                           lr_results_second[key])) < 1e-10

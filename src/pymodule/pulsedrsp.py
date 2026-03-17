@@ -244,7 +244,7 @@ class PulsedResponse:
         self.rsp_driver = ComplexResponse(self.comm, self.ostream)
         self.rsp_driver.update_settings(cpp_settings, method_settings)
 
-    def compute(self, molecule, ao_basis, scf_tensors):
+    def compute(self, molecule, ao_basis, scf_results):
         """
         Invoke complex response solver to compute complex response
         function at requested frequencies
@@ -253,7 +253,7 @@ class PulsedResponse:
             The molecule.
         :param aobasis:
             The AO basis.
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
 
         :return:
@@ -269,7 +269,7 @@ class PulsedResponse:
                 'Entering CPP Solver from Pulsed Linear Response')
 
         # Launch the rsp_driver calculations on the selected frequencies
-        results = self.rsp_driver.compute(molecule, ao_basis, scf_tensors)
+        results = self.rsp_driver.compute(molecule, ao_basis, scf_results)
 
         if self.rank == mpi_master():
             results['pulse_settings'] = self.pulse_settings

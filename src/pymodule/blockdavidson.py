@@ -69,25 +69,29 @@ class BlockDavidsonSolver:
         # Ritz data
         self.ritz_vectors = None
 
-    def add_iteration_data(self, sig_mat, trial_mat, iteration):
+    def add_iteration_data(self, sig_mat, trial_mat, neigenpairs):
         """
         Add sigma and trial vectors to sigma and trial matrices for specific
         iteration.
 
+        :param neigenpairs:
+            The number of eigenpairs.
         :param sig_mat:
             The sigma vectors {A * X_i} i = 0..l.
         :param trial_mat:
             The trial vectors {X_i} i = 0..l.
-        :param iteration:
-            The index of block Davidson iteration.
         """
 
-        if iteration == 0:
-            self.neigenpairs = sig_mat.shape[1]
+        self.neigenpairs = neigenpairs
+
+        if self.sigma_matrices is None:
             self.sigma_matrices = sig_mat
-            self.trial_matrices = trial_mat
         else:
             self.sigma_matrices = np.hstack((self.sigma_matrices, sig_mat))
+
+        if self.trial_matrices is None:
+            self.trial_matrices = trial_mat
+        else:
             self.trial_matrices = np.hstack((self.trial_matrices, trial_mat))
 
     def compute(self, diag_mat):

@@ -39,6 +39,7 @@ from .veloxchemlib import mpi_master
 from .distributedarray import DistributedArray
 from .errorhandler import assert_msg_critical
 from .molecule import Molecule
+from .molecularbasis import MolecularBasis
 
 
 def create_hdf5(fname, molecule, basis, dft_func_label, potfile_text):
@@ -62,8 +63,9 @@ def create_hdf5(fname, molecule, basis, dft_func_label, potfile_text):
     if valid_checkpoint:
         hf = h5py.File(fname, 'w')
 
-        hf.create_dataset('nuclear_repulsion',
-                          data=np.array([molecule.nuclear_repulsion_energy()]))
+        e_nuc = molecule.nuclear_repulsion_energy(basis)
+
+        hf.create_dataset('nuclear_repulsion', data=np.array([e_nuc]))
 
         hf.create_dataset('nuclear_charges', data=molecule.get_element_ids())
 
@@ -414,7 +416,8 @@ def check_rsp_hdf5(fname, labels, molecule, basis, dft_dict, pe_dict):
     if not valid_checkpoint:
         return False
 
-    e_nuc = molecule.nuclear_repulsion_energy()
+    e_nuc = molecule.nuclear_repulsion_energy(basis)
+
     nuclear_charges = molecule.get_element_ids()
     basis_set = basis.get_label()
 
@@ -630,11 +633,11 @@ def read_results(fname, label):
             the dictionary of results.
     """
 
-    valid_checkpoint = (fname and isinstance(fname, str) and
-                        Path(fname).is_file())
+    valid_filename = (fname and isinstance(fname, str))
+    assert_msg_critical(valid_filename, f"{fname!r} is not a valid filename.")
 
-    assert_msg_critical(valid_checkpoint,
-                        fname + " is not a valid checkpoint file.")
+    file_exists = Path(fname).is_file()
+    assert_msg_critical(file_exists, f"{fname!r} does not exist.")
 
     res_dict = {}
     h5f = h5py.File(fname, "r")
@@ -687,10 +690,7 @@ def read_results(fname, label):
             xyz_geometries.append(molecule.get_xyz_string())
         res_dict["opt_geometries"] = xyz_geometries
 
-    # Create molecule xyz
-    nuclear_charges = np.array(res_dict["nuclear_charges"]).astype(int)
-    coords = res_dict["atom_coordinates"]
-    molecule = Molecule(nuclear_charges, coords, units="au")
+    molecule, basis = read_molecule_and_basis(fname)
 
     xyz_lines = molecule.get_xyz_string().splitlines()
 
@@ -707,3 +707,56 @@ def read_results(fname, label):
     h5f.close()
 
     return res_dict
+
+
+def read_molecule_and_basis(fname):
+    """
+    Read molecule and AO basis set from a checkpoint file.
+
+    :param fname:
+        Name of the checkpoint file.
+
+    :return:
+        The molecule and AO basis set.
+    """
+
+    valid_filename = (fname and isinstance(fname, str))
+    assert_msg_critical(valid_filename, f"{fname!r} is not a valid filename.")
+
+    file_exists = Path(fname).is_file()
+    assert_msg_critical(file_exists, f"{fname!r} does not exist.")
+
+    molecule = None
+    basis = None
+
+    with h5py.File(fname, "r") as h5f:
+        nuclear_charges = np.array(h5f.get("nuclear_charges")).astype(int)
+        coords = np.array(h5f.get("atom_coordinates"))
+
+        atom_basis_labels = None
+        if "atom_basis_labels_flattened" in h5f:
+            atom_basis_labels_flattened = [
+                x.decode("utf-8")
+                for x in np.array(h5f.get("atom_basis_labels_flattened"))
+            ]
+            atom_basis_names = atom_basis_labels_flattened[0::2]
+            atom_basis_elems = atom_basis_labels_flattened[1::2]
+            atom_basis_labels = list(zip(atom_basis_names, atom_basis_elems))
+
+        if atom_basis_labels is not None:
+            molecule = Molecule(nuclear_charges, coords, "au",
+                                atom_basis_labels)
+        else:
+            molecule = Molecule(nuclear_charges, coords, "au")
+
+        if "molecular_charge" in h5f:
+            molecule.set_charge(float(np.array(h5f.get("molecular_charge"))[0]))
+
+        if "spin_multiplicity" in h5f:
+            molecule.set_multiplicity(
+                int(np.array(h5f.get("spin_multiplicity"))[0]))
+
+        basis_set_label = np.array(h5f.get("basis_set"))[0].decode("utf-8")
+        basis = MolecularBasis.read(molecule, basis_set_label, verbose=False)
+
+    return molecule, basis

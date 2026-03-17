@@ -41,7 +41,7 @@ from .profiler import Profiler
 from .distributedarray import DistributedArray
 from .linearsolver import LinearSolver
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           dft_sanity_check, pe_sanity_check,
+                           ri_sanity_check, dft_sanity_check, pe_sanity_check,
                            solvation_model_sanity_check)
 from .errorhandler import assert_msg_critical, safe_solve
 from .checkpoint import (check_rsp_hdf5, write_rsp_solution_with_multiple_keys)
@@ -155,6 +155,9 @@ class LinearResponseSolver(LinearSolver):
         if self.filename is not None and self.checkpoint_file is None:
             self.checkpoint_file = f'{self.filename}_rsp.h5'
 
+        # check RI setup
+        ri_sanity_check(self)
+
         # check dft setup
         dft_sanity_check(self, 'compute')
 
@@ -200,7 +203,7 @@ class LinearResponseSolver(LinearSolver):
             orb_ene = None
         orb_ene = self.comm.bcast(orb_ene, root=mpi_master())
         norb = orb_ene.shape[0]
-        nocc = molecule.number_of_alpha_electrons()
+        nocc = molecule.number_of_alpha_occupied_orbitals(basis)
 
         # ERI information
         eri_dict = self._init_eri(molecule, basis)

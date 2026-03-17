@@ -2577,9 +2577,10 @@ class IMForceFieldGenerator:
                     elif isinstance(self.drivers['gs'][0], XtbDriver):
                         
                         opt_results_mpi = _collective_call_inline_style(comm, rank, root, 'optimization tag', self._run_optimization, self.drivers['gs'][0],
-                            molecule,
-                            constraints=self.use_minimized_structures[1],
-                            index_offset=0)
+                            cur_molecule,
+                            constraints=constraints,
+                            index_offset=0,
+                            source_molecule=molecule)
                     
                         opt_results = opt_results_mpi[1]
                         optimized_molecule = opt_results_mpi[0]

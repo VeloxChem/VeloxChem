@@ -48,7 +48,7 @@ from .linearsolver import LinearSolver
 from .nonlinearsolver import NonlinearSolver
 from .distributedarray import DistributedArray
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           dft_sanity_check)
+                           ri_sanity_check, dft_sanity_check)
 from .errorhandler import assert_msg_critical
 from .checkpoint import (check_distributed_focks, read_distributed_focks,
                          write_distributed_focks)
@@ -135,7 +135,7 @@ class CubicResponseDriver(NonlinearSolver):
 
         super().update_settings(rsp_dict, method_dict)
 
-    def compute(self, molecule, ao_basis, scf_tensors):
+    def compute(self, molecule, ao_basis, scf_results):
         """
         Computes a cubic response function.
 
@@ -143,7 +143,7 @@ class CubicResponseDriver(NonlinearSolver):
             The molecule.
         :param basis:
             The AO basis.
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
 
         :return:
@@ -211,11 +211,14 @@ class CubicResponseDriver(NonlinearSolver):
         molecule_sanity_check(molecule)
 
         # check SCF results
-        scf_results_sanity_check(self, scf_tensors)
+        scf_results_sanity_check(self, scf_results)
 
         # update checkpoint_file after scf_results_sanity_check
         if self.filename is not None and self.checkpoint_file is None:
             self.checkpoint_file = f'{self.filename}_rsp.h5'
+
+        # check RI setup
+        ri_sanity_check(self)
 
         # check dft setup
         dft_sanity_check(self, 'compute', 'nonlinear')
@@ -240,9 +243,9 @@ class CubicResponseDriver(NonlinearSolver):
             'CubicResponseDriver: not implemented for unrestricted case')
 
         if self.rank == mpi_master():
-            S = scf_tensors['S']
-            da = scf_tensors['D_alpha']
-            mo = scf_tensors['C_alpha']
+            S = scf_results['S']
+            da = scf_results['D_alpha']
+            mo = scf_results['C_alpha']
             d_a_mo = np.linalg.multi_dot([mo.T, S, da, S, mo])
             norb = mo.shape[1]
         else:
@@ -257,8 +260,7 @@ class CubicResponseDriver(NonlinearSolver):
                 molecule, ao_basis, [0.0, 0.0, 0.0])
             quadrupole_mats = compute_quadrupole_integrals(
                 molecule, ao_basis, [0.0, 0.0, 0.0])
-            linmom_mats = compute_linear_momentum_integrals(
-                molecule, ao_basis)
+            linmom_mats = compute_linear_momentum_integrals(molecule, ao_basis)
             angmom_mats = compute_angular_momentum_integrals(
                 molecule, ao_basis, [0.0, 0.0, 0.0])
         else:
@@ -271,19 +273,19 @@ class CubicResponseDriver(NonlinearSolver):
         a_grad = linear_solver.get_complex_prop_grad(self._a_op_key,
                                                      [self.a_component],
                                                      molecule, ao_basis,
-                                                     scf_tensors)
+                                                     scf_results)
         b_grad = linear_solver.get_complex_prop_grad(self._b_op_key,
                                                      [self.b_component],
                                                      molecule, ao_basis,
-                                                     scf_tensors)
+                                                     scf_results)
         c_grad = linear_solver.get_complex_prop_grad(self._c_op_key,
                                                      [self.c_component],
                                                      molecule, ao_basis,
-                                                     scf_tensors)
+                                                     scf_results)
         d_grad = linear_solver.get_complex_prop_grad(self._d_op_key,
                                                      [self.d_component],
                                                      molecule, ao_basis,
-                                                     scf_tensors)
+                                                     scf_results)
 
         if self.rank == mpi_master():
             inv_sqrt_2 = 1.0 / np.sqrt(2.0)
@@ -388,7 +390,6 @@ class CubicResponseDriver(NonlinearSolver):
                     'y': 2 * self.ao2mo(mo, angmom_mats[1]) * (0.5j),
                     'z': 2 * self.ao2mo(mo, angmom_mats[2]) * (0.5j),
                 },
-
             }
         else:
             X = None
@@ -401,8 +402,8 @@ class CubicResponseDriver(NonlinearSolver):
             'damping', 'norm_thresh', 'lindep_thresh', 'conv_thresh',
             'max_iter', 'eri_thresh', 'timing', 'memory_profiling',
             'batch_size', 'restart', 'xcfun', 'grid_level', 'potfile',
-            'electric_field', 'program_end_time', '_debug', '_block_size_factor',
-            'ri_coulomb'
+            'electric_field', 'program_end_time', '_debug',
+            '_block_size_factor', 'ri_coulomb'
         }
 
         for key in cpp_keywords:
@@ -413,7 +414,7 @@ class CubicResponseDriver(NonlinearSolver):
             fpath = fpath.with_name(fpath.stem)
             N_drv.checkpoint_file = str(fpath) + '_crf_1.h5'
 
-        N_results = N_drv.compute(molecule, ao_basis, scf_tensors, ABCD)
+        N_results = N_drv.compute(molecule, ao_basis, scf_results, ABCD)
 
         self._is_converged = N_drv.is_converged
 
@@ -424,7 +425,7 @@ class CubicResponseDriver(NonlinearSolver):
 
         cubic_dict = self.compute_cubic_components(Focks, freqtriples, X,
                                                    d_a_mo, Nx, self.comp,
-                                                   scf_tensors, molecule,
+                                                   scf_results, molecule,
                                                    ao_basis, profiler)
 
         valstr = '*** Time spent in cubic response calculation: '
@@ -438,7 +439,7 @@ class CubicResponseDriver(NonlinearSolver):
         return cubic_dict
 
     def compute_cubic_components(self, Focks, freqtriples, X, d_a_mo, Nx, track,
-                                 scf_tensors, molecule, ao_basis, profiler):
+                                 scf_results, molecule, ao_basis, profiler):
         """
         Computes all the relevent terms to compute a general cubic response function
 
@@ -450,7 +451,7 @@ class CubicResponseDriver(NonlinearSolver):
             The SCF density in MO basis
         :param Nx:
             A dictonary containing all the response vectors in distributed form
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
         :param molecule:
             The molecule.
@@ -464,8 +465,8 @@ class CubicResponseDriver(NonlinearSolver):
         """
 
         if self.rank == mpi_master():
-            mo = scf_tensors['C_alpha']
-            F0 = np.linalg.multi_dot([mo.T, scf_tensors['F_alpha'], mo])
+            mo = scf_results['C_alpha']
+            F0 = np.linalg.multi_dot([mo.T, scf_results['F_alpha'], mo])
             norb = mo.shape[1]
         else:
             mo = None
@@ -479,7 +480,7 @@ class CubicResponseDriver(NonlinearSolver):
 
         eri_dict = self._init_eri(molecule, ao_basis)
 
-        dft_dict = self._init_dft(molecule, scf_tensors)
+        dft_dict = self._init_dft(molecule, scf_results)
 
         # computing all compounded first-order densities
         density_list1, density_list2, density_list3 = self.get_densities(
@@ -500,7 +501,7 @@ class CubicResponseDriver(NonlinearSolver):
         profiler.check_memory_usage('E[4]')
 
         Nxy, f_xy = self.get_nxy(freqtriples, Nx, fock_dict, Focks, nocc, norb,
-                                 d_a_mo, X, molecule, ao_basis, scf_tensors)
+                                 d_a_mo, X, molecule, ao_basis, scf_results)
 
         profiler.check_memory_usage('2nd CPP')
 
@@ -687,7 +688,8 @@ class CubicResponseDriver(NonlinearSolver):
                 val_E3 = -(NaE3NbNcd)
                 val_X3 = NaB3NcNd + NaB3NdNc + NaC3NbNd + NaC3NdNb + NaD3NbNc + NaD3NcNb
                 val_X2 = NaB2Ncd + NaC2Nbd + NaD2Nbc
-                val_A3 = -(NdA3NbNc + NdA3NcNb + NbA3NcNd + NbA3NdNc + NcA3NbNd + NcA3NdNb)
+                val_A3 = -(NdA3NbNc + NdA3NcNb + NbA3NcNd + NbA3NdNc +
+                           NcA3NbNd + NcA3NdNb)
                 val_A2 = NbA2Ncd + NcdA2Nb + NcA2Nbd + NbdA2Nc + NdA2Nbc + NbcA2Nd
 
                 # flip sign for T4 and E3
@@ -1421,7 +1423,7 @@ class CubicResponseDriver(NonlinearSolver):
         return e4_vec, s4_vec, r4_vec
 
     def get_nxy(self, wi, Nx, fo, fo2, nocc, norb, d_a_mo, X, molecule,
-                ao_basis, scf_tensors):
+                ao_basis, scf_results):
         """
         Computed NXY
 
@@ -1556,8 +1558,8 @@ class CubicResponseDriver(NonlinearSolver):
             'damping', 'norm_thresh', 'lindep_thresh', 'conv_thresh',
             'max_iter', 'eri_thresh', 'timing', 'memory_profiling',
             'batch_size', 'restart', 'xcfun', 'grid_level', 'potfile',
-            'electric_field', 'program_end_time', '_debug', '_block_size_factor',
-            'ri_coulomb'
+            'electric_field', 'program_end_time', '_debug',
+            '_block_size_factor', 'ri_coulomb'
         }
 
         for key in cpp_keywords:
@@ -1568,7 +1570,7 @@ class CubicResponseDriver(NonlinearSolver):
             fpath = fpath.with_name(fpath.stem)
             Nxy_drv.checkpoint_file = str(fpath) + '_crf_2.h5'
 
-        Nxy_results = Nxy_drv.compute(molecule, ao_basis, scf_tensors, XY)
+        Nxy_results = Nxy_drv.compute(molecule, ao_basis, scf_results, XY)
 
         self._is_converged = (self._is_converged and Nxy_drv.is_converged)
 

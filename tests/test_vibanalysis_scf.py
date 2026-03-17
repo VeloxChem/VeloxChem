@@ -19,8 +19,9 @@ class TestScfVibrationalAnalysisDriver:
         h5file = str(here / 'data' / 'water_vib_scf.h5')
 
         task = MpiTask([inpfile, None])
-        scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
 
+        scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
+        scf_drv.acc_type = 'l2_c2diis'
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
         vib_settings = {
@@ -91,16 +92,14 @@ class TestScfVibrationalAnalysisDriver:
 
             hf = h5py.File(h5file)
             ref_frequencies = np.array(hf.get('frequencies'))
-            hf_rr = hf['resonance_raman']
-            ref_raman_activities = np.array(
-                [hf_rr.get('0.0'), hf_rr.get('0.4')])
+            ref_raman_activities = np.array(hf.get('resonance_raman'))
             hf.close()
 
             rel_diff_freq = np.max(
                 np.abs(vibanalysis_drv.vib_frequencies / ref_frequencies - 1.0))
             rel_diff_raman_dyn = np.max(
                 np.abs(vibanalysis_drv.raman_activities[0] /
-                       ref_raman_activities[1] - 1.0))
+                       ref_raman_activities - 1.0))
 
             assert rel_diff_freq < 1.0e-3
             assert rel_diff_raman_dyn < 1.0e-3
@@ -228,16 +227,14 @@ class TestScfVibrationalAnalysisDriver:
 
             hf = h5py.File(h5file)
             ref_frequencies = np.array(hf.get('frequencies'))
-            hf_rr = hf['resonance_raman']
-            ref_raman_activities = np.array(
-                [hf_rr.get('0.0'), hf_rr.get('0.4')])
+            ref_raman_activities = np.array(hf.get('resonance_raman'))
             hf.close()
 
             rel_diff_freq = np.max(
                 np.abs(vibanalysis_drv.vib_frequencies / ref_frequencies - 1.0))
             rel_diff_raman_dyn = np.max(
                 np.abs(vibanalysis_drv.raman_activities[0] /
-                       ref_raman_activities[1] - 1.0))
+                       ref_raman_activities - 1.0))
 
             assert rel_diff_freq < 1.0e-3
             assert rel_diff_raman_dyn < 1.0e-3

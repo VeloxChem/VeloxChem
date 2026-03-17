@@ -22,6 +22,7 @@ dummy.*
 *.DS_Store
 /.ccls-cache/
 .DS_Store
+*imgui.ini
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
