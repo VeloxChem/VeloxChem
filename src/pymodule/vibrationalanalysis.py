@@ -47,7 +47,7 @@ from .xtbdriver import XtbDriver
 from .xtbhessiandriver import XtbHessianDriver
 from .polarizabilitygradient import PolarizabilityGradient
 from .lrsolver import LinearResponseSolver
-from .cppsolver import ComplexResponse
+from .cppsolver import ComplexResponseSolver
 from .veloxchemlib import (mpi_master, bohr_in_angstrom, avogadro_constant,
                            fine_structure_constant, electron_mass_in_amu,
                            amu_in_kg, speed_of_light_in_vacuum_in_SI)
@@ -725,7 +725,7 @@ class VibrationalAnalysis:
         # perform a linear response calculation
         if self.do_resonance_raman:
             polgrad_drv.is_complex = True
-            lr_drv = ComplexResponse(self.comm, self.ostream)
+            lr_drv = ComplexResponseSolver(self.comm, self.ostream)
             lr_drv.update_settings(self.rsp_dict, self.method_dict)
             lr_drv.damping = polgrad_drv.damping
             # get absorption cross section from CPP calculations

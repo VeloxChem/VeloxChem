@@ -154,8 +154,8 @@ from .lreigensolver import LinearResponseEigenSolver
 from .lreigensolverunrest import LinearResponseUnrestrictedEigenSolver
 from .lrsolver import LinearResponseSolver
 from .lrsolverunrest import LinearResponseUnrestrictedSolver
-from .cppsolver import ComplexResponse
-from .cppsolverunrest import ComplexResponseUnrestricted
+from .cppsolver import ComplexResponseSolver
+from .cppsolverunrest import ComplexResponseUnrestrictedSolver
 from .tdacppsolver import ComplexResponseTDA
 from .c6driver import C6Driver
 from .quadraticresponsedriver import QuadraticResponseDriver
@@ -225,6 +225,7 @@ from .reactionmatcher import ReactionMatcher
 from .smddriver import SmdDriver
 from .atombdedriver import AtomBdeDriver
 # for backward compatibility only
+from .cppsolver import ComplexResponseSolver as ComplexResponse
 from .peforcefieldgenerator import PEForceFieldGenerator as LoPropDriver
 
 # Python functions

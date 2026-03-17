@@ -9,7 +9,7 @@ from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.lrsolver import LinearResponseSolver
-from veloxchem.cppsolver import ComplexResponse
+from veloxchem.cppsolver import ComplexResponseSolver
 from veloxchem.polorbitalresponse import PolOrbitalResponse
 
 
@@ -92,7 +92,7 @@ class TestCphfPolgrad:
         # linear response
         rsp_settings = {'conv_thresh': 1.0e-5, 'frequencies': (0.0, 0.4),
                         'damping': 0.5}
-        lr_drv = ComplexResponse()
+        lr_drv = ComplexResponseSolver()
         lr_drv.a_operator = "electric dipole"
         lr_drv.b_operator = "electric dipole"
         lr_drv.update_settings(rsp_settings)

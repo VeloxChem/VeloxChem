@@ -37,7 +37,7 @@ from .veloxchemlib import (mpi_master, fine_structure_constant,
                            extinction_coefficient_from_beta)
 from .profiler import Profiler
 from .distributedarray import DistributedArray
-from .cppsolverbase import ComplexResponseBase
+from .cppsolverbase import ComplexResponseSolverBase
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            ri_sanity_check, dft_sanity_check, pe_sanity_check,
                            solvation_model_sanity_check)
@@ -46,7 +46,7 @@ from .checkpoint import (check_rsp_hdf5, write_rsp_solution_with_multiple_keys)
 from .inputparser import parse_seq_fixed
 
 
-class ComplexResponseUnrestricted(ComplexResponseBase):
+class ComplexResponseUnrestrictedSolver(ComplexResponseSolverBase):
     """
     Implements the complex linear response solver.
 

@@ -5,7 +5,7 @@ from veloxchem.veloxchemlib import mpi_master
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
-from veloxchem.cppsolver import ComplexResponse
+from veloxchem.cppsolver import ComplexResponseSolver
 
 
 @pytest.mark.solvers
@@ -40,7 +40,7 @@ class TestCPP:
         scf_drv.acc_type = 'l2_c2diis'
         scf_results = scf_drv.compute(mol, bas)
 
-        lr_drv = ComplexResponse()
+        lr_drv = ComplexResponseSolver()
         lr_drv.ostream.mute()
         lr_drv.property = cpp_property
         lr_drv.frequencies = list(ref_x_data)

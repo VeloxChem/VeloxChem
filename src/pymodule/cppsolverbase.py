@@ -52,7 +52,7 @@ except ImportError:
     pass
 
 
-class ComplexResponseBase(LinearSolver):
+class ComplexResponseSolverBase(LinearSolver):
     """
     Shared functionality for complex linear response solvers.
     """
