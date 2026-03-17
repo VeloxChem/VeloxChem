@@ -119,7 +119,7 @@ class TestExciton:
         if 'xcfun' in method_dict:
             exciton_drv.xcfun = method_dict['xcfun']
 
-        exciton_drv.compute(task.molecule, task.ao_basis)
+        first_result = exciton_drv.compute(task.molecule, task.ao_basis)
 
         if task.mpi_rank == mpi_master():
 
@@ -137,6 +137,10 @@ class TestExciton:
 
             backup_H = np.array(exciton_drv.H)
 
+            np.testing.assert_allclose(first_result['hamiltonian'],
+                                       exciton_drv.H)
+            assert first_result['num_states'] == exciton_drv.H.shape[0]
+
         task.mpi_comm.barrier()
 
         # reset attributes and test update_settings
@@ -150,10 +154,14 @@ class TestExciton:
         exciton_drv.update_settings(exciton_dict, method_dict)
 
         exciton_drv.restart = True
-        exciton_drv.compute(task.molecule, task.ao_basis)
+        second_result = exciton_drv.compute(task.molecule, task.ao_basis)
 
         if task.mpi_rank == mpi_master():
             assert np.max(np.abs(backup_H - exciton_drv.H)) < 1.0e-10
+
+            np.testing.assert_allclose(second_result['hamiltonian'],
+                                       exciton_drv.H)
+            assert second_result['num_states'] == first_result['num_states']
 
             exciton_h5 = Path(exciton_drv.checkpoint_file)
 

@@ -858,6 +858,26 @@ class ExcitonModelDriver:
 
             self.ostream.flush()
 
+            return {
+                'hamiltonian': self.H.copy(),
+                'num_states': total_num_states,
+                'adiabatic_eigenvalues': eigvals.copy(),
+                'adiabatic_eigenvectors': eigvecs.copy(),
+                'adiabatic_electric_transition_dipoles':
+                    adia_elec_trans_dipoles.copy(),
+                'adiabatic_velocity_transition_dipoles':
+                    adia_velo_trans_dipoles.copy(),
+                'adiabatic_magnetic_transition_dipoles':
+                    adia_magn_trans_dipoles.copy(),
+                'excitation_energies_in_ev': eigvals * hartree_in_ev(),
+                'oscillator_strengths': np.array(osc_str, dtype=float),
+                'rotatory_strengths': np.array(rot_str, dtype=float),
+            }
+
+        else:
+            # non-master rank
+            return {}
+
     def get_excitation_ids(self, dimer_pairs):
         """
         Gets excitation indices.
