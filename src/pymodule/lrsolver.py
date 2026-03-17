@@ -88,6 +88,7 @@ class LinearResponseSolver(LinearSolver):
         self.a_components = 'xyz'
         self.b_operator = 'electric dipole'
         self.b_components = 'xyz'
+        self.property = None
         self.frequencies = (0,)
 
         self._input_keywords['response'].update({
@@ -112,6 +113,25 @@ class LinearResponseSolver(LinearSolver):
             method_dict = {}
 
         super().update_settings(rsp_dict, method_dict)
+
+    def set_lr_property(self, prop):
+        """
+        Sets linear-response property.
+
+        :param prop:
+            The linear-response property.
+        """
+
+        assert_msg_critical(prop.lower() in ['polarizability'],
+                            f'{type(self).__name__}: invalid LR property')
+
+        self.property = prop.lower()
+
+        if self.property == 'polarizability':
+            self.a_operator = 'electric dipole'
+            self.a_components = 'xyz'
+            self.b_operator = 'electric dipole'
+            self.b_components = 'xyz'
 
     def compute(self, molecule, basis, scf_results, v_grad=None):
         """
@@ -144,6 +164,10 @@ class LinearResponseSolver(LinearSolver):
         self._dist_e2bung = None
 
         self.has_external_rhs = False
+
+        # make sure that lr_property is properly set
+        if self.property is not None:
+            self.set_lr_property(self.property)
 
         # check molecule
         molecule_sanity_check(molecule)
@@ -713,7 +737,7 @@ class LinearResponseSolver(LinearSolver):
 
         return dist_new_ger, dist_new_ung
 
-    def _print_results(self, rsp_funcs, ostream):
+    def _print_polarizability_results(self, rsp_funcs, ostream):
         """
         Prints polarizability to output stream.
 
@@ -748,3 +772,29 @@ class LinearResponseSolver(LinearSolver):
                 ostream.print_blank()
 
         ostream.flush()
+
+    def print_property(self, rsp_funcs):
+        """
+        Prints response property to stdout.
+
+        :param rsp_funcs:
+            The response functions.
+        """
+
+        ostream = OutputStream.create_mpi_ostream(self.comm)
+
+        if self.property == 'polarizability':
+            self._print_polarizability_results(rsp_funcs, ostream)
+
+    def _print_results(self, rsp_funcs, ostream):
+        """
+        Prints response results to output stream.
+
+        :param rsp_funcs:
+            The response functions.
+        :param ostream:
+            The output stream.
+        """
+
+        if self.property == 'polarizability':
+            self._print_polarizability_results(rsp_funcs, ostream)

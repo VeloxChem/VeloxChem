@@ -161,6 +161,12 @@ class ResponseProperty:
                 self._rsp_driver = LinearResponseUnrestrictedSolver(
                     self.comm, self.ostream)
 
+            if self.prop_type in [
+                    'polarizability',
+                    'dipole polarizability',
+            ]:
+                self._rsp_driver.set_lr_property('polarizability')
+
         # Linear response complex solver
         elif (self._rsp_dict['order'] == 'linear' and
               self._rsp_dict['residue'] == 'none' and
@@ -187,7 +193,8 @@ class ResponseProperty:
             })
 
             if self.prop_type in [
-                    'linear absorption cross-section',
+                    'linear absorption cross-section (cpp)',
+                    'linear absorption cross-section(cpp)',
                     'linear absorption (cpp)',
                     'linear absorption(cpp)',
                     'absorption (cpp)',
@@ -196,7 +203,8 @@ class ResponseProperty:
                 self._rsp_driver.set_cpp_property('absorption')
 
             elif self.prop_type in [
-                    'circular dichroism spectrum',
+                    'circular dichroism spectrum (cpp)',
+                    'circular dichroism spectrum(cpp)',
                     'circular dichroism (cpp)',
                     'circular dichroism(cpp)',
                     'ecd (cpp)',
