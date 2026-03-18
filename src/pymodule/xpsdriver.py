@@ -82,8 +82,8 @@ class XPSDriver:
         self.energy_ranges = {
             'C': (-10.4, -10.1),
             'O': (-19.4, -19.1),
-            'S': (-9.0, -8.7),
             'N': (-14.5, -14.2),
+            'S': (-89.0, -88.0),
         }
 
     def update_settings(self, xps_dict, method_dict=None):
@@ -105,10 +105,12 @@ class XPSDriver:
             if key in xps_keywords:
                 setattr(self, key, xps_dict[key])
 
-    def _find_core_orbital_indices(self, scf_results, element_symbol):
+    def _find_core_orbital_indices(self, molecule, scf_results, element_symbol):
         """
         Finds the indices of core orbitals for a given element.
 
+        :param molecule:
+            The molecule object.
         :param scf_results:
             The SCF results dictionary containing orbital energies.
         :param element_symbol:
@@ -132,23 +134,67 @@ class XPSDriver:
             f'XPSDriver._find_core_orbital_indices: Element {element_symbol} not supported. '
             f'Supported elements: {list(self.energy_ranges.keys())}')
 
+        # Count atoms of this element in the molecule
+        elem_labels = molecule.get_labels()
+        expected_count = sum(1 for label in elem_labels if label == element_symbol)
+
+        if expected_count == 0:
+            if self.rank == mpi_master():
+                self.ostream.print_info(
+                    f'Warning: No {element_symbol} atoms found in molecule.')
+            return []
+
+        # Start with default energy range
         emin, emax = self.energy_ranges[element_symbol]
-        indices = [
-            index for index, energy in enumerate(orbital_energies)
-            if emin <= energy <= emax
-        ]
+        expansion_factor = 0.0
+        max_expansions = 5
+        
+        for expansion in range(max_expansions):
+            # Expand range if needed
+            if expansion > 0:
+                expansion_factor = 0.1 * expansion
+                e_range = emax - emin
+                emin_expanded = emin - e_range * expansion_factor
+                emax_expanded = emax + e_range * expansion_factor
+            else:
+                emin_expanded = emin
+                emax_expanded = emax
+
+            indices = [
+                index for index, energy in enumerate(orbital_energies)
+                if emin_expanded <= energy <= emax_expanded
+            ]
+
+            if len(indices) == expected_count:
+                if expansion > 0 and self.rank == mpi_master():
+                    self.ostream.print_info(
+                        f'Found {len(indices)} core orbital(s) for {element_symbol} '
+                        f'with expanded range [{emin_expanded:.3f}, {emax_expanded:.3f}] Ha')
+                break
+            elif len(indices) > expected_count:
+                # Too many found, likely overlapping ranges
+                if self.rank == mpi_master():
+                    self.ostream.print_info(
+                        f'Warning: Found {len(indices)} core orbitals but expected {expected_count} '
+                        f'for {element_symbol}. Using all found orbitals.')
+                break
 
         assert_msg_critical(
             len(indices) > 0,
             f'XPSDriver._find_core_orbital_indices: No core orbital found for element '
-            f'{element_symbol} in the energy range [{emin}, {emax}] Hartree.')
+            f'{element_symbol}. Expected {expected_count} based on molecule composition.')
+
+        if len(indices) < expected_count and self.rank == mpi_master():
+            self.ostream.print_info(
+                f'Warning: Found only {len(indices)} core orbital(s) but expected {expected_count} '
+                f'for {element_symbol}. Consider adjusting energy_ranges.')
 
         return indices
 
-    def compute(self, molecule, basis, scf_driver, element):
+    def compute(self, molecule, basis, scf_driver, element=None, elements=None):
         """
-        Computes core ionization energies for all core orbitals of the
-        specified element using the full core-hole (FCH) approximation.
+        Computes core ionization energies for specified element(s) using 
+        the full core-hole (FCH) approximation.
 
         :param molecule:
             The molecule object (neutral ground state).
@@ -157,19 +203,47 @@ class XPSDriver:
         :param scf_driver:
             The converged SCF driver object (e.g., ScfRestrictedDriver).
         :param element:
-            The chemical symbol of the element (e.g., 'C', 'O', 'N', 'S').
+            Single element as string (e.g., 'C', 'O', 'N', 'S').
+        :param elements:
+            List of element symbols (e.g., ['C', 'O']).
 
         :return:
             Dictionary with element as key and list of (orbital_index, ionization_energy)
             tuples as value. Ionization energies are in eV.
         """
 
+        # Handle both element (single string) and elements (list)
+        if element is not None and elements is not None:
+            assert_msg_critical(
+                False,
+                'XPSDriver.compute: Specify either element or elements, not both.')
+        
+        if element is not None:
+            elements_list = [element]
+        elif elements is not None:
+            if isinstance(elements, str):
+                elements_list = [elements]
+            else:
+                elements_list = list(elements)
+        else:
+            assert_msg_critical(
+                False,
+                'XPSDriver.compute: Must specify either element or elements parameter.')
+
+        # Validate all elements are supported
+        for elem in elements_list:
+            assert_msg_critical(
+                elem in self.energy_ranges,
+                f'XPSDriver.compute: Element {elem} not supported. '
+                f'Supported elements: {list(self.energy_ranges.keys())}')
+
         if self.rank == mpi_master():
             self.ostream.print_blank()
             self.ostream.print_header('XPS Driver')
             self.ostream.print_header('=' * 80)
             self.ostream.print_blank()
-            self.ostream.print_info(f'Computing core ionization energies for element: {element}')
+            elem_str = ', '.join(elements_list)
+            self.ostream.print_info(f'Computing core ionization energies for element(s): {elem_str}')
             self.ostream.print_blank()
             self.ostream.flush()
 
@@ -185,19 +259,6 @@ class XPSDriver:
         # Get XC functional from ground state calculation
         xcfun = scf_driver.xcfun
 
-        # Find core orbital indices for the specified element
-        if self.rank == mpi_master():
-            core_orbital_indices = self._find_core_orbital_indices(scf_results, element)
-            self.ostream.print_info(
-                f'Found {len(core_orbital_indices)} core orbital(s) for {element}: '
-                f'{core_orbital_indices}')
-            self.ostream.print_blank()
-            self.ostream.flush()
-        else:
-            core_orbital_indices = None
-
-        core_orbital_indices = self.comm.bcast(core_orbital_indices, root=mpi_master())
-
         # Create molecular ion (+1 charge, doublet spin state)
         molecular_ion = copy.deepcopy(molecule)
         molecular_ion.set_charge(molecule.get_charge() + 1)
@@ -206,44 +267,71 @@ class XPSDriver:
         # Number of alpha electrons in neutral molecule
         nalpha = molecule.number_of_alpha_electrons()
 
-        # Calculate ionization energies for each core orbital
-        ionization_energies = []
+        # Results dictionary
+        results = {}
 
-        for mo_index in core_orbital_indices:
+        # Process each element
+        for elem in elements_list:
             if self.rank == mpi_master():
-                self.ostream.print_info(f'Computing FCH for orbital index {mo_index}...')
-                self.ostream.flush()
+                self.ostream.print_blank()
+                self.ostream.print_info(f'Processing element: {elem}')
+                self.ostream.print_info('-' * 60)
 
-            # Create occupation lists
-            # For FCH: remove one beta electron from the core orbital
-            occa = np.arange(0, nalpha, 1).tolist()
-            occb = np.arange(0, nalpha, 1).tolist()
-            occb.remove(mo_index)
-
-            # Setup unrestricted SCF calculation with FCH
-            scf_ion = ScfUnrestrictedDriver(self.comm, self.ostream)
-            scf_ion.xcfun = xcfun  # Use same functional as ground state
-
-            # Apply maximum overlap method to maintain core hole
-            scf_ion.maximum_overlap(molecular_ion, basis, orbs, occa, occb)
-
-            # Compute FCH state
-            fch_results = scf_ion.compute(molecular_ion, basis)
-            fch_energy = scf_ion.get_scf_energy()
-
-            # Calculate core ionization energy (in eV)
-            ie = (fch_energy - gs_energy) * hartree_in_ev()
-
-            ionization_energies.append((mo_index, ie))
-
+            # Find core orbital indices for this element
             if self.rank == mpi_master():
-                self.ostream.print_info(
-                    f'  Orbital {mo_index}: Ionization Energy = {ie:.2f} eV')
+                core_orbital_indices = self._find_core_orbital_indices(molecule, scf_results, elem)
+                if len(core_orbital_indices) > 0:
+                    self.ostream.print_info(
+                        f'Found {len(core_orbital_indices)} core orbital(s) for {elem}: '
+                        f'{core_orbital_indices}')
                 self.ostream.print_blank()
                 self.ostream.flush()
+            else:
+                core_orbital_indices = None
 
-        # Create results dictionary
-        results = {element: ionization_energies}
+            core_orbital_indices = self.comm.bcast(core_orbital_indices, root=mpi_master())
+
+            # Skip if no orbitals found
+            if len(core_orbital_indices) == 0:
+                continue
+
+            # Calculate ionization energies for each core orbital
+            ionization_energies = []
+
+            for mo_index in core_orbital_indices:
+                if self.rank == mpi_master():
+                    self.ostream.print_info(f'Computing FCH for {elem} orbital index {mo_index}...')
+                    self.ostream.flush()
+
+                # Create occupation lists
+                # For FCH: remove one beta electron from the core orbital
+                occa = np.arange(0, nalpha, 1).tolist()
+                occb = np.arange(0, nalpha, 1).tolist()
+                occb.remove(mo_index)
+
+                # Setup unrestricted SCF calculation with FCH
+                scf_ion = ScfUnrestrictedDriver(self.comm, self.ostream)
+                scf_ion.xcfun = xcfun  # Use same functional as ground state
+
+                # Apply maximum overlap method to maintain core hole
+                scf_ion.maximum_overlap(molecular_ion, basis, orbs, occa, occb)
+
+                # Compute FCH state
+                fch_results = scf_ion.compute(molecular_ion, basis)
+                fch_energy = scf_ion.get_scf_energy()
+
+                # Calculate core ionization energy (in eV)
+                ie = (fch_energy - gs_energy) * hartree_in_ev()
+
+                ionization_energies.append((mo_index, ie))
+
+                if self.rank == mpi_master():
+                    self.ostream.print_info(
+                        f'  Orbital {mo_index}: Ionization Energy = {ie:.2f} eV')
+                    self.ostream.print_blank()
+                    self.ostream.flush()
+
+            results[elem] = ionization_energies
 
         if self.rank == mpi_master():
             self.ostream.print_blank()
@@ -289,6 +377,8 @@ class XPSDriver:
                       results,
                       broadening_type="lorentzian",
                       broadening_value=0.5,
+                      separate_plots=False,
+                      colors='vlx',
                       ax=None):
         """
         Plot the XPS spectrum from the computed results.
@@ -299,14 +389,23 @@ class XPSDriver:
             The type of broadening to use. Either 'lorentzian' or 'gaussian'.
         :param broadening_value:
             The broadening value (FWHM) in eV.
+        :param separate_plots:
+            If True, create separate subplots for each element.
+            If False, plot all elements on the same spectrum.
+        :param colors:
+            Color scheme for plotting. Either 'vlx' for VeloxChem default color (darkcyan)
+            or 'cpk' for CPK coloring. Default is 'vlx'.
         :param ax:
             The matplotlib axis to plot on. If None, a new figure is created.
+            Only used when separate_plots=False.
 
         :return:
-            The matplotlib axis object.
+            The matplotlib axis object (or array of axes if separate_plots=True).
         """
 
         return plot_xps_spectrum(results,
                                 broadening_type=broadening_type,
                                 broadening_value=broadening_value,
+                                separate_plots=separate_plots,
+                                colors=colors,
                                 ax=ax)

@@ -424,6 +424,8 @@ def gaussian_ecd(x, y, xmin, xmax, xstep, sigma):
 def plot_xps_spectrum(xps_results,
                       broadening_type="lorentzian",
                       broadening_value=0.5,
+                      separate_plots=True,
+                      colors='vlx',
                       ax=None):
     """
     Plot the XPS (X-ray Photoelectron Spectroscopy) spectrum.
@@ -435,11 +437,17 @@ def plot_xps_spectrum(xps_results,
         The type of broadening to use. Either 'lorentzian' or 'gaussian'.
     :param broadening_value:
         The broadening value (FWHM) in eV.
+    :param separate_plots:
+        If True, create separate subplots for each element.
+        If False, plot all elements on the same spectrum.
+    :param colors:
+        Color scheme. Either 'vlx' for VeloxChem default (darkcyan) or 'cpk' for CPK coloring.
+        Default is 'vlx'.
     :param ax:
-        The matplotlib axis to plot on.
+        The matplotlib axis to plot on (only used when separate_plots=False).
 
     :return:
-        The matplotlib axis object.
+        The matplotlib axis object (or array of axes if separate_plots=True).
     """
 
     assert_msg_critical('matplotlib' in sys.modules, 'matplotlib is required.')
@@ -448,30 +456,174 @@ def plot_xps_spectrum(xps_results,
         broadening_type.lower() in ['lorentzian', 'gaussian'],
         f'plot_xps_spectrum: Invalid broadening_type: {broadening_type}')
 
-    # Extract all ionization energies and assign equal intensities
-    energies = []
-    intensities = []
-    elements_labels = []
+    assert_msg_critical(
+        colors.lower() in ['cpk', 'vlx'],
+        f'plot_xps_spectrum: Invalid colors: {colors}')
 
-    for element, ionization_data in xps_results.items():
-        for orbital_idx, ie in ionization_data:
-            energies.append(ie)
-            intensities.append(1.0)  # Equal intensity for all peaks
-            elements_labels.append(f"{element} (orb {orbital_idx})")
+    # CPK color scheme
+    cpk_colors = {
+        'C': '#909090',  # Gray
+        'O': '#FF0D0D',  # Red
+        'N': '#3050F8',  # Blue
+        'S': '#FFFF30',  # Yellow
+        'H': '#FFFFFF',  # White
+        'P': '#FF8000',  # Orange
+    }
+    vlx_color = 'darkcyan'
 
-    if len(energies) == 0:
+    # Check if there's any data
+    total_peaks = sum(len(data) for data in xps_results.values())
+    if total_peaks == 0:
         assert_msg_critical(False, 'plot_xps_spectrum: No XPS data to plot')
 
-    energies = np.array(energies)
-    intensities = np.array(intensities)
+    if separate_plots:
+        # Create separate subplot for each element
+        n_elements = len(xps_results)
+        fig, axes = plt.subplots(1, n_elements, figsize=(7 * n_elements, 5))
+        
+        if n_elements == 1:
+            axes = [axes]  # Make it iterable
 
-    # Initialize the plot
-    if ax is None:
-        fig, ax = plt.subplots(figsize=(8, 5))
+        for idx, (element, ionization_data) in enumerate(xps_results.items()):
+            ax_elem = axes[idx]
+            
+            # Get color for this element
+            if colors.lower() == 'cpk':
+                elem_color = cpk_colors.get(element, vlx_color)
+            else:
+                elem_color = vlx_color
+
+            # Extract data for this element
+            energies = np.array([ie for _, ie in ionization_data])
+            intensities = np.ones(len(energies))
+
+            # Plot on this subplot
+            _plot_single_element_xps(ax_elem, element, energies, intensities,
+                                    broadening_type, broadening_value,
+                                    elem_color)
+
+        plt.tight_layout()
+        return axes
+
+    else:
+        # Plot all elements on the same spectrum
+        if ax is None:
+            fig, ax = plt.subplots(figsize=(8, 5))
+
+        ax.set_xlabel('Binding Energy [eV]')
+        ax.set_ylabel('Intensity [a.u.]')
+        ax.set_title("XPS Spectrum")
+
+        # Create secondary y-axis for stick spectrum
+        ax2 = ax.twinx()
+        ax2.set_ylabel('Peak Intensity')
+
+        # Collect all energies for range determination
+        all_energies = []
+        for element, ionization_data in xps_results.items():
+            all_energies.extend([ie for _, ie in ionization_data])
+
+        xmin = max(0.0, min(all_energies) - 5.0)
+        xmax = max(all_energies) + 5.0
+        xstep = 0.01
+
+        # Initialize combined broadened spectrum
+        xi = np.arange(xmin, xmax, xstep)
+        yi_total = np.zeros(len(xi))
+
+        legend_handles = []
+
+        # Process each element
+        for element, ionization_data in xps_results.items():
+            # Get color for this element
+            if colors.lower() == 'cpk':
+                elem_color = cpk_colors.get(element, vlx_color)
+            else:
+                elem_color = vlx_color
+
+            # Extract data for this element
+            energies = np.array([ie for _, ie in ionization_data])
+            intensities = np.ones(len(energies))
+
+            # Plot stick spectrum for this element
+            for i in range(len(energies)):
+                ax2.plot(
+                    [energies[i], energies[i]],
+                    [0.0, intensities[i]],
+                    alpha=0.7,
+                    linewidth=2,
+                    color=elem_color,
+                )
+
+            # Apply broadening for this element
+            if broadening_type.lower() == "lorentzian":
+                xi_elem, yi_elem = lorentzian_xps(energies, intensities, xmin, xmax, xstep,
+                                                  broadening_value)
+            elif broadening_type.lower() == "gaussian":
+                xi_elem, yi_elem = gaussian_xps(energies, intensities, xmin, xmax, xstep,
+                                               broadening_value)
+
+            # Add to total spectrum
+            yi_total += yi_elem
+
+            # Add to legend
+            legend_handles.append(mlines.Line2D([], [],
+                                               color=elem_color,
+                                               alpha=0.7,
+                                               linewidth=2,
+                                               label=element))
+
+        # Plot total broadened spectrum
+        ax.plot(xi, yi_total, color="black", alpha=0.9, linewidth=2.5)
+
+        # Set plot limits
+        ax.set_xlim(xmin, xmax)
+        ax.set_ylim(0, max(yi_total) * 1.1)
+        ax2.set_ylim(0, 1.2)
+
+        # Add legend
+        label_spectrum = f'{broadening_type.capitalize()} '
+        label_spectrum += f'broadening ({broadening_value:.2f} eV FWHM)'
+        legend_spectrum = mlines.Line2D([], [],
+                                        color='black',
+                                        linestyle='-',
+                                        linewidth=2.5,
+                                        label=label_spectrum)
+        legend_handles.append(legend_spectrum)
+
+        ax2.legend(handles=legend_handles,
+                   frameon=False,
+                   borderaxespad=0.,
+                   loc='center left',
+                   bbox_to_anchor=(1.15, 0.5))
+
+        return ax
+
+
+def _plot_single_element_xps(ax, element, energies, intensities,
+                             broadening_type, broadening_value, color):
+    """
+    Helper function to plot XPS spectrum for a single element.
+
+    :param ax:
+        The matplotlib axis to plot on.
+    :param element:
+        The element symbol.
+    :param energies:
+        Array of binding energies.
+    :param intensities:
+        Array of intensities.
+    :param broadening_type:
+        'lorentzian' or 'gaussian'.
+    :param broadening_value:
+        FWHM in eV.
+    :param color:
+        Color for the element.
+    """
 
     ax.set_xlabel('Binding Energy [eV]')
     ax.set_ylabel('Intensity [a.u.]')
-    ax.set_title("XPS Spectrum")
+    ax.set_title(f"{element} 1s XPS Spectrum")
 
     # Create secondary y-axis for stick spectrum
     ax2 = ax.twinx()
@@ -484,7 +636,7 @@ def plot_xps_spectrum(xps_results,
             [0.0, intensities[i]],
             alpha=0.7,
             linewidth=2,
-            color="darkcyan",
+            color=color,
         )
 
     # Set up energy range for broadened spectrum
@@ -510,10 +662,10 @@ def plot_xps_spectrum(xps_results,
 
     # Add legend
     legend_bars = mlines.Line2D([], [],
-                                color='darkcyan',
+                                color=color,
                                 alpha=0.7,
                                 linewidth=2,
-                                label='Core orbitals')
+                                label=f'{element} core orbitals')
     label_spectrum = f'{broadening_type.capitalize()} '
     label_spectrum += f'broadening ({broadening_value:.2f} eV FWHM)'
     legend_spectrum = mlines.Line2D([], [],
@@ -526,8 +678,6 @@ def plot_xps_spectrum(xps_results,
                borderaxespad=0.,
                loc='center left',
                bbox_to_anchor=(1.15, 0.5))
-
-    return ax
 
 
 def lorentzian_xps(x, y, xmin, xmax, xstep, fwhm):
