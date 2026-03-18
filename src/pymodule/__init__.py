@@ -226,6 +226,8 @@ from .smddriver import SmdDriver
 from .atombdedriver import AtomBdeDriver
 # for backward compatibility only
 from .peforcefieldgenerator import PEForceFieldGenerator as LoPropDriver
+from .phf_parameterizer import PHFParameterizer
+from .artificial_mm_hessian_engine import ArtificialMMHessianEngine
 
 # Python functions
 from .errorhandler import assert_msg_critical
