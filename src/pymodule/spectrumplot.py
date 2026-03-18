@@ -419,3 +419,180 @@ def gaussian_ecd(x, y, xmin, xmax, xstep, sigma):
             yi[i] = yi[i] + y[k] * np.exp(-((xi[i] - x[k])**2) / (2 * sigma**2))
     yi = np.pi * yi / (sigma * np.sqrt(2 * np.pi))
     return xi, yi
+
+
+def plot_xps_spectrum(xps_results,
+                      broadening_type="lorentzian",
+                      broadening_value=0.5,
+                      ax=None):
+    """
+    Plot the XPS (X-ray Photoelectron Spectroscopy) spectrum.
+
+    :param xps_results:
+        The dictionary containing XPS results from XPSDriver.compute().
+        Format: {element: [(orbital_idx, ionization_energy), ...]}
+    :param broadening_type:
+        The type of broadening to use. Either 'lorentzian' or 'gaussian'.
+    :param broadening_value:
+        The broadening value (FWHM) in eV.
+    :param ax:
+        The matplotlib axis to plot on.
+
+    :return:
+        The matplotlib axis object.
+    """
+
+    assert_msg_critical('matplotlib' in sys.modules, 'matplotlib is required.')
+
+    assert_msg_critical(
+        broadening_type.lower() in ['lorentzian', 'gaussian'],
+        f'plot_xps_spectrum: Invalid broadening_type: {broadening_type}')
+
+    # Extract all ionization energies and assign equal intensities
+    energies = []
+    intensities = []
+    elements_labels = []
+
+    for element, ionization_data in xps_results.items():
+        for orbital_idx, ie in ionization_data:
+            energies.append(ie)
+            intensities.append(1.0)  # Equal intensity for all peaks
+            elements_labels.append(f"{element} (orb {orbital_idx})")
+
+    if len(energies) == 0:
+        assert_msg_critical(False, 'plot_xps_spectrum: No XPS data to plot')
+
+    energies = np.array(energies)
+    intensities = np.array(intensities)
+
+    # Initialize the plot
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(8, 5))
+
+    ax.set_xlabel('Binding Energy [eV]')
+    ax.set_ylabel('Intensity [a.u.]')
+    ax.set_title("XPS Spectrum")
+
+    # Create secondary y-axis for stick spectrum
+    ax2 = ax.twinx()
+    ax2.set_ylabel('Peak Intensity')
+
+    # Plot stick spectrum
+    for i in range(len(energies)):
+        ax2.plot(
+            [energies[i], energies[i]],
+            [0.0, intensities[i]],
+            alpha=0.7,
+            linewidth=2,
+            color="darkcyan",
+        )
+
+    # Set up energy range for broadened spectrum
+    xmin = max(0.0, min(energies) - 5.0)
+    xmax = max(energies) + 5.0
+    xstep = 0.01
+
+    # Apply broadening
+    if broadening_type.lower() == "lorentzian":
+        xi, yi = lorentzian_xps(energies, intensities, xmin, xmax, xstep,
+                                broadening_value)
+    elif broadening_type.lower() == "gaussian":
+        xi, yi = gaussian_xps(energies, intensities, xmin, xmax, xstep,
+                              broadening_value)
+
+    # Plot broadened spectrum
+    ax.plot(xi, yi, color="black", alpha=0.9, linewidth=2.5)
+
+    # Set plot limits
+    ax.set_xlim(xmin, xmax)
+    ax.set_ylim(0, max(yi) * 1.1)
+    ax2.set_ylim(0, max(intensities) * 1.1)
+
+    # Add legend
+    legend_bars = mlines.Line2D([], [],
+                                color='darkcyan',
+                                alpha=0.7,
+                                linewidth=2,
+                                label='Core orbitals')
+    label_spectrum = f'{broadening_type.capitalize()} '
+    label_spectrum += f'broadening ({broadening_value:.2f} eV FWHM)'
+    legend_spectrum = mlines.Line2D([], [],
+                                    color='black',
+                                    linestyle='-',
+                                    linewidth=2.5,
+                                    label=label_spectrum)
+    ax2.legend(handles=[legend_bars, legend_spectrum],
+               frameon=False,
+               borderaxespad=0.,
+               loc='center left',
+               bbox_to_anchor=(1.15, 0.5))
+
+    return ax
+
+
+def lorentzian_xps(x, y, xmin, xmax, xstep, fwhm):
+    """
+    Apply Lorentzian broadening to XPS data.
+
+    :param x:
+        Array of binding energies (in eV).
+    :param y:
+        Array of intensities.
+    :param xmin:
+        Minimum energy value for result.
+    :param xmax:
+        Maximum energy value for result.
+    :param xstep:
+        Energy step for result.
+    :param fwhm:
+        Full width at half maximum (in eV).
+
+    :return:
+        Tuple of (energy_array, intensity_array).
+    """
+    xi = np.arange(xmin, xmax, xstep)
+    yi = np.zeros(len(xi))
+    gamma = fwhm / 2.0  # Half-width at half-maximum
+
+    for i in range(len(xi)):
+        for k in range(len(x)):
+            yi[i] += y[k] * (gamma**2) / ((xi[i] - x[k])**2 + gamma**2)
+
+    # Normalize
+    yi = yi / np.pi * gamma
+
+    return xi, yi
+
+
+def gaussian_xps(x, y, xmin, xmax, xstep, fwhm):
+    """
+    Apply Gaussian broadening to XPS data.
+
+    :param x:
+        Array of binding energies (in eV).
+    :param y:
+        Array of intensities.
+    :param xmin:
+        Minimum energy value for result.
+    :param xmax:
+        Maximum energy value for result.
+    :param xstep:
+        Energy step for result.
+    :param fwhm:
+        Full width at half maximum (in eV).
+
+    :return:
+        Tuple of (energy_array, intensity_array).
+    """
+    xi = np.arange(xmin, xmax, xstep)
+    yi = np.zeros(len(xi))
+    sigma = fwhm / (2.0 * np.sqrt(2.0 * np.log(2.0)))  # Convert FWHM to sigma
+
+    for i in range(len(xi)):
+        for k in range(len(x)):
+            yi[i] += y[k] * np.exp(-((xi[i] - x[k])**2) / (2 * sigma**2))
+
+    # Normalize
+    yi = yi / (sigma * np.sqrt(2 * np.pi))
+
+    return xi, yi
