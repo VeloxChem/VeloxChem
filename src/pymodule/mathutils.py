@@ -93,17 +93,78 @@ def safe_solve(mat, b):
     return sol
 
 
-def safe_eigh(mat, thresh):
+def screened_eigh(mat, thresh=0.0, descending=False):
     """
-    Sovles an eigen problem and screens the eigenvalues and eigenvectors with a
-    threshold.
+    Solves a symmetric eigen problem and optionally screens the eigenvalues.
+
+    :param mat:
+        The symmetric matrix.
+    :param thresh:
+        The threshold for screening eigenvalues.
+    :param descending:
+        If True, return eigenpairs in descending order.
+
+    :return:
+        The eigenvalues and eigenvectors.
     """
 
     eigvals, eigvecs = np.linalg.eigh(mat)
 
-    num_eigs = sum(eigvals > thresh)
-    if num_eigs < eigvals.size:
-        eigvals = eigvals[-num_eigs:]
-        eigvecs = eigvecs[:, -num_eigs:]
+    if thresh is not None:
+        mask = eigvals > thresh
+        if not np.all(mask):
+            eigvals = eigvals[mask]
+            eigvecs = eigvecs[:, mask]
+
+    if descending:
+        eigvals = eigvals[::-1].copy()
+        eigvecs = eigvecs[:, ::-1].copy()
 
     return eigvals, eigvecs
+
+
+def symmetric_matrix_function(mat,
+                              func,
+                              thresh=None,
+                              descending=False):
+    """
+    Applies a scalar function to the eigenvalues of a symmetric matrix.
+
+    :param mat:
+        The symmetric matrix.
+    :param func:
+        The scalar function applied to the eigenvalues.
+    :param thresh:
+        The threshold for screening eigenvalues.
+    :param descending:
+        If True, return eigenpairs in descending order.
+
+    :return:
+        The transformed matrix.
+    """
+
+    eigvals, eigvecs = screened_eigh(mat, thresh, descending)
+
+    return np.matmul(eigvecs * func(eigvals), eigvecs.T)
+
+
+def solve_in_orthogonal_basis(mat, transform, descending=False):
+    """
+    Solves a symmetric eigen problem in an orthogonalized basis and
+    back-transforms the eigenvectors.
+
+    :param mat:
+        The matrix to diagonalize.
+    :param transform:
+        The orthogonalization or basis transformation matrix.
+    :param descending:
+        If True, return eigenpairs in descending order.
+
+    :return:
+        The eigenvalues and back-transformed eigenvectors.
+    """
+
+    eigvals, eigvecs = screened_eigh(np.linalg.multi_dot(
+        [transform.T, mat, transform]), thresh=None, descending=descending)
+
+    return eigvals, np.matmul(transform, eigvecs)

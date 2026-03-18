@@ -47,6 +47,7 @@ from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            ri_sanity_check, dft_sanity_check, pe_sanity_check,
                            solvation_model_sanity_check)
 from .errorhandler import assert_msg_critical
+from .mathutils import screened_eigh, symmetric_matrix_function
 from .checkpoint import (check_rsp_hdf5, write_rsp_solution,
                          write_lr_rsp_results_to_hdf5,
                          write_detach_attach_to_hdf5)
@@ -901,20 +902,19 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
 
         if self.rank == mpi_master():
 
-            evals, evecs = np.linalg.eigh(e2uu)
-            e2uu_inv = np.linalg.multi_dot(
-                [evecs, np.diag(1.0 / evals), evecs.T])
+            e2uu_inv = symmetric_matrix_function(e2uu,
+                                                 lambda x: 1.0 / x,
+                                                 thresh=1.0e-12)
             ses = np.linalg.multi_dot([s2ug.T, e2uu_inv, s2ug])
 
-            evals, evecs = np.linalg.eigh(e2gg)
-            tmat = np.linalg.multi_dot(
-                [evecs, np.diag(1.0 / np.sqrt(evals)), evecs.T])
+            tmat = symmetric_matrix_function(e2gg,
+                                             lambda x: 1.0 / np.sqrt(x),
+                                             thresh=1.0e-12)
             ses_tilde = np.linalg.multi_dot([tmat.T, ses, tmat])
 
-            evals, evecs = np.linalg.eigh(ses_tilde)
-            p = list(reversed(evals.argsort()))
-            evals = evals[p]
-            evecs = evecs[:, p]
+            evals, evecs = screened_eigh(ses_tilde,
+                                         thresh=None,
+                                         descending=True)
 
             nroots = min(nroots, evals.size)
             wn = 1.0 / np.sqrt(evals[:nroots])

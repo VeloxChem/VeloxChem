@@ -74,6 +74,7 @@ from .sanitychecks import (molecule_sanity_check, dft_sanity_check,
                            ri_sanity_check, pe_sanity_check,
                            solvation_model_sanity_check)
 from .errorhandler import assert_msg_critical
+from .mathutils import screened_eigh
 from .checkpoint import (create_hdf5, write_scf_results_to_hdf5,
                          write_cpcm_charges, read_cpcm_charges)
 
@@ -1475,11 +1476,7 @@ class ScfDriver:
             t0 = tm.time()
 
             S = ovl_mat
-            eigvals, eigvecs = np.linalg.eigh(S)
-            num_eigs = sum(eigvals > self.ovl_thresh)
-            if num_eigs < eigvals.size:
-                eigvals = eigvals[-num_eigs:]
-                eigvecs = eigvecs[:, -num_eigs:]
+            eigvals, eigvecs = screened_eigh(S, self.ovl_thresh)
             oao_mat = eigvecs * (1.0 / np.sqrt(eigvals))
 
             if self.print_level > 1:

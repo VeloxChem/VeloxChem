@@ -39,7 +39,7 @@ from .veloxchemlib import mpi_master, bohr_in_angstrom
 from .lrsolver import LinearResponseSolver
 from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
-from .mathutils import safe_solve
+from .mathutils import safe_solve, symmetric_matrix_function
 from .aoindices import get_basis_function_indices_of_atoms
 from .oneeints import compute_electric_dipole_integrals
 
@@ -471,8 +471,9 @@ class PEForceFieldGenerator:
             The orthonormalised vector.
         """
 
-        eigs, U = np.linalg.eigh(A)
-        return np.linalg.multi_dot([U, np.diag(1.0 / np.sqrt(eigs)), U.T])
+        return symmetric_matrix_function(A,
+                                         lambda x: 1.0 / np.sqrt(x),
+                                         thresh=1.0e-12)
 
     def get_ao_indices(self, molecule, basis):
         """
