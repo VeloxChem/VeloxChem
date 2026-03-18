@@ -55,6 +55,7 @@ from .optimizationdriver import OptimizationDriver
 from .interpolationdriver import InterpolationDriver
 from .errorhandler import assert_msg_critical
 from .mofutils import svd_superimpose
+from .oneeints import compute_electric_field_values
 
 try:
     import openmm as mm
@@ -189,6 +190,27 @@ class OpenMMDynamics:
 
         # Default value for the C-H linker distance
         self.linking_atom_distance = 1.0705 
+
+        # Electrostatic embedding controls
+        self.embedding_mode = 'mechanical'
+        self.embedding_sr_cutoff = None
+        self.embedding_stride = 1
+
+        # Electrostatic embedding runtime caches
+        self.mm_embedding_atoms = []
+        self.mm_embedding_atom_to_local = {}
+        self.mm_force_atoms = []
+        self.mm_force_atom_to_local = {}
+        self.mm_es_force_index = None
+        self.qmmm_coulomb_force_index = None
+        self.qmmm_coulomb_charges = None
+
+        self.latest_qm_molecule = None
+        self.latest_qm_basis = None
+        self.latest_point_charges = None
+        self.latest_mm_es_force_au = None
+        self.qm_mm_es_energy = []
+        self._force_update_step = 0
         
     # Loading methods
     # TODO: Integrate the guess with the read_pdb_file in Molecule.
@@ -1413,7 +1435,10 @@ class OpenMMDynamics:
                  snapshots=100, 
                  traj_file='trajectory.pdb',
                  state_file='output.xml',
-                 output_file='output'):
+                 output_file='output',
+                 embedding_mode='mechanical',
+                 embedding_sr_cutoff=None,
+                 embedding_stride=1):
         """
         Runs a QM/MM simulation using OpenMM, storing the trajectory and simulation data.
 
@@ -1443,6 +1468,14 @@ class OpenMMDynamics:
             Output file name for the trajectory. Default is 'trajectory.pdb'.
         :param state_file:
             Output file name for the simulation state. Default is 'output.xml'.
+        :param embedding_mode:
+            QM/MM embedding mode. Options are 'mechanical' and 'electrostatic_sr'.
+            Default is 'mechanical'.
+        :param embedding_sr_cutoff:
+            Optional short-range cutoff (nm) for selecting MM embedding charges.
+            If None, all MM atoms are used.
+        :param embedding_stride:
+            Rebuild MM embedding charges every N force updates.
         """
         if self.system is None:
             raise RuntimeError('System has not been created!')
@@ -1455,6 +1488,13 @@ class OpenMMDynamics:
         self.friction = friction / unit.picosecond
         self.timestep = timestep * unit.femtoseconds
         self.nsteps = nsteps
+        self.embedding_mode = embedding_mode
+        self.embedding_sr_cutoff = embedding_sr_cutoff
+        self.embedding_stride = max(1, int(embedding_stride))
+        self._force_update_step = 0
+
+        if self.embedding_mode not in ('mechanical', 'electrostatic_sr'):
+            raise ValueError("embedding_mode must be 'mechanical' or 'electrostatic_sr'")
 
         self.qm_driver = qm_driver
         self.grad_driver = grad_driver
@@ -1477,6 +1517,10 @@ class OpenMMDynamics:
         else:
             raise ValueError('Invalid QM driver. Please use a valid VeloxChem driver.')
 
+        if self.embedding_mode == 'electrostatic_sr' and self.basis is None:
+            raise ValueError(
+                "electrostatic_sr embedding requires an SCF driver and a basis set label.")
+
         self.qm_potentials = []
         self.qm_mm_interaction_energies = []
         self.mm_potentials = []
@@ -1485,6 +1529,7 @@ class OpenMMDynamics:
         self.temperatures = []
         self.total_energies = []
         self.dynamic_molecules = []
+        self.qm_mm_es_energy = []
         
         save_freq = nsteps // snapshots if snapshots else nsteps
 
@@ -1497,6 +1542,8 @@ class OpenMMDynamics:
         self.topology = self.pdb.topology
 
         self.positions = self.pdb.positions
+
+        self._prepare_embedding_for_run()
         
         self.simulation = app.Simulation(self.topology, self.system, new_integrator, platform=self._create_platform())
 
@@ -1524,6 +1571,7 @@ class OpenMMDynamics:
         print('QM/MM Simulation Parameters')
         print('=' * 60)
         print('QM Driver:', self.driver_flag)
+        print('Embedding mode:', self.embedding_mode)
         print('Ensemble:', ensemble)
         print('Integration method:', new_integrator.__class__.__name__)
         if ensemble in ['NVT', 'NPT']:
@@ -2231,10 +2279,14 @@ class OpenMMDynamics:
         total_atoms = self.system.getNumParticles()
         
         # The MM subregion is counted as regular MM atoms
-        qm_group = list(self.qm_atoms)
+        qm_group = sorted(list(self.qm_atoms))
         msg = f'QM region: {qm_group[0]} ... {qm_group[-1]}'
         self.ostream.print_info(msg)
-        mm_group = list(set(range(total_atoms)) - set(qm_group))
+        mm_group = sorted(list(set(range(total_atoms)) - set(qm_group)))
+        self.mm_force_atoms = mm_group
+        self.mm_force_atom_to_local = {a: i for i, a in enumerate(mm_group)}
+        self.mm_embedding_atoms = list(mm_group)
+        self.mm_embedding_atom_to_local = dict(self.mm_force_atom_to_local)
        
         if mm_group != []:
             msg = f'MM region: {mm_group[0]} ... {mm_group[-1]}'
@@ -2303,6 +2355,8 @@ class OpenMMDynamics:
             
             self.system.addForce(vdw)
             self.system.addForce(coulomb)
+            self.qmmm_coulomb_force_index = self.system.getNumForces() - 1
+            self.qmmm_coulomb_charges = []
 
             # Add particles to the custom forces
             # QM region
@@ -2310,6 +2364,7 @@ class OpenMMDynamics:
                 vdw.addParticle([ff_gen.atoms[i]['sigma']* unit.nanometer, 
                                  ff_gen.atoms[i]['epsilon']] * unit.kilojoules_per_mole)
                 coulomb.addParticle([ff_gen.atoms[i]['charge']] * unit.elementary_charge)
+                self.qmmm_coulomb_charges.append(ff_gen.atoms[i]['charge'])
 
             # MM region
             # Obtain the sigma, epsilon, and charge values from the system
@@ -2323,6 +2378,7 @@ class OpenMMDynamics:
                 charge = charge * unit.elementary_charge
                 vdw.addParticle([sigma, epsilon])
                 coulomb.addParticle([charge])
+                self.qmmm_coulomb_charges.append(charge.value_in_unit(unit.elementary_charge))
 
             vdw.addInteractionGroup(qm_group, mm_group)
             coulomb.addInteractionGroup(qm_group, mm_group)
@@ -2417,12 +2473,182 @@ class OpenMMDynamics:
                                     params['barrier'] * unit.kilojoule_per_mole * self.scaling_factor)
         self.system.addForce(improper_force)
 
-    def update_gradient_and_energy(self, new_positions):
+    def _get_nonbonded_force(self):
+        for force in self.system.getForces():
+            if isinstance(force, mm.NonbondedForce):
+                return force
+        raise RuntimeError('NonbondedForce not found in the system')
+
+    def _set_qmmm_coulomb_charges(self, charges, context=None):
+        """
+        Updates the per-particle charges of the custom QM/MM Coulomb force.
+        """
+        if self.qmmm_coulomb_force_index is None:
+            return
+
+        coulomb_force = self.system.getForce(self.qmmm_coulomb_force_index)
+        for i, chg in enumerate(charges):
+            coulomb_force.setParticleParameters(i, [float(chg)])
+
+        if context is not None:
+            coulomb_force.updateParametersInContext(context)
+
+    def _ensure_mm_es_force_exists(self):
+        """
+        Ensures a CustomExternalForce exists for MM reciprocal electrostatic forces.
+        """
+        if self.mm_es_force_index is not None or not self.mm_force_atoms:
+            return
+
+        mm_es_force = mm.CustomExternalForce("-fx*x-fy*y-fz*z")
+        mm_es_force.addPerParticleParameter("fx")
+        mm_es_force.addPerParticleParameter("fy")
+        mm_es_force.addPerParticleParameter("fz")
+
+        for idx in self.mm_force_atoms:
+            mm_es_force.addParticle(idx, [0.0, 0.0, 0.0])
+
+        mm_es_force.setForceGroup(9)
+        self.system.addForce(mm_es_force)
+        self.mm_es_force_index = self.system.getNumForces() - 1
+
+    def _prepare_embedding_for_run(self):
+        """
+        Configures Coulomb and reciprocal MM force containers for the selected
+        embedding mode before creating the OpenMM Simulation object.
+        """
+        if self.embedding_mode == 'electrostatic_sr':
+            if self.qmmm_coulomb_charges is not None:
+                zeros = np.zeros(len(self.qmmm_coulomb_charges))
+                self._set_qmmm_coulomb_charges(zeros)
+            self._ensure_mm_es_force_exists()
+        else:
+            if self.qmmm_coulomb_charges is not None:
+                self._set_qmmm_coulomb_charges(self.qmmm_coulomb_charges)
+            if self.mm_es_force_index is not None:
+                mm_es_force = self.system.getForce(self.mm_es_force_index)
+                for local_idx, atom_idx in enumerate(self.mm_force_atoms):
+                    mm_es_force.setParticleParameters(local_idx, atom_idx,
+                                                     [0.0, 0.0, 0.0])
+
+    def _select_mm_embedding_atoms(self, all_positions_nm):
+        """
+        Select MM atoms used as embedding point charges.
+        """
+        mm_candidates = list(self.mm_force_atoms)
+
+        if self.embedding_sr_cutoff is None:
+            return mm_candidates
+
+        qm_pos = np.array([all_positions_nm[i] for i in self.qm_atoms])
+        cutoff = float(self.embedding_sr_cutoff)
+        selected = []
+
+        for idx in mm_candidates:
+            r_i = all_positions_nm[idx]
+            d_min = np.min(np.linalg.norm(qm_pos - r_i, axis=1))
+            if d_min <= cutoff:
+                selected.append(idx)
+
+        return selected
+
+    def _build_point_charges_for_scf(self, context):
+        """
+        Builds VeloxChem point_charges array (6, npoints) from OpenMM state.
+        """
+        state = context.getState(getPositions=True)
+        positions_nm = np.array([
+            [p.x, p.y, p.z]
+            for p in state.getPositions().value_in_unit(unit.nanometer)
+        ])
+
+        mm_atoms = self._select_mm_embedding_atoms(positions_nm)
+        nb_force = self._get_nonbonded_force()
+
+        npoints = len(mm_atoms)
+        point_charges = np.zeros((6, npoints))
+        nm_to_bohr = 10.0 / bohr_in_angstrom()
+
+        for k, atom_idx in enumerate(mm_atoms):
+            charge, sigma, epsilon = nb_force.getParticleParameters(atom_idx)
+            r_nm = positions_nm[atom_idx]
+
+            point_charges[0, k] = r_nm[0] * nm_to_bohr
+            point_charges[1, k] = r_nm[1] * nm_to_bohr
+            point_charges[2, k] = r_nm[2] * nm_to_bohr
+            point_charges[3, k] = charge.value_in_unit(unit.elementary_charge)
+            point_charges[4, k] = sigma.value_in_unit(unit.nanometer)
+            point_charges[5, k] = epsilon.value_in_unit(
+                unit.kilojoules_per_mole)
+
+        self.mm_embedding_atoms = mm_atoms
+        self.mm_embedding_atom_to_local = {
+            atom: i for i, atom in enumerate(mm_atoms)
+        }
+        self.latest_point_charges = point_charges
+
+        return point_charges
+
+    def _compute_mm_es_forces_from_qm(self):
+        """
+        Computes reciprocal MM electrostatic forces from QM density and nuclei.
+
+        Returns:
+            ndarray (n_embedding, 3) forces in atomic units (Eh/bohr).
+        """
+        assert_msg_critical(
+            self.latest_qm_molecule is not None and self.latest_qm_basis is not None,
+            'OpenMMDynamics: Missing cached QM state for MM electrostatic forces.'
+        )
+        assert_msg_critical(
+            self.latest_point_charges is not None,
+            'OpenMMDynamics: Missing point charges for electrostatic embedding.'
+        )
+
+        den = self.qm_driver.density
+        if self.qm_driver.scf_type == 'restricted':
+            density_matrix = 2.0 * den[0]
+        else:
+            density_matrix = den[0] + den[1]
+
+        mm_coords = self.latest_point_charges[:3, :].T.copy()
+        mm_charges = self.latest_point_charges[3, :].copy()
+
+        # Electronic field from QM density at MM charge coordinates.
+        e_elec = compute_electric_field_values(
+            molecule=self.latest_qm_molecule,
+            basis=self.latest_qm_basis,
+            dipole_coords=mm_coords,
+            density=density_matrix)
+
+        # Nuclear field from QM nuclei at MM charge coordinates.
+        qm_coords = self.latest_qm_molecule.get_coordinates_in_bohr()
+        qm_charges = self.latest_qm_molecule.get_element_ids()
+        e_nuc = np.zeros_like(mm_coords)
+
+        for i, r_i in enumerate(mm_coords):
+            for z_j, r_j in zip(qm_charges, qm_coords):
+                dr = r_i - r_j
+                dist = np.linalg.norm(dr)
+                if dist > 1.0e-12:
+                    e_nuc[i] += z_j * dr / dist**3
+
+        e_total = e_nuc + e_elec
+        forces = mm_charges[:, None] * e_total
+        self.latest_mm_es_force_au = forces.copy()
+
+        return forces
+
+    def update_gradient_and_energy(self, new_positions, context=None, step=None):
         """
         Updates and returns the gradient and potential energy of the QM region.
 
         :param new_positions:
             The new positions of the atoms in the QM region.
+        :param context:
+            OpenMM context used to extract MM embedding point charges.
+        :param step:
+            Current force-update step index.
         :return:
             The gradient and potential energy of the QM region.
         """
@@ -2468,20 +2694,39 @@ class OpenMMDynamics:
 
         if self.basis is not None:
             basis = MolecularBasis.read(new_molecule, self.basis)
+
+            if self.embedding_mode == 'electrostatic_sr':
+                assert_msg_critical(
+                    context is not None,
+                    'OpenMMDynamics: Missing context for electrostatic embedding.'
+                )
+                if (self.latest_point_charges is None or step is None or
+                        step % self.embedding_stride == 0):
+                    self.qm_driver.point_charges = self._build_point_charges_for_scf(
+                        context)
+                else:
+                    self.qm_driver.point_charges = self.latest_point_charges
+            else:
+                self.qm_driver.point_charges = None
+
             scf_results = self.qm_driver.compute(new_molecule, basis)
             gradient = self.grad_driver.compute(new_molecule, basis, scf_results)
             potential_kjmol = self.qm_driver.get_scf_energy() * hartree_in_kjpermol()
             gradient = self.grad_driver.get_gradient()
+            self.latest_qm_molecule = new_molecule
+            self.latest_qm_basis = basis
         else:
             self.qm_driver.compute(new_molecule)
             if self.driver_flag != 'IM Driver':
                 self.grad_driver.compute(new_molecule)
             potential_kjmol = self.qm_driver.get_energy() * hartree_in_kjpermol()
             gradient = self.grad_driver.get_gradient()
+            self.latest_qm_molecule = new_molecule
+            self.latest_qm_basis = None
 
         return gradient, potential_kjmol
 
-    def update_gradient(self, new_positions):
+    def update_gradient(self, new_positions, context=None, step=None):
         """
         Updates and returns the gradient of the QM region.
 
@@ -2490,11 +2735,12 @@ class OpenMMDynamics:
         :return:
             The gradient of the QM region.
         """
-        gradient, _ = self.update_gradient_and_energy(new_positions)
+        gradient, _ = self.update_gradient_and_energy(
+            new_positions, context=context, step=step)
 
         return gradient
     
-    def update_potential_energy(self, new_positions):
+    def update_potential_energy(self, new_positions, context=None, step=None):
         """
         Updates and returns the potential energy of the QM region.
 
@@ -2503,7 +2749,8 @@ class OpenMMDynamics:
         :return:
             The potential energy of the QM region.
         """
-        _, potential_energy = self.update_gradient_and_energy(new_positions)
+        _, potential_energy = self.update_gradient_and_energy(
+            new_positions, context=context, step=step)
 
         return potential_energy
 
@@ -2521,7 +2768,8 @@ class OpenMMDynamics:
         # Update the forces of the QM region
         qm_positions = np.array([new_positions[i].value_in_unit(unit.nanometer) for i in self.qm_atoms])
 
-        gradient = self.update_gradient(qm_positions)
+        gradient = self.update_gradient(
+            qm_positions, context=context, step=self._force_update_step)
         force = -np.array(gradient) * conversion_factor
 
         custom_force = self.system.getForce(self.qm_force_index)
@@ -2533,6 +2781,28 @@ class OpenMMDynamics:
             custom_force.setParticleParameters(i, atom_idx, force[i])
             
         custom_force.updateParametersInContext(context)
+
+        if (self.embedding_mode == 'electrostatic_sr' and
+                self.mm_es_force_index is not None and self.basis is not None):
+            mm_force_obj = self.system.getForce(self.mm_es_force_index)
+            mm_force_au = self._compute_mm_es_forces_from_qm()
+            mm_force = mm_force_au * conversion_factor
+            self.qm_mm_es_energy.append(np.nan)
+
+            # Zero all MM reciprocal force entries first
+            for local_idx, atom_idx in enumerate(self.mm_force_atoms):
+                mm_force_obj.setParticleParameters(local_idx, atom_idx,
+                                                  [0.0, 0.0, 0.0])
+
+            for atom_idx in self.mm_embedding_atoms:
+                local_idx = self.mm_force_atom_to_local[atom_idx]
+                emb_idx = self.mm_embedding_atom_to_local[atom_idx]
+                mm_force_obj.setParticleParameters(local_idx, atom_idx,
+                                                  mm_force[emb_idx])
+
+            mm_force_obj.updateParametersInContext(context)
+
+        self._force_update_step += 1
     
     def get_qm_potential_energy(self):
         """
@@ -2766,4 +3036,3 @@ class OpenMMDynamics:
                     pos_restraint.addParticle(atom_idx, self.positions[atom_idx])
                     
         
-
