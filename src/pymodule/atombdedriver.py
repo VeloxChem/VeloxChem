@@ -635,10 +635,10 @@ class AtomBdeDriver:
         opt_results = self.mol_opt_drv.compute(molecule, basis_set1,
                                                scf_results)
         if self._rank == mpi_master():
-            opt_molecule = Molecule.read_xyz_string(
-                opt_results["final_geometry"])
-            opt_molecule.set_charge(molecule.get_charge())
-            opt_molecule.set_multiplicity(molecule.get_multiplicity())
+            opt_molecule = opt_results["final_molecule"]
+            # TODO: remove commented out code
+            # opt_molecule.set_charge(molecule.get_charge())
+            # opt_molecule.set_multiplicity(molecule.get_multiplicity())
         else:
             opt_molecule = None
 
@@ -816,14 +816,16 @@ class AtomBdeDriver:
         #then broadcast the molecule to all ranks
 
         if self._rank == mpi_master():  
-            mol = Molecule.read_xyz_string(opt_results_rad["final_geometry"])
+            mol = opt_results_rad["final_molecule"]
         #self._comm.barrier()
         mol = self._comm.bcast(mol, root=mpi_master())
-        mol.set_multiplicity(self.mol_rad_multiplicity)
+        # TODO: ask and delete
+        # mol.set_multiplicity(self.mol_rad_multiplicity)
 
         if self.mol_rad_multiplicity != 1:
             self.radical_final_scf_drv.guess_unpaired_electrons = f'{radical_carbon_idx+1}({self.mol_rad_multiplicity-1}.0)'
-        mol.set_charge(self.mol_rad_charge)
+        # TODO ask and delete
+        # mol.set_charge(self.mol_rad_charge)
 
 
         # Final single point energy calculation

@@ -328,9 +328,10 @@ class ReactionForceFieldBuilder():
 
             charge = molecule.get_charge()
             multiplicity = molecule.get_multiplicity()
-            molecule = Molecule.from_xyz_string(opt_results["final_geometry"])
-            molecule.set_charge(charge)
-            molecule.set_multiplicity(multiplicity)
+            molecule = opt_results["final_molecule"]
+            # TODO: ask and delete commented out
+            # molecule.set_charge(charge)
+            # molecule.set_multiplicity(multiplicity)
 
         forcefield = MMForceFieldGenerator(ostream=self.ostream)
 

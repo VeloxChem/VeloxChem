@@ -2567,8 +2567,7 @@ class MMForceFieldGenerator:
             xtb_opt_drv.ostream.mute()
             xtb_opt_drv.filename = self.molecule_name
             xtb_opt_results = xtb_opt_drv.compute(self.molecule)
-            self.molecule = Molecule.read_xyz_string(
-                xtb_opt_results['final_geometry'])
+            self.molecule = xtb_opt_results['final_molecule']
 
             # XTB Hessian
             self.ostream.print_info('Computing Hessian using XTB...')
@@ -3350,7 +3349,7 @@ class MMForceFieldGenerator:
         opt_drv = OptimizationDriver(grad_drv)
         opt_drv.constraints = constraints
         opt_results = opt_drv.compute(molecule)
-        final_mol = Molecule.read_xyz_string(opt_results['final_geometry'])
+        final_mol = opt_results['final_molecule']
         self.ostream.unmute()
 
         mm_drv.compute(final_mol)

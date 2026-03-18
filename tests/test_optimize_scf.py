@@ -44,7 +44,7 @@ class TestOptimizeSCF:
         opt_results = opt_drv.compute(task.molecule, task.ao_basis, scf_results)
 
         if task.mpi_rank == mpi_master():
-            opt_mol = Molecule.read_xyz_string(opt_results['final_geometry'])
+            opt_mol = opt_results['final_molecule']
             opt_coords = opt_mol.get_coordinates_in_bohr()
             assert np.max(np.abs(opt_coords - ref_coords)) < 1.0e-5
 

@@ -401,7 +401,8 @@ class OptimizationDriver:
                 self.print_vib_analysis(filename, 'vdata_first')
             final_mol = molecule
 
-            opt_results = {'final_geometry': final_mol.get_xyz_string()}
+            # opt_results = {'final_geometry': final_mol.get_xyz_string()}
+            opt_results = {'final_molecule': final_mol}
 
         else:
             coords = m.xyzs[-1] / geometric.nifty.bohr2ang
@@ -417,8 +418,8 @@ class OptimizationDriver:
                 final_mol = None
             final_mol = self.comm.bcast(final_mol, root=mpi_master())
 
-            opt_results = {'final_geometry': final_mol.get_xyz_string()}
-            opt_results['final_molecule'] = final_mol
+            # opt_results = {'final_geometry': final_mol.get_xyz_string()}
+            opt_results = {'final_molecule': final_mol}
 
             if self.rank == mpi_master():
                 self.grad_drv.ostream.print_info(
