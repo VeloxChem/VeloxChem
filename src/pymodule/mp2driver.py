@@ -255,6 +255,10 @@ class Mp2Driver:
             mol_orbs.get_orbitals_type() != molorb.restopen,
             'Mp2Driver.compute: Restricted open-shell MP2 not implemented')
 
+        assert_msg_critical(
+             0 =< n_frozen <= molecule.number_of_beta_occupied_orbitals(basis),
+             'Mp2Driver.compute: Invalid number of frozen orbitals')
+
         # compute MP2 in memory
 
         moints_drv = MOIntegralsDriver(self.comm, self.ostream)
@@ -372,6 +376,10 @@ class Mp2Driver:
         assert_msg_critical(
             mol_orbs.get_orbitals_type() != molorb.restopen,
             'Mp2Driver.compute: Restricted open-shell MP2 not implemented')
+
+        assert_msg_critical(
+             0 =< n_frozen <= molecule.number_of_beta_occupied_orbitals(basis),
+             'Mp2Driver.compute: Invalid number of frozen orbitals')
 
         # screening
 
@@ -678,6 +686,6 @@ class Mp2Driver:
                 if atom <= limit:
                     total += cores * count
                     break
-            assert_msg_critical(atom <= CORE_RULES[-1][1], f'No default core number of element {atom}')
+            assert_msg_critical(atom <= CORE_RULES[-1][0], f'No default core number of element {atom}')
 
-        return total - sum(basis.get_number_of_ecp_core_electrons())
+        return total - sum(basis.get_number_of_ecp_core_electrons())//2

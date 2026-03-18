@@ -92,7 +92,7 @@ class TestMp2Driver:
         self.run_mp2(task, 'unrestricted', e_ref, 'conventional', 1.0e-7)
 
     @pytest.mark.timeconsuming
-    def taest_ump2_fockdriven(self):
+    def test_ump2_fockdriven(self):
 
         here = Path(__file__).parent
         inpfile = str(here / 'data' / 'h2se.inp')

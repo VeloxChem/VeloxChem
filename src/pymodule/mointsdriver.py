@@ -94,7 +94,7 @@ class MOIntegralsDriver:
                           mol_orbs,
                           moints_name,
                           moints_spin='aaaa',
-                          n_frozen = 0):
+                          n_frozen=0):
         """
         Performs in-memory MO integrals calculation for a molecule and a basis
         set.
