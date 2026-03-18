@@ -2620,7 +2620,7 @@ class ScfDriver:
             n_alpha = molecule.number_of_alpha_occupied_orbitals(ao_basis)
 
             ovl = np.linalg.multi_dot([self._mom[0].T, smat, mo_a])
-            argsort = np.argsort(np.sum(np.abs(ovl), 0))[::-1]
+            argsort = np.argsort(np.sum(ovl**2, axis=0))[::-1]
             # restore energy ordering
             argsort[:n_alpha] = np.sort(argsort[:n_alpha])
             argsort[n_alpha:] = np.sort(argsort[n_alpha:])
@@ -2644,7 +2644,7 @@ class ScfDriver:
                     mo_b = mo_a[:, :n_alpha]
 
                 ovl = np.linalg.multi_dot([self._mom[1].T, smat, mo_b])
-                argsort_b = np.argsort(np.sum(np.abs(ovl), 0))[::-1]
+                argsort_b = np.argsort(np.sum(ovl**2, axis=0))[::-1]
                 # restore energy ordering
                 argsort_b[:n_beta] = np.sort(argsort_b[:n_beta])
                 argsort_b[n_beta:] = np.sort(argsort_b[n_beta:])
