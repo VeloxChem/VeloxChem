@@ -30,25 +30,80 @@
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-from mpi4py import MPI
-from sys import stderr
+import math
+import numpy as np
+
+from .errorhandler import assert_msg_critical
 
 
-def assert_msg_critical(condition, msg=''):
+def safe_arccos(val):
     """
-    Asserts that the condition is true. Otherwise terminates the program with
-    an error message.
+    Safely uses math.acos and avoids the math domain error.
 
-    :param condition:
-        The condition.
-    :param msg:
-        The error message.
+    :param val:
+        The cosine value.
+
+    :return:
+        The angle in radian.
     """
-    if __debug__ and MPI.COMM_WORLD.Get_size() == 1:
-        assert condition, msg
+
+    if abs(val) > 1.0:
+        # avoid math domain error
+        assert_msg_critical(
+            abs(abs(val) - 1.0) < 1.0e-12, 'arccos: Invalid cosine value')
+        cos_phi = 1.0 if val > 1.0 else -1.0
     else:
-        if not condition:
-            stderr.write(' **** Critical Error (process {}) **** {}\n'.format(
-                MPI.COMM_WORLD.Get_rank(), msg))
-            stderr.flush()
-            MPI.COMM_WORLD.Abort()
+        cos_phi = val
+
+    return math.acos(cos_phi)
+
+
+def safe_arcsin(val):
+    """
+    Safely uses math.asin and avoids the math domain error.
+
+    :param val:
+        The sine value.
+
+    :return:
+        The angle in radian.
+    """
+
+    if abs(val) > 1.0:
+        # avoid math domain error
+        assert_msg_critical(
+            abs(abs(val) - 1.0) < 1.0e-12, 'arcsin: Invalid sine value')
+        sin_phi = 1.0 if val > 1.0 else -1.0
+    else:
+        sin_phi = val
+
+    return math.asin(sin_phi)
+
+
+def safe_solve(mat, b):
+    """
+    Safely solve Ax=b.
+    """
+
+    try:
+        sol = np.linalg.solve(mat, b)
+    except np.linalg.LinAlgError:
+        sol = np.dot(np.linalg.pinv(mat), b)
+
+    return sol
+
+
+def safe_eigh(mat, thresh):
+    """
+    Sovles an eigen problem and screens the eigenvalues and eigenvectors with a
+    threshold.
+    """
+
+    eigvals, eigvecs = np.linalg.eigh(mat)
+
+    num_eigs = sum(eigvals > thresh)
+    if num_eigs < eigvals.size:
+        eigvals = eigvals[-num_eigs:]
+        eigvecs = eigvecs[:, -num_eigs:]
+
+    return eigvals, eigvecs

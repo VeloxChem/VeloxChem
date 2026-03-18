@@ -38,7 +38,8 @@ from collections import Counter
 from .veloxchemlib import mpi_master, bohr_in_angstrom
 from .lrsolver import LinearResponseSolver
 from .outputstream import OutputStream
-from .errorhandler import assert_msg_critical, safe_solve
+from .errorhandler import assert_msg_critical
+from .mathutils import safe_solve
 from .aoindices import get_basis_function_indices_of_atoms
 from .oneeints import compute_electric_dipole_integrals
 
