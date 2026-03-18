@@ -39,11 +39,13 @@
 #include "ErrorHandler.hpp"
 #include "StringFormat.hpp"
 
-CXCComponent::CXCComponent(const std::string& label, const double scalingFactor)
+CXCComponent::CXCComponent(const std::string& label, const double scalingFactor, const std::vector<double>& rangeSeparatedParameters)
 
     : _label(format::upper_case(label))
 
     , _scalingFactor(scalingFactor)
+
+    , _rangeSeparatedParameters(rangeSeparatedParameters)
 {
     _init_libxc_func();
 }
@@ -53,6 +55,8 @@ CXCComponent::CXCComponent(const CXCComponent& source)
     : _label(source._label)
 
     , _scalingFactor(source._scalingFactor)
+
+    , _rangeSeparatedParameters(source._rangeSeparatedParameters)
 {
     _init_libxc_func();
 }
@@ -62,6 +66,8 @@ CXCComponent::CXCComponent(CXCComponent&& source) noexcept
     : _label(std::move(source._label))
 
     , _scalingFactor(std::move(source._scalingFactor))
+
+    , _rangeSeparatedParameters(std::move(source._rangeSeparatedParameters))
 {
     _init_libxc_func();
 
@@ -83,6 +89,24 @@ CXCComponent::_init_libxc_func()
         auto xc_err = xc_func_init(&_func, funcID, XC_POLARIZED);
 
         errors::assertMsgCritical(xc_err == 0, std::string("XCComponent: Invalid LibXC functional ") + _label);
+
+        if (! _rangeSeparatedParameters.empty())
+        {
+            errors::assertMsgCritical(_rangeSeparatedParameters.size() == 3,
+                                      std::string("XCComponent: Expecting three numbers for rangeSeparatedParameters"));
+
+            // libxc convention of cam alpha and beta:
+            // libxc_alpha == alpha + beta
+            // libxc_beta  == -beta
+            const double libxc_alpha = _rangeSeparatedParameters[0] + _rangeSeparatedParameters[1];
+            const double libxc_beta  = -1.0 * _rangeSeparatedParameters[1];
+            const double libxc_omega = _rangeSeparatedParameters[2];
+
+            // Note: xc_func_set_ext_params_name must be called right after xc_func_init
+            xc_func_set_ext_params_name(&_func, "_alpha", libxc_alpha);
+            xc_func_set_ext_params_name(&_func, "_beta",  libxc_beta);
+            xc_func_set_ext_params_name(&_func, "_omega", libxc_omega);
+        }
 
         _initialized = true;
     }
@@ -116,6 +140,8 @@ CXCComponent::operator=(const CXCComponent& source)
 
     _scalingFactor = source._scalingFactor;
 
+    _rangeSeparatedParameters = source._rangeSeparatedParameters;
+
     _reset_libxc_func();
 
     return *this;
@@ -130,6 +156,8 @@ CXCComponent::operator=(CXCComponent&& source) noexcept
 
     _scalingFactor = std::move(source._scalingFactor);
 
+    _rangeSeparatedParameters = std::move(source._rangeSeparatedParameters);
+
     _reset_libxc_func();
 
     source._end_libxc_func();
@@ -143,6 +171,8 @@ CXCComponent::operator==(const CXCComponent& other) const
     if (_label != other._label) return false;
 
     if (_scalingFactor != other._scalingFactor) return false;
+
+    if (_rangeSeparatedParameters != other._rangeSeparatedParameters) return false;
 
     return true;
 }
