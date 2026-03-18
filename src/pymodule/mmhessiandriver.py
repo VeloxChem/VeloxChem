@@ -9,7 +9,7 @@ except ImportError:
     pass
 
 
-class ArtificialMMHessianEngine:
+class MMHessianDriver:
     """
     Computes 3x3 partial MM Hessian blocks for a given internal coordinate
     using controlled OpenMM parameter settings, as required by PHF.
@@ -32,11 +32,19 @@ class ArtificialMMHessianEngine:
     Hessians are computed numerically via central finite differences of
     forces (OpenMM does not expose analytical second derivatives).
 
-    Units throughout: positions in nm, forces in kJ/mol/nm,
-    Hessian blocks in kJ/mol/nm^2.
+    Units throughout: positions in nm, forces in kJ/mol/nm internally,
+    all returned Hessian values in Hartree/Bohr^2.
     """
 
     _DISPLACEMENT = 1e-4  # nm — step size for finite differences
+
+    # Conversion factor: kJ/mol/nm^2 -> Hartree/Bohr^2
+    # Computed lazily to avoid importing veloxchemlib at module level.
+    @staticmethod
+    def _to_hartree_bohr2() -> float:
+        from .veloxchemlib import bohr_in_angstrom, hartree_in_kjpermol
+        bohr_to_nm = bohr_in_angstrom() * 0.1
+        return bohr_to_nm**2 / hartree_in_kjpermol()
 
     def __init__(self):
         self._system = None
@@ -142,8 +150,8 @@ class ArtificialMMHessianEngine:
 
         del context, integrator
 
-        # Symmetrise to remove finite-difference noise
-        return 0.5 * (hessian + hessian.T)
+        # Symmetrise then convert kJ/mol/nm^2 -> Hartree/Bohr^2
+        return 0.5 * (hessian + hessian.T) * self._to_hartree_bohr2()
 
     def compute_h_unit(self, coord_type: str,
                        atom_indices: tuple) -> np.ndarray:
@@ -160,7 +168,7 @@ class ArtificialMMHessianEngine:
 
         Returns
         -------
-        np.ndarray, shape (3, 3), units kJ/mol/nm^2
+        np.ndarray, shape (3, 3), units Hartree/Bohr^2
         """
         system = copy.deepcopy(self._system)
         self._zero_nonbonded(system)
@@ -183,7 +191,7 @@ class ArtificialMMHessianEngine:
 
         Returns
         -------
-        np.ndarray, shape (3, 3), units kJ/mol/nm^2
+        np.ndarray, shape (3, 3), units Hartree/Bohr^2
         """
         system = copy.deepcopy(self._system)
         self._apply_current_best_estimates(system)
@@ -358,7 +366,7 @@ class ArtificialMMHessianEngine:
 
         Returns
         -------
-        np.ndarray, shape (3, 3), units kJ/mol/nm^2
+        np.ndarray, shape (3, 3), units Hartree/Bohr^2
         """
         integrator = mm.VerletIntegrator(0.001)
         platform = mm.Platform.getPlatformByName('Reference')
@@ -403,4 +411,4 @@ class ArtificialMMHessianEngine:
                 h_block[p, s] = -(fwd_s - bwd_s) / (2.0 * delta)
 
         del context, integrator
-        return h_block
+        return h_block * self._to_hartree_bohr2()

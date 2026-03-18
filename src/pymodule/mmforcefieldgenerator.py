@@ -61,6 +61,7 @@ from .uffparameters import get_uff_parameters
 from .tmparameters import get_tm_parameters
 from .waterparameters import get_water_parameters
 from .environment import get_data_path
+from .phfparameterizer import PHFParameterizer
 
 
 class MMForceFieldGenerator:
@@ -383,9 +384,8 @@ class MMForceFieldGenerator:
                 dihedral_types.append(dihedral['comment'])
 
         # Transform the dihedral indices to 1-indexed for printing
-        dihedral_indices_one_based = [
-            [i + 1, j + 1, k + 1, l + 1] for i, j, k, l in dihedral_indices
-        ]
+        dihedral_indices_one_based = [[i + 1, j + 1, k + 1, l + 1]
+                                      for i, j, k, l in dihedral_indices]
 
         # Print a header
         header = 'VeloxChem Dihedral Scan'
@@ -490,8 +490,8 @@ class MMForceFieldGenerator:
             error_msg = 'Scipy is required for reparameterize_dihedrals.'
             assert_msg_critical(False, error_msg)
 
-        valid_input = ((scan_results is None and scan_file is not None) or
-                       (scan_results is not None and scan_file is None))
+        valid_input = ((scan_results is None and scan_file is not None)
+                       or (scan_results is not None and scan_file is None))
         assert_msg_critical(
             valid_input, 'MMForceFieldGenerator.reparameterize_dihedrals: ' +
             'Please provide either scan_results or scan_file')
@@ -526,9 +526,8 @@ class MMForceFieldGenerator:
                 dihedral_types.append(dihedral['comment'])
 
         # Transform the dihedral indices to 1-indexed for printing
-        dihedral_indices_one_based = [
-            [i + 1, j + 1, k + 1, l + 1] for i, j, k, l in dihedral_indices
-        ]
+        dihedral_indices_one_based = [[i + 1, j + 1, k + 1, l + 1]
+                                      for i, j, k, l in dihedral_indices]
 
         # Print a header
         header = 'VeloxChem Dihedral Reparameterization'
@@ -721,7 +720,8 @@ class MMForceFieldGenerator:
                 'qm_scan_kJpermol': np.copy(qm_energies) - np.min(qm_energies),
             }
 
-            self.print_validation_summary(fitted_dihedral_results, verbose=verbose)
+            self.print_validation_summary(fitted_dihedral_results,
+                                          verbose=verbose)
 
             if visualize:
                 self.visualize(fitted_dihedral_results, show_diff=show_diff)
@@ -740,9 +740,9 @@ class MMForceFieldGenerator:
         # Extract maxima for QM and MM energies
         if fit_extrema:
             qm_maxima_indices = extract_maxima(barriers, qm_energies)
-            args = (qm_maxima_indices,)
+            args = (qm_maxima_indices, )
         else:
-            args = (None,)
+            args = (None, )
 
         # Set as bound that the barriers should be positive
         bounds = (0, np.inf)
@@ -852,14 +852,16 @@ class MMForceFieldGenerator:
         self.ostream.flush()
 
         return {
-            'dihedral_angles': np.array(
-                fitted_dihedral_results['dihedral_angles']),
-            'qm_scan_kJpermol': np.array(
-                fitted_dihedral_results['qm_scan_kJpermol']),
-            'mm_scan_kJpermol': np.array(
-                fitted_dihedral_results['mm_scan_kJpermol']),
-            'maximum_difference': self.fitting_summary['maximum_difference'],
-            'standard_deviation': self.fitting_summary['standard_deviation'],
+            'dihedral_angles':
+            np.array(fitted_dihedral_results['dihedral_angles']),
+            'qm_scan_kJpermol':
+            np.array(fitted_dihedral_results['qm_scan_kJpermol']),
+            'mm_scan_kJpermol':
+            np.array(fitted_dihedral_results['mm_scan_kJpermol']),
+            'maximum_difference':
+            self.fitting_summary['maximum_difference'],
+            'standard_deviation':
+            self.fitting_summary['standard_deviation'],
         }
 
     def read_qm_scan_xyz_files(self, scan_xyz_files, inp_dir=None):
@@ -1153,8 +1155,8 @@ class MMForceFieldGenerator:
 
         contains_water = molecule.contains_water_molecule()
         is_water = molecule.is_water_molecule()
-        use_water_model = ((water_model is not None) and
-                           (is_water or contains_water))
+        use_water_model = ((water_model is not None)
+                           and (is_water or contains_water))
         skip_resp = (not resp) or ((water_model is not None) and is_water)
 
         if skip_resp:
@@ -1376,34 +1378,47 @@ class MMForceFieldGenerator:
             f"Error: '{water_model}' is not available. Available models " +
             f"are: {list(self.water_parameters.keys())}")
 
-        self.ostream.print_info(f'Using water model parameters for {water_model}.')
-        self.ostream.print_reference('Reference: ' + self.water_parameters[water_model.lower()]['ref'])
+        self.ostream.print_info(
+            f'Using water model parameters for {water_model}.')
+        self.ostream.print_reference(
+            'Reference: ' + self.water_parameters[water_model.lower()]['ref'])
         self.ostream.flush()
 
         water_params = self.water_parameters[water_model.lower()]
 
         labels = self.molecule.get_labels()
         atoms = self.atoms
-        
-        hydrogen_indices = [idx for idx, atom in atoms.items() if atom['type'] == 'hw']
-        oxygen_indices = [idx for idx, atom in atoms.items() if atom['type'] == 'ow']
-        
-        water_bonds = [idx for idx, bond in self.bonds.items() if (idx[0] in oxygen_indices or idx[1] in oxygen_indices)]
-        water_angles = [idx for idx, angle in self.angles.items() if (idx[1] in oxygen_indices)]
-        
+
+        hydrogen_indices = [
+            idx for idx, atom in atoms.items() if atom['type'] == 'hw'
+        ]
+        oxygen_indices = [
+            idx for idx, atom in atoms.items() if atom['type'] == 'ow'
+        ]
+
+        water_bonds = [
+            idx for idx, bond in self.bonds.items()
+            if (idx[0] in oxygen_indices or idx[1] in oxygen_indices)
+        ]
+        water_angles = [
+            idx for idx, angle in self.angles.items()
+            if (idx[1] in oxygen_indices)
+        ]
+
         for hydrogen_idx in hydrogen_indices:
             self.atoms[hydrogen_idx]['sigma'] = water_params['hw']['sigma']
             self.atoms[hydrogen_idx]['epsilon'] = water_params['hw']['epsilon']
-            
+
             # Do not overwrite partial charges if the molecule is part of a larger system
             # This can cause the total charge to become a non-integer
             if self.molecule.is_water_molecule():
-                self.atoms[hydrogen_idx]['charge'] = water_params['hw']['charge']
-        
+                self.atoms[hydrogen_idx]['charge'] = water_params['hw'][
+                    'charge']
+
         for oxygen_idx in oxygen_indices:
             self.atoms[oxygen_idx]['sigma'] = water_params['ow']['sigma']
             self.atoms[oxygen_idx]['epsilon'] = water_params['ow']['epsilon']
-            
+
             if self.molecule.is_water_molecule():
                 self.atoms[oxygen_idx]['charge'] = water_params['ow']['charge']
 
@@ -2104,7 +2119,7 @@ class MMForceFieldGenerator:
                             dihedral_data[f'periodicity{dih_param_idx}'])
                         barrier = float(dihedral_data[f'k{dih_param_idx}'])
                         phase = float(dihedral_data[f'phase{dih_param_idx}']
-                                     ) / np.pi * 180.0
+                                      ) / np.pi * 180.0
 
                         dihedral_barriers.append(barrier)
                         dihedral_phases.append(phase)
@@ -2273,7 +2288,7 @@ class MMForceFieldGenerator:
             ('nt', 'ns'): 'n ',
             ('nu', 'nv'): 'nh',
             ('n7', 'n8', 'n5', 'n6'): 'n3',
-            ('cs',): 'c ',
+            ('cs', ): 'c ',
         }
         new_at_2, new_at_3 = at_2, at_3
         for key, val in atom_types_mapping.items():
@@ -2470,7 +2485,7 @@ class MMForceFieldGenerator:
 
             # Check if any side atom of the bond is involved in a triple bond
             if (bond[0] in ['c1', 'n1', 'cg', 'ch'
-                           ]) or (bond[1] in ['c1', 'n1', 'cg', 'ch']):
+                            ]) or (bond[1] in ['c1', 'n1', 'cg', 'ch']):
                 bonds_to_delete.append((i, j))
                 continue
 
@@ -2527,24 +2542,52 @@ class MMForceFieldGenerator:
     def reparameterize(self,
                        hessian=None,
                        reparameterize_all=False,
-                       reparameterize_keys=None):
+                       reparameterize_keys=None,
+                       method='seminario'):
         """
-        Reparameterizes all unknown parameters with the Seminario method using
-        the given Hessian matrix.
+        Reparameterizes force-field parameters using a QM Hessian matrix.
+
+        Two methods are supported via the ``method`` parameter:
+
+        ``'seminario'`` (default)
+            The original Seminario method.  Derives bond-stretching and
+            angle-bending force constants by diagonalising 3x3 partial QM
+            Hessian blocks.  Only bonds and angles are reparameterized;
+            dihedral force constants are left unchanged.
+
+        ``'phf'``
+            Partial Hessian Fitting (Wang, Ozhgibesov & Hirao,
+            J. Comput. Chem. 2016, 37, 2349–2359).  Derives bond, angle,
+            and dihedral force constants analytically by least-squares
+            fitting of partial MM Hessian blocks to the corresponding QM
+            blocks.  The ``reparameterize_all`` and ``reparameterize_keys``
+            arguments are ignored when ``method='phf'`` because PHF always
+            reparameterizes all internal coordinates.
 
         :param hessian:
-            The Hessian matrix, or the method to generate Hessian.
+            The Hessian matrix (np.ndarray, shape 3N x 3N, Hartree/Bohr^2)
+            or the string ``'xtb'`` to trigger an on-the-fly XTB Hessian.
         :param reparameterize_all:
-            If True, all parameters are reparameterized. If False, only unknown
-            parameters are reparameterized.
+            (Seminario only) If True, reparameterize all bonds and angles.
+            If False, only reparameterize entries whose comment is 'Guessed'.
         :param reparameterize_keys:
-            List of specific keys to reparameterize, can be bonds and angles.
+            (Seminario only) Explicit list of bond/angle keys to
+            reparameterize.
+        :param method:
+            Parameterization method: ``'seminario'`` (default) or ``'phf'``.
         """
 
-        # Hessian matrix
+        assert_msg_critical(
+            method in ('seminario', 'phf'),
+            "MMForceFieldGenerator.reparameterize: method must be "
+            "'seminario' or 'phf'")
 
+        # ------------------------------------------------------------------
+        # Resolve / validate the Hessian (shared by both methods)
+        # ------------------------------------------------------------------
+
+        assert method == 'seminario' or method == 'phf', "Method should be 'seminario' or 'phf'"
         if hessian is None:
-            # TODO: generate Hessian using VeloxChem
             assert_msg_critical(
                 False,
                 'MMForceFieldGenerator.reparameterize: expecting Hessian')
@@ -2554,14 +2597,12 @@ class MMForceFieldGenerator:
                 hessian.lower() == 'xtb',
                 'ForceFieldGenerator.reparameterize: invalid Hessian option')
 
-            # XTB optimization
             self.ostream.print_info('Optimizing molecule using XTB...')
             self.ostream.flush()
 
             xtb_drv = XtbDriver(self.comm, self.ostream)
             xtb_grad_drv = XtbGradientDriver(xtb_drv)
             xtb_opt_drv = OptimizationDriver(xtb_grad_drv)
-            # Mute all drivers
             xtb_drv.ostream.mute()
             xtb_grad_drv.ostream.mute()
             xtb_opt_drv.ostream.mute()
@@ -2570,7 +2611,6 @@ class MMForceFieldGenerator:
             self.molecule = Molecule.read_xyz_string(
                 xtb_opt_results['final_geometry'])
 
-            # XTB Hessian
             self.ostream.print_info('Computing Hessian using XTB...')
             self.ostream.flush()
 
@@ -2594,136 +2634,185 @@ class MMForceFieldGenerator:
                 False,
                 'MMForceFieldGenerator.reparameterize: invalid Hessian option')
 
-        bohr_to_nm = bohr_in_angstrom() * 0.1
+        # ------------------------------------------------------------------
+        # PHF branch
+        # ------------------------------------------------------------------
 
-        coords_in_au = self.molecule.get_coordinates_in_bohr()
+        if method == 'phf':
 
-        seminario = Seminario(hessian, coords_in_au)
+            self.ostream.print_info(
+                'Force-field reparameterization based on the PHF method')
+            self.ostream.print_blank()
+            self.ostream.print_reference('Reference:')
+            self.ostream.print_reference(
+                'R. Wang, M. Ozhgibesov, H. Hirao, '
+                'J. Comput. Chem. 2016, 37, 2349-2359. '
+                'DOI: 10.1002/jcc.24457')
+            self.ostream.print_blank()
+            self.ostream.flush()
 
-        self.ostream.print_info(
-            'Force-field reparameterization based on the Seminario method')
-        self.ostream.print_blank()
-        self.ostream.print_reference('Reference:')
-        self.ostream.print_reference(seminario.get_reference())
-        self.ostream.print_blank()
-        self.ostream.flush()
+            phf = PHFParameterizer()
+            phf_results = phf.compute(self, hessian)
 
-        # Reparameterize bonds
+            # Patch bonds
+            for key, k_phf in phf_results['bonds'].items():
+                self.bonds[key]['force_constant'] = k_phf
+                self.bonds[key]['comment'] += ' from Hessian (PHF)'
 
-        for i, j in self.bonds:
+            # Patch angles
+            for key, k_phf in phf_results['angles'].items():
+                self.angles[key]['force_constant'] = k_phf
+                self.angles[key]['comment'] += ' from Hessian (PHF)'
 
-            if not reparameterize_all:
-                if reparameterize_keys is None:
-                    if self.bonds[(i, j)]['comment'].capitalize() != 'Guessed':
+            # Patch dihedrals
+            for key, k_phf in phf_results['dihedrals'].items():
+                dih = self.dihedrals[key]
+                if dih['multiple']:
+                    # PHF yields one scalar per dihedral tuple; distribute
+                    # it equally across all terms of a multi-term dihedral.
+                    dih['barrier'] = [k_phf] * len(dih['barrier'])
+                    dih['comment'] = [
+                        c + ' from Hessian (PHF)' for c in dih['comment']
+                    ]
+                else:
+                    dih['barrier'] = k_phf
+                    dih['comment'] += ' from Hessian (PHF)'
+
+            return
+        elif method == 'seminario':
+
+            bohr_to_nm = bohr_in_angstrom() * 0.1
+
+            coords_in_au = self.molecule.get_coordinates_in_bohr()
+
+            seminario = Seminario(hessian, coords_in_au)
+
+            self.ostream.print_info(
+                'Force-field reparameterization based on the Seminario method')
+            self.ostream.print_blank()
+            self.ostream.print_reference('Reference:')
+            self.ostream.print_reference(seminario.get_reference())
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+            # Reparameterize bonds
+
+            for i, j in self.bonds:
+
+                if not reparameterize_all:
+                    if reparameterize_keys is None:
+                        if self.bonds[(i,
+                                       j)]['comment'].capitalize() != 'Guessed':
+                            continue
+                    elif (i, j) not in reparameterize_keys:
                         continue
-                elif (i, j) not in reparameterize_keys:
-                    continue
 
-            new_equilibrium = np.linalg.norm(coords_in_au[i] -
-                                             coords_in_au[j]) * bohr_to_nm
+                new_equilibrium = np.linalg.norm(coords_in_au[i] -
+                                                 coords_in_au[j]) * bohr_to_nm
 
-            new_force_constant = seminario.calculate_bond_force_constant(i, j)
-            new_force_constant *= hartree_in_kjpermol() / (bohr_to_nm**2)
+                new_force_constant = seminario.calculate_bond_force_constant(
+                    i, j)
+                new_force_constant *= hartree_in_kjpermol() / (bohr_to_nm**2)
 
-            self.bonds[(i, j)]['equilibrium'] = new_equilibrium
-            self.bonds[(i, j)]['force_constant'] = new_force_constant
-            self.bonds[(i, j)]['comment'] += ' from Hessian'
+                self.bonds[(i, j)]['equilibrium'] = new_equilibrium
+                self.bonds[(i, j)]['force_constant'] = new_force_constant
+                self.bonds[(i, j)]['comment'] += ' from Hessian'
 
-        # Average over equivalent bonds
+            # Average over equivalent bonds
 
-        uniq_bonds_data = {}
+            uniq_bonds_data = {}
 
-        for (i, j), bond in self.bonds.items():
-            eq_atoms_ij = tuple(
-                sorted([
+            for (i, j), bond in self.bonds.items():
+                eq_atoms_ij = tuple(
+                    sorted([
+                        self.atoms[i]['equivalent_atom'],
+                        self.atoms[j]['equivalent_atom']
+                    ]))
+
+                if eq_atoms_ij not in uniq_bonds_data:
+                    uniq_bonds_data[eq_atoms_ij] = {
+                        'indices': [],
+                        'r_sum': 0.0,
+                        'k_r_sum': 0.0,
+                        'count': 0
+                    }
+
+                uniq_bonds_data[eq_atoms_ij]['indices'].append((i, j))
+                uniq_bonds_data[eq_atoms_ij]['r_sum'] += bond['equilibrium']
+                uniq_bonds_data[eq_atoms_ij]['k_r_sum'] += bond[
+                    'force_constant']
+                uniq_bonds_data[eq_atoms_ij]['count'] += 1
+
+            for atom_pair, bond_data in uniq_bonds_data.items():
+                for i, j in bond_data['indices']:
+                    aver_r = bond_data['r_sum'] / bond_data['count']
+                    aver_k_r = bond_data['k_r_sum'] / bond_data['count']
+                    self.bonds[(i, j)]['equilibrium'] = aver_r
+                    self.bonds[(i, j)]['force_constant'] = aver_k_r
+
+            # Reparameterize angles
+
+            for i, j, k in self.angles:
+
+                if not reparameterize_all:
+                    if reparameterize_keys is None:
+                        if (self.angles[(i, j, k)]['comment'].capitalize()
+                                != 'Guessed'):
+                            continue
+                    elif (i, j, k) not in reparameterize_keys:
+                        continue
+
+                a = coords_in_au[i] - coords_in_au[j]
+                b = coords_in_au[k] - coords_in_au[j]
+                new_equilibrium = safe_arccos(
+                    np.dot(a, b) / np.linalg.norm(a) /
+                    np.linalg.norm(b)) * 180 / np.pi
+
+                new_force_constant = seminario.calculate_angle_force_constant(
+                    i, j, k)
+                new_force_constant *= hartree_in_kjpermol()
+
+                self.angles[(i, j, k)]['equilibrium'] = new_equilibrium
+                self.angles[(i, j, k)]['force_constant'] = new_force_constant
+                self.angles[(i, j, k)]['comment'] += ' from Hessian'
+
+            # Average over equivalent angles
+
+            uniq_angles_data = {}
+
+            for (i, j, k), angle in self.angles.items():
+                eq_atoms_ijk = sorted([
                     self.atoms[i]['equivalent_atom'],
-                    self.atoms[j]['equivalent_atom']
-                ]))
+                    self.atoms[k]['equivalent_atom']
+                ])
+                eq_atoms_ijk.insert(1, self.atoms[j]['equivalent_atom'])
+                eq_atoms_ijk = tuple(eq_atoms_ijk)
 
-            if eq_atoms_ij not in uniq_bonds_data:
-                uniq_bonds_data[eq_atoms_ij] = {
-                    'indices': [],
-                    'r_sum': 0.0,
-                    'k_r_sum': 0.0,
-                    'count': 0
-                }
+                if eq_atoms_ijk not in uniq_angles_data:
+                    uniq_angles_data[eq_atoms_ijk] = {
+                        'indices': [],
+                        'theta_sum': 0.0,
+                        'k_theta_sum': 0.0,
+                        'count': 0
+                    }
 
-            uniq_bonds_data[eq_atoms_ij]['indices'].append((i, j))
-            uniq_bonds_data[eq_atoms_ij]['r_sum'] += bond['equilibrium']
-            uniq_bonds_data[eq_atoms_ij]['k_r_sum'] += bond['force_constant']
-            uniq_bonds_data[eq_atoms_ij]['count'] += 1
+                uniq_angles_data[eq_atoms_ijk]['indices'].append((i, j, k))
+                uniq_angles_data[eq_atoms_ijk]['theta_sum'] += angle[
+                    'equilibrium']
+                uniq_angles_data[eq_atoms_ijk]['k_theta_sum'] += angle[
+                    'force_constant']
+                uniq_angles_data[eq_atoms_ijk]['count'] += 1
 
-        for atom_pair, bond_data in uniq_bonds_data.items():
-            for i, j in bond_data['indices']:
-                aver_r = bond_data['r_sum'] / bond_data['count']
-                aver_k_r = bond_data['k_r_sum'] / bond_data['count']
-                self.bonds[(i, j)]['equilibrium'] = aver_r
-                self.bonds[(i, j)]['force_constant'] = aver_k_r
+            for atom_triple, angle_data in uniq_angles_data.items():
+                for i, j, k in angle_data['indices']:
+                    aver_theta = angle_data['theta_sum'] / angle_data['count']
+                    aver_k_theta = angle_data['k_theta_sum'] / angle_data[
+                        'count']
+                    self.angles[(i, j, k)]['equilibrium'] = aver_theta
+                    self.angles[(i, j, k)]['force_constant'] = aver_k_theta
+            return
 
-        # Reparameterize angles
-
-        for i, j, k in self.angles:
-
-            if not reparameterize_all:
-                if reparameterize_keys is None:
-                    if (self.angles[(i, j, k)]['comment'].capitalize()
-                            != 'Guessed'):
-                        continue
-                elif (i, j, k) not in reparameterize_keys:
-                    continue
-
-            a = coords_in_au[i] - coords_in_au[j]
-            b = coords_in_au[k] - coords_in_au[j]
-            new_equilibrium = safe_arccos(
-                np.dot(a, b) / np.linalg.norm(a) /
-                np.linalg.norm(b)) * 180 / np.pi
-
-            new_force_constant = seminario.calculate_angle_force_constant(
-                i, j, k)
-            new_force_constant *= hartree_in_kjpermol()
-
-            self.angles[(i, j, k)]['equilibrium'] = new_equilibrium
-            self.angles[(i, j, k)]['force_constant'] = new_force_constant
-            self.angles[(i, j, k)]['comment'] += ' from Hessian'
-
-        # Average over equivalent angles
-
-        uniq_angles_data = {}
-
-        for (i, j, k), angle in self.angles.items():
-            eq_atoms_ijk = sorted([
-                self.atoms[i]['equivalent_atom'],
-                self.atoms[k]['equivalent_atom']
-            ])
-            eq_atoms_ijk.insert(1, self.atoms[j]['equivalent_atom'])
-            eq_atoms_ijk = tuple(eq_atoms_ijk)
-
-            if eq_atoms_ijk not in uniq_angles_data:
-                uniq_angles_data[eq_atoms_ijk] = {
-                    'indices': [],
-                    'theta_sum': 0.0,
-                    'k_theta_sum': 0.0,
-                    'count': 0
-                }
-
-            uniq_angles_data[eq_atoms_ijk]['indices'].append((i, j, k))
-            uniq_angles_data[eq_atoms_ijk]['theta_sum'] += angle['equilibrium']
-            uniq_angles_data[eq_atoms_ijk]['k_theta_sum'] += angle[
-                'force_constant']
-            uniq_angles_data[eq_atoms_ijk]['count'] += 1
-
-        for atom_triple, angle_data in uniq_angles_data.items():
-            for i, j, k in angle_data['indices']:
-                aver_theta = angle_data['theta_sum'] / angle_data['count']
-                aver_k_theta = angle_data['k_theta_sum'] / angle_data['count']
-                self.angles[(i, j, k)]['equilibrium'] = aver_theta
-                self.angles[(i, j, k)]['force_constant'] = aver_k_theta
-
-    def write_top(self,
-                  top_file,
-                  itp_file,
-                  mol_name=None,
-                  amber_ff=None):
+    def write_top(self, top_file, itp_file, mol_name=None, amber_ff=None):
         """
         Writes a topology file.
 
@@ -2812,7 +2901,9 @@ class MMForceFieldGenerator:
             for at in self.unique_atom_types:
                 for i, atom in self.atoms.items():
                     # Note: need strip() for converting e.g. 'c ' to 'c'
-                    if (atom['type'].strip() == at.strip()) or (atom['type'].strip() + '_unknown' == at.strip()):
+                    if (atom['type'].strip()
+                            == at.strip()) or (atom['type'].strip() + '_unknown'
+                                               == at.strip()):
                         line_str = '{:>3}{:>9}{:17.5f}{:9.5f}{:>4}'.format(
                             atom['type'], atom['type'], 0., 0., 'A')
                         line_str += '{:16.5e}{:14.5e}\n'.format(
@@ -3029,11 +3120,12 @@ class MMForceFieldGenerator:
                 # Multiple sets of periodicity, phase, k
                 for i in range(len(dihedral_data['periodicity'])):
                     attributes.update({
-                        f"periodicity{i+1}": str(
-                            abs(dihedral_data['periodicity'][i])),
-                        f"phase{i+1}": str(dihedral_data['phase'][i] * np.pi /
-                                           180),
-                        f"k{i+1}": str(dihedral_data['barrier'][i])
+                        f"periodicity{i+1}":
+                        str(abs(dihedral_data['periodicity'][i])),
+                        f"phase{i+1}":
+                        str(dihedral_data['phase'][i] * np.pi / 180),
+                        f"k{i+1}":
+                        str(dihedral_data['barrier'][i])
                     })
 
                 ET.SubElement(Dihedrals, "Proper", **attributes)
@@ -3367,16 +3459,18 @@ class MMForceFieldGenerator:
 
         if verbose:
             self.ostream.print_info(
-                '      Dihedral      MM energy(rel)      QM energy(rel)       diff')
+                '      Dihedral      MM energy(rel)      QM energy(rel)       diff'
+            )
             self.ostream.print_info(
-                '  ---------------------------------------------------------------')
+                '  ---------------------------------------------------------------'
+            )
             for angle, e_mm, e_qm in zip(
                     fitted_dihedral_results['dihedral_angles'],
                     fitted_dihedral_results['mm_scan_kJpermol'],
                     fitted_dihedral_results['qm_scan_kJpermol']):
                 self.ostream.print_info(
-                    f'  {angle:8.1f} deg {e_mm:12.3f} kJ/mol {e_qm:12.3f} kJ/mol ' +
-                    f'{(e_mm - e_qm):10.3f}')
+                    f'  {angle:8.1f} deg {e_mm:12.3f} kJ/mol {e_qm:12.3f} kJ/mol '
+                    + f'{(e_mm - e_qm):10.3f}')
             self.ostream.print_blank()
 
         self.ostream.print_info('Summary of validation')
@@ -3618,14 +3712,16 @@ class MMForceFieldGenerator:
             str: The JSON string representation of the forcefield data.
         """
         ff_data = {
-            "atoms": forcefield.atoms,
-            "bonds": MMForceFieldGenerator._tuple_to_str_key(forcefield.bonds),
-            "angles": MMForceFieldGenerator._tuple_to_str_key(forcefield.angles
-                                                             ),
-            "dihedrals": MMForceFieldGenerator._tuple_to_str_key(
-                forcefield.dihedrals),
-            "impropers": MMForceFieldGenerator._tuple_to_str_key(
-                forcefield.impropers),
+            "atoms":
+            forcefield.atoms,
+            "bonds":
+            MMForceFieldGenerator._tuple_to_str_key(forcefield.bonds),
+            "angles":
+            MMForceFieldGenerator._tuple_to_str_key(forcefield.angles),
+            "dihedrals":
+            MMForceFieldGenerator._tuple_to_str_key(forcefield.dihedrals),
+            "impropers":
+            MMForceFieldGenerator._tuple_to_str_key(forcefield.impropers),
         }
         return json.dumps(ff_data, indent=4)
 
@@ -3669,7 +3765,7 @@ class MMForceFieldGenerator:
                 item = item.replace("(", "")
                 item = item.replace(")", "")
                 item = item.replace(" ", "")
-                tuple += (int(item),)
+                tuple += (int(item), )
             if len(tuple) == 1:
                 tuple = tuple[0]
             tup_keys.append(tuple)

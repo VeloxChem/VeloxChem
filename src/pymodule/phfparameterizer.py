@@ -6,11 +6,9 @@ try:
 except ImportError:
     pass
 
-from .artificial_mm_hessian_engine import ArtificialMMHessianEngine
+from .mmhessiandriver import MMHessianDriver
 from .force_constant_solver import ForceConstantSolver
 from .partial_hessian_extractor import PartialHessianExtractor
-
-from .veloxchemlib import hartree_in_kjpermol, bohr_in_angstrom
 
 
 class PHFParameterizer:
@@ -68,7 +66,7 @@ class PHFParameterizer:
 
         self._extractor = PartialHessianExtractor()
         self._solver = ForceConstantSolver()
-        self._engine = ArtificialMMHessianEngine()
+        self._engine = MMHessianDriver()
 
     # ------------------------------------------------------------------
     # Public entry point
@@ -83,32 +81,28 @@ class PHFParameterizer:
         ff_gen : veloxchem.MMForceFieldGenerator
             Fully initialised force field generator.
         hessian : np.ndarray, shape (3N, 3N)
-            QM Hessian in atomic units (Hartree / Bohr^2).
+            QM Hessian in atomic units (Hartree/Bohr^2). Passed directly
+            to the fitting stages without unit conversion, since the MM
+            partial Hessian blocks from ArtificialMMHessianEngine are also
+            returned in Hartree/Bohr^2.
 
         Returns
         -------
         dict with keys 'bonds', 'angles', 'dihedrals'.
         """
-        # Convert QM Hessian from Hartree/Bohr^2 to kJ/mol/nm^2.
-        # The Seminario implementation in reparameterize() applies
-        # hartree_in_kjpermol() / bohr_to_nm^2 for bond force constants,
-        # so we use the same conversion factors here.
-        bohr_to_nm = bohr_in_angstrom() * 0.1
-        hessian_kjmol_nm2 = hessian * hartree_in_kjpermol() / bohr_to_nm**2
-
         self._extract_topology(ff_gen)
         self._check_for_rings()
 
         openmm_system, positions_nm = self._build_openmm_system(ff_gen)
         self._engine.set_system(openmm_system, positions_nm)
 
-        self._fit_dihedrals(hessian_kjmol_nm2)
+        self._fit_dihedrals(hessian)
         self._engine.update_dihedral_constants(self._dihedral_constants)
 
-        self._fit_angles(hessian_kjmol_nm2)
+        self._fit_angles(hessian)
         self._engine.update_angle_constants(self._angle_constants)
 
-        self._fit_bonds(hessian_kjmol_nm2)
+        self._fit_bonds(hessian)
 
         return {
             'bonds': dict(self._bond_constants),
