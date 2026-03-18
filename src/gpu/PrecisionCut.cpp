@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <functional>
 
 // Return the max value in each tile
 std::vector<double> tile_max_abs(const std::vector<double>& arr, int tile_dim) {
