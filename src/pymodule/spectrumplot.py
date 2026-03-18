@@ -426,6 +426,7 @@ def plot_xps_spectrum(xps_results,
                       broadening_value=0.5,
                       separate_plots=True,
                       colors='vlx',
+                      plot_elements=None,
                       ax=None):
     """
     Plot the XPS (X-ray Photoelectron Spectroscopy) spectrum.
@@ -443,6 +444,9 @@ def plot_xps_spectrum(xps_results,
     :param colors:
         Color scheme. Either 'vlx' for VeloxChem default (darkcyan) or 'cpk' for CPK coloring.
         Default is 'vlx'.
+    :param plot_elements:
+        List of element symbols to plot. If None, plot all elements in xps_results.
+        Examples: ['C'], ['O'], ['C', 'O']
     :param ax:
         The matplotlib axis to plot on (only used when separate_plots=False).
 
@@ -460,6 +464,23 @@ def plot_xps_spectrum(xps_results,
         colors.lower() in ['cpk', 'vlx'],
         f'plot_xps_spectrum: Invalid colors: {colors}')
 
+    # Filter results by plot_elements if specified
+    if plot_elements is not None:
+        if isinstance(plot_elements, str):
+            plot_elements = [plot_elements]
+        
+        # Validate that requested elements are in results
+        for elem in plot_elements:
+            assert_msg_critical(
+                elem in xps_results,
+                f'plot_xps_spectrum: Element {elem} not found in results. '
+                f'Available elements: {list(xps_results.keys())}')
+        
+        # Filter results
+        filtered_results = {elem: xps_results[elem] for elem in plot_elements}
+    else:
+        filtered_results = xps_results
+
     # CPK color scheme
     cpk_colors = {
         'C': '#909090',  # Gray
@@ -472,19 +493,19 @@ def plot_xps_spectrum(xps_results,
     vlx_color = 'darkcyan'
 
     # Check if there's any data
-    total_peaks = sum(len(data) for data in xps_results.values())
+    total_peaks = sum(len(data) for data in filtered_results.values())
     if total_peaks == 0:
         assert_msg_critical(False, 'plot_xps_spectrum: No XPS data to plot')
 
     if separate_plots:
         # Create separate subplot for each element
-        n_elements = len(xps_results)
+        n_elements = len(filtered_results)
         fig, axes = plt.subplots(1, n_elements, figsize=(7 * n_elements, 5))
         
         if n_elements == 1:
             axes = [axes]  # Make it iterable
 
-        for idx, (element, ionization_data) in enumerate(xps_results.items()):
+        for idx, (element, ionization_data) in enumerate(filtered_results.items()):
             ax_elem = axes[idx]
             
             # Get color for this element
@@ -520,7 +541,7 @@ def plot_xps_spectrum(xps_results,
 
         # Collect all energies for range determination
         all_energies = []
-        for element, ionization_data in xps_results.items():
+        for element, ionization_data in filtered_results.items():
             all_energies.extend([ie for _, ie in ionization_data])
 
         xmin = max(0.0, min(all_energies) - 5.0)
@@ -534,7 +555,7 @@ def plot_xps_spectrum(xps_results,
         legend_handles = []
 
         # Process each element
-        for element, ionization_data in xps_results.items():
+        for element, ionization_data in filtered_results.items():
             # Get color for this element
             if colors.lower() == 'cpk':
                 elem_color = cpk_colors.get(element, vlx_color)

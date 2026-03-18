@@ -379,6 +379,7 @@ class XPSDriver:
                       broadening_value=0.5,
                       separate_plots=False,
                       colors='vlx',
+                      plot_elements=None,
                       ax=None):
         """
         Plot the XPS spectrum from the computed results.
@@ -395,6 +396,9 @@ class XPSDriver:
         :param colors:
             Color scheme for plotting. Either 'vlx' for VeloxChem default color (darkcyan)
             or 'cpk' for CPK coloring. Default is 'vlx'.
+        :param plot_elements:
+            List of element symbols to plot. If None, plot all elements in results.
+            Examples: ['C'], ['O'], ['C', 'O']
         :param ax:
             The matplotlib axis to plot on. If None, a new figure is created.
             Only used when separate_plots=False.
@@ -408,4 +412,5 @@ class XPSDriver:
                                 broadening_value=broadening_value,
                                 separate_plots=separate_plots,
                                 colors=colors,
+                                plot_elements=plot_elements,
                                 ax=ax)
