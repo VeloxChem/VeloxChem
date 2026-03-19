@@ -36,12 +36,10 @@ import time
 import math
 
 from .veloxchemlib import (OverlapGeom100Driver, KineticEnergyGeom100Driver,
-                           NuclearPotentialGeom100Driver,
-                           NuclearPotentialGeom010Driver, FockGeom1000Driver)
+                           NuclearPotentialGeom100Driver, FockGeom1000Driver)
 from .veloxchemlib import XCMolecularGradient
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import RIFockGradDriver
-from .veloxchemlib import ECPGradientDriver
 from .veloxchemlib import mpi_master, mat_t
 from .veloxchemlib import make_matrix
 from .veloxchemlib import parse_xc_func
@@ -51,6 +49,7 @@ from .matrices import Matrices
 from .dispersionmodel import DispersionModel
 from .gradientdriver import GradientDriver
 from .oneeints import compute_nuclear_potential_gradient
+from .oneeints import compute_ecp_gradient
 from .errorhandler import assert_msg_critical
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            dft_sanity_check)
@@ -265,29 +264,8 @@ class ScfGradientDriver(GradientDriver):
                 idx for idx, nelec in enumerate(core_electrons) if nelec > 0
             ]
 
-            ecp_grad_drv = ECPGradientDriver()
-
-            for iatom in local_atoms:
-                gmats_100 = ecp_grad_drv.compute_bra_grad(
-                    molecule, basis, ecp_atom_inds, iatom)
-                if iatom in ecp_atom_inds:
-                    gmats_010 = ecp_grad_drv.compute_pot_grad(
-                        molecule, basis, iatom)
-
-                for i, label in enumerate(['X', 'Y', 'Z']):
-                    gmat_100 = gmats_100.matrix_to_numpy(label)
-                    if iatom in ecp_atom_inds:
-                        gmat_010 = gmats_010.matrix_to_numpy(label)
-
-                    # TODO: move minus sign into function call (such as in oneints)
-                    self.gradient[iatom, i] += 2.0 * np.sum(
-                        (gmat_100 + gmat_100.T) * D)
-                    if iatom in ecp_atom_inds:
-                        self.gradient[iatom, i] -= 2.0 * np.sum(gmat_010 * D)
-
-                gmats_100 = Matrices()
-                if iatom in ecp_atom_inds:
-                    gmats_010 = Matrices()
+            self.gradient += compute_ecp_gradient(molecule, basis, 2.0 * D,
+                                                  ecp_atom_inds, local_atoms)
 
         grad_timing['ECP_grad'] += time.time() - t0
 
@@ -678,29 +656,8 @@ class ScfGradientDriver(GradientDriver):
                 idx for idx, nelec in enumerate(core_electrons) if nelec > 0
             ]
 
-            ecp_grad_drv = ECPGradientDriver()
-
-            for iatom in local_atoms:
-                gmats_100 = ecp_grad_drv.compute_bra_grad(
-                    molecule, basis, ecp_atom_inds, iatom)
-                if iatom in ecp_atom_inds:
-                    gmats_010 = ecp_grad_drv.compute_pot_grad(
-                        molecule, basis, iatom)
-
-                for i, label in enumerate(['X', 'Y', 'Z']):
-                    gmat_100 = gmats_100.matrix_to_numpy(label)
-                    if iatom in ecp_atom_inds:
-                        gmat_010 = gmats_010.matrix_to_numpy(label)
-
-                    # TODO: move minus sign into function call (such as in oneints)
-                    self.gradient[iatom, i] += np.sum(
-                        (gmat_100 + gmat_100.T) * (Da + Db))
-                    if iatom in ecp_atom_inds:
-                        self.gradient[iatom, i] -= np.sum(gmat_010 * (Da + Db))
-
-                gmats_100 = Matrices()
-                if iatom in ecp_atom_inds:
-                    gmats_010 = Matrices()
+            self.gradient += compute_ecp_gradient(molecule, basis, Da + Db,
+                                                  ecp_atom_inds, local_atoms)
 
         # orbital contribution to gradient
 
