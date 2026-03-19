@@ -50,6 +50,7 @@ from .molecularbasis import MolecularBasis
 from .matrices import Matrices
 from .dispersionmodel import DispersionModel
 from .gradientdriver import GradientDriver
+from .oneeints import compute_nuclear_potential_gradient
 from .errorhandler import assert_msg_critical
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            dft_sanity_check)
@@ -217,30 +218,8 @@ class ScfGradientDriver(GradientDriver):
 
         t0 = time.time()
 
-        npot_grad_100_drv = NuclearPotentialGeom100Driver()
-        npot_grad_010_drv = NuclearPotentialGeom010Driver()
-
-        mol_charges = molecule.get_element_ids()
-        mol_charges -= basis.get_number_of_ecp_core_electrons()
-        mol_coords = molecule.get_coordinates_in_bohr()
-
-        for iatom in local_atoms:
-            gmats_100 = npot_grad_100_drv.compute(molecule, basis, iatom,
-                                                  mol_coords, mol_charges)
-            gmats_010 = npot_grad_010_drv.compute(molecule, basis, iatom,
-                                                  mol_charges[iatom])
-
-            for i, label in enumerate(['X', 'Y', 'Z']):
-                gmat_100 = gmats_100.matrix_to_numpy(label)
-                gmat_010 = gmats_010.matrix_to_numpy(label)
-
-                # TODO: move minus sign into function call (such as in oneints)
-                self.gradient[iatom, i] -= 2.0 * np.sum(
-                    (gmat_100 + gmat_100.T) * D)
-                self.gradient[iatom, i] -= 2.0 * np.sum(gmat_010 * D)
-
-            gmats_100 = Matrices()
-            gmats_010 = Matrices()
+        self.gradient += compute_nuclear_potential_gradient(
+            molecule, basis, 2.0 * D, local_atoms)
 
         grad_timing['Nuclear_potential_grad'] += time.time() - t0
 
@@ -249,6 +228,8 @@ class ScfGradientDriver(GradientDriver):
         t0 = time.time()
 
         if self.scf_driver.point_charges is not None:
+            npot_grad_100_drv = NuclearPotentialGeom100Driver()
+
             npoints = self.scf_driver.point_charges.shape[1]
 
             mm_coords = []
@@ -658,34 +639,14 @@ class ScfGradientDriver(GradientDriver):
 
         # nuclear potential contribution to gradient
 
-        npot_grad_100_drv = NuclearPotentialGeom100Driver()
-        npot_grad_010_drv = NuclearPotentialGeom010Driver()
-
-        mol_charges = molecule.get_element_ids()
-        mol_charges -= basis.get_number_of_ecp_core_electrons()
-        mol_coords = molecule.get_coordinates_in_bohr()
-
-        for iatom in local_atoms:
-            gmats_100 = npot_grad_100_drv.compute(molecule, basis, iatom,
-                                                  mol_coords, mol_charges)
-            gmats_010 = npot_grad_010_drv.compute(molecule, basis, iatom,
-                                                  mol_charges[iatom])
-
-            for i, label in enumerate(['X', 'Y', 'Z']):
-                gmat_100 = gmats_100.matrix_to_numpy(label)
-                gmat_010 = gmats_010.matrix_to_numpy(label)
-
-                # TODO: move minus sign into function call (such as in oneints)
-                self.gradient[iatom, i] -= np.sum(
-                    (gmat_100 + gmat_100.T) * (Da + Db))
-                self.gradient[iatom, i] -= np.sum(gmat_010 * (Da + Db))
-
-            gmats_100 = Matrices()
-            gmats_010 = Matrices()
+        self.gradient += compute_nuclear_potential_gradient(
+            molecule, basis, Da + Db, local_atoms)
 
         # point charges contribution
 
         if self.scf_driver.point_charges is not None:
+            npot_grad_100_drv = NuclearPotentialGeom100Driver()
+
             npoints = self.scf_driver.point_charges.shape[1]
 
             mm_coords = []

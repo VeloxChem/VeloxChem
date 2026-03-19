@@ -36,6 +36,7 @@ from .veloxchemlib import OverlapDriver
 from .veloxchemlib import KineticEnergyDriver
 from .veloxchemlib import NuclearPotentialDriver
 from .veloxchemlib import NuclearPotentialGeom100Driver
+from .veloxchemlib import NuclearPotentialGeom010Driver
 from .veloxchemlib import ElectricDipoleMomentDriver
 from .veloxchemlib import NuclearPotentialGeom200Driver
 from .veloxchemlib import NuclearPotentialGeom101Driver
@@ -114,6 +115,57 @@ def compute_nuclear_potential_integrals(molecule,
 
     # Note: factor -1.0 for electron charge
     return -1.0 * npot_mat.to_numpy()
+
+
+def compute_nuclear_potential_gradient(molecule,
+                                       basis,
+                                       D_total,
+                                       atom_list=None):
+    """
+    Computes nuclear potential gradient.
+
+    :param molecule:
+        The molecule.
+    :param basis:
+        The molecular basis set.
+    :param D_total:
+        The sum of spin-alpha and spin-beta density matrix.
+    :param atom_list:
+        The list of atoms to be computed.
+
+    :return:
+        The nuclear potential gradient.
+    """
+
+    natoms = molecule.number_of_atoms()
+
+    gradient = np.zeros((natoms, 3))
+
+    if atom_list is None:
+        atom_list = list(range(natoms))
+
+    npot_grad_100_drv = NuclearPotentialGeom100Driver()
+    npot_grad_010_drv = NuclearPotentialGeom010Driver()
+
+    mol_charges = molecule.get_element_ids()
+    mol_charges -= basis.get_number_of_ecp_core_electrons()
+    mol_coords = molecule.get_coordinates_in_bohr()
+
+    for iatom in atom_list:
+        gmats_100 = npot_grad_100_drv.compute(molecule, basis, iatom,
+                                              mol_coords, mol_charges)
+        gmats_010 = npot_grad_010_drv.compute(molecule, basis, iatom,
+                                              mol_charges[iatom])
+
+        for icart, label in enumerate(['X', 'Y', 'Z']):
+            gmat_100 = gmats_100.matrix_to_numpy(label)
+            gmat_010 = gmats_010.matrix_to_numpy(label)
+
+            gradient[iatom, icart] += np.sum(
+                (gmat_100 + gmat_100.T + gmat_010) * D_total)
+
+    # Note: factor -1.0 for electron charge
+    return -1.0 * gradient
 
 
 def compute_electric_dipole_integrals(molecule, basis, origin=(0.0, 0.0, 0.0)):
