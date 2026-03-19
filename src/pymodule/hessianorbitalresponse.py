@@ -638,7 +638,6 @@ class HessianOrbitalResponse(CphfSolver):
                 fmat_deriv[x] += pe_fock_grad_contr[x]
 
         # ECP contribution
-
         if basis.has_ecp():
             ecp_grad_drv = ECPGradientDriver()
 
@@ -662,7 +661,6 @@ class HessianOrbitalResponse(CphfSolver):
                 if i in ecp_atom_indices:
                     fmat_deriv[x] -= gmat_ecp_010
 
-        # DFT contribution
         if self._dft:
             if self.xcfun.is_hybrid():
                 fock_type = '2jkx'
