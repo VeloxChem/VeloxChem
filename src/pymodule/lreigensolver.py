@@ -864,6 +864,14 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
 
         if self.rank == mpi_master():
 
+            # Equations:
+            # E[2] X_g - w S[2] X_u = 0
+            # E[2] X_u - w S[2] X_g = 0
+
+            # Solutions:
+            # (S_gu (E_uu)^-1 S_ug) X_g = 1/w^2 E_gg X_g
+            # X_u = w (E_uu)^-1 S_ug X_g
+
             e2uu_inv = symmetric_matrix_function(e2uu,
                                                  lambda x: 1.0 / x,
                                                  thresh=1.0e-12)
