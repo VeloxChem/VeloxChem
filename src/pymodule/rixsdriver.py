@@ -100,7 +100,7 @@ class RixsDriver(LinearSolver):
         self.num_core_states = 5
 
         # Restricted subspace
-        self.restricted_subspace = True
+        self.restricted_subspace = False
 
         self.num_core_orbitals = 0
         self.num_virtual_orbitals = 0
