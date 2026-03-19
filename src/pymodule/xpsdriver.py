@@ -77,14 +77,27 @@ class XPSDriver:
         self.ostream = ostream
         self.rank = self.comm.Get_rank()
 
-        # Core orbital energy ranges (in Hartree) for different elements
-        # These are approximate ranges for identifying 1s core orbitals
-        self.energy_ranges = {
-            'C': (-10.4, -10.1),
-            'O': (-19.4, -19.1),
-            'N': (-14.5, -14.2),
-            'S': (-89.0, -88.0),
+        # Core orbital energy ranges (in Hartree) for different elements and methods
+        # Based on typical Hartree-Fock calculations
+        self.energy_ranges_hf = {
+            'C': (-11.4, -11.3),
+            'N': (-15.7, -15.6),
+            'O': (-20.7, -20.6),
+            'F': (-26.4, -26.3),
+            'S': (-92.0, -91.0),
         }
+
+        # Based on typical DFT (B3LYP/PBE) calculations
+        self.energy_ranges_dft = {
+            'C': (-10.5, -10.2),
+            'N': (-14.6, -14.2),
+            'O': (-19.4, -18.9),
+            'F': (-24.9, -24.4),
+            'S': (-89.0, -87-0),
+        }
+
+        # Default to DFT ranges for backward compatibility
+        self.energy_ranges = self.energy_ranges_dft
 
     def update_settings(self, xps_dict, method_dict=None):
         """
@@ -105,19 +118,165 @@ class XPSDriver:
             if key in xps_keywords:
                 setattr(self, key, xps_dict[key])
 
-    def _find_core_orbital_indices(self, molecule, scf_results, element_symbol):
+    def _detect_method_type(self, xcfun):
         """
-        Finds the indices of core orbitals for a given element.
+        Detects whether the calculation is HF or DFT based on xcfun.
+
+        :param xcfun:
+            The exchange-correlation functional name.
+
+        :return:
+            'hf' for Hartree-Fock, 'dft' for DFT methods.
+        """
+
+        if xcfun is None:
+            return 'hf'
+
+        xcfun_lower = str(xcfun).lower()
+
+        # HF-like functionals (no correlation or exchange-only)
+        hf_keywords = ['hf', 'hartree-fock', 'hartree_fock', 'slater']
+
+        for keyword in hf_keywords:
+            if keyword in xcfun_lower:
+                return 'hf'
+
+        # Everything else is DFT
+        return 'dft'
+
+    def _get_energy_ranges(self, method_type):
+        """
+        Gets energy ranges for the specified method type.
+
+        :param method_type:
+            Either 'hf' or 'dft'.
+
+        :return:
+            Dictionary of energy ranges for each element.
+        """
+
+        if method_type == 'hf':
+            return self.energy_ranges_hf
+        elif method_type == 'dft':
+            return self.energy_ranges_dft
+        else:
+            # Fallback to DFT ranges (broader and safer)
+            return self.energy_ranges_dft
+
+    def _get_ao_to_atom_mapping(self, molecule, basis):
+        """
+        Creates a mapping from AO index to atom index.
 
         :param molecule:
             The molecule object.
-        :param scf_results:
-            The SCF results dictionary containing orbital energies.
-        :param element_symbol:
-            The chemical symbol of the element (e.g., 'C', 'O', 'N', 'S').
+        :param basis:
+            The molecular basis set.
 
         :return:
-            List of orbital indices corresponding to core orbitals of the element.
+            List where ao_to_atom[i] gives the atom index for AO i.
+        """
+
+        n_atoms = molecule.number_of_atoms()
+        max_angl = basis.max_angular_momentum()
+
+        ao_to_atom = []
+
+        # Loop over angular momentum shells
+        for angl in range(max_angl + 1):
+            n_sph = angl * 2 + 1  # Number of spherical components
+
+            # Loop over spherical components
+            for isph in range(n_sph):
+
+                # Loop over atoms
+                for atom_idx in range(n_atoms):
+                    n_ao = basis.number_of_basis_functions([atom_idx], angl)
+
+                    # All AOs of this type on this atom
+                    for iao in range(n_ao):
+                        ao_to_atom.append(atom_idx)
+
+        return ao_to_atom
+
+    def _assign_orbital_to_atom(self, mo_index, mo_coefficients, molecule, basis, element):
+        """
+        Assigns a core molecular orbital to a specific atom based on MO coefficient analysis.
+
+        Uses Mulliken-like population analysis: the atom with the largest sum of squared
+        MO coefficients is assigned as the parent atom of the core orbital.
+
+        :param mo_index:
+            Index of the molecular orbital.
+        :param mo_coefficients:
+            MO coefficient matrix (C_alpha), shape (n_aos, n_mos).
+        :param molecule:
+            The molecule object.
+        :param basis:
+            The molecular basis set.
+        :param element:
+            Element symbol (e.g., 'C', 'O', 'N').
+
+        :return:
+            Tuple of (atom_index, contribution) where atom_index is the 0-based index
+            and contribution is the fractional contribution (0-1).
+        """
+
+        # Get MO coefficients for this orbital
+        if isinstance(mo_coefficients, np.ndarray):
+            mo_coeff = mo_coefficients[:, mo_index]
+        else:
+            # Handle DenseMatrix type
+            mo_coeff = mo_coefficients.to_numpy()[:, mo_index]
+
+        # Get atom labels
+        atom_labels = molecule.get_labels()
+        n_atoms = molecule.number_of_atoms()
+
+        # Map each AO to its parent atom
+        ao_to_atom_map = self._get_ao_to_atom_mapping(molecule, basis)
+
+        # Calculate contribution from each atom (Mulliken-like analysis)
+        atom_contributions = np.zeros(n_atoms)
+
+        for ao_idx, atom_idx in enumerate(ao_to_atom_map):
+            # Sum of squared coefficients for this atom
+            atom_contributions[atom_idx] += mo_coeff[ao_idx]**2
+
+        # Find atoms of the target element
+        target_atom_indices = [i for i, label in enumerate(atom_labels)
+                               if label == element]
+
+        # Find which target atom has the largest contribution
+        max_contrib = 0.0
+        assigned_atom = None
+
+        for atom_idx in target_atom_indices:
+            if atom_contributions[atom_idx] > max_contrib:
+                max_contrib = atom_contributions[atom_idx]
+                assigned_atom = atom_idx
+
+        return assigned_atom, max_contrib
+
+    def _find_core_orbital_indices(self, molecule, basis, scf_results, element_symbol, method_type='dft'):
+        """
+        Finds the indices of core orbitals for a given element and assigns them to specific atoms.
+
+        :param molecule:
+            The molecule object.
+        :param basis:
+            The molecular basis set.
+        :param scf_results:
+            The SCF results dictionary containing orbital energies and coefficients.
+        :param element_symbol:
+            The chemical symbol of the element (e.g., 'C', 'N', 'O', 'F', 'S').
+        :param method_type:
+            The method type ('hf' or 'dft') for selecting appropriate energy ranges.
+
+        :return:
+            List of tuples (mo_index, atom_index, contribution) where:
+            - mo_index: orbital index
+            - atom_index: 0-based atom index
+            - contribution: fractional contribution (0-1) of the atom to the MO
         """
 
         if 'E_alpha' in scf_results:
@@ -129,10 +288,13 @@ class XPSDriver:
                 False,
                 f'XPSDriver._find_core_orbital_indices: Cannot find orbital energies in scf_results')
 
+        # Get appropriate energy ranges based on method type
+        energy_ranges = self._get_energy_ranges(method_type)
+
         assert_msg_critical(
-            element_symbol in self.energy_ranges,
+            element_symbol in energy_ranges,
             f'XPSDriver._find_core_orbital_indices: Element {element_symbol} not supported. '
-            f'Supported elements: {list(self.energy_ranges.keys())}')
+            f'Supported elements: {list(energy_ranges.keys())}')
 
         # Count atoms of this element in the molecule
         elem_labels = molecule.get_labels()
@@ -144,8 +306,8 @@ class XPSDriver:
                     f'Warning: No {element_symbol} atoms found in molecule.')
             return []
 
-        # Start with default energy range
-        emin, emax = self.energy_ranges[element_symbol]
+        # Start with method-specific energy range
+        emin, emax = energy_ranges[element_symbol]
         expansion_factor = 0.0
         max_expansions = 5
         
@@ -189,7 +351,24 @@ class XPSDriver:
                 f'Warning: Found only {len(indices)} core orbital(s) but expected {expected_count} '
                 f'for {element_symbol}. Consider adjusting energy_ranges.')
 
-        return indices
+        # Get MO coefficients for atom assignment
+        if 'C_alpha' in scf_results:
+            mo_coefficients = scf_results['C_alpha']
+        elif 'orbital_coefficients_alpha' in scf_results:
+            mo_coefficients = scf_results['orbital_coefficients_alpha']
+        else:
+            assert_msg_critical(
+                False,
+                f'XPSDriver._find_core_orbital_indices: Cannot find MO coefficients in scf_results')
+
+        # Assign each core orbital to an atom
+        assignments = []
+        for mo_idx in indices:
+            atom_idx, contribution = self._assign_orbital_to_atom(
+                mo_idx, mo_coefficients, molecule, basis, element_symbol)
+            assignments.append((mo_idx, atom_idx, contribution))
+
+        return assignments
 
     def compute(self, molecule, basis, scf_driver, element=None, elements=None):
         """
@@ -230,12 +409,17 @@ class XPSDriver:
                 False,
                 'XPSDriver.compute: Must specify either element or elements parameter.')
 
+        # Detect method type (HF or DFT)
+        xcfun = scf_driver.xcfun
+        method_type = self._detect_method_type(xcfun)
+        energy_ranges = self._get_energy_ranges(method_type)
+
         # Validate all elements are supported
         for elem in elements_list:
             assert_msg_critical(
-                elem in self.energy_ranges,
+                elem in energy_ranges,
                 f'XPSDriver.compute: Element {elem} not supported. '
-                f'Supported elements: {list(self.energy_ranges.keys())}')
+                f'Supported elements: {list(energy_ranges.keys())}')
 
         if self.rank == mpi_master():
             self.ostream.print_blank()
@@ -244,6 +428,10 @@ class XPSDriver:
             self.ostream.print_blank()
             elem_str = ', '.join(elements_list)
             self.ostream.print_info(f'Computing core ionization energies for element(s): {elem_str}')
+            self.ostream.print_info(f'Method type: {method_type.upper()}')
+            xcfun_str = xcfun if xcfun else 'HF (Hartree-Fock)'
+            self.ostream.print_info(f'XC functional: {xcfun_str}')
+            self.ostream.print_info(f'Using {method_type.upper()} energy ranges for core orbital identification')
             self.ostream.print_blank()
             self.ostream.flush()
 
@@ -277,30 +465,35 @@ class XPSDriver:
                 self.ostream.print_info(f'Processing element: {elem}')
                 self.ostream.print_info('-' * 60)
 
-            # Find core orbital indices for this element
+            # Find core orbital indices for this element and assign to atoms
             if self.rank == mpi_master():
-                core_orbital_indices = self._find_core_orbital_indices(molecule, scf_results, elem)
-                if len(core_orbital_indices) > 0:
+                core_orbital_assignments = self._find_core_orbital_indices(
+                    molecule, basis, scf_results, elem, method_type)
+                if len(core_orbital_assignments) > 0:
                     self.ostream.print_info(
-                        f'Found {len(core_orbital_indices)} core orbital(s) for {elem}: '
-                        f'{core_orbital_indices}')
+                        f'Found {len(core_orbital_assignments)} core orbital(s) for {elem}:')
+                    for mo_idx, atom_idx, contrib in core_orbital_assignments:
+                        self.ostream.print_info(
+                            f'  MO {mo_idx} -> Atom {atom_idx+1} ({elem}) with {contrib:.1%} contribution')
                 self.ostream.print_blank()
                 self.ostream.flush()
             else:
-                core_orbital_indices = None
+                core_orbital_assignments = None
 
-            core_orbital_indices = self.comm.bcast(core_orbital_indices, root=mpi_master())
+            core_orbital_assignments = self.comm.bcast(core_orbital_assignments, root=mpi_master())
 
             # Skip if no orbitals found
-            if len(core_orbital_indices) == 0:
+            if len(core_orbital_assignments) == 0:
                 continue
 
             # Calculate ionization energies for each core orbital
             ionization_energies = []
 
-            for mo_index in core_orbital_indices:
+            for mo_index, atom_index, contribution in core_orbital_assignments:
                 if self.rank == mpi_master():
-                    self.ostream.print_info(f'Computing FCH for {elem} orbital index {mo_index}...')
+                    self.ostream.print_info(
+                        f'Computing FCH for {elem} orbital {mo_index} '
+                        f'(Atom {atom_index+1}, contribution: {contribution:.1%})...')
                     self.ostream.flush()
 
                 # Create occupation lists
@@ -323,11 +516,11 @@ class XPSDriver:
                 # Calculate core ionization energy (in eV)
                 ie = (fch_energy - gs_energy) * hartree_in_ev()
 
-                ionization_energies.append((mo_index, ie))
+                ionization_energies.append((mo_index, atom_index, ie, contribution))
 
                 if self.rank == mpi_master():
                     self.ostream.print_info(
-                        f'  Orbital {mo_index}: Ionization Energy = {ie:.2f} eV')
+                        f'  Orbital {mo_index} (Atom {atom_index+1}): Ionization Energy = {ie:.2f} eV')
                     self.ostream.print_blank()
                     self.ostream.flush()
 
@@ -344,7 +537,7 @@ class XPSDriver:
 
     def print_results(self, results):
         """
-        Prints XPS results in a formatted table.
+        Prints XPS results in a formatted table with atom assignments.
 
         :param results:
             The results dictionary from compute method.
@@ -355,62 +548,71 @@ class XPSDriver:
 
         self.ostream.print_blank()
         self.ostream.print_header('XPS Core Ionization Energies')
-        self.ostream.print_header('=' * 60)
+        self.ostream.print_header('=' * 80)
         self.ostream.print_blank()
 
         for element, ionization_data in results.items():
             self.ostream.print_info(f'Element: {element}')
-            self.ostream.print_info('-' * 60)
-            self.ostream.print_info(f'{"Orbital Index":<20} {"Ionization Energy (eV)":<30}')
-            self.ostream.print_info('-' * 60)
+            self.ostream.print_info('-' * 80)
+            self.ostream.print_info(
+                f'{"Atom":<8} {"MO Index":<12} {"IE (eV)":<15} {"Localization":<15}')
+            self.ostream.print_info('-' * 80)
 
-            for orbital_idx, ie in ionization_data:
-                self.ostream.print_info(f'{orbital_idx:<20} {ie:>25.2f}')
+            # Sort by atom index for better readability
+            sorted_data = sorted(ionization_data, key=lambda x: x[1])
+
+            for mo_idx, atom_idx, ie, contribution in sorted_data:
+                self.ostream.print_info(
+                    f'{atom_idx+1:<8} {mo_idx:<12} {ie:>12.2f}   {contribution:>13.1%}')
 
             self.ostream.print_blank()
 
-        self.ostream.print_header('=' * 60)
+        self.ostream.print_header('=' * 80)
         self.ostream.print_blank()
         self.ostream.flush()
 
     def plot_spectrum(self,
                       results,
+                      element=None,
                       broadening_type="lorentzian",
                       broadening_value=0.5,
-                      separate_plots=False,
-                      colors='vlx',
-                      plot_elements=None,
+                      color='vlx',
+                      show_atom_labels=True,
+                      color_by_atom=False,
                       ax=None):
         """
-        Plot the XPS spectrum from the computed results.
+        Plot the XPS spectrum for a single element from the computed results.
 
         :param results:
             The results dictionary from compute method.
+        :param element:
+            Element symbol to plot (e.g., 'C', 'O', 'N', 'F', 'S').
+            If None and results contains only one element, that element is plotted.
+            If None and results contains multiple elements, an error is raised.
         :param broadening_type:
             The type of broadening to use. Either 'lorentzian' or 'gaussian'.
         :param broadening_value:
             The broadening value (FWHM) in eV.
-        :param separate_plots:
-            If True, create separate subplots for each element.
-            If False, plot all elements on the same spectrum.
-        :param colors:
+        :param color:
             Color scheme for plotting. Either 'vlx' for VeloxChem default color (darkcyan)
-            or 'cpk' for CPK coloring. Default is 'vlx'.
-        :param plot_elements:
-            List of element symbols to plot. If None, plot all elements in results.
-            Examples: ['C'], ['O'], ['C', 'O']
+            or 'cpk' for CPK coloring (element-specific colors). Default is 'vlx'.
+        :param show_atom_labels:
+            If True, display atom indices as labels above peaks. Default is True.
+        :param color_by_atom:
+            If True, color each peak according to its atom index instead of using 
+            element color. Default is False.
         :param ax:
             The matplotlib axis to plot on. If None, a new figure is created.
-            Only used when separate_plots=False.
 
         :return:
-            The matplotlib axis object (or array of axes if separate_plots=True).
+            The matplotlib axis object.
         """
 
         return plot_xps_spectrum(results,
+                                element=element,
                                 broadening_type=broadening_type,
                                 broadening_value=broadening_value,
-                                separate_plots=separate_plots,
-                                colors=colors,
-                                plot_elements=plot_elements,
+                                color=color,
+                                show_atom_labels=show_atom_labels,
+                                color_by_atom=color_by_atom,
                                 ax=ax)

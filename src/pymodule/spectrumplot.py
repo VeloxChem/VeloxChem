@@ -422,36 +422,40 @@ def gaussian_ecd(x, y, xmin, xmax, xstep, sigma):
 
 
 def plot_xps_spectrum(xps_results,
+                      element=None,
                       broadening_type="lorentzian",
                       broadening_value=0.5,
-                      separate_plots=True,
-                      colors='vlx',
-                      plot_elements=None,
+                      color='vlx',
+                      show_atom_labels=True,
+                      color_by_atom=False,
                       ax=None):
     """
-    Plot the XPS (X-ray Photoelectron Spectroscopy) spectrum.
+    Plot the XPS (X-ray Photoelectron Spectroscopy) spectrum for a single element.
 
     :param xps_results:
         The dictionary containing XPS results from XPSDriver.compute().
-        Format: {element: [(orbital_idx, ionization_energy), ...]}
+        Format: {element: [(mo_idx, atom_idx, ionization_energy, contribution), ...]}
+    :param element:
+        Element symbol to plot (e.g., 'C', 'O', 'N', 'F', 'S').
+        If None and xps_results contains only one element, that element is plotted.
+        If None and xps_results contains multiple elements, an error is raised.
     :param broadening_type:
         The type of broadening to use. Either 'lorentzian' or 'gaussian'.
     :param broadening_value:
         The broadening value (FWHM) in eV.
-    :param separate_plots:
-        If True, create separate subplots for each element.
-        If False, plot all elements on the same spectrum.
-    :param colors:
+    :param color:
         Color scheme. Either 'vlx' for VeloxChem default (darkcyan) or 'cpk' for CPK coloring.
-        Default is 'vlx'.
-    :param plot_elements:
-        List of element symbols to plot. If None, plot all elements in xps_results.
-        Examples: ['C'], ['O'], ['C', 'O']
+        If 'cpk', uses element-specific colors. Default is 'vlx'.
+    :param show_atom_labels:
+        If True, display atom indices as labels above peaks. Default is True.
+    :param color_by_atom:
+        If True, color each peak according to its atom index instead of using element color.
+        Default is False.
     :param ax:
-        The matplotlib axis to plot on (only used when separate_plots=False).
+        The matplotlib axis to plot on. If None, a new figure is created.
 
     :return:
-        The matplotlib axis object (or array of axes if separate_plots=True).
+        The matplotlib axis object.
     """
 
     assert_msg_critical('matplotlib' in sys.modules, 'matplotlib is required.')
@@ -461,168 +465,76 @@ def plot_xps_spectrum(xps_results,
         f'plot_xps_spectrum: Invalid broadening_type: {broadening_type}')
 
     assert_msg_critical(
-        colors.lower() in ['cpk', 'vlx'],
-        f'plot_xps_spectrum: Invalid colors: {colors}')
+        color.lower() in ['cpk', 'vlx'],
+        f'plot_xps_spectrum: Invalid color: {color}')
 
-    # Filter results by plot_elements if specified
-    if plot_elements is not None:
-        if isinstance(plot_elements, str):
-            plot_elements = [plot_elements]
-        
-        # Validate that requested elements are in results
-        for elem in plot_elements:
+    # Determine which element to plot
+    if element is None:
+        if len(xps_results) == 1:
+            element = list(xps_results.keys())[0]
+        else:
             assert_msg_critical(
-                elem in xps_results,
-                f'plot_xps_spectrum: Element {elem} not found in results. '
+                False,
+                f'plot_xps_spectrum: Must specify element when multiple elements are present. '
                 f'Available elements: {list(xps_results.keys())}')
-        
-        # Filter results
-        filtered_results = {elem: xps_results[elem] for elem in plot_elements}
     else:
-        filtered_results = xps_results
+        assert_msg_critical(
+            element in xps_results,
+            f'plot_xps_spectrum: Element {element} not found in results. '
+            f'Available elements: {list(xps_results.keys())}')
 
-    # CPK color scheme
+    # Get data for the specified element
+    ionization_data = xps_results[element]
+
+    # Check if there's any data
+    if len(ionization_data) == 0:
+        assert_msg_critical(False, f'plot_xps_spectrum: No XPS data for element {element}')
+
+    # CPK color scheme (including Fluorine)
     cpk_colors = {
         'C': '#909090',  # Gray
-        'O': '#FF0D0D',  # Red
         'N': '#3050F8',  # Blue
+        'O': '#FF0D0D',  # Red
+        'F': '#90E050',  # Light green
         'S': '#FFFF30',  # Yellow
-        'H': '#FFFFFF',  # White
         'P': '#FF8000',  # Orange
+        'H': '#FFFFFF',  # White
     }
     vlx_color = 'darkcyan'
 
-    # Check if there's any data
-    total_peaks = sum(len(data) for data in filtered_results.values())
-    if total_peaks == 0:
-        assert_msg_critical(False, 'plot_xps_spectrum: No XPS data to plot')
-
-    if separate_plots:
-        # Create separate subplot for each element
-        n_elements = len(filtered_results)
-        fig, axes = plt.subplots(1, n_elements, figsize=(7 * n_elements, 5))
-        
-        if n_elements == 1:
-            axes = [axes]  # Make it iterable
-
-        for idx, (element, ionization_data) in enumerate(filtered_results.items()):
-            ax_elem = axes[idx]
-            
-            # Get color for this element
-            if colors.lower() == 'cpk':
-                elem_color = cpk_colors.get(element, vlx_color)
-            else:
-                elem_color = vlx_color
-
-            # Extract data for this element
-            energies = np.array([ie for _, ie in ionization_data])
-            intensities = np.ones(len(energies))
-
-            # Plot on this subplot
-            _plot_single_element_xps(ax_elem, element, energies, intensities,
-                                    broadening_type, broadening_value,
-                                    elem_color)
-
-        plt.tight_layout()
-        return axes
-
+    # Get color for this element
+    if color.lower() == 'cpk':
+        elem_color = cpk_colors.get(element, vlx_color)
     else:
-        # Plot all elements on the same spectrum
-        if ax is None:
-            fig, ax = plt.subplots(figsize=(8, 5))
+        elem_color = vlx_color
 
-        ax.set_xlabel('Binding Energy [eV]')
-        ax.set_ylabel('Intensity [a.u.]')
-        ax.set_title("XPS Spectrum")
+    # Extract data for the specified element
+    # Handle both old format (mo_idx, ie) and new format (mo_idx, atom_idx, ie, contribution)
+    if len(ionization_data[0]) == 2:
+        energies = np.array([ie for _, ie in ionization_data])
+        atom_indices = None
+    else:
+        energies = np.array([ie for _, _, ie, _ in ionization_data])
+        atom_indices = np.array([atom_idx for _, atom_idx, _, _ in ionization_data])
+    intensities = np.ones(len(energies))
 
-        # Create secondary y-axis for stick spectrum
-        ax2 = ax.twinx()
-        ax2.set_ylabel('Peak Intensity')
+    # Create or use provided axis
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(8, 5))
 
-        # Collect all energies for range determination
-        all_energies = []
-        for element, ionization_data in filtered_results.items():
-            all_energies.extend([ie for _, ie in ionization_data])
+    # Plot the spectrum for this single element
+    _plot_single_element_xps(ax, element, energies, intensities,
+                            broadening_type, broadening_value,
+                            elem_color, atom_indices, show_atom_labels,
+                            color_by_atom)
 
-        xmin = max(0.0, min(all_energies) - 5.0)
-        xmax = max(all_energies) + 5.0
-        xstep = 0.01
-
-        # Initialize combined broadened spectrum
-        xi = np.arange(xmin, xmax, xstep)
-        yi_total = np.zeros(len(xi))
-
-        legend_handles = []
-
-        # Process each element
-        for element, ionization_data in filtered_results.items():
-            # Get color for this element
-            if colors.lower() == 'cpk':
-                elem_color = cpk_colors.get(element, vlx_color)
-            else:
-                elem_color = vlx_color
-
-            # Extract data for this element
-            energies = np.array([ie for _, ie in ionization_data])
-            intensities = np.ones(len(energies))
-
-            # Plot stick spectrum for this element
-            for i in range(len(energies)):
-                ax2.plot(
-                    [energies[i], energies[i]],
-                    [0.0, intensities[i]],
-                    alpha=0.7,
-                    linewidth=2,
-                    color=elem_color,
-                )
-
-            # Apply broadening for this element
-            if broadening_type.lower() == "lorentzian":
-                xi_elem, yi_elem = lorentzian_xps(energies, intensities, xmin, xmax, xstep,
-                                                  broadening_value)
-            elif broadening_type.lower() == "gaussian":
-                xi_elem, yi_elem = gaussian_xps(energies, intensities, xmin, xmax, xstep,
-                                               broadening_value)
-
-            # Add to total spectrum
-            yi_total += yi_elem
-
-            # Add to legend
-            legend_handles.append(mlines.Line2D([], [],
-                                               color=elem_color,
-                                               alpha=0.7,
-                                               linewidth=2,
-                                               label=element))
-
-        # Plot total broadened spectrum
-        ax.plot(xi, yi_total, color="black", alpha=0.9, linewidth=2.5)
-
-        # Set plot limits
-        ax.set_xlim(xmin, xmax)
-        ax.set_ylim(0, max(yi_total) * 1.1)
-        ax2.set_ylim(0, 1.2)
-
-        # Add legend
-        label_spectrum = f'{broadening_type.capitalize()} '
-        label_spectrum += f'broadening ({broadening_value:.2f} eV FWHM)'
-        legend_spectrum = mlines.Line2D([], [],
-                                        color='black',
-                                        linestyle='-',
-                                        linewidth=2.5,
-                                        label=label_spectrum)
-        legend_handles.append(legend_spectrum)
-
-        ax2.legend(handles=legend_handles,
-                   frameon=False,
-                   borderaxespad=0.,
-                   loc='center left',
-                   bbox_to_anchor=(1.15, 0.5))
-
-        return ax
+    return ax
 
 
 def _plot_single_element_xps(ax, element, energies, intensities,
-                             broadening_type, broadening_value, color):
+                             broadening_type, broadening_value, color,
+                             atom_indices=None, show_atom_labels=True,
+                             color_by_atom=False):
     """
     Helper function to plot XPS spectrum for a single element.
 
@@ -640,6 +552,12 @@ def _plot_single_element_xps(ax, element, energies, intensities,
         FWHM in eV.
     :param color:
         Color for the element.
+    :param atom_indices:
+        Array of atom indices corresponding to each peak. If None, no atom attribution.
+    :param show_atom_labels:
+        If True and atom_indices provided, show atom labels above peaks.
+    :param color_by_atom:
+        If True and atom_indices provided, color peaks by atom instead of using single color.
     """
 
     ax.set_xlabel('Binding Energy [eV]')
@@ -650,15 +568,34 @@ def _plot_single_element_xps(ax, element, energies, intensities,
     ax2 = ax.twinx()
     ax2.set_ylabel('Peak Intensity')
 
+    # Generate colors for atom-based coloring
+    if color_by_atom and atom_indices is not None:
+        unique_atoms = np.unique(atom_indices)
+        # Use a colormap for distinguishing atoms
+        cmap = plt.cm.get_cmap('tab10')
+        atom_colors = {atom_idx: cmap(i % 10) for i, atom_idx in enumerate(unique_atoms)}
+    
     # Plot stick spectrum
     for i in range(len(energies)):
+        if color_by_atom and atom_indices is not None:
+            peak_color = atom_colors[atom_indices[i]]
+        else:
+            peak_color = color
+            
         ax2.plot(
             [energies[i], energies[i]],
             [0.0, intensities[i]],
             alpha=0.7,
             linewidth=2,
-            color=color,
+            color=peak_color,
         )
+        
+        # Add atom labels above peaks (1-based indexing)
+        if show_atom_labels and atom_indices is not None:
+            ax2.text(energies[i], intensities[i] * 1.05, 
+                    f'{element}{atom_indices[i] + 1}',
+                    ha='center', va='bottom', fontsize=9,
+                    fontweight='bold')
 
     # Set up energy range for broadened spectrum
     xmin = max(0.0, min(energies) - 5.0)
@@ -682,11 +619,27 @@ def _plot_single_element_xps(ax, element, energies, intensities,
     ax2.set_ylim(0, max(intensities) * 1.1)
 
     # Add legend
-    legend_bars = mlines.Line2D([], [],
-                                color=color,
-                                alpha=0.7,
-                                linewidth=2,
-                                label=f'{element} core orbitals')
+    legend_handles = []
+    
+    if color_by_atom and atom_indices is not None:
+        # Add legend entry for each atom (1-based indexing)
+        for atom_idx in np.unique(atom_indices):
+            legend_handles.append(
+                mlines.Line2D([], [],
+                            color=atom_colors[atom_idx],
+                            alpha=0.7,
+                            linewidth=2,
+                            label=f'{element}{atom_idx + 1}')
+            )
+    else:
+        legend_handles.append(
+            mlines.Line2D([], [],
+                        color=color,
+                        alpha=0.7,
+                        linewidth=2,
+                        label=f'{element} core orbitals')
+        )
+    
     label_spectrum = f'{broadening_type.capitalize()} '
     label_spectrum += f'broadening ({broadening_value:.2f} eV FWHM)'
     legend_spectrum = mlines.Line2D([], [],
@@ -694,7 +647,9 @@ def _plot_single_element_xps(ax, element, energies, intensities,
                                     linestyle='-',
                                     linewidth=2.5,
                                     label=label_spectrum)
-    ax2.legend(handles=[legend_bars, legend_spectrum],
+    legend_handles.append(legend_spectrum)
+    
+    ax2.legend(handles=legend_handles,
                frameon=False,
                borderaxespad=0.,
                loc='center left',
@@ -727,10 +682,10 @@ def lorentzian_xps(x, y, xmin, xmax, xstep, fwhm):
 
     for i in range(len(xi)):
         for k in range(len(x)):
-            yi[i] += y[k] * (gamma**2) / ((xi[i] - x[k])**2 + gamma**2)
+            yi[i] += y[k] * gamma / ((xi[i] - x[k])**2 + gamma**2)
 
     # Normalize
-    yi = yi / np.pi * gamma
+    yi = yi / np.pi
 
     return xi, yi
 
