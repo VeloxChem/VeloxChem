@@ -226,6 +226,8 @@ from .smddriver import SmdDriver
 from .atombdedriver import AtomBdeDriver
 # for backward compatibility only
 from .peforcefieldgenerator import PEForceFieldGenerator as LoPropDriver
+from .phfparameterizer import PHFParameterizer
+from .mmhessiandriver import MMHessianDriver
 from .molecule_toolkit import MoleculeToolkit
 
 # Python functions
