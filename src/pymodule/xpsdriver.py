@@ -40,7 +40,7 @@ from .outputstream import OutputStream
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .errorhandler import assert_msg_critical
 from .spectrumplot import plot_xps_spectrum
-
+from .sanitychecks import scf_results_sanity_check
 
 class XPSDriver:
     """
@@ -77,10 +77,11 @@ class XPSDriver:
         self.ostream = ostream
         self.rank = self.comm.Get_rank()
 
+        # TODO: can HF and DFT be combined in the same range?
         # Core orbital energy ranges (in Hartree) for different elements and methods
         # Based on typical Hartree-Fock calculations
         self.energy_ranges_hf = {
-            'C': (-11.4, -11.3),
+            'C': (-11.5, -11.0),
             'N': (-15.7, -15.6),
             'O': (-20.7, -20.6),
             'F': (-26.4, -26.3),
@@ -89,11 +90,11 @@ class XPSDriver:
 
         # Based on typical DFT (B3LYP/PBE) calculations
         self.energy_ranges_dft = {
-            'C': (-10.5, -10.2),
-            'N': (-14.6, -14.2),
-            'O': (-19.4, -18.9),
+            'C': (-10.5, -9.2),
+            'N': (-14.6, -13.8),
+            'O': (-19.4, -18.0),
             'F': (-24.9, -24.4),
-            'S': (-89.0, -87-0),
+            'S': (-89.0, -87.0),
         }
 
         # Default to DFT ranges for backward compatibility
@@ -422,6 +423,7 @@ class XPSDriver:
                 f'Supported elements: {list(energy_ranges.keys())}')
 
         if self.rank == mpi_master():
+            # TODO: this could be moved to a self.print_header?
             self.ostream.print_blank()
             self.ostream.print_header('XPS Driver')
             self.ostream.print_header('=' * 80)
@@ -443,9 +445,6 @@ class XPSDriver:
 
         # Get molecular orbitals
         orbs = scf_driver.molecular_orbitals
-
-        # Get XC functional from ground state calculation
-        xcfun = scf_driver.xcfun
 
         # Create molecular ion (+1 charge, doublet spin state)
         molecular_ion = copy.deepcopy(molecule)
@@ -472,9 +471,23 @@ class XPSDriver:
                 if len(core_orbital_assignments) > 0:
                     self.ostream.print_info(
                         f'Found {len(core_orbital_assignments)} core orbital(s) for {elem}:')
+                    delocalized = []
                     for mo_idx, atom_idx, contrib in core_orbital_assignments:
                         self.ostream.print_info(
                             f'  MO {mo_idx} -> Atom {atom_idx+1} ({elem}) with {contrib:.1%} contribution')
+                        if contrib < 0.75:
+                            delocalized.append(mo_idx)
+                    if delocalized:
+                        # TODO: Localize orbitals. If multiple edges, core orbitals must be
+                        # localized separately for each edge.
+                        n_deloc = len(delocalized)
+                        warning = f' The molecule contains {n_deloc} delocalized core orbitals.'
+                        self.ostream.print_blank()
+                        self.ostream.print_warning(warning)
+                        warning = f' For correct XPS spectra, localize these orbitals first: '
+                        for mo_idx in delocalized:
+                            warning += f' MO {mo_idx} '
+                        self.ostream.print_warning(warning)
                 self.ostream.print_blank()
                 self.ostream.flush()
             else:
@@ -504,7 +517,12 @@ class XPSDriver:
 
                 # Setup unrestricted SCF calculation with FCH
                 scf_ion = ScfUnrestrictedDriver(self.comm, self.ostream)
-                scf_ion.xcfun = xcfun  # Use same functional as ground state
+
+                # Scf sanity check
+                scf_results_sanity_check(scf_ion, scf_results)
+
+                # Maximum number of iterations (not included in scf_results)
+                scf_ion.max_iter = scf_driver.max_iter
 
                 # Apply maximum overlap method to maintain core hole
                 scf_ion.maximum_overlap(molecular_ion, basis, orbs, occa, occb)
@@ -608,11 +626,11 @@ class XPSDriver:
             The matplotlib axis object.
         """
 
-        return plot_xps_spectrum(results,
-                                element=element,
-                                broadening_type=broadening_type,
-                                broadening_value=broadening_value,
-                                color=color,
-                                show_atom_labels=show_atom_labels,
-                                color_by_atom=color_by_atom,
-                                ax=ax)
+        plot_xps_spectrum(results,
+                          element=element,
+                          broadening_type=broadening_type,
+                          broadening_value=broadening_value,
+                          color=color,
+                          show_atom_labels=show_atom_labels,
+                          color_by_atom=color_by_atom,
+                          ax=ax)
