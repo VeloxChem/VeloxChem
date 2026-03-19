@@ -60,7 +60,6 @@ from .xtbhessiandriver import XtbHessianDriver
 from .uffparameters import get_uff_parameters
 from .tmparameters import get_tm_parameters
 from .waterparameters import get_water_parameters
-from .smirnofftyper import SmirnoffTyper
 from .environment import get_data_path
 
 
@@ -186,7 +185,7 @@ class MMForceFieldGenerator:
         self.fitting_summary = None
 
         # Force field selection: 'gaff' (default), 'opls',
-        # 'openff-2.0.0', or 'openff-2.1.0'.
+        # 'openff-2.0.0', 'openff-2.1.0', or 'openff-2.2.0'.
         # Set via   mmgen.force_field = 'openff-2.0.0'   before create_topology().
         # OPLS-AA uses geometric-mean LJ mixing (comb_rule 3 in GROMACS); this
         # is applied automatically in write_top() when force_field == 'opls'.
@@ -1499,18 +1498,12 @@ class MMForceFieldGenerator:
         ff_data_dict = None
         ff_data_lines = None
 
-        # Early availability check for optional dependencies so the user
-        # gets a clear error before any expensive RESP calculation starts.
-        if self.force_field.startswith('openff-'):
-            try:
-                from rdkit import Chem as _  # noqa: F401
-            except ImportError:
-                assert_msg_critical(
-                    False,
-                    'MMForceFieldGenerator: RDKit is required for '
-                    f'force_field = "{self.force_field}". '
-                    'Install with:  conda install -c conda-forge rdkit'
-                )
+        # Check OpenFF version, if no version is set, use 2.2.0
+        if self.force_field.strip().lower() == ('openff'):
+                self.force_field = 'openff-2.2.0'
+                self.ostream.print_info("No OpenFF version explicitly specified. Defaulting to 'openff-2.2.0'.")
+                self.ostream.print_blank()
+                self.ostream.flush()
 
         # Read the force field data
 
@@ -1675,7 +1668,7 @@ class MMForceFieldGenerator:
 
         # Read the force field and include the data in the topology dictionary.
 
-        if self.force_field.startswith('openff-'):
+        if self.force_field.startswith('openff'):
             # OpenFF Sage: all parameters come from SmirnoffTyper
             # via SMIRKS-based assignment — bypass the individual populate_*
             # methods entirely.
@@ -2230,65 +2223,103 @@ class MMForceFieldGenerator:
                              dihedral_indices, equivalent_atoms):
         """
         Parametrize all bonded and nonbonded terms using an OpenFF Sage
-        force field via SmirnoffTyper — requires only RDKit.
+        force field via SmirnoffTyper.
 
-        Returns (atoms, bonds, angles, dihedrals, rotatable_bonds, impropers)
-        with the same dict structure as the individual populate_* methods.
+        Builds a hybrid RDKit molecule: uses VeloxChem's exact connectivity 
+        to prevent dropped bonds, attempts 3D bond order perception for exact 
+        SMIRKS matching, and falls back to a GAFF-aromaticity graph on failure.
         """
-        # OpenFF 2.y.z Sage currently only supports the following elements
+        # Enforce OpenFF Element Limits 
         allowed_elements = {
             'C', 'H', 'O', 'N', 'P', 'S', 'F', 'Cl', 'Br', 'I', 'Xe',
             'Li', 'Na', 'K', 'Rb', 'Cs'
         }
-        unsupported = set(self.molecule.get_labels()) - allowed_elements
-        
+        unsupported = set(label.strip() for label in self.molecule.get_labels()) - allowed_elements
         if unsupported:
             assert_msg_critical(
                 False,
-                f"MMForceFieldGenerator: OpenFF Sage does not support elements {unsupported}. "
-                "Please switch to 'gaff' to utilize UFF/literature fallbacks."
+                f"MMForceFieldGenerator: OpenFF Sage does not support elements "
+                f"{unsupported}. Please switch to 'gaff' to use UFF/literature fallbacks."
             )
 
-        try:
-            from rdkit import Chem
-            from rdkit.Chem import rdDetermineBonds
-        except ImportError:
-            assert_msg_critical(
-                False,
-                'MMForceFieldGenerator: RDKit is required for '
-                f'force_field = "{self.force_field}". '
-                'Install with:  conda install -c conda-forge rdkit'
-            )
-
+        from rdkit import Chem
         from .smirnofftyper import SmirnoffTyper
 
-        # Build Chemically Accurate RDKit Mol 
-        n_atoms = self.molecule.number_of_atoms()
-        xyz_block = self.molecule.get_xyz_string()
+        # Build RDKit Mol Skeleton (Bypass DetermineConnectivity) 
+        elem_symbols = self.molecule.get_labels()
+        n_atoms      = self.molecule.number_of_atoms()
         total_charge = int(round(self.molecule.get_charge()))
-        
-        rdmol = Chem.MolFromXYZBlock(xyz_block)
-        assert_msg_critical(rdmol is not None, "RDKit failed to read the XYZ coordinates.")
-        
-        if n_atoms == 1:
+        conn         = self.connectivity_matrix
 
+        rw = Chem.RWMol()
+        for elem in elem_symbols:
+            rw.AddAtom(Chem.Atom(elem.strip()))
+
+        # Add only SINGLE bonds to establish the exact graph topology
+        for i in range(n_atoms):
+            for j in range(i + 1, n_atoms):
+                if conn[i, j] == 1:
+                    rw.AddBond(i, j, Chem.BondType.SINGLE)
+
+        rdmol = rw.GetMol()
+
+        # Add the 3D conformer so DetermineBondOrders can measure lengths
+        conf = Chem.Conformer(n_atoms)
+        for i in range(n_atoms):
+            # coords is passed in Angstroms from create_topology
+            conf.SetAtomPosition(i, (float(coords[i][0]), float(coords[i][1]), float(coords[i][2])))
+        rdmol.AddConformer(conf)
+
+        # Assign True Bond Orders and Formal Charges
+        if n_atoms == 1:
             rdmol.GetAtomWithIdx(0).SetFormalCharge(total_charge)
             rdmol.UpdatePropertyCache(strict=False)
         else:
+            from rdkit.Chem import rdDetermineBonds
             try:
-                rdDetermineBonds.DetermineConnectivity(rdmol)
+                # Safely assigns DOUBLE/TRIPLE bonds and exact formal charges!
                 rdDetermineBonds.DetermineBondOrders(rdmol, charge=total_charge)
-            except ValueError as e:
-                assert_msg_critical(False, f"RDKit failed to determine chemical structure from 3D coordinates: {e}")
+            except Exception as e:
+                # ── 3. The Ultimate Fallback (GAFF-Aromaticity Method) ──
+                self.ostream.print_warning(
+                    f"RDKit bond order perception failed ({e}). Falling back to "
+                    "GAFF-based aromaticity graph. WARNING: OpenFF may assign "
+                    "generic parameters for complex double/triple bonds."
+                )
+                
+                _GAFF_AROM = frozenset([
+                    'ca', 'cp', 'cq',       # aromatic C (benzene-like)
+                    'cc', 'cd',             # aromatic C in non-pure-aromatic rings
+                    'nb',                   # aromatic N (no H, pyridine-like)
+                    'nc', 'nd',             # aromatic N conjugated
+                    'na',                   # aromatic N-H (pyrrole-like)
+                    'pb', 'pc', 'pd',       # aromatic P
+                ])
+                gaff_types = [t.strip() for t in self.atom_types]
+                is_arom = [gaff_types[i] in _GAFF_AROM for i in range(n_atoms)]
 
-        # Load FF and Assign All Parameters 
+                for i in range(n_atoms):
+                    atom = rdmol.GetAtomWithIdx(i)
+                    atom.SetIsAromatic(is_arom[i])
+                    atom.SetNoImplicit(True)
+
+                for bond in rdmol.GetBonds():
+                    i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+                    if is_arom[i] and is_arom[j]:
+                        bond.SetBondType(Chem.BondType.AROMATIC)
+
+                san_flags = (Chem.SanitizeFlags.SANITIZE_ALL ^ 
+                             Chem.SanitizeFlags.SANITIZE_SETAROMATICITY)
+                Chem.SanitizeMol(rdmol, catchErrors=False, sanitizeOps=san_flags)
+
+        # Load FF and assign all parameters 
         ff_name     = self.force_field
         offxml_path = getattr(self, 'openff_offxml_path', None)
         typer = SmirnoffTyper(ff_name=ff_name, offxml_path=offxml_path)
-        
-        raw   = typer.assign_all(rdmol, bond_indices, angle_indices, dihedral_indices)
+        raw   = typer.assign_all(rdmol, bond_indices, angle_indices,
+                                 dihedral_indices)
 
-        # Map Atoms 
+        # Atoms 
         atom_names  = self.get_atom_names()
         atom_masses = self.molecule.get_masses()
         atoms = {}
@@ -2302,76 +2333,42 @@ class MMForceFieldGenerator:
                 'sigma':           vdw['sigma'],
                 'epsilon':         vdw['epsilon'],
                 'equivalent_atom': equivalent_atoms[i],
-                'comment':         'OpenFF-2.0',
+                'comment':         'OpenFF',
             }
 
-        # Map Bonds 
+        # Bonds 
         bonds = {}
         for ij, bp in raw['bonds'].items():
-            r_ff = bp['length']
-            k_r = bp['k']
-            
-            if self.eq_param:
-                # Override ideal FF length with molecule's 3D geometry
-                i, j = ij
-                r_eq = np.linalg.norm(coords[i] - coords[j]) * 0.1
-                if abs(r_ff - r_eq) > self.r_thresh:
-                    msg = f'Updated bond length {i+1}-{j+1} to {r_eq:.3f} nm'
-                    self.ostream.print_info(msg)
-                r_ff = r_eq
-
             bonds[ij] = {
-                'equilibrium':    r_ff,
-                'force_constant': k_r,
+                'type':           'harmonic',
+                'equilibrium':    bp['length'],
+                'force_constant': bp['k'],
                 'comment':        f'openff bond {ij[0]+1}-{ij[1]+1}',
             }
 
-        # Map Angles 
+        # Angles 
         angles = {}
         for ijk, ap in raw['angles'].items():
-            th_ff = ap['angle']
-            k_th = ap['k']
-
-            if self.eq_param:
-                # Override ideal FF angle with molecule's 3D geometry
-                i, j, k = ijk
-                a = coords[i] - coords[j]
-                b = coords[k] - coords[j]
-                th_eq = safe_arccos(
-                    np.dot(a, b) / np.linalg.norm(a) / np.linalg.norm(b)
-                ) * 180.0 / np.pi
-                
-                if abs(th_ff - th_eq) > self.theta_thresh:
-                    msg = f'Updated angle {i+1}-{j+1}-{k+1} to {th_eq:.3f} deg'
-                    self.ostream.print_info(msg)
-                th_ff = th_eq
-
             angles[ijk] = {
-                'equilibrium':    th_ff,
-                'force_constant': k_th,
+                'type':           'harmonic',
+                'equilibrium':    ap['angle'],  # Degrees directly from Typer
+                'force_constant': ap['k'],
                 'comment':        f'openff angle {ijk[0]+1}-{ijk[1]+1}-{ijk[2]+1}',
             }
 
-        # Map Proper Dihedrals 
+        # Proper dihedrals 
         dihedrals       = {}
-        rotatable_bonds = set()
-        
+        candidate_bonds = set()
         for ijkl, terms in raw['propers'].items():
-            barriers = []
-            phases = []
-            periodicities = []
-            comments = []
-            
-            for term in terms:
-                barriers.append(term['k'])
-                phases.append(term['phase']) 
-                periodicities.append(term['periodicity'])
-                comments.append(f'openff proper {ijkl[0]+1}-{ijkl[1]+1}-{ijkl[2]+1}-{ijkl[3]+1}')
+            barriers      = [t['k']           for t in terms]
+            phases        = [t['phase']       for t in terms]   # degrees
+            periodicities = [t['periodicity'] for t in terms]
+            comments      = [f'openff proper {ijkl[0]+1}-{ijkl[1]+1}-'
+                              f'{ijkl[2]+1}-{ijkl[3]+1}'] * len(terms)
 
-            # Track rotatable bonds
             if any(k != 0.0 for k in barriers):
                 j, k = ijkl[1], ijkl[2]
-                rotatable_bonds.add((min(j, k), max(j, k)))
+                candidate_bonds.add((min(j, k), max(j, k)))
 
             multiple = len(barriers) > 1
             if multiple:
@@ -2393,35 +2390,39 @@ class MMForceFieldGenerator:
                     'comment':     comments[0],
                 }
 
-        # Map Improper Dihedrals 
+        rotatable_bonds = []
+        for (j, k) in sorted(candidate_bonds):
+            if self.is_bond_in_ring(j, k):
+                continue
+            j_conns = int(self.connectivity_matrix[j].sum())
+            k_conns = int(self.connectivity_matrix[k].sum())
+            if j_conns <= 1 or k_conns <= 1:
+                continue
+            rotatable_bonds.append([j + 1, k + 1])   
+
+        # Impropers
         impropers = {}
         for ijkl, terms in raw['impropers'].items():
             if not terms:
                 continue
-            
-            # GROMACS `funct 4` expects a single term per improper line.
-            # SMIRNOFF impropers are normally 1 term (phase=180, per=2).
-            term = terms[0]
-            
-            # SmirnoffTyper key is (periph1, center, periph2, periph3)
-            # VeloxChem's improper writer unpacks to center = index 0.
-            # We must re-order it to (center, p1, p2, p3) so GROMACS puts the center atom 3rd.
-            center = ijkl[1]
-            p1, p2, p3 = ijkl[0], ijkl[2], ijkl[3]
-            gaff_key = (center, p1, p2, p3)
-            
-            impropers[gaff_key] = {
+            term   = terms[0]
+            centre = ijkl[1]
+            a, b, c = ijkl[0], ijkl[2], ijkl[3]
+            imp_entry = {
                 'type':        'Fourier',
-                'multiple':    False, # Write_itp ignores this for impropers, but good practice
-                'barrier':     term['k'],
-                'phase':       term['phase'], # Keep in degrees
+                'multiple':    False,
+                'barrier':     term['k'],         
+                'phase':       term['phase'],      
                 'periodicity': term['periodicity'],
-                'comment':     f'openff improper center={center+1}',
+                'comment':     f'openff improper center={centre+1}',
             }
+            # Write all three permutations so GROMACS gets the full restoring force
+            for pa, pb, pc in [(a, b, c), (b, a, c), (c, a, b)]:
+                key = (centre, pa, pb, pc)
+                impropers[key] = dict(imp_entry)
 
-        return atoms, bonds, angles, dihedrals, list(rotatable_bonds), impropers
-
-
+        return atoms, bonds, angles, dihedrals, rotatable_bonds, impropers
+    
     def print_references(self, gaff_version, use_gaff, use_opls, use_uff, use_tm):
         if use_gaff:
             if gaff_version is not None:
@@ -3467,7 +3468,7 @@ class MMForceFieldGenerator:
                 # (comb_rule 3) and equal 1-4 scaling (fudgeLJ = fudgeQQ = 0.5).
                 # GAFF/AMBER uses Lorentz-Berthelot mixing (comb_rule 2) and
                 # fudgeQQ = 1/1.2.
-                if self.force_field in ('opls'):
+                if self.force_field in ('opls',) or self.force_field.startswith('openff'):
                     comb_rule = 3
                     fudgeLJ = 0.5
                     fudgeQQ = 0.5
@@ -3516,24 +3517,11 @@ class MMForceFieldGenerator:
             line_str = ';name   bond_type     mass     charge'
             line_str += '   ptype   sigma         epsilon\n'
             f_itp.write(line_str)
-            
             # For OPLS, opls_NNN types are already defined in the system-wide
-            # oplsaa.ff/ffnonbonded.itp and must NOT be redeclared here.
-            # For GAFF/UFF/OpenFF, types are molecule-specific and must be declared.
-            if self.force_field == 'opls':
-                pass
-            elif self.force_field.startswith('openff-'):
-                # Each OpenFF atom has a unique type (openff_N) carrying its
-                # own sigma/epsilon — write one line per atom directly.
-                for i, atom in self.atoms.items():
-                    # Left-aligned (<12) to prevent string overflow bugs in GROMACS!
-                    line_str = '{:<12}{:<12}{:12.5f}{:9.5f}{:>4}'.format(
-                        atom['type'], atom['type'], 0., 0., 'A')
-                    line_str += '{:16.5e}{:14.5e}\n'.format(
-                        atom['sigma'], atom['epsilon'])
-                    f_itp.write(line_str)
-            else:
-                # GAFF/UFF standard path
+            # oplsaa.ff/ffnonbonded.itp and must NOT be redeclared in the
+            # molecule itp. For GAFF/UFF, types are non-standard and must be
+            # declared explicitly.
+            if self.force_field not in ('opls',) and not self.force_field.startswith('openff'):
                 # TODO: Make unique_atom_types and atom['type'] more consistent
                 for at in self.unique_atom_types:
                     for i, atom in self.atoms.items():
@@ -3765,13 +3753,21 @@ class MMForceFieldGenerator:
                 ET.SubElement(Dihedrals, "Proper", **attributes)
 
         # Improper dihedrals
+        # OpenMM PeriodicTorsionForce <Improper> convention: class3 is the central atom.
+        # Our improper key stores centre at index 0: (centre, p1, p2, p3).
+        # Reorder to (p1, p2, centre, p3) so that class3 = centre.
         for improper_id, improper_data in self.impropers.items():
-
+            centre_idx = improper_id[0]
+            p1_idx     = improper_id[1]
+            p2_idx     = improper_id[2]
+            p3_idx     = improper_id[3]
+            # Reorder: class1=p1, class2=p2, class3=centre, class4=p3
+            ordered = (p1_idx, p2_idx, centre_idx, p3_idx)
             attributes = {
-                "class1": str(improper_id[0] + 1) + f'_{mol_name}',
-                "class2": str(improper_id[1] + 1) + f'_{mol_name}',
-                "class3": str(improper_id[2] + 1) + f'_{mol_name}',
-                "class4": str(improper_id[3] + 1) + f'_{mol_name}',
+                "class1": str(ordered[0] + 1) + f'_{mol_name}',
+                "class2": str(ordered[1] + 1) + f'_{mol_name}',
+                "class3": str(ordered[2] + 1) + f'_{mol_name}',
+                "class4": str(ordered[3] + 1) + f'_{mol_name}',
                 "periodicity1": str(improper_data['periodicity']),
                 "phase1": str(improper_data['phase'] * np.pi / 180),
                 "k1": str(improper_data['barrier'])
@@ -3938,7 +3934,7 @@ class MMForceFieldGenerator:
         if mol_name is None:
             mol_name = Path(self.molecule_name).stem
 
-        if self.force_field in ('opls',) or self.force_field.startswith('openff-'):
+        if self.force_field in ('opls',) or self.force_field.startswith('openff'):
             warnmsg = (
                 'MMForceFieldGenerator: OPLS-AA uses geometric-mean combining '
                 'rules (comb-rule 3) for LJ interactions. OpenMM only supports '

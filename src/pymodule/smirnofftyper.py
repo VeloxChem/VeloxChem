@@ -1,40 +1,9 @@
-#
-#                                   VELOXCHEM
-#              ----------------------------------------------------
-#                          An Electronic Structure Code
-#
-#  SPDX-License-Identifier: BSD-3-Clause
-#
-#  Copyright 2018-2025 VeloxChem developers
-#
-#  Redistribution and use in source and binary forms, with or without modification,
-#  are permitted provided that the following conditions are met:
-#
-#  1. Redistributions of source code must retain the above copyright notice, this
-#     list of conditions and the following disclaimer.
-#  2. Redistributions in binary form must reproduce the above copyright notice,
-#     this list of conditions and the following disclaimer in the documentation
-#     and/or other materials provided with the distribution.
-#  3. Neither the name of the copyright holder nor the names of its contributors
-#     may be used to endorse or promote products derived from this software without
-#     specific prior written permission.
-#
-#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-#  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-#  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-#  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-#  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-#  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-#  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
-#  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
-#  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-#  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
 """
 smirnofftyper.py — Self-contained SMIRNOFF parameter applier
 =============================================================
 Applies OpenFF-format (.offxml) force fields to molecules using only RDKit
-and Python stdlib (xml.etree, urllib). 
+and Python stdlib (xml.etree, urllib).  No openff-toolkit, openff-interchange,
+or openff-units required.
 
 Supports  : Bonds, Angles, ProperTorsions, ImproperTorsions, vdW.
 No support: virtual sites, fractional bond-order interpolation,
@@ -54,6 +23,7 @@ Output unit conventions (matching VeloxChem / GROMACS internals):
     epsilon     kJ mol⁻¹
     sigma       nm
 
+License: MIT (same as openff-toolkit and openff-forcefields)
 """
 
 import re
@@ -62,7 +32,7 @@ import xml.etree.ElementTree as ET
 import urllib.request
 
 
-# Unit conversion constants 
+# Unit conversion constants
 
 _KCAL_TO_KJ        = 4.184          # 1 kcal/mol → kJ/mol
 _ANG_TO_NM         = 0.1            # 1 Å → nm
@@ -72,7 +42,7 @@ _KCAL_ANG2_TO_KJ_NM2 = _KCAL_TO_KJ / (_ANG_TO_NM ** 2)
 _KCAL_RAD2_TO_KJ_RAD2 = _KCAL_TO_KJ
 
 
-# Quantity parsing 
+# Quantity parsing
 
 def _parse_quantity(text):
     """
@@ -146,7 +116,7 @@ def _sigma_to_nm(value, unit):
     return _to_nm(value, unit)
 
 
-# .offxml fetching 
+# .offxml fetching
 
 # Commit-pinned raw URLs for MIT-licensed force field files.
 _OFFXML_URLS = {
@@ -219,22 +189,28 @@ def _tagged_indices(smirks, match_tuple, query):
     return tag_to_idx
 
 
-# Molecule builder 
+# Molecule builder
 
 def build_rdkit_mol(connectivity_matrix, elem_ids):
     """
     Build and sanitize an RDKit Mol from VeloxChem connectivity data.
 
     :param connectivity_matrix: 2-D numpy array; integer bond orders (0/1/2/3)
-    :param elem_ids:            array-like of atomic numbers (int)
+    :param elem_ids:            array-like of element symbols (str, e.g. 'C')
+                                or atomic numbers (int).  VeloxChem's public
+                                API exposes get_labels() which returns symbols.
     :returns:                   sanitized RDKit Mol
     """
     from rdkit import Chem
     n  = len(elem_ids)
     rw = Chem.RWMol()
 
-    for z in elem_ids:
-        rw.AddAtom(Chem.Atom(int(z)))
+    for elem in elem_ids:
+        # Accept either element symbol ('C', 'N', ...) or atomic number (int)
+        if isinstance(elem, str):
+            rw.AddAtom(Chem.Atom(elem))
+        else:
+            rw.AddAtom(Chem.Atom(int(elem)))
 
     for i in range(n):
         for j in range(i + 1, n):
@@ -253,7 +229,7 @@ def build_rdkit_mol(connectivity_matrix, elem_ids):
     return mol
 
 
-# Core typer 
+# Core typer
 
 class SmirnoffTyper:
     """
@@ -352,7 +328,7 @@ class SmirnoffTyper:
         section = self._root.find('ProperTorsions')
         if section is None:
             return out
-
+        # 'auto' default_idivf means 1.0 for wildcards; we treat as 1.0
         try:
             default_idivf = float(section.get('default_idivf', '1'))
         except ValueError:
@@ -369,7 +345,7 @@ class SmirnoffTyper:
                 try:
                     idivf = float(el.get(f'idivf{n}', str(default_idivf)))
                 except ValueError:
-                    idivf = 1.0   
+                    idivf = 1.0   # 'auto' → 1.0
                 terms.append({
                     'k':           _torsion_k_to_kj(kv, ku) / idivf,
                     'phase':       _to_degree(pv, pu),
@@ -448,7 +424,7 @@ class SmirnoffTyper:
                 sigma = _sigma_to_nm(sv, su)
             elif rmin_str:
                 rv, ru = _parse_quantity(rmin_str)
-                # sigma = rmin_half * 2 / 2^(1/6)
+                # σ = rmin_half * 2 / 2^(1/6)
                 sigma = _to_nm(rv, ru) * 2.0 / (2.0 ** (1.0 / 6.0))
             else:
                 continue
@@ -575,7 +551,7 @@ class SmirnoffTyper:
         }
 
 
-#  Module-level convenience function
+# Module-level convenience function 
 
 def parametrize_molecule(
     connectivity_matrix,
@@ -590,7 +566,7 @@ def parametrize_molecule(
     One-shot parametrization: build RDKit mol, load force field, assign all.
 
     :param connectivity_matrix: numpy (n×n) integer bond-order matrix
-    :param elem_ids:            array-like of atomic numbers
+    :param elem_ids:            array-like of element symbols (str) or atomic numbers
     :param bond_indices:        list of (i,j) tuples
     :param angle_indices:       list of (i,j,k) tuples
     :param dihedral_indices:    list of (i,j,k,l) tuples
@@ -602,3 +578,4 @@ def parametrize_molecule(
     mol   = build_rdkit_mol(connectivity_matrix, elem_ids)
     typer = SmirnoffTyper(ff_name=ff_name, offxml_path=offxml_path)
     return typer.assign_all(mol, bond_indices, angle_indices, dihedral_indices)
+
