@@ -250,7 +250,12 @@ export_t2cintegrals(py::module& m)
             "compute",
             [](const CNuclearPotentialGeom0X0Driver<2>& geom_drv, const CMolecule& molecule, const CMolecularBasis& basis, const int iatom)
                 -> CMatrices { return geom_drv.compute(basis, molecule, iatom); },
-            "Computes nuclear potential derivatives matrices for given molecule, basis and selected atom.");
+            "Computes nuclear potential derivatives matrices for given molecule, basis and selected atom.")
+        .def(
+            "compute",
+            [](const CNuclearPotentialGeom0X0Driver<2>& geom_drv, const CMolecule& molecule, const CMolecularBasis& basis, const int iatom, const double alternative_charge)
+                -> CMatrices { return geom_drv.compute(basis, molecule, iatom, alternative_charge); },
+            "Computes nuclear potential derivatives matrices for given molecule, basis, selected atom and alternative nuclear charge (e.g. with ECP).");
 
     // CNuclearPotentialGeom100Driver class
     PyClass<CNuclearPotentialGeomX00Driver<1>>(m, "NuclearPotentialGeom100Driver")
@@ -347,7 +352,18 @@ export_t2cintegrals(py::module& m)
                const int                                   jatom) -> CMatrices {
                 return geom_drv.compute(basis, molecule, iatom, jatom);
             },
-            "Computes nuclear potential second derivatives matrices for given molecule, basis and selected atom.");
+            "Computes nuclear potential second derivatives matrices for given molecule, basis and selected atom.")
+        .def(
+            "compute",
+            [](const CNuclearPotentialGeomXY0Driver<1, 1>& geom_drv,
+               const CMolecule&                            molecule,
+               const CMolecularBasis&                      basis,
+               const int                                   iatom,
+               const int                                   jatom,
+               const double                                alternative_charge) -> CMatrices {
+                return geom_drv.compute(basis, molecule, iatom, jatom, alternative_charge);
+            },
+            "Computes nuclear potential second derivatives matrices for given molecule, basis, selected atom and alternative nuclear charge (e.g. with ECP).");
 
     // COverlapGeom100Driver class
     PyClass<COverlapGeomX00Driver<1>>(m, "OverlapGeom100Driver")

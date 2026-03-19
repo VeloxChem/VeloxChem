@@ -173,7 +173,7 @@ class CphfSolver(LinearSolver):
             # nmo is sometimes different than nao (because of linear
             # dependencies which get removed during SCF)
             nmo = mo_energies.shape[0]
-            nocc = molecule.number_of_alpha_electrons()
+            nocc = molecule.number_of_alpha_occupied_orbitals(basis)
             nvir = nmo - nocc
             nao = scf_results['C_alpha'].shape[0]
             eocc = mo_energies[:nocc]
@@ -189,7 +189,7 @@ class CphfSolver(LinearSolver):
         nao = self.comm.bcast(nao, root=mpi_master())
 
         nmo = mo_energies.shape[0]
-        nocc = molecule.number_of_alpha_electrons()
+        nocc = molecule.number_of_alpha_occupied_orbitals(basis)
         nvir = nmo - nocc
 
         dof = len(dist_rhs)
@@ -325,11 +325,6 @@ class CphfSolver(LinearSolver):
             and an auxiliary Fock matrix (oo block of the CPHF coefficients
             contracted with the two-electron integrals).
         """
-
-        # TODO: enable ECP
-        assert_msg_critical(
-            not basis.has_ecp(),
-            f'{type(self).__name__}.compute: ECP is not yet supported')
 
         if self.norm_thresh is None:
             self.norm_thresh = self.conv_thresh * 1.0e-6
@@ -689,7 +684,7 @@ class CphfSolver(LinearSolver):
             # nmo is sometimes different than nao (because of linear
             # dependencies which get removed during SCF)
             nmo = mo_energies.shape[0]
-            nocc = molecule.number_of_alpha_electrons()
+            nocc = molecule.number_of_alpha_occupied_orbitals(basis)
             nvir = nmo - nocc
             mo_occ = mo[:, :nocc].copy()
             mo_vir = mo[:, nocc:].copy()
@@ -998,7 +993,7 @@ class CphfSolver(LinearSolver):
             # nmo is sometimes different than nao (because of linear
             # dependencies which get removed during SCF)
             nmo = mo_energies.shape[0]
-            nocc = molecule.number_of_alpha_electrons()
+            nocc = molecule.number_of_alpha_occupied_orbitals(basis)
             nvir = nmo - nocc
             mo_occ = mo[:, :nocc]
             mo_vir = mo[:, nocc:]
@@ -1147,8 +1142,8 @@ class CphfSolver(LinearSolver):
             nao = basis.get_dimension_of_basis()
             orb_ene_a = scf_results['E_alpha']
             orb_ene_b = scf_results['E_beta']
-            nocc_a = molecule.number_of_alpha_electrons()
-            nocc_b = molecule.number_of_beta_electrons()
+            nocc_a = molecule.number_of_alpha_occupied_orbitals(basis)
+            nocc_b = molecule.number_of_beta_occupied_orbitals(basis)
             mo_occ_a = mo_a[:, :nocc_a]
             mo_occ_b = mo_b[:, :nocc_b]
             mo_vir_a = mo_a[:, nocc_a:]
@@ -1316,8 +1311,8 @@ class CphfSolver(LinearSolver):
         if self.rank == mpi_master():
             orb_ene_a = scf_results['E_alpha']
             orb_ene_b = scf_results['E_beta']
-            nocc_a = molecule.number_of_alpha_electrons()
-            nocc_b = molecule.number_of_beta_electrons()
+            nocc_a = molecule.number_of_alpha_occupied_orbitals(basis)
+            nocc_b = molecule.number_of_beta_occupied_orbitals(basis)
             eocc_a = orb_ene_a[:nocc_a]
             eocc_b = orb_ene_b[:nocc_b]
             evir_a = orb_ene_a[nocc_a:]

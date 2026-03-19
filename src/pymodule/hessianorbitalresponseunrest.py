@@ -118,8 +118,8 @@ class UnrestrictedHessianOrbitalResponse(CphfSolver):
         profiler.set_timing_key('RHS')
 
         natm = molecule.number_of_atoms()
-        nocc_a = molecule.number_of_alpha_electrons()
-        nocc_b = molecule.number_of_beta_electrons()
+        nocc_a = molecule.number_of_alpha_occupied_orbitals(basis)
+        nocc_b = molecule.number_of_beta_occupied_orbitals(basis)
 
         if self.rank == mpi_master():
             density_a = scf_results['D_alpha']

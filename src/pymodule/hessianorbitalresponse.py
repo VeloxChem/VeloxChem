@@ -116,7 +116,7 @@ class HessianOrbitalResponse(CphfSolver):
         profiler.set_timing_key('RHS')
 
         natm = molecule.number_of_atoms()
-        nocc = molecule.number_of_alpha_electrons()
+        nocc = molecule.number_of_alpha_occupied_orbitals(basis)
 
         if self.rank == mpi_master():
             density = scf_results['D_alpha']
