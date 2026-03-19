@@ -40,6 +40,7 @@
 
 #include "AtomBasis.hpp"
 #include "Molecule.hpp"
+#include "AtomCorePotential.hpp"
 
 /// @brief Class CMolecularBasis stores data about molecular basis and provides
 /// set of methods for handling of molecular basis data.
@@ -290,6 +291,11 @@ class CMolecularBasis
     /// @param molecule the molecule.
     /// @return the string map of basis functions.
     auto get_ao_basis_map(const CMolecule& molecule) const -> std::vector<std::string>;
+    
+    /// @brief Gets ECP potential of requested atom.
+    /// @param atom The index of atom.
+    /// @return the ECP potential of atom.
+    auto get_ecp_potential(const int atom) const -> CAtomCorePotential;
 
    private:
     /// @brief The vector of atom basis sets.

@@ -34,8 +34,9 @@ from contextlib import redirect_stderr
 from io import StringIO
 from pathlib import Path
 import numpy as np
-import h5py
 import tempfile
+import h5py
+import re
 
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
@@ -141,6 +142,9 @@ class VibrationalAnalysis:
         self.rr_damping = None
         self.frequencies = (0,)
 
+        # Dictionary to define the isotopes
+        self.isotopes = None
+
         # Excited-state index in case of
         # excited-state vibrational analysis.
         self.state_deriv_index = None
@@ -226,6 +230,8 @@ class VibrationalAnalysis:
                     ('bool', 'whether to print Raman depolarization ratio'),
                 'temperature': ('float', 'the temperature'),
                 'pressure': ('float', 'the pressure'),
+                'isotopes':
+                    ('str', 'atomic masses in amu for isotope analysis'),
                 'state_deriv_index': ('int', 'excited state index'),
                 'frequencies':
                     ('seq_range', 'frequencies of external electric field'),
@@ -371,7 +377,7 @@ class VibrationalAnalysis:
             self.print_vibrational_analysis(molecule)
 
             # create binary file and save vibrational analysis results
-            self._write_final_hdf5(molecule)
+            self._write_final_hdf5(molecule, ao_basis)
 
             return vib_results
         else:
@@ -394,10 +400,49 @@ class VibrationalAnalysis:
                    '  geometric via pip or conda.\n')
         assert_msg_critical(hasattr(geometric, 'normal_modes'), err_msg)
 
+        title = 'Free Energy Analysis'
+        self.ostream.print_header(title)
+        self.ostream.print_header('=' * (len(title) + 2))
+        self.ostream.print_blank()
+
         # number of atoms, elements, and coordinates
         natm = molecule.number_of_atoms()
         elem = molecule.get_labels()
         coords = molecule.get_coordinates_in_bohr().reshape(natm * 3)
+
+        masses = molecule.get_masses()
+
+        # modify masses according to the isotopes
+        if self.isotopes is not None:
+
+            for entry in self.isotopes.split(','):
+                m = re.search(r'^(.*)\((.*)\)$', entry.strip())
+                assert_msg_critical(
+                    m is not None,
+                    'VibrationalAnalysis.frequency_analysis: Invalid input ' +
+                    'for isotopes')
+
+                label = m.group(1).strip()
+                mass = m.group(2).strip()
+
+                if label.isdigit():
+                    assert_msg_critical(
+                        (int(label) == float(label) and int(label) >= 1 and
+                            int(label) <= natm),
+                        'VibrationalAnalysis.frequency_analysis: Invalid ' +
+                        'input for one-based atom index')
+                    masses[int(label) - 1] = float(mass)
+                    self.ostream.print_info(f'Using isotope mass {mass} for ' +
+                                            f'atom {label}')
+
+                elif isinstance(label, str):
+                    self.ostream.print_info(
+                        f'Using isotope mass {mass} for {label}')
+                    for iatom in range(natm):
+                        if label.lower() == elem[iatom].lower():
+                            masses[iatom] = float(mass)
+
+            self.ostream.print_blank()
 
         try:
             temp_dir = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
@@ -413,6 +458,7 @@ class VibrationalAnalysis:
                 coords,
                 self.hessian,
                 elem,
+                mass=masses,
                 energy=self.elec_energy,
                 temperature=self.temperature,
                 pressure=self.pressure,
@@ -427,11 +473,6 @@ class VibrationalAnalysis:
             vdata_file.is_file(),
             'VibrationalAnalysis.frequency_analysis: cannot find vdata file ' +
             f'{str(vdata_file)}')
-
-        title = 'Free Energy Analysis'
-        self.ostream.print_header(title)
-        self.ostream.print_header('=' * (len(title) + 2))
-        self.ostream.print_blank()
 
         text = []
         with vdata_file.open() as fh:
@@ -663,7 +704,7 @@ class VibrationalAnalysis:
         # check if both normal and resonance Raman requested
         raman_sanity_check(self)
 
-        scf_tensors = self.scf_driver.scf_tensors
+        scf_results = self.scf_driver.scf_results
 
         # set up the polarizability gradient driver
         polgrad_drv = PolarizabilityGradient(self.scf_driver, self.comm,
@@ -688,12 +729,12 @@ class VibrationalAnalysis:
             lr_drv.update_settings(self.rsp_dict, self.method_dict)
             lr_drv.damping = polgrad_drv.damping
             # get absorption cross section from CPP calculations
-            lr_drv.cpp_flag = 'absorption'
+            lr_drv.property = 'absorption'
             # don't save the solution vectors
             lr_drv.save_solutions = False
             if 'frequencies' not in self.rsp_dict:
                 lr_drv.frequencies = polgrad_drv.frequencies
-            lr_results = lr_drv.compute(molecule, ao_basis, scf_tensors)
+            lr_results = lr_drv.compute(molecule, ao_basis, scf_results)
         else:
             lr_drv = LinearResponseSolver(self.comm, self.ostream)
             lr_drv.update_settings(self.rsp_dict, self.method_dict)
@@ -701,10 +742,10 @@ class VibrationalAnalysis:
             lr_drv.save_solutions = False
             if 'frequencies' not in self.rsp_dict:
                 lr_drv.frequencies = self.frequencies
-            lr_results = lr_drv.compute(molecule, ao_basis, scf_tensors)
+            lr_results = lr_drv.compute(molecule, ao_basis, scf_results)
 
         # compute polarizability gradient
-        polgrad = polgrad_drv.compute(molecule, ao_basis, scf_tensors,
+        polgrad = polgrad_drv.compute(molecule, ao_basis, scf_results,
                                       lr_results)
 
         # save the gradient
@@ -1137,20 +1178,22 @@ class VibrationalAnalysis:
             index for index, element in enumerate(lst) if element in targets
         ]
 
-    def _write_final_hdf5(self, molecule):
+    def _write_final_hdf5(self, molecule, basis=None):
         """
         Writes final HDF5 file that contains results
         from vibrational analysis
 
         :param molecule:
             The molecule.
+        :param basis:
+            Optional AO basis set object (for taking care of ECP core electrons).
         """
 
         if self.filename is not None:
             results_h5_file = f"{self.filename}.h5"
-            self.write_vib_results_to_hdf5(molecule, results_h5_file)
+            self.write_vib_results_to_hdf5(molecule, results_h5_file, basis)
 
-    def write_vib_results_to_hdf5(self, molecule, fname):
+    def write_vib_results_to_hdf5(self, molecule, fname, basis=None):
         """
         Writes vibrational analysis results to HDF5 file.
 
@@ -1158,6 +1201,8 @@ class VibrationalAnalysis:
             The molecule.
         :param fname:
             Name of the HDF5 file.
+        :param basis:
+            Optional AO basis set object (for taking care of ECP core electrons).
         """
 
         if not (fname and isinstance(fname, str) and Path(fname).is_file()):
@@ -1171,7 +1216,8 @@ class VibrationalAnalysis:
         nmodes = len(self.vib_frequencies)
         nfreqs = len(self.frequencies)
 
-        nuc_rep = molecule.nuclear_repulsion_energy()
+        # TODO: take care of ECP core electrons
+        nuc_rep = molecule.nuclear_repulsion_energy(basis)
         hf.create_dataset(vib_group + 'nuclear_repulsion', data=nuc_rep)
 
         hf.create_dataset(vib_group + "number_of_modes", data=np.array([nmodes]))
@@ -1181,8 +1227,6 @@ class VibrationalAnalysis:
                               nmodes, natm, 3)))
 
         hf.create_dataset(vib_group + 'hessian', data=self.hessian)
-        hf.create_dataset(vib_group + 'dipole_gradient',
-                          data=self.dipole_gradient)
         hf.create_dataset(vib_group + 'vib_frequencies',
                           data=np.array(self.vib_frequencies))
         hf.create_dataset(vib_group + 'force_constants',
@@ -1190,6 +1234,8 @@ class VibrationalAnalysis:
         hf.create_dataset(vib_group + 'reduced_masses',
                           data=np.array(self.reduced_masses))
         if self.do_ir:
+            hf.create_dataset(vib_group + 'dipole_gradient',
+                             data=self.dipole_gradient)
             hf.create_dataset(vib_group + 'ir_intensities',
                               data=np.array(self.ir_intensities))
 
@@ -1200,6 +1246,9 @@ class VibrationalAnalysis:
                               data=np.array(self.frequencies))
             ra = [s for s in self.raman_activities]
             hf.create_dataset(vib_group + 'raman_activities', data=np.array(ra))
+            polgrad = [self.polarizability_gradient[a] for a in self.polarizability_gradient.keys()]
+            hf.create_dataset(vib_group + 'polarizability_gradient',
+                            data=np.array(polgrad))
 
             raman_type = 'normal'
             if self.do_resonance_raman:

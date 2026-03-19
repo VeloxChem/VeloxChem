@@ -26,22 +26,23 @@ class TestTransitionStateGuesser:
         rea = Molecule.read_smiles("C1CCC=C1")
         pro = Molecule.read_smiles("C=CC1CC1")
         ts_guesser = TransitionStateGuesser()
-        ts_guesser.ostream.mute()
-        ts_guesser.scf_xcfun = "HF"
-        ts_guesser.scf_basis = "STO-3G"
-        results = ts_guesser.find_TS(rea, pro)
-        folder = Path(__file__).parent / 'data'
+        # ts_guesser.ostream.mute()
+        # ts_guesser.scf_xcfun = "HF"
+        # ts_guesser.scf_basis = "STO-3G"
+        ts_guesser.mm_steps = 200
+        ts_guesser.lambda_vec = [0, 0.2, 0.4, 0.45, 0.5, 0.55, 0.6, 0.8, 1.0]
+        # ts_guesser.do_qm_scan = True
+        results = ts_guesser.find_transition_state(rea, pro)
 
-        reference_results = EvbDriver._load_dict_from_h5(
-            folder / "ts_guesser_reference_results.h5")
+        data_path = Path(__file__).parent / 'data'
+        ref_ts_guesser = TransitionStateGuesser()
+        reference_results = ref_ts_guesser.load_results(
+            data_path / "ts_guesser_reference_results.h5")
 
-        assert results['breaking_bonds'] == {
-            tuple(reference_results['breaking_bonds'][0])
-        }
-        assert results['forming_bonds'] == {
-            tuple(reference_results['forming_bonds'][0])
-        }
-        assert results['max_scf_lambda'] == reference_results['max_scf_lambda']
+        assert results['breaking_bonds'] == reference_results['breaking_bonds']
+        assert results['forming_bonds'] == reference_results['forming_bonds']
+        assert round(float(results['max_mm_lambda']),
+                     2) == round(float(reference_results['max_mm_lambda']), 2)
 
         self.clean_up_files()
 

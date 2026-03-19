@@ -207,6 +207,11 @@ class RixsDriver(LinearSolver):
             and the scattering amplitude tensor.
         """
 
+        # TODO: enable ECP
+        assert_msg_critical(
+            not basis.has_ecp(),
+            f'{type(self).__name__}.compute: ECP is not yet supported')
+
         if rsp_results is None:
 
             rsp_keys = [
