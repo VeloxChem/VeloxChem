@@ -83,3 +83,36 @@ class TestScfUnrestrictedHessian:
             [470.01, 1373.86, 1373.90, 3096.68, 3296.69, 3296.72])
 
         self.run_hessian_unrest(xcfun_label, ref_vib_freqs)
+
+    def run_hessian_unrest_with_ecp(self, ref_vib_freqs, ref_ir_intens):
+
+        mol = Molecule.read_xyz_string("""2
+        xyz
+        Au 0 0 0
+        H  0 0 1.55
+        """)
+        mol.set_charge(1)
+        mol.set_multiplicity(2)
+
+        bas = MolecularBasis.read(mol, 'def2-svp')
+
+        scf_drv = ScfUnrestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_drv.compute(mol, bas)
+
+        vib_drv = VibrationalAnalysis(scf_drv)
+        vib_drv.ostream.mute()
+        vib_results = vib_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            assert np.max(np.abs(vib_results['vib_frequencies'] -
+                                 ref_vib_freqs)) < 0.1
+            assert np.max(np.abs(vib_results['ir_intensities'] -
+                                 ref_ir_intens)) < 0.1
+
+    @pytest.mark.solvers
+    def test_hessian_unrest_with_ecp(self):
+
+        ref_vib_freqs = np.array([1949.51])
+        ref_ir_intens = np.array([278.8583])
+        self.run_hessian_unrest_with_ecp(ref_vib_freqs, ref_ir_intens)
