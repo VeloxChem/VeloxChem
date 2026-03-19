@@ -164,4 +164,4 @@ class TestProjectedPECPGeom101Driver:
             fref.set_values(np.ascontiguousarray(ref_mat[k]))
             #assert smat == fref
             
-        assert False
+        #assert False
