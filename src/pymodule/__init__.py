@@ -218,6 +218,7 @@ from .atombdedriver import AtomBdeDriver
 # for backward compatibility only
 from .peforcefieldgenerator import PEForceFieldGenerator as LoPropDriver
 from .molecule_toolkit import MoleculeToolkit
+from .openmmhessian import MMHessianDriver
 
 # Python functions
 from .errorhandler import assert_msg_critical
