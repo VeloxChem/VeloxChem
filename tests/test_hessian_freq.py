@@ -88,7 +88,6 @@ class TestHessianFrequencies:
             assert np.max(np.abs(calc_vib_freqs[:n_freqs] -
                                  ref_vib_freqs)) < 0.1
 
-    @pytest.mark.solvers
     def test_hessian_freq_with_isotopes(self):
 
         ref_vib_freqs = np.array([1349.11, 2556.18, 2662.01])
