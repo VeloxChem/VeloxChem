@@ -70,7 +70,6 @@ class XtbGradientDriver(GradientDriver):
         self.ostream.mute()
         self.xtb_driver.compute(molecule)
         self.ostream.unmute()
-
         self.gradient = self.xtb_driver.get_gradient()
         self.gradient = self.comm.bcast(self.gradient, root=mpi_master())
 

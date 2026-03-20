@@ -237,6 +237,7 @@ class IMForceFieldGenerator:
         self.es_basis_set_label = '6-31g*'
 
         self.drivers = {'gs': None, 'es':None}
+        self.sampling_driver = {'gs': None, 'es': None}
 
         if isinstance(ground_state_driver, ScfRestrictedDriver):
         # should be necessary to initialize
@@ -275,7 +276,17 @@ class IMForceFieldGenerator:
             qm_grad_driver = XtbGradientDriver(ground_state_driver)
             qm_hess_driver = XtbHessianDriver(ground_state_driver)
             self.drivers['gs'] = (ground_state_driver, qm_grad_driver, qm_hess_driver)
+            self.sampling_driver['gs'] = self.drivers['gs']
+
+        else:
+            qm_sampling_driver = XtbDriver()
+            qm_sampling_grad_driver = XtbGradientDriver(qm_sampling_driver)
+            qm_sampling_hess_driver = XtbHessianDriver(qm_sampling_driver)
+            self.sampling_driver['gs'] = (qm_sampling_driver, qm_sampling_grad_driver, qm_sampling_hess_driver)
         
+
+
+
         self.states_interpolation_settings = {root: None for root in roots_to_follow}
         self.states_data_point_density = {root: None for root in roots_to_follow}
         self.roots_to_follow = roots_to_follow
@@ -319,7 +330,39 @@ class IMForceFieldGenerator:
         self.solvent = 'gas'
         self.add_bias_force = None
         self.bias_force_reaction_idx = None
-        self.bias_force_reaction_prop = None
+        self.bias_force_reaction_prop = None # this is being set by giving a dihedral, force constant and the final theta, steps_when_increased
+
+        # sampling settings
+        self.sampling_settings = {
+            'enabled':False,
+            'e_thrsh_kcal_per_atom': 0.1,
+            'g_rmsd_thrsh_kcal_ang_per_atom':2.0,
+            'force_orient_cos': 0.0001
+        }
+        
+        self.sampling_imforcefieldfiles = None
+        self.sampling_states_interpolation_settings = {root: None for root in roots_to_follow}
+
+        self.metadynamics_settings = None 
+
+        # {
+        #             "enabled": True,
+        #             "bias_factor":10.0,
+        #             "hill_height_kjmol":1.2,
+        #             "hill_frequency":200,
+        #             "variables": 
+        #             [
+        #                 {
+        #                     "type":"torsion",
+        #                     "atoms":[3,4,6,10],
+        #                     "min_deg":-180,
+        #                     "max_deg":180,
+        #                     "width_deg":12,
+        #                     "periodic":True,
+        #                 }
+        #             ]
+        # }
+
 
         self.atom_transfer_reaction_path = None
 
@@ -360,6 +403,80 @@ class IMForceFieldGenerator:
         self.mpi_reload_from_hdf5 = True
         self.mpi_debug_sync = False
 
+    def _compute_energy_mpi_safe(self, qm_driver, molecule, basis=None, collective=True, phase_name='Energy calcualtion'):
+        comm = MPI.COMM_WORLD
+        rank = comm.Get_rank()
+        root = mpi_master()
+
+        if collective:
+            return _collective_call_inline_style(
+                comm, rank, root, phase_name, self.compute_energy, qm_driver, molecule, basis)
+
+        return self.compute_energy(qm_driver, molecule, basis)
+
+    def _compute_gradient_mpi_safe(self, grad_driver, molecule, basis=None, scf_results=None, rsp_results=None, collective=True, phase_name='Gradient Calculation'):
+        comm = MPI.COMM_WORLD
+        rank = comm.Get_rank()
+        root = mpi_master()
+
+        if collective:
+            return _collective_call_inline_style(
+                comm, rank, root, phase_name, self.compute_gradient, grad_driver, molecule, basis, scf_results, rsp_results)
+
+        return self.compute_gradient(grad_driver, molecule, basis, scf_results, rsp_results)
+
+    def _compute_hessian_mpi_safe(self, hess_driver, molecule, basis=None, collective=True, phase_name='hessian calculation'):
+        comm = MPI.COMM_WORLD
+        rank = comm.Get_rank()
+        root = mpi_master()
+
+        if collective:
+            return _collective_call_inline_style(
+                comm, rank, root, phase_name, self.compute_hessian, hess_driver, molecule, basis)
+
+        return self.compute_hessian(hess_driver, molecule, basis)
+
+    def _run_optimization_mpi_safe(self, optimization_driver, molecule, constraints=None, transition=False, index_offset=1, compute_args=None, source_molecule=None, collective=True, phase_name='optimization tag'):
+        comm = MPI.COMM_WORLD
+        rank = comm.Get_rank()
+        root = mpi_master()
+
+        if collective:
+            return _collective_call_inline_style(
+                comm,
+                rank,
+                root,
+                phase_name,
+                self._run_optimization,
+                optimization_driver,
+                molecule,
+                constraints,
+                transition,
+                index_offset,
+                compute_args,
+                source_molecule,
+            )
+
+        return self._run_optimization(
+            optimization_driver,
+            molecule,
+            constraints=constraints,
+            transition=transition,
+            index_offset=index_offset,
+            compute_args=compute_args,
+            source_molecule=source_molecule,
+        )
+
+    @staticmethod
+    def _serialize_molecule_for_mpi(mol):
+        return (mol.get_xyz_string(), int(mol.get_charge()), int(mol.get_multiplicity()))
+
+    @staticmethod
+    def _deserialize_molecule_from_mpi(payload):
+        mol = Molecule.from_xyz_string(payload[0])
+        mol.set_charge(int(payload[1]))
+        mol.set_multiplicity(int(payload[2]))
+        return mol
 
     def _build_opt_constraint_list(self, constraints, index_offset=1):
 
@@ -750,15 +867,22 @@ class IMForceFieldGenerator:
                         conformers_plus_ts[0][dih_key] = []
                         for i in range(len(entries[1])):
                             global_counter += i
+                            curr_dih = conformal_structures['molecules'][entry_idx + global_counter].get_dihedral_in_degrees(dih_key)
+                            if abs(curr_dih) > 175 or abs(curr_dih) < 5:
+                                print('changing dihedral')
+                                conformal_structures['molecules'][entry_idx + global_counter].set_dihedral_in_degrees(dih_key, curr_dih + 10)
                             conformers_plus_ts[0][dih_key].append((conformal_structures['molecules'][entry_idx + global_counter], 'normal'))
-                            print(conformal_structures['molecules'][entry_idx + global_counter].get_xyz_string())
+                            
+                            ts_molecule = Molecule.from_xyz_string(conformal_structures['molecules'][entry_idx + global_counter].get_xyz_string())
+                            ts_molecule.set_dihedral(dih_key, ts_molecule.get_dihedral(dih_key, 'radian') + np.pi/periodicity, 'radian')
+                            
 
-                        _, ts_molecule = self.determine_atom_transfer_reaction_path([conformers_plus_ts[0][dih_key][-2][0]], [conformers_plus_ts[0][dih_key][-1][0]], scf=False)
+                            conformers_plus_ts[0][dih_key].append((ts_molecule, 'transition'))
+                            
+                        if 1 == 2:
+                            _, ts_molecule = self.determine_atom_transfer_reaction_path([conformers_plus_ts[0][dih_key][-2][0]], [conformers_plus_ts[0][dih_key][-1][0]], scf=False)
                         
-                        
-                        
-                        ts_molecule.set_dihedral((3,4,6,10), np.pi/2, 'radian')
-                        conformers_plus_ts[0][dih_key].append((ts_molecule, 'transition'))
+                            conformers_plus_ts[0][dih_key].append((ts_molecule, 'transition'))
                         
                 else:
                     if len(conformal_structures['molecules']) == 0:
@@ -795,6 +919,110 @@ class IMForceFieldGenerator:
                     rebuilt[state][dih_key] = rebuilt_entries
 
             self.conformal_structures = rebuilt
+    
+    def _bootstrap_sampling_db_from_abinito_db(self, root):
+
+        comm = MPI.COMM_WORLD
+        rank = comm.Get_rank()
+        root_rank = mpi_master()
+
+        ref_settings = self.states_interpolation_settings[root]
+        sampling_settings = self.sampling_states_interpolation_settings[root]
+
+        ref_file = ref_settings['imforcefield_file']
+        sampling_file = sampling_settings['imforcefield_file']
+
+        ref_file_exists = os.path.exists(ref_file) if rank == root_rank else None
+        ref_file_exists = comm.bcast(ref_file_exists, root=root_rank)
+        if not ref_file_exists:
+            comm.barrier()
+            return
+        
+        ref_drv = InterpolationDriver(self.roots_z_matrix[root])
+        ref_drv.update_settings(ref_settings)
+        ref_db_labels, _ = ref_drv.read_labels()
+        
+        existing = set()
+
+        if os.path.exists(sampling_file):
+            sampling_drv = InterpolationDriver(self.roots_z_matrix[root])
+            sampling_drv.update_settings(sampling_settings)
+            samp_db_labels, _ = sampling_drv.read_labels()
+            existing = set(samp_db_labels)
+        
+        mol_labels = self.molecule.get_labels()
+        sampling_qm, sampling_grad, sampling_hess = self.sampling_driver['gs'] #if rank == root_rank else None, None, None
+        # sampling_qm = comm.bcast(sampling_qm, root=root_rank)
+        # sampling_grad = comm.bcast(sampling_grad, root=root_rank)
+        # sampling_hess = comm.bcast(sampling_hess, root=root_rank)
+        # comm.barrier()
+
+        for label in ref_db_labels:
+            if label in existing:
+                continue
+
+            ref_dp = InterpolationDatapoint(self.roots_z_matrix[root])
+            ref_dp.update_settings(ref_settings)
+            ref_dp.read_hdf5(ref_file, label)
+
+            coords_ang = ref_dp.cartesian_coordinates * bohr_in_angstrom()
+            mol = Molecule(mol_labels, coords_ang, 'angstrom')
+            mol.set_charge(self.molecule.get_charge())
+            mol.set_multiplicity(self.molecule.get_multiplicity())
+
+            # XTB reference compute
+            e, _, _ = self._compute_energy_mpi_safe(
+                sampling_qm,
+                mol,
+                basis=None,
+                collective=True,
+                phase_name='Sampling energy bootstrap',
+            )
+
+            g = self._compute_gradient_mpi_safe(
+                sampling_grad,
+                mol,
+                basis=None,
+                scf_results=None,
+                rsp_results=None,
+                collective=True,
+                phase_name='Sampling gradient bootstrap',
+            )
+
+            h = self._compute_hessian_mpi_safe(
+                sampling_hess,
+                mol,
+                basis=None,
+                collective=True,
+                phase_name='Sampling hessian bootstrap',
+            )
+
+
+            # Build datapoint in sampling DB using same label and geometry metadata
+            masses = mol.get_masses().copy()
+            inv_sqrt = 1.0 / np.sqrt(np.repeat(masses, 3))
+            grad_vec = g[0].reshape(-1)
+            hess_mat = h[0].reshape(grad_vec.size, grad_vec.size)
+            mw_grad = inv_sqrt * grad_vec
+            mw_hess = (inv_sqrt[:, None] * hess_mat) * inv_sqrt[None, :]
+
+            samp_dp = InterpolationDatapoint(self.roots_z_matrix[root])
+            samp_dp.update_settings(sampling_settings)
+            samp_dp.cartesian_coordinates = ref_dp.cartesian_coordinates
+            samp_dp.eq_bond_lengths = ref_dp.eq_bond_lengths
+            samp_dp.mapping_masks = getattr(ref_dp, 'mapping_masks', None)
+            samp_dp.imp_int_coordinates = getattr(ref_dp, 'imp_int_coordinates', [])
+            samp_dp.inv_sqrt_masses = inv_sqrt
+            samp_dp.energy = e[0]
+            samp_dp.gradient = mw_grad.reshape(g[0].shape)
+            samp_dp.hessian = mw_hess.reshape(h[0].shape)
+            samp_dp.confidence_radius = getattr(ref_dp, 'confidence_radius', self.confidence_radius)
+            samp_dp.transform_gradient_and_hessian()
+
+            if rank == root_rank:
+                samp_dp.write_hdf5(sampling_file, label)
+
+        comm.barrier()
 
     def compute(self, molecule, states_basis=None):
 
@@ -810,7 +1038,11 @@ class IMForceFieldGenerator:
         to expand/generate the interpolation forcefield with new data points.
 
         """
-            
+
+        comm = MPI.COMM_WORLD
+        rank = comm.Get_rank()
+        root = mpi_master()
+
         # First set up the system for which the database needs to be constructed
         states_basis = {'gs':self.gs_basis_set_label, 'es':self.es_basis_set_label}
         root_extract_z_matrix = None
@@ -819,13 +1051,16 @@ class IMForceFieldGenerator:
             for i, root in enumerate(self.roots_to_follow):
                 if root not in self.imforcefieldfiles:
                     self.imforcefieldfiles[self.roots_to_follow[i]] = f'im_database_{root}.h5'
+                    self.sampling_imforcefieldfiles[self.roots_to_follow[i]] = f'im_database_sampling_{root}.h5'
                     root_extract_z_matrix[self.roots_to_follow[i]] = False
                 else:
                     root_extract_z_matrix[self.roots_to_follow[i]] = True
 
         else:
             self.imforcefieldfiles = {}
+            self.sampling_imforcefieldfiles = {}
             standard_files = [f'im_database_{root}.h5' for root in self.roots_to_follow]
+            standard_smapling_files = [f'im_database_sampling_{root}.h5' for root in self.roots_to_follow]
             root_extract_z_matrix = {}
             for root_idx, standard_file in enumerate(standard_files):
                 
@@ -835,6 +1070,7 @@ class IMForceFieldGenerator:
                 else:
                     root_extract_z_matrix[self.roots_to_follow[root_idx]] = False     
                 self.imforcefieldfiles[self.roots_to_follow[root_idx]] = standard_file
+                self.sampling_imforcefieldfiles[self.roots_to_follow[root_idx]] = standard_smapling_files[root_idx]
                 
         print(f'IMPORTANT: IM ForceFieldFile is initalized from the current directory as {self.imforcefieldfiles}')
         self.set_up_the_system(molecule, extract_z_matrix=root_extract_z_matrix)
@@ -859,6 +1095,19 @@ class IMForceFieldGenerator:
                                     'use_tc_weights':self.use_tc_weights,
                                     'use_mpi_preload': self.use_mpi_preload
                                 }
+                self.sampling_states_interpolation_settings[root] = {
+                    'interpolation_type': self.interpolation_type,
+                    'weightfunction_type': self.weightfunction_type,
+                    'exponent_p': self.exponent_p,
+                    'exponent_q': self.exponent_q,
+                    'confidence_radius': self.confidence_radius,
+                    'imforcefield_file': self.sampling_imforcefieldfiles[root],
+                    'use_inverse_bond_length': self.use_inverse_bond_length,
+                    'use_eq_bond_length': self.use_eq_bond_length,
+                    'use_cosine_dihedral': self.use_cosine_dihedral,
+                    'use_tc_weights': self.use_tc_weights,
+                    'use_mpi_preload': self.use_mpi_preload,
+                }
                 
             self.dynamics_settings = {  'drivers':self.drivers,
                                         'basis_set_label': states_basis,
@@ -867,7 +1116,9 @@ class IMForceFieldGenerator:
                                         'timestep': self.timestep, 'nsteps': self.nsteps, 'friction':self.friction,
                                         'snapshots':self.snapshots, 'trajectory_file':self.trajectory_file, 'reference_struc_energy_file':self.reference_struc_energy_file,
                                         'desired_datapoint_density':self.desired_point_density, 'converged_cycle': self.converged_cycle, 
-                                        'energy_threshold':self.energy_threshold, 'grad_rmsd_thrsh': self.gradient_rmsd_thrsh, 'force_orient_thrsh':self.force_orient_thrsh,
+                                        'energy_threshold':self.energy_threshold, 'grad_rmsd_thrsh': self.gradient_rmsd_thrsh, 'force_orient_thrsh':self.force_orient_thrsh, 
+                                        'sampling_drivers': self.sampling_driver, 'sampling_settings':self.sampling_settings,
+                                        'metadynamics':self.metadynamics_settings,
                                         'NAC':False, 'load_system': None, 'collect_qm_points_from':self.start_collect, 'roots_to_follow':self.roots_to_follow, 'excitation_pulse':self.excitation_pulse,
                                         'profile_runtime_timing': self.profile_runtime_timing, 'profile_interpolation_timing': self.profile_interpolation_timing,
                                         'mpi_control_plane_enabled': self.mpi_control_plane_enabled,
@@ -891,14 +1142,22 @@ class IMForceFieldGenerator:
                         if ts_root == 0 and isinstance(self.drivers['gs'][0], ScfRestrictedDriver) or ts_root == 0 and isinstance(self.drivers['gs'][0], XtbDriver):
                         
                             current_basis = MolecularBasis.read(reaction_mol, states_basis['gs'])
-                            _, scf_results, _ = self.compute_energy(opt_qm_driver, reaction_mol, current_basis)
-                            optimized_molecule, _ = self._run_optimization(
+                            _, scf_results, _ = self._compute_energy_mpi_safe(
+                                opt_qm_driver,
+                                reaction_mol,
+                                current_basis,
+                                collective=True,
+                                phase_name='Energy calcualtion',
+                            )
+                            optimized_molecule, _ = self._run_optimization_mpi_safe(
                                 opt_qm_driver,
                                 reaction_mol,
                                 constraints=self.use_minimized_structures[1],
                                 index_offset=1,
                                 compute_args=(current_basis, scf_results),
                                 source_molecule=molecule,
+                                collective=True,
+                                phase_name='optimization tag',
                             )
                             reaction_mol = optimized_molecule
                             print(optimized_molecule.get_xyz_string())
@@ -934,18 +1193,26 @@ class IMForceFieldGenerator:
                                 if  root_to_add == 0 and isinstance(self.drivers['gs'][0], ScfRestrictedDriver) or root_to_add == 0 and isinstance(self.drivers['gs'][0], ScfUnrestrictedDriver) or root_to_add == 0 and isinstance(self.drivers['gs'][0], XtbDriver):
                                 
                                     current_basis = MolecularBasis.read(mol, states_basis['gs'])
-                                    _, scf_results, _ = self.compute_energy(self.drivers['gs'][0], mol, current_basis)
+                                    _, scf_results, _ = self._compute_energy_mpi_safe(
+                                        self.drivers['gs'][0],
+                                        mol,
+                                        current_basis,
+                                        collective=True,
+                                        phase_name='Energy calcualtion',
+                                    )
                                     combined_constraints = (
                                         self.use_minimized_structures[1]
                                         + constraint_conf
                                     )
-                                    optimized_molecule, opt_results = self._run_optimization(
+                                    optimized_molecule, opt_results = self._run_optimization_mpi_safe(
                                         self.drivers['gs'][0],
                                         mol,
                                         constraints=combined_constraints,
                                         index_offset=1,
                                         compute_args=(current_basis, scf_results),
                                         source_molecule=molecule,
+                                        collective=True,
+                                        phase_name='optimization tag',
                                     )
                                     energy = opt_results['opt_energies'][-1]
 
@@ -985,13 +1252,21 @@ class IMForceFieldGenerator:
                         elif opt_root == 0 and isinstance(self.drivers['gs'][0], ScfRestrictedDriver) or opt_root == 0 and isinstance(self.drivers['gs'][0], ScfUnrestrictedDriver) or opt_root == 0 and isinstance(self.drivers['gs'][0], XtbDriver):
                         
                             current_basis = MolecularBasis.read(molecule, states_basis['gs'])
-                            _, scf_results, _ = self.compute_energy(self.drivers['gs'][0], molecule, current_basis)
-                            optimized_molecule, opt_results = self._run_optimization(
+                            _, scf_results, _ = self._compute_energy_mpi_safe(
+                                self.drivers['gs'][0],
+                                molecule,
+                                current_basis,
+                                collective=True,
+                                phase_name='Energy calcualtion',
+                            )
+                            optimized_molecule, opt_results = self._run_optimization_mpi_safe(
                                 self.drivers['gs'][0],
                                 molecule,
                                 constraints=self.use_minimized_structures[1],
-                                index_offset=1,
+                                index_offset=0,
                                 compute_args=(current_basis, scf_results),
+                                collective=True,
+                                phase_name='optimization tag',
                             )
                             energy = opt_results['opt_energies'][-1]
                             print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', molecule.get_xyz_string())
@@ -1001,15 +1276,23 @@ class IMForceFieldGenerator:
                             
                             self.drivers['es'][1].state_deriv_index = [opt_root]
                             current_basis = MolecularBasis.read(molecule, states_basis['es'])
-                            _, _, rsp_results = self.compute_energy(self.drivers['es'][0], molecule, current_basis)
+                            _, _, rsp_results = self._compute_energy_mpi_safe(
+                                self.drivers['es'][0],
+                                molecule,
+                                current_basis,
+                                collective=True,
+                                phase_name='Energy calcualtion',
+                            )
                             self.drivers['es'][3].ostream.mute()
                             self.drivers['es'][0].ostream.mute()
-                            optimized_molecule, opt_results = self._run_optimization(
+                            optimized_molecule, opt_results = self._run_optimization_mpi_safe(
                                 self.drivers['es'][1],
                                 molecule,
                                 constraints=self.use_minimized_structures[1],
-                                index_offset=1,
+                                index_offset=0,
                                 compute_args=(current_basis, self.drivers['es'][3], self.drivers['es'][0], rsp_results),
+                                collective=True,
+                                phase_name='optimization tag',
                             )
                             excitated_roots = [root for root in self.roots_to_follow if root != 0]
                             self.drivers['es'][1].state_deriv_index = excitated_roots
@@ -1143,6 +1426,19 @@ class IMForceFieldGenerator:
                                 'use_tc_weights':self.use_tc_weights,
                                 'use_mpi_preload': self.use_mpi_preload
                             }
+            self.sampling_states_interpolation_settings[self.roots_to_follow[0]] = {
+                    'interpolation_type': self.interpolation_type,
+                    'weightfunction_type': self.weightfunction_type,
+                    'exponent_p': self.exponent_p,
+                    'exponent_q': self.exponent_q,
+                    'confidence_radius': self.confidence_radius,
+                    'imforcefield_file': self.sampling_imforcefieldfiles[self.roots_to_follow[0]],
+                    'use_inverse_bond_length': self.use_inverse_bond_length,
+                    'use_eq_bond_length': self.use_eq_bond_length,
+                    'use_cosine_dihedral': self.use_cosine_dihedral,
+                    'use_tc_weights': self.use_tc_weights,
+                    'use_mpi_preload': self.use_mpi_preload,
+                }
 
             self.dynamics_settings = {  'drivers':self.drivers,
                                         'basis_set_label': states_basis,
@@ -1153,6 +1449,8 @@ class IMForceFieldGenerator:
                                         'desired_datapoint_density':self.desired_point_density, 'converged_cycle': self.converged_cycle, 
                                         'energy_threshold':self.energy_threshold, 'grad_rmsd_thrsh': self.gradient_rmsd_thrsh, 'force_orient_thrsh':self.force_orient_thrsh,
                                         'NAC':False, 'load_system': None, 'collect_qm_points_from':self.start_collect, 'roots_to_follow':self.roots_to_follow,
+                                        'sampling_drivers': self.sampling_driver, 'sampling_settings':self.sampling_settings,
+                                        'metadynamics':self.metadynamics_settings,
                                         'profile_runtime_timing': self.profile_runtime_timing, 'profile_interpolation_timing': self.profile_interpolation_timing,
                                         'mpi_control_plane_enabled': self.mpi_control_plane_enabled,
                                         'mpi_root_worker_mode': self.mpi_root_worker_mode,
@@ -1182,16 +1480,25 @@ class IMForceFieldGenerator:
                         if self.roots_to_follow[0] == 0 and isinstance(self.drivers['gs'][0], ScfRestrictedDriver) or self.roots_to_follow[0] == 0 and isinstance(self.drivers['gs'][0], ScfUnrestrictedDriver):
                         
                             current_basis = MolecularBasis.read(reaction_mol, states_basis['gs'])
-                            _, scf_results, _ = self.compute_energy(self.drivers['gs'][0], reaction_mol, current_basis)
-                            optimized_molecule, _ = self._run_optimization(
+                            _, scf_results, _ = self._compute_energy_mpi_safe(
+                                self.drivers['gs'][0],
+                                reaction_mol,
+                                current_basis,
+                                collective=True,
+                                phase_name='Energy calcualtion',
+                            )
+                            opt_results_mpi = self._run_optimization_mpi_safe(
                                 self.drivers['gs'][0],
                                 reaction_mol,
                                 constraints=self.use_minimized_structures[1],
                                 index_offset=1,
                                 compute_args=(current_basis, scf_results),
                                 source_molecule=molecule,
+                                collective=True,
+                                phase_name='optimization tag',
                             )
-
+                            opt_results = opt_results_mpi[1]
+                            optimized_molecule = opt_results['final_molecule']
                             print(optimized_molecule.get_xyz_string())                           
 
                         current_basis = MolecularBasis.read(optimized_molecule, basis.get_main_basis_label())
@@ -1217,17 +1524,14 @@ class IMForceFieldGenerator:
                                 constraints_global = []
                                 if len(self.use_minimized_structures[1]) > 0:
                                     constraints_global.append(self.use_minimized_structures[1])
-                                if dih_key:
-                                    constraints_global.append(dih_key)
+                                # if dih_key:
+                                #     constraints_global.append(dih_key)
                                 if mode == 'transition':
                                     transition = True
                                     constraints_global = []
 
                                 if self.use_minimized_structures[0]:       
                                     optimized_molecule = None
-                                    comm = MPI.COMM_WORLD
-                                    rank = comm.Get_rank()
-                                    root = mpi_master()
 
                                     local_error = None
                                     opt_results = None
@@ -1238,21 +1542,31 @@ class IMForceFieldGenerator:
 
                                         current_basis = MolecularBasis.read(mol, states_basis['gs'])
 
-                                        scf_results_mpi = _collective_call_inline_style(comm, rank, root, 'Energy calcualtion', self.compute_energy, self.drivers['gs'][0], mol, current_basis)
+                                        scf_results_mpi = self._compute_energy_mpi_safe(
+                                            self.drivers['gs'][0],
+                                            mol,
+                                            current_basis,
+                                            collective=True,
+                                            phase_name='Energy calcualtion',
+                                        )
                                         scf_results = scf_results_mpi[1]
                                         # _, scf_results, _ = self.compute_energy(self.drivers['gs'][0], mol, current_basis)
-
-                                        opt_results_mpi = _collective_call_inline_style(comm, rank, root, 'optimization tag', self._run_optimization, self.drivers['gs'][0],
+                                        print('original molecule', mol.get_xyz_string(), constraints_global, transition)
+                                        opt_results_mpi = self._run_optimization_mpi_safe(
+                                            self.drivers['gs'][0],
                                             mol,
                                             constraints=constraints_global,
                                             transition=transition,
                                             index_offset=0,
                                             compute_args=(current_basis, scf_results),
                                             source_molecule=molecule,
-                                            )
+                                            collective=True,
+                                            phase_name='optimization tag',
+                                        )
                                         
                                         opt_results = opt_results_mpi[1]
-                                        optimized_molecule = opt_results_mpi[0]
+
+                                        optimized_molecule = opt_results['final_molecule']
 
                                         # optimized_molecule, opt_results = self._run_optimization(
                                         #     self.drivers['gs'][0],
@@ -1284,14 +1598,18 @@ class IMForceFieldGenerator:
                                         # )
                                         # energy = opt_results['opt_energies'][-1]
                                         
-                                        opt_results_mpi = _collective_call_inline_style(comm, rank, root, 'optimization tag', self._run_optimization, self.drivers['gs'][0],
+                                        opt_results_mpi = self._run_optimization_mpi_safe(
+                                            self.drivers['gs'][0],
                                             mol,
                                             constraints=constraints_global,
                                             transition=transition,
-                                            index_offset=0)
+                                            index_offset=0,
+                                            collective=True,
+                                            phase_name='optimization tag',
+                                        )
                                         
                                         opt_results = opt_results_mpi[1]
-                                        optimized_molecule = opt_results_mpi[0]
+                                        optimized_molecule = opt_results['final_molecule']
 
                                         print('Optimization enegiers', opt_results['opt_energies'][-1] * hartree_in_kcalpermol())
 
@@ -1313,18 +1631,29 @@ class IMForceFieldGenerator:
                                     elif self.roots_to_follow[0] >= 1 and isinstance(self.drivers['es'][0], LinearResponseEigenSolver) or self.roots_to_follow[0] >= 1 and isinstance(self.drivers['es'][0], TdaEigenSolver):
 
                                             current_basis = MolecularBasis.read(mol, states_basis['es'])
-                                            _, _, rsp_results  = self.compute_energy(self.drivers['es'][0], mol, current_basis)
+                                            _, _, rsp_results  = self._compute_energy_mpi_safe(
+                                                self.drivers['es'][0],
+                                                mol,
+                                                current_basis,
+                                                collective=True,
+                                                phase_name='Energy calcualtion',
+                                            )
                                             self.drivers['es'][3].ostream.mute()
                                             self.drivers['es'][0].ostream.mute()
-                                            optimized_molecule, opt_results = self._run_optimization(
+                                            opt_results_mpi = self._run_optimization_mpi_safe(
                                                 self.drivers['es'][1],
                                                 molecule,
                                                 constraints=self.use_minimized_structures[1],
                                                 index_offset=1,
                                                 compute_args=(current_basis, self.drivers['es'][3], self.drivers['es'][0], rsp_results),
                                                 source_molecule=molecule,
+                                                collective=True,
+                                                phase_name='optimization tag',
                                             )
-                                            energy = opt_results['opt_energies'][-1]
+
+                                            opt_results = opt_results_mpi[1]
+                                            optimized_molecule = opt_results['final_molecule']
+                                            
                                             print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', molecule.get_xyz_string())
                                             current_basis = MolecularBasis.read(optimized_molecule, states_basis['es'])
                                             current_molecule_to_add_info.append((optimized_molecule, current_basis, self.roots_to_follow, constraints_global))
@@ -1353,10 +1682,6 @@ class IMForceFieldGenerator:
                 if self.use_minimized_structures[0]:       
                     optimized_molecule = None
 
-                    comm = MPI.COMM_WORLD
-                    rank = comm.Get_rank()
-                    root = mpi_master()
-
                     local_error = None
                     opt_results = None
                     scf_results = None
@@ -1364,17 +1689,40 @@ class IMForceFieldGenerator:
 
                     if self.roots_to_follow[0] == 0 and isinstance(self.drivers['gs'][0], ScfRestrictedDriver) or self.roots_to_follow[0] == 0 and isinstance(self.drivers['gs'][0], ScfUnrestrictedDriver):
                     
-
                         current_basis = MolecularBasis.read(molecule, states_basis['gs'])
-                        _, scf_results, _ = self.compute_energy(self.drivers['gs'][0], molecule, current_basis)
-                        optimized_molecule, opt_results = self._run_optimization(
+
+                        scf_results_mpi = self._compute_energy_mpi_safe(
+                            self.drivers['gs'][0],
+                            molecule,
+                            current_basis,
+                            collective=True,
+                            phase_name='Energy calcualtion',
+                        )
+                        scf_results = scf_results_mpi[1]
+                        # _, scf_results, _ = self.compute_energy(self.drivers['gs'][0], mol, current_basis)
+                        opt_results_mpi = self._run_optimization_mpi_safe(
                             self.drivers['gs'][0],
                             molecule,
                             constraints=self.use_minimized_structures[1],
-                            index_offset=1,
+                            index_offset=0,
                             compute_args=(current_basis, scf_results),
+                            collective=True,
+                            phase_name='optimization tag',
                         )
-                        energy = opt_results['opt_energies'][-1]
+                        
+                        opt_results = opt_results_mpi[1]
+                        optimized_molecule = opt_results['final_molecule']
+
+                        # current_basis = MolecularBasis.read(molecule, states_basis['gs'])
+                        # _, scf_results, _ = self.compute_energy(self.drivers['gs'][0], molecule, current_basis)
+                        # optimized_molecule, opt_results = self._run_optimization(
+                        #     self.drivers['gs'][0],
+                        #     molecule,
+                        #     constraints=self.use_minimized_structures[1],
+                        #     index_offset=0,
+                        #     compute_args=(current_basis, scf_results),
+                        # )
+                        # energy = opt_results['opt_energies'][-1]
 
                         current_basis = MolecularBasis.read(optimized_molecule, states_basis['gs'])
                         molecules_to_add_info.append((optimized_molecule, current_basis, self.roots_to_follow, self.use_minimized_structures[1]))
@@ -1396,13 +1744,17 @@ class IMForceFieldGenerator:
                         # )
                         # energy = opt_results['opt_energies'][-1]
                         
-                        opt_results_mpi = _collective_call_inline_style(comm, rank, root, 'optimization tag', self._run_optimization, self.drivers['gs'][0],
+                        opt_results_mpi = self._run_optimization_mpi_safe(
+                            self.drivers['gs'][0],
                             molecule,
                             constraints=self.use_minimized_structures[1],
-                            index_offset=0)
+                            index_offset=0,
+                            collective=True,
+                            phase_name='optimization tag',
+                        )
                         
                         opt_results = opt_results_mpi[1]
-                        optimized_molecule = opt_results_mpi[0]
+                        optimized_molecule = opt_results['final_molecule']
 
 
                         current_basis = MolecularBasis.read(optimized_molecule, states_basis['gs'])
@@ -1414,21 +1766,31 @@ class IMForceFieldGenerator:
                     elif self.roots_to_follow[0] >= 1 and isinstance(self.drivers['es'][0], LinearResponseEigenSolver) or self.roots_to_follow[0] >= 1 and isinstance(self.drivers['es'][0], TdaEigenSolver):
 
                             current_basis = MolecularBasis.read(molecule, states_basis['es'])
-                            _, _, rsp_results  = self.compute_energy(self.drivers['es'][0], molecule, current_basis)
+                            _, _, rsp_results  = self._compute_energy_mpi_safe(
+                                self.drivers['es'][0],
+                                molecule,
+                                current_basis,
+                                collective=True,
+                                phase_name='Energy calcualtion',
+                            )
                             self.drivers['es'][3].ostream.mute()
                             self.drivers['es'][0].ostream.mute()
-                            optimized_molecule, opt_results = self._run_optimization(
+                            opt_results_mpi = self._run_optimization_mpi_safe(
                                 self.drivers['es'][1],
                                 molecule,
                                 constraints=self.use_minimized_structures[1],
                                 index_offset=0,
                                 compute_args=(current_basis, self.drivers['es'][3], self.drivers['es'][0], rsp_results),
+                                collective=True,
+                                phase_name='optimization tag',
                             )
-                            energy = opt_results['opt_energies'][-1]
+                            opt_results = opt_results_mpi[1]
+                            optimized_molecule = opt_results['final_molecule']
+
                             print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', molecule.get_xyz_string())
                             current_basis = MolecularBasis.read(optimized_molecule, states_basis['es'])
                             molecules_to_add_info.append((optimized_molecule, current_basis, self.roots_to_follow, self.use_minimized_structures[1]))
-                        
+    
                     self.add_point(molecules_to_add_info, self.states_interpolation_settings, symmetry_information=self.symmetry_information)
 
 
@@ -1471,25 +1833,46 @@ class IMForceFieldGenerator:
                                 if self.roots_to_follow[0] == 0 and isinstance(self.drivers['gs'][0], ScfRestrictedDriver) or self.roots_to_follow[0] == 0 and isinstance(self.drivers['gs'][0], ScfUnrestrictedDriver) or self.roots_to_follow[0] == 0 and isinstance(self.drivers['gs'][0], XtbDriver):
 
                                     current_basis = MolecularBasis.read(mol, 'def2-svp')
-                                    _, scf_results, _ = self.compute_energy(self.drivers['gs'][0], mol, current_basis)
-                                    optimized_molecule, opt_results = self._run_optimization(
+                                    _, scf_results, _ = self._compute_energy_mpi_safe(
+                                        self.drivers['gs'][0],
+                                        mol,
+                                        current_basis,
+                                        collective=True,
+                                        phase_name='Energy calcualtion',
+                                    )
+                                    opt_results_mpi = self._run_optimization_mpi_safe(
                                         self.drivers['gs'][0],
                                         mol,
                                         constraints=self.use_minimized_structures[1],
                                         index_offset=0,
                                         compute_args=(current_basis, scf_results),
                                         source_molecule=molecule,
+                                        collective=True,
+                                        phase_name='optimization tag',
                                     )
-                                    energy = opt_results['opt_energies'][-1]
+                                    opt_results = opt_results_mpi[1]
+                                    optimized_molecule = opt_results['final_molecule']
                                     print(optimized_molecule.get_xyz_string())
                             
-                            if self.roots_to_follow[0] == 0 and energy is None:
+                            if self.roots_to_follow[0] == 0:
 
                                 current_basis = MolecularBasis.read(molecule, states_basis['gs'])
-                                energy, scf_results, _ = self.compute_energy(self.drivers['gs'][0], mol, current_basis)
+                                energy, scf_results, _ = self._compute_energy_mpi_safe(
+                                    self.drivers['gs'][0],
+                                    mol,
+                                    current_basis,
+                                    collective=True,
+                                    phase_name='Energy calcualtion',
+                                )
                             elif self.roots_to_follow[0] > 0 and energy is None:
                                 current_basis = MolecularBasis.read(molecule, states_basis['es'])
-                                energy, scf_results, _ = self.compute_energy(self.drivers['es'][0], mol, current_basis)
+                                energy, scf_results, _ = self._compute_energy_mpi_safe(
+                                    self.drivers['es'][0],
+                                    mol,
+                                    current_basis,
+                                    collective=True,
+                                    phase_name='Energy calcualtion',
+                                )
                             impes_driver = InterpolationDriver(self.roots_z_matrix[self.roots_to_follow[0]])
                             impes_driver.update_settings(self.states_interpolation_settings[self.roots_to_follow[0]])
                             if self.roots_to_follow[0] == 0:
@@ -1522,8 +1905,9 @@ class IMForceFieldGenerator:
                                 print(f'Energy difference {energy_difference} is larger than the threshold {self.energy_threshold}, adding point to the database')
 
                                 self.add_point(optimized_molecule, current_basis, self.states_interpolation_settings, symmetry_information=self.symmetry_information)
-            
-
+        
+            self._bootstrap_sampling_db_from_abinito_db(self.roots_to_follow[0])
+    
             for counter, (state, dihedral_dict) in enumerate(self.molecules_along_rp.items()):
 
                 for key, mol_info in dihedral_dict.items():
@@ -1586,7 +1970,13 @@ class IMForceFieldGenerator:
                             else:
                                 im_database_driver.allowed_molecule_deviation = self.allowed_deviation
 
-                            im_database_driver.update_settings(self.dynamics_settings, self.states_interpolation_settings)
+                            im_database_driver.update_settings(self.dynamics_settings, self.states_interpolation_settings, self.sampling_states_interpolation_settings)
+                            datapoint_molecules_local, _, _ = self.database_extracter(
+                            self.states_interpolation_settings[0]['imforcefield_file'],
+                            molecule.get_labels(),
+                            self.states_interpolation_settings[0],
+                            )
+
                             # im_database_driver.run_qmmm()
                             stats = im_database_driver.run_qmmm()
 
@@ -1630,15 +2020,15 @@ class IMForceFieldGenerator:
             products_partial_charges_list.append(current_charge)
 
         ts_guesser = TransitionStateGuesser()
-        results = ts_guesser.find_TS(reactants, products, reactant_partial_charges=reactants_partial_charges_list, product_partial_charges=products_partial_charges_list, scf=scf)
+        results = ts_guesser.find_transition_state(reactants, products, reactant_partial_charges=reactants_partial_charges_list, product_partial_charges=products_partial_charges_list)
         molecules_along_reaction_path = []
         print(results.keys())
-        ts_guess_mol = Molecule.from_xyz_string(results['max_mm_structure'])
-        for xyz_string in results['structures']:
-            mol_to_add = Molecule.from_xyz_string(xyz_string)
-            mol_to_add.set_charge(self.molecule.get_charge())
-            mol_to_add.set_multiplicity(self.molecule.get_multiplicity())
-            molecules_along_reaction_path.append(mol_to_add)
+        ts_guess_mol = Molecule.from_xyz_string(results['max_mm_xyz'])
+        # for xyz_string in results['structures']:
+        #     mol_to_add = Molecule.from_xyz_string(xyz_string)
+        #     mol_to_add.set_charge(self.molecule.get_charge())
+        #     mol_to_add.set_multiplicity(self.molecule.get_multiplicity())
+        #     molecules_along_reaction_path.append(mol_to_add)
 
 
         return molecules_along_reaction_path, ts_guess_mol
@@ -2063,7 +2453,6 @@ class IMForceFieldGenerator:
             """
             Store an edge list + metadata + XYZ structures in an HDF5 file.
             """
-
             with h5py.File(h5_path, "a") as f:
                 # 1. Overwrite group if it exists
                 if group_name in f:
@@ -2079,6 +2468,8 @@ class IMForceFieldGenerator:
                 # 3. Define the variable-length string data type
                 dt = h5py.string_dtype(encoding='utf-8')
 
+                print('file 1', f[group_name])
+
                 # 4. Write the XYZ dataset
                 #    We use 'dtype=object' for numpy to handle variable length strings before passing to h5py
                 g.create_dataset(
@@ -2088,6 +2479,8 @@ class IMForceFieldGenerator:
                     compression="gzip", 
                     compression_opts=4
                 )
+
+                print('file', f[group_name])
 
                 # 5. Optional Labels
                 if labels is not None:
@@ -2101,108 +2494,160 @@ class IMForceFieldGenerator:
                 
         overall_db_covergage = {}
 
+        comm = MPI.COMM_WORLD
+        rank = comm.Get_rank()
+        root_rank = mpi_master()
+
+        if given_molecular_strucutres is None:
+            raise ValueError('confirm_database_quality requires given_molecular_strucutres.')
+
+        if not isinstance(given_molecular_strucutres, dict):
+            raise ValueError('confirm_database_quality expects given_molecular_strucutres to be a dict keyed by root.')
 
         for root in self.roots_to_follow:
             database_quality = False
-            drivers = None
-            if root == 0:
-                drivers = self.drivers['gs']
-            else:
-                drivers = self.drivers['es']
-            all_structures = given_molecular_strucutres[root]
+            drivers = self.drivers['gs'] if root == 0 else self.drivers['es']
             current_datafile = im_settings[root]['imforcefield_file']
-            datapoint_molecules, _, z_matrix = self.database_extracter(current_datafile, molecule.get_labels(), im_settings[root])
+            all_structures_root = []
+            random_structure_choices_root = []
+            last_qm_energies = []
+            last_im_energies = []
 
-            overall_db_covergage[current_datafile] = {}
-            if len(all_structures) == 0:
-                continue
+            while not database_quality:
+                payload = None
+                if rank == root_rank:
+                    all_structures_root = list(given_molecular_strucutres.get(root, []))
+                    payload = {
+                        'skip_root': False,
+                        'current_datafile': current_datafile,
+                        'random_struct_info': [],
+                    }
 
-            while database_quality is False:
-                
-                database_expanded = False
-                if given_molecular_strucutres is None:
-                    print('provide reference structures!')
-                    exit()
-                    
-                rmsd = -np.inf
-                random_structure_choices = None
-                counter = 0
-                # if given_molecular_strucutres is not None:
-                #     random_structure_choices = given_molecular_strucutres
-                dist_ok = False
-                while dist_ok == False and counter <= 20:
-                    print('Dihedrals dict is given here', self.dihedrals_dict)
-                    if self.dihedrals_dict is not None:
+                    if len(all_structures_root) == 0:
+                        payload['skip_root'] = True
+                    else:
+                        datapoint_molecules_local, _, _ = self.database_extracter(
+                            current_datafile,
+                            molecule.get_labels(),
+                            im_settings[root],
+                        )
+
+                        rmsd = -np.inf
+                        counter = 0
+                        dist_ok = False
                         selected_molecules = []
-                        for entries in self.dihedrals_dict:
-                            specific_dihedral = entries[0]
-                            n_sampling = entries[1]
-                            state = entries[2]
-                            if state != root:
-                                continue
-                            start = entries[3]
-                            desired_angles = np.linspace(0, 360, 36)
-                            angles_mols = {int(angle):[] for angle in desired_angles}
 
-                            keys = list(angles_mols.keys())
+                        while (not dist_ok) and counter <= 20:
+                            if self.dihedrals_dict is not None:
+                                selected_molecules = []
+                                for entries in self.dihedrals_dict:
+                                    specific_dihedral = entries[0]
+                                    state = entries[2]
+                                    if state != root:
+                                        continue
 
-                            for mol in all_structures:  
-                                mol_angle = (mol.get_dihedral_in_degrees(specific_dihedral) + 360) % 360
-                                
-                                
-                                for i in range(len(desired_angles) - 1):
-                                    
-                                    if keys[i] <= mol_angle < keys[i + 1]:
-                                        angles_mols[keys[i]].append(mol)
-                                        break
-                        
-                            # List to hold selected molecules
-                            
-                            total_molecules = sum(len(mols) for mols in angles_mols.values())
+                                    desired_angles = np.linspace(0, 360, 36)
+                                    angles_mols = {int(angle): [] for angle in desired_angles}
+                                    keys = list(angles_mols.keys())
 
-                            # Adaptive selection based on bin sizes
-                
-                            for angle_bin, molecules_in_bin in angles_mols.items():
-                                num_mols_in_bin = len(molecules_in_bin)
+                                    for mol in all_structures_root:
+                                        mol_angle = (mol.get_dihedral_in_degrees(specific_dihedral) + 360) % 360
+                                        for i in range(len(desired_angles) - 1):
+                                            if keys[i] <= mol_angle < keys[i + 1]:
+                                                angles_mols[keys[i]].append(mol)
+                                                break
 
-                                if num_mols_in_bin == 0:
-                                    continue  # Skip empty bins
+                                    total_molecules = sum(len(mols) for mols in angles_mols.values())
+                                    if total_molecules == 0:
+                                        continue
 
-                                # If 2 or fewer molecules, take all
-                                elif num_mols_in_bin <= 2:
-                                    selected_molecules.extend(molecules_in_bin)
+                                    for molecules_in_bin in angles_mols.values():
+                                        num_mols_in_bin = len(molecules_in_bin)
+                                        if num_mols_in_bin == 0:
+                                            continue
+                                        if num_mols_in_bin <= 2:
+                                            selected_molecules.extend(molecules_in_bin)
+                                        else:
+                                            proportion = num_mols_in_bin / total_molecules
+                                            num_to_select = max(
+                                                1,
+                                                math.ceil(proportion * self.nstruc_to_confirm_database_quality),
+                                            )
+                                            selected_mols = random.sample(
+                                                molecules_in_bin,
+                                                min(num_to_select, num_mols_in_bin),
+                                            )
+                                            selected_molecules.extend(selected_mols)
+                            else:
+                                selected_molecules = random.sample(
+                                    all_structures_root,
+                                    min(self.nstruc_to_confirm_database_quality, len(all_structures_root)),
+                                )
 
-                                else:
-                                    # Calculate proportional number of molecules to select
-                                    proportion = num_mols_in_bin / total_molecules
-                                    num_to_select = max(1, math.ceil(proportion * self.nstruc_to_confirm_database_quality))
 
-                                    # Randomly select the proportional number
-                                    selected_mols = random.sample(molecules_in_bin, min(num_to_select, num_mols_in_bin))
-                                    selected_molecules.extend(selected_mols)
-                    else:
-                        selected_molecules = random.sample(all_structures, min(self.nstruc_to_confirm_database_quality, len(all_structures)))
-                          
-                    individual_distances = []
-                    random_structure_choices = selected_molecules
-                    for datapoint_molecule in datapoint_molecules:
-                        for random_struc in random_structure_choices:
-                            
-                            distance_norm = self.calculate_distance_to_ref(random_struc.get_coordinates_in_bohr(), datapoint_molecule.get_coordinates_in_bohr())
-                            individual_distances.append(distance_norm / np.sqrt(len(molecule.get_labels())) * bohr_in_angstrom())
-                    
-                    rmsd = min(individual_distances)
-                    counter += 1
-                    if rmsd >= 0.1:
-                        print(f'The overall RMSD is {rmsd} -> The current structures are well seperated from the database conformations! loop is discontinued')
-                        dist_ok = True
-                    else:
-                        print(f'The overall RMSD is {rmsd} -> The current structures are not all well seperated from the database conformations! loop is continued')        
+                            if len(selected_molecules) == 0 and len(all_structures_root) > 0:
+                                selected_molecules = random.sample(
+                                    all_structures_root,
+                                    min(self.nstruc_to_confirm_database_quality, len(all_structures_root)),
+                                )
+
+                            individual_distances = []
+                            for datapoint_molecule in datapoint_molecules_local:
+                                for random_struc in selected_molecules:
+                                    distance_norm = self.calculate_distance_to_ref(
+                                        random_struc.get_coordinates_in_bohr(),
+                                        datapoint_molecule.get_coordinates_in_bohr(),
+                                    )
+                                    individual_distances.append(
+                                        distance_norm / np.sqrt(len(molecule.get_labels())) * bohr_in_angstrom()
+                                    )
+
+                            if len(individual_distances) == 0:
+                                rmsd = np.inf
+                            else:
+                                rmsd = min(individual_distances)
+                            counter += 1
+                            if rmsd >= 0.1:
+                                print(
+                                    f'The overall RMSD is {rmsd} -> '
+                                    'The current structures are well seperated from the database conformations! '
+                                    'loop is discontinued'
+                                )
+                                dist_ok = True
+                            else:
+                                print(
+                                    f'The overall RMSD is {rmsd} -> '
+                                    'The current structures are not all well seperated from the database conformations! '
+                                    'loop is continued'
+                                )
+
+                        random_structure_choices_root = list(selected_molecules)
+                        payload['random_struct_info'] = [
+                            self._serialize_molecule_for_mpi(mol)
+                            for mol in random_structure_choices_root
+                        ]
+
+                payload = comm.bcast(payload, root=root_rank)
+                comm.barrier()
+
+                if payload is None:
+                    raise RuntimeError('confirm_database_quality: failed to broadcast root payload.')
+
+                if payload.get('skip_root', False):
+                    database_quality = True
+                    continue
+
+                current_datafile = payload['current_datafile']
+                datapoint_molecules, _, z_matrix = self.database_extracter(
+                    current_datafile,
+                    molecule.get_labels(),
+                    im_settings[root],
+                )
 
                 masses = molecule.get_masses().copy()
                 masses_cart = np.repeat(masses, 3)
                 inv_sqrt_masses = 1.0 / np.sqrt(masses_cart)
-                
+
                 impes_driver = InterpolationDriver(self.roots_z_matrix[root])
                 impes_driver.update_settings(im_settings[root])
                 impes_driver.impes_coordinate.inv_sqrt_masses = inv_sqrt_masses
@@ -2210,7 +2655,7 @@ class IMForceFieldGenerator:
                     impes_driver.symmetry_information = self.symmetry_information['gs']
                 else:
                     impes_driver.symmetry_information = self.symmetry_information['es']
-                
+
                 old_label = None
                 im_labels, _ = impes_driver.read_labels()
                 impes_driver.qm_data_points = []
@@ -2218,133 +2663,198 @@ class IMForceFieldGenerator:
                     if '_symmetry' not in label:
                         qm_data_point = InterpolationDatapoint(self.roots_z_matrix[root])
                         qm_data_point.update_settings(im_settings[root])
-
                         qm_data_point.read_hdf5(current_datafile, label)
-                        
                         old_label = qm_data_point.point_label
                         impes_driver.qm_symmetry_data_points[old_label] = [qm_data_point]
                         impes_driver.qm_data_points.append(qm_data_point)
-
                     else:
                         symmetry_data_point = InterpolationDatapoint(self.roots_z_matrix[root])
                         symmetry_data_point.read_hdf5(current_datafile, label)
-                        
                         impes_driver.qm_symmetry_data_points[old_label].append(symmetry_data_point)
 
+                struct_to_check = [
+                    self._deserialize_molecule_from_mpi(mol_info)
+                    for mol_info in payload.get('random_struct_info', [])
+                ]
 
                 qm_energies = []
                 im_energies = []
+                database_expanded = False
 
-                for i, mol in enumerate(random_structure_choices):
-                    
+                for i, mol in enumerate(struct_to_check[:]):
                     if root == 0:
                         current_basis = MolecularBasis.read(mol, basis['gs'])
                     else:
                         current_basis = MolecularBasis.read(mol, basis['es'])
                     impes_driver.compute(mol)
-                    reference_energy, scf_results, _ = self.compute_energy(drivers[0], mol, current_basis)
-                    
-                    qm_energies.append(reference_energy[root])
+
+                    scf_results_mpi = self._compute_energy_mpi_safe(
+                        drivers[0],
+                        mol,
+                        current_basis,
+                        collective=True,
+                        phase_name='Energy calcualtion',
+                    )
+                    reference_energies, scf_results, rsp_results = (
+                        scf_results_mpi[0],
+                        scf_results_mpi[1],
+                        scf_results_mpi[2],
+                    )
+
+                    qm_energy_val = float(reference_energies[root]) if len(reference_energies) > root else float(reference_energies[0])
+                    qm_energies.append(qm_energy_val)
                     im_energies.append(impes_driver.impes_coordinate.energy)
                     print(mol.get_xyz_string())
-                    print('Energies', qm_energies[-1], im_energies[-1])
-                    
-                    print(f'\n\n ########## Step {i} ######### \n')
-                    print(f'delta_E:  {abs(qm_energies[-1] - im_energies[-1]) * hartree_in_kcalpermol()} kcal/mol ::: {abs(qm_energies[-1] - im_energies[-1]) * hartree_in_kcalpermol() / len(molecule.get_labels())} kcal/mol per atom  \n')
-                    if (abs(qm_energies[-1] - im_energies[-1])/len(molecule.get_labels())) * hartree_in_kcalpermol() > self.energy_threshold and improve == True:
 
+                    print(f'\n\n ########## Step {i} ######### \n')
+                    print(
+                        f'delta_E:  {abs(qm_energies[-1] - im_energies[-1]) * hartree_in_kcalpermol()} kcal/mol ::: '
+                        f'{abs(qm_energies[-1] - im_energies[-1]) * hartree_in_kcalpermol() / len(molecule.get_labels())} '
+                        'kcal/mol per atom  \n'
+                    )
+
+                    if (
+                        (abs(qm_energies[-1] - im_energies[-1]) / len(molecule.get_labels()))
+                        * hartree_in_kcalpermol()
+                        > self.energy_threshold
+                        and improve
+                    ):
                         print(mol.get_xyz_string())
-                        molecules_to_add_info = [(mol, current_basis, [root])]
+                        molecules_to_add_info = [(mol, current_basis, [root], [])]
 
                         if self.identfy_relevant_int_coordinates:
                             current_weights = impes_driver.weights
-
                             weights = [value for _, value in current_weights.items()]
                             used_labels = [label_idx for label_idx, _ in current_weights.items()]
-
-                            # Sort labels and weights by descending weight
-                            sorted_items = sorted(zip(used_labels, weights), key=lambda x: x[1], reverse=True)
+                            sorted_items = sorted(
+                                zip(used_labels, weights),
+                                key=lambda x: x[1],
+                                reverse=True,
+                            )
 
                             total_weight = sum(weights)
                             cumulative_weight = 0.0
                             internal_coordinate_datapoints = []
-
-                            for label, weight in sorted_items:
+                            for label_idx, weight in sorted_items:
                                 cumulative_weight += weight
-                                internal_coordinate_datapoints.append(impes_driver.qm_data_points[label])
+                                internal_coordinate_datapoints.append(impes_driver.qm_data_points[label_idx])
                                 if cumulative_weight >= 0.8 * total_weight:
                                     break
 
-                            # qm_datapoints_weighted = [qm_datapoint for qm_datapoint in enumerate if ]
-                            constraints = impes_driver.determine_important_internal_coordinates(qm_energies[-1], impes_driver.impes_coordinate.gradient, mol, self.roots_z_matrix[root], internal_coordinate_datapoints)
+                            constraints = impes_driver.determine_important_internal_coordinates(
+                                qm_energies[-1],
+                                impes_driver.impes_coordinate.gradient,
+                                mol,
+                                self.roots_z_matrix[root],
+                                internal_coordinate_datapoints,
+                            )
 
                             print('CONSTRAINTS', constraints)
-                            molecules_to_add_info = (())
-                            
-                            if isinstance(drivers[0], ScfRestrictedDriver) or isinstance(drivers[0], ScfUnrestrictedDriver):
 
-                                _, scf_tensors, _ = self.compute_energy(drivers[0], molecule, current_basis)
+                            if isinstance(drivers[0], (ScfRestrictedDriver, ScfUnrestrictedDriver)):
+                                _, scf_tensors, _ = self._compute_energy_mpi_safe(
+                                    drivers[0],
+                                    molecule,
+                                    current_basis,
+                                    collective=True,
+                                    phase_name='Energy calcualtion',
+                                )
+
                                 opt_constraint_list = self._build_opt_constraint_list(constraints, index_offset=1)
                                 opt_constraint_list.extend(self._build_opt_constraint_list(self.use_minimized_structures[1], index_offset=0))
-                                optimized_molecule, opt_results = self._run_optimization(
+                                opt_results_mpi = self._run_optimization_mpi_safe(
                                     drivers[0],
                                     mol,
                                     constraints=opt_constraint_list,
                                     index_offset=1,
                                     compute_args=(current_basis, scf_tensors),
+                                    collective=True,
+                                    phase_name='optimization tag',
                                 )
-                                
-                                # qm_energy, scf_tensors = self.compute_energy(drivers[0], optimized_molecule, opt_current_basis)
+                                opt_results = opt_results_mpi[1]
+                                optimized_molecule = opt_results['final_molecule']
                                 print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', mol.get_xyz_string())
                                 current_basis = MolecularBasis.read(optimized_molecule, basis['gs'])
-                                molecules_to_add_info = [(optimized_molecule, current_basis, [root])]
+                                molecules_to_add_info = [(optimized_molecule, current_basis, [root], constraints)]
 
-                            elif root >= 1 and isinstance(drivers['es'][0], LinearResponseEigenSolver) or root >= 1 and isinstance(drivers['es'][0], TdaEigenSolver):
-
+                            elif root >= 1 and isinstance(drivers[0], (LinearResponseEigenSolver, TdaEigenSolver)):
                                 current_basis = MolecularBasis.read(molecule, basis['es'])
-                                _, _, rsp_results  = self.compute_energy(self.drivers['es'][0], molecule, current_basis)
+                                _, _, rsp_results = self._compute_energy_mpi_safe(
+                                    self.drivers['es'][0],
+                                    molecule,
+                                    current_basis,
+                                    collective=True,
+                                    phase_name='Energy calcualtion',
+                                )
                                 self.drivers['es'][3].ostream.mute()
                                 self.drivers['es'][0].ostream.mute()
-                                optimized_molecule, opt_results = self._run_optimization(
-                                    drivers['es'][1],
+                                opt_results_mpi = self._run_optimization_mpi_safe(
+                                    drivers[1],
                                     molecule,
                                     constraints=self.use_minimized_structures[1],
                                     index_offset=1,
-                                    compute_args=(current_basis, self.drivers['gs'][3], self.drivers['gs'][0], rsp_results),
+                                    compute_args=(current_basis, self.drivers['es'][3], self.drivers['es'][0], rsp_results),
+                                    collective=True,
+                                    phase_name='optimization tag',
                                 )
-                                energy = opt_results['opt_energies'][-1]
+                                opt_results = opt_results_mpi[1]
+                                optimized_molecule = opt_results['final_molecule']
                                 print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', molecule.get_xyz_string())
                                 current_basis = MolecularBasis.read(optimized_molecule, basis['es'])
-                                molecules_to_add_info = [(optimized_molecule, current_basis, [root])]
-                        
-                            labels = []
-                            labels.append("point_{0}".format((len(im_labels) + 1)))
-                            current_basis = MolecularBasis.read(mol, current_basis.get_main_basis_label())
-                            self.add_point(molecules_to_add_info, im_settings, symmetry_information=self.symmetry_information)
+                                molecules_to_add_info = [(optimized_molecule, current_basis, [root], constraints)]
 
-                            database_expanded = True
-
+                        self.add_point(molecules_to_add_info, im_settings, symmetry_information=self.symmetry_information)
+                        database_expanded = True
                     else:
-                        with h5py.File('summary_output.h5', "a") as h5f:
-                            print(reference_energy[root])
-                            self.append_confirm_database_quality_h5(h5f, [mol], np.array([reference_energy[root]]), np.array([impes_driver.impes_coordinate.energy]), root)
+                        if rank == root_rank:
+                            with h5py.File('summary_output.h5', "a") as h5f:
+                                self.append_confirm_database_quality_h5(
+                                    h5f,
+                                    [mol],
+                                    np.array([qm_energy_val]),
+                                    np.array([impes_driver.impes_coordinate.energy]),
+                                    root,
+                                )
+                    comm.barrier()
+
+                database_expanded = bool(comm.allreduce(bool(database_expanded), op=MPI.LOR))
+                last_qm_energies = qm_energies
+                last_im_energies = im_energies
 
                 if not database_expanded:
                     database_quality = True
-
-                    minmum_distances_in_db = database_distance_check(datapoint_molecules)
-                    overall_db_covergage[current_datafile]['db_distances'] = minmum_distances_in_db
-
-                    N, pairs, dists = dist_dict_to_edges(minmum_distances_in_db)
-                    labels = [f"point {i+1}" for i in range(N)]  # optional
-
-                    write_distances_h5(current_datafile, group_name="internal_dist_MDS", db_mol=datapoint_molecules, N=N, pairs=pairs, dists=dists, labels=labels)
-            
-            print('Overall coverage', overall_db_covergage)
-            # self.plot_final_energies(qm_energies, im_energies)
-
-            self.structures_to_xyz_file(all_structures[::int(self.nsteps / self.snapshots)], 'full_xyz_traj.xyz')
-            self.structures_to_xyz_file(random_structure_choices, 'random_xyz_structures.xyz', im_energies, qm_energies)
+                    comm.barrier()
+                    if rank == root_rank:
+                        overall_db_covergage[current_datafile] = {}
+                        minmum_distances_in_db = database_distance_check(datapoint_molecules)
+                        overall_db_covergage[current_datafile]['db_distances'] = minmum_distances_in_db
+                        N, pairs, dists = dist_dict_to_edges(minmum_distances_in_db)
+                        labels = [f"point {i+1}" for i in range(N)]
+                        write_distances_h5(
+                            current_datafile,
+                            group_name="internal_dist_MDS",
+                            db_mol=datapoint_molecules,
+                            N=N,
+                            pairs=pairs,
+                            dists=dists,
+                            labels=labels,
+                        )
+                comm.barrier()
+            if rank == root_rank:
+                print('Overall coverage', overall_db_covergage)
+                if len(all_structures_root) > 0:
+                    stride = max(1, int(self.nsteps / self.snapshots)) if self.snapshots else 1
+                    self.structures_to_xyz_file(
+                        all_structures_root[::stride],
+                        'full_xyz_traj.xyz',
+                    )
+                if len(random_structure_choices_root) > 0:
+                    self.structures_to_xyz_file(
+                        random_structure_choices_root,
+                        'random_xyz_structures.xyz',
+                        last_im_energies,
+                        last_qm_energies,
+                    )
 
 
     
@@ -2563,27 +3073,41 @@ class IMForceFieldGenerator:
                     scf_results = None
 
                     if isinstance(self.drivers['gs'][0], ScfRestrictedDriver):
-                        _, scf_results, _ = self.compute_energy(self.drivers['gs'][0], cur_molecule, current_basis)
-                        optimized_molecule, opt_results = self._run_optimization(
+                        _, scf_results, _ = self._compute_energy_mpi_safe(
+                            self.drivers['gs'][0],
+                            cur_molecule,
+                            current_basis,
+                            collective=True,
+                            phase_name='Energy calcualtion',
+                        )
+                        opt_results_mpi = self._run_optimization_mpi_safe(
                                         self.drivers['gs'][0],
                                         cur_molecule,
                                         constraints=constraints,
                                         index_offset=0,
                                         compute_args=(current_basis, scf_results),
-                                        source_molecule=molecule
+                                        source_molecule=molecule,
+                                        collective=True,
+                                        phase_name='optimization tag',
                                     )
+                        opt_results = opt_results_mpi[1]
+                        optimized_molecule = opt_results['final_molecule']
                         cur_molecule = optimized_molecule
                         
                     elif isinstance(self.drivers['gs'][0], XtbDriver):
                         
-                        opt_results_mpi = _collective_call_inline_style(comm, rank, root, 'optimization tag', self._run_optimization, self.drivers['gs'][0],
+                        opt_results_mpi = self._run_optimization_mpi_safe(
+                            self.drivers['gs'][0],
                             cur_molecule,
                             constraints=constraints,
                             index_offset=0,
-                            source_molecule=molecule)
+                            source_molecule=molecule,
+                            collective=True,
+                            phase_name='optimization tag',
+                        )
                     
                         opt_results = opt_results_mpi[1]
-                        optimized_molecule = opt_results_mpi[0]
+                        optimized_molecule = opt_results['final_molecule']
 
                         # optimized_molecule, opt_results = self._run_optimization(
                         #                 self.drivers['gs'][0],
@@ -2685,7 +3209,14 @@ class IMForceFieldGenerator:
                     # drivers[2].roots_to_follow = root_to_follow_calc
                 
                 
-                scf_results_mpi = _collective_call_inline_style(comm, rank, root, 'Energy calcualtion', self.compute_energy, drivers[0], mol_basis[0], mol_basis[1])
+                scf_results_mpi = self._compute_energy_mpi_safe(
+                    drivers[0],
+                    mol_basis[0],
+                    mol_basis[1],
+                    collective=True,
+                    phase_name='Energy calcualtion',
+                )
+
                 # energies, scf_results, rsp_results = self.compute_energy(drivers[0], mol_basis[0], mol_basis[1])
                 energies, scf_results, rsp_results = scf_results_mpi[0], scf_results_mpi[1], scf_results_mpi[2]
 
@@ -2701,12 +3232,27 @@ class IMForceFieldGenerator:
                 if isinstance(drivers[0], LinearResponseEigenSolver) or isinstance(drivers[0], TdaEigenSolver):
                     energies = energies[mol_basis[4]]
 
-                gradient_results_mpi = _collective_call_inline_style(comm, rank, root, 'Gradient Calculation', self.compute_gradient, drivers[1], mol_basis[0], mol_basis[1], scf_results, rsp_results)
+                gradient_results_mpi = self._compute_gradient_mpi_safe(
+                    drivers[1],
+                    mol_basis[0],
+                    mol_basis[1],
+                    scf_results,
+                    rsp_results,
+                    collective=True,
+                    phase_name='Gradient Calculation',
+                )
                 gradients = gradient_results_mpi
                 
                 # gradients = self.compute_gradient(drivers[1], mol_basis[0], mol_basis[1], scf_results, rsp_results)
                 
-                hessians_result_mpi = _collective_call_inline_style(comm, rank, root, 'hessian calculation', self.compute_hessian, drivers[2], mol_basis[0], mol_basis[1])
+                hessians_result_mpi = self._compute_hessian_mpi_safe(
+                    drivers[2],
+                    mol_basis[0],
+                    mol_basis[1],
+                    collective=True,
+                    phase_name='hessian calculation',
+                )
+
 
 
                 hessians = hessians_result_mpi#
@@ -2974,7 +3520,17 @@ class IMForceFieldGenerator:
             
             qm_driver.ostream.mute()
             qm_driver.compute(molecule)
-            qm_energy = qm_driver.get_energy()
+            qm_energy_local = qm_driver.get_energy()
+            if hasattr(qm_driver, 'comm') and qm_driver.comm is not None:
+                qm_energy = qm_driver.comm.bcast(
+                    qm_energy_local if qm_driver.comm.Get_rank() == mpi_master() else None,
+                    root=mpi_master(),
+                )
+            else:
+                qm_energy = qm_energy_local
+
+            if qm_energy is None:
+                raise RuntimeError('XTB energy is None on this rank after MPI synchronization.')
             qm_energy = np.array([qm_energy])
 
         # restricted SCF
@@ -3077,8 +3633,18 @@ class IMForceFieldGenerator:
         if isinstance(hess_driver, XtbHessianDriver):
             hess_driver.ostream.mute()
             hess_driver.compute(molecule)
-            qm_hessian = hess_driver.hessian
+            qm_hessian_local = hess_driver.hessian
+            if hasattr(hess_driver, 'comm') and hess_driver.comm is not None:
+                qm_hessian = hess_driver.comm.bcast(
+                    qm_hessian_local if hess_driver.comm.Get_rank() == mpi_master() else None,
+                    root=mpi_master(),
+                )
+            else:
+                qm_hessian = qm_hessian_local
             hess_driver.ostream.unmute()
+
+            if qm_hessian is None:
+                raise RuntimeError('XTB Hessian is None on this rank after MPI synchronization.')
             qm_hessians = np.array([qm_hessian])
 
         elif isinstance(hess_driver, ScfHessianDriver):
