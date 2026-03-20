@@ -332,3 +332,25 @@ class TestScfDriverMiscellaneous:
 
             assert 0.0 != scf_drv.scf_results["scf_energy"]
             assert 0.0 != np.max(np.abs(scf_drv.scf_results["C_alpha"]))
+
+    def test_mom(self):
+
+        molecule, basis = self.get_water_and_basis()
+
+        scf_drv, scf_results = self.run_hf_scf(molecule, basis)
+
+        uhf_drv = ScfUnrestrictedDriver()
+        uhf_drv.ostream.mute()
+
+        occ_beta = list(range(molecule.number_of_beta_occupied_orbitals(basis)))
+        occ_alpha = list(occ_beta)
+        occ_alpha[-1] += 1  # HOMO->LUMO excitation
+
+        uhf_drv.maximum_overlap(
+            molecule, basis, scf_drv.molecular_orbitals, occ_alpha, occ_beta
+        )
+
+        scf_results = uhf_drv.compute(molecule, basis)
+
+        if self.is_master():
+            assert abs(-74.54939063506086 - scf_results["scf_energy"]) < 1.0e-8
