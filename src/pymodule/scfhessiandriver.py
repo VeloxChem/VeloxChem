@@ -235,11 +235,12 @@ class ScfHessianDriver(HessianDriver):
         scf_results_sanity_check(self, self.scf_driver.scf_results)
         dft_sanity_check(self, 'compute')
 
-        # use determine_xc_hessian_grid_level here to ensure early exit for
+        # use _determine_xc_hessian_grid_level here to ensure early exit for
         # unsupported cases
         if self._dft:
-            self.determine_xc_hessian_grid_level(
-                molecule, get_default_grid_level(self.scf_driver.xcfun))
+            self._determine_xc_hessian_grid_level(
+                molecule, ao_basis,
+                get_default_grid_level(self.scf_driver.xcfun))
 
         self.ostream.print_info('Computing analytical Hessian...')
         self.ostream.print_blank()
@@ -755,8 +756,8 @@ class ScfHessianDriver(HessianDriver):
                           self.scf_driver.grid_level)
 
             # determine grid level for XC Hessian
-            grid_level = self.determine_xc_hessian_grid_level(
-                molecule, grid_level)
+            grid_level = self._determine_xc_hessian_grid_level(
+                molecule, ao_basis, grid_level)
 
             grid_drv.set_level(grid_level)
             mol_grid = grid_drv.generate(molecule)
@@ -917,12 +918,14 @@ class ScfHessianDriver(HessianDriver):
             self.compute_dipole_gradient_restricted(molecule, ao_basis,
                                                     dist_cphf_ov)
 
-    def determine_xc_hessian_grid_level(self, molecule, grid_level):
+    def _determine_xc_hessian_grid_level(self, molecule, basis, grid_level):
         """
         Determines XC Hessian grid level.
 
         :param molecule:
             The molecule.
+        :param basis:
+            The AO basis set.
         :param grid_level:
             The input grid_level.
 
@@ -936,13 +939,25 @@ class ScfHessianDriver(HessianDriver):
         # determine grid level for XC Hessian based on default_grid_level
         # and max_elem_id
 
+        # max_elem_id does not count for ECP atoms since ECP atoms do not have
+        # inner shells with high exponent
+
         default_grid_level = get_default_grid_level(self.scf_driver.xcfun)
+
         elem_ids = molecule.get_identifiers()
-        max_elem_id = max(elem_ids)
+        core_electrons = basis.get_number_of_ecp_core_electrons()
+        elem_ids_without_ecp = [
+            z for z, ncore in zip(elem_ids, core_electrons) if ncore == 0
+        ]
+        max_elem_id = max(elem_ids_without_ecp)
 
         errmsg = 'Hessian calculation with '
         errmsg += self.scf_driver.xcfun.get_func_label().upper()
-        errmsg += f' functional and max element id {max_elem_id} '
+        errmsg += ' functional and '
+        if basis.has_ecp():
+            errmsg += f'max element id {max_elem_id} '
+        else:
+            errmsg += 'effective core potential '
         errmsg += 'is not supported.'
 
         if default_grid_level <= 4:
@@ -954,6 +969,10 @@ class ScfHessianDriver(HessianDriver):
                 assert_msg_critical(False, errmsg)
 
         elif default_grid_level in [5, 6]:
+            # special case for the combination of default_grid_level 6 and ECP
+            if default_grid_level == 6 and basis.has_ecp():
+                assert_msg_critical(False, errmsg)
+
             if max_elem_id <= 10:
                 grid_level = max(6, grid_level)
             elif max_elem_id <= 18:
@@ -988,11 +1007,12 @@ class ScfHessianDriver(HessianDriver):
             self.scf_driver.solvation_model is None,
             'ScfHessianDriver: Solvation model not implemented')
 
-        # use determine_xc_hessian_grid_level here to ensure early exit for
+        # use _determine_xc_hessian_grid_level here to ensure early exit for
         # unsupported cases
         if self._dft:
-            self.determine_xc_hessian_grid_level(
-                molecule, get_default_grid_level(self.scf_driver.xcfun))
+            self._determine_xc_hessian_grid_level(
+                molecule, ao_basis,
+                get_default_grid_level(self.scf_driver.xcfun))
 
         self.ostream.print_info('Computing analytical Hessian...')
         self.ostream.print_blank()
@@ -1316,7 +1336,8 @@ class ScfHessianDriver(HessianDriver):
 
                         # TODO: move sign into function call (such as in oneints)
                         hessian_2nd_order_derivatives[i, i, x, y] += np.sum(
-                            (density_a + density_b) * (ecp_200_iixy + ecp_200_iixy.T))
+                            (density_a + density_b) *
+                            (ecp_200_iixy + ecp_200_iixy.T))
 
                         if i in ecp_atom_inds:
                             hessian_2nd_order_derivatives[i, i, x, y] += np.sum(
@@ -1484,8 +1505,9 @@ class ScfHessianDriver(HessianDriver):
 
                         # TODO: move sign into function call (such as in oneints)
                         hessian_2nd_order_derivatives[i, j, x, y] += np.sum(
-                            (density_a + density_b) * (-ecp_110_ijxy - ecp_110_ijxy.T +
-                                                       ecp_101_ijxy + ecp_101_ijxy.T))
+                            (density_a + density_b) *
+                            (-ecp_110_ijxy - ecp_110_ijxy.T + ecp_101_ijxy +
+                             ecp_101_ijxy.T))
 
             # ERI Hessian contribution
 
@@ -1586,8 +1608,8 @@ class ScfHessianDriver(HessianDriver):
                           self.scf_driver.grid_level)
 
             # determine grid level for XC Hessian
-            grid_level = self.determine_xc_hessian_grid_level(
-                molecule, grid_level)
+            grid_level = self._determine_xc_hessian_grid_level(
+                molecule, ao_basis, grid_level)
 
             grid_drv.set_level(grid_level)
             mol_grid = grid_drv.generate(molecule)
