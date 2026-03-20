@@ -248,3 +248,4 @@ set_omp_num_threads()
 configure_mkl_rt()
 
 __version__ = "1.0rc4"
+from .rpqs import RpqsDriver, RpqsFepDriver
