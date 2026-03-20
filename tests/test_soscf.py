@@ -1,6 +1,7 @@
 import pytest
 
 from veloxchem.scfrestdriver import ScfRestrictedDriver
+from veloxchem.soscf import Soscf
 
 
 @pytest.mark.solvers
@@ -67,3 +68,43 @@ class TestSoscfSwitching:
         scf_drv._history = history[:5]
         assert scf_drv._should_activate_soscf() is True
         assert scf_drv._soscf_switch_counter == 2
+
+    def test_lbfgs_history_is_bounded_and_updates(self):
+
+        soscf = Soscf()
+        options = {
+            'use_bfgs': True,
+            'max_step_norm': 10.0,
+            'damping': 1.0,
+            'min_damping': 0.1,
+            'damping_decay': 0.5,
+            'damping_growth': 1.2,
+            'reset_ratio': 10.0,
+            'improve_ratio': 0.8,
+            'curvature_tol': 1.0e-12,
+            'diag_blend': 0.0,
+            'history_size': 2,
+        }
+
+        diag_inv = [1.0, 0.5]
+
+        step_1, info_1 = soscf.compute_step([1.0, -0.5], diag_inv, options)
+        assert info_1['reset'] is True
+        assert len(soscf.history) == 0
+
+        step_2, info_2 = soscf.compute_step([0.6, -0.2], diag_inv, options)
+        assert info_2['bfgs_updated'] is True
+        assert len(soscf.history) == 1
+
+        step_3, info_3 = soscf.compute_step([0.3, -0.1], diag_inv, options)
+        assert info_3['bfgs_updated'] is True
+        assert len(soscf.history) == 2
+
+        step_4, info_4 = soscf.compute_step([0.1, -0.05], diag_inv, options)
+        assert info_4['bfgs_updated'] is True
+        assert len(soscf.history) == 2
+
+        assert step_1.shape == (2,)
+        assert step_2.shape == (2,)
+        assert step_3.shape == (2,)
+        assert step_4.shape == (2,)

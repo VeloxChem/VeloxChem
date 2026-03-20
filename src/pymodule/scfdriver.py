@@ -169,6 +169,7 @@ class ScfDriver:
         self.soscf_improve_ratio = 0.8
         self.soscf_curvature_tol = 1.0e-10
         self.soscf_diag_blend = 1.0e-3
+        self.soscf_history_size = 8
         self.soscf_switch_thresh = 1.0e-2
         self.soscf_switch_ratio = 0.7
         self.soscf_switch_window = 4
@@ -348,6 +349,8 @@ class ScfDriver:
                     ('float', 'minimum curvature for SOSCF inverse-BFGS'),
                 'soscf_diag_blend':
                     ('float', 'diagonal blending factor for SOSCF inverse-BFGS'),
+                'soscf_history_size':
+                    ('int', 'number of L-BFGS correction pairs in SOSCF'),
                 'soscf_switch_thresh':
                     ('float', 'gradient threshold for DIIS to SOSCF switch'),
                 'soscf_switch_ratio':
@@ -2798,6 +2801,7 @@ class ScfDriver:
             'improve_ratio': self.soscf_improve_ratio,
             'curvature_tol': self.soscf_curvature_tol,
             'diag_blend': self.soscf_diag_blend,
+            'history_size': self.soscf_history_size,
         }
 
     def _get_soscf_orbitals(self, molecule, ao_basis, fock_mat, oao_mat):

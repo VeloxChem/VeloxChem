@@ -44,6 +44,8 @@ class Soscf:
 
     def __init__(self):
         self.inv_hessian = None
+        self.history = []
+        self.inverse_hessian_diagonal = None
         self.prev_gradient = None
         self.prev_step = None
         self.damping = 1.0
@@ -54,6 +56,8 @@ class Soscf:
         """
 
         self.inv_hessian = None
+        self.history = []
+        self.inverse_hessian_diagonal = None
         self.prev_gradient = None
         self.prev_step = None
         self.damping = 1.0
@@ -82,17 +86,18 @@ class Soscf:
 
         grad = np.array(gradient, dtype='float64', copy=True).reshape(-1)
         diag_inv = np.array(diag_inv_hessian, dtype='float64', copy=True).reshape(-1)
+        self.inverse_hessian_diagonal = diag_inv.copy()
 
-        if self.inv_hessian is None or self.inv_hessian.shape != (grad.size, grad.size):
-            self.inv_hessian = np.diag(diag_inv)
+        if self.prev_gradient is None or self.prev_gradient.size != grad.size:
+            self.history = []
             self.prev_gradient = None
             self.prev_step = None
             self.damping = options['damping']
             info['reset'] = True
         else:
-            self._update_inverse_hessian(grad, diag_inv, options, info)
+            self._update_inverse_hessian_model(grad, diag_inv, options, info)
 
-        step = -self.damping * np.dot(self.inv_hessian, grad)
+        step = -self.damping * self._apply_inverse_hessian(grad, diag_inv)
 
         step_norm = np.linalg.norm(step)
         max_step = options['max_step_norm']
@@ -106,9 +111,9 @@ class Soscf:
 
         return step, info
 
-    def _update_inverse_hessian(self, grad, diag_inv, options, info):
+    def _update_inverse_hessian_model(self, grad, diag_inv, options, info):
         """
-        Updates or resets the inverse Hessian using the latest gradient.
+        Updates or resets the inverse-Hessian model using the latest gradient.
         """
 
         prev_grad_norm = (np.linalg.norm(self.prev_gradient)
@@ -117,7 +122,7 @@ class Soscf:
 
         if (self.prev_gradient is None or self.prev_step is None or
                 self.prev_gradient.size != grad.size):
-            self.inv_hessian = np.diag(diag_inv)
+            self.history = []
             self.prev_gradient = None
             self.prev_step = None
             self.damping = options['damping']
@@ -127,7 +132,7 @@ class Soscf:
         if prev_grad_norm is not None and prev_grad_norm > 0.0:
             ratio = grad_norm / prev_grad_norm
             if ratio > options['reset_ratio']:
-                self.inv_hessian = np.diag(diag_inv)
+                self.history = []
                 self.damping = max(options['min_damping'],
                                    self.damping * options['damping_decay'])
                 info['reset'] = True
@@ -138,29 +143,46 @@ class Soscf:
                                    self.damping * options['damping_growth'])
 
         if not options['use_bfgs']:
-            self.inv_hessian = np.diag(diag_inv)
+            self.history = []
             return
 
         svec = self.prev_step
         yvec = grad - self.prev_gradient
         sty = np.dot(svec, yvec)
         if sty <= options['curvature_tol']:
-            self.inv_hessian = np.diag(diag_inv)
+            self.history = []
             info['reset'] = True
             return
 
-        dim = grad.size
-        ident = np.eye(dim)
         rho = 1.0 / sty
-        left = ident - rho * np.outer(svec, yvec)
-        right = ident - rho * np.outer(yvec, svec)
-        updated = np.linalg.multi_dot([left, self.inv_hessian, right])
-        updated += rho * np.outer(svec, svec)
-
-        # Keep the inverse Hessian symmetric and blend the diagonal
-        # preconditioner back in to limit drift.
-        updated = 0.5 * (updated + updated.T)
-        updated += options['diag_blend'] * np.diag(diag_inv)
-
-        self.inv_hessian = updated
+        self.history.append((svec.copy(), yvec.copy(), rho))
+        max_history = max(0, int(options['history_size']))
+        if max_history == 0:
+            self.history = []
+        elif len(self.history) > max_history:
+            self.history = self.history[-max_history:]
         info['bfgs_updated'] = True
+
+    def _apply_inverse_hessian(self, grad, diag_inv):
+        """
+        Applies the inverse-Hessian approximation to a vector.
+        """
+
+        if len(self.history) == 0:
+            return diag_inv * grad
+
+        qvec = grad.copy()
+        alphas = []
+
+        for svec, yvec, rho in reversed(self.history):
+            alpha = rho * np.dot(svec, qvec)
+            alphas.append(alpha)
+            qvec = qvec - alpha * yvec
+
+        rvec = diag_inv * qvec
+
+        for alpha, (svec, yvec, rho) in zip(reversed(alphas), self.history):
+            beta = rho * np.dot(yvec, rvec)
+            rvec = rvec + svec * (alpha - beta)
+
+        return rvec
