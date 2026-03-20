@@ -2742,8 +2742,6 @@ class ScfDriver:
                 self.ostream.print_info(
                     'Switching convergence accelerator from DIIS to SOSCF')
                 self.ostream.print_blank()
-        else:
-            self._soscf_switch_counter = 0
 
     def _should_activate_soscf(self):
         """
@@ -2754,6 +2752,7 @@ class ScfDriver:
         persistence = max(1, int(self.soscf_switch_persistence))
 
         if len(self._history) < window:
+            self._soscf_switch_counter = 0
             return False
 
         recent = self._history[-window:]
@@ -2761,6 +2760,7 @@ class ScfDriver:
         grad_old = recent[0]['gradient_norm']
 
         if grad_now >= self.soscf_switch_thresh or grad_old <= 0.0:
+            self._soscf_switch_counter = 0
             return False
 
         stall = (grad_now / grad_old) > self.soscf_switch_ratio
