@@ -84,6 +84,8 @@ class TestSoscfSwitching:
             'curvature_tol': 1.0e-12,
             'diag_blend': 0.0,
             'history_size': 2,
+            'reset_persistence': 2,
+            'success_recovery_steps': 3,
         }
 
         diag_inv = [1.0, 0.5]
@@ -108,3 +110,96 @@ class TestSoscfSwitching:
         assert step_2.shape == (2,)
         assert step_3.shape == (2,)
         assert step_4.shape == (2,)
+
+    def test_single_bad_step_backs_off_without_reset(self):
+
+        soscf = Soscf()
+        options = {
+            'use_bfgs': True,
+            'max_step_norm': 10.0,
+            'damping': 1.0,
+            'min_damping': 0.1,
+            'damping_decay': 0.5,
+            'damping_growth': 1.2,
+            'reset_ratio': 1.25,
+            'improve_ratio': 0.8,
+            'curvature_tol': 1.0e-12,
+            'diag_blend': 0.0,
+            'history_size': 4,
+            'reset_persistence': 2,
+            'success_recovery_steps': 3,
+        }
+
+        diag_inv = [1.0, 1.0]
+
+        soscf.compute_step([1.0, 0.0], diag_inv, options)
+        soscf.compute_step([0.6, 0.0], diag_inv, options)
+        assert len(soscf.history) == 1
+
+        _, info = soscf.compute_step([1.0, 0.0], diag_inv, options)
+        assert info['backoff'] is True
+        assert info['reset'] is False
+        assert len(soscf.history) == 1
+        assert soscf.damping == pytest.approx(0.5)
+
+    def test_repeated_bad_steps_trigger_reset(self):
+
+        soscf = Soscf()
+        options = {
+            'use_bfgs': True,
+            'max_step_norm': 10.0,
+            'damping': 1.0,
+            'min_damping': 0.1,
+            'damping_decay': 0.5,
+            'damping_growth': 1.2,
+            'reset_ratio': 1.25,
+            'improve_ratio': 0.8,
+            'curvature_tol': 1.0e-12,
+            'diag_blend': 0.0,
+            'history_size': 4,
+            'reset_persistence': 2,
+            'success_recovery_steps': 3,
+        }
+
+        diag_inv = [1.0, 1.0]
+
+        soscf.compute_step([1.0, 0.0], diag_inv, options)
+        soscf.compute_step([0.6, 0.0], diag_inv, options)
+
+        soscf.compute_step([1.0, 0.0], diag_inv, options)
+        _, info = soscf.compute_step([1.3, 0.0], diag_inv, options)
+
+        assert info['backoff'] is True
+        assert info['reset'] is True
+        assert len(soscf.history) == 0
+
+    def test_successful_steps_recover_damping(self):
+
+        soscf = Soscf()
+        options = {
+            'use_bfgs': True,
+            'max_step_norm': 10.0,
+            'damping': 1.0,
+            'min_damping': 0.1,
+            'damping_decay': 0.5,
+            'damping_growth': 1.2,
+            'reset_ratio': 1.25,
+            'improve_ratio': 0.95,
+            'curvature_tol': 1.0e-12,
+            'diag_blend': 0.0,
+            'history_size': 4,
+            'reset_persistence': 2,
+            'success_recovery_steps': 2,
+        }
+
+        diag_inv = [1.0, 1.0]
+
+        soscf.compute_step([1.0, 0.0], diag_inv, options)
+        soscf.compute_step([0.6, 0.0], diag_inv, options)
+        soscf.compute_step([1.0, 0.0], diag_inv, options)
+        assert soscf.damping == pytest.approx(0.5)
+
+        soscf.compute_step([0.8, 0.0], diag_inv, options)
+        soscf.compute_step([0.6, 0.0], diag_inv, options)
+
+        assert soscf.damping > 0.5

@@ -49,6 +49,8 @@ class Soscf:
         self.prev_gradient = None
         self.prev_step = None
         self.damping = 1.0
+        self.bad_step_counter = 0
+        self.success_counter = 0
 
     def reset(self):
         """
@@ -61,6 +63,8 @@ class Soscf:
         self.prev_gradient = None
         self.prev_step = None
         self.damping = 1.0
+        self.bad_step_counter = 0
+        self.success_counter = 0
 
     def compute_step(self, gradient, diag_inv_hessian, options):
         """
@@ -80,6 +84,7 @@ class Soscf:
         info = {
             'bfgs_updated': False,
             'reset': False,
+            'backoff': False,
             'scaled': False,
             'damping': self.damping,
         }
@@ -93,6 +98,8 @@ class Soscf:
             self.prev_gradient = None
             self.prev_step = None
             self.damping = options['damping']
+            self.bad_step_counter = 0
+            self.success_counter = 0
             info['reset'] = True
         else:
             self._update_inverse_hessian_model(grad, diag_inv, options, info)
@@ -126,21 +133,35 @@ class Soscf:
             self.prev_gradient = None
             self.prev_step = None
             self.damping = options['damping']
+            self.bad_step_counter = 0
+            self.success_counter = 0
             info['reset'] = True
             return
 
         if prev_grad_norm is not None and prev_grad_norm > 0.0:
             ratio = grad_norm / prev_grad_norm
             if ratio > options['reset_ratio']:
-                self.history = []
+                self.bad_step_counter += 1
+                self.success_counter = 0
                 self.damping = max(options['min_damping'],
                                    self.damping * options['damping_decay'])
-                info['reset'] = True
+                info['backoff'] = True
+                if self.bad_step_counter >= options['reset_persistence']:
+                    self.history = []
+                    self.bad_step_counter = 0
+                    info['reset'] = True
                 return
 
+            self.bad_step_counter = 0
             if ratio < options['improve_ratio']:
+                self.success_counter += 1
+            else:
+                self.success_counter = 0
+
+            if self.success_counter >= options['success_recovery_steps']:
                 self.damping = min(options['damping'],
                                    self.damping * options['damping_growth'])
+                self.success_counter = 0
 
         if not options['use_bfgs']:
             self.history = []
@@ -150,10 +171,18 @@ class Soscf:
         yvec = grad - self.prev_gradient
         sty = np.dot(svec, yvec)
         if sty <= options['curvature_tol']:
-            self.history = []
-            info['reset'] = True
+            self.bad_step_counter += 1
+            self.success_counter = 0
+            self.damping = max(options['min_damping'],
+                               self.damping * options['damping_decay'])
+            info['backoff'] = True
+            if self.bad_step_counter >= options['reset_persistence']:
+                self.history = []
+                self.bad_step_counter = 0
+                info['reset'] = True
             return
 
+        self.bad_step_counter = 0
         rho = 1.0 / sty
         self.history.append((svec.copy(), yvec.copy(), rho))
         max_history = max(0, int(options['history_size']))

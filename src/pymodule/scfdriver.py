@@ -170,6 +170,8 @@ class ScfDriver:
         self.soscf_curvature_tol = 1.0e-10
         self.soscf_diag_blend = 1.0e-3
         self.soscf_history_size = 8
+        self.soscf_reset_persistence = 2
+        self.soscf_success_recovery_steps = 3
         self.soscf_switch_thresh = 1.0e-2
         self.soscf_switch_ratio = 0.7
         self.soscf_switch_window = 4
@@ -351,6 +353,10 @@ class ScfDriver:
                     ('float', 'diagonal blending factor for SOSCF inverse-BFGS'),
                 'soscf_history_size':
                     ('int', 'number of L-BFGS correction pairs in SOSCF'),
+                'soscf_reset_persistence':
+                    ('int', 'number of failed SOSCF updates before reset'),
+                'soscf_success_recovery_steps':
+                    ('int', 'successful SOSCF updates before damping recovery'),
                 'soscf_switch_thresh':
                     ('float', 'gradient threshold for DIIS to SOSCF switch'),
                 'soscf_switch_ratio':
@@ -2802,6 +2808,8 @@ class ScfDriver:
             'curvature_tol': self.soscf_curvature_tol,
             'diag_blend': self.soscf_diag_blend,
             'history_size': self.soscf_history_size,
+            'reset_persistence': self.soscf_reset_persistence,
+            'success_recovery_steps': self.soscf_success_recovery_steps,
         }
 
     def _get_soscf_orbitals(self, molecule, ao_basis, fock_mat, oao_mat):
