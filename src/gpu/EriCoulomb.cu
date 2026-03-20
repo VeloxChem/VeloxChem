@@ -906,8 +906,7 @@ computeCoulombFockSSSP_FP32(double*         mat_J,
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
         const float D_f = sp_mat_D_f[kl];
-        const float sym_f = (k != l) ? 2.0f : 1.0f;
-        const float contrib_f = eri_ijkl_f * D_f * sym_f;
+        const float contrib_f = eri_ijkl_f * D_f * 2.0f;
         ERIs[threadIdx.y][threadIdx.x] += (double)contrib_f;
 
     }
@@ -2438,7 +2437,7 @@ computeCoulombFockSPSS_FP32(double*         mat_J,
     const uint32_t screen_cut = screen_cut_ij_tile[ij_tile];
 
     float a_i_f, a_j_f, r_i_f[3], r_j_f[3], S_ij_00_f, S1_f, inv_S1_f;
-    double PB_0_f;
+    float PB_0_f;
     uint32_t i, j, b0;
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
@@ -2959,7 +2958,7 @@ computeCoulombFockSPSP_FP32(double*         mat_J,
     const uint32_t screen_cut = screen_cut_ij_tile[ij_tile];
 
     float a_i_f, a_j_f, r_i_f[3], r_j_f[3], S_ij_00_f, S1_f, inv_S1_f;
-    double PB_0_f;
+    float PB_0_f;
     uint32_t i, j, b0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -3090,8 +3089,7 @@ computeCoulombFockSPSP_FP32(double*         mat_J,
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
         const float D_f = sp_mat_D_f[kl];
-        const float sym_f = (k != l) ? 2.0f : 1.0f;
-        const float contrib_f = eri_ijkl_f * D_f * sym_f;
+        const float contrib_f = eri_ijkl_f * D_f * 2.0f;
         ERIs[threadIdx.y][threadIdx.x] += (double)contrib_f;
 
     }
@@ -3786,7 +3784,7 @@ computeCoulombFockSPPP_FP32(double*         mat_J,
     const uint32_t screen_cut = screen_cut_ij_tile[ij_tile];
 
     float a_i_f, a_j_f, r_i_f[3], r_j_f[3], S_ij_00_f, S1_f, inv_S1_f;
-    double PB_0_f;
+    float PB_0_f;
     uint32_t i, j, b0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -5699,8 +5697,7 @@ computeCoulombFockPPSP_FP32(double*         mat_J,
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
         const float D_f = sp_mat_D_f[kl];
-        const float sym_f = (k != l) ? 2.0f : 1.0f;
-        const float contrib_f = eri_ijkl_f * D_f * sym_f;
+        const float contrib_f = eri_ijkl_f * D_f * 2.0f;
         ERIs[threadIdx.y][threadIdx.x] += (double)contrib_f;
 
     }

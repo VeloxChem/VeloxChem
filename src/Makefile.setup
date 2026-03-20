@@ -32,12 +32,12 @@
 
 USE_CUDA := true
 
-CUDA_LIB_DIR := /usr/local/cuda-12.4/lib64
-LIBXC_HOME   := /home/yuch4126/VeloxChem.cuda/dependencies/libxc
+CUDA_LIB_DIR := /path/to/cuda/lib64
+LIBXC_HOME   := /path/to/libxc
 
 CXX    := g++
 PYTHON := python3
-DEVCC  := nvcc -gencode arch=compute_89,code=sm_89
+DEVCC  := nvcc -gencode arch=compute_80,code=sm_80
 
 CXX_REL_FLG := -fopenmp -std=c++17 -O3 -Wall
 CXX_DEB_FLG := -fopenmp -std=c++17 -O3 -Wall -g
@@ -51,7 +51,7 @@ CXX_REL_FLG += -fPIC $(PYTHON_INC) $(XC_INC)
 CXX_DEB_FLG += -fPIC $(PYTHON_INC) $(XC_INC)
 
 DEVCC_REL_FLG := -Xcompiler -fPIC -Xcompiler -fopenmp -std=c++17 -O3 $(XC_INC)
-DEVCC_DEB_FLG := -Xcompiler -fPIC -Xcompiler -fopenmp -std=c++17 -O3 $(XC_INC) -g
+DEVCC_DEB_FLG := -Xcompiler -fPIC -Xcompiler -fopenmp -std=c++17 -O3 $(XC_INC)
 DEVICE_LIB := -L$(CUDA_LIB_DIR) -lcudart -lcublas -lcusolver
 
 MACLIBS :=
