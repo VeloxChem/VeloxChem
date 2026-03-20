@@ -31,7 +31,6 @@ class TestScfUnrestrictedDriver:
         scf_results = scf_drv.compute(mol, bas)
 
         if scf_drv.rank == mpi_master():
-            print(f'\n{xcfun_label}', ref_scf_energy, scf_results['scf_energy'])
             assert abs(ref_scf_energy - scf_results['scf_energy']) < tol
 
     def test_hf(self):

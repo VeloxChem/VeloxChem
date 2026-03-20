@@ -102,7 +102,8 @@ CXCComponent::_init_libxc_func()
             const double libxc_beta  = -1.0 * _rangeSeparatedParameters[1];
             const double libxc_omega = _rangeSeparatedParameters[2];
 
-            // Note: xc_func_set_ext_params_name must be called right after xc_func_init
+            // Note: 1) xc_func_set_ext_params_name must be called right after xc_func_init
+            //       2) calling xc_func_set_ext_params_name more than once requires libxc version 7 or newer
             xc_func_set_ext_params_name(&_func, "_alpha", libxc_alpha);
             xc_func_set_ext_params_name(&_func, "_beta",  libxc_beta);
             xc_func_set_ext_params_name(&_func, "_omega", libxc_omega);
