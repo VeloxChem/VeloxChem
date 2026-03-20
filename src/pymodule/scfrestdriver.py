@@ -193,7 +193,7 @@ class ScfRestrictedDriver(ScfDriver):
 
                 if self.acc_type.upper() in ['C2DIIS', 'L2_C2DIIS']:
                     acc_diis = CTwoDiis()
-                elif self.acc_type.upper() in ['DIIS', 'L2_DIIS']:
+                elif self.acc_type.upper() in ['DIIS', 'L2_DIIS', 'DIIS_SOSCF']:
                     acc_diis = Diis()
 
                 acc_diis.compute_error_vectors_restricted(

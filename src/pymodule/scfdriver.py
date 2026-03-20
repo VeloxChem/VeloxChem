@@ -77,6 +77,7 @@ from .errorhandler import assert_msg_critical
 from .mathutils import screened_eigh
 from .checkpoint import (create_hdf5, write_scf_results_to_hdf5,
                          write_cpcm_charges, read_cpcm_charges)
+from .soscf import Soscf
 
 
 class ScfDriver:
@@ -158,6 +159,20 @@ class ScfDriver:
         self.max_err_vecs = 10
         self.max_iter = 50
         self._first_step = False
+        self.soscf_max_step = 0.5
+        self.soscf_min_denominator = 1.0e-3
+        self.soscf_damping = 1.0
+        self.soscf_min_damping = 0.1
+        self.soscf_damping_decay = 0.5
+        self.soscf_damping_growth = 1.2
+        self.soscf_reset_ratio = 1.25
+        self.soscf_improve_ratio = 0.8
+        self.soscf_curvature_tol = 1.0e-10
+        self.soscf_diag_blend = 1.0e-3
+        self.soscf_switch_thresh = 1.0e-2
+        self.soscf_switch_ratio = 0.7
+        self.soscf_switch_window = 4
+        self.soscf_switch_persistence = 2
 
         # pseudo fractional occupation number (pFON)
         # J. Chem. Phys. 110, 695-700 (1999)
@@ -196,6 +211,9 @@ class ScfDriver:
 
         self._density_matrices_alpha = deque()
         self._density_matrices_beta = deque()
+        self._soscf = Soscf()
+        self._soscf_active = False
+        self._soscf_switch_counter = 0
 
         # density matrix and molecular orbitals
         self._density = None
@@ -311,6 +329,33 @@ class ScfDriver:
                     ('str_upper', 'type of SCF convergence accelerator'),
                 'max_iter': ('int', 'maximum number of SCF iterations'),
                 'max_err_vecs': ('int', 'maximum number of DIIS error vectors'),
+                'soscf_max_step':
+                    ('float', 'maximum norm of SOSCF orbital rotation step'),
+                'soscf_min_denominator':
+                    ('float', 'minimum SOSCF orbital energy denominator'),
+                'soscf_damping': ('float', 'initial SOSCF damping factor'),
+                'soscf_min_damping':
+                    ('float', 'minimum SOSCF damping factor after reset'),
+                'soscf_damping_decay':
+                    ('float', 'SOSCF damping decay after resets'),
+                'soscf_damping_growth':
+                    ('float', 'SOSCF damping growth after improvement'),
+                'soscf_reset_ratio':
+                    ('float', 'gradient growth ratio that resets SOSCF'),
+                'soscf_improve_ratio':
+                    ('float', 'gradient improvement ratio that relaxes damping'),
+                'soscf_curvature_tol':
+                    ('float', 'minimum curvature for SOSCF inverse-BFGS'),
+                'soscf_diag_blend':
+                    ('float', 'diagonal blending factor for SOSCF inverse-BFGS'),
+                'soscf_switch_thresh':
+                    ('float', 'gradient threshold for DIIS to SOSCF switch'),
+                'soscf_switch_ratio':
+                    ('float', 'stall ratio for DIIS to SOSCF switch'),
+                'soscf_switch_window':
+                    ('int', 'history window for DIIS to SOSCF switch'),
+                'soscf_switch_persistence':
+                    ('int', 'consecutive DIIS stall checks before SOSCF switch'),
                 'pfon': ('bool', 'use pFON to accelerate convergence'),
                 'pfon_temperature': ('float', 'pFON temperature'),
                 'pfon_delta_temperature': ('float', 'pFON delta temperature'),
@@ -618,6 +663,11 @@ class ScfDriver:
         # check molecule
         molecule_sanity_check(molecule, self.scf_type)
 
+        if self._use_soscf_family():
+            assert_msg_critical(
+                self.scf_type in ['restricted', 'unrestricted'],
+                'ScfDriver: SOSCF is currently implemented only for RHF and UHF')
+
         # check RI setup
         ri_sanity_check(self)
 
@@ -919,8 +969,8 @@ class ScfDriver:
 
             self._nuc_mm_energy = self.comm.allreduce(self._nuc_mm_energy)
 
-        # DIIS method
-        if self.acc_type.upper() in ['C2DIIS', 'DIIS']:
+        # DIIS and SOSCF methods
+        if self.acc_type.upper() in ['C2DIIS', 'DIIS', 'SOSCF', 'DIIS_SOSCF']:
             if self.rank == mpi_master():
                 if self.restart:
                     den_mat = self.gen_initial_density_restart(molecule)
@@ -1421,6 +1471,9 @@ class ScfDriver:
         self._scf_prop = FirstOrderProperties(self.comm, self.ostream)
 
         self._history = []
+        self._soscf.reset()
+        self._soscf_active = False
+        self._soscf_switch_counter = 0
 
         if not self._first_step:
             profiler.begin({
@@ -1723,20 +1776,28 @@ class ScfDriver:
             if self.is_converged:
                 break
 
+            self._update_soscf_switch_state()
+
             # compute new Fock matrix, molecular orbitals and density
 
             profiler.start_timer('EffFock')
 
-            self._store_diis_data(fock_mat, den_mat, ovl_mat, e_grad)
-
-            eff_fock_mat = self._get_effective_fock(fock_mat, ovl_mat, oao_mat)
+            eff_fock_mat = None
+            if self._use_diis_acceleration():
+                self._store_diis_data(fock_mat, den_mat, ovl_mat, e_grad)
+                eff_fock_mat = self._get_effective_fock(fock_mat, ovl_mat,
+                                                        oao_mat)
 
             profiler.stop_timer('EffFock')
 
             profiler.start_timer('NewMO')
 
-            self._molecular_orbitals = self._gen_molecular_orbitals(
-                molecule, ao_basis, eff_fock_mat, oao_mat)
+            if self._use_soscf_acceleration():
+                self._molecular_orbitals = self._get_soscf_orbitals(
+                    molecule, ao_basis, fock_mat, oao_mat)
+            else:
+                self._molecular_orbitals = self._gen_molecular_orbitals(
+                    molecule, ao_basis, eff_fock_mat, oao_mat)
 
             if self.pfon:
                 self.pfon_temperature -= self.pfon_delta_temperature
@@ -2636,6 +2697,270 @@ class ScfDriver:
 
         return MolecularOrbitals()
 
+    def _use_diis_acceleration(self):
+        """
+        Checks if the current accelerator uses DIIS-style Fock mixing.
+        """
+
+        if self.acc_type.upper() == 'DIIS_SOSCF':
+            return not self._soscf_active
+
+        return self.acc_type.upper() in ['C2DIIS', 'DIIS', 'L2_C2DIIS', 'L2_DIIS']
+
+    def _use_soscf_family(self):
+        """
+        Checks if the current accelerator belongs to the SOSCF family.
+        """
+
+        return self.acc_type.upper() in ['SOSCF', 'DIIS_SOSCF']
+
+    def _use_soscf_acceleration(self):
+        """
+        Checks if the current accelerator uses SOSCF orbital rotations.
+        """
+
+        if self.acc_type.upper() == 'SOSCF':
+            return True
+
+        if self.acc_type.upper() == 'DIIS_SOSCF':
+            return self._soscf_active
+
+        return False
+
+    def _update_soscf_switch_state(self):
+        """
+        Activates SOSCF in the hybrid DIIS->SOSCF mode when DIIS stalls.
+        """
+
+        if self.acc_type.upper() != 'DIIS_SOSCF' or self._soscf_active:
+            return
+
+        if self._should_activate_soscf():
+            self._soscf_active = True
+            self._soscf.reset()
+            if self.rank == mpi_master():
+                self.ostream.print_info(
+                    'Switching convergence accelerator from DIIS to SOSCF')
+                self.ostream.print_blank()
+        else:
+            self._soscf_switch_counter = 0
+
+    def _should_activate_soscf(self):
+        """
+        Checks whether the hybrid DIIS->SOSCF switch criterion is satisfied.
+        """
+
+        window = max(2, int(self.soscf_switch_window))
+        persistence = max(1, int(self.soscf_switch_persistence))
+
+        if len(self._history) < window:
+            return False
+
+        recent = self._history[-window:]
+        grad_now = recent[-1]['gradient_norm']
+        grad_old = recent[0]['gradient_norm']
+
+        if grad_now >= self.soscf_switch_thresh or grad_old <= 0.0:
+            return False
+
+        stall = (grad_now / grad_old) > self.soscf_switch_ratio
+
+        energy_signs = []
+        for item in recent[1:]:
+            diff_energy = item['diff_energy']
+            if abs(diff_energy) > 1.0e-14:
+                energy_signs.append(np.sign(diff_energy))
+
+        oscillating = any(
+            sign_a * sign_b < 0.0
+            for sign_a, sign_b in zip(energy_signs, energy_signs[1:]))
+
+        if stall or oscillating:
+            self._soscf_switch_counter += 1
+        else:
+            self._soscf_switch_counter = 0
+
+        return self._soscf_switch_counter >= persistence
+
+    def _get_soscf_options(self):
+        """
+        Gets SOSCF options for the quasi-Newton update.
+        """
+
+        return {
+            'use_bfgs': True,
+            'max_step_norm': self.soscf_max_step,
+            'damping': self.soscf_damping,
+            'min_damping': self.soscf_min_damping,
+            'damping_decay': self.soscf_damping_decay,
+            'damping_growth': self.soscf_damping_growth,
+            'reset_ratio': self.soscf_reset_ratio,
+            'improve_ratio': self.soscf_improve_ratio,
+            'curvature_tol': self.soscf_curvature_tol,
+            'diag_blend': self.soscf_diag_blend,
+        }
+
+    def _get_soscf_orbitals(self, molecule, ao_basis, fock_mat, oao_mat):
+        """
+        Builds the next set of orbitals using SOSCF orbital rotations.
+        """
+
+        if self.rank != mpi_master():
+            return MolecularOrbitals()
+
+        if self.scf_type == 'restricted_openshell':
+            return self._gen_molecular_orbitals(molecule, ao_basis, tuple(fock_mat),
+                                                oao_mat)
+
+        cur_mos = self._molecular_orbitals
+        if cur_mos.get_orbitals_type() is None:
+            cur_mos = self._gen_molecular_orbitals(molecule, ao_basis,
+                                                   tuple(fock_mat), oao_mat)
+
+        grad_vec, diag_inv, meta = self._get_soscf_gradient_data(
+            molecule, ao_basis, fock_mat, cur_mos)
+
+        if grad_vec.size == 0:
+            return cur_mos
+
+        step_vec, info = self._soscf.compute_step(grad_vec, diag_inv,
+                                                  self._get_soscf_options())
+
+        if self.print_level > 1:
+            msg = ('Applying SOSCF'
+                   f' (|step|={np.linalg.norm(step_vec):.3e},'
+                   f' damping={info["damping"]:.2f}')
+            if info['bfgs_updated']:
+                msg += ', inverse-BFGS'
+            if info['reset']:
+                msg += ', reset'
+            msg += ')'
+            self.ostream.print_info(msg)
+
+        return self._rotate_molecular_orbitals(cur_mos, fock_mat, meta, step_vec)
+
+    def _get_soscf_gradient_data(self, molecule, ao_basis, fock_mat, mol_orbs):
+        """
+        Extracts the orbital-space gradient and diagonal inverse Hessian.
+        """
+
+        if self.scf_type == 'restricted':
+            coeffs = mol_orbs.alpha_to_numpy()
+            fmo = np.linalg.multi_dot([coeffs.T, fock_mat[0], coeffs])
+            nocc = molecule.number_of_alpha_occupied_orbitals(ao_basis)
+            nvir = fmo.shape[0] - nocc
+
+            grad = fmo[nocc:, :nocc].reshape(-1)
+            denom = self._get_soscf_denominators(np.diag(fmo), nocc)
+            meta = {
+                'kind': 'restricted',
+                'nocc_alpha': nocc,
+                'nvir_alpha': nvir,
+            }
+            return grad, denom, meta
+
+        if self.scf_type == 'unrestricted':
+            coeffs_a = mol_orbs.alpha_to_numpy()
+            coeffs_b = mol_orbs.beta_to_numpy()
+            fmo_a = np.linalg.multi_dot([coeffs_a.T, fock_mat[0], coeffs_a])
+            fmo_b = np.linalg.multi_dot([coeffs_b.T, fock_mat[1], coeffs_b])
+
+            nocc_a = molecule.number_of_alpha_occupied_orbitals(ao_basis)
+            nocc_b = molecule.number_of_beta_occupied_orbitals(ao_basis)
+            nvir_a = fmo_a.shape[0] - nocc_a
+            nvir_b = fmo_b.shape[0] - nocc_b
+
+            grad_a = fmo_a[nocc_a:, :nocc_a].reshape(-1)
+            grad_b = fmo_b[nocc_b:, :nocc_b].reshape(-1)
+            denom_a = self._get_soscf_denominators(np.diag(fmo_a), nocc_a)
+            denom_b = self._get_soscf_denominators(np.diag(fmo_b), nocc_b)
+            meta = {
+                'kind': 'unrestricted',
+                'nocc_alpha': nocc_a,
+                'nvir_alpha': nvir_a,
+                'nocc_beta': nocc_b,
+                'nvir_beta': nvir_b,
+            }
+            return np.concatenate((grad_a, grad_b)), np.concatenate(
+                (denom_a, denom_b)), meta
+
+        return np.array([], dtype='float64'), np.array([], dtype='float64'), {}
+
+    def _get_soscf_denominators(self, orb_energies, nocc):
+        """
+        Forms the diagonal inverse Hessian from orbital energy differences.
+        """
+
+        occ = orb_energies[:nocc]
+        vir = orb_energies[nocc:]
+        if occ.size == 0 or vir.size == 0:
+            return np.array([], dtype='float64')
+
+        diffs = (vir[:, None] - occ[None, :]).reshape(-1)
+        min_den = abs(self.soscf_min_denominator)
+        diffs = np.where(np.abs(diffs) < min_den,
+                         np.sign(diffs + 1.0e-16) * min_den, diffs)
+
+        return 1.0 / diffs
+
+    def _rotate_molecular_orbitals(self, mol_orbs, fock_mat, meta, step_vec):
+        """
+        Rotates the current orbitals with an orthogonal Cayley transform.
+        """
+
+        if meta['kind'] == 'restricted':
+            coeffs = mol_orbs.alpha_to_numpy()
+            occ = mol_orbs.occa_to_numpy()
+            step_mat = step_vec.reshape(meta['nvir_alpha'], meta['nocc_alpha'])
+            rotated, energies = self._rotate_one_spin(coeffs, fock_mat[0],
+                                                      meta['nocc_alpha'],
+                                                      step_mat)
+            return MolecularOrbitals([rotated], [energies], [occ], molorb.rest)
+
+        if meta['kind'] == 'unrestricted':
+            coeffs_a = mol_orbs.alpha_to_numpy()
+            coeffs_b = mol_orbs.beta_to_numpy()
+            occ_a = mol_orbs.occa_to_numpy()
+            occ_b = mol_orbs.occb_to_numpy()
+
+            na = meta['nvir_alpha'] * meta['nocc_alpha']
+            step_a = step_vec[:na].reshape(meta['nvir_alpha'], meta['nocc_alpha'])
+            step_b = step_vec[na:].reshape(meta['nvir_beta'], meta['nocc_beta'])
+
+            rotated_a, energies_a = self._rotate_one_spin(coeffs_a, fock_mat[0],
+                                                          meta['nocc_alpha'],
+                                                          step_a)
+            rotated_b, energies_b = self._rotate_one_spin(coeffs_b, fock_mat[1],
+                                                          meta['nocc_beta'],
+                                                          step_b)
+
+            return MolecularOrbitals([rotated_a, rotated_b],
+                                     [energies_a, energies_b],
+                                     [occ_a, occ_b], molorb.unrest)
+
+        return mol_orbs
+
+    def _rotate_one_spin(self, coeffs, fock, nocc, step_mat):
+        """
+        Applies one-spin occupied-virtual orbital rotations.
+        """
+
+        nmo = coeffs.shape[1]
+        if step_mat.size == 0:
+            fmo = np.linalg.multi_dot([coeffs.T, fock, coeffs])
+            return coeffs.copy(), np.diag(fmo).copy()
+
+        kappa = np.zeros((nmo, nmo), dtype='float64')
+        kappa[nocc:, :nocc] = step_mat
+        kappa[:nocc, nocc:] = -step_mat.T
+
+        ident = np.eye(nmo)
+        rot = np.linalg.solve(ident - 0.5 * kappa, ident + 0.5 * kappa)
+        new_coeffs = np.matmul(coeffs, rot)
+        fmo = np.linalg.multi_dot([new_coeffs.T, fock, new_coeffs])
+
+        return new_coeffs, np.diag(fmo).copy()
+
     def _apply_mom(self, molecule, ao_basis, ovl_mat):
         """
         Apply the maximum overlap constraint.
@@ -3080,6 +3405,12 @@ class ScfDriver:
 
         if self.acc_type.upper() == 'L2_DIIS':
             return 'Two Level Direct Inversion of Iterative Subspace'
+
+        if self.acc_type.upper() == 'SOSCF':
+            return 'Second-Order Self-Consistent Field'
+
+        if self.acc_type.upper() == 'DIIS_SOSCF':
+            return 'DIIS with SOSCF Switch'
 
         return 'Undefined'
 
