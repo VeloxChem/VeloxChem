@@ -1,5 +1,30 @@
 target_sources(vlxobjs
   PRIVATE
+    GeometricalDerivatives010ForDD.cpp
+    GeometricalDerivatives010ForDF.cpp
+    GeometricalDerivatives010ForDG.cpp
+    GeometricalDerivatives010ForDP.cpp
+    GeometricalDerivatives010ForDS.cpp
+    GeometricalDerivatives010ForFD.cpp
+    GeometricalDerivatives010ForFF.cpp
+    GeometricalDerivatives010ForFG.cpp
+    GeometricalDerivatives010ForFP.cpp
+    GeometricalDerivatives010ForFS.cpp
+    GeometricalDerivatives010ForGD.cpp
+    GeometricalDerivatives010ForGF.cpp
+    GeometricalDerivatives010ForGG.cpp
+    GeometricalDerivatives010ForGP.cpp
+    GeometricalDerivatives010ForGS.cpp
+    GeometricalDerivatives010ForPD.cpp
+    GeometricalDerivatives010ForPF.cpp
+    GeometricalDerivatives010ForPG.cpp
+    GeometricalDerivatives010ForPP.cpp
+    GeometricalDerivatives010ForPS.cpp
+    GeometricalDerivatives010ForSD.cpp
+    GeometricalDerivatives010ForSF.cpp
+    GeometricalDerivatives010ForSG.cpp
+    GeometricalDerivatives010ForSP.cpp
+    GeometricalDerivatives010ForSS.cpp
     GeometricalDerivatives1X0ForDY.cpp
     GeometricalDerivatives1X0ForFY.cpp
     GeometricalDerivatives1X0ForGY.cpp

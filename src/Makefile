@@ -9,7 +9,7 @@ VLX_TARGET := veloxchemlib.so
 VLX_MODULE := $(wildcard pymodule/*.py)
 VLX_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 
-LIB_LIST += -shared $(PYTHON_LD) $(OPENMP_LD) $(MATH_LD) $(LIBXC_LD)
+LIB_LIST += -shared $(PYTHON_LD) $(OPENMP_LD) $(MATH_LD) $(LIBXC_LD)  $(LIBBST_LD)
 
 # Select compiler flags
 ifneq "$(MAKECMDGOALS)" "release"
@@ -44,6 +44,8 @@ VLX_LIBS_DIR += t2c_nuclear_potential
 VLX_LIBS_DIR += t2c_electric_dipole_momentum
 VLX_LIBS_DIR += t2c_nuclear_potential_geom_0X0
 VLX_LIBS_DIR += t2c_electron_repulsion
+VLX_LIBS_DIR += t2c_local_ecp
+VLX_LIBS_DIR += t2c_projected_ecp
 VLX_LIBS_DIR += t4c_func
 VLX_LIBS_DIR += t4c_electron_repulsion
 VLX_LIBS_DIR += t4c_geometrical_derivatives

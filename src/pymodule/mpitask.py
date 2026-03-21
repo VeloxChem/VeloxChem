@@ -158,7 +158,8 @@ class MpiTask:
             if ('molecule' in self.input_dict and
                 ('xyz' in self.input_dict['molecule'] or
                  'xyzfile' in self.input_dict['molecule'])):
-                self.molecule = Molecule.from_dict(self.input_dict['molecule'])
+                self.molecule = Molecule.from_input_dict(
+                    self.input_dict['molecule'])
 
                 self.ostream.print_block(self.molecule.get_string())
                 self.ostream.print_block(self.molecule.more_info())
@@ -181,8 +182,13 @@ class MpiTask:
                                                         basis_name, basis_path,
                                                         self.ostream)
 
+                    if self.ao_basis.has_ecp():
+                        min_basis_label = 'AO-START-GUESS-FOR-ECP'
+                    else:
+                        min_basis_label = 'AO-START-GUESS'
+
                     self.min_basis = MolecularBasis.read(self.molecule,
-                                                         'AO-START-GUESS',
+                                                         min_basis_label,
                                                          basis_path,
                                                          ostream=None)
 

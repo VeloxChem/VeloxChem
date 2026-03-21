@@ -115,7 +115,7 @@ class ExcitedStateAnalysisDriver:
         self.print_header('Excited State Analysis.', state_index)
 
         start_time = tm.time()
-        dens_dict = self.compute_density_matrices(molecule, scf_results,
+        dens_dict = self.compute_density_matrices(molecule, basis, scf_results,
                                                   rsp_results, state_index,
                                                   num_core_orbitals)
         tdens_ao = dens_dict['transition_density_matrix_AO']
@@ -253,6 +253,7 @@ class ExcitedStateAnalysisDriver:
 
     def compute_density_matrices(self,
                                  molecule,
+                                 basis,
                                  scf_results,
                                  rsp_results,
                                  state_index,
@@ -263,6 +264,8 @@ class ExcitedStateAnalysisDriver:
 
         :param molecule:
             The Molecule object
+        :param basis:
+            The AO basis set object
         :param scf_results:
             The dictionary containing the scf results.
         :param rsp_results:
@@ -277,12 +280,16 @@ class ExcitedStateAnalysisDriver:
             density matrices in MO and AO basis.
         """
 
+        assert_msg_critical(
+            scf_results['scf_type'] == 'restricted',
+            f'{type(self).__name__}: open-shell is not yet supported')
+
         if (any(key.startswith('eigenvector') for key in rsp_results) and
                 'formatted' not in rsp_results):
             rsp_results = self.format_rsp_results(rsp_results)
 
         mo = scf_results["C_alpha"]
-        nocc = molecule.number_of_alpha_electrons()
+        nocc = molecule.number_of_alpha_occupied_orbitals(basis)
         norb = mo.shape[1]
         nvirt = norb - nocc
         mo_occ = mo[:, :nocc].copy()

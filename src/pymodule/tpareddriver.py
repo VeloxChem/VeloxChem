@@ -299,7 +299,7 @@ class TpaReducedDriver(TpaDriver):
         return focks
 
     def get_Nxy(self, w, d_a_mo, X, fock_dict, Nx, nocc, norb, molecule,
-                ao_basis, scf_tensors):
+                ao_basis, scf_results):
         """
         Computes all the second-order response vectors needed for the reduced
         isotropic cubic response computation
@@ -322,7 +322,7 @@ class TpaReducedDriver(TpaDriver):
             The molecule.
         :param basis:
             The AO basis.
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
 
         :return:
@@ -360,7 +360,7 @@ class TpaReducedDriver(TpaDriver):
             fpath = fpath.with_name(fpath.stem)
             N_total_drv.checkpoint_file = str(fpath) + '_tpa_2_red.h5'
 
-        N_total_results = N_total_drv.compute(molecule, ao_basis, scf_tensors,
+        N_total_results = N_total_drv.compute(molecule, ao_basis, scf_results,
                                               xy_dict)
 
         self._is_converged = (self._is_converged and N_total_drv.is_converged)

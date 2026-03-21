@@ -204,7 +204,7 @@ class ReactionForceFieldBuilder():
             )
 
         forming_bonds, breaking_bonds = self._summarise_reaction(
-            reactant_ff, product_ff, self.ostream)
+            reactant_ff, product_ff)
 
         for bond in breaking_bonds:
             reactant_ff.bonds[bond]['comment'] += ', broken in reaction'
@@ -642,7 +642,7 @@ class ReactionForceFieldBuilder():
             new_parameters.update({new_key: val})
         return new_parameters
 
-    def _summarise_reaction(self, reactant, product, ostream):
+    def _summarise_reaction(self, reactant, product):
         """
         Summarises the reaction by printing the bonds that are being broken and formed.
 
@@ -653,11 +653,11 @@ class ReactionForceFieldBuilder():
         product_bonds = set(product.bonds)
         formed_bonds = product_bonds - reactant_bonds
         broken_bonds = reactant_bonds - product_bonds
-        ostream.print_header("Reaction summary")
-        ostream.print_header(f"{len(broken_bonds)} breaking bonds:")
+        self.ostream.print_header("Reaction summary")
+        self.ostream.print_header(f"{len(broken_bonds)} breaking bonds:")
 
         if len(broken_bonds) > 0:
-            ostream.print_header(f"ReaType  ProType  ID - ReaType  ProType  ID")
+            self.ostream.print_header(f"ReaType  ProType  ID - ReaType  ProType  ID")
         for bond_key in broken_bonds:
             reactant_type0 = reactant.atoms[bond_key[0]]["type"]
             product_type0 = product.atoms[bond_key[0]]["type"]
@@ -665,13 +665,13 @@ class ReactionForceFieldBuilder():
             reactant_type1 = reactant.atoms[bond_key[1]]["type"]
             product_type1 = product.atoms[bond_key[1]]["type"]
             id1 = bond_key[1] + 1
-            ostream.print_header(
+            self.ostream.print_header(
                 f"{reactant_type0:^9}{product_type0:^9}{id0:^2} - {reactant_type1:^9}{product_type1:^9}{id1:^2}"
             )
-        ostream.print_blank()
-        ostream.print_header(f"{len(formed_bonds)} forming bonds:")
+        self.ostream.print_blank()
+        self.ostream.print_header(f"{len(formed_bonds)} forming bonds:")
         if len(formed_bonds) > 0:
-            ostream.print_header("ReaType  ProType  ID - ReaType  ProType  ID")
+            self.ostream.print_header("ReaType  ProType  ID - ReaType  ProType  ID")
         for bond_key in formed_bonds:
             reactant_type0 = reactant.atoms[bond_key[0]]["type"]
             product_type0 = product.atoms[bond_key[0]]["type"]
@@ -679,11 +679,11 @@ class ReactionForceFieldBuilder():
             reactant_type1 = reactant.atoms[bond_key[1]]["type"]
             product_type1 = product.atoms[bond_key[1]]["type"]
             id1 = bond_key[1] + 1
-            ostream.print_header(
+            self.ostream.print_header(
                 f"{reactant_type0:^9}{product_type0:^9}{id0:^2} - {reactant_type1:^9}{product_type1:^9}{id1:^2}"
             )
-        ostream.print_blank()
-        ostream.flush()
+        self.ostream.print_blank()
+        self.ostream.flush()
         return formed_bonds, broken_bonds
 
     # Does an FF optimization of the molecule.

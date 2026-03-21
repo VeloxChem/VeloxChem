@@ -34,7 +34,6 @@ from mpi4py import MPI
 from copy import deepcopy
 import numpy as np
 import time as tm
-import h5py
 import sys
 
 from .oneeints import compute_electric_dipole_integrals
@@ -53,7 +52,7 @@ from .molecularorbitals import MolecularOrbitals
 from .visualizationdriver import VisualizationDriver
 from .cubicgrid import CubicGrid
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           dft_sanity_check, pe_sanity_check,
+                           ri_sanity_check, dft_sanity_check, pe_sanity_check,
                            solvation_model_sanity_check)
 from .errorhandler import assert_msg_critical
 from .checkpoint import (check_rsp_hdf5, write_rsp_solution,
@@ -112,6 +111,9 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
 
         self.nstates = 3
 
+        self.initial_guess_multiplier = 3
+        self.guess_scaling_threshold = 10
+
         self.core_excitation = False
         self.num_core_orbitals = 0
 
@@ -129,6 +131,10 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
 
         self._input_keywords['response'].update({
             'nstates': ('int', 'number of excited states'),
+            'initial_guess_multiplier':
+                ('int', 'multiplier for initial guess size'),
+            'guess_scaling_threshold':
+                ('int', 'threshold for guess size to increase linearly'),
             'core_excitation': ('bool', 'compute core-excited states'),
             'num_core_orbitals': ('int', 'number of involved core-orbitals'),
             'nto': ('bool', 'analyze natural transition orbitals'),
@@ -220,6 +226,9 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
         if self.filename is not None and self.checkpoint_file is None:
             self.checkpoint_file = f'{self.filename}_rsp.h5'
 
+        # check RI setup
+        ri_sanity_check(self)
+
         # check dft setup
         dft_sanity_check(self, 'compute')
 
@@ -256,8 +265,8 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
         orb_ene_b = self.comm.bcast(orb_ene_b, root=mpi_master())
 
         norb = orb_ene_a.shape[0]
-        nocc_a = molecule.number_of_alpha_electrons()
-        nocc_b = molecule.number_of_beta_electrons()
+        nocc_a = molecule.number_of_alpha_occupied_orbitals(basis)
+        nocc_b = molecule.number_of_beta_occupied_orbitals(basis)
 
         # check number of excited states, core excitation, restricted subspace
         assert_msg_critical(
@@ -349,13 +358,23 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
                                                 (orb_ene_a, orb_ene_b),
                                                 (nocc_a, nocc_b), norb,
                                                 checkpoint_nstates)
-                bger, bung = self._setup_trials(igs, None, self._dist_bger,
-                                                self._dist_bung)
 
-                profiler.set_timing_key('Preparation')
+                if igs:
+                    bger, bung = self._setup_trials(igs, None, self._dist_bger,
+                                                    self._dist_bung)
 
-                self._e2n_half_size(bger, bung, molecule, basis, scf_results,
-                                    eri_dict, dft_dict, pe_dict, profiler)
+                    profiler.set_timing_key('Preparation')
+
+                    self._e2n_half_size(bger,
+                                        bung,
+                                        molecule,
+                                        basis,
+                                        scf_results,
+                                        eri_dict,
+                                        dft_dict,
+                                        pe_dict,
+                                        profiler,
+                                        method_type='unrestricted')
 
         # generate initial guess from scratch
         else:
@@ -764,7 +783,7 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
                         nto_label = f'NTO_S{s + 1}'
                         if final_h5_fname is not None:
                             nto_mo.write_hdf5(final_h5_fname,
-                                              label=f'rsp/nto/{nto_label}')
+                                              label=f'rsp/nto/{nto_label}_')
                     else:
                         nto_mo = MolecularOrbitals()
                     nto_mo = nto_mo.broadcast(self.comm, root=mpi_master())
@@ -835,6 +854,9 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
                     'not yet implemented for excited state absorption')
 
                 if self.esa:
+                    if self.rank == mpi_master():
+                        esa_results = []
+                    """
                     if self.esa_from_state is None:
                         source_states = list(range(self.nstates))
                     else:
@@ -892,6 +914,7 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
                                 'oscillator_strength': esa_osc_str,
                                 'transition_dipole': esa_trans_dipole,
                             })
+                    """
 
                 if self.rank == mpi_master():
                     for ind, comp in enumerate('xyz'):
@@ -987,48 +1010,6 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
         else:
             # not converged
             return {}
-
-    def _add_nstates_to_checkpoint(self):
-        """
-        Add nstates to checkpoint file.
-        """
-
-        if self.checkpoint_file is None:
-            return
-
-        if self.rank == mpi_master():
-            hf = h5py.File(self.checkpoint_file, 'a')
-            key = 'nstates'
-            if key in hf:
-                del hf[key]
-            hf.create_dataset(key, data=np.array([self.nstates]))
-            hf.close()
-
-        self.comm.barrier()
-
-    def _read_nstates_from_checkpoint(self):
-        """
-        Read nstates from checkpoint file.
-
-        :return:
-            The number of states.
-        """
-
-        if self.checkpoint_file is None:
-            return None
-
-        nstates = None
-
-        if self.rank == mpi_master():
-            hf = h5py.File(self.checkpoint_file, 'r')
-            key = 'nstates'
-            if key in hf:
-                nstates = np.array(hf.get(key))[0]
-            hf.close()
-
-        nstates = self.comm.bcast(nstates, root=mpi_master())
-
-        return nstates
 
     @staticmethod
     def get_full_solution_vector(solution):
@@ -1138,8 +1119,15 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
 
         final = {}
 
+        # number of excitations to be excluded from initial guess
+        guess_excl_nstates = self._get_initial_guess_size_for_excitations(
+            n_excl_states)
+
+        # total number of excitations in initial guess
+        guess_nstates = self._get_initial_guess_size_for_excitations(nstates)
+
         for k, (i, a) in enumerate(
-                sorted(w_a, key=w_a.get)[n_excl_states:nstates]):
+                sorted(w_a, key=w_a.get)[guess_excl_nstates:guess_nstates]):
             if self.rank == mpi_master():
                 ia = excitations_a.index((i, a))
 
@@ -1172,7 +1160,7 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
         k_offset = len(final)
 
         for k, (j, b) in enumerate(
-                sorted(w_b, key=w_b.get)[n_excl_states:nstates]):
+                sorted(w_b, key=w_b.get)[guess_excl_nstates:guess_nstates]):
             if self.rank == mpi_master():
                 jb = excitations_b.index((j, b))
 
