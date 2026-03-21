@@ -70,7 +70,7 @@ jobs:
           export BOOST_INCLUDE_DIR=$(pwd)/boost-math/include
           CXX=g++ python -m pip install git+https://github.com/VeloxChem/PyFraME.git
           python -m pip install dftd4 xtb
-          python -m pip install openmm rdkit
+          python -m pip install openmm rdkit pymbar
           echo "=== VeloxChem build ==="
           export CMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH:/usr/local
           SKBUILD_CONFIGURE_OPTIONS="-DCMAKE_CXX_COMPILER=g++" \
