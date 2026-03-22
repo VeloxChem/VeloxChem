@@ -52,6 +52,12 @@ from .scfrestdriver import ScfRestrictedDriver
 from .scfrestopendriver import ScfRestrictedOpenDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .optimizationdriver import OptimizationDriver
+
+from .serenityscfdriver import SerenityScfDriver
+from .serenitygradientdriver import SerenityGradientDriver
+from .serenitylrrspeigensolver import SerenityLinearResponseSolver
+from .serenityexcitedstategradientdriver import SerenityExcitedStateGradientDriver
+
 from .interpolationdriver import InterpolationDriver
 from .errorhandler import assert_msg_critical
 from .mofutils import svd_superimpose
@@ -99,7 +105,8 @@ class OpenMMDynamics:
         - molecule: The VeloxChem molecule object.
         - unique_residues: The list of unique residues in the system.
         - unique_molecules: The list of unique molecules in the system.
-        - qm_driver: The VeloxChem driver object. Options are XtbDriver or an ScfDriver.
+        - qm_driver: The VeloxChem driver object. Options include XtbDriver,
+          VeloxChem SCF drivers, SerenityScfDriver, or SerenityLinearResponseSolver.
         - basis: The basis set for the QM region if an SCF driver is used.
         - grad_driver: The VeloxChem gradient driver object.
         - qm_atoms: The list of atom indices for the QM region.
@@ -107,6 +114,8 @@ class OpenMMDynamics:
         - linking_atoms: The list of atom indices for the linking atoms.
         - qm_force_index: The index of the QM force in the system.
         - driver_flag: The flag to determine the driver to be used.
+        - state_mode: Current QM state mode (`ground` or `excited`).
+        - active_state_index: Active excited state index (1-based, excited mode only).
         - scaling_factor: The scaling factor for the QM stabilizer.
         - linking_atom_distance: The distance between the QM and MM regions in angstroms.
     """
@@ -183,6 +192,13 @@ class OpenMMDynamics:
         self.linking_atoms = None
         self.qm_force_index = None
         self.driver_flag = None
+        self.state_mode = 'ground'
+        self.active_state_index = None
+        self._last_qm_potential_kjmol = None
+        # Temporary workaround for Serenity grid/cache desynchronization in
+        # long MD trajectories. When enabled, Serenity backend objects are
+        # rebuilt once per MD force update.
+        self.temporal_serenity_rebuild_each_timestep = True
 
         # QM stabilizer parameters
         self.scaling_factor = 0.01
@@ -1418,9 +1434,13 @@ class OpenMMDynamics:
         Runs a QM/MM simulation using OpenMM, storing the trajectory and simulation data.
 
         :param qm_driver:
-            QM driver object from VeloxChem.
+            QM driver object from VeloxChem/Serenity.
+            Supported Serenity modes:
+            - Ground state: SerenityScfDriver with SerenityGradientDriver.
+            - Excited single-state: SerenityLinearResponseSolver with
+              SerenityExcitedStateGradientDriver.
         :param grad_driver:
-            Gradient driver object from VeloxChem.
+            Gradient driver object matching the QM driver.
         :param basis:
             Molecular basis string.
         :param restart_file:
@@ -1443,12 +1463,13 @@ class OpenMMDynamics:
             Output file name for the trajectory. Default is 'trajectory.pdb'.
         :param state_file:
             Output file name for the simulation state. Default is 'output.xml'.
+        
+        Notes:
+            Excited-state dynamics currently supports only a fixed single state
+            via `SerenityExcitedStateGradientDriver.state_deriv_index`.
         """
         if self.system is None:
             raise RuntimeError('System has not been created!')
-        
-        if basis is not None:
-            self.basis = basis
 
         self.ensemble = ensemble
         self.temperature = temperature * unit.kelvin
@@ -1458,24 +1479,40 @@ class OpenMMDynamics:
 
         self.qm_driver = qm_driver
         self.grad_driver = grad_driver
-        self.qm_driver.ostream.mute()
+        self._last_qm_potential_kjmol = None
 
-        # Driver flag 
-        if isinstance(self.qm_driver, XtbDriver):
-            self.driver_flag = 'XTb Driver'
-        elif isinstance(self.qm_driver, ScfRestrictedDriver):
-            self.driver_flag = 'RSCF Driver'
-        elif isinstance(self.qm_driver, ScfUnrestrictedDriver):
-            self.driver_flag = 'USCF Driver'
-        elif isinstance(self.qm_driver, ScfRestrictedOpenDriver):
-            self.driver_flag = 'ROSCF Driver'
-        elif isinstance(self.qm_driver, InterpolationDriver):
-            self.driver_flag = 'IM Driver'
-            _ = self.qm_driver.read_qm_data_points()
+        self._setup_qmmm_driver_mode()
 
-        
+        # Basis policy:
+        # - VeloxChem SCF drivers need a user-provided AO basis label.
+        # - Serenity drivers keep basis configuration internally.
+        if isinstance(self.qm_driver, (ScfRestrictedDriver, ScfUnrestrictedDriver,
+                                       ScfRestrictedOpenDriver)):
+            if basis is not None:
+                self.basis = basis
+            assert_msg_critical(
+                self.basis is not None,
+                'Basis set is required for VeloxChem SCF QM/MM dynamics.')
+        elif isinstance(self.qm_driver,
+                        (SerenityScfDriver, SerenityLinearResponseSolver)):
+            if basis is not None:
+                warning = 'Ignoring basis argument in run_qmmm for Serenity '
+                warning += 'drivers. Configure basis via SerenityScfDriver.'
+                self.ostream.print_warning(warning)
+                self.ostream.flush()
+            self.basis = None
+
+            if self.temporal_serenity_rebuild_each_timestep:
+                warning = 'Temporary Serenity MD workaround enabled: '
+                warning += 'rebuilding Serenity backend objects each timestep.'
+                self.ostream.print_warning(warning)
+                self.ostream.flush()
         else:
-            raise ValueError('Invalid QM driver. Please use a valid VeloxChem driver.')
+            if basis is not None:
+                self.basis = basis
+
+        # Silence QM driver output during MD force updates.
+        self.qm_driver.ostream.mute()
 
         self.qm_potentials = []
         self.qm_mm_interaction_energies = []
@@ -1524,6 +1561,9 @@ class OpenMMDynamics:
         print('QM/MM Simulation Parameters')
         print('=' * 60)
         print('QM Driver:', self.driver_flag)
+        print('State mode:', self.state_mode)
+        if self.state_mode == 'excited':
+            print('Active state:', f'S{self.active_state_index}')
         print('Ensemble:', ensemble)
         print('Integration method:', new_integrator.__class__.__name__)
         if ensemble in ['NVT', 'NPT']:
@@ -1622,6 +1662,107 @@ class OpenMMDynamics:
         self._save_output(output_file)
         self.ostream.print_info(f'Simulation report saved as {output_file}.out')
         self.ostream.flush()
+
+    def _setup_qmmm_driver_mode(self):
+        """
+        Validates QM/gradient driver combinations and determines state mode.
+
+        First implementation supports only single-state dynamics for excited
+        states (fixed `state_deriv_index`).
+        """
+
+        self.state_mode = 'ground'
+        self.active_state_index = None
+
+        if isinstance(self.qm_driver, XtbDriver):
+            self.driver_flag = 'XTb Driver'
+
+        elif isinstance(self.qm_driver, ScfRestrictedDriver):
+            self.driver_flag = 'RSCF Driver'
+
+        elif isinstance(self.qm_driver, ScfUnrestrictedDriver):
+            self.driver_flag = 'USCF Driver'
+
+        elif isinstance(self.qm_driver, ScfRestrictedOpenDriver):
+            self.driver_flag = 'ROSCF Driver'
+
+        elif isinstance(self.qm_driver, InterpolationDriver):
+            self.driver_flag = 'IM Driver'
+            _ = self.qm_driver.read_qm_data_points()
+
+        elif isinstance(self.qm_driver, SerenityScfDriver):
+            errmsg = 'run_qmmm: SerenityScfDriver requires '
+            errmsg += 'SerenityGradientDriver as grad_driver.'
+            assert_msg_critical(
+                isinstance(self.grad_driver, SerenityGradientDriver), errmsg)
+            errmsg = 'run_qmmm: SerenityScfDriver and SerenityGradientDriver '
+            errmsg += 'must be linked to the same Serenity SCF driver instance.'
+            assert_msg_critical(self.grad_driver.serenity_driver is
+                                self.qm_driver, errmsg)
+            self.driver_flag = 'Serenity Ground-State Driver'
+
+        elif isinstance(self.qm_driver, SerenityLinearResponseSolver):
+            errmsg = 'run_qmmm: SerenityLinearResponseSolver requires '
+            errmsg += 'SerenityExcitedStateGradientDriver as grad_driver.'
+            assert_msg_critical(
+                isinstance(self.grad_driver, SerenityExcitedStateGradientDriver),
+                errmsg)
+            errmsg = 'run_qmmm: Serenity excited-state dynamics requires the '
+            errmsg += 'same SerenityLinearResponseSolver in qm_driver and '
+            errmsg += 'grad_driver.rsp_driver.'
+            assert_msg_critical(self.grad_driver.rsp_driver is self.qm_driver,
+                                errmsg)
+            errmsg = 'run_qmmm: Serenity excited-state dynamics requires the '
+            errmsg += 'same SerenityScfDriver in qm_driver and grad_driver.'
+            assert_msg_critical(self.grad_driver.serenity_driver is
+                                self.qm_driver.scf_driver, errmsg)
+
+            state_index = self.grad_driver.state_deriv_index
+            if isinstance(state_index, (list, tuple, np.ndarray)):
+                assert_msg_critical(
+                    len(state_index) > 0,
+                    'run_qmmm: empty state_deriv_index for excited-state dynamics.'
+                )
+                state_index = state_index[0]
+            state_index = int(state_index)
+            assert_msg_critical(
+                state_index > 0,
+                'run_qmmm: state_deriv_index must be > 0 for excited-state dynamics.'
+            )
+
+            self.state_mode = 'excited'
+            self.active_state_index = state_index
+            self.driver_flag = 'Serenity Excited-State Driver'
+
+        else:
+            raise ValueError(
+                'Invalid QM driver. Please use a supported VeloxChem/Serenity driver.'
+            )
+
+    def _reset_serenity_backends_for_step(self):
+        """
+        Temporarily resets Serenity backend state for each MD step.
+
+        This is a workaround until the Serenity side cache/grid handling is
+        fixed. It forces recreation of Serenity task/controller objects for the
+        current geometry update.
+        """
+
+        if not self.temporal_serenity_rebuild_each_timestep:
+            return
+
+        if isinstance(self.qm_driver, SerenityScfDriver):
+            self.qm_driver._invalidate_cache()
+            return
+
+        if isinstance(self.qm_driver, SerenityLinearResponseSolver):
+            self.qm_driver.scf_driver._invalidate_cache()
+            self.qm_driver._invalidate_rsp_cache()
+
+            if hasattr(self.grad_driver, 'excited_state_energy'):
+                self.grad_driver.excited_state_energy = None
+            if hasattr(self.grad_driver, 'total_energy'):
+                self.grad_driver.total_energy = None
 
     # Post-simulation analysis methods
     def plot_energy(self,
@@ -2466,7 +2607,30 @@ class OpenMMDynamics:
             new_molecule = Molecule(qm_atom_labels, positions_ang, units="angstrom")
             self.dynamic_molecules.append(new_molecule)
 
-        if self.basis is not None:
+        # Temporary Serenity workaround: force new Serenity backend objects
+        # every MD step to avoid stale grid-block metadata reuse.
+        self._reset_serenity_backends_for_step()
+
+        if isinstance(self.qm_driver, SerenityLinearResponseSolver):
+            # Excited-state single-state dynamics:
+            # use the dedicated excited-state gradient driver, which also
+            # provides total excited-state energy (E_gs + E_exc).
+            self.grad_driver.compute(new_molecule)
+            print(new_molecule.get_xyz_string())
+            gradient = self.grad_driver.get_gradient()
+            total_energy_au = self.grad_driver.total_energy
+            if total_energy_au is None:
+                total_energy_au = self.grad_driver.compute_energy(new_molecule)
+            potential_kjmol = float(total_energy_au) * hartree_in_kjpermol()
+
+        elif isinstance(self.qm_driver, SerenityScfDriver):
+            # Serenity ground-state dynamics.
+            self.qm_driver.compute(new_molecule)
+            self.grad_driver.compute(new_molecule)
+            potential_kjmol = float(self.qm_driver.get_energy()) * hartree_in_kjpermol()
+            gradient = self.grad_driver.get_gradient()
+
+        elif self.basis is not None:
             basis = MolecularBasis.read(new_molecule, self.basis)
             scf_results = self.qm_driver.compute(new_molecule, basis)
             gradient = self.grad_driver.compute(new_molecule, basis, scf_results)
@@ -2478,6 +2642,8 @@ class OpenMMDynamics:
                 self.grad_driver.compute(new_molecule)
             potential_kjmol = self.qm_driver.get_energy() * hartree_in_kjpermol()
             gradient = self.grad_driver.get_gradient()
+
+        self._last_qm_potential_kjmol = float(potential_kjmol)
 
         return gradient, potential_kjmol
 
@@ -2541,6 +2707,35 @@ class OpenMMDynamics:
         Returns:
             The potential energy of the QM region.
         """
+        if self._last_qm_potential_kjmol is not None:
+            return float(self._last_qm_potential_kjmol)
+
+        if isinstance(self.qm_driver, SerenityLinearResponseSolver):
+            if (hasattr(self.grad_driver, 'total_energy') and
+                    self.grad_driver.total_energy is not None):
+                return float(self.grad_driver.total_energy) * hartree_in_kjpermol()
+
+            rsp_results = self.qm_driver.get_results()
+            gs_energy = self.qm_driver.scf_driver.get_energy()
+            if (rsp_results is not None and gs_energy is not None and
+                    self.active_state_index is not None):
+                nstates = len(rsp_results['eigenvalues'])
+                state = int(self.active_state_index)
+                assert_msg_critical(
+                    state <= nstates,
+                    'get_qm_potential_energy: active excited state is out of range.'
+                )
+                exc_energy = rsp_results['eigenvalues'][state - 1]
+                return float(gs_energy + exc_energy) * hartree_in_kjpermol()
+
+            assert_msg_critical(
+                False,
+                'get_qm_potential_energy: missing Serenity excited-state energy.'
+            )
+
+        if isinstance(self.qm_driver, SerenityScfDriver):
+            return float(self.qm_driver.get_energy()) * hartree_in_kjpermol()
+
         if self.basis is not None:
             potential_energy = self.qm_driver.get_scf_energy() * hartree_in_kjpermol()
         else:
@@ -2766,4 +2961,3 @@ class OpenMMDynamics:
                     pos_restraint.addParticle(atom_idx, self.positions[atom_idx])
                     
         
-

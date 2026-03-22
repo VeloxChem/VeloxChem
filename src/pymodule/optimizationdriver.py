@@ -51,6 +51,10 @@ from .scfhessiandriver import ScfHessianDriver
 from .tddftgradientdriver import TddftGradientDriver
 from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
+from .serenityscfdriver import SerenityScfDriver
+from .serenitygradientdriver import SerenityGradientDriver
+from .serenitylrrspeigensolver import SerenityLinearResponseSolver
+from .serenityexcitedstategradientdriver import SerenityExcitedStateGradientDriver
 from .openmmdriver import OpenMMDriver
 from .openmmgradientdriver import OpenMMGradientDriver
 from .mmdriver import MMDriver
@@ -206,6 +210,12 @@ class OptimizationDriver:
         elif isinstance(drv, XtbDriver):
             grad_drv = XtbGradientDriver(drv)
 
+        elif isinstance(drv, SerenityScfDriver):
+            grad_drv = SerenityGradientDriver(drv)
+
+        elif isinstance(drv, SerenityLinearResponseSolver):
+            grad_drv = SerenityExcitedStateGradientDriver(drv.scf_driver, drv)
+
         elif isinstance(drv, OpenMMDriver):
             grad_drv = OpenMMGradientDriver(drv)
 
@@ -214,6 +224,8 @@ class OptimizationDriver:
 
         elif (isinstance(drv, ScfGradientDriver) or
               isinstance(drv, XtbGradientDriver) or
+              isinstance(drv, SerenityGradientDriver) or
+              isinstance(drv, SerenityExcitedStateGradientDriver) or
               isinstance(drv, OpenMMGradientDriver) or
               isinstance(drv, TddftGradientDriver) or
               isinstance(drv, MMGradientDriver)):
