@@ -912,7 +912,8 @@ export_dft(py::module& m)
         .def("get_rs_alpha", &CXCFunctional::getRangeSeparationParameterAlpha, "Gets range-separation parameter alpha.")
         .def("get_rs_beta", &CXCFunctional::getRangeSeparationParameterBeta, "Gets range-separation parameter beta.")
         .def("get_rs_omega", &CXCFunctional::getRangeSeparationParameterOmega, "Gets range-separation parameter omega.")
-        .def("get_dimension_of_derivatives", &CXCFunctional::getDimensionOfDerivatives, "Gets dimension of derivatives.");
+        .def("get_dimension_of_derivatives", &CXCFunctional::getDimensionOfDerivatives, "Gets dimension of derivatives.")
+        .def("__deepcopy__", [](const CXCFunctional &self, py::dict) { return CXCFunctional(self); });
 
     // XCPairDensityFunctional class
     PyClass<CXCPairDensityFunctional>(m, "XCPairDensityFunctional")

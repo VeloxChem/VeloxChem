@@ -424,8 +424,6 @@ class ScfUnrestrictedDriver(ScfDriver):
         for key, val in vars(self).items():
             if isinstance(val, (MPI.Intracomm, OutputStream)):
                 pass
-            elif isinstance(val, XCFunctional):
-                new_scf_drv.key = XCFunctional(val)
             elif isinstance(val, MolecularGrid):
                 new_scf_drv.key = MolecularGrid(val)
             else:

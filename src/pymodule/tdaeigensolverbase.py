@@ -340,9 +340,7 @@ class TdaEigenSolverBase(LinearSolver):
             if isinstance(val, (MPI.Intracomm, OutputStream)):
                 continue
 
-            if isinstance(val, XCFunctional):
-                setattr(new_rsp_drv, key, XCFunctional(val))
-            elif isinstance(val, MolecularGrid):
+            if isinstance(val, MolecularGrid):
                 setattr(new_rsp_drv, key, MolecularGrid(val))
             else:
                 setattr(new_rsp_drv, key, deepcopy(val))

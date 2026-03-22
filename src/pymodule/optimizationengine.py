@@ -138,17 +138,9 @@ class OptimizationEngine(geometric.engine.Engine):
             self.grad_drv.ostream.print_blank()
             self.grad_drv.ostream.flush()
 
-        if not self._debug:
-            #self.grad_drv.ostream.mute()
-            pass
-
         energy = self.grad_drv.compute_energy(new_mol, *self.args)
         self.grad_drv.compute(new_mol, *self.args)
         gradient = self.grad_drv.get_gradient()
-
-        if not self._debug:
-            #self.grad_drv.ostream.unmute()
-            pass
 
         energy = self.comm.bcast(energy, root=mpi_master())
         gradient = self.comm.bcast(gradient, root=mpi_master())
@@ -211,8 +203,6 @@ class OptimizationEngine(geometric.engine.Engine):
         for key, val in vars(self).items():
             if isinstance(val, (MPI.Intracomm, OutputStream)):
                 pass
-            elif isinstance(val, XCFunctional):
-                new_engine.key = XCFunctional(val)
             elif isinstance(val, MolecularGrid):
                 new_engine.key = MolecularGrid(val)
             else:
