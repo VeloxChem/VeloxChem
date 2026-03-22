@@ -611,7 +611,8 @@ export_dft(py::module& m)
             "Redo distributing MolecularGrid counts and displacements.",
             "rank"_a,
             "nnodes"_a)
-        .def(py::self == py::self);
+        .def(py::self == py::self)
+        .def("__deepcopy__", [](const CMolecularGrid &self, py::dict) { return CMolecularGrid(self); });
 
     // CGridDriver class
     // Note: GridDriver is prefixed by an underscore and will be used in griddriver.py

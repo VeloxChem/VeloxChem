@@ -317,10 +317,7 @@ class ScfRestrictedDriver(ScfDriver):
 
         for key, val in vars(self).items():
             if isinstance(val, (MPI.Intracomm, OutputStream)):
-                pass
-            elif isinstance(val, MolecularGrid):
-                new_scf_drv.key = MolecularGrid(val)
-            else:
-                new_scf_drv.key = deepcopy(val)
+                continue
+            new_scf_drv.key = deepcopy(val)
 
         return new_scf_drv

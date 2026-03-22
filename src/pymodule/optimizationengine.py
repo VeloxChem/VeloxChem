@@ -202,10 +202,7 @@ class OptimizationEngine(geometric.engine.Engine):
 
         for key, val in vars(self).items():
             if isinstance(val, (MPI.Intracomm, OutputStream)):
-                pass
-            elif isinstance(val, MolecularGrid):
-                new_engine.key = MolecularGrid(val)
-            else:
-                new_engine.key = deepcopy(val)
+                continue
+            new_engine.key = deepcopy(val)
 
         return new_engine
