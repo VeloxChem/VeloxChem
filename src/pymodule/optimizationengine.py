@@ -38,10 +38,10 @@ import numpy as np
 import time as tm
 
 from .veloxchemlib import mpi_master
-from .veloxchemlib import XCFunctional, MolecularGrid
 from .outputstream import OutputStream
 from .molecule import Molecule
 from .profiler import Profiler
+from .inputparser import write_unparsed_input_to_hdf5
 
 with redirect_stderr(StringIO()) as fg_err:
     import geometric
@@ -87,6 +87,8 @@ class OptimizationEngine(geometric.engine.Engine):
         self.rank = grad_drv.comm.Get_rank()
 
         self._debug = False
+
+        self.opt_unparsed_input = None
 
     def lower(self):
         """
@@ -141,6 +143,14 @@ class OptimizationEngine(geometric.engine.Engine):
         energy = self.grad_drv.compute_energy(new_mol, *self.args)
         self.grad_drv.compute(new_mol, *self.args)
         gradient = self.grad_drv.get_gradient()
+
+        if self.rank == mpi_master():
+            checkpoint_file = self.grad_drv.scf_driver._get_effective_checkpoint_file(
+            )
+            if checkpoint_file is not None and self.opt_unparsed_input is not None:
+                write_unparsed_input_to_hdf5(checkpoint_file,
+                                             self.opt_unparsed_input,
+                                             group_name='opt_settings')
 
         energy = self.comm.bcast(energy, root=mpi_master())
         gradient = self.comm.bcast(gradient, root=mpi_master())

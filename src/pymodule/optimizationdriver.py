@@ -56,7 +56,9 @@ from .openmmdriver import OpenMMDriver
 from .openmmgradientdriver import OpenMMGradientDriver
 from .mmdriver import MMDriver
 from .mmgradientdriver import MMGradientDriver
-from .inputparser import parse_input, print_keywords, get_random_string_parallel
+from .inputparser import (parse_input, print_keywords,
+                          get_random_string_parallel, unparse_input,
+                          read_unparsed_input_from_hdf5)
 from .errorhandler import assert_msg_critical
 
 with redirect_stderr(StringIO()) as fg_err:
@@ -192,6 +194,27 @@ class OptimizationDriver:
         if ('hessian' not in opt_dict) and (self.transition or self.irc):
             self.hessian = 'first'
 
+    def read_settings(self, checkpoint_file):
+        """
+        Reads opt settings from checkpoint file.
+
+        :param checkpoint_file:
+            The checkpoint file to read settings from.
+        """
+
+        if self.rank == mpi_master():
+            checkpoint_opt_input = read_unparsed_input_from_hdf5(
+                checkpoint_file, group_name='opt_settings')
+        else:
+            checkpoint_opt_input = None
+
+        checkpoint_opt_input = self.comm.bcast(checkpoint_opt_input,
+                                               root=mpi_master())
+
+        self.update_settings(checkpoint_opt_input)
+
+        self.grad_drv.scf_driver.read_settings(checkpoint_file)
+
     def _pick_driver(self, drv):
         """
         Chooses the gradient driver.
@@ -263,6 +286,12 @@ class OptimizationDriver:
         start_time = tm.time()
 
         opt_engine = OptimizationEngine(self.grad_drv, molecule, *args)
+
+        # save unparsed opt_dict in opt_engine for later writing to checkpoint
+        opt_keywords = {
+            key: val[0] for key, val in self.input_keywords['optimize'].items()
+        }
+        opt_engine.opt_unparsed_input = unparse_input(self, opt_keywords)
 
         if self._debug:
             opt_engine._debug = True
