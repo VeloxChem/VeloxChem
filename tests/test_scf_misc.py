@@ -78,7 +78,7 @@ class TestScfDriverMiscellaneous:
             molecule, basis, lambda drv: setattr(drv, "filename", filename))
 
         assert first_results is not None
-        assert first_drv.checkpoint_file == str(checkpoint_file)
+        assert first_drv.checkpoint_file is None
         if self.is_master():
             assert checkpoint_file.is_file()
 
@@ -86,7 +86,7 @@ class TestScfDriverMiscellaneous:
             molecule, basis, lambda drv: setattr(drv, "filename", filename))
 
         assert second_results is not None
-        assert second_drv.checkpoint_file == str(checkpoint_file)
+        assert second_drv.checkpoint_file is None
         assert second_drv.restart
         if self.is_master():
             assert second_drv._ref_mol_orbs is not None
@@ -109,7 +109,7 @@ class TestScfDriverMiscellaneous:
             lambda drv: setattr(drv, "filename", filename))
 
         assert third_results is not None
-        assert third_drv.checkpoint_file == str(checkpoint_file)
+        assert third_drv.checkpoint_file is None
         assert third_drv.restart
         if self.is_master():
             assert third_drv._ref_mol_orbs is not None
@@ -148,6 +148,16 @@ class TestScfDriverMiscellaneous:
             assert second_results["scf_energy"] == pytest.approx(
                 first_results["scf_energy"], abs=1.0e-10)
 
+    def test_no_filename_or_checkpoint_file_disables_checkpoint_output(self):
+
+        molecule, basis = self.get_water_and_basis()
+
+        scf_drv, scf_results = self.run_hf_scf(molecule, basis)
+
+        assert scf_results is not None
+        assert scf_drv.checkpoint_file is None
+        assert scf_drv.restart is False
+
     def test_checkpoint_writes_input_groups(self, tmp_path):
 
         molecule, basis = self.get_water_and_basis()
@@ -172,7 +182,7 @@ class TestScfDriverMiscellaneous:
         scf_drv, scf_results = self.run_hf_scf(molecule, basis, configure)
 
         assert scf_results is not None
-        assert scf_drv.checkpoint_file == str(checkpoint_file)
+        assert scf_drv.checkpoint_file is None
 
         scf_keywords = {
             key: val[0] for key, val in scf_drv._input_keywords["scf"].items()

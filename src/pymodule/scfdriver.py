@@ -66,7 +66,7 @@ from .cpcmdriver import CpcmDriver
 from .smddriver import SmdDriver
 from .dispersionmodel import DispersionModel
 from .inputparser import (parse_input, print_keywords, print_attributes,
-                          get_random_string_parallel, unparse_input,
+                          unparse_input,
                           write_unparsed_input_to_hdf5,
                           read_unparsed_input_from_hdf5)
 from .dftutils import get_default_grid_level, print_xc_reference
@@ -524,9 +524,6 @@ class ScfDriver:
             self.program_end_time = scf_dict['program_end_time']
         if 'filename' in scf_dict:
             self.filename = scf_dict['filename']
-            if ('checkpoint_file' not in scf_dict and
-                    self.checkpoint_file is None):
-                self._ensure_checkpoint_file()
 
         method_keywords = {
             key: val[0]
@@ -591,13 +588,9 @@ class ScfDriver:
 
         self.update_settings(checkpoint_scf_input, checkpoint_method_input)
 
-    def _get_effective_checkpoint_file(self, autogenerate=False):
+    def _get_effective_checkpoint_file(self):
         """
         Gets the effective checkpoint file path.
-
-        :param autogenerate:
-            If True, generate a default checkpoint file when neither
-            checkpoint_file nor filename is set.
 
         :return:
             The effective checkpoint file path, or None if unavailable.
@@ -609,28 +602,7 @@ class ScfDriver:
         if self.filename is not None:
             return f'{self.filename}_scf.h5'
 
-        if autogenerate:
-            name_string = get_random_string_parallel(self.comm)
-            return f'vlx_{name_string}_scf.h5'
-
         return None
-
-    def _ensure_checkpoint_file(self, autogenerate=False):
-        """
-        Resolves and stores the effective checkpoint file path.
-
-        :param autogenerate:
-            If True, generate a default checkpoint file when needed.
-
-        :return:
-            The effective checkpoint file path, or None if unavailable.
-        """
-
-        checkpoint_file = self._get_effective_checkpoint_file(autogenerate)
-        if checkpoint_file is not None:
-            self.checkpoint_file = checkpoint_file
-
-        return checkpoint_file
 
     def compute(self, molecule, basis, min_basis=None):
         """
@@ -659,8 +631,6 @@ class ScfDriver:
             else:
                 min_basis = None
             min_basis = self.comm.bcast(min_basis, root=mpi_master())
-
-        self._ensure_checkpoint_file()
 
         # validate checkpoint file
         if not self._start_orbitals:
@@ -720,7 +690,7 @@ class ScfDriver:
                 self.acc_type = 'DIIS'
             if self.restart and self.rank == mpi_master():
                 self._ref_mol_orbs = MolecularOrbitals.read_hdf5(
-                    self._ensure_checkpoint_file())
+                    self._get_effective_checkpoint_file())
 
         # nuclear repulsion energy
         self._nuc_energy = molecule.nuclear_repulsion_energy(basis)
@@ -992,7 +962,7 @@ class ScfDriver:
             if self._cpcm:
                 if self.restart and self.rank == mpi_master():
                     self.cpcm_drv._cpcm_q = read_cpcm_charges(
-                        self._ensure_checkpoint_file())
+                        self._get_effective_checkpoint_file())
                 self.cpcm_drv._cpcm_q = self.comm.bcast(self.cpcm_drv._cpcm_q,
                                                         root=mpi_master())
 
@@ -1222,7 +1192,7 @@ class ScfDriver:
             The AO density matrix.
         """
 
-        checkpoint_file = self._ensure_checkpoint_file()
+        checkpoint_file = self._get_effective_checkpoint_file()
         self._molecular_orbitals = MolecularOrbitals.read_hdf5(
             checkpoint_file)
         den_mat = self._molecular_orbitals.get_density(molecule, self.scf_type)
@@ -1269,7 +1239,7 @@ class ScfDriver:
         """
 
         valid = False
-        checkpoint_file = self._ensure_checkpoint_file()
+        checkpoint_file = self._get_effective_checkpoint_file()
 
         if self.rank == mpi_master():
             if (isinstance(checkpoint_file, str) and
@@ -1450,7 +1420,9 @@ class ScfDriver:
         if self._skip_writing_h5:
             return
 
-        checkpoint_file = self._ensure_checkpoint_file(autogenerate=True)
+        checkpoint_file = self._get_effective_checkpoint_file()
+        if checkpoint_file is None:
+            return
 
         if self.rank == mpi_master():
             if checkpoint_file and isinstance(checkpoint_file, str):
