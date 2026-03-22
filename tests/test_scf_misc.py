@@ -116,6 +116,38 @@ class TestScfDriverMiscellaneous:
             assert third_results["scf_energy"] == pytest.approx(
                 first_results["scf_energy"], abs=1.0e-10)
 
+    def test_explicit_checkpoint_file_overrides_filename(self, tmp_path):
+
+        molecule, basis = self.get_water_and_basis()
+        filename = str(tmp_path / "water_named_output")
+        checkpoint_file = str(tmp_path / "custom_restart_file.h5")
+
+        comm = MPI.COMM_WORLD
+        filename = comm.bcast(filename, root=mpi_master())
+        checkpoint_file = comm.bcast(checkpoint_file, root=mpi_master())
+
+        def configure(driver):
+            driver.filename = filename
+            driver.checkpoint_file = checkpoint_file
+
+        first_drv, first_results = self.run_hf_scf(molecule, basis, configure)
+
+        assert first_results is not None
+        assert first_drv.checkpoint_file == checkpoint_file
+        if self.is_master():
+            assert Path(checkpoint_file).is_file()
+            assert not Path(f"{filename}_scf.h5").exists()
+
+        second_drv, second_results = self.run_hf_scf(molecule, basis, configure)
+
+        assert second_results is not None
+        assert second_drv.checkpoint_file == checkpoint_file
+        assert second_drv.restart
+        if self.is_master():
+            assert second_drv._ref_mol_orbs is not None
+            assert second_results["scf_energy"] == pytest.approx(
+                first_results["scf_energy"], abs=1.0e-10)
+
     def test_checkpoint_writes_input_groups(self, tmp_path):
 
         molecule, basis = self.get_water_and_basis()
