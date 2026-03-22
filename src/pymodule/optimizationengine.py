@@ -198,11 +198,11 @@ class OptimizationEngine(geometric.engine.Engine):
 
         new_engine = OptimizationEngine(deepcopy(self.grad_drv),
                                         deepcopy(self.molecule),
-                                        deepcopy(self.args))
+                                        *deepcopy(self.args))
 
         for key, val in vars(self).items():
             if isinstance(val, (MPI.Intracomm, OutputStream)):
                 continue
-            new_engine.key = deepcopy(val)
+            setattr(new_engine, key, deepcopy(val))
 
         return new_engine

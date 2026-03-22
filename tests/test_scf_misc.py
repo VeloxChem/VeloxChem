@@ -1,4 +1,5 @@
 from pathlib import Path
+from copy import deepcopy
 
 import numpy as np
 import pytest
@@ -494,3 +495,17 @@ class TestScfDriverMiscellaneous:
         assert start_drv.restart is False
         assert start_drv._use_start_orbitals is False
         assert start_drv._mom is None
+
+    def test_scfdriver_deepcopy(self):
+
+        molecule, basis = self.get_water_and_basis()
+
+        scf_drv, scf_results = self.run_hf_scf(
+            molecule, basis, lambda drv: setattr(drv, "xcfun", "pbe"))
+
+        scf_drv_copy = deepcopy(scf_drv)
+
+        assert scf_drv_copy.xcfun == scf_drv.xcfun
+        assert scf_drv_copy.scf_energy == scf_drv.scf_energy
+        assert np.allclose(scf_drv_copy.scf_results['D_alpha'],
+                           scf_drv.scf_results['D_alpha'])

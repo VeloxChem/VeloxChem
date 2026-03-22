@@ -31,6 +31,7 @@
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from mpi4py import MPI
+from copy import deepcopy
 import numpy as np
 import sys
 
@@ -216,3 +217,23 @@ class FirstOrderProperties:
 
         self.ostream.print_blank()
         self.ostream.flush()
+
+    def __deepcopy__(self, memo):
+        """
+        Implements deepcopy.
+
+        :param memo:
+            The memo dictionary for deepcopy.
+
+        :return:
+            A deepcopy of self.
+        """
+
+        new_scf_prop = FirstOrderProperties(self.comm, self.ostream)
+
+        for key, val in vars(self).items():
+            if isinstance(val, (MPI.Intracomm, OutputStream)):
+                continue
+            setattr(new_scf_prop, key, deepcopy(val))
+
+        return new_scf_prop

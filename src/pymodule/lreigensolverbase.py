@@ -385,7 +385,7 @@ class LinearResponseEigenSolverBase(LinearSolver):
         for key, val in vars(self).items():
             if isinstance(val, (MPI.Intracomm, OutputStream)):
                 continue
-            new_rsp_drv.key = deepcopy(val)
+            setattr(new_rsp_drv, key, deepcopy(val))
 
         return new_rsp_drv
 

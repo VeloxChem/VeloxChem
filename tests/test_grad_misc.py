@@ -269,3 +269,17 @@ class TestScfGradientDriverMiscellaneous:
         assert np.max(
             np.abs((disp_gradient - base_gradient) -
                    d4_model.get_gradient())) < 1.0e-8
+
+    def test_gradient_driver_deepcopy(self):
+
+        molecule, basis = self.get_ch3_molecule_and_basis()
+
+        scf_drv, scf_results = self.run_unrestricted_scf(
+            molecule, basis, 'b3lyp')
+        grad_drv = ScfGradientDriver(scf_drv)
+        grad_drv.compute(molecule, basis, scf_results)
+
+        grad_drv_copy = deepcopy(grad_drv)
+
+        assert grad_drv_copy.xcfun == grad_drv.xcfun
+        assert np.allclose(grad_drv_copy.gradient, grad_drv.gradient)

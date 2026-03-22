@@ -31,6 +31,7 @@
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from mpi4py import MPI
+from copy import deepcopy
 import numpy as np
 import time
 import math
@@ -46,6 +47,7 @@ from .veloxchemlib import bohr_in_angstrom, hartree_in_kjpermol
 from .molecularbasis import MolecularBasis
 from .dispersionmodel import DispersionModel
 from .gradientdriver import GradientDriver
+from .outputstream import OutputStream
 from .oneeints import compute_kinetic_energy_gradient
 from .oneeints import compute_overlap_gradient
 from .oneeints import compute_nuclear_potential_gradient
@@ -943,3 +945,23 @@ class ScfGradientDriver(GradientDriver):
             scf_results.update(new_scf_results)
 
         return self.scf_driver.get_scf_energy()
+
+    def __deepcopy__(self, memo):
+        """
+        Implements deepcopy.
+
+        :param memo:
+            The memo dictionary for deepcopy.
+
+        :return:
+            A deepcopy of self.
+        """
+
+        new_grad_drv = ScfGradientDriver(deepcopy(self.scf_driver))
+
+        for key, val in vars(self).items():
+            if isinstance(val, (MPI.Intracomm, OutputStream)):
+                continue
+            setattr(new_grad_drv, key, deepcopy(val))
+
+        return new_grad_drv

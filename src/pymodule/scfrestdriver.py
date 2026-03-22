@@ -318,6 +318,6 @@ class ScfRestrictedDriver(ScfDriver):
         for key, val in vars(self).items():
             if isinstance(val, (MPI.Intracomm, OutputStream)):
                 continue
-            new_scf_drv.key = deepcopy(val)
+            setattr(new_scf_drv, key, deepcopy(val))
 
         return new_scf_drv
