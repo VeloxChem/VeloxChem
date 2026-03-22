@@ -459,3 +459,28 @@ class TestScfDriverMiscellaneous:
             assert checkpoint_file.exists()
             assert start_results["scf_energy"] == pytest.approx(
                 ref_results["scf_energy"], abs=1.0e-10)
+
+    def test_clear_start_orbitals_resets_user_start_mode(self):
+
+        molecule, basis = self.get_water_and_basis()
+
+        ref_drv, _ = self.run_hf_scf(molecule, basis)
+
+        start_drv = ScfRestrictedDriver()
+        start_drv.ostream.mute()
+
+        if self.is_master():
+            start_orbitals = ref_drv.molecular_orbitals.alpha_to_numpy().copy()
+        else:
+            start_orbitals = None
+
+        start_drv.set_start_orbitals(molecule, basis, start_orbitals)
+        assert start_drv.restart is False
+        assert start_drv._start_orbitals is True
+
+        start_drv._mom = ('alpha', 'beta')
+        start_drv.clear_start_orbitals()
+
+        assert start_drv.restart is False
+        assert start_drv._start_orbitals is False
+        assert start_drv._mom is None

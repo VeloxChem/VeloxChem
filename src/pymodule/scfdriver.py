@@ -1429,6 +1429,14 @@ class ScfDriver:
         else:
             self._ref_mol_orbs = None
 
+    def clear_start_orbitals(self):
+        """
+        Clears the user-supplied start orbitals mode.
+        """
+
+        self._start_orbitals = False
+        self._mom = None
+
     def write_checkpoint(self, molecule, basis):
         """
         Writes molecular orbitals to checkpoint file.
