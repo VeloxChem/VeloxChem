@@ -216,7 +216,7 @@ class ScfDriver:
         self.restart = True
         self.checkpoint_file = None
         self._ref_mol_orbs = None
-        self._start_orbitals = False
+        self._use_start_orbitals = False
 
         # Maximum overlap constraint
         self._mom = None
@@ -633,7 +633,7 @@ class ScfDriver:
             min_basis = self.comm.bcast(min_basis, root=mpi_master())
 
         # validate checkpoint file
-        if not self._start_orbitals:
+        if not self._use_start_orbitals:
             self._ref_mol_orbs = None
         if self.restart:
             self.restart = self.validate_checkpoint(molecule.get_element_ids(),
@@ -683,7 +683,7 @@ class ScfDriver:
         # check print level (verbosity of output)
         self.print_level = max(1, min(self.print_level, 3))
 
-        if self._uses_explicit_initial_orbitals():
+        if self._uses_custom_initial_guess():
             if self.acc_type.upper() == 'L2_C2DIIS':
                 self.acc_type = 'C2DIIS'
             elif self.acc_type.upper() == 'L2_DIIS':
@@ -949,7 +949,7 @@ class ScfDriver:
             if self.rank == mpi_master():
                 if self.restart:
                     den_mat = self.gen_initial_density_restart(molecule)
-                elif self._start_orbitals:
+                elif self._use_start_orbitals:
                     den_mat = self.gen_initial_density_start_orbitals(
                         molecule)
                 else:
@@ -1252,12 +1252,12 @@ class ScfDriver:
 
         return valid
 
-    def _uses_explicit_initial_orbitals(self):
+    def _uses_custom_initial_guess(self):
         """
         Returns whether SCF starts from checkpoint or user supplied orbitals.
         """
 
-        return self.restart or self._start_orbitals
+        return self.restart or self._use_start_orbitals
 
     def maximum_overlap(self, molecule, basis, orbitals, alpha_list, beta_list):
         """
@@ -1393,7 +1393,7 @@ class ScfDriver:
         # forcing checkpoint I/O.
 
         self.restart = False
-        self._start_orbitals = True
+        self._use_start_orbitals = True
         if self.rank == mpi_master():
             self._ref_mol_orbs = deepcopy(self._molecular_orbitals)
         else:
@@ -1404,7 +1404,7 @@ class ScfDriver:
         Clears the user-supplied start orbitals mode.
         """
 
-        self._start_orbitals = False
+        self._use_start_orbitals = False
         self._mom = None
 
     def write_checkpoint(self, molecule, basis):
@@ -1642,7 +1642,7 @@ class ScfDriver:
 
             # set the current number of SCF iterations
             # (note the extra SCF cycle when starting from scratch)
-            if self._uses_explicit_initial_orbitals():
+            if self._uses_custom_initial_guess():
                 self._num_iter = i + 1
             else:
                 self._num_iter = i
@@ -2855,7 +2855,7 @@ class ScfDriver:
             e_grad = self._iter_data['gradient_norm']
 
             if e_grad < self.conv_thresh:
-                if self._uses_explicit_initial_orbitals():
+                if self._uses_custom_initial_guess():
                     # Double check that the number of electrons are reasonable
                     # when starting from externally provided orbitals.
                     nalpha = molecule.number_of_alpha_occupied_orbitals(
@@ -2907,7 +2907,7 @@ class ScfDriver:
         # (note the extra SCF cycle when starting from scratch)
         if self.restart:
             return range(self.max_iter)
-        elif self._start_orbitals:
+        elif self._use_start_orbitals:
             return range(self.max_iter)
         else:
             return range(self.max_iter + 1)
@@ -3122,7 +3122,7 @@ class ScfDriver:
 
         if self.restart:
             return 'Restart from Checkpoint'
-        elif self._start_orbitals:
+        elif self._use_start_orbitals:
             return 'User Supplied Orbitals'
         else:
             return 'Superposition of Atomic Densities'

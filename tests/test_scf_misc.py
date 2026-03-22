@@ -463,7 +463,7 @@ class TestScfDriverMiscellaneous:
         start_results = start_drv.compute(molecule, basis)
 
         assert start_drv.restart is False
-        assert start_drv._start_orbitals is True
+        assert start_drv._use_start_orbitals is True
         if self.is_master():
             assert start_drv._ref_mol_orbs is not None
             assert checkpoint_file.exists()
@@ -486,11 +486,11 @@ class TestScfDriverMiscellaneous:
 
         start_drv.set_start_orbitals(molecule, basis, start_orbitals)
         assert start_drv.restart is False
-        assert start_drv._start_orbitals is True
+        assert start_drv._use_start_orbitals is True
 
         start_drv._mom = ('alpha', 'beta')
         start_drv.clear_start_orbitals()
 
         assert start_drv.restart is False
-        assert start_drv._start_orbitals is False
+        assert start_drv._use_start_orbitals is False
         assert start_drv._mom is None
