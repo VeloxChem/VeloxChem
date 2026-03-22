@@ -430,14 +430,17 @@ class TestScfDriverMiscellaneous:
         if self.is_master():
             assert abs(-74.54939063506086 - scf_results["scf_energy"]) < 1.0e-8
 
-    def test_user_supplied_start_orbitals_are_not_checkpoint_restart(self):
+    def test_user_supplied_start_orbitals_are_not_checkpoint_restart(
+            self, tmp_path):
 
         molecule, basis = self.get_water_and_basis()
+        checkpoint_file = tmp_path / "user_start_should_not_exist.h5"
 
         ref_drv, ref_results = self.run_hf_scf(molecule, basis)
 
         start_drv = ScfRestrictedDriver()
         start_drv.ostream.mute()
+        start_drv.checkpoint_file = str(checkpoint_file)
 
         if self.is_master():
             start_orbitals = ref_drv.molecular_orbitals.alpha_to_numpy().copy()
@@ -445,11 +448,14 @@ class TestScfDriverMiscellaneous:
             start_orbitals = None
 
         start_drv.set_start_orbitals(molecule, basis, start_orbitals)
+        if self.is_master():
+            assert not checkpoint_file.exists()
         start_results = start_drv.compute(molecule, basis)
 
         assert start_drv.restart is False
         assert start_drv._start_orbitals is True
         if self.is_master():
             assert start_drv._ref_mol_orbs is not None
+            assert checkpoint_file.exists()
             assert start_results["scf_energy"] == pytest.approx(
                 ref_results["scf_energy"], abs=1.0e-10)

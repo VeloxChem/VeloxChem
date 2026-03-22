@@ -1419,19 +1419,15 @@ class ScfDriver:
         else:
             self._molecular_orbitals = MolecularOrbitals()
 
-        # write checkpoint file and sychronize MPI processes
+        # Record that SCF should start from the supplied orbitals without
+        # forcing checkpoint I/O.
 
         self.restart = False
         self._start_orbitals = True
-        checkpoint_file = self._ensure_checkpoint_file(autogenerate=True)
-        self.write_checkpoint(molecule, basis)
         if self.rank == mpi_master():
-            self._ref_mol_orbs = MolecularOrbitals.read_hdf5(
-                checkpoint_file)
+            self._ref_mol_orbs = deepcopy(self._molecular_orbitals)
         else:
             self._ref_mol_orbs = None
-
-        self.comm.barrier()
 
     def write_checkpoint(self, molecule, basis):
         """
