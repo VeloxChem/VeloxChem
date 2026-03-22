@@ -586,6 +586,38 @@ class IMForceFieldGenerator:
         dihedral_candidates = list(payload.get("dihedral_candidates", []) or [])
         return conformers, dihedral_candidates
 
+    def define_z_matrix_dict(self, molecule, add_coordinates=None):
+        g_molecule = geometric.molecule.Molecule()
+        g_molecule.elem = molecule.get_labels()
+        g_molecule.xyzs = [molecule.get_coordinates_in_bohr() * geometric.nifty.bohr2ang]
+        g_molecule.build_topology()
+        g_molecule.build_bonds()
+
+        bonds = [tuple(x) for x in g_molecule.Data['bonds']]
+        angles = [tuple(x) for x in g_molecule.find_angles()]
+        dihedrals = [tuple(x) for x in g_molecule.find_dihedrals()]
+
+        zmat = {
+            "bonds": bonds[:],
+            "angles": angles[:],
+            "dihedrals": dihedrals[:],
+            "impropers": [],
+        }
+
+        if add_coordinates is not None:
+            for key, coord in add_coordinates.items():
+                c = tuple(coord)
+                if key == 'bond' and c not in zmat["bonds"]:
+                    zmat["bonds"].append(c)
+                elif key == 'angle' and c not in zmat["angles"]:
+                    zmat["angles"].append(c)
+                elif key == 'dihedral' and c not in zmat["dihedrals"]:
+                    zmat["dihedrals"].append(c)
+                elif key == 'impropers' and c not in zmat["impropers"]:
+                    zmat["impropers"].append(c)
+
+        return zmat
+
     def set_up_the_system(self, molecule, extract_z_matrix=None):
 
         """
@@ -733,6 +765,61 @@ class IMForceFieldGenerator:
 
             return new_groups, rot_groups
         
+        def _promote_nonrotatable_ring_torsions_to_impropers(zmat, ff_gen, rotatable_bonds_zero_based):
+            """
+            Promote proper ring torsions around non-rotatable bonds to impropers.
+
+            Matching by full 4-atom set is too strict (and often fails), so we match
+            by the middle bond of the proper torsion and collect impropers touching
+            the same bond.
+            """
+            rot_set = {frozenset((int(i), int(j))) for i, j in rotatable_bonds_zero_based}
+
+            # Existing impropers from z-matrix (if any)
+            impropers = [tuple(int(x) for x in imp) for imp in zmat.get("impropers", [])]
+            impropers_seen = set(impropers)
+
+            # Build non-rotatable ring bond -> impropers map from MM impropers.
+            impropers_ff = [tuple(int(x) for x in t) for t in ff_gen.impropers.keys()]
+            bond_to_impropers = {}
+            for imp in impropers_ff:
+                center = int(imp[0])
+                for neigh in imp[1:]:
+                    neigh = int(neigh)
+                    bond = frozenset((center, neigh))
+                    if bond in rot_set:
+                        continue
+                    if not ff_gen.is_bond_in_ring(center, neigh):
+                        continue
+                    bond_to_impropers.setdefault(bond, []).append(imp)
+
+            kept_dihedrals = []
+            for dih_raw in zmat["dihedrals"]:
+                dih = tuple(int(x) for x in dih_raw)
+                mid = frozenset((dih[1], dih[2]))
+
+                # Keep proper terms for rotatable or non-ring bonds.
+                if mid in rot_set or ff_gen.is_bond_in_ring(dih[0], dih[1]) and ff_gen.is_bond_in_ring(dih[1], dih[2]) and ff_gen.is_bond_in_ring(dih[2], dih[3]):
+                    kept_dihedrals.append(dih)
+                    continue
+
+                # Non-rotatable ring bond: attach any corresponding impropers.
+                promoted = False
+                for imp in bond_to_impropers.get(mid, []):
+                    if imp not in impropers_seen:
+                        impropers.append(imp)
+                        impropers_seen.add(imp)
+                    promoted = True
+
+                # If no improper was found for this bond, keep the dihedral.
+                if not promoted:
+                    kept_dihedrals.append(dih)
+
+            zmat["dihedrals"] = kept_dihedrals
+            zmat["impropers"] = impropers
+            return zmat
+
+        
 
         self.symmetry_information = {'gs': (), 'es': ()}
         self.molecule = molecule
@@ -746,7 +833,7 @@ class IMForceFieldGenerator:
                 elif len(dimer_coordinates) > 0:
                     self.reaction_coordinates = dimer_coordinates
             
-                self.roots_z_matrix[root] = self.define_z_matrix(molecule, self.reaction_coordinates)
+                self.roots_z_matrix[root] = self.define_z_matrix_dict(molecule, self.reaction_coordinates)
             elif root not in self.roots_z_matrix:
                 int_driver = InterpolationDriver()
                 int_driver.update_settings({ 'interpolation_type':self.interpolation_type,
@@ -763,10 +850,6 @@ class IMForceFieldGenerator:
        
                 _, z_matrix = int_driver.read_labels()
                 self.roots_z_matrix[root] = z_matrix
-
-        
-            angle_index = next((i for i, x in enumerate(self.roots_z_matrix[root]) if len(x) == 3), len(self.roots_z_matrix[root]))
-            dihedral_index = next((i for i, x in enumerate(self.roots_z_matrix[root]) if len(x) == 4), len(self.roots_z_matrix[root]))
 
             self.qm_data_points = None
             self.molecule = molecule
@@ -787,6 +870,12 @@ class IMForceFieldGenerator:
             rotatable_bonds.extend(es_rotatable_bonds)
             
             rotatable_bonds_zero_based = [(i - 1, j - 1) for (i, j) in rotatable_bonds]
+
+            self.roots_z_matrix[root] = _promote_nonrotatable_ring_torsions_to_impropers(self.roots_z_matrix[root], ff_gen, rotatable_bonds_zero_based)
+
+            dihedral_start = len(self.roots_z_matrix[root]['bonds']) + len(self.roots_z_matrix[root]['angles'])
+            dihedral_end = dihedral_start + len(self.roots_z_matrix[root]['dihedrals'])
+
             self.all_rotatable_bonds = rotatable_bonds_zero_based
             all_exclision = [element for rot_bond in rotatable_bonds_zero_based for element in rot_bond]
 
@@ -804,10 +893,10 @@ class IMForceFieldGenerator:
                 indices_list = []
                 for key, dihedral_list in self.symmetry_dihedral_lists.items():
                 
-                    for i, element in enumerate(self.roots_z_matrix[root][dihedral_index:], start=dihedral_index):
+                    for i, element in enumerate(self.roots_z_matrix[root]['dihedrals']):
                         if tuple(sorted(element)) in dihedral_list:
                             indices_list.append(i)
-                self.symmetry_information['gs'] = [symmetry_groups[0], rot_groups['gs'], regrouped['gs'], core_atoms, non_core_atoms, rotatable_bonds_zero_based, indices_list, self.symmetry_dihedral_lists, dihedrals_to_set, [angle_index, dihedral_index]]
+                self.symmetry_information['gs'] = [symmetry_groups[0], rot_groups['gs'], regrouped['gs'], core_atoms, non_core_atoms, rotatable_bonds_zero_based, indices_list, self.symmetry_dihedral_lists, dihedrals_to_set, [dihedral_start, dihedral_end]]
             if root == 1 and self.drivers['es'] is not None and self.drivers['es'][0].spin_flip is False:
                 non_core_atoms = [element for group in regrouped['gs'] for element in group]
                 core_atoms = [element for element in symmetry_groups[0] if element not in non_core_atoms]
@@ -816,10 +905,10 @@ class IMForceFieldGenerator:
                 indices_list = []
                 for key, dihedral_list in self.symmetry_dihedral_lists.items():
                 
-                    for i, element in enumerate(self.roots_z_matrix[root][dihedral_index:], start=dihedral_index):
+                    for i, element in enumerate(self.roots_z_matrix[root]['dihedrals']):
                         if tuple(sorted(element)) in dihedral_list:
                             indices_list.append(i)
-                self.symmetry_information['es'] = [symmetry_groups[0], rot_groups['es'], regrouped['es'], core_atoms, non_core_atoms, rotatable_bonds_zero_based, indices_list, self.symmetry_dihedral_lists, dihedrals_to_set, [angle_index, dihedral_index]]
+                self.symmetry_information['es'] = [symmetry_groups[0], rot_groups['es'], regrouped['es'], core_atoms, non_core_atoms, rotatable_bonds_zero_based, indices_list, self.symmetry_dihedral_lists, dihedrals_to_set, [dihedral_start, dihedral_end]]
             if root >= 2 and len(self.symmetry_information['es']) == 0 and self.drivers['es']:
                 non_core_atoms = [element for group in regrouped['es'] for element in group]
                 core_atoms = [element for element in symmetry_groups[0] if element not in non_core_atoms]
@@ -829,10 +918,10 @@ class IMForceFieldGenerator:
                 indices_list = []
                 for key, dihedral_list in self.symmetry_dihedral_lists.items():
                 
-                    for i, element in enumerate(self.roots_z_matrix[root][dihedral_index:], start=dihedral_index):
+                    for i, element in enumerate(self.roots_z_matrix[root]['dihedrals']):
                         if tuple(sorted(element)) in dihedral_list:
                             indices_list.append(i)
-                self.symmetry_information['es'] = [symmetry_groups[0], rot_groups['es'], regrouped['es'], core_atoms, non_core_atoms, rotatable_bonds_zero_based, indices_list, self.symmetry_dihedral_lists, dihedrals_to_set, [angle_index, dihedral_index]]
+                self.symmetry_information['es'] = [symmetry_groups[0], rot_groups['es'], regrouped['es'], core_atoms, non_core_atoms, rotatable_bonds_zero_based, indices_list, self.symmetry_dihedral_lists, dihedrals_to_set, [dihedral_start, dihedral_end]]
 
 
             if self.reaction_molecules_dict is not None and extract_z_matrix[root]:
@@ -841,7 +930,6 @@ class IMForceFieldGenerator:
 
                         self.atom_transfer_reaction_path = {entry['root']: []}
                     self.atom_transfer_reaction_path[entry['root']].append(self.determine_atom_transfer_reaction_path(entry['reactants'], entry['products']))
-
 
         if self.add_conformal_structures and 0 in self.roots_to_follow:
 
@@ -941,7 +1029,7 @@ class IMForceFieldGenerator:
         ref_drv = InterpolationDriver(self.roots_z_matrix[root])
         ref_drv.update_settings(ref_settings)
         ref_db_labels, _ = ref_drv.read_labels()
-        
+
         existing = set()
 
         if os.path.exists(sampling_file):
@@ -2210,6 +2298,8 @@ class IMForceFieldGenerator:
                 impes_driver = InterpolationDriver(self.roots_z_matrix[state])
                 impes_driver.update_settings(imforcefieldfile[state])
                 self.qmlabels, z_matrix = impes_driver.read_labels()
+               
+             
                 for label in self.qmlabels:
                     if '_symmetry' not in label:
                         qm_data_point = InterpolationDatapoint(z_matrix)
@@ -3279,17 +3369,16 @@ class IMForceFieldGenerator:
                         target_file = interpolation_settings[target_root]['imforcefield_file']
                         
                         z_matrix = self.roots_z_matrix[target_root]
-                        interpolation_driver = InterpolationDriver()
+                        interpolation_driver = InterpolationDriver(z_matrix)
                         interpolation_driver.update_settings(interpolation_settings[target_root])
                         interpolation_driver.imforcefield_file = target_file
-                        
                         
                         sorted_labels = []
                         if target_file in os.listdir(os.getcwd()):
                             org_labels, z_matrix = interpolation_driver.read_labels()
                             labels = [label for label in org_labels if '_symmetry' not in label]
                             sorted_labels = sorted(labels, key=lambda x: int(x.split('_')[1]))
-                
+                        print(z_matrix)
                         label = None
                         grad = gradients[number].copy()
                         hess = hessians[number].copy()
@@ -3320,7 +3409,7 @@ class IMForceFieldGenerator:
                         impes_coordinate.eq_bond_lengths = eq_bond_length
                         impes_coordinate.update_settings(interpolation_settings[target_root])
                         impes_coordinate.cartesian_coordinates = mol_basis[0].get_coordinates_in_bohr()
-                        impes_coordinate.imp_int_coordinates = []
+                        impes_coordinate.imp_int_coordinates = {'bonds': [], 'angles': [], 'dihedrals': [], 'impropers': []}
                         impes_coordinate.inv_sqrt_masses = inv_sqrt_masses
                         impes_coordinate.energy = energies[number]
                         impes_coordinate.gradient =  mw_grad_vec.reshape(grad.shape)
@@ -3404,6 +3493,7 @@ class IMForceFieldGenerator:
                         impes_coordinate.confidence_radius = trust_radius
                         
                         impes_coordinate.write_hdf5(target_file, label)
+                        impes_coordinate.write_hdf5('im_database_{target_root}_org.h5}', label)
                         interpolation_driver.imforcefield_file = target_file
                         
                         labels, z_matrix = interpolation_driver.read_labels()
@@ -3466,7 +3556,7 @@ class IMForceFieldGenerator:
                         filtered_dihedrals.append(d)
             return filtered_dihedrals
         
-        all_dihedrals = [element for element in z_matrix if len(element) == 4]
+        all_dihedrals = [element for element in z_matrix['dihedrals']]
 
         symmetry_group_dihedral_dict = {} 
         angles_to_set = {}

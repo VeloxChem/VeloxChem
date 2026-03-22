@@ -479,8 +479,10 @@ class InterpolationDriver():
         z_matrix_bonds = z_matrix_label + '_bonds'
         z_matrix_angles = z_matrix_label + '_angles'
         z_matrix_dihedrals = z_matrix_label + '_dihedrals'
-        z_matrix_labels = [z_matrix_bonds, z_matrix_angles, z_matrix_dihedrals]
-        z_matrix = []
+        z_matrix_impropers = z_matrix_label + '_impropers'
+
+        z_matrix_labels = [z_matrix_bonds, z_matrix_angles, z_matrix_dihedrals, z_matrix_impropers]
+        z_matrix = {"bonds": [], "angles": [], "dihedrals": [], "impropers": []}
             
         labels = []
         counter = 0
@@ -498,7 +500,14 @@ class InterpolationDriver():
 
                         z_label = label + label_obj
                         current_z_list = [tuple(z_list.tolist()) for z_list in list(h5f.get(z_label))]
-                        z_matrix.extend(current_z_list)
+                        if 'bonds' in z_label:
+                            z_matrix['bonds'] = current_z_list
+                        elif 'angles' in z_label:
+                            z_matrix['angles'] = current_z_list
+                        elif 'dihedrals' in z_label:
+                            z_matrix['dihedrals'] = current_z_list
+                        elif 'impropers' in z_label:
+                            z_matrix['impropers'] = current_z_list
                 counter = 1
 
 
@@ -1180,7 +1189,7 @@ class InterpolationDriver():
             row indices for periodicity-3 and periodicity-2 contributions.
         """
 
-        dihedral_start = self.symmetry_information[-1][1]
+        dihedral_start = self.symmetry_information[-1][0]
         sym3_keys = tuple(self.symmetry_information[7][3].keys())
         sym3_key_to_idx = {key: idx for idx, key in enumerate(sym3_keys)}
         sym2_set = {tuple(sorted(entry)) for entry in self.symmetry_information[7][2]}
@@ -1189,16 +1198,15 @@ class InterpolationDriver():
         sym3_center_ids = []
         sym2_rows = []
 
-        for row_idx, element in enumerate(self.impes_coordinate.z_matrix[dihedral_start:], start=dihedral_start):
+        for row_idx, element in enumerate(self.impes_coordinate.z_matrix_dict['dihedrals']):
             center = tuple(element[1:3])
             if center in sym3_key_to_idx:
-                sym3_rows.append(row_idx)
+                sym3_rows.append(dihedral_start + row_idx)
                 sym3_center_ids.append(sym3_key_to_idx[center])
             elif tuple(sorted(element)) in sym2_set:
                 sym2_rows.append(row_idx)
 
         return {
-            'dihedral_start': dihedral_start,
             'sym3_keys': sym3_keys,
             'sym3_rows': np.asarray(sym3_rows, dtype=np.int64),
             'sym3_center_ids': np.asarray(sym3_center_ids, dtype=np.int64),
@@ -1521,7 +1529,10 @@ class InterpolationDriver():
 
             r_cut = 1.5
             torsion_meta = self._get_symmetry_torsion_meta()
-            dihedral_start = torsion_meta['dihedral_start']
+
+
+            dihedral_start = self.symmetry_information[-1][0]
+            dihedral_end = self.symmetry_information[-1][1]
             b_matrix = self.impes_coordinate.b_matrix
 
             # # Current full methyl-rotor phases
@@ -1582,9 +1593,9 @@ class InterpolationDriver():
                 dist_correlation = org_int_coords.copy() - symmetry_data_point.internal_coordinates_values[mask]
 
                 if not self.use_cosine_dihedral:
-                    dist_check[dihedral_start:] = np.sin(dist_org[dihedral_start:])
+                    dist_check[dihedral_start:dihedral_end] = np.sin(dist_org[dihedral_start:dihedral_end])
 
-                dist_correlation[dihedral_start:] = dist_check[dihedral_start:]
+                dist_correlation[dihedral_start:dihedral_end] = dist_check[dihedral_start:dihedral_end]
 
                 # (
                 #     sum_sym_3_dihedral_cos,
@@ -1647,9 +1658,9 @@ class InterpolationDriver():
                 dist_hessian = np.matmul(dist_check.T, hessian)
 
                 if not self.use_cosine_dihedral:
-                    cos_dist = np.cos(dist_org[dihedral_start:])
-                    grad[dihedral_start:] *= cos_dist
-                    dist_hessian[dihedral_start:] *= cos_dist
+                    cos_dist = np.cos(dist_org[dihedral_start:dihedral_end])
+                    grad[dihedral_start:dihedral_end] *= cos_dist
+                    dist_hessian[dihedral_start:dihedral_end] *= cos_dist
 
                 pes_prime_i = np.matmul(b_matrix.T, (grad + dist_hessian)).reshape(natm, 3)
                 pot_gradients.append(pes_prime_i)
@@ -1769,9 +1780,10 @@ class InterpolationDriver():
             dist_org = (org_int_coords.copy() - data_point.internal_coordinates_values)
             dist_check = (org_int_coords.copy() - data_point.internal_coordinates_values)
 
-            dihedral_start = self.symmetry_information[-1][1]
+            dihedral_start = self.symmetry_information[-1][0]
+            dihedral_end = self.symmetry_information[-1][1]
             if not self.use_cosine_dihedral:
-                dist_check[dihedral_start:] = np.sin(dist_org[dihedral_start:])
+                dist_check[dihedral_start:dihedral_end] = np.sin(dist_org[dihedral_start:dihedral_end])
 
             self.bond_rmsd.append(np.sqrt(np.mean(np.sum((dist_org[:self.symmetry_information[-1][0]])**2))))
             self.angle_rmsd.append(np.sqrt(np.mean(np.sum(dist_org[self.symmetry_information[-1][0]:self.symmetry_information[-1][1]]**2))))
@@ -1786,9 +1798,9 @@ class InterpolationDriver():
             dist_hessian_eff = np.matmul(dist_check.T, hessian)
 
             if not self.use_cosine_dihedral:
-                cos_dist = np.cos(dist_org[dihedral_start:])
-                grad[dihedral_start:] *= cos_dist
-                dist_hessian_eff[dihedral_start:] *= cos_dist
+                cos_dist = np.cos(dist_org[dihedral_start:dihedral_end])
+                grad[dihedral_start:dihedral_end] *= cos_dist
+                dist_hessian_eff[dihedral_start:dihedral_end] *= cos_dist
 
             pes_prime = np.matmul(self.impes_coordinate.b_matrix.T, (grad + dist_hessian_eff)).reshape(natm, 3)
 
@@ -2331,26 +2343,27 @@ class InterpolationDriver():
         dq_dx = np.zeros_like(distance_vector_sub).reshape(-1)
         Dimp_sq = 0.0
         if self.use_tc_weights:
-            for element in data_point.imp_int_coordinates:
-                idx = self.z_matrix.index(element)
-                org_imp_int_coord_distance = (self.impes_coordinate.internal_coordinates_values[idx] - data_point.internal_coordinates_values[idx])
-                unmw_b_matrix = self.impes_coordinate.b_matrix[idx, :] / self.impes_coordinate.inv_sqrt_masses
+            for key, entries in data_point.imp_int_coordinates.items:
+                for element in entries:
+                    idx = self.z_matrix[key].index(element)
+                    org_imp_int_coord_distance = (self.impes_coordinate.internal_coordinates_values[idx] - data_point.internal_coordinates_values[idx])
+                    unmw_b_matrix = self.impes_coordinate.b_matrix[idx, :] / self.impes_coordinate.inv_sqrt_masses
+                    
+                    if len(element) == 4:
+                        sin_delta = np.sin(org_imp_int_coord_distance)
+                        cos_delta = np.cos(org_imp_int_coord_distance)
+                        imp_int_coord_derivative_contribution += 2.0 * unmw_b_matrix * cos_delta * sin_delta
+                        imp_int_coord_distance += sin_delta**2
+
+                        dq_dx +=  coord_curvature[idx] * 2.0 * unmw_b_matrix * np.cos(coord_curvature[idx] * org_imp_int_coord_distance) * np.sin(coord_curvature[idx] * org_imp_int_coord_distance) 
+                        Dimp_sq += np.sin(coord_curvature[idx] * org_imp_int_coord_distance)**2
+                    else:
+                        imp_int_coord_distance += org_imp_int_coord_distance**2
+                        imp_int_coord_derivative_contribution += 2.0 * unmw_b_matrix * org_imp_int_coord_distance
+
+                        dq_dx += coord_curvature[idx]**2 * 2.0 * unmw_b_matrix * org_imp_int_coord_distance
+                        Dimp_sq += (coord_curvature[idx] * org_imp_int_coord_distance)**2
                 
-                if len(element) == 4:
-                    sin_delta = np.sin(org_imp_int_coord_distance)
-                    cos_delta = np.cos(org_imp_int_coord_distance)
-                    imp_int_coord_derivative_contribution += 2.0 * unmw_b_matrix * cos_delta * sin_delta
-                    imp_int_coord_distance += sin_delta**2
-
-                    dq_dx +=  coord_curvature[idx] * 2.0 * unmw_b_matrix * np.cos(coord_curvature[idx] * org_imp_int_coord_distance) * np.sin(coord_curvature[idx] * org_imp_int_coord_distance) 
-                    Dimp_sq += np.sin(coord_curvature[idx] * org_imp_int_coord_distance)**2
-                else:
-                    imp_int_coord_distance += org_imp_int_coord_distance**2
-                    imp_int_coord_derivative_contribution += 2.0 * unmw_b_matrix * org_imp_int_coord_distance
-
-                    dq_dx += coord_curvature[idx]**2 * 2.0 * unmw_b_matrix * org_imp_int_coord_distance
-                    Dimp_sq += (coord_curvature[idx] * org_imp_int_coord_distance)**2
-            
             if imp_int_coord_distance < 1e-8:
                 imp_int_coord_distance = 1e-8
                 imp_int_coord_derivative_contribution[:] = 0
@@ -2752,7 +2765,7 @@ class InterpolationDriver():
         top_src_per_err = 8
 
 
-        novelty_weight = 0.35          # stronger than before, but not dominant
+        novelty_weight = 0.4          # stronger than before, but not dominant
         redundancy_weight = 0.55       # softer penalty than before
 
         # extra preference for torsional exploration
@@ -2761,8 +2774,8 @@ class InterpolationDriver():
         dihedral_novelty_bonus = 0.40
 
         # automatic constraint selection
-        max_constraints_to_return = 3
-        dihedral_score_frac = 0.35     # torsion considered relevant if >= 35% of top block coord score
+        max_constraints_to_return = int(len(self.molecule.get_labels()) / 3)
+        dihedral_score_frac = 0.20     # torsion considered relevant if >= 35% of top block coord score
         secondary_score_frac = 0.20    # secondary constraints should be meaningful
 
 
@@ -2774,9 +2787,8 @@ class InterpolationDriver():
         # ------------------------------------------------------------------
         # Exclude near-linear angles from being chosen as direct constraints
         # ------------------------------------------------------------------
-        for element in self.z_matrix:
-            if len(element) != 3:
-                continue
+        z_matrix_array = z_matrix['bonds'] + z_matrix['angles'] + z_matrix['dihedrals'] + z_matrix['impropers']
+        for element in self.z_matrix['angles']:
 
             current_angle = molecule.get_angle_in_degrees(
                 (element[0] + 1, element[1] + 1, element[2] + 1)
@@ -2790,7 +2802,7 @@ class InterpolationDriver():
         qm_gradient_mw = qm_gradient.reshape(-1) * sqrt_masses
 
         q_current = np.asarray(self.impes_coordinate.internal_coordinates_values, dtype=float)
-        N = len(z_matrix)
+        N = len(z_matrix['bonds']) + len(z_matrix['angles']) + len(z_matrix['dihedrals']) + len(z_matrix['impropers'])
 
         global_coord_novelty = np.zeros(N, dtype=float)
 
@@ -2936,7 +2948,7 @@ class InterpolationDriver():
                 "support_mask": support_mask.copy(),
                 "coord_novelty_local_abs": coord_novelty_local_abs.copy(),
                 "coord_novelty_local_rel": coord_novelty_local_rel.copy(),
-                "coords": [tuple(int(x) for x in c) for c in z_matrix],
+                "coords": [tuple(int(x) for x in c) for key in z_matrix.keys() for c in z_matrix[key]],
             })
 
             
@@ -3045,6 +3057,7 @@ class InterpolationDriver():
 
         candidate_anchor_indices = [int(sorted_idx[pos]) for pos in selected_pos]
         candidate_anchor_indices = candidate_anchor_indices[:max_anchor_candidates]
+        
 
         # ------------------------------------------------------------------
         # Build and rank coupled blocks
@@ -3053,7 +3066,7 @@ class InterpolationDriver():
         seen_blocks = set()
 
         for anchor_idx in candidate_anchor_indices:
-            anchor_coord = tuple(int(x) for x in z_matrix[anchor_idx])
+            anchor_coord = tuple(int(x) for x in z_matrix_array[anchor_idx])
 
             # skip excluded anchors
             if anchor_coord in constraints_to_exclude:
@@ -3070,7 +3083,7 @@ class InterpolationDriver():
                 anchor_idx=anchor_idx,
                 global_coord_score=global_coord_score,
                 global_pair=global_pair,
-                z_matrix=z_matrix,
+                z_matrix=z_matrix_array,
                 constraints_to_exclude=constraints_to_exclude,
                 max_partners=max_block_partners,
                 min_partner_pair_frac=min_partner_pair_frac,
@@ -3084,7 +3097,7 @@ class InterpolationDriver():
 
             coord_mass = float(np.sum(global_coord_score[block_indices]))
             support_mass = float(np.mean(global_support[block_indices]))
-            coord_novelty_mass = float(np.sum(global_coord_novelty[block_indices]))
+            coord_novelty_mass = float(np.sum(global_coord_novelty_abs[block_indices]))
 
             pair_mass = 0.0
             for a in range(len(block_indices)):
@@ -3106,11 +3119,13 @@ class InterpolationDriver():
 
             # --- type-aware torsion preference ---
             anchor_type = self.coord_type(anchor_coord)
+        
             dihedral_indices_in_block = [
                 i for i in block_indices
-                if self.coord_type(tuple(int(x) for x in z_matrix[i])) == "dihedral"
+                if self.coord_type(tuple(int(x) for x in z_matrix_array[i])) == "dihedral"
             ]
-
+            print('dihedral indices: ', z_matrix_array, dihedral_indices_in_block)
+          
             dihedral_bonus = 0.0
 
             if anchor_type == "dihedral":
@@ -3120,7 +3135,7 @@ class InterpolationDriver():
                 dihedral_bonus += dihedral_in_block_bonus
 
                 # reward torsional novelty specifically
-                torsion_novelty = float(np.sum(global_coord_novelty[dihedral_indices_in_block]))
+                torsion_novelty = float(np.sum(global_coord_novelty_abs[dihedral_indices_in_block]))
                 dihedral_bonus += dihedral_novelty_bonus * torsion_novelty
 
             # --- repair and explore split ---
@@ -3140,7 +3155,7 @@ class InterpolationDriver():
 
             acq_score = repair_score * explore_score * (1.0 + dihedral_bonus)
 
-            block_coords = [tuple(int(x) for x in z_matrix[i]) for i in block_indices]
+            block_coords = [tuple(int(x) for x in z_matrix_array[i]) for i in block_indices]
 
             ranked_blocks.append({
                 "anchor_idx": int(anchor_idx),
@@ -3158,12 +3173,12 @@ class InterpolationDriver():
             })
 
         ranked_blocks = sorted(ranked_blocks, key=lambda x: x["acq_score"], reverse=True)
-
+        
         if not ranked_blocks:
             return [], [], []
         
         ranked_torsions = self._rank_torsion_exploration_candidates(
-            z_matrix=z_matrix,
+            z_matrix=z_matrix_array,
             global_coord_score=global_coord_score,
             global_support=global_support,
             global_torsion_novelty=global_coord_novelty_abs,
@@ -3177,7 +3192,7 @@ class InterpolationDriver():
             best_repair_block=best_repair_block,
             ranked_torsions=ranked_torsions,
             global_coord_score=global_coord_score,
-            torsion_novelty_threshold=0.25,
+            torsion_novelty_threshold=0.20,
             exploration_competitiveness=0.55,
         )
 
@@ -3192,7 +3207,7 @@ class InterpolationDriver():
                 torsion_idx=torsion_idx,
                 global_coord_score=global_coord_score,
                 global_pair=global_pair,
-                z_matrix=z_matrix,
+                z_matrix=z_matrix_array,
                 max_neighbors=max_constraints_to_return - 1,
                 min_pair_frac=0.10,
                 min_score_frac=0.15,
@@ -3202,18 +3217,18 @@ class InterpolationDriver():
                 torsion_idx=torsion_idx,
                 block_indices=exploration_block_indices,
                 global_coord_score=global_coord_score,
-                global_torsion_novelty=global_coord_novelty,
-                z_matrix=z_matrix,
+                global_torsion_novelty=global_coord_novelty_abs,
+                z_matrix=z_matrix_array,
                 max_constraints=max_constraints_to_return,
             )
 
             candidate_constraints = selected_constraints
             best_block = {
                 "anchor_idx": torsion_idx,
-                "anchor_coord": tuple(int(x) for x in z_matrix[torsion_idx]),
+                "anchor_coord": tuple(int(x) for x in z_matrix_array[torsion_idx]),
                 "anchor_type": "dihedral",
                 "block_indices": exploration_block_indices,
-                "block_coords": [tuple(int(x) for x in z_matrix[i]) for i in exploration_block_indices],
+                "block_coords": [tuple(int(x) for x in z_matrix_array[i]) for i in exploration_block_indices],
                 "coord_mass": float(np.sum(global_coord_score[exploration_block_indices])),
                 "pair_mass": float(np.sum([
                     global_pair[i, j]
@@ -3239,8 +3254,8 @@ class InterpolationDriver():
             selected_constraints, primary_constraint = self._select_constraints_from_block(
                 block_indices=best_block["block_indices"],
                 global_coord_score=global_coord_score,
-                global_coord_novelty=global_coord_novelty,
-                z_matrix=z_matrix,
+                global_coord_novelty=global_coord_novelty_abs,
+                z_matrix=z_matrix_array,
                 max_constraints=max_constraints_to_return,
                 dihedral_score_frac=dihedral_score_frac,
                 secondary_score_frac=secondary_score_frac,
@@ -3256,7 +3271,7 @@ class InterpolationDriver():
             f"{'score':>12} {'support':>12} {'rho':>12}")
         print("-" * 82)
         for rank, idx in enumerate(np.argsort(-global_coord_score)[:12]):
-            coord = tuple(int(x) for x in z_matrix[idx])
+            coord = tuple(int(x) for x in z_matrix_array[idx])
             print(
                 f"{rank:4d} {idx:4d} {self.coord_type(coord):>9} {self.format_coord(coord):>18} "
                 f"{global_coord_score[idx]:12.6e} {global_support[idx]:12.6e} {global_rho[idx]:12.6e}"
@@ -3473,7 +3488,7 @@ class InterpolationDriver():
         ranked_torsions : list of dicts
         """
         ranked = []
-
+        
         for i, coord in enumerate(z_matrix):
             coord = tuple(int(x) for x in coord)
 
@@ -3540,16 +3555,22 @@ class InterpolationDriver():
         """
         dq_raw = np.asarray(dq_raw, dtype=float).reshape(-1)
         novelty = np.zeros_like(dq_raw)
+        
+        off_set = 0
+        for key, coords in z_matrix.items():
 
-        for i, coord in enumerate(z_matrix):
-            coord = tuple(int(x) for x in coord)
+            for i, _ in enumerate(coords):
+                idx = i + off_set
+                # coord = tuple(int(x) for x in coord)
 
-            if len(coord) == 4:
-                # wrapped torsional distance normalized by pi
-                novelty[i] = abs(dq_raw[i]) / np.pi
-            else:
-                # rough bounded novelty for non-torsions
-                novelty[i] = min(abs(dq_raw[i]) / bond_angle_scale, 1.0)
+                if key == 'dihedrals':
+                    # wrapped torsional distance normalized by pi
+                    novelty[idx] = abs(dq_raw[idx]) / np.pi
+                else:
+                    # rough bounded novelty for non-torsions
+                    novelty[idx] = min(abs(dq_raw[idx]) / bond_angle_scale, 1.0)
+            
+            off_set += len(z_matrix[key])
 
         return novelty
 
@@ -3663,7 +3684,7 @@ class InterpolationDriver():
         q_current = np.asarray(q_current, dtype=float)
         q_ref = np.asarray(q_ref, dtype=float)
 
-        N = len(z_matrix)
+        N = len(z_matrix['bonds']) + len(z_matrix['angles']) + len(z_matrix['dihedrals']) + len(z_matrix['impropers'])
         dq_raw = np.zeros(N, dtype=float)
         dq_eff = np.zeros(N, dtype=float)
         chain = np.ones(N, dtype=float)
@@ -3673,27 +3694,31 @@ class InterpolationDriver():
             sym_torsion_centers = set(tuple(x) for x in symmetry_information[7][3])
         except Exception:
             sym_torsion_centers = set()
+        
+        off_set = 0
+        for key in z_matrix.keys():
+            for i, coord in enumerate(z_matrix[key]):
+                coord = tuple(int(x) for x in coord)
+                idx = i + off_set
+                if key == 'dihedrals':
+                    # excluded/symmetric torsions -> zero effective displacement
+                    if tuple(coord[1:3]) in sym_torsion_centers:
+                        dq_raw[idx] = 0.0
+                        dq_eff[idx] = 0.0
+                        chain[idx] = 0.0
+                        continue
 
-        for i, coord in enumerate(z_matrix):
-            coord = tuple(int(x) for x in coord)
-
-            if len(coord) == 4:
-                # excluded/symmetric torsions -> zero effective displacement
-                if tuple(coord[1:3]) in sym_torsion_centers:
-                    dq_raw[i] = 0.0
-                    dq_eff[i] = 0.0
-                    chain[i] = 0.0
-                    continue
-
-                d = self._principal_torsion_delta(q_current[i] - q_ref[i])
-                dq_raw[i] = d
-                dq_eff[i] = np.sin(d)
-                chain[i] = np.cos(d)
-            else:
-                d = q_current[i] - q_ref[i]
-                dq_raw[i] = d
-                dq_eff[i] = d
-                chain[i] = 1.0
+                    d = self._principal_torsion_delta(q_current[idx] - q_ref[idx])
+                    dq_raw[idx] = d
+                    dq_eff[idx] = np.sin(d)
+                    chain[idx] = np.cos(d)
+                else:
+                    d = q_current[idx] - q_ref[idx]
+                    dq_raw[idx] = d
+                    dq_eff[idx] = d
+                    chain[idx] = 1.0
+            
+            off_set += len(z_matrix[key])
 
         return dq_raw, dq_eff, chain
 
@@ -3760,7 +3785,7 @@ class InterpolationDriver():
         H = np.asarray(H, dtype=float)
         abs_err = np.asarray(abs_err, dtype=float)
 
-        N = len(z_matrix)
+        N = len(z_matrix['bonds']) + len(z_matrix['angles']) + len(z_matrix['dihedrals']) + len(z_matrix['impropers'])
         causal_score = np.zeros(N, dtype=float)
         pair_score = np.zeros((N, N), dtype=float)
 
@@ -3882,18 +3907,20 @@ class InterpolationDriver():
             sym_torsion_centers = set()
 
         for i in block_indices:
-            coord = tuple(int(x) for x in z_matrix[i])
-
-            if len(coord) == 4:
-                if tuple(coord[1:3]) in sym_torsion_centers:
-                    continue
-                d = self._principal_torsion_delta(q_a[i] - q_b[i])
-                x = d / np.pi
-            else:
-                x = q_a[i] - q_b[i]
-
-            d2 += x * x
-
+            wanted_coord = None
+            off_set = 0
+            for key in z_matrix.keys():
+                for z_idx, coord in enumerate(z_matrix[key]):
+                    if i == z_idx + off_set:
+                        if key == 'dihedral':
+                            if tuple(coord[1:3]) in sym_torsion_centers:
+                                continue
+                            d = self._principal_torsion_delta(q_a[i] - q_b[i])
+                            x = d / np.pi
+                        else:
+                            x = q_a[i] - q_b[i]
+                        d2 += x * x
+                off_set += len(z_matrix[key])
         return float(np.sqrt(d2))
 
 
@@ -3978,7 +4005,7 @@ class InterpolationDriver():
         g0 = np.asarray(g0, dtype=float).reshape(-1)
         g_qm = np.asarray(g_qm, dtype=float).reshape(-1)
 
-        N = len(z_matrix)
+        N = dq_raw.shape[0]
         if dq_raw.shape[0] != N:
             raise ValueError("dq_raw has wrong length")
         if g0.shape[0] != N:
@@ -3990,12 +4017,16 @@ class InterpolationDriver():
 
         dq_eff = dq_raw.copy()
         chain = np.ones(N)
-
-        for i, coord in enumerate(z_matrix):
-            if len(coord) == 4:
-                dq_eff[i] = np.sin(dq_raw[i])
-                chain[i] = np.cos(dq_raw[i])
-
+        
+        off_set = 0
+        for key in z_matrix:
+            for i, coord in enumerate(z_matrix[key]):
+                idx = i + off_set
+                if len(coord) == 4:
+                    dq_eff[idx] = np.sin(dq_raw[idx])
+                    chain[idx] = np.cos(dq_raw[idx])
+            
+            off_set += len(z_matrix[key])
         # Forward (matches your PES code)
         Hdq_raw = H @ dq_eff
         diag_resp_raw = np.diag(H) * dq_eff
@@ -4024,31 +4055,35 @@ class InterpolationDriver():
 
 
         rows = []
-        for i, coord in enumerate(z_matrix):
-            rows.append({
-                "idx": i,
-                "coord": tuple(coord),
-                "type": self.coord_type(tuple(coord)),
-                "dq_raw": dq_raw[i],
-                "dq_eff": dq_eff[i],
-                "abs_dq": abs(dq_eff[i]),
-                "chain": chain[i],
-                "g0_eff": g0_eff[i],
-                "diag_resp": diag_resp[i],
-                "abs_diag_resp": abs(diag_resp[i]),
-                "offdiag_resp": offdiag_resp[i],
-                "abs_offdiag_resp": abs(offdiag_resp[i]),
-                "Hdq": Hdq[i],
-                "abs_Hdq": abs(Hdq[i]),
-                "g_model": g_model[i],
-                "g_qm": g_qm[i],
-                "delta_g_err": delta_g_err[i],
-                "abs_delta_g_err": abs(delta_g_err[i]),
-                "rho": rho[i],
-                "pE_total": pE_total[i],
-                "abs_pE_total": abs(pE_total[i]),
+        off_set = 0
+        for key in z_matrix:
+            for i, coord in enumerate(z_matrix[key]):
+                idx = i + off_set
+                rows.append({
+                    "idx": idx,
+                    "coord": tuple(coord),
+                    "type": self.coord_type(tuple(coord)),
+                    "dq_raw": dq_raw[idx],
+                    "dq_eff": dq_eff[idx],
+                    "abs_dq": abs(dq_eff[idx]),
+                    "chain": chain[idx],
+                    "g0_eff": g0_eff[idx],
+                    "diag_resp": diag_resp[idx],
+                    "abs_diag_resp": abs(diag_resp[idx]),
+                    "offdiag_resp": offdiag_resp[idx],
+                    "abs_offdiag_resp": abs(offdiag_resp[idx]),
+                    "Hdq": Hdq[idx],
+                    "abs_Hdq": abs(Hdq[idx]),
+                    "g_model": g_model[idx],
+                    "g_qm": g_qm[idx],
+                    "delta_g_err": delta_g_err[idx],
+                    "abs_delta_g_err": abs(delta_g_err[idx]),
+                    "rho": rho[idx],
+                    "pE_total": pE_total[idx],
+                    "abs_pE_total": abs(pE_total[idx]),
 
-            })
+                })
+            off_set += len(z_matrix[key])
 
         by_abs_dq = sorted(rows, key=lambda r: r["abs_dq"], reverse=True)
         by_abs_Hdq = sorted(rows, key=lambda r: r["abs_Hdq"], reverse=True)

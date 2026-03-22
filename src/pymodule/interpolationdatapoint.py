@@ -97,9 +97,10 @@ class InterpolationDatapoint:
         self.energy = None
         self.gradient = None
         self.hessian = None
-
-
-        self.z_matrix = z_matrix
+        self.z_matrix_dict = z_matrix
+        if z_matrix is not None:
+            z_matrix_flat = self.flatten_z_matrix(z_matrix)
+            self.z_matrix = z_matrix_flat
         self.atom_labels = atom_labels
         self.internal_gradient = None
         self.internal_hessian = None
@@ -177,6 +178,16 @@ class InterpolationDatapoint:
             }
         }
 
+    @staticmethod
+    def flatten_z_matrix(zm_dict):
+        """Flatten canonical dict to legacy ordered list representation."""
+        return (
+            list(zm_dict["bonds"]) +
+            list(zm_dict["angles"]) +
+            list(zm_dict["dihedrals"]) +
+            list(zm_dict["impropers"])
+        )
+        
     def print_keywords(self):
         """
         Prints the input keywords of the InterpolationDatapoint.
@@ -997,32 +1008,13 @@ class InterpolationDatapoint:
             self._validate_vectorized_internal_coordinate_values_against_legacy()
 
     def get_z_matrix_as_np_arrays(self):
-        """
-        Returns a dictionary with the numpy arrays corresponding to the bonds,
-        bond angles, and dihedral angles defined by the Z-matrix.
-        """
-        assert_msg_critical(self.z_matrix is not None,
-                            'InterpolationDatapoint: No Z-matrix is defined.')
 
-        bonds = []
-        angles = []
-        dihedrals = []
-        
-        for z in self.z_matrix:
-            if len(z) == 2:
-                bonds.append(z)
-            elif len(z) == 3:
-                angles.append(z)
-            elif len(z) == 4:
-                dihedrals.append(z)
-            else:
-                assert_msg_critical(
-                    False, 'InterpolationDatapoint: Invalid entry size in Z-matrix.')
-
+        zmat = self.z_matrix_dict
         return {
-            'bonds': np.array(bonds),
-            'angles': np.array(angles),
-            'dihedrals': np.array(dihedrals)
+            "bonds": np.array(zmat["bonds"], dtype=np.int64),
+            "angles": np.array(zmat["angles"], dtype=np.int64),
+            "dihedrals": np.array(zmat["dihedrals"], dtype=np.int64),
+            "impropers": np.array(zmat["impropers"], dtype=np.int64),
         }
     
     def get_imp_int_coord_as_np_arrays(self):
@@ -1033,25 +1025,12 @@ class InterpolationDatapoint:
         assert_msg_critical(self.imp_int_coordinates is not None,
                             'InterpolationDatapoint: No Z-matrix is defined.')
 
-        bonds = []
-        angles = []
-        dihedrals = []
-
-        for z in self.imp_int_coordinates:
-            if len(z) == 2:
-                bonds.append(z)
-            elif len(z) == 3:
-                angles.append(z)
-            elif len(z) == 4:
-                dihedrals.append(z)
-            else:
-                assert_msg_critical(
-                    False, 'InterpolationDatapoint: Invalid entry size in Z-matrix.')
-
+        imp_coords = self.imp_int_coordinates
         return {
-            'imp_bonds': np.array(bonds),
-            'imp_angles': np.array(angles),
-            'imp_dihedrals': np.array(dihedrals)
+            "imp_bonds": np.array(imp_coords["bonds"], dtype=np.int64),
+            "imp_angles": np.array(imp_coords["angles"], dtype=np.int64),
+            "imp_dihedrals": np.array(imp_coords["dihedrals"], dtype=np.int64),
+            "imp_impropers": np.array(imp_coords["impropers"], dtype=np.int64),
         }
 
     def calculate_translation_coordinates(self):
@@ -1260,16 +1239,14 @@ class InterpolationDatapoint:
 
             z_matrix_bonds = label + '_bonds'
             z_matrix_angles = label + '_angles'
-            z_matrix_dihedral = label + '_dihedrals'
-
-            z_matrix_labels = [z_matrix_bonds, z_matrix_angles, z_matrix_dihedral]
+            z_matrix_dihedrals = label + '_dihedrals'
+            z_matrix_impropers = label + '_impropers'
 
             imp_int_coord_bonds = label + '_imp_bonds'
             imp_int_coord_angles = label + '_imp_angles'
             imp_int_coord_dihedrals = label + '_imp_dihedrals'
+            imp_int_coord_impropers = label + '_imp_impropers'
 
-            imp_int_coord_labels = [imp_int_coord_bonds, imp_int_coord_angles, imp_int_coord_dihedrals]
-            
             self.point_label = label
             self.energy = np.array(h5f.get(energy_label))
             self.internal_gradient = np.array(h5f.get(gradient_label))
@@ -1283,17 +1260,30 @@ class InterpolationDatapoint:
             self.mapping_masks = np.array(h5f.get(mapping_masks_label))
 
 
-            self.z_matrix = []
-            for label_obj in z_matrix_labels:
-                current_z_list = [tuple(z_list.tolist()) for z_list in list(h5f.get(label_obj))]
-                self.z_matrix.extend(current_z_list)
+            z_matrix_dict = {}
+            for kname, key in [
+                (z_matrix_bonds, "bonds"),
+                (z_matrix_angles, "angles"),
+                (z_matrix_dihedrals, "dihedrals"),
+                (z_matrix_impropers, "impropers")
+            ]:
+                ds = h5f.get(kname)
+                if ds is not None:
+                    z_matrix_dict[key] = [tuple(x.tolist()) for x in ds]
+            self.z_matrix = self.flatten_z_matrix(z_matrix_dict)
             self._b_matrix_row_cache = None
 
             if self.identify_imp_int_coord:
-                self.imp_int_coordinates = []
-                for label_obj in imp_int_coord_labels:
-                    current_imp_int_coord_list = [tuple(z_list_imp_coord.tolist()) for z_list_imp_coord in list(h5f.get(label_obj))]
-                    self.imp_int_coordinates.extend(current_imp_int_coord_list)
+                self.imp_int_coordinates = {}
+                for kname, key in [
+                    (imp_int_coord_bonds, "bonds"),
+                    (imp_int_coord_angles, "angles"),
+                    (imp_int_coord_dihedrals, "dihedrals"),
+                    (imp_int_coord_impropers, "impropers")
+                ]:
+                    ds = h5f.get(kname)
+                    if ds is not None:
+                        self.imp_int_coordinates[key] = [tuple(x.tolist()) for x in ds]
 
             h5f.close()
 
@@ -1426,9 +1416,11 @@ class InterpolationDatapoint:
             label + "_bonds",
             label + "_angles",
             label + "_dihedrals",
+            label + "_impropers",
             label + "_imp_bonds",
             label + "_imp_angles",
-            label + "_imp_dihedrals"
+            label + "_imp_dihedrals",
+            label + "_imp_impropers"
             ]
 
         with h5py.File(fname, 'r+') as h5f:

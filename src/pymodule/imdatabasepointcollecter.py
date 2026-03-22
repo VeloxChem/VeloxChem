@@ -4302,6 +4302,7 @@ class IMDatabasePointCollecter:
                             
                             opt_drv.constraints = opt_constraint_list
                             opt_results = self._opt_compute_mpi_safe(opt_drv, molecule, current_basis, scf_tensors)
+
                             optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
                             optimized_molecule.set_charge(molecule.get_charge())
                             optimized_molecule.set_multiplicity(molecule.get_multiplicity())
@@ -4399,7 +4400,16 @@ class IMDatabasePointCollecter:
                             print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', molecule.get_xyz_string()) 
                             current_basis = MolecularBasis.read(optimized_molecule, current_basis.get_main_basis_label())       
                         
-                        imp_int_coord = main_constraint_list
+                        imp_int_coord = {'bonds': [], 'angles': [], 'dihedrals': [], 'impropers': []}
+                        for element in main_constraint_list:
+                            if element in self.root_z_matrix[self.current_state]['bonds']:
+                                imp_int_coord['bonds'].append(element)
+                            elif element in self.root_z_matrix[self.current_state]['angles']:
+                                imp_int_coord['angles'].append(element)
+                            elif element in self.root_z_matrix[self.current_state]['dihedrals']:
+                                imp_int_coord['dihedrals'].append(element)
+                            elif element in self.root_z_matrix[self.current_state]['impropers']:
+                                imp_int_coord['impropers'].append(element)
 
                         # same = False
                         # sum_of_values = 0
