@@ -185,26 +185,28 @@ class TestScfDriverMiscellaneous:
         for key in method_keywords:
             assert getattr(second_drv, key) == getattr(scf_drv, key)
 
-        # test restart_exact
+        # test read_settings
 
         third_drv = ScfRestrictedDriver()
         third_drv.ostream.mute()
         third_drv.checkpoint_file = str(checkpoint_file)
+        third_drv.filename = str(tmp_path / "copied_settings_target")
 
         new_molecule, new_basis = read_molecule_and_basis(str(checkpoint_file))
 
-        third_results = third_drv.compute(new_molecule,
-                                          new_basis,
-                                          restart_exact=True)
+        third_drv.read_settings(str(checkpoint_file))
+        third_results = third_drv.compute(new_molecule, new_basis)
 
         for key in scf_keywords:
-            if key == 'restart':
+            if key in ('restart', 'filename', 'checkpoint_file'):
                 continue
             assert getattr(third_drv, key) == getattr(scf_drv, key)
         for key in method_keywords:
             assert getattr(third_drv, key) == getattr(scf_drv, key)
 
         assert third_drv.restart
+        assert third_drv.filename == str(tmp_path / "copied_settings_target")
+        assert third_drv.checkpoint_file == str(checkpoint_file)
 
         if self.is_master():
             assert third_results['scf_type'] == scf_results['scf_type']
@@ -214,21 +216,62 @@ class TestScfDriverMiscellaneous:
                 np.abs(third_results['D_alpha'] -
                        scf_results['D_alpha'])) < 1e-8
 
-        # test restart_exact with a different scf_type
+        # test read_settings with a different scf_type and invalid restart
 
         fourth_drv = ScfUnrestrictedDriver()
         fourth_drv.ostream.mute()
         fourth_drv.checkpoint_file = str(checkpoint_file)
+        fourth_drv.read_settings(str(checkpoint_file))
 
         new_molecule, new_basis = read_molecule_and_basis(str(checkpoint_file))
         new_molecule.set_charge(1)
         new_molecule.set_multiplicity(2)
 
-        fourth_results_not_used = fourth_drv.compute(new_molecule,
-                                                     new_basis,
-                                                     restart_exact=True)
+        fourth_results_not_used = fourth_drv.compute(new_molecule, new_basis)
 
         assert not fourth_drv.restart
+
+    def test_read_settings_imports_only_configuration(self, tmp_path):
+
+        molecule, basis = self.get_water_and_basis()
+        filename = str(tmp_path / "water_import_settings")
+        checkpoint_file = Path(f"{filename}_scf.h5")
+
+        comm = MPI.COMM_WORLD
+        filename = comm.bcast(filename, root=mpi_master())
+        checkpoint_file = comm.bcast(checkpoint_file, root=mpi_master())
+
+        def configure(driver):
+            driver.filename = filename
+            driver.max_iter = 37
+            driver.density_damping = True
+            driver.xcfun = 'blyp'
+            driver.ri_coulomb = True
+            driver.ri_auxiliary_basis = 'def2-universal-jkfit'
+            driver.ri_metric_threshold = 1.0e-10
+
+        scf_drv, _ = self.run_hf_scf(molecule, basis, configure)
+
+        imported_drv = ScfRestrictedDriver()
+        imported_drv.ostream.mute()
+        imported_drv.restart = False
+        imported_drv.filename = str(tmp_path / "do_not_override")
+        imported_drv.checkpoint_file = str(tmp_path / "do_not_override_scf.h5")
+
+        imported_drv.read_settings(str(checkpoint_file))
+
+        assert imported_drv.restart is False
+        assert imported_drv.filename == str(tmp_path / "do_not_override")
+        assert imported_drv.checkpoint_file == str(
+            tmp_path / "do_not_override_scf.h5")
+        assert imported_drv.max_iter == scf_drv.max_iter
+        assert imported_drv.density_damping == scf_drv.density_damping
+        assert imported_drv.xcfun == scf_drv.xcfun
+        assert imported_drv.ri_coulomb == scf_drv.ri_coulomb
+        assert (imported_drv.ri_auxiliary_basis ==
+                scf_drv.ri_auxiliary_basis)
+        assert (imported_drv.ri_metric_threshold ==
+                scf_drv.ri_metric_threshold)
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='skip pytest.raises for multiple MPI processes')
@@ -354,3 +397,27 @@ class TestScfDriverMiscellaneous:
 
         if self.is_master():
             assert abs(-74.54939063506086 - scf_results["scf_energy"]) < 1.0e-8
+
+    def test_user_supplied_start_orbitals_are_not_checkpoint_restart(self):
+
+        molecule, basis = self.get_water_and_basis()
+
+        ref_drv, ref_results = self.run_hf_scf(molecule, basis)
+
+        start_drv = ScfRestrictedDriver()
+        start_drv.ostream.mute()
+
+        if self.is_master():
+            start_orbitals = ref_drv.molecular_orbitals.alpha_to_numpy().copy()
+        else:
+            start_orbitals = None
+
+        start_drv.set_start_orbitals(molecule, basis, start_orbitals)
+        start_results = start_drv.compute(molecule, basis)
+
+        assert start_drv.restart is False
+        assert start_drv._start_orbitals is True
+        if self.is_master():
+            assert start_drv._ref_mol_orbs is not None
+            assert start_results["scf_energy"] == pytest.approx(
+                ref_results["scf_energy"], abs=1.0e-10)
