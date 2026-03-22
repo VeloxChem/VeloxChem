@@ -793,6 +793,7 @@ class IMDatabasePointCollecter:
         engine.comm = self._mpi_interp_comm
         engine.rank = self._mpi_interp_comm.Get_rank()
         engine.size = self._mpi_interp_comm.Get_size()
+    
     def _interp_compute_root_local_serial(self, driver, molecule):
         """
         Runs InterpolationDriver.compute in a root-local serial-safe mode.
@@ -2115,6 +2116,7 @@ class IMDatabasePointCollecter:
                     'sync_roots': sync_roots,
                 })
 
+
             self.update_forces(self.simulation.context)
             self._add_runtime_timing('step.update_forces', time() - force_t0)
 
@@ -2169,6 +2171,7 @@ class IMDatabasePointCollecter:
                 self._metadynamics.step(self.simulation, 1)
             else:
                 self.simulation.step(1)
+
 
             self._add_runtime_timing('step.integrator', time() - integ_t0)
             self.prev_state = self.current_state
@@ -3333,13 +3336,14 @@ class IMDatabasePointCollecter:
             compute_t0 = time()
             try:
                 driver.compute(molecule)
+               
             finally:
                 driver.mpi_collective_compute_active = False
                 if self._mpi_is_active() and self.mpi_root_worker_mode:
                     driver.mpi_preload_enabled = False
                 else:
                     driver.mpi_preload_enabled = preload_config
-
+      
             compute_dt = time() - compute_t0
             self._add_runtime_timing(
                 f'update_gradient_and_energy.impes_compute_root_{root}',
@@ -3902,7 +3906,6 @@ class IMDatabasePointCollecter:
                 print('Energy difference', energy_difference, energy_difference * hartree_in_kcalpermol(), 'kcal/mol', 'energy differences rmsd', energy_difference / natms * hartree_in_kcalpermol())
                 print('gradients alignment', cos_theta, 'rmsd gradient', rmsd_gradient, 'kcal/mol/angstrom')
 
-
                 state_specific_energies[self.roots_to_follow[identification_state + e_idx]] = [qm_energy[e_idx], self.impes_drivers[self.roots_to_follow[identification_state + e_idx]].impes_coordinate.energy]
                 current_state_difference[self.roots_to_follow[identification_state + e_idx]][0] = energy_difference / natms * hartree_in_kcalpermol()
                 current_state_difference[self.roots_to_follow[identification_state + e_idx]][1] = rmsd_gradient
@@ -3925,15 +3928,15 @@ class IMDatabasePointCollecter:
 
         if len(addition_of_state_specific_points) > 0:
 
-            for state in self.roots_to_follow:
-                if self.use_opt_confidence_radius[0] and len(self.allowed_molecules[state]['molecules']) > 20 and 1 == 2:
-                    self.add_a_point = True
-                    if not self.expansion:
-                        length_vectors = (self.impes_drivers[-1].impes_coordinate.cartesian_distance_vector(self.qm_data_points[0]))
-                        rmsd = (np.linalg.norm(length_vectors) / np.sqrt(len(self.molecule.get_labels())) * bohr_in_angstrom())
-                        self.expansion_molecules.append((molecule, energy_difference / natms * hartree_in_kcalpermol(), rmsd, (np.linalg.norm(length_vectors))))
-                        self.last_point_added = self.point_checker - 1
-                        self.point_checker = 0
+            for root in self.roots_to_follow:
+                if self.use_opt_confidence_radius[0] and len(self.allowed_molecules[root]['molecules']) < 20:
+                    self.allowed_molecules[root]['molecules'].append(molecule)
+                    self.allowed_molecules[root]['im_energies'].append(self.impes_drivers[root].impes_coordinate.energy)
+                    self.allowed_molecules[root]['qm_energies'].append(state_specific_energies[root][0])
+                    self.allowed_molecules[root]['qm_gradients'].append(state_specific_gradients[root][0])
+                    self.last_point_added = self.point_checker - 1
+                    self.point_checker = 0
+                    self.add_a_point = False
                 
                 else:
                     self.add_a_point = True

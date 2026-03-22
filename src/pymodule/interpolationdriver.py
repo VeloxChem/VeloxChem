@@ -845,6 +845,7 @@ class InterpolationDriver():
             sum_weight_gradients_cart += weight_grad_cart
 
             potential_t0 = time()
+
             potential, gradient_mw, r_i = self.compute_potential_mpi(
                qm_data_point,
                self.impes_coordinate.internal_coordinates_values,
@@ -862,6 +863,7 @@ class InterpolationDriver():
             self.potentials.append(potential)
             self.gradients.append(gradient)
             weight_gradients_cart.append(weight_grad_cart)
+
         self._add_runtime_timing('shepard.point_eval_loop', time() - eval_loop_t0)
         self._add_runtime_timing('shepard.compute_potential', compute_potential_acc)
            
@@ -1779,11 +1781,13 @@ class InterpolationDriver():
             hessian = data_point.internal_hessian.copy()
             dist_org = (org_int_coords.copy() - data_point.internal_coordinates_values)
             dist_check = (org_int_coords.copy() - data_point.internal_coordinates_values)
-
+            
             dihedral_start = self.symmetry_information[-1][0]
             dihedral_end = self.symmetry_information[-1][1]
             if not self.use_cosine_dihedral:
                 dist_check[dihedral_start:dihedral_end] = np.sin(dist_org[dihedral_start:dihedral_end])
+            
+            # print(data_point.point_label, dist_check[dihedral_start:], np.max(hessian[dihedral_start:, dihedral_start:]))
 
             self.bond_rmsd.append(np.sqrt(np.mean(np.sum((dist_org[:self.symmetry_information[-1][0]])**2))))
             self.angle_rmsd.append(np.sqrt(np.mean(np.sum(dist_org[self.symmetry_information[-1][0]:self.symmetry_information[-1][1]]**2))))
