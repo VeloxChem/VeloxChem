@@ -35,9 +35,11 @@ from pathlib import PurePath
 from datetime import datetime
 from random import getrandbits
 import numpy as np
+import h5py
 import sys
 import re
 
+from .veloxchemlib import XCFunctional
 from .veloxchemlib import mpi_master
 from .errorhandler import assert_msg_critical
 
@@ -441,6 +443,176 @@ def parse_input(obj, keyword_types, input_dictionary):
         else:
             err_type = f'parse_input: invalid keyword type for \'{key}\''
             assert_msg_critical(False, err_type)
+
+
+def _format_input_number(value):
+    """
+    Formats numeric input into a stable string representation.
+    """
+
+    if isinstance(value, (int, np.integer)):
+        return str(int(value))
+
+    if isinstance(value, (float, np.floating)):
+        return str(float(value))
+
+    return str(value)
+
+
+def _format_seq_input(input_seq):
+    """
+    Formats sequence input into parse-equivalent input.
+    """
+
+    return ', '.join(_format_input_number(x) for x in tuple(input_seq))
+
+
+def unparse_input(obj, keyword_types):
+    """
+    Converts parsed object attributes back into canonical string input.
+
+    The resulting dictionary is suitable for passing to ``parse_input`` again.
+    Since parsing normalizes some values, this function emits a normalized
+    representation rather than the exact original user formatting.
+
+    :param obj:
+        The object holding parsed attributes.
+    :param keyword_types:
+        The data type associated with keyword.
+
+    :return:
+        A dictionary containing canonical string input.
+    """
+
+    input_dictionary = {}
+
+    for key, keyword_type in keyword_types.items():
+        if not hasattr(obj, key):
+            continue
+
+        val = getattr(obj, key)
+
+        if val is None:
+            input_dictionary[key] = None
+
+        elif isinstance(val, XCFunctional):
+            input_dictionary[key] = val.get_func_label()
+
+        elif keyword_type in ['str', 'str_upper', 'str_lower']:
+            input_dictionary[key] = str(val)
+
+        elif keyword_type == 'int':
+            input_dictionary[key] = str(int(val))
+
+        elif keyword_type == 'float':
+            input_dictionary[key] = _format_input_number(val)
+
+        elif keyword_type == 'bool':
+            input_dictionary[key] = 'yes' if bool(val) else 'no'
+
+        elif keyword_type == 'list':
+            input_dictionary[key] = [str(x) for x in list(val)]
+
+        elif keyword_type in [
+                'seq_fixed_str', 'seq_fixed_int', 'seq_fixed', 'seq_range'
+        ]:
+            input_dictionary[key] = _format_seq_input(val)
+
+        else:
+            err_type = f'unparse_input: invalid keyword type for \'{key}\''
+            assert_msg_critical(False, err_type)
+
+    return input_dictionary
+
+
+def write_unparsed_input_to_hdf5(fname, input_dictionary, group_name='input'):
+    """
+    Writes unparsed input dictionary to HDF5 file.
+
+    Each entry in the dictionary must be either a string, a list of strings,
+    or ``None``.
+
+    :param fname:
+        The HDF5 file name.
+    :param input_dictionary:
+        The unparsed input dictionary.
+    :param group_name:
+        The name of the HDF5 group.
+    """
+
+    string_type = h5py.string_dtype(encoding='utf-8')
+
+    with h5py.File(fname, 'a') as h5f:
+        if group_name in h5f:
+            del h5f[group_name]
+
+        group = h5f.create_group(group_name)
+
+        for key, val in input_dictionary.items():
+            if val is None:
+                dset = group.create_dataset(key, shape=(0,), dtype=string_type)
+                dset.attrs['value_type'] = 'none'
+
+            elif isinstance(val, str):
+                dset = group.create_dataset(key, data=val, dtype=string_type)
+                dset.attrs['value_type'] = 'str'
+
+            elif isinstance(val, list):
+                assert_msg_critical(
+                    all(isinstance(x, str) for x in val),
+                    f'write_unparsed_input_to_hdf5: invalid list value for \'{key}\''
+                )
+                dset = group.create_dataset(key, data=val, dtype=string_type)
+                dset.attrs['value_type'] = 'list'
+
+            else:
+                errmsg = f'write_unparsed_input_to_hdf5: invalid value type for \'{key}\''
+                assert_msg_critical(False, errmsg)
+
+
+def read_unparsed_input_from_hdf5(fname, group_name='input'):
+    """
+    Reads unparsed input dictionary from HDF5 file.
+
+    :param fname:
+        The HDF5 file name.
+    :param group_name:
+        The name of the HDF5 group.
+
+    :return:
+        The unparsed input dictionary.
+    """
+
+    input_dictionary = {}
+
+    with h5py.File(fname, 'r') as h5f:
+        assert_msg_critical(
+            group_name in h5f,
+            f'read_unparsed_input_from_hdf5: group \'{group_name}\' not found')
+
+        group = h5f[group_name]
+
+        for key in group:
+            dset = group[key]
+            value_type = dset.attrs.get('value_type', 'str')
+
+            if isinstance(value_type, bytes):
+                value_type = value_type.decode('utf-8')
+
+            if value_type == 'none':
+                input_dictionary[key] = None
+
+            elif value_type == 'str':
+                input_dictionary[key] = dset.asstr()[()]
+
+            elif value_type == 'list':
+                input_dictionary[key] = list(dset.asstr()[()])
+
+            else:
+                errmsg = f'read_unparsed_input_from_hdf5: invalid value type for \'{key}\''
+                assert_msg_critical(False, errmsg)
+
+    return input_dictionary
 
 
 def print_keywords(input_keywords, ostream):

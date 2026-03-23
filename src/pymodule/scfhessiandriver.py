@@ -44,6 +44,7 @@ from .veloxchemlib import NuclearPotentialGeom200Driver
 from .veloxchemlib import NuclearPotentialGeom020Driver
 from .veloxchemlib import NuclearPotentialGeom110Driver
 from .veloxchemlib import NuclearPotentialGeom101Driver
+from .veloxchemlib import ECPHessianDriver
 from .veloxchemlib import ElectricDipoleMomentGeom100Driver
 from .veloxchemlib import FockGeom2000Driver
 from .veloxchemlib import FockGeom1100Driver
@@ -149,11 +150,6 @@ class ScfHessianDriver(HessianDriver):
             The AO basis set.
         """
 
-        # TODO: enable ECP
-        assert_msg_critical(
-            not ao_basis.has_ecp(),
-            f'{type(self).__name__}.compute: ECP is not yet supported')
-
         if self.rank == mpi_master():
             self.print_header()
 
@@ -239,11 +235,12 @@ class ScfHessianDriver(HessianDriver):
         scf_results_sanity_check(self, self.scf_driver.scf_results)
         dft_sanity_check(self, 'compute')
 
-        # use determine_xc_hessian_grid_level here to ensure early exit for
+        # use _determine_xc_hessian_grid_level here to ensure early exit for
         # unsupported cases
         if self._dft:
-            self.determine_xc_hessian_grid_level(
-                molecule, get_default_grid_level(self.scf_driver.xcfun))
+            self._determine_xc_hessian_grid_level(
+                molecule, ao_basis,
+                get_default_grid_level(self.scf_driver.xcfun))
 
         self.ostream.print_info('Computing analytical Hessian...')
         self.ostream.print_blank()
@@ -261,7 +258,7 @@ class ScfHessianDriver(HessianDriver):
         if self.rank == mpi_master():
             density = scf_results['D_alpha']
             mo = scf_results['C_alpha']
-            nocc = molecule.number_of_alpha_electrons()
+            nocc = molecule.number_of_alpha_occupied_orbitals(ao_basis)
             mo_occ = mo[:, :nocc]
             mo_energies = scf_results['E_alpha']
             eocc = mo_energies[:nocc]
@@ -393,6 +390,13 @@ class ScfHessianDriver(HessianDriver):
         npot_hess_110_drv = NuclearPotentialGeom110Driver()
         npot_hess_101_drv = NuclearPotentialGeom101Driver()
 
+        if ao_basis.has_ecp():
+            ecp_hess_drv = ECPHessianDriver()
+            core_electrons = ao_basis.get_number_of_ecp_core_electrons()
+            ecp_atom_inds = [
+                idx for idx, nelec in enumerate(core_electrons) if nelec > 0
+            ]
+
         fock_hess_2000_drv = FockGeom2000Driver()
         fock_hess_1100_drv = FockGeom1100Driver()
         fock_hess_1010_drv = FockGeom1010Driver()
@@ -449,6 +453,10 @@ class ScfHessianDriver(HessianDriver):
         # Parts related to second-order integral derivatives
         hessian_2nd_order_derivatives = np.zeros((natm, natm, 3, 3))
 
+        mol_charges = molecule.get_element_ids()
+        mol_charges -= ao_basis.get_number_of_ecp_core_electrons()
+        mol_coords = molecule.get_coordinates_in_bohr()
+
         for i in local_atoms:
 
             ovlp_hess_200_mats = ovlp_hess_200_drv.compute(
@@ -475,9 +483,9 @@ class ScfHessianDriver(HessianDriver):
             kin_hess_200_mats = Matrices()
 
             npot_hess_200_mats = npot_hess_200_drv.compute(
-                molecule, ao_basis, i)
+                molecule, ao_basis, i, mol_coords, mol_charges)
             npot_hess_020_mats = npot_hess_020_drv.compute(
-                molecule, ao_basis, i)
+                molecule, ao_basis, i, mol_charges[i])
 
             for x, label_x in enumerate('XYZ'):
                 for y, label_y in enumerate('XYZ'):
@@ -507,6 +515,39 @@ class ScfHessianDriver(HessianDriver):
                             np.sum(density * (npot_200_iixy + npot_200_iixy.T)))
 
                 hmats_200 = Matrices()
+
+            # ECP Hessian contribution
+
+            if ao_basis.has_ecp():
+
+                ecp_hess_200_mats = ecp_hess_drv.compute_geom_200(
+                    molecule, ao_basis, ecp_atom_inds, i)
+
+                if i in ecp_atom_inds:
+                    ecp_hess_020_mats = ecp_hess_drv.compute_geom_020(
+                        molecule, ao_basis, i)
+
+                for x, label_x in enumerate('XYZ'):
+                    for y, label_y in enumerate('XYZ'):
+                        ecp_label = label_x + label_y if x <= y else label_y + label_x
+
+                        ecp_200_iixy = ecp_hess_200_mats.matrix_to_numpy(
+                            ecp_label)
+
+                        if i in ecp_atom_inds:
+                            ecp_020_iixy = ecp_hess_020_mats.matrix_to_numpy(
+                                ecp_label)
+
+                        # TODO: move sign into function call (such as in oneints)
+                        hessian_2nd_order_derivatives[i, i, x, y] += 2.0 * (
+                            np.sum(density * (ecp_200_iixy + ecp_200_iixy.T)))
+
+                        if i in ecp_atom_inds:
+                            hessian_2nd_order_derivatives[
+                                i, i, x,
+                                y] += 2.0 * (np.sum(density * ecp_020_iixy))
+
+            # ERI Hessian contribution
 
             screener_atom_i = T4CScreener()
             screener_atom_i.partition_atom(ao_basis, molecule, 'eri', i)
@@ -577,11 +618,11 @@ class ScfHessianDriver(HessianDriver):
             kin_hess_101_mats = Matrices()
 
             npot_hess_110_mats_ij = npot_hess_110_drv.compute(
-                molecule, ao_basis, i, j)
+                molecule, ao_basis, i, j, mol_charges[j])
             npot_hess_110_mats_ji = npot_hess_110_drv.compute(
-                molecule, ao_basis, j, i)
+                molecule, ao_basis, j, i, mol_charges[i])
             npot_hess_101_mats = npot_hess_101_drv.compute(
-                molecule, ao_basis, i, j)
+                molecule, ao_basis, i, j, mol_coords, mol_charges)
 
             for x, label_x in enumerate('XYZ'):
                 for y, label_y in enumerate('XYZ'):
@@ -614,6 +655,44 @@ class ScfHessianDriver(HessianDriver):
                             np.sum(density * (npot_101_ijxy + npot_101_ijxy.T)))
 
                 hmats_101 = Matrices()
+
+            # ECP Hessian contribution
+
+            if ao_basis.has_ecp():
+
+                ecp_hess_101_mats = ecp_hess_drv.compute_geom_101(
+                    molecule, ao_basis, ecp_atom_inds, i, j)
+
+                if j in ecp_atom_inds:
+                    ecp_hess_110_mats_ij = ecp_hess_drv.compute_geom_110(
+                        molecule, ao_basis, i, j)
+
+                if i in ecp_atom_inds:
+                    ecp_hess_110_mats_ji = ecp_hess_drv.compute_geom_110(
+                        molecule, ao_basis, j, i)
+
+                for x, label_x in enumerate('XYZ'):
+                    for y, label_y in enumerate('XYZ'):
+                        ecp_xy_label = f'{label_x}_{label_y}'
+                        ecp_yx_label = f'{label_y}_{label_x}'
+
+                        ecp_101_ijxy = ecp_hess_101_mats.matrix_to_numpy(
+                            ecp_xy_label)
+
+                        ecp_110_ijxy = np.zeros(ecp_101_ijxy.shape)
+                        if j in ecp_atom_inds:
+                            ecp_110_ijxy += ecp_hess_110_mats_ij.matrix_to_numpy(
+                                ecp_xy_label)
+                        if i in ecp_atom_inds:
+                            ecp_110_ijxy += ecp_hess_110_mats_ji.matrix_to_numpy(
+                                ecp_yx_label)
+
+                        # TODO: move sign into function call (such as in oneints)
+                        hessian_2nd_order_derivatives[i, j, x, y] += 2.0 * (
+                            np.sum(density * (-ecp_110_ijxy - ecp_110_ijxy.T +
+                                              ecp_101_ijxy + ecp_101_ijxy.T)))
+
+            # ERI Hessian contribution
 
             screener_atom_pair = T4CScreener()
             screener_atom_pair.partition_atom_pair(ao_basis, molecule, 'eri', i,
@@ -677,8 +756,8 @@ class ScfHessianDriver(HessianDriver):
                           self.scf_driver.grid_level)
 
             # determine grid level for XC Hessian
-            grid_level = self.determine_xc_hessian_grid_level(
-                molecule, grid_level)
+            grid_level = self._determine_xc_hessian_grid_level(
+                molecule, ao_basis, grid_level)
 
             grid_drv.set_level(grid_level)
             mol_grid = grid_drv.generate(molecule)
@@ -709,6 +788,7 @@ class ScfHessianDriver(HessianDriver):
 
             qm_coords = molecule.get_coordinates_in_bohr()
             nuclear_charges = molecule.get_element_ids()
+            nuclear_charges -= ao_basis.get_number_of_ecp_core_electrons()
 
             for i in range(self.rank, natm, self.nodes):
                 if atom_pairs is not None:
@@ -783,7 +863,7 @@ class ScfHessianDriver(HessianDriver):
         if self.rank == mpi_master():
 
             # Nuclear-nuclear repulsion contribution
-            hessian_nuclear_nuclear = self.hess_nuc_contrib(molecule)
+            hessian_nuclear_nuclear = self.hess_nuc_contrib(molecule, ao_basis)
 
             # Doing this post-hoc is much easier to implement, and the cost of
             # the nuclear nuclear contribution is neglible
@@ -838,12 +918,14 @@ class ScfHessianDriver(HessianDriver):
             self.compute_dipole_gradient_restricted(molecule, ao_basis,
                                                     dist_cphf_ov)
 
-    def determine_xc_hessian_grid_level(self, molecule, grid_level):
+    def _determine_xc_hessian_grid_level(self, molecule, basis, grid_level):
         """
         Determines XC Hessian grid level.
 
         :param molecule:
             The molecule.
+        :param basis:
+            The AO basis set.
         :param grid_level:
             The input grid_level.
 
@@ -857,13 +939,25 @@ class ScfHessianDriver(HessianDriver):
         # determine grid level for XC Hessian based on default_grid_level
         # and max_elem_id
 
+        # max_elem_id does not count for ECP atoms since ECP atoms do not have
+        # inner shells with high exponent
+
         default_grid_level = get_default_grid_level(self.scf_driver.xcfun)
+
         elem_ids = molecule.get_identifiers()
-        max_elem_id = max(elem_ids)
+        core_electrons = basis.get_number_of_ecp_core_electrons()
+        elem_ids_without_ecp = [
+            z for z, ncore in zip(elem_ids, core_electrons) if ncore == 0
+        ]
+        max_elem_id = max(elem_ids_without_ecp)
 
         errmsg = 'Hessian calculation with '
         errmsg += self.scf_driver.xcfun.get_func_label().upper()
-        errmsg += f' functional and max element id {max_elem_id} '
+        errmsg += ' functional and '
+        if basis.has_ecp():
+            errmsg += f'max element id {max_elem_id} '
+        else:
+            errmsg += 'effective core potential '
         errmsg += 'is not supported.'
 
         if default_grid_level <= 4:
@@ -875,6 +969,10 @@ class ScfHessianDriver(HessianDriver):
                 assert_msg_critical(False, errmsg)
 
         elif default_grid_level in [5, 6]:
+            # special case for the combination of default_grid_level 6 and ECP
+            if default_grid_level == 6 and basis.has_ecp():
+                assert_msg_critical(False, errmsg)
+
             if max_elem_id <= 10:
                 grid_level = max(6, grid_level)
             elif max_elem_id <= 18:
@@ -909,11 +1007,12 @@ class ScfHessianDriver(HessianDriver):
             self.scf_driver.solvation_model is None,
             'ScfHessianDriver: Solvation model not implemented')
 
-        # use determine_xc_hessian_grid_level here to ensure early exit for
+        # use _determine_xc_hessian_grid_level here to ensure early exit for
         # unsupported cases
         if self._dft:
-            self.determine_xc_hessian_grid_level(
-                molecule, get_default_grid_level(self.scf_driver.xcfun))
+            self._determine_xc_hessian_grid_level(
+                molecule, ao_basis,
+                get_default_grid_level(self.scf_driver.xcfun))
 
         self.ostream.print_info('Computing analytical Hessian...')
         self.ostream.print_blank()
@@ -933,8 +1032,8 @@ class ScfHessianDriver(HessianDriver):
             density_b = scf_results['D_beta']
             mo_a = scf_results['C_alpha']
             mo_b = scf_results['C_beta']
-            nocc_a = molecule.number_of_alpha_electrons()
-            nocc_b = molecule.number_of_beta_electrons()
+            nocc_a = molecule.number_of_alpha_occupied_orbitals(ao_basis)
+            nocc_b = molecule.number_of_beta_occupied_orbitals(ao_basis)
             mo_occ_a = mo_a[:, :nocc_a]
             mo_occ_b = mo_b[:, :nocc_b]
             orb_ene_a = scf_results['E_alpha']
@@ -1075,6 +1174,13 @@ class ScfHessianDriver(HessianDriver):
         npot_hess_110_drv = NuclearPotentialGeom110Driver()
         npot_hess_101_drv = NuclearPotentialGeom101Driver()
 
+        if ao_basis.has_ecp():
+            ecp_hess_drv = ECPHessianDriver()
+            core_electrons = ao_basis.get_number_of_ecp_core_electrons()
+            ecp_atom_inds = [
+                idx for idx, nelec in enumerate(core_electrons) if nelec > 0
+            ]
+
         fock_hess_2000_drv = FockGeom2000Driver()
         fock_hess_1100_drv = FockGeom1100Driver()
         fock_hess_1010_drv = FockGeom1010Driver()
@@ -1140,6 +1246,10 @@ class ScfHessianDriver(HessianDriver):
         # Parts related to second-order integral derivatives
         hessian_2nd_order_derivatives = np.zeros((natm, natm, 3, 3))
 
+        mol_charges = molecule.get_element_ids()
+        mol_charges -= ao_basis.get_number_of_ecp_core_electrons()
+        mol_coords = molecule.get_coordinates_in_bohr()
+
         for i in local_atoms:
 
             ovlp_hess_200_mats = ovlp_hess_200_drv.compute(
@@ -1167,9 +1277,9 @@ class ScfHessianDriver(HessianDriver):
             kin_hess_200_mats = Matrices()
 
             npot_hess_200_mats = npot_hess_200_drv.compute(
-                molecule, ao_basis, i)
+                molecule, ao_basis, i, mol_coords, mol_charges)
             npot_hess_020_mats = npot_hess_020_drv.compute(
-                molecule, ao_basis, i)
+                molecule, ao_basis, i, mol_charges[i])
 
             for x, label_x in enumerate('XYZ'):
                 for y, label_y in enumerate('XYZ'):
@@ -1201,6 +1311,39 @@ class ScfHessianDriver(HessianDriver):
                                 (npot_200_iixy + npot_200_iixy.T)))
 
                 hmats_200 = Matrices()
+
+            # ECP Hessian contribution
+
+            if ao_basis.has_ecp():
+
+                ecp_hess_200_mats = ecp_hess_drv.compute_geom_200(
+                    molecule, ao_basis, ecp_atom_inds, i)
+
+                if i in ecp_atom_inds:
+                    ecp_hess_020_mats = ecp_hess_drv.compute_geom_020(
+                        molecule, ao_basis, i)
+
+                for x, label_x in enumerate('XYZ'):
+                    for y, label_y in enumerate('XYZ'):
+                        ecp_label = label_x + label_y if x <= y else label_y + label_x
+
+                        ecp_200_iixy = ecp_hess_200_mats.matrix_to_numpy(
+                            ecp_label)
+
+                        if i in ecp_atom_inds:
+                            ecp_020_iixy = ecp_hess_020_mats.matrix_to_numpy(
+                                ecp_label)
+
+                        # TODO: move sign into function call (such as in oneints)
+                        hessian_2nd_order_derivatives[i, i, x, y] += np.sum(
+                            (density_a + density_b) *
+                            (ecp_200_iixy + ecp_200_iixy.T))
+
+                        if i in ecp_atom_inds:
+                            hessian_2nd_order_derivatives[i, i, x, y] += np.sum(
+                                (density_a + density_b) * ecp_020_iixy)
+
+            # ERI Hessian contribution
 
             screener_atom_i = T4CScreener()
             screener_atom_i.partition_atom(ao_basis, molecule, 'eri', i)
@@ -1288,11 +1431,11 @@ class ScfHessianDriver(HessianDriver):
             kin_hess_101_mats = Matrices()
 
             npot_hess_110_mats_ij = npot_hess_110_drv.compute(
-                molecule, ao_basis, i, j)
+                molecule, ao_basis, i, j, mol_charges[j])
             npot_hess_110_mats_ji = npot_hess_110_drv.compute(
-                molecule, ao_basis, j, i)
+                molecule, ao_basis, j, i, mol_charges[i])
             npot_hess_101_mats = npot_hess_101_drv.compute(
-                molecule, ao_basis, i, j)
+                molecule, ao_basis, i, j, mol_coords, mol_charges)
 
             for x, label_x in enumerate('XYZ'):
                 for y, label_y in enumerate('XYZ'):
@@ -1328,6 +1471,45 @@ class ScfHessianDriver(HessianDriver):
                                 (npot_101_ijxy + npot_101_ijxy.T)))
 
                 hmats_101 = Matrices()
+
+            # ECP Hessian contribution
+
+            if ao_basis.has_ecp():
+
+                ecp_hess_101_mats = ecp_hess_drv.compute_geom_101(
+                    molecule, ao_basis, ecp_atom_inds, i, j)
+
+                if j in ecp_atom_inds:
+                    ecp_hess_110_mats_ij = ecp_hess_drv.compute_geom_110(
+                        molecule, ao_basis, i, j)
+
+                if i in ecp_atom_inds:
+                    ecp_hess_110_mats_ji = ecp_hess_drv.compute_geom_110(
+                        molecule, ao_basis, j, i)
+
+                for x, label_x in enumerate('XYZ'):
+                    for y, label_y in enumerate('XYZ'):
+                        ecp_xy_label = f'{label_x}_{label_y}'
+                        ecp_yx_label = f'{label_y}_{label_x}'
+
+                        ecp_101_ijxy = ecp_hess_101_mats.matrix_to_numpy(
+                            ecp_xy_label)
+
+                        ecp_110_ijxy = np.zeros(ecp_101_ijxy.shape)
+                        if j in ecp_atom_inds:
+                            ecp_110_ijxy += ecp_hess_110_mats_ij.matrix_to_numpy(
+                                ecp_xy_label)
+                        if i in ecp_atom_inds:
+                            ecp_110_ijxy += ecp_hess_110_mats_ji.matrix_to_numpy(
+                                ecp_yx_label)
+
+                        # TODO: move sign into function call (such as in oneints)
+                        hessian_2nd_order_derivatives[i, j, x, y] += np.sum(
+                            (density_a + density_b) *
+                            (-ecp_110_ijxy - ecp_110_ijxy.T + ecp_101_ijxy +
+                             ecp_101_ijxy.T))
+
+            # ERI Hessian contribution
 
             screener_atom_pair = T4CScreener()
             screener_atom_pair.partition_atom_pair(ao_basis, molecule, 'eri', i,
@@ -1426,8 +1608,8 @@ class ScfHessianDriver(HessianDriver):
                           self.scf_driver.grid_level)
 
             # determine grid level for XC Hessian
-            grid_level = self.determine_xc_hessian_grid_level(
-                molecule, grid_level)
+            grid_level = self._determine_xc_hessian_grid_level(
+                molecule, ao_basis, grid_level)
 
             grid_drv.set_level(grid_level)
             mol_grid = grid_drv.generate(molecule)
@@ -1458,6 +1640,7 @@ class ScfHessianDriver(HessianDriver):
 
             qm_coords = molecule.get_coordinates_in_bohr()
             nuclear_charges = molecule.get_element_ids()
+            nuclear_charges -= ao_basis.get_number_of_ecp_core_electrons()
 
             for i in range(self.rank, natm, self.nodes):
                 if atom_pairs is not None:
@@ -1532,7 +1715,7 @@ class ScfHessianDriver(HessianDriver):
         if self.rank == mpi_master():
 
             # Nuclear-nuclear repulsion contribution
-            hessian_nuclear_nuclear = self.hess_nuc_contrib(molecule)
+            hessian_nuclear_nuclear = self.hess_nuc_contrib(molecule, ao_basis)
 
             # Doing this post-hoc is much easier to implement, and the cost of
             # the nuclear nuclear contribution is neglible
@@ -1601,6 +1784,7 @@ class ScfHessianDriver(HessianDriver):
         # Number of atoms and atomic charges
         natm = molecule.number_of_atoms()
         nuclear_charges = molecule.get_element_ids()
+        nuclear_charges -= ao_basis.get_number_of_ecp_core_electrons()
 
         # Dipole integrals
         dipole_mats = compute_electric_dipole_integrals(molecule, ao_basis,
@@ -1628,7 +1812,7 @@ class ScfHessianDriver(HessianDriver):
             scf_results = self.scf_driver.scf_results
             density = scf_results['D_alpha']
             mo = scf_results['C_alpha']
-            nocc = molecule.number_of_alpha_electrons()
+            nocc = molecule.number_of_alpha_occupied_orbitals(ao_basis)
             mo_occ = mo[:, :nocc]
             mo_vir = mo[:, nocc:]
             nvir = mo_vir.shape[1]
@@ -1713,6 +1897,7 @@ class ScfHessianDriver(HessianDriver):
         # Number of atoms and atomic charges
         natm = molecule.number_of_atoms()
         nuclear_charges = molecule.get_element_ids()
+        nuclear_charges -= ao_basis.get_number_of_ecp_core_electrons()
 
         # Dipole integrals
         dipole_mats = compute_electric_dipole_integrals(molecule, ao_basis,
@@ -1743,8 +1928,8 @@ class ScfHessianDriver(HessianDriver):
             density = density_a + density_b
             mo_a = scf_results['C_alpha']
             mo_b = scf_results['C_beta']
-            nocc_a = molecule.number_of_alpha_electrons()
-            nocc_b = molecule.number_of_beta_electrons()
+            nocc_a = molecule.number_of_alpha_occupied_orbitals(ao_basis)
+            nocc_b = molecule.number_of_beta_occupied_orbitals(ao_basis)
             mo_occ_a = mo_a[:, :nocc_a]
             mo_vir_a = mo_a[:, nocc_a:]
             mo_occ_b = mo_b[:, :nocc_b]

@@ -40,7 +40,7 @@ import re
 from .veloxchemlib import mpi_master
 from .veloxchemlib import chemical_element_identifier
 from .outputstream import OutputStream
-from .errorhandler import safe_arccos
+from .mathutils import safe_arccos
 
 
 class AtomTypeIdentifier:
