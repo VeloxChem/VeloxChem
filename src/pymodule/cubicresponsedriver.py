@@ -43,7 +43,7 @@ from .oneeints import compute_angular_momentum_integrals
 from .veloxchemlib import mpi_master, hartree_in_wavenumber
 from .profiler import Profiler
 from .outputstream import OutputStream
-from .cppsolver import ComplexResponse
+from .cppsolver import ComplexResponseSolver
 from .linearsolver import LinearSolver
 from .nonlinearsolver import NonlinearSolver
 from .distributedarray import DistributedArray
@@ -396,7 +396,7 @@ class CubicResponseDriver(NonlinearSolver):
             self.comp = None
 
         # Computing the first-order response vectors (3 per frequency)
-        N_drv = ComplexResponse(self.comm, self.ostream)
+        N_drv = ComplexResponseSolver(self.comm, self.ostream)
 
         cpp_keywords = {
             'damping', 'norm_thresh', 'lindep_thresh', 'conv_thresh',
@@ -526,17 +526,17 @@ class CubicResponseDriver(NonlinearSolver):
 
         for (wb, wc, wd) in freqtriples:
 
-            Na = ComplexResponse.get_full_solution_vector(Nx[('A',
+            Na = ComplexResponseSolver.get_full_solution_vector(Nx[('A',
                                                               (wb + wc + wd))])
-            Nb = ComplexResponse.get_full_solution_vector(Nx[('B', wb)])
-            Nc = ComplexResponse.get_full_solution_vector(Nx[('C', wc)])
-            Nd = ComplexResponse.get_full_solution_vector(Nx[('D', wd)])
+            Nb = ComplexResponseSolver.get_full_solution_vector(Nx[('B', wb)])
+            Nc = ComplexResponseSolver.get_full_solution_vector(Nx[('C', wc)])
+            Nd = ComplexResponseSolver.get_full_solution_vector(Nx[('D', wd)])
 
-            Nbc = ComplexResponse.get_full_solution_vector(Nxy[(('BC', wb, wc),
+            Nbc = ComplexResponseSolver.get_full_solution_vector(Nxy[(('BC', wb, wc),
                                                                 wb + wc)])
-            Nbd = ComplexResponse.get_full_solution_vector(Nxy[(('BD', wb, wd),
+            Nbd = ComplexResponseSolver.get_full_solution_vector(Nxy[(('BD', wb, wd),
                                                                 wb + wd)])
-            Ncd = ComplexResponse.get_full_solution_vector(Nxy[(('CD', wc, wd),
+            Ncd = ComplexResponseSolver.get_full_solution_vector(Nxy[(('CD', wc, wd),
                                                                 wc + wd)])
 
             if self.rank == mpi_master():
@@ -808,15 +808,15 @@ class CubicResponseDriver(NonlinearSolver):
 
             vec_pack = self._collect_vectors_in_columns(vec_pack)
 
-            Nb = ComplexResponse.get_full_solution_vector(Nx[('B', wb)])
-            Nc = ComplexResponse.get_full_solution_vector(Nx[('C', wc)])
-            Nd = ComplexResponse.get_full_solution_vector(Nx[('D', wd)])
+            Nb = ComplexResponseSolver.get_full_solution_vector(Nx[('B', wb)])
+            Nc = ComplexResponseSolver.get_full_solution_vector(Nx[('C', wc)])
+            Nd = ComplexResponseSolver.get_full_solution_vector(Nx[('D', wd)])
 
-            Nbc = ComplexResponse.get_full_solution_vector(Nxy[(('BC', wb, wc),
+            Nbc = ComplexResponseSolver.get_full_solution_vector(Nxy[(('BC', wb, wc),
                                                                 wb + wc)])
-            Nbd = ComplexResponse.get_full_solution_vector(Nxy[(('BD', wb, wd),
+            Nbd = ComplexResponseSolver.get_full_solution_vector(Nxy[(('BD', wb, wd),
                                                                 wb + wd)])
-            Ncd = ComplexResponse.get_full_solution_vector(Nxy[(('CD', wc, wd),
+            Ncd = ComplexResponseSolver.get_full_solution_vector(Nxy[(('CD', wc, wd),
                                                                 wc + wd)])
 
             if self.rank != mpi_master():
@@ -890,9 +890,9 @@ class CubicResponseDriver(NonlinearSolver):
 
             # convert response matrix to ao basis #
 
-            Nb = ComplexResponse.get_full_solution_vector(Nx[('B', wb)])
-            Nc = ComplexResponse.get_full_solution_vector(Nx[('C', wc)])
-            Nd = ComplexResponse.get_full_solution_vector(Nx[('D', wd)])
+            Nb = ComplexResponseSolver.get_full_solution_vector(Nx[('B', wb)])
+            Nc = ComplexResponseSolver.get_full_solution_vector(Nx[('C', wc)])
+            Nd = ComplexResponseSolver.get_full_solution_vector(Nx[('D', wd)])
 
             if self.rank == mpi_master():
 
@@ -1023,15 +1023,15 @@ class CubicResponseDriver(NonlinearSolver):
 
         for (wb, wc, wd) in freqtriples:
 
-            Nb = ComplexResponse.get_full_solution_vector(Nx[('B', wb)])
-            Nc = ComplexResponse.get_full_solution_vector(Nx[('C', wc)])
-            Nd = ComplexResponse.get_full_solution_vector(Nx[('D', wd)])
+            Nb = ComplexResponseSolver.get_full_solution_vector(Nx[('B', wb)])
+            Nc = ComplexResponseSolver.get_full_solution_vector(Nx[('C', wc)])
+            Nd = ComplexResponseSolver.get_full_solution_vector(Nx[('D', wd)])
 
-            Nbc = ComplexResponse.get_full_solution_vector(Nxy[(('BC', wb, wc),
+            Nbc = ComplexResponseSolver.get_full_solution_vector(Nxy[(('BC', wb, wc),
                                                                 wb + wc)])
-            Nbd = ComplexResponse.get_full_solution_vector(Nxy[(('BD', wb, wd),
+            Nbd = ComplexResponseSolver.get_full_solution_vector(Nxy[(('BD', wb, wd),
                                                                 wb + wd)])
-            Ncd = ComplexResponse.get_full_solution_vector(Nxy[(('CD', wc, wd),
+            Ncd = ComplexResponseSolver.get_full_solution_vector(Nxy[(('CD', wc, wd),
                                                                 wc + wd)])
 
             if self.rank == mpi_master():
@@ -1352,11 +1352,11 @@ class CubicResponseDriver(NonlinearSolver):
 
             vec_pack = self._collect_vectors_in_columns(vec_pack)
 
-            Na = ComplexResponse.get_full_solution_vector(Nx[('A',
+            Na = ComplexResponseSolver.get_full_solution_vector(Nx[('A',
                                                               (wb + wc + wd))])
-            Nb = ComplexResponse.get_full_solution_vector(Nx[('B', wb)])
-            Nc = ComplexResponse.get_full_solution_vector(Nx[('C', wc)])
-            Nd = ComplexResponse.get_full_solution_vector(Nx[('D', wd)])
+            Nb = ComplexResponseSolver.get_full_solution_vector(Nx[('B', wb)])
+            Nc = ComplexResponseSolver.get_full_solution_vector(Nx[('C', wc)])
+            Nd = ComplexResponseSolver.get_full_solution_vector(Nx[('D', wd)])
 
             if self.rank != mpi_master():
                 continue
@@ -1463,9 +1463,9 @@ class CubicResponseDriver(NonlinearSolver):
 
             vec_pack = self._collect_vectors_in_columns(vec_pack)
 
-            Nb = ComplexResponse.get_full_solution_vector(Nx[('B', wb)])
-            Nc = ComplexResponse.get_full_solution_vector(Nx[('C', wc)])
-            Nd = ComplexResponse.get_full_solution_vector(Nx[('D', wd)])
+            Nb = ComplexResponseSolver.get_full_solution_vector(Nx[('B', wb)])
+            Nc = ComplexResponseSolver.get_full_solution_vector(Nx[('C', wc)])
+            Nd = ComplexResponseSolver.get_full_solution_vector(Nx[('D', wd)])
 
             if self.rank != mpi_master():
                 continue
@@ -1552,7 +1552,7 @@ class CubicResponseDriver(NonlinearSolver):
             XY.update(BD)
             XY.update(CD)
 
-        Nxy_drv = ComplexResponse(self.comm, self.ostream)
+        Nxy_drv = ComplexResponseSolver(self.comm, self.ostream)
 
         cpp_keywords = {
             'damping', 'norm_thresh', 'lindep_thresh', 'conv_thresh',

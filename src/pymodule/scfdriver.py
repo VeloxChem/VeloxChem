@@ -66,12 +66,15 @@ from .cpcmdriver import CpcmDriver
 from .smddriver import SmdDriver
 from .dispersionmodel import DispersionModel
 from .inputparser import (parse_input, print_keywords, print_attributes,
-                          get_random_string_parallel)
+                          get_random_string_parallel, unparse_input,
+                          write_unparsed_input_to_hdf5,
+                          read_unparsed_input_from_hdf5)
 from .dftutils import get_default_grid_level, print_xc_reference
 from .sanitychecks import (molecule_sanity_check, dft_sanity_check,
                            ri_sanity_check, pe_sanity_check,
                            solvation_model_sanity_check)
 from .errorhandler import assert_msg_critical
+from .mathutils import screened_eigh
 from .checkpoint import (create_hdf5, write_scf_results_to_hdf5,
                          write_cpcm_charges, read_cpcm_charges)
 
@@ -556,7 +559,7 @@ class ScfDriver:
                 'with polarizable embedding')
             # Note: we allow restarting SCF with point charges
 
-    def compute(self, molecule, basis, min_basis=None):
+    def compute(self, molecule, basis, min_basis=None, restart_exact=False):
         """
         Performs SCF calculation using molecular data.
 
@@ -586,6 +589,31 @@ class ScfDriver:
 
         if self.filename is not None and self.checkpoint_file is None:
             self.checkpoint_file = f'{self.filename}_scf.h5'
+
+        # validate checkpoint file
+        if self.restart:
+            self.restart = self.validate_checkpoint(molecule.get_element_ids(),
+                                                    basis.get_label(),
+                                                    self.scf_type)
+
+        # read SCF and method settings, if restart_exact is requested
+        if self.restart and restart_exact:
+            if self.rank == mpi_master():
+                checkpoint_scf_input = read_unparsed_input_from_hdf5(
+                    self.checkpoint_file, group_name="scf_settings")
+                checkpoint_method_input = read_unparsed_input_from_hdf5(
+                    self.checkpoint_file, group_name="method_settings")
+            else:
+                checkpoint_scf_input = None
+                checkpoint_method_input = None
+            checkpoint_scf_input = self.comm.bcast(checkpoint_scf_input,
+                                                   root=mpi_master())
+            checkpoint_method_input = self.comm.bcast(checkpoint_method_input,
+                                                      root=mpi_master())
+            # remove restart option from checkpoint_scf_input before calling
+            # update_settings, since we are already doing restart
+            checkpoint_scf_input.pop('restart', None)
+            self.update_settings(checkpoint_scf_input, checkpoint_method_input)
 
         # check molecule
         molecule_sanity_check(molecule, self.scf_type)
@@ -629,11 +657,6 @@ class ScfDriver:
 
         # check print level (verbosity of output)
         self.print_level = max(1, min(self.print_level, 3))
-
-        if self.restart:
-            self.restart = self.validate_checkpoint(molecule.get_element_ids(),
-                                                    basis.get_label(),
-                                                    self.scf_type)
 
         if self.restart:
             if self.acc_type.upper() == 'L2_C2DIIS':
@@ -1357,6 +1380,24 @@ class ScfDriver:
                 if self._cpcm:
                     write_cpcm_charges(self.checkpoint_file,
                                        self.cpcm_drv._cpcm_q)
+
+                scf_keywords = {
+                    key: val[0]
+                    for key, val in self._input_keywords['scf'].items()
+                }
+                method_keywords = {
+                    key: val[0] for key, val in
+                    self._input_keywords['method_settings'].items()
+                }
+
+                write_unparsed_input_to_hdf5(self.checkpoint_file,
+                                             unparse_input(self, scf_keywords),
+                                             group_name='scf_settings')
+                write_unparsed_input_to_hdf5(self.checkpoint_file,
+                                             unparse_input(
+                                                 self, method_keywords),
+                                             group_name='method_settings')
+
                 self.ostream.print_blank()
                 self.ostream.print_info('Checkpoint written to file: ' +
                                         self.checkpoint_file)
@@ -1435,11 +1476,7 @@ class ScfDriver:
             t0 = tm.time()
 
             S = ovl_mat
-            eigvals, eigvecs = np.linalg.eigh(S)
-            num_eigs = sum(eigvals > self.ovl_thresh)
-            if num_eigs < eigvals.size:
-                eigvals = eigvals[-num_eigs:]
-                eigvecs = eigvecs[:, -num_eigs:]
+            eigvals, eigvecs = screened_eigh(S, self.ovl_thresh)
             oao_mat = eigvecs * (1.0 / np.sqrt(eigvals))
 
             if self.print_level > 1:
@@ -2620,7 +2657,7 @@ class ScfDriver:
             n_alpha = molecule.number_of_alpha_occupied_orbitals(ao_basis)
 
             ovl = np.linalg.multi_dot([self._mom[0].T, smat, mo_a])
-            argsort = np.argsort(np.sum(np.abs(ovl), 0))[::-1]
+            argsort = np.argsort(np.sum(ovl**2, axis=0))[::-1]
             # restore energy ordering
             argsort[:n_alpha] = np.sort(argsort[:n_alpha])
             argsort[n_alpha:] = np.sort(argsort[n_alpha:])
@@ -2644,7 +2681,7 @@ class ScfDriver:
                     mo_b = mo_a[:, :n_alpha]
 
                 ovl = np.linalg.multi_dot([self._mom[1].T, smat, mo_b])
-                argsort_b = np.argsort(np.sum(np.abs(ovl), 0))[::-1]
+                argsort_b = np.argsort(np.sum(ovl**2, axis=0))[::-1]
                 # restore energy ordering
                 argsort_b[:n_beta] = np.sort(argsort_b[:n_beta])
                 argsort_b[n_beta:] = np.sort(argsort_b[n_beta:])

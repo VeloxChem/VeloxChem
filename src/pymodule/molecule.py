@@ -38,7 +38,8 @@ from .veloxchemlib import Molecule
 from .veloxchemlib import bohr_in_angstrom, mpi_master
 from .outputstream import OutputStream
 from .inputparser import print_keywords
-from .errorhandler import assert_msg_critical, safe_arccos
+from .errorhandler import assert_msg_critical
+from .mathutils import safe_arccos
 from .pubchemfetcher import (get_data_from_name, get_all_conformer_IDs,
                              get_conformer_data, get_pubchem_sketcher_reference)
 

@@ -40,7 +40,8 @@ from .veloxchemlib import mpi_master
 from .veloxchemlib import make_matrix, mat_t, partition_atoms
 from .veloxchemlib import (OverlapGeom100Driver, KineticEnergyGeom100Driver,
                            NuclearPotentialGeom100Driver,
-                           NuclearPotentialGeom010Driver, FockGeom1000Driver)
+                           NuclearPotentialGeom010Driver, FockGeom1000Driver,
+                           ECPGradientDriver)
 from .matrices import Matrices
 from .matrix import Matrix
 from .profiler import Profiler
@@ -118,8 +119,8 @@ class UnrestrictedHessianOrbitalResponse(CphfSolver):
         profiler.set_timing_key('RHS')
 
         natm = molecule.number_of_atoms()
-        nocc_a = molecule.number_of_alpha_electrons()
-        nocc_b = molecule.number_of_beta_electrons()
+        nocc_a = molecule.number_of_alpha_occupied_orbitals(basis)
+        nocc_b = molecule.number_of_beta_occupied_orbitals(basis)
 
         if self.rank == mpi_master():
             density_a = scf_results['D_alpha']
@@ -715,8 +716,14 @@ class UnrestrictedHessianOrbitalResponse(CphfSolver):
         npot_grad_100_drv = NuclearPotentialGeom100Driver()
         npot_grad_010_drv = NuclearPotentialGeom010Driver()
 
-        gmats_npot_100 = npot_grad_100_drv.compute(molecule, basis, i)
-        gmats_npot_010 = npot_grad_010_drv.compute(molecule, basis, i)
+        mol_charges = molecule.get_element_ids()
+        mol_charges -= basis.get_number_of_ecp_core_electrons()
+        mol_coords = molecule.get_coordinates_in_bohr()
+
+        gmats_npot_100 = npot_grad_100_drv.compute(molecule, basis, i,
+                                                   mol_coords, mol_charges)
+        gmats_npot_010 = npot_grad_010_drv.compute(molecule, basis, i,
+                                                   mol_charges[i])
 
         for x, label in enumerate(['X', 'Y', 'Z']):
             gmat_npot_100 = gmats_npot_100.matrix_to_numpy(label)
@@ -757,6 +764,32 @@ class UnrestrictedHessianOrbitalResponse(CphfSolver):
             for x in range(3):
                 fmat_deriv_a[x] += pe_fock_grad_contr[x]
                 fmat_deriv_b[x] += pe_fock_grad_contr[x]
+
+        # ECP contribution
+        if basis.has_ecp():
+            ecp_grad_drv = ECPGradientDriver()
+
+            core_electrons = basis.get_number_of_ecp_core_electrons()
+            ecp_atom_indices = [
+                idx for idx, nelec in enumerate(core_electrons) if nelec > 0
+            ]
+
+            gmats_ecp_100 = ecp_grad_drv.compute_bra_grad(
+                molecule, basis, ecp_atom_indices, i)
+            if i in ecp_atom_indices:
+                gmats_ecp_010 = ecp_grad_drv.compute_pot_grad(molecule, basis, i)
+
+            for x, label in enumerate(['X', 'Y', 'Z']):
+                gmat_ecp_100 = gmats_ecp_100.matrix_to_numpy(label)
+                if i in ecp_atom_indices:
+                    gmat_ecp_010 = gmats_ecp_010.matrix_to_numpy(label)
+
+                # Note different signs for 100 and 010 contributions
+                fmat_deriv_a[x] += (gmat_ecp_100 + gmat_ecp_100.T)
+                fmat_deriv_b[x] += (gmat_ecp_100 + gmat_ecp_100.T)
+                if i in ecp_atom_indices:
+                    fmat_deriv_a[x] -= gmat_ecp_010
+                    fmat_deriv_b[x] -= gmat_ecp_010
 
         if self._dft:
             if self.xcfun.is_hybrid():

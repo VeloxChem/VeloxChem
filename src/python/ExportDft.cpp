@@ -882,7 +882,8 @@ export_dft(py::module& m)
 
     // XCComponent class
     PyClass<CXCComponent>(m, "XCComponent")
-        .def(py::init<const std::string&, const double>(), "label"_a, "coeff"_a)
+        .def(py::init<const std::string&, const double, const std::vector<double>&>(),
+             "label"_a, "coeff"_a, "range_separated_parameters"_a = std::vector<double>())
         .def(py::init<const CXCComponent&>())
         .def("get_scaling_factor", &CXCComponent::getScalingFactor, "Gets scaling factor of XC functional component.")
         .def("get_label", &CXCComponent::getLabel, "Gets name of XC functional component.")
@@ -890,11 +891,12 @@ export_dft(py::module& m)
 
     // XCFunctional class
     PyClass<CXCFunctional>(m, "XCFunctional")
-        .def(py::init<const std::string&, const std::vector<std::string>&, const std::vector<double>&, const double>(),
+        .def(py::init<const std::string&, const std::vector<std::string>&, const std::vector<double>&, const double, const std::vector<double>&>(),
              "name_of_functional"_a,
              "labels"_a,
              "coeffs"_a,
-             "fraction_of_exact_exchange"_a = 0.0)
+             "fraction_of_exact_exchange"_a = 0.0,
+             "range_separated_parameters"_a = std::vector<double>())
         .def(py::init<const CXCFunctional&>())
         .def(py::self == py::self)
         .def("get_libxc_version", &CXCFunctional::getLibxcVersion, "Gets Libxc version.")
@@ -910,8 +912,7 @@ export_dft(py::module& m)
         .def("get_rs_alpha", &CXCFunctional::getRangeSeparationParameterAlpha, "Gets range-separation parameter alpha.")
         .def("get_rs_beta", &CXCFunctional::getRangeSeparationParameterBeta, "Gets range-separation parameter beta.")
         .def("get_rs_omega", &CXCFunctional::getRangeSeparationParameterOmega, "Gets range-separation parameter omega.")
-        .def("get_dimension_of_derivatives", &CXCFunctional::getDimensionOfDerivatives, "Gets dimension of derivatives.")
-        .def("set_rs_omega", &CXCFunctional::setRangeSeparatedParameterOmega, "Sets range-separation parameter omega.");
+        .def("get_dimension_of_derivatives", &CXCFunctional::getDimensionOfDerivatives, "Gets dimension of derivatives.");
 
     // XCPairDensityFunctional class
     PyClass<CXCPairDensityFunctional>(m, "XCPairDensityFunctional")

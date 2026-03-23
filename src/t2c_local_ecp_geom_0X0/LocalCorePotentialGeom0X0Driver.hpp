@@ -41,6 +41,7 @@
 #include "MolecularBasis.hpp"
 #include "Molecule.hpp"
 #include "LocalCorePotentialGeom010Func.hpp"
+#include "LocalCorePotentialGeom020Func.hpp"
 #include "OpenMPFunc.hpp"
 #include "Point.hpp"
 #include "T2CDistributor.hpp"
@@ -141,6 +142,10 @@ CLocalCorePotentialGeom0X0Driver<N>::compute(const CMolecularBasis     &basis,
                     if constexpr (N == 1)
                     {
                         t2lecp::compute_geom_010(distributor, bra_gtos, ket_gtos, local_ecp_pot, bra_indices, ket_indices, bkequal);
+                    }
+                    if constexpr (N == 2)
+                    {
+                        t2lecp::compute_geom_020(distributor, bra_gtos, ket_gtos, local_ecp_pot, bra_indices, ket_indices, bkequal);
                     }
                 }
             });

@@ -34,6 +34,7 @@
 #define ProjectedCorePotentialFunc_hpp
 
 #include <array>
+#include <iostream>
 
 #include "GtoBlock.hpp"
 #include "BaseCorePotential.hpp"
