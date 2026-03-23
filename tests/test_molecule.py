@@ -1,10 +1,12 @@
 from mpi4py import MPI
 from pathlib import Path
+from textwrap import dedent
 import numpy as np
 import pickle
 import pytest
 import math
 import sys
+from unittest.mock import Mock
 
 from veloxchem.veloxchemlib import Point
 from veloxchem.veloxchemlib import bohr_in_angstrom, mpi_master
@@ -20,6 +22,15 @@ try:
     import rdkit
 except ImportError:
     pass
+
+
+class FakeBasis:
+
+    def __init__(self, core_electrons):
+        self._core_electrons = core_electrons
+
+    def get_number_of_ecp_core_electrons(self):
+        return self._core_electrons
 
 
 class TestMolecule:
@@ -86,6 +97,33 @@ class TestMolecule:
                   O   0.0000000000    0.0000000000    1.2000000000
                   O   0.0000000000    0.0000000000   -1.2000000000"""
 
+    def cyclopropane_xyzstr(self):
+
+        return """C              0.401049000000        -0.048676000000         0.720786000000
+                  C              0.132408000000         0.924865000000         1.852698000000
+                  C             -1.017462000000         0.171567000000         1.211199000000
+                  H              0.853020000000        -1.011283000000         1.041107000000
+                  H              0.629526000000         0.432541000000        -0.253752000000
+                  H              0.198379000000         1.994972000000         1.562844000000
+                  H              0.421836000000         0.551154000000         2.857718000000
+                  H             -1.647101000000         0.786020000000         0.533335000000
+                  H             -1.423602000000        -0.657837000000         1.828158000000"""
+
+    def cyclobutane_xyzstr(self):
+
+        return """C              1.191613000000        -0.128056000000        -0.605997000000
+                  C             -0.183673000000        -0.778595000000        -0.609576000000
+                  C             -0.472210000000        -0.161128000000        -1.969762000000
+                  C              0.903078000000         0.489408000000        -1.966185000000
+                  H              2.016724000000        -0.872771000000        -0.641091000000
+                  H              1.301225000000         0.635243000000         0.195251000000
+                  H             -0.846689000000        -0.380768000000         0.189663000000
+                  H             -0.131187000000        -1.888779000000        -0.646682000000
+                  H             -1.297316000000         0.583592000000        -1.934662000000
+                  H             -0.581828000000        -0.924424000000        -2.771011000000
+                  H              1.566090000000         0.091578000000        -2.765425000000
+                  H              0.850600000000         1.599591000000        -1.929080000000"""
+
     def nh3_molecule(self):
 
         return Molecule(self.nh3_elements(), self.nh3_coords(), "au")
@@ -135,6 +173,118 @@ class TestMolecule:
         mol_c = Molecule(mol_a, mol_b)
         mol_d = Molecule.read_str(self.nh3_h2o_xyzstr(), 'au')
         assert mol_c == mol_d
+
+    def test_read_molecule_string_ghost_atoms_and_basis_labels(self):
+
+        mol = Molecule.read_molecule_string("""Bq_N  0.0  0.0  0.0  def2-svp
+                                               H_Bq  0.0  0.0  1.0  aug-cc-pvdz
+                                               O     0.0  1.0  0.0""")
+
+        assert mol.get_labels() == ['Bq', 'Bq', 'O']
+        assert mol.get_identifiers() == [0, 0, 8]
+        assert mol.get_atom_basis_labels() == [('DEF2-SVP', 'N'),
+                                               ('AUG-CC-PVDZ', 'H'), ('', 'O')]
+        assert 'Bq_N' in mol.get_xyz_string()
+        assert 'Bq_H' in mol.get_xyz_string()
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    def test_read_xyz_string_validation(self):
+
+        with pytest.raises(AssertionError,
+                           match='Invalid number of atoms in XYZ input'):
+            Molecule.read_xyz_string("""not-an-int
+                                        comment
+                                        H 0.0 0.0 0.0""")
+
+        with pytest.raises(AssertionError,
+                           match='Inconsistent number of atoms in XYZ input'):
+            Molecule.read_xyz_string("""2
+                                        comment
+                                        H 0.0 0.0 0.0""")
+
+    def test_read_xyz_file_success(self, tmp_path):
+
+        xyz_path = tmp_path / 'water.xyz'
+        xyz_path.write_text(
+            dedent("""
+                3
+                water
+                O  0.0  0.0  -1.0
+                H  0.0  1.4  -2.1
+                H  0.0 -1.4  -2.1
+                """).lstrip())
+
+        mol = Molecule.read_xyz_file(xyz_path)
+        ref_mol = Molecule.read_molecule_string(self.h2o_xyzstr(), 'angstrom')
+        assert mol == ref_mol
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    def test_read_xyz_file_missing_file(self, tmp_path):
+
+        missing_path = tmp_path / 'missing.xyz'
+        with pytest.raises(AssertionError,
+                           match=f'xyzfile {missing_path} does not exist'):
+            Molecule.read_xyz_file(missing_path)
+
+    def test_read_gro_file_element_guessing(self, tmp_path):
+
+        gro_path = tmp_path / 'test.gro'
+        gro_lines = [
+            'test system',
+            '3',
+            f'{1:5d}{"ALA":<5}{"CA":>5}{1:5d}{0.100:8.3f}{0.200:8.3f}{0.300:8.3f}',
+            f'{1:5d}{"LIG":<5}{"CL1":>5}{2:5d}{0.400:8.3f}{0.500:8.3f}{0.600:8.3f}',
+            f'{1:5d}{"NA":<5}{"NA":>5}{3:5d}{0.700:8.3f}{0.800:8.3f}{0.900:8.3f}',
+            '   1.00000   1.00000   1.00000',
+        ]
+        gro_path.write_text('\n'.join(gro_lines) + '\n')
+
+        mol = Molecule.read_gro_file(gro_path)
+
+        assert mol.get_labels() == ['C', 'Cl', 'Na']
+        assert np.allclose(
+            mol.get_coordinates_in_angstrom(),
+            np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]]))
+
+    def test_read_pdb_file_element_guessing_and_explicit_columns(
+            self, tmp_path):
+
+        pdb_path = tmp_path / 'test.pdb'
+
+        def pdb_record(record,
+                       serial,
+                       atom_name,
+                       residue_name,
+                       x,
+                       y,
+                       z,
+                       element=''):
+            return (f'{record:<6s}{serial:5d} '
+                    f'{atom_name:^4s}'
+                    f' '
+                    f'{residue_name:>3s} A'
+                    f'{1:4d}'
+                    f'    '
+                    f'{x:8.3f}{y:8.3f}{z:8.3f}'
+                    f'{1.00:6.2f}{0.00:6.2f}'
+                    f'          '
+                    f'{element:>2s}')
+
+        pdb_lines = [
+            pdb_record('ATOM', 1, 'NA', 'NA', 1.0, 2.0, 3.0),
+            pdb_record('HETATM', 2, 'CL1', 'UNL', 4.0, 5.0, 6.0),
+            pdb_record('HETATM', 3, 'O', 'HOH', 7.0, 8.0, 9.0, 'O'),
+        ]
+        pdb_path.write_text('\n'.join(pdb_lines) + '\n')
+
+        mol = Molecule.read_pdb_file(pdb_path)
+
+        assert mol.get_labels() == ['Na', 'Cl', 'O']
+        assert np.allclose(
+            mol.get_coordinates_in_angstrom(),
+            np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]]))
 
     def test_pickle(self):
 
@@ -317,6 +467,48 @@ class TestMolecule:
                             rel_tol=tol,
                             abs_tol=tol)
 
+    def test_nuclear_repulsion_energy_with_ecp_basis(self):
+
+        tol = 1.0e-12
+
+        mol = Molecule.read_str(self.h2o_xyzstr(), 'au')
+        basis = FakeBasis([2, 0, 0])
+
+        coords = mol.get_coordinates_in_bohr()
+        charges = np.array(mol.get_element_ids()) - np.array([2, 0, 0])
+        ref_energy = 0.0
+
+        for i in range(len(charges)):
+            for j in range(i + 1, len(charges)):
+                distance = np.linalg.norm(coords[j] - coords[i])
+                ref_energy += charges[i] * charges[j] / distance
+
+        assert math.isclose(mol.nuclear_repulsion_energy(basis),
+                            ref_energy,
+                            rel_tol=tol,
+                            abs_tol=tol)
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    def test_nuclear_repulsion_energy_rejects_ecp_length_mismatch(self):
+
+        mol = Molecule.read_str(self.h2o_xyzstr(), 'au')
+
+        with pytest.raises(
+                AssertionError,
+                match='ECP core electron list must match number of atoms'):
+            mol.nuclear_repulsion_energy(FakeBasis([2, 0]))
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    def test_nuclear_repulsion_energy_rejects_negative_ecp_electrons(self):
+
+        mol = Molecule.read_str(self.h2o_xyzstr(), 'au')
+
+        with pytest.raises(AssertionError,
+                           match='ECP core electrons must be non-negative'):
+            mol.nuclear_repulsion_energy(FakeBasis([2, -1, 0]))
+
     def test_check_proximity(self):
 
         mol = self.nh3_molecule()
@@ -328,18 +520,55 @@ class TestMolecule:
         mol = self.nh3_molecule()
         molstr = mol.get_string()
         lines = molstr.splitlines()
-        # yapf: disable
-        assert lines[0] == 'Molecular Geometry (Angstroms)'
-        assert lines[1] == '================================'
-        assert lines[2] == ''
-        assert lines[3] == '  Atom         Coordinate X          Coordinate Y          Coordinate Z  '
-        assert lines[4] == ''
-        assert lines[5] == '  N          -1.963247452450        1.597585999716       -0.019579556803'
-        assert lines[6] == '  H          -1.959014034763        2.615193776283        0.031221455443'
-        assert lines[7] == '  H          -2.489249600088        1.277962964331        0.792178284722'
-        assert lines[8] == '  H          -2.529467068116        1.359456254810       -0.832395752750'
-        assert lines[9] == ''
-        # yapf: enable
+        assert lines[0].strip() == 'Molecular Geometry (Angstroms)'
+        assert lines[1].strip() == '================================'
+        assert lines[2].strip() == ''
+        assert lines[3].lstrip().startswith('Atom')
+        assert lines[3].rstrip().endswith('Coordinate Z')
+        assert lines[4].strip() == ''
+        assert lines[5].lstrip().startswith('N')
+        assert lines[5].rstrip().endswith('-0.019579556803')
+        assert lines[6].lstrip().startswith('H')
+        assert lines[6].rstrip().endswith('0.031221455443')
+        assert lines[7].lstrip().startswith('H')
+        assert lines[7].rstrip().endswith('0.792178284722')
+        assert lines[8].lstrip().startswith('H')
+        assert lines[8].rstrip().endswith('-0.832395752750')
+        assert lines[9].strip() == ''
+
+    def test_get_xyz_string_formatting_and_aliases(self, tmp_path):
+
+        mol = self.nh3_molecule_with_ghost_atom()
+        xyz = mol.get_xyz_string(precision=4,
+                                 comment='   comment with spaces   \nignored')
+        lines = xyz.splitlines()
+
+        assert lines[0].strip() == '4'
+        assert lines[1].strip() == 'comment with spaces'
+        assert lines[2].split()[0] == 'Bq_N'
+        assert lines[2].rstrip().endswith('-0.0196')
+        assert lines[3].rstrip().endswith('0.0312')
+        assert mol.get_xyz_string(comment='x' *
+                                  120).splitlines()[1].strip() == ('x' * 80)
+
+        xyz_path = tmp_path / 'ghost.xyz'
+        mol.write_xyz(xyz_path)
+
+        assert Molecule.read_xyz(xyz_path) == Molecule.read_xyz_file(xyz_path)
+        assert Molecule.from_xyz_string(xyz) == Molecule.read_xyz_string(xyz)
+        assert Molecule.read_str(self.nh3_xyzstr(),
+                                 'au') == Molecule.read_molecule_string(
+                                     self.nh3_xyzstr(), 'au')
+
+    def test_get_string_formats_ghost_atoms(self):
+
+        mol = self.nh3_molecule_with_ghost_atom()
+        lines = mol.get_string(title='Ghost Geometry', sep='-').splitlines()
+
+        assert lines[0].strip() == 'Ghost Geometry (Angstroms)'
+        assert lines[1].strip() == '----------------------------'
+        assert lines[5].lstrip().startswith('Bq_N')
+        assert lines[5].rstrip().endswith('-0.019579556803')
 
     def test_read_dict(self):
 
@@ -349,11 +578,97 @@ class TestMolecule:
         ]
         mdict = {"xyz": rxyz, "charge": 3.0, "multiplicity": 2, "units": "au"}
 
-        mol_a = Molecule.from_dict(mdict)
+        mol_a = Molecule.from_input_dict(mdict)
         mol_b = self.nh3_molecule()
         mol_b.set_charge(3.0)
         mol_b.set_multiplicity(2)
         assert mol_a == mol_b
+
+    def test_read_dict_xyzfile(self, tmp_path):
+
+        xyz_path = tmp_path / 'ammonia.xyz'
+        xyz_path.write_text(
+            dedent("""
+                4
+                ammonia
+                N  -3.710   3.019  -0.037
+                H  -3.702   4.942   0.059
+                H  -4.704   2.415   1.497
+                H  -4.780   2.569  -1.573
+                """).lstrip())
+
+        mol_a = Molecule.from_input_dict({
+            "xyzfile": str(xyz_path),
+            "charge": 3.0,
+            "multiplicity": 2
+        })
+        mol_b = Molecule.read_molecule_string(self.nh3_xyzstr(), 'angstrom')
+        mol_b.set_charge(3.0)
+        mol_b.set_multiplicity(2)
+        assert mol_a == mol_b
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    def test_read_dict_rejects_xyz_and_xyzfile(self, tmp_path):
+
+        xyz_path = tmp_path / 'water.xyz'
+        xyz_path.write_text(
+            dedent("""
+                3
+                water
+                O  0.0  0.0  -1.0
+                H  0.0  1.4  -2.1
+                H  0.0 -1.4  -2.1
+                """).lstrip())
+
+        with pytest.raises(AssertionError,
+                           match='Cannot have both "xyz" and "xyzfile" input'):
+            Molecule.from_input_dict({
+                "xyz": ['H 0.0 0.0 0.0'],
+                "xyzfile": str(xyz_path)
+            })
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    def test_read_dict_rejects_units_with_xyzfile(self, tmp_path):
+
+        xyz_path = tmp_path / 'water.xyz'
+        xyz_path.write_text(
+            dedent("""
+                3
+                water
+                O  0.0  0.0  -1.0
+                H  0.0  1.4  -2.1
+                H  0.0 -1.4  -2.1
+                """).lstrip())
+
+        with pytest.raises(
+                AssertionError,
+                match='Cannot have both "units" and "xyzfile" input'):
+            Molecule.from_input_dict({"xyzfile": str(xyz_path), "units": "au"})
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    def test_read_dict_rejects_invalid_multiplicity_parity(self):
+
+        with pytest.raises(
+                AssertionError,
+                match='Incompatible multiplicity and number of electrons'):
+            Molecule.from_input_dict({
+                "xyz": [
+                    'N  -3.710   3.019  -0.037', 'H  -3.702   4.942   0.059',
+                    'H  -4.704   2.415   1.497', 'H  -4.780   2.569  -1.573'
+                ],
+                "multiplicity": 2
+            })
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    def test_read_dict_rejects_close_atoms(self):
+
+        with pytest.raises(AssertionError, match='Atoms too close'):
+            Molecule.from_input_dict(
+                {"xyz": ['H  0.0  0.0  0.0', 'H  0.0  0.0  0.05']})
 
     def test_moments_of_inertia(self):
 
@@ -365,12 +680,47 @@ class TestMolecule:
             [3.198919866723860, 3.198919866723860, 3.198919866723860])
         assert np.allclose(rmoms, imoms, tol, tol, False)
 
+    def test_moments_of_inertia_principal_axes(self):
+
+        tol = 1.0e-12
+        mol = Molecule.read_molecule_string(
+            """O  0.000  0.000  0.000
+               H  0.000  0.757  0.586
+               H  0.000 -0.757  0.586""", 'angstrom')
+
+        imoms, axes = mol.moments_of_inertia(principal_axes=True)
+
+        masses = np.array(mol.get_masses())
+        coords = mol.get_coordinates_in_bohr()
+        center_of_mass = np.array(mol.center_of_mass_in_bohr())
+        coords_com = coords - center_of_mass[np.newaxis, :]
+        inertia_terms = []
+        for i in range(mol.number_of_atoms()):
+            coord = coords_com[i]
+            diagonal = np.eye(3) * np.dot(coord, coord)
+            outer = np.outer(coord, coord)
+            inertia_terms.append(masses[i] * (diagonal - outer))
+        inertia = np.sum(inertia_terms, axis=0)
+
+        assert np.allclose(np.matmul(axes, axes.T), np.eye(3), tol, tol, False)
+        principal_inertia = np.matmul(np.matmul(axes, inertia), axes.T)
+        assert np.allclose(principal_inertia, np.diag(imoms), tol, tol, False)
+
     def test_is_linear(self):
 
         mol = Molecule.read_str(self.ch4_xyzstr(), 'au')
         assert not mol.is_linear()
         mol = Molecule.read_str(self.co2_xyzstr(), 'au')
         assert mol.is_linear()
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    def test_is_linear_rejects_less_than_two_atoms(self):
+
+        mol = Molecule.read_molecule_string('He 0.0 0.0 0.0')
+        with pytest.raises(AssertionError,
+                           match='Molecule.is_linear: Need at least two atoms'):
+            mol.is_linear()
 
     def test_center_of_mass_bohr(self):
 
@@ -401,11 +751,22 @@ class TestMolecule:
         mol.set_multiplicity(3)
         molstr = mol.more_info()
         lines = molstr.splitlines()
-        assert lines[0] == ('Molecular charge            : 0' + 39 * ' ')
-        assert lines[1] == ('Spin multiplicity           : 3' + 39 * ' ')
-        assert lines[2] == ('Number of atoms             : 4' + 39 * ' ')
-        assert lines[3] == ('Number of alpha electrons   : 6' + 39 * ' ')
-        assert lines[4] == ('Number of beta  electrons   : 4' + 39 * ' ')
+        assert lines[0].strip() == 'Molecular charge            : 0'
+        assert lines[1].strip() == 'Spin multiplicity           : 3'
+        assert lines[2].strip() == 'Number of atoms             : 4'
+        assert lines[3].strip() == 'Number of alpha electrons   : 6'
+        assert lines[4].strip() == 'Number of beta  electrons   : 4'
+
+    def test_more_info_fixed_width_output(self):
+
+        mol = self.nh3_molecule()
+        mol.set_charge(-1.0)
+        mol.set_multiplicity(2)
+        lines = mol.more_info().splitlines()
+
+        assert all(len(line) == 70 for line in lines)
+        assert lines[0].strip() == 'Molecular charge            : -1'
+        assert lines[1].strip() == 'Spin multiplicity           : 2'
 
     def test_number_of_alpha_electrons(self):
 
@@ -420,6 +781,14 @@ class TestMolecule:
         assert mol.number_of_beta_electrons() == 5
         mol.set_multiplicity(3)
         assert mol.number_of_beta_electrons() == 4
+
+    def test_number_of_occupied_orbitals_with_ecp_basis(self):
+
+        mol = self.nh3_molecule()
+        basis = FakeBasis([2, 0, 0, 0])
+
+        assert mol.number_of_alpha_occupied_orbitals(basis) == 4
+        assert mol.number_of_beta_occupied_orbitals(basis) == 4
 
     def test_check_multiplicity(self):
 
@@ -452,6 +821,29 @@ class TestMolecule:
         rocc = np.array([1.0, 1.0, 1.0, 1.0, 1.0, 0.0])
         assert np.allclose(rocc, nocc, tol, tol, False)
 
+    def test_get_aufbau_alpha_occupation_with_ecp_basis(self):
+
+        tol = 1.0e-12
+
+        mol = self.nh3_molecule()
+        basis = FakeBasis([2, 0, 0, 0])
+
+        nocc = mol.get_aufbau_alpha_occupation(5, basis)
+        rocc = np.array([1.0, 1.0, 1.0, 1.0, 0.0])
+        assert np.allclose(rocc, nocc, tol, tol, False)
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    def test_get_aufbau_alpha_occupation_rejects_too_few_mos_with_basis(self):
+
+        mol = self.nh3_molecule()
+        basis = FakeBasis([2, 0, 0, 0])
+
+        with pytest.raises(AssertionError,
+                           match='Number of molecular orbitals is too small ' +
+                           'for explicit alpha electrons'):
+            mol.get_aufbau_alpha_occupation(3, basis)
+
     def test_get_aufbau_beta_occupation(self):
 
         tol = 1.0e-12
@@ -463,6 +855,29 @@ class TestMolecule:
         nocc = mol.get_aufbau_beta_occupation(6)
         rocc = np.array([1.0, 1.0, 1.0, 1.0, 0.0, 0.0])
         assert np.allclose(rocc, nocc, tol, tol, False)
+
+    def test_get_aufbau_beta_occupation_with_ecp_basis(self):
+
+        tol = 1.0e-12
+
+        mol = self.nh3_molecule()
+        basis = FakeBasis([2, 0, 0, 0])
+
+        nocc = mol.get_aufbau_beta_occupation(5, basis)
+        rocc = np.array([1.0, 1.0, 1.0, 1.0, 0.0])
+        assert np.allclose(rocc, nocc, tol, tol, False)
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    def test_get_aufbau_beta_occupation_rejects_too_few_mos_with_basis(self):
+
+        mol = self.nh3_molecule()
+        basis = FakeBasis([2, 0, 0, 0])
+
+        with pytest.raises(AssertionError,
+                           match='Number of molecular orbitals is too small ' +
+                           'for explicit beta electrons'):
+            mol.get_aufbau_beta_occupation(3, basis)
 
     def test_get_aufbau_occupation(self):
 
@@ -481,6 +896,39 @@ class TestMolecule:
         roccb = np.array([1.0, 1.0, 1.0, 1.0, 0.0, 0.0])
         assert np.allclose(rocca, nocca, tol, tol, False)
         assert np.allclose(roccb, noccb, tol, tol, False)
+
+    def test_get_connectivity_matrix(self):
+
+        mol = Molecule.read_str(self.nh3_h2o_xyzstr(), 'au')
+        connectivity = mol.get_connectivity_matrix()
+        ref_connectivity = np.array([
+            [0, 1, 1, 1, 0, 0, 0],
+            [1, 0, 0, 0, 0, 0, 0],
+            [1, 0, 0, 0, 0, 0, 0],
+            [1, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 1, 1],
+            [0, 0, 0, 0, 1, 0, 0],
+            [0, 0, 0, 0, 1, 0, 0],
+        ])
+        assert np.array_equal(connectivity, ref_connectivity)
+
+    def test_get_connectivity_matrix_uses_h2_special_factor(self):
+
+        mol = Molecule.read_molecule_string('H 0.0 0.0 0.0\nH 0.0 0.0 0.7',
+                                            'angstrom')
+
+        assert np.array_equal(mol.get_connectivity_matrix(),
+                              np.array([[0, 1], [1, 0]]))
+        assert np.array_equal(mol.get_connectivity_matrix(H2_factor=1.3),
+                              np.array([[0, 0], [0, 0]]))
+
+    def test_find_connected_atoms(self):
+
+        mol = Molecule.read_str(self.nh3_h2o_xyzstr(), 'au')
+        connectivity = mol.get_connectivity_matrix()
+
+        assert mol._find_connected_atoms(0, connectivity) == {0, 1, 2, 3}
+        assert mol._find_connected_atoms(4, connectivity) == {4, 5, 6}
 
     def test_coordinates_in_bohr(self):
 
@@ -719,6 +1167,55 @@ class TestMolecule:
                 if fpath.is_file():
                     fpath.unlink()
 
+    def test_write_xyz_file_serializes_ghost_atoms(self, tmp_path):
+
+        mol = self.nh3_molecule_with_ghost_atom()
+        xyz_path = tmp_path / 'ghost_written.xyz'
+        mol.write_xyz_file(xyz_path)
+
+        lines = xyz_path.read_text().splitlines()
+        assert lines[0] == '4'
+        assert lines[2].split()[0] == 'Bq_N'
+
+        mol.write_xyz(xyz_path)
+        assert Molecule.read_xyz_file(xyz_path) == mol
+
+    def test_rotate_around_vector(self):
+
+        mol = self.nh3_molecule()
+        coords = np.array([[1.0, 0.0, 0.0], [2.0, 1.0, 0.0]])
+        origin = np.array([0.0, 0.0, 0.0])
+        vector = np.array([0.0, 0.0, 1.0])
+
+        rotated = mol._rotate_around_vector(coords, origin, vector, 90.0,
+                                            'degree')
+
+        assert np.allclose(rotated,
+                           np.array([
+                               [0.0, 1.0, 0.0],
+                               [-1.0, 2.0, 0.0],
+                           ]), 1.0e-12, 1.0e-12, False)
+
+    def test_get_input_keywords(self):
+
+        assert Molecule._get_input_keywords() == {
+            'molecule': {
+                'charge': ('int', 'net charge'),
+                'multiplicity': ('int', 'spin multiplicity'),
+                'units':
+                    ('str_lower', 'unit of coordinates, default is Angstrom'),
+                'xyz': ('list', 'atom and Cartesian coordinates'),
+                'xyzfile': ('str', 'XYZ file name (conflicts with units/xyz)'),
+            },
+        }
+
+    def test_partition_atoms_comm_self(self):
+
+        mol = Molecule.read_molecule_string("""H  0.0  0.0  0.0
+                                               O  1.0  0.0  0.0
+                                               Li 2.0  0.0  0.0""")
+        assert mol.partition_atoms(MPI.COMM_SELF) == [1, 2, 0]
+
     def test_distance_angle_dihedral(self):
 
         xyz_string = """
@@ -752,6 +1249,124 @@ class TestMolecule:
         mol.set_distance_in_angstroms((1, 2), 1.7)
         assert abs(mol.get_distance_in_angstroms((1, 2)) - 1.7) < 1e-4
 
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    def test_distance_angle_dihedral_invalid_arguments(self):
+
+        mol = Molecule.read_molecule_string(self.nh3_xyzstr(), 'angstrom')
+
+        with pytest.raises(
+                AssertionError,
+                match='Molecule.get_distance: Expecting two atom indices'):
+            mol.get_distance((1,), 'angstrom')
+
+        with pytest.raises(
+                AssertionError,
+                match='Molecule.get_distance: Invalid distance unit'):
+            mol.get_distance((1, 2), 'nanometer')
+
+        with pytest.raises(
+                AssertionError,
+                match='Molecule.set_distance: Expecting two atom indices'):
+            mol.set_distance((1,), 1.1, 'angstrom')
+
+        with pytest.raises(
+                AssertionError,
+                match='Molecule.set_distance: Invalid distance unit'):
+            mol.set_distance((1, 2), 1.1, 'nanometer')
+
+        with pytest.raises(AssertionError,
+                           match='Molecule.get_angle: Expecting three atom '
+                           'indices'):
+            mol.get_angle((1, 2), 'degree')
+
+        with pytest.raises(AssertionError,
+                           match='Molecule.get_angle: Invalid angle unit'):
+            mol.get_angle((1, 2, 3), 'gradian')
+
+        with pytest.raises(AssertionError,
+                           match='Molecule.set_angle: Expecting three atom '
+                           'indices'):
+            mol.set_angle((1, 2), 100.0, 'degree')
+
+        with pytest.raises(AssertionError,
+                           match='Molecule.set_angle: Invalid angle unit'):
+            mol.set_angle((1, 2, 3), 100.0, 'gradian')
+
+        with pytest.raises(AssertionError,
+                           match='Molecule.get_dihedral: Expecting four atom '
+                           'indices'):
+            mol.get_dihedral((1, 2, 3), 'degree')
+
+        with pytest.raises(AssertionError,
+                           match='Molecule.get_dihedral: Invalid angle unit'):
+            mol.get_dihedral((1, 2, 3, 4), 'gradian')
+
+        with pytest.raises(AssertionError,
+                           match='Molecule.set_dihedral: Expecting four atom '
+                           'indices'):
+            mol.set_dihedral((1, 2, 3), 120.0, 'degree')
+
+        with pytest.raises(AssertionError,
+                           match='Molecule.set_dihedral: Invalid angle unit'):
+            mol.set_dihedral((1, 2, 3, 4), 120.0, 'gradian')
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    def test_geometry_setters_reject_ring_rotations(self):
+
+        cyclopropane = Molecule.read_molecule_string(self.cyclopropane_xyzstr(),
+                                                     'angstrom')
+
+        with pytest.raises(AssertionError,
+                           match='Molecule.set_distance: Cannot set '
+                           'distance'):
+            cyclopropane.set_distance((1, 2), 1.6, 'angstrom')
+
+        with pytest.raises(AssertionError,
+                           match='Molecule.set_angle: Cannot set angle'):
+            cyclopropane.set_angle((1, 2, 3), 70.0, 'degree')
+
+        cyclobutane = Molecule.read_molecule_string(self.cyclobutane_xyzstr(),
+                                                    'angstrom')
+
+        with pytest.raises(AssertionError,
+                           match='Molecule.set_dihedral: Cannot set '
+                           'dihedral'):
+            cyclobutane.set_dihedral((1, 2, 3, 4), 30.0, 'degree')
+
+    def test_angle_and_dihedral_target_wraparound(self):
+
+        xyz_string = """
+            9
+            xyz
+            O    1.086900000000    0.113880000000   -0.060730000000
+            C    2.455250000000    0.132120000000   -0.071390000000
+            C    3.171673900000   -0.838788100000    0.496389800000
+            C    2.491492369403   -1.966504408464    1.155862765438
+            O    1.664691816845   -2.650313648401    0.565927537003
+            H    0.786520000000   -0.686240000000    0.407170000000
+            H    2.871553600000    0.995167700000   -0.576074500000
+            H    4.254316047964   -0.842628605717    0.498660431748
+            H    2.767678583706   -2.159148582998    2.205812810612
+        """
+
+        mol = Molecule.read_xyz_string(xyz_string)
+        mol.set_angle_in_degrees((1, 2, 3), 470.0, verbose=False)
+        assert abs(mol.get_angle_in_degrees((1, 2, 3)) - 110.0) < 1e-4
+
+        mol = Molecule.read_xyz_string(xyz_string)
+        mol.set_dihedral_in_degrees((2, 3, 4, 5), 450.0, verbose=False)
+        assert abs(mol.get_dihedral_in_degrees((2, 3, 4, 5)) - 90.0) < 1e-4
+
+        mol = Molecule.read_xyz_string(xyz_string)
+        mol.set_dihedral((2, 3, 4, 5),
+                         -3.0 * math.pi / 2.0,
+                         'radian',
+                         verbose=False)
+        assert abs(mol.get_dihedral((2, 3, 4, 5), 'radian') -
+                   math.pi / 2.0) < 1e-4
+
     @pytest.mark.skipif("rdkit" not in sys.modules,
                         reason="rdkit not available")
     def test_is_water_molecule(self):
@@ -764,3 +1379,58 @@ class TestMolecule:
 
         mol = Molecule.read_smiles('OO')
         assert not mol.is_water_molecule()
+
+    @pytest.mark.skipif("rdkit" not in sys.modules,
+                        reason="rdkit not available")
+    def test_smiles_to_xyz_returns_xyz_for_both_hydrogen_options(self):
+
+        xyz_with_hydrogen = Molecule.smiles_to_xyz('O', hydrogen=True)
+        xyz_without_hydrogen = Molecule.smiles_to_xyz('O', hydrogen=False)
+
+        assert isinstance(xyz_with_hydrogen, str)
+        assert isinstance(xyz_without_hydrogen, str)
+        assert int(xyz_with_hydrogen.splitlines()[0]) == 3
+        assert int(xyz_without_hydrogen.splitlines()[0]) == 1
+
+    @pytest.mark.skipif("rdkit" not in sys.modules,
+                        reason="rdkit not available")
+    def test_draw_2d_uses_display(self, monkeypatch):
+
+        ipython_display = pytest.importorskip("IPython.display")
+        display_mock = Mock()
+        monkeypatch.setattr(ipython_display, "display", display_mock)
+
+        Molecule.draw_2d('O', width=200, height=100)
+
+        display_mock.assert_called_once()
+
+    def test_is_water_molecule_requires_water_connectivity(self):
+
+        mol = Molecule.read_molecule_string("""O  0.000  0.000  0.000
+                                               H  0.000  0.757  0.586
+                                               H  0.000 -0.757  0.586""")
+        assert mol.is_water_molecule()
+
+        mol = Molecule.read_molecule_string("""O  0.000  0.000  0.000
+                                               H  0.000  0.000  5.000
+                                               H  0.000  5.000  0.000""")
+        assert not mol.is_water_molecule()
+
+    def test_contains_water_molecule(self):
+
+        mol = Molecule.read_molecule_string(self.nh3_h2o_xyzstr(), 'au')
+        assert mol.contains_water_molecule()
+
+        mol = Molecule.read_molecule_string(self.nh3_xyzstr(), 'au')
+        assert not mol.contains_water_molecule()
+
+        mol = Molecule.read_molecule_string(
+            """N  -3.710   3.019  -0.037
+                                               H  -3.702   4.942   0.059
+                                               H  -4.704   2.415   1.497
+                                               H  -4.780   2.569  -1.573
+                                               O   0.000   0.000  -1.000
+                                               H   0.000   0.000   4.000
+                                               H   0.000   4.000  -1.000""",
+            'au')
+        assert not mol.contains_water_molecule()

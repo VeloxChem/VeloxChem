@@ -623,3 +623,9 @@ CMolecularBasis::get_ao_basis_map(const CMolecule& molecule) const -> std::vecto
 
     return strmap;
 }
+
+auto
+CMolecularBasis::get_ecp_potential(const int atom) const -> CAtomCorePotential
+{
+    return _basis_sets[_indices.at(atom)].get_ecp_potential(); 
+}

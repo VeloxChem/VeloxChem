@@ -7,6 +7,7 @@ include Makefile.setup
 VLX_BAS := ../basis
 VLX_TARGET := veloxchemlib.so
 VLX_MODULE := $(wildcard pymodule/*.py)
+VLX_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 
 LIB_LIST += -shared $(PYTHON_LD) $(OPENMP_LD) $(MATH_LD) $(LIBXC_LD)
 
@@ -36,6 +37,7 @@ VLX_LIBS_DIR += moldata
 VLX_LIBS_DIR += orbdata
 VLX_LIBS_DIR += python
 VLX_LIBS_DIR += t2c_func
+VLX_LIBS_DIR += t2c_hrr_func
 VLX_LIBS_DIR += t2c_geometrical_derivatives
 VLX_LIBS_DIR += t2c_overlap
 VLX_LIBS_DIR += t2c_kinetic_energy
@@ -43,6 +45,8 @@ VLX_LIBS_DIR += t2c_nuclear_potential
 VLX_LIBS_DIR += t2c_electric_dipole_momentum
 VLX_LIBS_DIR += t2c_nuclear_potential_geom_0X0
 VLX_LIBS_DIR += t2c_electron_repulsion
+VLX_LIBS_DIR += t2c_local_ecp
+VLX_LIBS_DIR += t2c_projected_ecp
 VLX_LIBS_DIR += t4c_func
 VLX_LIBS_DIR += t4c_electron_repulsion
 VLX_LIBS_DIR += t4c_geometrical_derivatives
@@ -75,6 +79,8 @@ debug: $(VLX_LIBS)
 	$(CP) -r $(VLX_BAS) $(CURDIR)/../build/python/veloxchem
 	$(CP) -r ../database $(CURDIR)/../build/python/veloxchem
 	$(CP) pymodule/mklconf.py.in $(CURDIR)/../build/python/veloxchem/mklconf.py
+	@echo ""                               >> $(CURDIR)/../build/python/veloxchem/__init__.py
+	@echo "__commit__ = \"$(VLX_COMMIT)\"" >> $(CURDIR)/../build/python/veloxchem/__init__.py
 
 # Release
 release: $(VLX_LIBS)
@@ -88,6 +94,8 @@ release: $(VLX_LIBS)
 	$(CP) -r $(VLX_BAS) $(CURDIR)/../build/python/veloxchem
 	$(CP) -r ../database $(CURDIR)/../build/python/veloxchem
 	$(CP) pymodule/mklconf.py.in $(CURDIR)/../build/python/veloxchem/mklconf.py
+	@echo ""                               >> $(CURDIR)/../build/python/veloxchem/__init__.py
+	@echo "__commit__ = \"$(VLX_COMMIT)\"" >> $(CURDIR)/../build/python/veloxchem/__init__.py
 
 # Clean up
 clean:
@@ -101,4 +109,4 @@ clean:
 .PHONY: $(VLX_LIBS) $(VLX_LIBS_DIR)
 $(VLX_LIBS): $(VLX_LIBS_DIR)
 $(VLX_LIBS_DIR):
-	make --directory=$@ $(MAKECMDGOALS)
+	$(MAKE) --directory=$@ $(MAKECMDGOALS)

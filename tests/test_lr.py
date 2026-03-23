@@ -26,6 +26,7 @@ class TestLR:
         scf_drv = ScfRestrictedDriver()
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label
+        scf_drv.acc_type = 'l2_c2diis'
         scf_results = scf_drv.compute(mol, bas)
 
         lr_drv = LinearResponseSolver()

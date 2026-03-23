@@ -175,6 +175,7 @@ class TransitionStateGuesser():
 
         if self.mute_ff_build:
             self.ostream.unmute()
+            self.ffbuilder._summarise_reaction(self.reactant, self.product)
 
         self.molecule = Molecule.read_xyz_string(
             self.reactant.molecule.get_xyz_string())
