@@ -36,7 +36,7 @@ import numpy as np
 import h5py
 import sys
 
-from .veloxchemlib import hartree_in_ev, mpi_master
+from .veloxchemlib import hartree_in_ev, mpi_master, fine_structure_constant
 from .oneeints import compute_electric_dipole_integrals
 from .outputstream import OutputStream
 from .linearsolver import LinearSolver
@@ -96,6 +96,7 @@ class RixsDriver(LinearSolver):
         # a.u., FWHM
         # 1000.0 / hartree_in_wavenumber()
         self.gamma = 0.124 / hartree_in_ev()
+        self.final_state_gamma = 0.124 / hartree_in_ev()
 
         self.nstates = 5
         self.num_core_states = 5
@@ -104,6 +105,10 @@ class RixsDriver(LinearSolver):
         self.restricted_subspace = False
         # CPP-approach
         self.cpp = False
+        self.components = 'xyz'
+        self.energyloss_frequencies = None
+        # TODO: enable emission freqs. in a good way
+        self.emission_frequencies = None
 
         self.num_core_orbitals = 0
         self.num_virtual_orbitals = 0
@@ -210,6 +215,274 @@ class RixsDriver(LinearSolver):
             and the scattering amplitude tensor.
         """
 
+        if self.cpp and (self.energyloss_frequencies is not None or self.emission_frequencies is not None):
+            return self.compute_cpp(molecule, basis, scf_results,
+                             rsp_results=cvs_rsp_results, cvs_rsp_results=cvs_rsp_results)
+        else:
+            return self.compute_sos(molecule, basis, scf_results,
+                            rsp_results=rsp_results, cvs_rsp_results=cvs_rsp_results)
+
+    def compute_cpp(self, molecule, basis, scf_results,
+                    rsp_results=None, cvs_rsp_results=None):
+        """
+        Implements the CPP variant of LR-TDDFT RIXS.
+        """
+
+        # TODO: enable ECP
+        assert_msg_critical(
+            not basis.has_ecp(),
+            f'{type(self).__name__}.compute: ECP is not yet supported')
+        
+        if rsp_results is None:
+
+            rsp_keys = [
+                'frequencies',
+                'conv_thresh',
+                'restart',
+            ]
+
+            rsp_drv = ComplexResponse(self.comm, self.ostream)
+            #rsp_drv.ostream.mute()
+
+            for key in rsp_keys:
+                if hasattr(self, key):
+                    setattr(rsp_drv, key, getattr(self, key))
+
+            rsp_drv.frequencies = self.energyloss_frequencies
+            rsp_drv.property = 'absorption'
+            # given broadening is FWHM but CPP-driver takes HWHM -> HWHM
+            rsp_drv.damping = self.final_state_gamma / 2
+
+            if self.checkpoint_file is not None:
+                fpath = Path(self.checkpoint_file)
+                fpath = fpath.with_name(fpath.stem)
+                rsp_drv.checkpoint_file = str(fpath) + '_rixs.h5'
+
+        if self.rank == mpi_master():
+            self._print_header(molecule)
+
+        if cvs_rsp_results is None:
+            init_photon_set = True if self.photon_energy is not None else False 
+            assert_msg_critical(init_photon_set,
+                                            'Must provide incoming photon energies for the CPP approach!')
+            
+            rsp_keys = [
+                'frequencies',
+                'conv_thresh',
+                'restart',
+            ]
+
+            cvs_rsp_drv = ComplexResponse(self.comm, self.ostream)
+            #cvs_rsp_drv.ostream.mute()
+
+            for key in rsp_keys:
+                if hasattr(self, key):
+                    setattr(rsp_drv, key, getattr(self, key))
+
+            cvs_rsp_drv.frequencies = self.photon_energy
+            cvs_rsp_drv.property = 'absorption'
+            # given broadening is FWHM but CPP-driver takes HWHM -> HWHM
+            cvs_rsp_drv.damping = self.gamma / 2
+            
+            if self.checkpoint_file is not None:
+                cvs_rsp_drv.group_label = 'rsp_cvs'
+                fpath = Path(self.checkpoint_file)
+                fpath = fpath.with_name(fpath.stem)
+                cvs_rsp_drv.checkpoint_file = str(fpath) + '_rixs_cvs.h5'
+
+            energies_ev = np.array(self.photon_energy) * hartree_in_ev()
+            energies_str = ", ".join(f"{x:.2f}" for x in energies_ev)
+            self.ostream.print_blank()
+            self.ostream.print_info(
+                f"Solving CPP-equations at incoming photon energies: {energies_str} eV."
+            )
+            self.ostream.print_blank()
+            
+            cvs_rsp_results = cvs_rsp_drv.compute(molecule, basis, scf_results)
+            self.ostream.print_info('...done.')
+
+        num_final_xsections         = len(self.energyloss_frequencies)
+        self.ene_losses             = np.zeros((num_final_xsections, len(self.photon_energy)))
+        self.emission_enes          = np.zeros((num_final_xsections, len(self.photon_energy)))
+        self.cross_sections         = np.zeros((num_final_xsections, len(self.photon_energy)))
+        self.elastic_cross_sections = np.zeros((len(self.photon_energy)))
+        #self.scattering_amplitudes  = np.zeros((num_final_xsections, len(self.photon_energy),
+        #                                       3, 3), dtype=complex)
+
+        sin2_theta = np.sin(self.theta) ** 2
+        a = 2.0 - 0.5 * sin2_theta
+        b = 0.75 * sin2_theta - 0.5
+        
+        for n_ind, w_ex in enumerate(self.photon_energy):
+            self.ostream.print_info(
+                    f'Computing cross sections for components: {self.components}, of {num_final_xsections} energy-loss frequencies '
+                    f'at photon energy: {w_ex*hartree_in_ev():.2f} eV.'
+                )
+            self.ostream.print_blank()
+            # TODO: enable elastic cross-sections
+            ret_cpp_solution_vector_x = cvs_rsp_drv.get_full_solution_vector(cvs_rsp_results['solutions'][('x', w_ex)])
+            ret_cpp_solution_vector_y = cvs_rsp_drv.get_full_solution_vector(cvs_rsp_results['solutions'][('y', w_ex)])
+            ret_cpp_solution_vector_z = cvs_rsp_drv.get_full_solution_vector(cvs_rsp_results['solutions'][('z', w_ex)])
+            
+            adv_cpp_solution_vector_x = np.conjugate(ret_cpp_solution_vector_x)
+            adv_cpp_solution_vector_y = np.conjugate(ret_cpp_solution_vector_y)
+            adv_cpp_solution_vector_z = np.conjugate(ret_cpp_solution_vector_z)
+
+            rsp_grad_x = self.eff_excited_grad(molecule, basis, scf_results, ret_cpp_solution_vector_x, components=self.components)
+            rsp_grad_y = self.eff_excited_grad(molecule, basis, scf_results, ret_cpp_solution_vector_y, components=self.components)
+            rsp_grad_z = self.eff_excited_grad(molecule, basis, scf_results, ret_cpp_solution_vector_z, components=self.components)
+
+            # TODO: define components for exc-gradients properly
+            exc_grad_x = {
+                (op, w): g
+                for op, g in zip(cvs_rsp_drv.b_components, rsp_grad_x)
+                for w in rsp_drv.frequencies
+            }
+            exc_grad_y = {
+                (op, w): g
+                for op, g in zip(cvs_rsp_drv.b_components, rsp_grad_y)
+                for w in rsp_drv.frequencies
+            }
+            exc_grad_z = {
+                (op, w): g
+                for op, g in zip(cvs_rsp_drv.b_components, rsp_grad_z)
+                for w in rsp_drv.frequencies
+            }
+
+            Bvec_x = rsp_drv.compute(molecule, basis, scf_results, v_grad=exc_grad_x)
+            Bvec_y = rsp_drv.compute(molecule, basis, scf_results, v_grad=exc_grad_y)
+            Bvec_z = rsp_drv.compute(molecule, basis, scf_results, v_grad=exc_grad_z)
+
+            A_vecs_prime = {
+                'x': ret_cpp_solution_vector_x,
+                'y': ret_cpp_solution_vector_y,
+                'z': ret_cpp_solution_vector_z,
+            }
+            A_vecs = {
+                'x': adv_cpp_solution_vector_x,
+                'y': adv_cpp_solution_vector_y,
+                'z': adv_cpp_solution_vector_z,
+            }
+
+            B_lambda = {
+                    'x': Bvec_x,
+                    'y': Bvec_y,
+                    'z': Bvec_z,
+                }
+
+            for f_ind, w in enumerate(rsp_drv.frequencies):
+                w_em = w_ex - w
+                self.ene_losses[f_ind,n_ind] = w
+
+                C = {}
+                for lam in 'xyz':
+                    for rho in 'xyz':
+                        B_rho_lam = rsp_drv.get_full_solution_vector(
+                            B_lambda[lam]['solutions'][(rho, w)]
+                        )
+                        for tau in 'xyz':
+                            A_tau = A_vecs[tau]
+
+                            for sigma_comp in 'xyz':
+                                mu_sigma_on_B = self.eff_excited_grad(
+                                    molecule, basis, scf_results, B_rho_lam, components=sigma_comp
+                                )[0]
+
+                                C[(sigma_comp, tau, rho, lam)] = -np.dot(mu_sigma_on_B, A_tau).imag
+
+                S1 = sum(C[(rho, lam, rho, lam)] for rho in 'xyz' for lam in 'xyz')
+                S2 = sum(C[(rho, rho, lam, lam)] for rho in 'xyz' for lam in 'xyz')
+                S3 = sum(C[(rho, lam, lam, rho)] for rho in 'xyz' for lam in 'xyz')
+
+                angular_part = a * S1 + b * (S2 + S3)
+                # TODO: fix correct constants
+                pref = -16 * np.pi * w_em**3 * w_ex * fine_structure_constant()**2
+
+                self.emission_enes[f_ind, n_ind] = w_em
+                self.cross_sections[f_ind, n_ind] = pref * angular_part
+        
+            if self.rank == mpi_master():
+                #self.elastic_cross_sections[w_ind] = self.cross_section(F_elastic).real
+                #for start, end, em_en_part, loss_part, cs_part, amp_part in parts:
+                    #self.emission_enes[start:end, w_ind]         = em_en_part
+                    #self.ene_losses[start:end, w_ind]            = loss_part
+                    #self.cross_sections[start:end, w_ind]        = cs_part
+                    #self.scattering_amplitudes[start:end, w_ind] = amp_part
+
+                self.ostream.print_info(
+                    f'Computed RIXS cross sections for {num_final_xsections} energy-loss frequencies '
+                    f'at photon energy: {w_ex*hartree_in_ev():.2f} eV.'
+                )
+                self.ostream.print_blank()
+                self._print_rixs_data(f'RIXS cross sections at incident X-ray energy '
+                                      f'{w_ex*hartree_in_ev():.2f} eV, energy-loss mode',
+                                      self.ene_losses[:,n_ind], self.cross_sections[:,n_ind], self.elastic_cross_sections[n_ind])
+                self.ostream.print_blank()
+                self.ostream.flush()
+
+        results_dict = {
+            'cross_sections': self.cross_sections,
+            'elastic_cross_sections': self.elastic_cross_sections,
+            'elastic_emission': self.photon_energy,
+            #'scattering_amplitudes': self.scattering_amplitudes,
+            'emission_energies': self.emission_enes,
+            'energy_losses': self.ene_losses,
+        }
+
+        if self.filename is not None and self.rank == mpi_master():
+            self.ostream.print_info('Writing to files...')
+            self.ostream.print_blank()
+            self.ostream.flush()
+            # TODO: append to final h5 (instead of writting new file)
+            self._write_hdf5(self.filename + '_rixs')
+
+        #if not init_photon_set:
+        #    self.photon_energy = None
+
+        if self.rank == mpi_master():
+            self.ostream.print_info('...done.')
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+        return results_dict
+
+    def eff_excited_grad(self, molecule, basis, scf_results, response_vec, components='xyz'):
+        """
+        Get effective RHS/gradient vectors of a previous LR.
+
+        :return: 
+            LR vectors (yuple)
+        """
+        dip = compute_electric_dipole_integrals(molecule, basis, [0.0, 0.0, 0.0])
+        dip_ints = {'x': dip[0], 'y': dip[1], 'z': dip[2]}
+
+        C = scf_results['C_alpha']
+        nocc = molecule.number_of_alpha_occupied_orbitals(basis)
+        norb = C.shape[1]
+
+        Z = self.lrvec2mat(response_vec, nocc, norb)
+
+        sqrt_2 = np.sqrt(2.0)
+        grads = []
+
+        for comp in components:
+            dip_x_ao = dip_ints[comp]
+            dip_x_mo = C.T @ dip_x_ao.T @ C
+
+            grad = self.commut(dip_x_mo, Z) #dip_x_mo @ Z - Z @ dip_x_mo
+
+            grad_vec = -1.0 * sqrt_2 * self.lrmat2vec(grad, nocc, norb)
+            grads.append(grad_vec)
+
+        return tuple(grads)
+
+
+    def compute_sos(self, molecule, basis, scf_results,
+                rsp_results=None, cvs_rsp_results=None):
+        """
+        Implements the sum-over-states variant of LR-TDDFT RIXS.
+        """
+
         # TODO: enable ECP
         assert_msg_critical(
             not basis.has_ecp(),
@@ -284,12 +557,12 @@ class RixsDriver(LinearSolver):
 
                 cvs_rsp_results = cvs_rsp_drv.compute(molecule, basis, scf_results)
 
-            elif self.complex_polarization_prop:
+            elif self.cpp:
                 assert_msg_critical(self.photon_energy,
                                         'Must provide incoming photon energies for the CPP approach!')
                 cpp_rsp_drv = ComplexResponse()
                 cpp_rsp_drv.frequencies = self.photon_energy
-                # given broadening is FWHM -> HWHM
+                # given broadening is FWHM but CPP-driver takes HWHM -> HWHM
                 cpp_rsp_drv.damping = self.gamma / 2
                 
                 if self.checkpoint_file is not None:
