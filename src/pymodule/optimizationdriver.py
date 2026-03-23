@@ -369,6 +369,15 @@ class OptimizationDriver:
                         for line in constr_dict[key]:
                             print(line, file=fh)
             constr_filename = constr_file.as_posix()
+
+            # self.ostream.print_info('The following constraints are passed to geomeTRIC:')
+            # self.ostream.print_blank()
+            # with constr_file.open('r') as fh:
+            #     for line in fh:
+            #         self.ostream.print_header(line.rstrip().ljust(104))
+            # self.ostream.print_blank()
+            # self.ostream.flush()
+
         else:
             constr_filename = None
 

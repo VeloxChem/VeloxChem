@@ -285,7 +285,7 @@ class TestScfGradientDriverMiscellaneous:
         assert grad_drv_copy.xcfun == grad_drv.xcfun
         assert np.allclose(grad_drv_copy.gradient, grad_drv.gradient)
 
-    def test_read_settings_imports_only_configuration(self, tmp_path):
+    def test_read_settings(self, tmp_path):
 
         molecule, basis = self.get_ch3_molecule_and_basis()
 

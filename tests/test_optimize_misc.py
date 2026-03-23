@@ -1,3 +1,4 @@
+from mpi4py import MPI
 from pathlib import Path
 from copy import deepcopy
 
@@ -28,13 +29,19 @@ class TestOptimizeMiscellaneous:
         return molecule, basis
 
     @staticmethod
-    def run_unrestricted_opt(molecule, basis, xcfun='hf'):
+    def run_unrestricted_opt(molecule,
+                             basis,
+                             xcfun='hf',
+                             filename=None,
+                             constraints=None):
 
         scf_drv = ScfUnrestrictedDriver()
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun
+        scf_drv.filename = filename
 
         opt_drv = OptimizationDriver(scf_drv)
+        opt_drv.constraints = constraints
         opt_results = opt_drv.compute(molecule, basis)
 
         return opt_drv, opt_results
@@ -66,3 +73,38 @@ class TestOptimizeMiscellaneous:
 
         assert opt_drv_copy.grad_drv.xcfun == opt_drv.grad_drv.xcfun
         assert opt_drv_copy.grad_drv.ostream is opt_drv.grad_drv.ostream
+
+    def test_read_settings(self, tmp_path):
+
+        molecule, basis = self.get_ch3_molecule_and_basis()
+
+        filename = str(tmp_path / "opt_import_settings")
+
+        comm = MPI.COMM_WORLD
+        filename = comm.bcast(filename, root=mpi_master())
+
+        opt_drv, opt_results = self.run_unrestricted_opt(
+            molecule,
+            basis,
+            'b3lyp',
+            filename=filename,
+            constraints=[
+                'freeze distance 1 2',
+                'set angle 2 1 3 115.0',
+            ])
+
+        checkpoint_file = f'{filename}_scf.h5'
+
+        new_scf_drv = ScfUnrestrictedDriver()
+        new_opt_drv = OptimizationDriver(new_scf_drv)
+        new_opt_drv.read_settings(checkpoint_file)
+
+        # these should be updated by read_settings
+        assert new_opt_drv.grad_drv.scf_driver.xcfun == opt_drv.grad_drv.xcfun
+        assert new_opt_drv.grad_drv.xcfun == opt_drv.grad_drv.xcfun
+        assert new_opt_drv.constraints == opt_drv.constraints
+
+        # these should not be updated by read_settings
+        assert new_opt_drv.grad_drv.scf_driver.filename is None
+        assert new_opt_drv.grad_drv.scf_driver.checkpoint_file is None
+        assert new_opt_drv.grad_drv.gradient is None
