@@ -105,7 +105,7 @@ class ScfGradientDriver(GradientDriver):
 
         self.scf_driver.read_settings(checkpoint_file)
 
-    def compute(self, molecule, basis, scf_results=None):
+    def compute(self, molecule, basis, scf_results_not_used=None):
         """
         Performs calculation of gradient.
 
@@ -113,8 +113,8 @@ class ScfGradientDriver(GradientDriver):
             The molecule.
         :param basis:
             The AO basis set.
-        :param scf_results:
-            The dictionary containing converged SCF results.
+        :param scf_results_not_used:
+            For backward compatibility.
         """
 
         # TODO: enable RI-JK
@@ -122,7 +122,10 @@ class ScfGradientDriver(GradientDriver):
             not self.scf_driver.ri_jk,
             f'{type(self).__name__}.compute: RI-JK is not yet supported')
 
+        scf_results = self.scf_driver.scf_results
         if scf_results is None:
+            # run SCF if needed
+            scf_energy_not_used = self.compute_energy(molecule, basis)
             scf_results = self.scf_driver.scf_results
 
         start_time = time.time()
@@ -134,7 +137,7 @@ class ScfGradientDriver(GradientDriver):
         else:
             # sanity checks
             molecule_sanity_check(molecule)
-            scf_results_sanity_check(self, self.scf_driver.scf_results)
+            scf_results_sanity_check(self, scf_results)
             dft_sanity_check(self, 'compute')
 
             if self.rank == mpi_master():
@@ -936,37 +939,34 @@ class ScfGradientDriver(GradientDriver):
                     self.ostream.print_info(f'    {key:<25}:  {val:.2f} sec')
             self.ostream.print_blank()
 
-    def compute_energy(self, molecule, ao_basis, scf_results=None):
+    def compute_energy(self, molecule, basis, scf_results_not_used=None):
         """
         Computes the energy at current geometry.
 
         :param molecule:
             The molecule.
-        :param ao_basis:
+        :param basis:
             The AO basis set.
-        :param scf_results:
-            The dictionary containing converged SCF results.
+        :param scf_results_not_used:
+            For backward compatibility.
 
         :return:
             The energy.
         """
 
         if self.numerical:
-            # disable restarting scf for numerical gradient
+            # disable restarting scf for numerical calculation
             self.scf_driver.restart = False
         else:
-            # always try restarting scf for analytical gradient
+            # always try restarting scf for analytical calculation
             self.scf_driver.restart = True
 
         self.scf_driver.ostream.mute()
-        new_scf_results = self.scf_driver.compute(molecule, ao_basis)
+        new_scf_results_not_used = self.scf_driver.compute(molecule, basis)
         self.scf_driver.ostream.unmute()
 
         assert_msg_critical(self.scf_driver.is_converged,
-                            'ScfGradientDriver: SCF did not converge')
-
-        if (self.rank == mpi_master()) and (scf_results is not None):
-            scf_results.update(new_scf_results)
+                            f'{type(self).__name__}: SCF did not converge')
 
         return self.scf_driver.get_scf_energy()
 

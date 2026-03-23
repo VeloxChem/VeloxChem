@@ -494,8 +494,7 @@ def main():
                 opt_drv = OptimizationDriver(grad_drv)
                 opt_drv.keep_files = True
                 opt_drv.update_settings(opt_dict)
-                opt_results = opt_drv.compute(task.molecule, task.ao_basis,
-                                              scf_results)
+                opt_results = opt_drv.compute(task.molecule, task.ao_basis)
 
         elif run_excited_state_gradient:
 
