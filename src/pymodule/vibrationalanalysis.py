@@ -296,7 +296,7 @@ class VibrationalAnalysis:
         self.rsp_dict = dict(rsp_dict)
         self.polgrad_dict = dict(polgrad_dict)
 
-    def compute(self, molecule, ao_basis=None, min_basis=None):
+    def compute(self, molecule, ao_basis=None):
         """
         Drives the computation of the vibrational analysis and
         associated properties.
@@ -305,8 +305,6 @@ class VibrationalAnalysis:
             The molecule.
         :param ao_basis:
             The AO basis set.
-        :param min_basis:
-            The minimal AO basis set.
 
         :returns:
             The dictionary with vibrational analysis results.
