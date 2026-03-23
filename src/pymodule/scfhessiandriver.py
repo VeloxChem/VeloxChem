@@ -150,6 +150,11 @@ class ScfHessianDriver(HessianDriver):
             The AO basis set.
         """
 
+        # TODO: enable RI-JK
+        assert_msg_critical(
+            not self.scf_driver.ri_jk,
+            f'{type(self).__name__}.compute: RI-JK is not yet supported')
+
         if self.rank == mpi_master():
             self.print_header()
 

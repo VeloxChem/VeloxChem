@@ -1954,6 +1954,9 @@ class LinearSolver:
                 den_mat_for_ri_j.set_values(0.5 * (dens_Jab + dens_Jab.T))
 
                 fock_mat = self._ri_drv.compute(den_mat_for_ri_j, 'j')
+
+                fock_mat_a_np = fock_mat.to_numpy()
+                fock_mat_b_np = fock_mat.to_numpy()
             else:
                 # for now we calculate Ka, Kb and Jab separately for open-shell
                 den_mat_for_Ka = make_matrix(basis, mat_t.general)
