@@ -48,6 +48,7 @@ from .scfunrestdriver import ScfUnrestrictedDriver
 from .scfrestopendriver import ScfRestrictedOpenDriver
 from .scfgradientdriver import ScfGradientDriver
 from .scfhessiandriver import ScfHessianDriver
+from .vibrationalanalysis import VibrationalAnalysis
 from .tddftgradientdriver import TddftGradientDriver
 from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
@@ -341,10 +342,23 @@ class OptimizationDriver:
 
         optinp_filename = Path(filename + '.optinp').as_posix()
 
+        # prepare for post-opt Hessian
+
+        need_scf_postopt_hessian = False
+        if self.is_scf and self.hessian == 'last':
+            need_scf_postopt_hessian = True
+            self.hessian = 'never'
+        elif self.is_scf and self.hessian == 'first+last':
+            need_scf_postopt_hessian = True
+            self.hessian = 'first'
+
         # pre-compute Hessian
 
-        if self.is_scf and self.hessian in ['first', 'first+last']:
+        if self.is_scf and self.hessian == 'first':
             hessian_drv = ScfHessianDriver(self.grad_drv.scf_driver)
+            # conservative choice of disabling restart
+            # since geometry is likely changed during an opt calculation
+            hessian_drv.cphf_dict = {'restart': False}
             hessian_drv.compute(molecule, args[0])
             if self.rank == mpi_master():
                 hess_data = hessian_drv.hessian.copy()
@@ -502,6 +516,23 @@ class OptimizationDriver:
                                            opt_results)
 
             opt_results = self.comm.bcast(opt_results, root=mpi_master())
+
+        # post-opt Hessian
+
+        if self.is_scf and need_scf_postopt_hessian:
+            vib_drv = VibrationalAnalysis(self.grad_drv.scf_driver)
+            vib_drv.filename = self.grad_drv.scf_driver.filename
+            # conservative choice of disabling restart
+            # since geometry is likely changed during an opt calculation
+            vib_drv.cphf_dict = {'restart': False}
+            vib_results_not_used = vib_drv.compute(molecule, args[0])
+            # restore Hessian option
+            if self.hessian == 'never':
+                need_scf_postopt_hessian = False
+                self.hessian == 'last'
+            elif self.hessian == 'first':
+                need_scf_postopt_hessian = False
+                self.hessian == 'first+last'
 
         try:
             temp_dir.cleanup()

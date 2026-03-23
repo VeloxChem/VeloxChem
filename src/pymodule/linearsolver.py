@@ -657,6 +657,19 @@ class LinearSolver:
         else:
             self._dist_fock_ung.append(fock_ung, axis=1)
 
+    def _clear_subspace_data(self):
+        """
+        Clears stored reduced-space trial, sigma, and nonlinear Fock data.
+        """
+
+        self._dist_bger = None
+        self._dist_bung = None
+        self._dist_e2bger = None
+        self._dist_e2bung = None
+
+        self._dist_fock_ger = None
+        self._dist_fock_ung = None
+
     def _get_initial_guess_size_for_excitations(self, nstates):
         """
         Gets the initial guess size for initial excitations.

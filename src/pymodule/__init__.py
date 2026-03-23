@@ -69,8 +69,11 @@ from .veloxchemlib import LocalECPGeom100Driver
 from .veloxchemlib import LocalECPGeom200Driver
 from .veloxchemlib import LocalECPGeom101Driver
 from .veloxchemlib import LocalECPGeom010Driver
+from .veloxchemlib import LocalECPGeom020Driver
+from .veloxchemlib import LocalECPGeom110Driver
 from .veloxchemlib import ProjectedECPDriver
 from .veloxchemlib import ProjectedECPGeom100Driver
+from .veloxchemlib import ProjectedECPGeom200Driver
 from .veloxchemlib import ECPDriver
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import FockGeom1000Driver
@@ -154,8 +157,8 @@ from .lreigensolver import LinearResponseEigenSolver
 from .lreigensolverunrest import LinearResponseUnrestrictedEigenSolver
 from .lrsolver import LinearResponseSolver
 from .lrsolverunrest import LinearResponseUnrestrictedSolver
-from .cppsolver import ComplexResponse
-from .cppsolverunrest import ComplexResponseUnrestricted
+from .cppsolver import ComplexResponseSolver
+from .cppsolverunrest import ComplexResponseUnrestrictedSolver
 from .tdacppsolver import ComplexResponseTDA
 from .c6driver import C6Driver
 from .quadraticresponsedriver import QuadraticResponseDriver
@@ -225,6 +228,7 @@ from .reactionmatcher import ReactionMatcher
 from .smddriver import SmdDriver
 from .atombdedriver import AtomBdeDriver
 # for backward compatibility only
+from .cppsolver import ComplexResponseSolver as ComplexResponse
 from .peforcefieldgenerator import PEForceFieldGenerator as LoPropDriver
 
 # Python functions

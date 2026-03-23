@@ -49,6 +49,10 @@ class TestScfRestrictedDriver:
 
         self.run_scf_rest('cam-b3lyp', -152.6595419840, 1.0e-6)
 
+    def test_camb3lyp_100(self):
+
+        self.run_scf_rest('cam-b3lyp-100', -152.5671319422, 1.0e-6)
+
     def test_tpssh(self):
 
         self.run_scf_rest('tpssh', -152.7062253947, 1.0e-6)
