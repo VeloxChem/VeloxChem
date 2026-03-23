@@ -182,13 +182,15 @@ class HessianDriver:
 
         return
 
-    def hess_nuc_contrib(self, molecule):
+    def hess_nuc_contrib(self, molecule, basis=None):
         """
         Calculates the contribution of the nuclear-nuclear repulsion
         to the analytical nuclear Hessian.
 
         :param molecule:
             The molecule.
+        :param basis:
+            The optional AO basis set.
 
         :return:
             The nuclear contribution to the Hessian.
@@ -205,6 +207,8 @@ class HessianDriver:
 
         # atomic charges
         nuclear_charges = molecule.get_element_ids()
+        if basis is not None:
+            nuclear_charges -= basis.get_number_of_ecp_core_electrons()
 
         # loop over all distinct atom pairs and add energy contribution
         for i in range(natm):

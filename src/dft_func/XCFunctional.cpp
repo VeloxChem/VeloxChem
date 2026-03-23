@@ -48,7 +48,8 @@
 CXCFunctional::CXCFunctional(const std::string&              nameOfFunctional,
                              const std::vector<std::string>& labels,
                              const std::vector<double>&      coeffs,
-                             const double                    fractionOfExactExchange)
+                             const double                    fractionOfExactExchange,
+                             const std::vector<double>&      rangeSeparatedParameters)
 
     : _nameOfFunctional(format::upper_case(nameOfFunctional))
 
@@ -72,7 +73,13 @@ CXCFunctional::CXCFunctional(const std::string&              nameOfFunctional,
 
         auto coeff = coeffs[i];
 
-        auto xccomp = CXCComponent(label, coeff);
+        if (! rangeSeparatedParameters.empty())
+        {
+            errors::assertMsgCritical(labels.size() == 1,
+                                      "XCFunctional: Range-separated functional with custom parameters can include only one component");
+        }
+
+        auto xccomp = CXCComponent(label, coeff, rangeSeparatedParameters);
 
         auto funcptr = xccomp.getFunctionalPointer();
 
@@ -3164,22 +3171,6 @@ CXCFunctional::getDimensionOfDerivatives() const
     }
 
     return 0;
-}
-
-auto
-CXCFunctional::setRangeSeparatedParameterOmega(const double omega) -> void
-{
-    errors::assertMsgCritical(isRangeSeparated(), "XCFunctional.setRangeSeparatedParameterOmega: Only applicable to range-separated functional");
-
-    errors::assertMsgCritical(_components.size() == 1, "XCFunctional.setRangeSeparatedParameterOmega: Only applicable to single-component functional");
-
-    std::string param_name("_omega");
-
-    auto funcptr = _components[0].getFunctionalPointer();
-
-    xc_func_set_ext_params_name(funcptr, param_name.c_str(), omega);
-
-    xc_hyb_cam_coef(funcptr, &_rangeSeparationParameterOmega, &_rangeSeparationParameterAlpha, &_rangeSeparationParameterBeta);
 }
 
 auto

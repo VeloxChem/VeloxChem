@@ -1,3 +1,4 @@
+from mpi4py import MPI
 import pytest
 
 from veloxchem.veloxchemlib import mpi_master
@@ -41,6 +42,32 @@ class TestLR:
                 ref_val = ref_rsp_func[key]
                 max_diff = max(max_diff, abs(val - ref_val))
             assert max_diff < tol
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    def test_compute_rejects_openshell_molecule(self):
+
+        xyz_string = """3
+        xyz
+        O   -0.1858140  -1.1749469   0.7662596
+        H   -0.1285513  -0.8984365   1.6808606
+        H   -0.0582782  -0.3702550   0.2638279
+        """
+        mol = Molecule.read_xyz_string(xyz_string)
+        mol.set_multiplicity(3)
+
+        bas = MolecularBasis.read(mol, 'def2-svp', ostream=None)
+
+        # empty scf results just for testing
+        scf_results = {}
+
+        lr_drv = LinearResponseSolver()
+        lr_drv.ostream.mute()
+
+        with pytest.raises(
+                AssertionError,
+                match="Molecule: Invalid multiplicity for restricted"):
+            lr_results_not_used = lr_drv.compute(mol, bas, scf_results)
 
     def test_hf(self):
 

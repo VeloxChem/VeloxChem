@@ -5,7 +5,7 @@ from veloxchem.veloxchemlib import mpi_master
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
-from veloxchem.cppsolver import ComplexResponse
+from veloxchem.cppsolver import ComplexResponseSolver
 
 
 @pytest.mark.solvers
@@ -24,7 +24,7 @@ class TestCppPropertyDensities:
 
         # run CPP
 
-        cpp_drv = ComplexResponse()
+        cpp_drv = ComplexResponseSolver()
         cpp_drv.frequencies = cpp_frequencies
         cpp_drv.property = cpp_property
         cpp_drv.ostream.mute()
