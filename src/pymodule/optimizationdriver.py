@@ -30,9 +30,11 @@
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+from mpi4py import MPI
 from contextlib import redirect_stdout, redirect_stderr
 from pathlib import Path
 from io import StringIO
+from copy import deepcopy
 import numpy as np
 import time as tm
 import tempfile
@@ -42,6 +44,7 @@ import h5py
 from .veloxchemlib import mpi_master, hartree_in_kjpermol
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
+from .outputstream import OutputStream
 from .optimizationengine import OptimizationEngine
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
@@ -1065,3 +1068,23 @@ class OptimizationDriver:
             self.ostream.flush()
 
             hf.close()
+
+    def __deepcopy__(self, memo):
+        """
+        Implements deepcopy.
+
+        :param memo:
+            The memo dictionary for deepcopy.
+
+        :return:
+            A deepcopy of self.
+        """
+
+        new_opt_drv = OptimizationDriver(deepcopy(self.grad_drv))
+
+        for key, val in vars(self).items():
+            if isinstance(val, (MPI.Intracomm, OutputStream)):
+                continue
+            setattr(new_opt_drv, key, deepcopy(val))
+
+        return new_opt_drv

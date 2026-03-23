@@ -144,13 +144,14 @@ class OptimizationEngine(geometric.engine.Engine):
         self.grad_drv.compute(new_mol, *self.args)
         gradient = self.grad_drv.get_gradient()
 
-        if self.rank == mpi_master():
+        if hasattr(self.grad_drv, "scf_driver"):
             checkpoint_file = self.grad_drv.scf_driver._get_effective_checkpoint_file(
             )
             if checkpoint_file is not None and self.opt_unparsed_input is not None:
-                write_unparsed_input_to_hdf5(checkpoint_file,
-                                             self.opt_unparsed_input,
-                                             group_name='opt_settings')
+                if self.rank == mpi_master():
+                    write_unparsed_input_to_hdf5(checkpoint_file,
+                                                 self.opt_unparsed_input,
+                                                 group_name='opt_settings')
 
         energy = self.comm.bcast(energy, root=mpi_master())
         gradient = self.comm.bcast(gradient, root=mpi_master())

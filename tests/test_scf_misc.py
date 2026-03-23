@@ -305,16 +305,14 @@ class TestScfDriverMiscellaneous:
 
         assert imported_drv.restart is False
         assert imported_drv.filename == str(tmp_path / "do_not_override")
-        assert imported_drv.checkpoint_file == str(
-            tmp_path / "do_not_override_scf.h5")
+        assert imported_drv.checkpoint_file == str(tmp_path /
+                                                   "do_not_override_scf.h5")
         assert imported_drv.max_iter == scf_drv.max_iter
         assert imported_drv.density_damping == scf_drv.density_damping
         assert imported_drv.xcfun == scf_drv.xcfun
         assert imported_drv.ri_coulomb == scf_drv.ri_coulomb
-        assert (imported_drv.ri_auxiliary_basis ==
-                scf_drv.ri_auxiliary_basis)
-        assert (imported_drv.ri_metric_threshold ==
-                scf_drv.ri_metric_threshold)
+        assert imported_drv.ri_auxiliary_basis == scf_drv.ri_auxiliary_basis
+        assert imported_drv.ri_metric_threshold == scf_drv.ri_metric_threshold
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='skip pytest.raises for multiple MPI processes')
@@ -432,9 +430,8 @@ class TestScfDriverMiscellaneous:
         occ_alpha = list(occ_beta)
         occ_alpha[-1] += 1  # HOMO->LUMO excitation
 
-        uhf_drv.maximum_overlap(
-            molecule, basis, scf_drv.molecular_orbitals, occ_alpha, occ_beta
-        )
+        uhf_drv.maximum_overlap(molecule, basis, scf_drv.molecular_orbitals,
+                                occ_alpha, occ_beta)
 
         scf_results = uhf_drv.compute(molecule, basis)
 
@@ -507,5 +504,6 @@ class TestScfDriverMiscellaneous:
 
         assert scf_drv_copy.xcfun == scf_drv.xcfun
         assert scf_drv_copy.scf_energy == scf_drv.scf_energy
-        assert np.allclose(scf_drv_copy.scf_results['D_alpha'],
-                           scf_drv.scf_results['D_alpha'])
+        if self.is_master():
+            assert np.allclose(scf_drv_copy.scf_results['D_alpha'],
+                               scf_drv.scf_results['D_alpha'])
