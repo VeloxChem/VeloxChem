@@ -1488,7 +1488,6 @@ def _Molecule_show(self,
                         'fontColor': 0x000000,
                         'backgroundColor': 0xffffff,
                         'backgroundOpacity': 0.0,
-                        'fontSize': label_font_size,
                     })
         viewer.setViewStyle({"style": "outline", "width": 0.05})
         viewer.setStyle({"stick": {}, "sphere": {"scale": 0.25}})
