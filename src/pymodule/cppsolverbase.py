@@ -511,7 +511,7 @@ class ComplexResponseSolverBase(LinearSolver):
 
         return spectrum
 
-    def  _get_ord_spectrum(self, rsp_results, x_unit):
+    def _get_ord_spectrum(self, rsp_results, x_unit):
         """
         Gets optical rotatory dispersion spectrum.
 
