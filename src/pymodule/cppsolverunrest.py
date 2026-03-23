@@ -172,6 +172,10 @@ class ComplexResponseUnrestrictedSolver(ComplexResponseSolverBase):
         # make sure that cpp_property is properly set
         if self.property is not None:
             self.set_cpp_property(self.property)
+            assert_msg_critical(
+                self.property in ['absorption', 'ecd'],
+                f'{type(self).__name__}.compute: ord is only supported for restricted reference'
+            )
 
         # check molecule
         molecule_sanity_check(molecule)

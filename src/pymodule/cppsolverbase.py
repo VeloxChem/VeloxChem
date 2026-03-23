@@ -676,6 +676,8 @@ class ComplexResponseSolverBase(LinearSolver):
             self._print_absorption_results(rsp_results, ostream)
         elif self.property == 'ecd':
             self._print_ecd_results(rsp_results, ostream)
+        elif self.property == 'ord':
+            self._print_ord_results(rsp_results, ostream)
 
     def _print_response_functions(self, rsp_results, ostream=None):
         """
@@ -837,6 +839,45 @@ class ComplexResponseSolverBase(LinearSolver):
         ostream.print_blank()
         ostream.flush()
 
+    def _print_ord_results(self, rsp_results, ostream=None):
+        """
+        Prints ORD results to output stream.
+        """
+
+        if ostream is None:
+            ostream = self.ostream
+
+        width = 92
+
+        spectrum = self.get_spectrum(rsp_results, 'au')
+
+        title = 'Optical Rotatory Dispersion Spectrum'
+        ostream.print_header(title.ljust(width))
+        ostream.print_header(('=' * len(title)).ljust(width))
+        ostream.print_blank()
+
+        freqs = rsp_results['frequencies']
+
+        if len(freqs) == 1 and freqs[0] == 0.0:
+            text = '*** No optical rotatory dispersion spectrum at zero frequency.'
+            ostream.print_header(text.ljust(width))
+            ostream.print_blank()
+            return
+
+        title = '{:<20s}{:<20s}{:>28s}'.format(
+            'Frequency[a.u.]', 'Frequency[eV]', 'ORD[10^3 deg dm^-1 (g cm^-3)^-1]'
+        )
+        ostream.print_header(title.ljust(width))
+        ostream.print_header(('-' * len(title)).ljust(width))
+
+        for w, ord_value in zip(spectrum['x_data'], spectrum['y_data']):
+            output = '{:<20.4f}{:<20.5f}{:>18.8f}'.format(
+                w, w * hartree_in_ev(), ord_value)
+            ostream.print_header(output.ljust(width))
+
+        ostream.print_blank()
+        ostream.flush()
+
     def write_cpp_rsp_results_to_hdf5(self, fname, rsp_results):
         """
         Writes the results of a linear response calculation to HDF5 file.
@@ -863,6 +904,8 @@ class ComplexResponseSolverBase(LinearSolver):
                     ylabel = self.group_label + '/sigma'
                 elif self.property == 'ecd':
                     ylabel = self.group_label + '/delta-epsilon'
+                elif self.property == 'ord':
+                    ylabel = self.group_label + '/optical-rotation'
                 if ylabel in hf:
                     del hf[ylabel]
                 hf.create_dataset(ylabel, data=y_data)
