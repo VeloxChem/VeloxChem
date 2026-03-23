@@ -66,8 +66,7 @@ from .cpcmdriver import CpcmDriver
 from .smddriver import SmdDriver
 from .dispersionmodel import DispersionModel
 from .inputparser import (parse_input, print_keywords, print_attributes,
-                          unparse_input,
-                          write_unparsed_input_to_hdf5,
+                          unparse_input, write_unparsed_input_to_hdf5,
                           read_unparsed_input_from_hdf5)
 from .dftutils import get_default_grid_level, print_xc_reference
 from .sanitychecks import (molecule_sanity_check, dft_sanity_check,
@@ -588,7 +587,7 @@ class ScfDriver:
 
         self.update_settings(checkpoint_scf_input, checkpoint_method_input)
 
-    def _get_effective_checkpoint_file(self):
+    def get_checkpoint_file(self):
         """
         Gets the effective checkpoint file path.
 
@@ -690,7 +689,7 @@ class ScfDriver:
                 self.acc_type = 'DIIS'
             if self.restart and self.rank == mpi_master():
                 self._ref_mol_orbs = MolecularOrbitals.read_hdf5(
-                    self._get_effective_checkpoint_file())
+                    self.get_checkpoint_file())
 
         # nuclear repulsion energy
         self._nuc_energy = molecule.nuclear_repulsion_energy(basis)
@@ -950,8 +949,7 @@ class ScfDriver:
                 if self.restart:
                     den_mat = self.gen_initial_density_restart(molecule)
                 elif self._use_start_orbitals:
-                    den_mat = self.gen_initial_density_start_orbitals(
-                        molecule)
+                    den_mat = self.gen_initial_density_start_orbitals(molecule)
                 else:
                     den_mat = self.gen_initial_density_sad(
                         molecule, basis, min_basis)
@@ -962,7 +960,7 @@ class ScfDriver:
             if self._cpcm:
                 if self.restart and self.rank == mpi_master():
                     self.cpcm_drv._cpcm_q = read_cpcm_charges(
-                        self._get_effective_checkpoint_file())
+                        self.get_checkpoint_file())
                 self.cpcm_drv._cpcm_q = self.comm.bcast(self.cpcm_drv._cpcm_q,
                                                         root=mpi_master())
 
@@ -1192,9 +1190,8 @@ class ScfDriver:
             The AO density matrix.
         """
 
-        checkpoint_file = self._get_effective_checkpoint_file()
-        self._molecular_orbitals = MolecularOrbitals.read_hdf5(
-            checkpoint_file)
+        checkpoint_file = self.get_checkpoint_file()
+        self._molecular_orbitals = MolecularOrbitals.read_hdf5(checkpoint_file)
         den_mat = self._molecular_orbitals.get_density(molecule, self.scf_type)
 
         restart_text = 'Restarting from checkpoint file: '
@@ -1239,7 +1236,7 @@ class ScfDriver:
         """
 
         valid = False
-        checkpoint_file = self._get_effective_checkpoint_file()
+        checkpoint_file = self.get_checkpoint_file()
 
         if self.rank == mpi_master():
             if (isinstance(checkpoint_file, str) and
@@ -1420,7 +1417,7 @@ class ScfDriver:
         if self._skip_writing_h5:
             return
 
-        checkpoint_file = self._get_effective_checkpoint_file()
+        checkpoint_file = self.get_checkpoint_file()
         if checkpoint_file is None:
             return
 
@@ -1441,8 +1438,7 @@ class ScfDriver:
                             potfile_text)
                 self.molecular_orbitals.write_hdf5(checkpoint_file)
                 if self._cpcm:
-                    write_cpcm_charges(checkpoint_file,
-                                       self.cpcm_drv._cpcm_q)
+                    write_cpcm_charges(checkpoint_file, self.cpcm_drv._cpcm_q)
 
                 scf_keywords = {
                     key: val[0]

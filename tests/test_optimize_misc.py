@@ -1,5 +1,7 @@
+from pathlib import Path
 from copy import deepcopy
 
+from veloxchem.veloxchemlib import mpi_master
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
@@ -43,6 +45,13 @@ class TestOptimizeMiscellaneous:
 
         opt_drv, opt_results = self.run_unrestricted_opt(
             molecule, basis, 'b3lyp')
+
+        if opt_drv.rank == mpi_master():
+            filename = opt_drv.grad_drv.scf_driver.filename
+            for fname in [f'{filename}.h5', f'{filename}_scf.h5']:
+                fpath = Path(fname)
+                if fpath.is_file():
+                    fpath.unlink()
 
         opt_engine = OptimizationEngine(opt_drv.grad_drv, molecule, basis)
 

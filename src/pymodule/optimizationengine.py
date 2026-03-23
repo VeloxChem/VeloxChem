@@ -146,8 +146,7 @@ class OptimizationEngine(geometric.engine.Engine):
         gradient = self.grad_drv.get_gradient()
 
         if hasattr(self.grad_drv, "scf_driver"):
-            checkpoint_file = self.grad_drv.scf_driver._get_effective_checkpoint_file(
-            )
+            checkpoint_file = self.grad_drv.scf_driver.get_checkpoint_file()
             if checkpoint_file is not None and self.opt_unparsed_input is not None:
                 if self.rank == mpi_master():
                     write_unparsed_input_to_hdf5(checkpoint_file,
