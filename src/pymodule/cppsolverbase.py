@@ -119,13 +119,13 @@ class ComplexResponseSolverBase(LinearSolver):
 
     def set_cpp_property(self, prop):
         """
-        Sets CPP property (absorption or ecd).
+        Sets CPP property (absorption or ecd or ord).
 
         :param prop:
-            The CPP property (absorption or ecd).
+            The CPP property (absorption or ecd or ord).
         """
 
-        assert_msg_critical(prop.lower() in ['absorption', 'ecd'],
+        assert_msg_critical(prop.lower() in ['absorption', 'ecd', 'ord'],
                             f'{type(self).__name__}: invalid CPP property')
 
         self.property = prop.lower()
@@ -141,6 +141,12 @@ class ComplexResponseSolverBase(LinearSolver):
             self.a_components = 'xyz'
             self.b_operator = 'linear momentum'
             self.b_components = 'xyz'
+        
+        elif self.property == 'ord':
+            self.a_operator = 'electric dipole'
+            self.a_components = 'xyz'
+            self.b_operator = 'magnetic dipole'
+            self.b_components = 'xyz'        
 
     def _preconditioning(self, precond, v_in):
         """
@@ -343,6 +349,45 @@ class ComplexResponseSolverBase(LinearSolver):
 
         self.ostream.flush()
 
+    @staticmethod
+    def _get_molecular_mass_amu(molecule):
+        """
+        Gets molecular mass in atomic mass units.
+
+        :param molecule:
+            Molecule object.
+
+        :return:
+            Molecular mass in amu.
+        """
+
+        masses = molecule.get_masses()
+
+        assert_msg_critical(
+            masses is not None,
+            f'{ComplexResponseSolverBase.__name__}: unable to get atomic masses'
+        )
+
+        return float(np.sum(masses))
+
+    def _attach_molecular_metadata(self, rsp_results, molecule):
+        """
+        Attaches molecular metadata to response results.
+
+        :param rsp_results:
+            Response results dictionary.
+        :param molecule:
+            Molecule object.
+
+        :return:
+            Updated response results dictionary.
+        """
+
+        rsp_results['molecular_mass_amu'] = self._get_molecular_mass_amu(
+            molecule)
+
+        return rsp_results
+
     def get_spectrum(self, rsp_results, x_unit):
         """
         Gets spectrum.
@@ -361,6 +406,9 @@ class ComplexResponseSolverBase(LinearSolver):
 
         elif self.property == 'ecd':
             return self._get_ecd_spectrum(rsp_results, x_unit)
+        
+        elif self.property == 'ord':
+            return self._get_ord_spectrum(rsp_results, x_unit)        
 
         return None
 
@@ -463,6 +511,79 @@ class ComplexResponseSolverBase(LinearSolver):
 
         return spectrum
 
+    def  _get_ord_spectrum(self, rsp_results, x_unit):
+        """
+        Gets optical rotatory dispersion spectrum.
+
+        :param rsp_results:
+            The dictionary containing response results.
+        :param x_unit:
+            The unit of x-axis.
+
+        :return:
+            A dictionary containing the optical rotatory dispersion spectrum.
+        """
+
+        assert_msg_critical(
+            x_unit.lower() in ['au', 'ev', 'nm'],
+            f'{type(self).__name__}.get_spectrum: x_unit should be au, ev or nm'
+        )
+
+        au2ev = hartree_in_ev()
+        auxnm = 1.0 / hartree_in_inverse_nm()
+
+        spectrum = {'x_data': [], 'y_data': []}
+
+        if x_unit.lower() == 'au':
+            spectrum['x_label'] = 'Photon energy [a.u.]'
+        elif x_unit.lower() == 'ev':
+            spectrum['x_label'] = 'Photon energy [eV]'
+        elif x_unit.lower() == 'nm':
+            spectrum['x_label'] = 'Wavelength [nm]'
+
+        molecular_mass_amu = rsp_results.get('molecular_mass_amu', None)
+        convert_to_specific_rotation = (
+            molecular_mass_amu is not None and molecular_mass_amu > 0.0)
+
+        if convert_to_specific_rotation:
+            spectrum['y_label'] = r'Optical rotatory dispersion [10$^3$ deg dm$^{-1}$ (g cm$^{-3}$)$^{-1}$]'
+            molecular_weight = float(molecular_mass_amu)
+            au2wn = hartree_in_wavenumber()
+            alpha_prefactor = 1.3422940570573704e-4
+        else:
+            spectrum['y_label'] = 'Optical rotation parameter '
+            spectrum['y_label'] += r'$\beta(\omega)$ [a.u.]'
+
+        freqs = rsp_results['frequencies']
+        rsp_funcs = rsp_results['response_functions']
+
+        for w in freqs:
+            if w == 0.0:
+                continue
+
+            if x_unit.lower() == 'au':
+                spectrum['x_data'].append(w)
+            elif x_unit.lower() == 'ev':
+                spectrum['x_data'].append(au2ev * w)
+            elif x_unit.lower() == 'nm':
+                spectrum['x_data'].append(auxnm / w)
+
+            Gxx = -rsp_funcs[('x', 'x', w)].imag
+            Gyy = -rsp_funcs[('y', 'y', w)].imag
+            Gzz = -rsp_funcs[('z', 'z', w)].imag
+
+            beta = (Gxx + Gyy + Gzz) / (3.0 * w)
+
+            if convert_to_specific_rotation:
+                nu_bar = au2wn * w
+                specific_rotation = alpha_prefactor * (nu_bar**2) * beta
+                specific_rotation /= molecular_weight
+                spectrum['y_data'].append(specific_rotation / 1000.0)
+            else:
+                spectrum['y_data'].append(beta)
+
+        return spectrum
+
     def plot(self, cpp_results, x_unit='nm', plot_scatter=True):
         """
         Plot absorption or ECD spectrum from the CPP calculation.
@@ -518,6 +639,16 @@ class ComplexResponseSolverBase(LinearSolver):
         elif self.property == 'ecd':
             ax.set_ylabel(r'$\Delta \epsilon$ [L mol$^{-1}$ cm$^{-1}$]')
             ax.set_title('ECD Spectrum')
+            ax.set_ylim(-y_max * 1.1, y_max * 1.1)
+            ax.axhline(y=0,
+                       marker=',',
+                       color='k',
+                       linestyle='-.',
+                       markersize=0,
+                       linewidth=0.2)
+        elif self.property == 'ord':
+            ax.set_ylabel(cpp_spec['y_label'])
+            ax.set_title('Optical Rotatory Dispersion')
             ax.set_ylim(-y_max * 1.1, y_max * 1.1)
             ax.axhline(y=0,
                        marker=',',
