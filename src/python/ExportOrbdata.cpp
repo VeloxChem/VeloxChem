@@ -52,6 +52,8 @@
 #include "GtoPairBlock.hpp"
 #include "GtoPairBlockFunc.hpp"
 #include "MolecularBasis.hpp"
+#include "BaseCorePotential.hpp"
+#include "AtomCorePotential.hpp"
 
 namespace py = pybind11;
 using namespace py::literals;
@@ -124,17 +126,18 @@ export_orbdata(py::module &m)
     PyClass<CAtomBasis>(m, "AtomBasis")
         .def(py::init<>())
         .def(py::init<const CAtomBasis &>())
-        .def(py::init<const std::vector<CBasisFunction> &, const std::string &, const std::string &, const int>())
+        .def(py::init<const std::vector<CBasisFunction> &, const std::string &, const CAtomCorePotential &, const int>())
+        .def(py::init<const std::vector<CBasisFunction> &, const std::string &, const int>())
         .def(py::pickle(
             [](const CAtomBasis &abas) {
-                return py::make_tuple(abas.basis_functions(), abas.get_name(), abas.get_ecp_label(), abas.get_identifier());
+                return py::make_tuple(abas.basis_functions(), abas.get_name(), abas.get_ecp_potential(), abas.get_identifier());
             },
             [](py::tuple t) {
-                return CAtomBasis(t[0].cast<std::vector<CBasisFunction>>(), t[1].cast<std::string>(), t[2].cast<std::string>(), t[3].cast<int>());
+                return CAtomBasis(t[0].cast<std::vector<CBasisFunction>>(), t[1].cast<std::string>(), t[2].cast<CAtomCorePotential>(), t[3].cast<int>());
             }))
         .def("set_identifier", &CAtomBasis::set_identifier, "Sets identifier of atom basis.")
         .def("set_name", &CAtomBasis::set_name, "Sets name of atom basis.")
-        .def("set_ecp_label", &CAtomBasis::set_ecp_label, "Sets effective core potential label of atom basis.")
+        .def("set_ecp_potential", &CAtomBasis::set_ecp_potential, "Sets effective core potential of atom basis.")
         .def("add", &CAtomBasis::add, "Adds basis function to atom basis.")
         .def("reduce_to_valence_basis", &CAtomBasis::reduce_to_valence_basis, "Reduces atom basis to it's valence only form.")
         .def("get_basis_functions", py::overload_cast<>(&CAtomBasis::basis_functions, py::const_), "Gets GTOs.")
@@ -146,8 +149,8 @@ export_orbdata(py::module &m)
              "Gets GTOs with specific angular momentum and number of primitives.")
         .def("get_identifier", &CAtomBasis::get_identifier, "Gets identifier of atom basis.")
         .def("get_name", &CAtomBasis::get_name, "Gets name of atom basis.")
-        .def("get_ecp_label", &CAtomBasis::get_ecp_label, "Gets effective core potential label of atom basis.")
-        .def("need_ecp", &CAtomBasis::need_ecp, "Checks if atom basis requires effective core potential.")
+        .def("get_ecp_potential", &CAtomBasis::get_ecp_potential, "Gets effective core potential of atom basis.")
+        .def("has_ecp", &CAtomBasis::has_ecp, "Checks if atom basis contains effective core potential.")
         .def("max_angular_momentum", &CAtomBasis::max_angular_momentum, "Gets maximum angular momentum in atom basis.")
         .def("number_of_basis_functions",
              py::overload_cast<const int>(&CAtomBasis::number_of_basis_functions, py::const_),
@@ -408,7 +411,7 @@ export_orbdata(py::module &m)
         .def("__neq__", [](const CBlockedGtoPairBlock &self, const CBlockedGtoPairBlock &other) { return self != other; })
         .def("__copy__", [](const CBlockedGtoPairBlock &self) { return CBlockedGtoPairBlock(self); })
         .def("__deepcopy__", [](const CBlockedGtoPairBlock &self, py::dict) { return CBlockedGtoPairBlock(self); });
-
+    
     // CAODensityMatrix class
 
     // clang-format off
@@ -442,6 +445,48 @@ export_orbdata(py::module &m)
         .def("number_of_density_matrices", &CAODensityMatrix::getNumberOfDensityMatrices, "Gets number of density matrices.")
         .def("get_density_type", &CAODensityMatrix::getDensityType, "Gets type of density matrix.")
         .def(py::self == py::self);
+    
+    // CBaseCorePotential class
+    PyClass<CBaseCorePotential>(m, "BaseCorePotential")
+        .def(py::init<>())
+        .def(py::init<const CBaseCorePotential&>())
+        .def(py::init<const std::vector<double> &, const std::vector<double> &, const std::vector<int> &>())
+        .def(py::pickle(
+            [](const CBaseCorePotential &ecp) { return py::make_tuple(ecp.get_exponents(), ecp.get_factors(), ecp.get_radial_orders()); },
+            [](py::tuple t) { return CBaseCorePotential(t[0].cast<std::vector<double>>(), t[1].cast<std::vector<double>>(), t[2].cast<std::vector<int>>()); }))
+        .def("set_exponents", &CBaseCorePotential::set_exponents, "Sets exponents of base core potential.")
+        .def("set_factors", &CBaseCorePotential::set_factors, "Sets factors of base core potential.")
+        .def("set_radial_orders", &CBaseCorePotential::set_radial_orders, "Sets radial orders of base core potential.")
+        .def("add",
+             &CBaseCorePotential::add,
+             "Add primitive i.e. exponent, factor and radial order to base core potentia.")
+        .def("get_exponents", &CBaseCorePotential::get_exponents, "Gets vector of exponents in base core potential.")
+        .def("get_factors", &CBaseCorePotential::get_factors, "Gets vector of factors in base core potential.")
+        .def("get_radial_orders", &CBaseCorePotential::get_radial_orders, "Gets vector of radial orders in base core potential.")
+        .def("number_of_primitive_potentials", &CBaseCorePotential::number_of_primitive_potentials, "Gets number of primitive potentials in base core potential.")
+        .def("__eq__", [](const CBaseCorePotential &self, const CBaseCorePotential &other) { return self == other; })
+        .def("__copy__", [](const CBaseCorePotential &self) { return CBaseCorePotential(self); })
+        .def("__deepcopy__", [](const CBaseCorePotential &self, py::dict) { return CBaseCorePotential(self); });
+    
+    // CAtomCorePotential class
+    PyClass<CAtomCorePotential>(m, "AtomCorePotential")
+        .def(py::init<>())
+        .def(py::init<const CAtomCorePotential&>())
+        .def(py::init<const CBaseCorePotential &, const std::vector<CBaseCorePotential> &, const std::vector<int> &, const int>())
+        .def(py::pickle(
+            [](const CAtomCorePotential &ecp) { return py::make_tuple(ecp.get_local_potential(), ecp.get_projected_potentials(), ecp.get_angular_momentums(), ecp.number_of_core_electrons()); },
+            [](py::tuple t) { return CAtomCorePotential(t[0].cast<CBaseCorePotential>(), t[1].cast<std::vector<CBaseCorePotential>>(), t[2].cast<std::vector<int>>(), t[3].cast<int>()); }))
+        .def("set_local_potential", &CAtomCorePotential::set_local_potential, "Sets local core potential.")
+        .def("set_projected_potentials", &CAtomCorePotential::set_projected_potentials, "Sets projected core potentials.")
+        .def("add_projected_potential", &CAtomCorePotential::add_projected_potential, "Adds projected core potential.")
+        .def("set_number_of_core_electrons", &CAtomCorePotential::set_number_core_electrons, "Sets number of excluded electron in atom core potential.")
+        .def("get_local_potential", &CAtomCorePotential::get_local_potential, "Gets local core potential")
+        .def("get_projected_potentials", &CAtomCorePotential::get_projected_potentials, "Gets vector of projected potentials.")
+        .def("get_angular_momentums", &CAtomCorePotential::get_angular_momentums, "Gets vector of angular momentums of projected potentials.")
+        .def("number_of_core_electrons", &CAtomCorePotential::number_of_core_electrons, "Gets number of electrons in atom core potential.")
+        .def("__eq__", [](const CAtomCorePotential &self, const CAtomCorePotential &other) { return self == other; })
+        .def("__copy__", [](const CAtomCorePotential &self) { return CAtomCorePotential(self); })
+        .def("__deepcopy__", [](const CAtomCorePotential &self, py::dict) { return CAtomCorePotential(self); });
 
     // exposing functions
 

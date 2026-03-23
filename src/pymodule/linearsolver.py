@@ -35,6 +35,7 @@ import numpy as np
 import time as tm
 import math
 import sys
+import h5py
 
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import MolecularGrid, XCIntegrator
@@ -53,7 +54,7 @@ from .oneeints import (compute_electric_dipole_integrals,
                        compute_quadrupole_integrals,
                        compute_linear_momentum_integrals,
                        compute_angular_momentum_integrals)
-from .sanitychecks import (dft_sanity_check, pe_sanity_check,
+from .sanitychecks import (dft_sanity_check, ri_sanity_check, pe_sanity_check,
                            solvation_model_sanity_check)
 from .errorhandler import assert_msg_critical
 from .inputparser import (parse_input, print_keywords, print_attributes,
@@ -124,7 +125,9 @@ class LinearSolver:
 
         # RI-J
         self.ri_coulomb = False
+        self.ri_jk = False
         self.ri_auxiliary_basis = 'def2-universal-jfit'
+        self.ri_metric_threshold = 1.0e-12
         self._ri_drv = None
 
         # dft
@@ -364,6 +367,8 @@ class LinearSolver:
 
         parse_input(self, method_keywords, method_dict)
 
+        ri_sanity_check(self)
+
         dft_sanity_check(self, 'update_settings')
 
         pe_sanity_check(self, method_dict)
@@ -399,6 +404,11 @@ class LinearSolver:
             The dictionary of ERI information.
         """
 
+        # TODO: enable RI-JK
+        assert_msg_critical(
+            not self.ri_jk,
+            f'{type(self).__name__}.compute: RI-JK is not yet supported')
+
         if self.rank == mpi_master():
             screening = T4CScreener()
             screening.partition(basis, molecule, 'eri')
@@ -417,13 +427,13 @@ class LinearSolver:
             'screening': screening,
         }
 
-    def _init_dft(self, molecule, scf_tensors, silent=False):
+    def _init_dft(self, molecule, scf_results, silent=False):
         """
         Initializes DFT.
 
         :param molecule:
             The molecule.
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
 
         :return:
@@ -451,11 +461,11 @@ class LinearSolver:
 
             if self.rank == mpi_master():
                 # Note: make gs_density a tuple
-                if scf_tensors['scf_type'] == 'restricted':
-                    gs_density = (scf_tensors['D_alpha'].copy(),)
+                if scf_results['scf_type'] == 'restricted':
+                    gs_density = (scf_results['D_alpha'].copy(),)
                 else:
-                    gs_density = (scf_tensors['D_alpha'].copy(),
-                                  scf_tensors['D_beta'].copy())
+                    gs_density = (scf_results['D_alpha'].copy(),
+                                  scf_results['D_beta'].copy())
             else:
                 gs_density = None
             # TODO: bcast D_alpha and D_beta separately
@@ -647,7 +657,74 @@ class LinearSolver:
         else:
             self._dist_fock_ung.append(fock_ung, axis=1)
 
-    def compute(self, molecule, basis, scf_tensors, v_grad=None):
+    def _get_initial_guess_size_for_excitations(self, nstates):
+        """
+        Gets the initial guess size for initial excitations.
+
+        :param nstates:
+            The number of states requested.
+        :return:
+            The size of the initial guess.
+        """
+
+        # For RPA/TDA
+
+        if nstates <= self.guess_scaling_threshold:
+            # small nstates: guess size increases as multiple of nstates
+            return nstates * self.initial_guess_multiplier
+        else:
+            # large nstates: guess size increases as 1x nstates
+            return (
+                self.guess_scaling_threshold * self.initial_guess_multiplier +
+                (nstates - self.guess_scaling_threshold))
+
+    def _add_nstates_to_checkpoint(self):
+        """
+        Add nstates to checkpoint file.
+        """
+
+        # For RPA/TDA
+
+        if self.checkpoint_file is None:
+            return
+
+        if self.rank == mpi_master():
+            hf = h5py.File(self.checkpoint_file, 'a')
+            key = 'nstates'
+            if key in hf:
+                del hf[key]
+            hf.create_dataset(key, data=np.array([self.nstates]))
+            hf.close()
+
+        self.comm.barrier()
+
+    def _read_nstates_from_checkpoint(self):
+        """
+        Read nstates from checkpoint file.
+
+        :return:
+            The number of excited states.
+        """
+
+        # For RPA/TDA
+
+        if self.checkpoint_file is None:
+            return None
+
+        nstates = None
+
+        if self.rank == mpi_master():
+            hf = h5py.File(self.checkpoint_file, 'r')
+            key = 'nstates'
+            if key in hf:
+                nstates = np.array(hf.get(key))[0]
+            hf.close()
+
+        nstates = self.comm.bcast(nstates, root=mpi_master())
+
+        return nstates
+
+    def compute(self, molecule, basis, scf_results, v_grad=None):
         """
         Solves for the linear equations.
 
@@ -655,7 +732,7 @@ class LinearSolver:
             The molecule.
         :param basis:
             The AO basis.
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
         :param v_grad:
             The gradients on the right-hand side. If not provided, v_grad will
@@ -672,7 +749,7 @@ class LinearSolver:
                        vecs_ung,
                        molecule,
                        basis,
-                       scf_tensors,
+                       scf_results,
                        eri_dict,
                        dft_dict,
                        pe_dict,
@@ -691,7 +768,7 @@ class LinearSolver:
         if self.use_subcomms:
             if method_type == 'restricted':
                 self._e2n_half_size_subcomms(vecs_ger, vecs_ung, molecule,
-                                             basis, scf_tensors, eri_dict,
+                                             basis, scf_results, eri_dict,
                                              dft_dict, pe_dict, profiler)
             else:
                 # TODO: enable subcomms for unrestricted
@@ -701,11 +778,11 @@ class LinearSolver:
         else:
             if method_type == 'restricted':
                 self._e2n_half_size_single_comm(vecs_ger, vecs_ung, molecule,
-                                                basis, scf_tensors, eri_dict,
+                                                basis, scf_results, eri_dict,
                                                 dft_dict, pe_dict, profiler)
             else:
                 self._e2n_half_size_single_comm_unrestricted(
-                    vecs_ger, vecs_ung, molecule, basis, scf_tensors, eri_dict,
+                    vecs_ger, vecs_ung, molecule, basis, scf_results, eri_dict,
                     dft_dict, pe_dict, profiler)
 
     def _e2n_half_size_subcomms(self,
@@ -713,7 +790,7 @@ class LinearSolver:
                                 vecs_ung,
                                 molecule,
                                 basis,
-                                scf_tensors,
+                                scf_results,
                                 eri_dict,
                                 dft_dict,
                                 pe_dict,
@@ -729,7 +806,7 @@ class LinearSolver:
             The molecule.
         :param basis:
             The AO basis set.
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
         :param eri_dict:
             The dictionary containing ERI information.
@@ -768,10 +845,10 @@ class LinearSolver:
                 'LinearSolver._e2n_half_size: '
                 'inconsistent shape of trial vectors')
 
-            mo = scf_tensors['C_alpha']
-            fa = scf_tensors['F_alpha']
+            mo = scf_results['C_alpha']
+            fa = scf_results['F_alpha']
 
-            nocc = molecule.number_of_alpha_electrons()
+            nocc = molecule.number_of_alpha_occupied_orbitals(basis)
             norb = mo.shape[1]
 
             if getattr(self, 'core_excitation', False):
@@ -1218,7 +1295,7 @@ class LinearSolver:
                                    vecs_ung,
                                    molecule,
                                    basis,
-                                   scf_tensors,
+                                   scf_results,
                                    eri_dict,
                                    dft_dict,
                                    pe_dict,
@@ -1234,7 +1311,7 @@ class LinearSolver:
             The molecule.
         :param basis:
             The AO basis set.
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
         :param eri_dict:
             The dictionary containing ERI information.
@@ -1271,10 +1348,10 @@ class LinearSolver:
                 'LinearSolver._e2n_half_size: '
                 'inconsistent shape of trial vectors')
 
-            mo = scf_tensors['C_alpha']
-            fa = scf_tensors['F_alpha']
+            mo = scf_results['C_alpha']
+            fa = scf_results['F_alpha']
 
-            nocc = molecule.number_of_alpha_electrons()
+            nocc = molecule.number_of_alpha_occupied_orbitals(basis)
             norb = mo.shape[1]
 
             if getattr(self, 'core_excitation', False):
@@ -1985,7 +2062,7 @@ class LinearSolver:
                                                 vecs_ung,
                                                 molecule,
                                                 basis,
-                                                scf_tensors,
+                                                scf_results,
                                                 eri_dict,
                                                 dft_dict,
                                                 pe_dict,
@@ -2001,7 +2078,7 @@ class LinearSolver:
             The molecule.
         :param basis:
             The AO basis set.
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
         :param eri_dict:
             The dictionary containing ERI information.
@@ -2038,14 +2115,14 @@ class LinearSolver:
                 'LinearSolver._e2n_half_size: '
                 'inconsistent shape of trial vectors')
 
-            mo_a = scf_tensors['C_alpha']
-            mo_b = scf_tensors['C_beta']
+            mo_a = scf_results['C_alpha']
+            mo_b = scf_results['C_beta']
 
-            fa = scf_tensors['F_alpha']
-            fb = scf_tensors['F_beta']
+            fa = scf_results['F_alpha']
+            fb = scf_results['F_beta']
 
-            nocc_a = molecule.number_of_alpha_electrons()
-            nocc_b = molecule.number_of_beta_electrons()
+            nocc_a = molecule.number_of_alpha_occupied_orbitals(basis)
+            nocc_b = molecule.number_of_beta_occupied_orbitals(basis)
 
             norb = mo_a.shape[1]
 
@@ -2783,7 +2860,7 @@ class LinearSolver:
                       components,
                       molecule,
                       basis,
-                      scf_tensors,
+                      scf_results,
                       spin='alpha'):
         """
         Computes property gradients for linear response equations.
@@ -2796,7 +2873,7 @@ class LinearSolver:
             The molecule.
         :param basis:
             The AO basis set.
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
 
         :return:
@@ -2875,11 +2952,11 @@ class LinearSolver:
             integral_comps = [integrals[p] for p in components]
 
             if spin == 'alpha':
-                mo = scf_tensors['C_alpha']
-                nocc = molecule.number_of_alpha_electrons()
+                mo = scf_results['C_alpha']
+                nocc = molecule.number_of_alpha_occupied_orbitals(basis)
             elif spin == 'beta':
-                mo = scf_tensors['C_beta']
-                nocc = molecule.number_of_beta_electrons()
+                mo = scf_results['C_beta']
+                nocc = molecule.number_of_beta_occupied_orbitals(basis)
             norb = mo.shape[1]
 
             factor = np.sqrt(2.0)
@@ -2933,7 +3010,7 @@ class LinearSolver:
                               components,
                               molecule,
                               basis,
-                              scf_tensors,
+                              scf_results,
                               spin='alpha'):
         """
         Computes complex property gradients for linear response equations.
@@ -2946,7 +3023,7 @@ class LinearSolver:
             The molecule.
         :param basis:
             The AO basis set.
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
 
         :return:
@@ -3027,11 +3104,11 @@ class LinearSolver:
             integral_comps = [integrals[p] for p in components]
 
             if spin == 'alpha':
-                mo = scf_tensors['C_alpha']
-                nocc = molecule.number_of_alpha_electrons()
+                mo = scf_results['C_alpha']
+                nocc = molecule.number_of_alpha_occupied_orbitals(basis)
             elif spin == 'beta':
-                mo = scf_tensors['C_beta']
-                nocc = molecule.number_of_beta_electrons()
+                mo = scf_results['C_beta']
+                nocc = molecule.number_of_beta_occupied_orbitals(basis)
             norb = mo.shape[1]
 
             factor = np.sqrt(2.0)
@@ -3555,9 +3632,9 @@ class LinearSolver:
             nocc = self.num_core_orbitals + self.num_valence_orbitals
         else:
             if nto_spin == '' or nto_spin == 'alpha':
-                nocc = molecule.number_of_alpha_electrons()
+                nocc = molecule.number_of_alpha_occupied_orbitals(basis)
             elif nto_spin == 'beta':
-                nocc = molecule.number_of_beta_electrons()
+                nocc = molecule.number_of_beta_occupied_orbitals(basis)
         nvir = nto_mo.number_of_mos() - nocc
         if getattr(self, 'restricted_subspace', False):
             nvir = self.num_virtual_orbitals

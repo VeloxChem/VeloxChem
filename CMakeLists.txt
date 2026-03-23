@@ -52,6 +52,7 @@ include(${PROJECT_SOURCE_DIR}/cmake/downloaded/autocmake_default_build_paths.cma
 include(${PROJECT_SOURCE_DIR}/cmake/downloaded/autocmake_safeguards.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/compiler_flags/CXXFlags.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/custom/eigen.cmake)
+include(${PROJECT_SOURCE_DIR}/cmake/custom/boostmath.cmake)
 
 # find external dependencies
 # Python 3.10+

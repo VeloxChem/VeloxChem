@@ -48,7 +48,7 @@ from .linearsolver import LinearSolver
 from .nonlinearsolver import NonlinearSolver
 from .distributedarray import DistributedArray
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           dft_sanity_check)
+                           ri_sanity_check, dft_sanity_check)
 from .errorhandler import assert_msg_critical
 from .checkpoint import (check_distributed_focks, read_distributed_focks,
                          write_distributed_focks)
@@ -147,6 +147,9 @@ class ThreePATransitionDriver(NonlinearSolver):
         # update checkpoint_file after scf_results_sanity_check
         if self.filename is not None and self.checkpoint_file is None:
             self.checkpoint_file = f'{self.filename}_rsp.h5'
+
+        # check RI setup
+        ri_sanity_check(self)
 
         # check dft setup
         dft_sanity_check(self, 'compute', 'nonlinear')
@@ -763,7 +766,7 @@ class ThreePATransitionDriver(NonlinearSolver):
         return e4_vec, s4_vec
 
 
-    def get_nxy(self, freqs, Nx, fo, fo2, nocc, norb, d_a_mo, X, molecule,ao_basis, scf_tensors,Xf):
+    def get_nxy(self, freqs, Nx, fo, fo2, nocc, norb, d_a_mo, X, molecule,ao_basis, scf_results,Xf):
         """
         Computed NXY
 
@@ -931,7 +934,7 @@ class ThreePATransitionDriver(NonlinearSolver):
             fpath = fpath.with_name(fpath.stem)
             Nxy_drv.checkpoint_file = str(fpath) + '_3patrans_2.h5'
 
-        Nxy_results = Nxy_drv.compute(molecule, ao_basis, scf_tensors, XY)
+        Nxy_results = Nxy_drv.compute(molecule, ao_basis, scf_results, XY)
 
         self._is_converged = (self._is_converged and Nxy_drv.is_converged)
 

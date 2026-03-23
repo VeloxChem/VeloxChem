@@ -48,7 +48,7 @@ from .linearsolver import LinearSolver
 from .nonlinearsolver import NonlinearSolver
 from .distributedarray import DistributedArray
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           dft_sanity_check)
+                           ri_sanity_check, dft_sanity_check)
 from .errorhandler import assert_msg_critical
 from .checkpoint import (check_distributed_focks, read_distributed_focks,
                          write_distributed_focks)
@@ -132,7 +132,7 @@ class QuadraticResponseDriver(NonlinearSolver):
 
         super().update_settings(rsp_dict, method_dict)
 
-    def compute(self, molecule, ao_basis, scf_tensors):
+    def compute(self, molecule, ao_basis, scf_results):
         """
         Computes a quadratic response function.
 
@@ -140,7 +140,7 @@ class QuadraticResponseDriver(NonlinearSolver):
             The molecule.
         :param basis:
             The AO basis.
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
 
         :return:
@@ -198,11 +198,14 @@ class QuadraticResponseDriver(NonlinearSolver):
         molecule_sanity_check(molecule)
 
         # check SCF results
-        scf_results_sanity_check(self, scf_tensors)
+        scf_results_sanity_check(self, scf_results)
 
         # update checkpoint_file after scf_results_sanity_check
         if self.filename is not None and self.checkpoint_file is None:
             self.checkpoint_file = f'{self.filename}_rsp.h5'
+
+        # check RI setup
+        ri_sanity_check(self)
 
         # check dft setup
         dft_sanity_check(self, 'compute', 'nonlinear')
@@ -227,9 +230,9 @@ class QuadraticResponseDriver(NonlinearSolver):
             'QuadaticResponseDriver: not implemented for unrestricted case')
 
         if self.rank == mpi_master():
-            S = scf_tensors['S']
-            da = scf_tensors['D_alpha']
-            mo = scf_tensors['C_alpha']
+            S = scf_results['S']
+            da = scf_results['D_alpha']
+            mo = scf_results['C_alpha']
             d_a_mo = np.linalg.multi_dot([mo.T, S, da, S, mo])
             norb = mo.shape[1]
         else:
@@ -258,15 +261,15 @@ class QuadraticResponseDriver(NonlinearSolver):
         a_grad = linear_solver.get_complex_prop_grad(self._a_op_key,
                                                      [self.a_component],
                                                      molecule, ao_basis,
-                                                     scf_tensors)
+                                                     scf_results)
         b_grad = linear_solver.get_complex_prop_grad(self._b_op_key,
                                                      [self.b_component],
                                                      molecule, ao_basis,
-                                                     scf_tensors)
+                                                     scf_results)
         c_grad = linear_solver.get_complex_prop_grad(self._c_op_key,
                                                      [self.c_component],
                                                      molecule, ao_basis,
-                                                     scf_tensors)
+                                                     scf_results)
 
         if self.rank == mpi_master():
             inv_sqrt_2 = 1.0 / np.sqrt(2.0)
@@ -372,7 +375,7 @@ class QuadraticResponseDriver(NonlinearSolver):
             fpath = fpath.with_name(fpath.stem)
             N_drv.checkpoint_file = str(fpath) + '_qrf.h5'
 
-        N_results = N_drv.compute(molecule, ao_basis, scf_tensors, ABC)
+        N_results = N_drv.compute(molecule, ao_basis, scf_results, ABC)
 
         self._is_converged = N_drv.is_converged
 
@@ -382,7 +385,7 @@ class QuadraticResponseDriver(NonlinearSolver):
         profiler.check_memory_usage('CPP')
 
         quad_dict = self.compute_quad_components(Focks, freqpairs, X, d_a_mo,
-                                                 Nx, self.comp, scf_tensors,
+                                                 Nx, self.comp, scf_results,
                                                  molecule, ao_basis, profiler)
 
         valstr = '*** Time spent in quadratic response calculation: '
@@ -396,7 +399,7 @@ class QuadraticResponseDriver(NonlinearSolver):
         return quad_dict
 
     def compute_quad_components(self, Focks, freqpairs, X, d_a_mo, Nx, track,
-                                scf_tensors, molecule, ao_basis, profiler):
+                                scf_results, molecule, ao_basis, profiler):
         """
         Computes all the relevent terms to compute a general quadratic response function
 
@@ -408,7 +411,7 @@ class QuadraticResponseDriver(NonlinearSolver):
             The SCF density in MO basis
         :param Nx:
             A dictonary containing all the response vectors in distributed form
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
         :param molecule:
             The molecule.
@@ -422,8 +425,8 @@ class QuadraticResponseDriver(NonlinearSolver):
         """
 
         if self.rank == mpi_master():
-            mo = scf_tensors['C_alpha']
-            F0 = np.linalg.multi_dot([mo.T, scf_tensors['F_alpha'], mo])
+            mo = scf_results['C_alpha']
+            F0 = np.linalg.multi_dot([mo.T, scf_results['F_alpha'], mo])
             norb = mo.shape[1]
         else:
             mo = None
@@ -437,7 +440,7 @@ class QuadraticResponseDriver(NonlinearSolver):
 
         eri_dict = self._init_eri(molecule, ao_basis)
 
-        dft_dict = self._init_dft(molecule, scf_tensors)
+        dft_dict = self._init_dft(molecule, scf_results)
 
         # computing all compounded first-order densities
         first_order_dens, second_order_dens = self.get_densities(
