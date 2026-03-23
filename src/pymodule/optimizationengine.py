@@ -89,6 +89,7 @@ class OptimizationEngine(geometric.engine.Engine):
         self._debug = False
 
         self.opt_unparsed_input = None
+        self.opt_current_step = 0
 
     def lower(self):
         """
@@ -124,7 +125,7 @@ class OptimizationEngine(geometric.engine.Engine):
             new_mol = Molecule()
         new_mol = self.comm.bcast(new_mol, root=mpi_master())
 
-        title_txt = 'Optimization Step'
+        title_txt = f'Optimization Step {self.opt_current_step}'
         self.grad_drv.ostream.print_header(title_txt)
         self.grad_drv.ostream.print_header('=' * (len(title_txt) + 2))
         self.grad_drv.ostream.print_blank()
@@ -155,6 +156,8 @@ class OptimizationEngine(geometric.engine.Engine):
 
         energy = self.comm.bcast(energy, root=mpi_master())
         gradient = self.comm.bcast(gradient, root=mpi_master())
+
+        self.opt_current_step += 1
 
         if self.rank == mpi_master():
             grad2 = np.sum(gradient**2, axis=1)
