@@ -39,6 +39,7 @@ import time as tm
 
 from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
+from .scfgradientdriver import ScfGradientDriver
 from .molecule import Molecule
 from .profiler import Profiler
 from .inputparser import write_unparsed_input_to_hdf5
@@ -145,7 +146,8 @@ class OptimizationEngine(geometric.engine.Engine):
         self.grad_drv.compute(new_mol, *self.args)
         gradient = self.grad_drv.get_gradient()
 
-        if hasattr(self.grad_drv, "scf_driver"):
+        if hasattr(self.grad_drv, "scf_driver") and isinstance(
+                self.grad_drv, ScfGradientDriver):
             checkpoint_file = self.grad_drv.scf_driver.get_checkpoint_file()
             if checkpoint_file is not None and self.opt_unparsed_input is not None:
                 if self.rank == mpi_master():

@@ -48,6 +48,7 @@ from .molecularbasis import MolecularBasis
 from .dispersionmodel import DispersionModel
 from .gradientdriver import GradientDriver
 from .outputstream import OutputStream
+from .inputparser import write_unparsed_input_to_hdf5, unparse_input
 from .oneeints import compute_kinetic_energy_gradient
 from .oneeints import compute_overlap_gradient
 from .oneeints import compute_nuclear_potential_gradient
@@ -91,6 +92,18 @@ class ScfGradientDriver(GradientDriver):
 
         # D4 dispersion correction
         self.dispersion = scf_drv.dispersion
+
+    def read_settings(self, checkpoint_file):
+        """
+        Reads opt settings from checkpoint file.
+
+        :param checkpoint_file:
+            The checkpoint file to read settings from.
+        """
+
+        super().read_settings(checkpoint_file)
+
+        self.scf_driver.read_settings(checkpoint_file)
 
     def compute(self, molecule, basis, scf_results=None):
         """
@@ -147,6 +160,17 @@ class ScfGradientDriver(GradientDriver):
         self.print_geometry(molecule)
         self.print_gradient(molecule)
 
+        # write grad_settings to checkpoint
+        checkpoint_file = self.scf_driver.get_checkpoint_file()
+        if self.rank == mpi_master() and checkpoint_file is not None:
+            grad_keywords = {
+                key: val[0]
+                for key, val in self._input_keywords['gradient'].items()
+            }
+            write_unparsed_input_to_hdf5(checkpoint_file,
+                                         unparse_input(self, grad_keywords),
+                                         group_name='grad_settings')
+
         valstr = '*** Time spent in gradient calculation: '
         valstr += '{:.2f} sec ***'.format(time.time() - start_time)
         self.ostream.print_header(valstr)
@@ -187,8 +211,8 @@ class ScfGradientDriver(GradientDriver):
 
         t0 = time.time()
 
-        gradient += compute_nuclear_potential_gradient(molecule, basis,
-                                                       D_total, local_atoms)
+        gradient += compute_nuclear_potential_gradient(molecule, basis, D_total,
+                                                       local_atoms)
 
         grad_timing['Nuclear_potential_grad'] += time.time() - t0
 

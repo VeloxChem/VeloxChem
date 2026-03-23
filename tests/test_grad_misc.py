@@ -69,11 +69,12 @@ class TestScfGradientDriverMiscellaneous:
         return scf_drv, scf_results
 
     @staticmethod
-    def run_unrestricted_scf(molecule, basis, xcfun='hf'):
+    def run_unrestricted_scf(molecule, basis, xcfun='hf', filename=None):
 
         scf_drv = ScfUnrestrictedDriver()
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun
+        scf_drv.filename = filename
         scf_results = scf_drv.compute(molecule, basis)
         return scf_drv, scf_results
 
@@ -283,3 +284,34 @@ class TestScfGradientDriverMiscellaneous:
 
         assert grad_drv_copy.xcfun == grad_drv.xcfun
         assert np.allclose(grad_drv_copy.gradient, grad_drv.gradient)
+
+    def test_read_settings_imports_only_configuration(self, tmp_path):
+
+        molecule, basis = self.get_ch3_molecule_and_basis()
+
+        filename = str(tmp_path / "grad_import_settings")
+
+        comm = MPI.COMM_WORLD
+        filename = comm.bcast(filename, root=mpi_master())
+
+        scf_drv, scf_results = self.run_unrestricted_scf(molecule,
+                                                         basis,
+                                                         'b3lyp',
+                                                         filename=filename)
+        grad_drv = ScfGradientDriver(scf_drv)
+        grad_drv.compute(molecule, basis, scf_results)
+
+        checkpoint_file = f'{filename}_scf.h5'
+
+        new_scf_drv = ScfUnrestrictedDriver()
+        new_grad_drv = ScfGradientDriver(new_scf_drv)
+        new_grad_drv.read_settings(checkpoint_file)
+
+        # these should be updated by read_settings
+        assert new_grad_drv.scf_driver.xcfun == scf_drv.xcfun
+        assert new_grad_drv.xcfun == scf_drv.xcfun
+
+        # these should not be updated by read_settings
+        assert new_grad_drv.scf_driver.filename is None
+        assert new_grad_drv.scf_driver.checkpoint_file is None
+        assert new_grad_drv.gradient is None

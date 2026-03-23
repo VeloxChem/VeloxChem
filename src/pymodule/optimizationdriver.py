@@ -216,7 +216,7 @@ class OptimizationDriver:
 
         self.update_settings(checkpoint_opt_input)
 
-        self.grad_drv.scf_driver.read_settings(checkpoint_file)
+        self.grad_drv.read_settings(checkpoint_file)
 
     def _pick_driver(self, drv):
         """
