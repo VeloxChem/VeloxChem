@@ -40,12 +40,12 @@ from .oneeints import compute_electric_dipole_integrals
 from .veloxchemlib import mpi_master, hartree_in_ev
 from .profiler import Profiler
 from .outputstream import OutputStream
-from .cppsolver import ComplexResponse
+from .cppsolver import ComplexResponseSolver
 from .linearsolver import LinearSolver
 from .nonlinearsolver import NonlinearSolver
 from .distributedarray import DistributedArray
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           dft_sanity_check)
+                           ri_sanity_check, dft_sanity_check)
 from .errorhandler import assert_msg_critical
 from .checkpoint import (check_distributed_focks, read_distributed_focks,
                          write_distributed_focks)
@@ -150,6 +150,9 @@ class DoubleResBetaDriver(NonlinearSolver):
         # update checkpoint_file after scf_results_sanity_check
         if self.filename is not None and self.checkpoint_file is None:
             self.checkpoint_file = f'{self.filename}_rsp.h5'
+
+        # check RI setup
+        ri_sanity_check(self)
 
         # check dft setup
         dft_sanity_check(self, 'compute', 'nonlinear')
@@ -279,7 +282,7 @@ class DoubleResBetaDriver(NonlinearSolver):
             X = None
 
         # Computing the first-order response vectors (3 per frequency)
-        N_drv = ComplexResponse(self.comm, self.ostream)
+        N_drv = ComplexResponseSolver(self.comm, self.ostream)
 
         cpp_keywords = {
             'damping', 'norm_thresh', 'lindep_thresh', 'conv_thresh',
@@ -396,9 +399,9 @@ class DoubleResBetaDriver(NonlinearSolver):
         scf_prop = FirstOrderProperties(self.comm, self.ostream)
         scf_prop.compute_scf_prop(molecule, ao_basis, scf_results)
     
-        N0_x = ComplexResponse.get_full_solution_vector(Nx[('x', freqs[0])])
-        N0_y = ComplexResponse.get_full_solution_vector(Nx[('y', freqs[0])])
-        N0_z = ComplexResponse.get_full_solution_vector(Nx[('z', freqs[0])])
+        N0_x = ComplexResponseSolver.get_full_solution_vector(Nx[('x', freqs[0])])
+        N0_y = ComplexResponseSolver.get_full_solution_vector(Nx[('y', freqs[0])])
+        N0_z = ComplexResponseSolver.get_full_solution_vector(Nx[('z', freqs[0])])
 
 
         Nf = LinearResponseEigenSolver.get_full_solution_vector(Xf[self.initial_state - 1])

@@ -45,7 +45,7 @@ from .profiler import Profiler
 from .distributedarray import DistributedArray
 from .linearsolver import LinearSolver
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           dft_sanity_check, pe_sanity_check,
+                           ri_sanity_check, dft_sanity_check, pe_sanity_check,
                            solvation_model_sanity_check)
 from .errorhandler import assert_msg_critical
 from .checkpoint import (check_rsp_hdf5, write_rsp_hdf5,
@@ -276,6 +276,11 @@ class ComplexResponseTDA(LinearSolver):
             a non-linear response module.
         """
 
+        # TODO: enable ECP
+        assert_msg_critical(
+            not basis.has_ecp(),
+            f'{type(self).__name__}.compute: ECP is not yet supported')
+
         # take care of quadrupole components
         if self.is_quadrupole(self.a_operator):
             if isinstance(self.a_components, str):
@@ -310,7 +315,7 @@ class ComplexResponseTDA(LinearSolver):
             self.set_cpp_property(self.property)
 
         # check molecule
-        molecule_sanity_check(molecule)
+        molecule_sanity_check(molecule, 'restricted')
 
         # check SCF results
         scf_results_sanity_check(self, scf_results)
@@ -318,6 +323,9 @@ class ComplexResponseTDA(LinearSolver):
         # update checkpoint_file after scf_results_sanity_check
         if self.filename is not None and self.checkpoint_file is None:
             self.checkpoint_file = f'{self.filename}_rsp.h5'
+
+        # check RI setup
+        ri_sanity_check(self)
 
         # check dft setup
         dft_sanity_check(self, 'compute')
@@ -344,14 +352,6 @@ class ComplexResponseTDA(LinearSolver):
                                n_freqs=len(self.frequencies))
 
         self.start_time = tm.time()
-
-        # sanity check
-        nalpha = molecule.number_of_alpha_electrons()
-        nbeta = molecule.number_of_beta_electrons()
-        assert_msg_critical(
-            nalpha == nbeta,
-            f'{type(self).__name__}: not implemented for unrestricted case')
-
         if self.rank == mpi_master():
             orb_ene = scf_results['E_alpha']
         else:

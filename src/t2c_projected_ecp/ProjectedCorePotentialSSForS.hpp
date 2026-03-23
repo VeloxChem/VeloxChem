@@ -145,7 +145,7 @@ comp_projected_core_potential_ss_for_s(T& distributor,
                     t2cfunc::comp_i_vals(i_values, 0, pfactors, 8);
                     
                     t2cfunc::comp_l_vals(l_values, 0, pfactors, 8, 6);
-
+                    
                     t2pecp::comp_prim_projected_core_potential_ss(0, 0, 0, 0, pbuffer, 0, i_values, l_values,  pfactors, 7, 5, r_a, a_norm, c_norm);
 
                     t2cfunc::reduce(cbuffer, 0, pbuffer, 0, 1, ket_width, ket_npgtos);

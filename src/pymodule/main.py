@@ -627,7 +627,7 @@ def main():
         polgrad_drv = PolarizabilityGradient(scf_drv, task.mpi_comm,
                                              task.ostream)
         polgrad_drv.update_settings(polgrad_dict, orbrsp_dict, method_dict)
-        polgrad_drv.compute(task.molecule, task.ao_basis, scf_drv.scf_tensors,
+        polgrad_drv.compute(task.molecule, task.ao_basis, scf_drv.scf_results,
                             rsp_prop._rsp_property)
 
     # Response
@@ -672,7 +672,7 @@ def main():
                                                       task.ostream)
                     orbrsp_drv.update_settings(orbrsp_dict, method_dict)
                     orbrsp_drv.compute(task.molecule, task.ao_basis,
-                                       scf_drv.scf_tensors,
+                                       scf_drv.scf_results,
                                        rsp_prop._rsp_property)
             else:
                 orbrsp_dict = {}

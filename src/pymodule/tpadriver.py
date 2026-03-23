@@ -40,12 +40,12 @@ from .veloxchemlib import (mpi_master, bohr_in_angstrom, hartree_in_ev,
                            fine_structure_constant,
                            speed_of_light_in_vacuum_in_SI)
 from .profiler import Profiler
-from .cppsolver import ComplexResponse
+from .cppsolver import ComplexResponseSolver
 from .linearsolver import LinearSolver
 from .nonlinearsolver import NonlinearSolver
 from .distributedarray import DistributedArray
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           dft_sanity_check)
+                           ri_sanity_check, dft_sanity_check)
 from .errorhandler import assert_msg_critical
 
 
@@ -104,7 +104,7 @@ class TpaDriver(NonlinearSolver):
 
         super().update_settings(rsp_dict, method_dict)
 
-    def compute(self, molecule, ao_basis, scf_tensors):
+    def compute(self, molecule, ao_basis, scf_results):
         """
         Computes the isotropic cubic response function for two-photon
         absorption
@@ -113,7 +113,7 @@ class TpaDriver(NonlinearSolver):
             The molecule.
         :param basis:
             The AO basis.
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
 
         :return:
@@ -131,11 +131,14 @@ class TpaDriver(NonlinearSolver):
         molecule_sanity_check(molecule)
 
         # check SCF results
-        scf_results_sanity_check(self, scf_tensors)
+        scf_results_sanity_check(self, scf_results)
 
         # update checkpoint_file after scf_results_sanity_check
         if self.filename is not None and self.checkpoint_file is None:
             self.checkpoint_file = f'{self.filename}_rsp.h5'
+
+        # check RI setup
+        ri_sanity_check(self)
 
         # check dft setup
         dft_sanity_check(self, 'compute', 'nonlinear')
@@ -154,7 +157,7 @@ class TpaDriver(NonlinearSolver):
 
         eri_dict = self._init_eri(molecule, ao_basis)
 
-        dft_dict = self._init_dft(molecule, scf_tensors)
+        dft_dict = self._init_dft(molecule, scf_results)
 
         # sanity check
         nalpha = molecule.number_of_alpha_electrons()
@@ -164,9 +167,9 @@ class TpaDriver(NonlinearSolver):
             'TPA Driver: not implemented for unrestricted case')
 
         if self.rank == mpi_master():
-            S = scf_tensors['S']
-            da = scf_tensors['D_alpha']
-            mo = scf_tensors['C_alpha']
+            S = scf_results['S']
+            da = scf_results['D_alpha']
+            mo = scf_results['C_alpha']
             d_a_mo = np.linalg.multi_dot([mo.T, S, da, S, mo])
             norb = mo.shape[1]
         else:
@@ -192,7 +195,7 @@ class TpaDriver(NonlinearSolver):
         linear_solver = LinearSolver(self.comm, self.ostream)
         b_grad = linear_solver.get_complex_prop_grad(operator, component,
                                                      molecule, ao_basis,
-                                                     scf_tensors)
+                                                     scf_results)
 
         # This is a workaround for the sqrt(2) factor in the property gradient
         if self.rank == mpi_master():
@@ -225,7 +228,7 @@ class TpaDriver(NonlinearSolver):
         self.comp = self.comm.bcast(self.comp, root=mpi_master())
 
         # Computing the first-order response vectors (3 per frequency)
-        Nb_drv = ComplexResponse(self.comm, self.ostream)
+        Nb_drv = ComplexResponseSolver(self.comm, self.ostream)
 
         cpp_keywords = {
             'frequencies', 'damping', 'norm_thresh', 'lindep_thresh',
@@ -243,7 +246,7 @@ class TpaDriver(NonlinearSolver):
             fpath = fpath.with_name(fpath.stem)
             Nb_drv.checkpoint_file = str(fpath) + '_tpa_1.h5'
 
-        Nb_results = Nb_drv.compute(molecule, ao_basis, scf_tensors, v_grad)
+        Nb_results = Nb_drv.compute(molecule, ao_basis, scf_results, v_grad)
 
         self._is_converged = Nb_drv.is_converged
 
@@ -276,7 +279,7 @@ class TpaDriver(NonlinearSolver):
 
         tpa_dict = self.compute_tpa_components(Focks, self.frequencies, X,
                                                d_a_mo, Nx, self.comp,
-                                               scf_tensors, molecule, ao_basis,
+                                               scf_results, molecule, ao_basis,
                                                profiler, eri_dict, dft_dict)
 
         valstr = '*** Time spent in TPA calculation: {:.2f} sec ***'.format(
@@ -290,7 +293,7 @@ class TpaDriver(NonlinearSolver):
         return tpa_dict
 
     def compute_tpa_components(self, Focks, w, X, d_a_mo, Nx, track,
-                               scf_tensors, molecule, ao_basis, profiler,
+                               scf_results, molecule, ao_basis, profiler,
                                eri_dict, dft_dict):
         """
         Computes all the relevent terms to third-order isotropic gradient
@@ -306,7 +309,7 @@ class TpaDriver(NonlinearSolver):
         :param track:
             A list that contains all the information about which γ components
             and at what freqs they are to be computed
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
         :param molecule:
             The molecule.
@@ -323,8 +326,8 @@ class TpaDriver(NonlinearSolver):
         """
 
         if self.rank == mpi_master():
-            mo = scf_tensors['C_alpha']
-            F0 = np.linalg.multi_dot([mo.T, scf_tensors['F_alpha'], mo])
+            mo = scf_results['C_alpha']
+            F0 = np.linalg.multi_dot([mo.T, scf_results['F_alpha'], mo])
             norb = mo.shape[1]
         else:
             mo = None
@@ -367,7 +370,7 @@ class TpaDriver(NonlinearSolver):
         # extracting some of the second-order Fock matrices from the subspace
         (Nxy_dict, Focks_xy) = self.get_Nxy(w, d_a_mo, X, fock_dict, Nx, nocc,
                                             norb, molecule, ao_basis,
-                                            scf_tensors)
+                                            scf_results)
 
         profiler.check_memory_usage('2nd CPP')
 
@@ -529,7 +532,7 @@ class TpaDriver(NonlinearSolver):
         return None
 
     def get_Nxy(self, w, d_a_mo, X, fock_dict, kX, nocc, norb, molecule,
-                ao_basis, scf_tensors):
+                ao_basis, scf_results):
         """
         Computes all the second-order response vectors needed for the isotropic
         cubic response computation
@@ -552,7 +555,7 @@ class TpaDriver(NonlinearSolver):
             The molecule.
         :param basis:
             The AO basis.
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
 
         :return:
@@ -733,9 +736,9 @@ class TpaDriver(NonlinearSolver):
         for i in range(len(freqs)):
             w = float(track[i * (len(track) // len(freqs))].split(",")[1])
 
-            na_x = ComplexResponse.get_full_solution_vector(Nx[('x', w)])
-            na_y = ComplexResponse.get_full_solution_vector(Nx[('y', w)])
-            na_z = ComplexResponse.get_full_solution_vector(Nx[('z', w)])
+            na_x = ComplexResponseSolver.get_full_solution_vector(Nx[('x', w)])
+            na_y = ComplexResponseSolver.get_full_solution_vector(Nx[('y', w)])
+            na_z = ComplexResponseSolver.get_full_solution_vector(Nx[('z', w)])
 
             if self.rank == mpi_master():
 
@@ -789,15 +792,15 @@ class TpaDriver(NonlinearSolver):
         w = inp_dict['freq']
         A = inp_dict['A']
 
-        Na = ComplexResponse.get_full_solution_vector(inp_dict['Na'])
+        Na = ComplexResponseSolver.get_full_solution_vector(inp_dict['Na'])
 
         if inp_dict['flag'] == 'CD':
-            Ncd = ComplexResponse.get_full_solution_vector(inp_dict['Ncd'])
-            Nb = ComplexResponse.get_full_solution_vector(inp_dict['Nb'])
+            Ncd = ComplexResponseSolver.get_full_solution_vector(inp_dict['Ncd'])
+            Nb = ComplexResponseSolver.get_full_solution_vector(inp_dict['Nb'])
 
         elif inp_dict['flag'] == 'BD':
-            Nbd = ComplexResponse.get_full_solution_vector(inp_dict['Nbd'])
-            Nc = ComplexResponse.get_full_solution_vector(inp_dict['Nc'])
+            Nbd = ComplexResponseSolver.get_full_solution_vector(inp_dict['Nbd'])
+            Nc = ComplexResponseSolver.get_full_solution_vector(inp_dict['Nc'])
 
         if self.rank == mpi_master():
 

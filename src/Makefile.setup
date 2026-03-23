@@ -44,6 +44,14 @@ LIBXC_LD  := -L /Users/rinkevic/Development/Frameworks/libxc/lib -lxc
 CXX_REL_FLG += $(LIBXC_INC)
 CXX_DEB_FLG += $(LIBXC_INC)
 
+# Boost interface
+
+LIBBST_INC := -I /usr/local/Cellar/boost/1.90.0_1/include
+LIBBST_LD  := -L /usr/local/Cellar/boost/1.90.0_1/lib -lboost_math_c99
+
+CXX_REL_FLG += $(LIBBST_INC)
+CXX_DEB_FLG += $(LIBBST_INC)
+
 # Eigen interface
 
 EIGEN_INC := -I /Users/rinkevic/Development/Frameworks/eigen

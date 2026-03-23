@@ -1,3 +1,4 @@
+from mpi4py import MPI
 import pytest
 
 from veloxchem.veloxchemlib import mpi_master
@@ -10,7 +11,7 @@ from veloxchem.lrsolver import LinearResponseSolver
 @pytest.mark.solvers
 class TestLR:
 
-    def run_lr(self, xcfun_label, ref_rsp_func, tol):
+    def run_lr(self, xcfun_label, ref_rsp_func, tol, ri_coulomb=False):
 
         xyz_string = """3
         xyz
@@ -26,6 +27,7 @@ class TestLR:
         scf_drv = ScfRestrictedDriver()
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label
+        scf_drv.ri_coulomb = ri_coulomb
         scf_drv.acc_type = 'l2_c2diis'
         scf_results = scf_drv.compute(mol, bas)
 
@@ -40,6 +42,32 @@ class TestLR:
                 ref_val = ref_rsp_func[key]
                 max_diff = max(max_diff, abs(val - ref_val))
             assert max_diff < tol
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    def test_compute_rejects_openshell_molecule(self):
+
+        xyz_string = """3
+        xyz
+        O   -0.1858140  -1.1749469   0.7662596
+        H   -0.1285513  -0.8984365   1.6808606
+        H   -0.0582782  -0.3702550   0.2638279
+        """
+        mol = Molecule.read_xyz_string(xyz_string)
+        mol.set_multiplicity(3)
+
+        bas = MolecularBasis.read(mol, 'def2-svp', ostream=None)
+
+        # empty scf results just for testing
+        scf_results = {}
+
+        lr_drv = LinearResponseSolver()
+        lr_drv.ostream.mute()
+
+        with pytest.raises(
+                AssertionError,
+                match="Molecule: Invalid multiplicity for restricted"):
+            lr_results_not_used = lr_drv.compute(mol, bas, scf_results)
 
     def test_hf(self):
 
@@ -165,3 +193,72 @@ class TestLR:
         }
 
         self.run_lr('tpssh', ref_rsp_func, 1.0e-5)
+
+    def test_ri_blyp(self):
+
+        ref_rsp_func = {
+            ('x', 'x', 0.05): -3.28252412,
+            ('y', 'x', 0.05): -0.40522649,
+            ('z', 'x', 0.05): 0.05390479,
+            ('x', 'x', 0.06): -3.29747011,
+            ('y', 'x', 0.06): -0.40664672,
+            ('z', 'x', 0.06): 0.05379217,
+            ('x', 'y', 0.05): -0.40522650,
+            ('y', 'y', 0.05): -5.69997023,
+            ('z', 'y', 0.05): 0.61928204,
+            ('x', 'y', 0.06): -0.40664672,
+            ('y', 'y', 0.06): -5.72322129,
+            ('z', 'y', 0.06): 0.61924903,
+            ('x', 'z', 0.05): 0.05390479,
+            ('y', 'z', 0.05): 0.61928204,
+            ('z', 'z', 0.05): -7.18182779,
+            ('x', 'z', 0.06): 0.05379217,
+            ('y', 'z', 0.06): 0.61924903,
+            ('z', 'z', 0.06): -7.20519718,
+        }
+
+        self.run_lr('blyp', ref_rsp_func, 1.0e-5, ri_coulomb=True)
+
+    def run_lr_with_ecp(self, ref_rsp_func, tol):
+
+        xyz_string = """3
+        xyz
+        Hg   0.00  0.00  0.00
+        Cl   0.00  0.00  2.35
+        Cl   0.00  0.10 -2.40
+        """
+        mol = Molecule.read_xyz_string(xyz_string)
+
+        basis_label = 'def2-svp'
+        bas = MolecularBasis.read(mol, basis_label, ostream=None)
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_results = scf_drv.compute(mol, bas)
+
+        lr_drv = LinearResponseSolver()
+        lr_drv.ostream.mute()
+        lr_results = lr_drv.compute(mol, bas, scf_results)
+
+        if lr_drv.rank == mpi_master():
+            max_diff = 0.0
+            for key, val in lr_results['response_functions'].items():
+                ref_val = ref_rsp_func[key]
+                max_diff = max(max_diff, abs(val - ref_val))
+            assert max_diff < tol
+
+    def test_hf_with_ecp(self):
+
+        ref_rsp_func = {
+            ('x', 'x', 0.0): -27.35540784,
+            ('y', 'x', 0.0): 0.00000000,
+            ('z', 'x', 0.0): 0.00000000,
+            ('x', 'y', 0.0): 0.00000000,
+            ('y', 'y', 0.0): -27.40381961,
+            ('z', 'y', 0.0): 1.06711071,
+            ('x', 'z', 0.0): 0.00000000,
+            ('y', 'z', 0.0): 1.06711071,
+            ('z', 'z', 0.0): -76.97515361,
+        }
+
+        self.run_lr_with_ecp(ref_rsp_func, 1.0e-5)

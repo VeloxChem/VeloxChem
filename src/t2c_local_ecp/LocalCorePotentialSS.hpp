@@ -70,9 +70,7 @@ comp_local_core_potential_ss(T& distributor,
 
     // allocate aligned 2D arrays for ket side
 
-    CSimdArray<double> pfactors(8, ket_npgtos);
-
-    CSimdArray<double> cfactors(6, 1);
+    CSimdArray<double> pfactors(9, ket_npgtos);
 
     // allocate aligned primitive integrals
 
@@ -98,8 +96,6 @@ comp_local_core_potential_ss(T& distributor,
 
         pfactors.replicate_points(ket_gto_coords, ket_range, 2, ket_npgtos);
 
-        cfactors.replicate_points(ket_gto_coords, ket_range, 0, 1);
-
         // set up active SIMD width
 
         const auto ket_width = ket_range.second - ket_range.first;
@@ -116,8 +112,6 @@ comp_local_core_potential_ss(T& distributor,
 
             const auto r_a = bra_gto_coords[j];
 
-            t2cfunc::comp_distances_ab(cfactors, 3, 0, r_a);
-
             for (size_t k = 0; k < bra_npgtos; k++)
             {
                 const auto a_exp = bra_gto_exps[k * bra_ncgtos + j];
@@ -132,10 +126,9 @@ comp_local_core_potential_ss(T& distributor,
 
                     t2cfunc::comp_coordinates_r(pfactors, 5, 2, r_a, a_exp, c_exp);
 
-                    t2lecp::comp_prim_local_core_potential_ss(pbuffer, 0, pfactors, r_a, a_exp, c_exp, a_norm, c_norm);
+                    t2lecp::comp_prim_local_core_potential_ss(pbuffer, 0, pfactors, 5, 8, r_a, a_exp, c_exp, a_norm, c_norm);
 
-                    t2cfunc::reduce(cbuffer, 0, pbuffer, 0, 1, ket_width, ket_npgtos);
-
+                    t2cfunc::reduce(cbuffer, pbuffer, 0, ket_width, ket_npgtos);
                 }
             }
 

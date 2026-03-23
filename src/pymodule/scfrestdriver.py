@@ -43,6 +43,7 @@ from .outputstream import OutputStream
 from .scfdriver import ScfDriver
 from .c2diis import CTwoDiis
 from .diis import Diis
+from .mathutils import solve_in_orthogonal_basis
 
 
 class ScfRestrictedDriver(ScfDriver):
@@ -247,10 +248,7 @@ class ScfRestrictedDriver(ScfDriver):
 
         if self.rank == mpi_master():
             tmat = oao_mat
-            eigs, evecs = np.linalg.eigh(
-                np.linalg.multi_dot([tmat.T, eff_fock_mat[0], tmat]))
-
-            orb_coefs = np.matmul(tmat, evecs)
+            eigs, orb_coefs = solve_in_orthogonal_basis(eff_fock_mat[0], tmat)
             orb_coefs, eigs = self._delete_mos(orb_coefs, eigs)
 
             occa = molecule.get_aufbau_alpha_occupation(eigs.size, ao_basis)

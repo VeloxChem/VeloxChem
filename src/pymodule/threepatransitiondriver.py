@@ -43,12 +43,12 @@ from .veloxchemlib import (mpi_master, bohr_in_angstrom, hartree_in_ev,
                            speed_of_light_in_vacuum_in_SI)
 from .profiler import Profiler
 from .outputstream import OutputStream
-from .cppsolver import ComplexResponse
+from .cppsolver import ComplexResponseSolver
 from .linearsolver import LinearSolver
 from .nonlinearsolver import NonlinearSolver
 from .distributedarray import DistributedArray
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           dft_sanity_check)
+                           ri_sanity_check, dft_sanity_check)
 from .errorhandler import assert_msg_critical
 from .checkpoint import (check_distributed_focks, read_distributed_focks,
                          write_distributed_focks)
@@ -147,6 +147,9 @@ class ThreePATransitionDriver(NonlinearSolver):
         # update checkpoint_file after scf_results_sanity_check
         if self.filename is not None and self.checkpoint_file is None:
             self.checkpoint_file = f'{self.filename}_rsp.h5'
+
+        # check RI setup
+        ri_sanity_check(self)
 
         # check dft setup
         dft_sanity_check(self, 'compute', 'nonlinear')
@@ -276,7 +279,7 @@ class ThreePATransitionDriver(NonlinearSolver):
             X = None
 
         # Computing the first-order response vectors (3 per frequency)
-        N_drv = ComplexResponse(self.comm, self.ostream)
+        N_drv = ComplexResponseSolver(self.comm, self.ostream)
 
         cpp_keywords = {
             'damping', 'norm_thresh', 'lindep_thresh', 'conv_thresh',
@@ -407,17 +410,17 @@ class ThreePATransitionDriver(NonlinearSolver):
                 for b_comp in 'xyz':
                     for c_comp in 'xyz':
 
-                        Na_raw = ComplexResponse.get_full_solution_vector(Nx[(a_comp, w)])
+                        Na_raw = ComplexResponseSolver.get_full_solution_vector(Nx[(a_comp, w)])
 
-                        Nb = ComplexResponse.get_full_solution_vector(Nx[(b_comp, w)])
-                        Nc = ComplexResponse.get_full_solution_vector(Nx[(c_comp, w)])
+                        Nb = ComplexResponseSolver.get_full_solution_vector(Nx[(b_comp, w)])
+                        Nc = ComplexResponseSolver.get_full_solution_vector(Nx[(c_comp, w)])
 
-                        Ncf = ComplexResponse.get_full_solution_vector(Nxy[(f"f{c_comp}", - 2 * w)])
-                        Nbf = ComplexResponse.get_full_solution_vector(Nxy[(f"f{b_comp}", - 2 * w)])
+                        Ncf = ComplexResponseSolver.get_full_solution_vector(Nxy[(f"f{c_comp}", - 2 * w)])
+                        Nbf = ComplexResponseSolver.get_full_solution_vector(Nxy[(f"f{b_comp}", - 2 * w)])
                         try:
-                            Nbc = ComplexResponse.get_full_solution_vector(Nxy[(f"{b_comp}{c_comp}", 2 * w)])
+                            Nbc = ComplexResponseSolver.get_full_solution_vector(Nxy[(f"{b_comp}{c_comp}", 2 * w)])
                         except KeyError:
-                            Nbc = ComplexResponse.get_full_solution_vector(Nxy[(f"{c_comp}{b_comp}", 2 * w)])
+                            Nbc = ComplexResponseSolver.get_full_solution_vector(Nxy[(f"{c_comp}{b_comp}", 2 * w)])
 
                         Nf_raw = LinearResponseEigenSolver.get_full_solution_vector(Xf[w_ind])
 
@@ -617,9 +620,9 @@ class ThreePATransitionDriver(NonlinearSolver):
 
             vec_pack = self._collect_vectors_in_columns(vec_pack)
 
-            Nx = ComplexResponse.get_full_solution_vector(N[('x', w)])
-            Ny = ComplexResponse.get_full_solution_vector(N[('y', w)])
-            Nz = ComplexResponse.get_full_solution_vector(N[('z', w)])
+            Nx = ComplexResponseSolver.get_full_solution_vector(N[('x', w)])
+            Ny = ComplexResponseSolver.get_full_solution_vector(N[('y', w)])
+            Nz = ComplexResponseSolver.get_full_solution_vector(N[('z', w)])
             Nf = LinearResponseEigenSolver.get_full_solution_vector(Xf[w_ind])
 
             if self.rank != mpi_master():
@@ -763,7 +766,7 @@ class ThreePATransitionDriver(NonlinearSolver):
         return e4_vec, s4_vec
 
 
-    def get_nxy(self, freqs, Nx, fo, fo2, nocc, norb, d_a_mo, X, molecule,ao_basis, scf_tensors,Xf):
+    def get_nxy(self, freqs, Nx, fo, fo2, nocc, norb, d_a_mo, X, molecule,ao_basis, scf_results,Xf):
         """
         Computed NXY
 
@@ -808,9 +811,9 @@ class ThreePATransitionDriver(NonlinearSolver):
 
             vec_pack = self._collect_vectors_in_columns(vec_pack)
 
-            nx = ComplexResponse.get_full_solution_vector(Nx[('x', w)])
-            ny = ComplexResponse.get_full_solution_vector(Nx[('y', w)])
-            nz = ComplexResponse.get_full_solution_vector(Nx[('z', w)])
+            nx = ComplexResponseSolver.get_full_solution_vector(Nx[('x', w)])
+            ny = ComplexResponseSolver.get_full_solution_vector(Nx[('y', w)])
+            nz = ComplexResponseSolver.get_full_solution_vector(Nx[('z', w)])
 
             Nf = LinearResponseEigenSolver.get_full_solution_vector(Xf[w_ind])
 
@@ -913,7 +916,7 @@ class ThreePATransitionDriver(NonlinearSolver):
             XY.update(BC)
 
 
-        Nxy_drv = ComplexResponse(self.comm, self.ostream)
+        Nxy_drv = ComplexResponseSolver(self.comm, self.ostream)
 
         cpp_keywords = {
             'damping', 'norm_thresh', 'lindep_thresh', 'conv_thresh',
@@ -931,7 +934,7 @@ class ThreePATransitionDriver(NonlinearSolver):
             fpath = fpath.with_name(fpath.stem)
             Nxy_drv.checkpoint_file = str(fpath) + '_3patrans_2.h5'
 
-        Nxy_results = Nxy_drv.compute(molecule, ao_basis, scf_tensors, XY)
+        Nxy_results = Nxy_drv.compute(molecule, ao_basis, scf_results, XY)
 
         self._is_converged = (self._is_converged and Nxy_drv.is_converged)
 
@@ -968,21 +971,21 @@ class ThreePATransitionDriver(NonlinearSolver):
 
         for w_ind, w in enumerate(freq):
 
-            Nx = ComplexResponse.get_full_solution_vector(N[('x', w)])
-            Ny = ComplexResponse.get_full_solution_vector(N[('y', w)])
-            Nz = ComplexResponse.get_full_solution_vector(N[('z', w)])
+            Nx = ComplexResponseSolver.get_full_solution_vector(N[('x', w)])
+            Ny = ComplexResponseSolver.get_full_solution_vector(N[('y', w)])
+            Nz = ComplexResponseSolver.get_full_solution_vector(N[('z', w)])
             Nf = LinearResponseEigenSolver.get_full_solution_vector(Xf[w_ind])
 
-            Nfx = ComplexResponse.get_full_solution_vector(N2[('fx', - 2 * w)])
-            Nfy = ComplexResponse.get_full_solution_vector(N2[('fy', - 2 * w)])
-            Nfz = ComplexResponse.get_full_solution_vector(N2[('fz', - 2 * w)])
+            Nfx = ComplexResponseSolver.get_full_solution_vector(N2[('fx', - 2 * w)])
+            Nfy = ComplexResponseSolver.get_full_solution_vector(N2[('fy', - 2 * w)])
+            Nfz = ComplexResponseSolver.get_full_solution_vector(N2[('fz', - 2 * w)])
 
-            Nxx = ComplexResponse.get_full_solution_vector(N2[('xx', 2 * w)])
-            Nyy = ComplexResponse.get_full_solution_vector(N2[('yy', 2 * w)])
-            Nzz = ComplexResponse.get_full_solution_vector(N2[('zz', 2 * w)])
-            Nxy = ComplexResponse.get_full_solution_vector(N2[('xy', 2 * w)])
-            Nxz = ComplexResponse.get_full_solution_vector(N2[('xz', 2 * w)])
-            Nyz = ComplexResponse.get_full_solution_vector(N2[('yz', 2 * w)])
+            Nxx = ComplexResponseSolver.get_full_solution_vector(N2[('xx', 2 * w)])
+            Nyy = ComplexResponseSolver.get_full_solution_vector(N2[('yy', 2 * w)])
+            Nzz = ComplexResponseSolver.get_full_solution_vector(N2[('zz', 2 * w)])
+            Nxy = ComplexResponseSolver.get_full_solution_vector(N2[('xy', 2 * w)])
+            Nxz = ComplexResponseSolver.get_full_solution_vector(N2[('xz', 2 * w)])
+            Nyz = ComplexResponseSolver.get_full_solution_vector(N2[('yz', 2 * w)])
             
 
             if self.rank == mpi_master():
@@ -1195,9 +1198,9 @@ class ThreePATransitionDriver(NonlinearSolver):
 
         for w_ind, w in enumerate(freqs):
 
-            nx = ComplexResponse.get_full_solution_vector(Nx[('x', w)])
-            ny = ComplexResponse.get_full_solution_vector(Nx[('y', w)])
-            nz = ComplexResponse.get_full_solution_vector(Nx[('z', w)])
+            nx = ComplexResponseSolver.get_full_solution_vector(Nx[('x', w)])
+            ny = ComplexResponseSolver.get_full_solution_vector(Nx[('y', w)])
+            nz = ComplexResponseSolver.get_full_solution_vector(Nx[('z', w)])
 
             Nf = LinearResponseEigenSolver.get_full_solution_vector(Xf[w_ind])
 
@@ -1612,22 +1615,22 @@ class ThreePATransitionDriver(NonlinearSolver):
             vec_pack = self._collect_vectors_in_columns(vec_pack)
 
             # First-order response vectors
-            Nbx = ComplexResponse.get_full_solution_vector(Nx[('x', w)])
-            Nby = ComplexResponse.get_full_solution_vector(Nx[('y', w)])
-            Nbz = ComplexResponse.get_full_solution_vector(Nx[('z', w)])
+            Nbx = ComplexResponseSolver.get_full_solution_vector(Nx[('x', w)])
+            Nby = ComplexResponseSolver.get_full_solution_vector(Nx[('y', w)])
+            Nbz = ComplexResponseSolver.get_full_solution_vector(Nx[('z', w)])
             Nf = LinearResponseEigenSolver.get_full_solution_vector(Xf[w_ind])
 
             # Second-order response vectors
-            Nfx = ComplexResponse.get_full_solution_vector(N_xy[('fx', - 2 * w)])
-            Nfy = ComplexResponse.get_full_solution_vector(N_xy[('fy', - 2 * w)])
-            Nfz = ComplexResponse.get_full_solution_vector(N_xy[('fz', - 2 * w)])
+            Nfx = ComplexResponseSolver.get_full_solution_vector(N_xy[('fx', - 2 * w)])
+            Nfy = ComplexResponseSolver.get_full_solution_vector(N_xy[('fy', - 2 * w)])
+            Nfz = ComplexResponseSolver.get_full_solution_vector(N_xy[('fz', - 2 * w)])
 
-            Nxx = ComplexResponse.get_full_solution_vector(N_xy[('xx', 2 * w)])
-            Nyy = ComplexResponse.get_full_solution_vector(N_xy[('yy', 2 * w)])
-            Nzz = ComplexResponse.get_full_solution_vector(N_xy[('zz', 2 * w)])
-            Nxy = ComplexResponse.get_full_solution_vector(N_xy[('xy', 2 * w)])
-            Nxz = ComplexResponse.get_full_solution_vector(N_xy[('xz', 2 * w)])
-            Nyz = ComplexResponse.get_full_solution_vector(N_xy[('yz', 2 * w)])
+            Nxx = ComplexResponseSolver.get_full_solution_vector(N_xy[('xx', 2 * w)])
+            Nyy = ComplexResponseSolver.get_full_solution_vector(N_xy[('yy', 2 * w)])
+            Nzz = ComplexResponseSolver.get_full_solution_vector(N_xy[('zz', 2 * w)])
+            Nxy = ComplexResponseSolver.get_full_solution_vector(N_xy[('xy', 2 * w)])
+            Nxz = ComplexResponseSolver.get_full_solution_vector(N_xy[('xz', 2 * w)])
+            Nyz = ComplexResponseSolver.get_full_solution_vector(N_xy[('yz', 2 * w)])
 
             if self.rank != mpi_master():
                 continue

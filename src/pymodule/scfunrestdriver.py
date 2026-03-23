@@ -43,6 +43,7 @@ from .outputstream import OutputStream
 from .scfdriver import ScfDriver
 from .c2diis import CTwoDiis
 from .diis import Diis
+from .mathutils import solve_in_orthogonal_basis
 
 
 class ScfUnrestrictedDriver(ScfDriver):
@@ -269,13 +270,10 @@ class ScfUnrestrictedDriver(ScfDriver):
 
         if self.rank == mpi_master():
             tmat = oao_mat
-            eigs_a, evecs_a = np.linalg.eigh(
-                np.linalg.multi_dot([tmat.T, eff_fock_mat[0], tmat]))
-            eigs_b, evecs_b = np.linalg.eigh(
-                np.linalg.multi_dot([tmat.T, eff_fock_mat[1], tmat]))
-
-            orb_coefs_a = np.matmul(tmat, evecs_a)
-            orb_coefs_b = np.matmul(tmat, evecs_b)
+            eigs_a, orb_coefs_a = solve_in_orthogonal_basis(
+                eff_fock_mat[0], tmat)
+            eigs_b, orb_coefs_b = solve_in_orthogonal_basis(
+                eff_fock_mat[1], tmat)
             orb_coefs_a, eigs_a = self._delete_mos(orb_coefs_a, eigs_a)
             orb_coefs_b, eigs_b = self._delete_mos(orb_coefs_b, eigs_b)
 
@@ -353,27 +351,27 @@ class ScfUnrestrictedDriver(ScfDriver):
 
         return "Spin-Unrestricted Hartree-Fock" + emb_type
 
-    def natural_orbitals(self, scf_tensors=None):
+    def natural_orbitals(self, scf_results=None):
         """
         Compute the UHF natural orbitals
 
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
 
         :return:
             The natural orbitals.
         """
 
-        if scf_tensors is None:
-            scf_tensors = self.scf_tensors
+        if scf_results is None:
+            scf_results = self.scf_results
 
         if self.rank == mpi_master():
             # Get total density
-            D_total = scf_tensors['D_alpha'] + scf_tensors['D_beta']
+            D_total = scf_results['D_alpha'] + scf_results['D_beta']
 
             # Get some MO coefficients and create C^-1
-            C = scf_tensors['C_alpha']
-            S = scf_tensors['S']
+            C = scf_results['C_alpha']
+            S = scf_results['S']
             C_inv = np.matmul(S, C)
 
             # Transform total density to MO basis
@@ -387,8 +385,8 @@ class ScfUnrestrictedDriver(ScfDriver):
 
             # Compute the orbital energy as expectation value of the averaged Fock
             # matrix (they are not eigenvalues!)
-            F_alpha = scf_tensors['F_alpha']
-            F_beta = scf_tensors['F_beta']
+            F_alpha = scf_results['F_alpha']
+            F_beta = scf_results['F_beta']
             F_avg = 0.5 * (F_alpha + F_beta)
 
             orbital_energies = np.diag(

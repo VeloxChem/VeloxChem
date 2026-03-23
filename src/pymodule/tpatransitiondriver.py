@@ -42,12 +42,12 @@ from .veloxchemlib import (mpi_master, bohr_in_angstrom, hartree_in_ev,
                            speed_of_light_in_vacuum_in_SI)
 from .profiler import Profiler
 from .outputstream import OutputStream
-from .cppsolver import ComplexResponse
+from .cppsolver import ComplexResponseSolver
 from .linearsolver import LinearSolver
 from .nonlinearsolver import NonlinearSolver
 from .distributedarray import DistributedArray
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           dft_sanity_check)
+                           ri_sanity_check, dft_sanity_check)
 from .errorhandler import assert_msg_critical
 from .checkpoint import (check_distributed_focks, read_distributed_focks,
                          write_distributed_focks)
@@ -146,6 +146,9 @@ class TpaTransitionDriver(NonlinearSolver):
         # update checkpoint_file after scf_results_sanity_check
         if self.filename is not None and self.checkpoint_file is None:
             self.checkpoint_file = f'{self.filename}_rsp.h5'
+
+        # check RI setup
+        ri_sanity_check(self)
 
         # check dft setup
         dft_sanity_check(self, 'compute', 'nonlinear')
@@ -273,7 +276,7 @@ class TpaTransitionDriver(NonlinearSolver):
             X = None
 
         # Computing the first-order response vectors (3 per frequency)
-        N_drv = ComplexResponse(self.comm, self.ostream)
+        N_drv = ComplexResponseSolver(self.comm, self.ostream)
 
         cpp_keywords = {
             'damping', 'norm_thresh', 'lindep_thresh', 'conv_thresh',
@@ -393,13 +396,13 @@ class TpaTransitionDriver(NonlinearSolver):
         for w_ind, w in enumerate(freqs):
             m = np.zeros((3, 3), dtype='complex128')
 
-            N0_x = ComplexResponse.get_full_solution_vector(Nx[('x', 0)])
-            N0_y = ComplexResponse.get_full_solution_vector(Nx[('y', 0)])
-            N0_z = ComplexResponse.get_full_solution_vector(Nx[('z', 0)])
+            N0_x = ComplexResponseSolver.get_full_solution_vector(Nx[('x', 0)])
+            N0_y = ComplexResponseSolver.get_full_solution_vector(Nx[('y', 0)])
+            N0_z = ComplexResponseSolver.get_full_solution_vector(Nx[('z', 0)])
 
-            N_x = ComplexResponse.get_full_solution_vector(Nx[('x', w)])
-            N_y = ComplexResponse.get_full_solution_vector(Nx[('y', w)])
-            N_z = ComplexResponse.get_full_solution_vector(Nx[('z', w)])
+            N_x = ComplexResponseSolver.get_full_solution_vector(Nx[('x', w)])
+            N_y = ComplexResponseSolver.get_full_solution_vector(Nx[('y', w)])
+            N_z = ComplexResponseSolver.get_full_solution_vector(Nx[('z', w)])
 
             Nc = LinearResponseEigenSolver.get_full_solution_vector(Xf[w_ind])
 
@@ -681,9 +684,9 @@ class TpaTransitionDriver(NonlinearSolver):
 
         for w_ind, w in enumerate(freqs):
 
-            nx = ComplexResponse.get_full_solution_vector(Nx[('x', w)])
-            ny = ComplexResponse.get_full_solution_vector(Nx[('y', w)])
-            nz = ComplexResponse.get_full_solution_vector(Nx[('z', w)])
+            nx = ComplexResponseSolver.get_full_solution_vector(Nx[('x', w)])
+            ny = ComplexResponseSolver.get_full_solution_vector(Nx[('y', w)])
+            nz = ComplexResponseSolver.get_full_solution_vector(Nx[('z', w)])
 
             Nc = LinearResponseEigenSolver.get_full_solution_vector(Xf[w_ind])
 
@@ -897,9 +900,9 @@ class TpaTransitionDriver(NonlinearSolver):
 
             vec_pack = self._collect_vectors_in_columns(vec_pack)
 
-            Nbx = ComplexResponse.get_full_solution_vector(Nx[('x', w)])
-            Nby = ComplexResponse.get_full_solution_vector(Nx[('y', w)])
-            Nbz = ComplexResponse.get_full_solution_vector(Nx[('z', w)])
+            Nbx = ComplexResponseSolver.get_full_solution_vector(Nx[('x', w)])
+            Nby = ComplexResponseSolver.get_full_solution_vector(Nx[('y', w)])
+            Nbz = ComplexResponseSolver.get_full_solution_vector(Nx[('z', w)])
 
             Nc = LinearResponseEigenSolver.get_full_solution_vector(Xf[w_ind])
 

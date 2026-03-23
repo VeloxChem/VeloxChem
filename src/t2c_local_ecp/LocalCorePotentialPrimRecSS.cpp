@@ -10,6 +10,8 @@ auto
 comp_prim_local_core_potential_ss(CSimdArray<double>& pbuffer,
                                   const size_t idx_ss,
                                   const CSimdArray<double>& factors,
+                                  const size_t idx_r,
+                                  const size_t idx_zeta,
                                   const TPoint<double>& r_a,
                                   const double a_exp,
                                   const double c_exp,
@@ -50,11 +52,11 @@ comp_prim_local_core_potential_ss(CSimdArray<double>& pbuffer,
     
     // Set up R coordinates
 
-    auto r_x = factors.data(5);
+    auto r_x = factors.data(idx_r);
 
-    auto r_y = factors.data(6);
+    auto r_y = factors.data(idx_r + 1);
 
-    auto r_z = factors.data(7);
+    auto r_z = factors.data(idx_r + 2);
 
     // Set up components of auxiliary buffer : SS
 
