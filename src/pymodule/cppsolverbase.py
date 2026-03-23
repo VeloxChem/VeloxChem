@@ -864,8 +864,9 @@ class ComplexResponseSolverBase(LinearSolver):
             ostream.print_blank()
             return
 
+        y_label = spectrum.get('y_label', 'ORD[10^3 deg dm^-1 (g cm^-3)^-1]')
         title = '{:<20s}{:<20s}{:>28s}'.format(
-            'Frequency[a.u.]', 'Frequency[eV]', 'ORD[10^3 deg dm^-1 (g cm^-3)^-1]'
+            'Frequency[a.u.]', 'Frequency[eV]', y_label
         )
         ostream.print_header(title.ljust(width))
         ostream.print_header(('-' * len(title)).ljust(width))
