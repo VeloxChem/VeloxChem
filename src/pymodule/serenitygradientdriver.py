@@ -76,10 +76,10 @@ class SerenityGradientDriver(GradientDriver):
             self.gradient = self.serenity_driver.get_gradient()
 
         self.gradient = self.comm.bcast(self.gradient, root=mpi_master())
-
+        
         self.print_geometry(molecule)
         self.print_gradient(molecule)
-
+        self.serenity_driver._invalidate_cache()
         self.ostream.print_blank()
         self.ostream.flush()
 

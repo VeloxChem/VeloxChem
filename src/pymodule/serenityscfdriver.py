@@ -381,6 +381,7 @@ class SerenityScfDriver:
         return self._scf_results
 
     def _compute_gradient_master(self, molecule):
+        
         self._compute_energy_master(molecule)
 
         geom_signature = self._active_geom_signature

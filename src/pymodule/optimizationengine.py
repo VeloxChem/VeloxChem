@@ -142,6 +142,7 @@ class OptimizationEngine(geometric.engine.Engine):
         self.grad_drv.compute(new_mol, *self.args)
         gradient = self.grad_drv.get_gradient()
 
+
         if not self._debug:
             #self.grad_drv.ostream.unmute()
             pass
