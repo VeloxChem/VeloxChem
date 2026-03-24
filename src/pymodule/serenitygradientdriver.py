@@ -62,8 +62,7 @@ class SerenityGradientDriver(GradientDriver):
         :param molecule:
             The molecule.
         """
-
-        self.print_header()
+        self.ostream.mute()
 
         if self.numerical:
             if self.rank == mpi_master():

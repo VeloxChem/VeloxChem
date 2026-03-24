@@ -166,7 +166,8 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
             The molecule.
         """
 
-        self.print_header([self.state_deriv_index])
+        
+        self.ostream.mute()
 
         if self.numerical:
             if self.rank == mpi_master():
@@ -201,8 +202,8 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
         if self.rank != mpi_master():
             return None
 
-        with self._silent_context():
-            rsp_results = self.rsp_driver.compute(molecule, broadcast=False)
+
+        rsp_results = self.rsp_driver.compute(molecule, broadcast=False)
 
         exc_ene = self._extract_excitation_energy(rsp_results)
         self.excited_state_energy = float(exc_ene)
@@ -212,8 +213,8 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
         return self.total_energy
 
     def _compute_analytical_master(self, molecule):
-        with self._silent_context():
-            rsp_results = self.rsp_driver.compute(molecule, broadcast=False)
+
+        rsp_results = self.rsp_driver.compute(molecule, broadcast=False)
 
         self.excited_state_energy = self._extract_excitation_energy(rsp_results)
 
@@ -228,7 +229,7 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
 
         self._configure_excited_gradient_task(grad_task)
 
-        with self._silent_context():
+        with self.serenity_driver._serenity_output_context():
             grad_task.run()
 
         gradient = np.array(self.serenity_driver._system.getGeometry().getGradients(),
@@ -287,18 +288,3 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
         assert_msg_critical(state <= nst, errmsg)
 
         return float(eig[state - 1])
-
-    def _silent_context(self):
-        class _MuteCtx:
-
-            def __init__(self, ostream):
-                self._ostream = ostream
-
-            def __enter__(self):
-                self._ostream.mute()
-
-            def __exit__(self, exc_type, exc_val, exc_tb):
-                self._ostream.unmute()
-                return False
-
-        return _MuteCtx(self.ostream)

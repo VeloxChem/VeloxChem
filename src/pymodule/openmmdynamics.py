@@ -2598,6 +2598,8 @@ class OpenMMDynamics:
                 positions_ang[atom1] = positions_ang[atom2] - direction * self.linking_atom_distance
 
             new_molecule = Molecule(qm_atom_labels, positions_ang, units="angstrom")
+            new_molecule.set_charge(self.molecule.get_charge())
+            new_molecule.set_multiplicity(self.molecule.get_multiplicity())
             self.dynamic_molecules.append(new_molecule)
 
         else:
@@ -2605,6 +2607,8 @@ class OpenMMDynamics:
             atom_labels = [atom.element.symbol for atom in self.topology.atoms()]
             qm_atom_labels = [atom_labels[i] for i in self.qm_atoms]
             new_molecule = Molecule(qm_atom_labels, positions_ang, units="angstrom")
+            new_molecule.set_charge(self.molecule.get_charge())
+            new_molecule.set_multiplicity(self.molecule.get_multiplicity())
             self.dynamic_molecules.append(new_molecule)
 
         # Temporary Serenity workaround: force new Serenity backend objects
@@ -2616,7 +2620,6 @@ class OpenMMDynamics:
             # use the dedicated excited-state gradient driver, which also
             # provides total excited-state energy (E_gs + E_exc).
             self.grad_driver.compute(new_molecule)
-            print(new_molecule.get_xyz_string())
             gradient = self.grad_driver.get_gradient()
             total_energy_au = self.grad_driver.total_energy
             if total_energy_au is None:

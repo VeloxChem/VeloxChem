@@ -31,6 +31,8 @@
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import numpy as np
+from contextlib import nullcontext
+import os
 
 from .veloxchemlib import mpi_master, hartree_in_ev
 from .errorhandler import assert_msg_critical
@@ -38,6 +40,7 @@ from .serenityscfdriver import SerenityScfDriver
 
 try:
     from qcserenity import serenipy as spy
+    import qcserenity as qc
 except ImportError:
     pass
 
@@ -218,6 +221,7 @@ class SerenityLinearResponseSolver:
         errmsg = 'SerenityLinearResponseSolver: qcserenity is not available. '
         errmsg += 'Please install/build Serenity python bindings.'
         assert_msg_critical(self.is_available(), errmsg)
+        self.ostream.mute()
 
         if self.rank == mpi_master():
             rsp_results = self._compute_master(molecule)
@@ -307,9 +311,10 @@ class SerenityLinearResponseSolver:
 
             self._configure_lr_task()
 
+            
             with self.scf_driver._serenity_output_context():
                 self._lr_task.run()
-
+            
             transitions = np.array(self._lr_task.getTransitions(), dtype=float)
             self._rsp_results = self._build_rsp_results(transitions)
             self._rsp_results['exc_method'] = self.exc_method
@@ -392,6 +397,11 @@ class SerenityLinearResponseSolver:
             'number_of_states': int(nroots),
         }
 
+    def _serenity_output_context(self):
+        if self.scf_driver.serenity_verbose and not self.ostream.is_muted:
+            return nullcontext()
+        return qc.redirectOutputToFile(os.devnull)
+    
     @staticmethod
     def _copy_rsp_results(rsp_results):
         if rsp_results is None:

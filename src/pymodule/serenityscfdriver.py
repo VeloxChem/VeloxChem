@@ -107,11 +107,14 @@ class SerenityScfDriver:
         self.scratch_dir = None
         self.serenity_verbose = False
 
-        self._system = None
-        self._scf_task = None
-        self._gradient_task = None
+        self._system = None # This is the systemController object from Serenity
+        self._scf_task = None # This is the Task object that is executing the given Task here: SCFTask
+        self._fat_task = None
+        self._gradient_task = None # Uses gradient task object to perform the scf calculation
 
-        self._system_signature = None
+        # Variables that store information about the SCF 
+        # !!! Currently needs to be reseted within the dyanmics as BasisFunctionOnGridController is giving an Error !!!
+        self._system_signature = None 
         self._active_geom_signature = None
         self._last_scf_geom_signature = None
         self._last_grad_geom_signature = None
@@ -271,7 +274,7 @@ class SerenityScfDriver:
         errmsg = 'SerenityScfDriver: qcserenity is not available. '
         errmsg += 'Please install/build Serenity python bindings.'
         assert_msg_critical(self.is_available(), errmsg)
-
+        self.ostream.mute()
         if self.rank == mpi_master():
             results = self._compute_energy_master(molecule)
             energy = float(results['energy'])
@@ -341,7 +344,13 @@ class SerenityScfDriver:
         return ref_str
 
     def _invalidate_cache(self):
-        self._system = None
+        """
+        This function is crucial for resetting the full object
+        as the new initalizaiton for the dynamics is necessary
+        for a correct basis function integration!
+        """
+
+        # self._system = None
         self._scf_task = None
         self._gradient_task = None
         self._system_signature = None
@@ -403,6 +412,11 @@ class SerenityScfDriver:
         return results
 
     def _ensure_system(self, molecule):
+
+        """
+        In Sereentiy the systemController 
+        """
+
         mode = self._get_effective_scf_mode(molecule)
         signature = self._get_system_signature(molecule, mode)
 
