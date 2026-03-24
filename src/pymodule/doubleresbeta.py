@@ -40,7 +40,7 @@ from .oneeints import compute_electric_dipole_integrals
 from .veloxchemlib import mpi_master, hartree_in_ev
 from .profiler import Profiler
 from .outputstream import OutputStream
-from .cppsolver import ComplexResponse
+from .cppsolver import ComplexResponseSolver
 from .linearsolver import LinearSolver
 from .nonlinearsolver import NonlinearSolver
 from .distributedarray import DistributedArray
@@ -282,7 +282,7 @@ class DoubleResBetaDriver(NonlinearSolver):
             X = None
 
         # Computing the first-order response vectors (3 per frequency)
-        N_drv = ComplexResponse(self.comm, self.ostream)
+        N_drv = ComplexResponseSolver(self.comm, self.ostream)
 
         cpp_keywords = {
             'damping', 'norm_thresh', 'lindep_thresh', 'conv_thresh',
@@ -399,9 +399,9 @@ class DoubleResBetaDriver(NonlinearSolver):
         scf_prop = FirstOrderProperties(self.comm, self.ostream)
         scf_prop.compute_scf_prop(molecule, ao_basis, scf_results)
     
-        N0_x = ComplexResponse.get_full_solution_vector(Nx[('x', freqs[0])])
-        N0_y = ComplexResponse.get_full_solution_vector(Nx[('y', freqs[0])])
-        N0_z = ComplexResponse.get_full_solution_vector(Nx[('z', freqs[0])])
+        N0_x = ComplexResponseSolver.get_full_solution_vector(Nx[('x', freqs[0])])
+        N0_y = ComplexResponseSolver.get_full_solution_vector(Nx[('y', freqs[0])])
+        N0_z = ComplexResponseSolver.get_full_solution_vector(Nx[('z', freqs[0])])
 
 
         Nf = LinearResponseEigenSolver.get_full_solution_vector(Xf[self.initial_state - 1])

@@ -1,3 +1,4 @@
+from mpi4py import MPI
 import numpy as np
 import pytest
 
@@ -17,7 +18,8 @@ class TestTDA:
                 ref_exc_enes,
                 ref_osc_str,
                 tol,
-                ri_coulomb=False):
+                ri_coulomb=False,
+                max_subspace_dim=None):
 
         xyz_string = """3
         xyz
@@ -38,6 +40,7 @@ class TestTDA:
         lr_drv = TdaEigenSolver()
         lr_drv.ostream.mute()
         lr_drv.nstates = 5
+        lr_drv.max_subspace_dim = max_subspace_dim
         lr_results = lr_drv.compute(mol, bas, scf_results)
 
         if lr_drv.rank == mpi_master():
@@ -56,7 +59,12 @@ class TestTDA:
 
         ref_osc_str = np.array([0.0229, 0.0000, 0.1039, 0.0975, 0.3060])
 
-        self.run_tda('hf', 'def2-svp', ref_exc_enes, ref_osc_str, 1.0e-6)
+        self.run_tda('hf',
+                     'def2-svp',
+                     ref_exc_enes,
+                     ref_osc_str,
+                     1.0e-6,
+                     max_subspace_dim=30)
 
     def test_b3lyp_svp(self):
 
@@ -192,3 +200,29 @@ class TestTDA:
                 assert np.max(
                     np.abs(lr_results_first[key] -
                            lr_results_second[key])) < 1e-10
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    def test_compute_rejects_openshell_molecule(self):
+
+        xyz_string = """3
+        xyz
+        O   -0.1858140  -1.1749469   0.7662596
+        H   -0.1285513  -0.8984365   1.6808606
+        H   -0.0582782  -0.3702550   0.2638279
+        """
+        mol = Molecule.read_xyz_string(xyz_string)
+        mol.set_multiplicity(3)
+
+        bas = MolecularBasis.read(mol, 'def2-svp', ostream=None)
+
+        # empty scf results just for testing
+        scf_results = {}
+
+        lr_drv = TdaEigenSolver()
+        lr_drv.ostream.mute()
+
+        with pytest.raises(
+                AssertionError,
+                match="Molecule: Invalid multiplicity for restricted"):
+            lr_results_not_used = lr_drv.compute(mol, bas, scf_results)

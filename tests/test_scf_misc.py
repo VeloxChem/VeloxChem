@@ -8,8 +8,10 @@ from veloxchem.veloxchemlib import mpi_master
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
+from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
 from veloxchem.dispersionmodel import DispersionModel
 from veloxchem.checkpoint import read_molecule_and_basis
+from veloxchem.inputparser import unparse_input, read_unparsed_input_from_hdf5
 
 
 @pytest.mark.solvers
@@ -114,6 +116,120 @@ class TestScfDriverMiscellaneous:
             assert third_results["scf_energy"] == pytest.approx(
                 first_results["scf_energy"], abs=1.0e-10)
 
+    def test_checkpoint_writes_input_groups(self, tmp_path):
+
+        molecule, basis = self.get_water_and_basis()
+        filename = str(tmp_path / "water_keywords")
+        checkpoint_file = Path(f"{filename}_scf.h5")
+
+        comm = MPI.COMM_WORLD
+        filename = comm.bcast(filename, root=mpi_master())
+        checkpoint_file = comm.bcast(checkpoint_file, root=mpi_master())
+
+        def configure(driver):
+            driver.filename = filename
+            driver.max_iter = 37
+            driver.density_damping = True
+            driver.xcfun = 'blyp'
+            driver.ri_coulomb = True
+            driver.ri_auxiliary_basis = 'def2-universal-jkfit'
+            driver.ri_metric_threshold = 1.0e-10
+            driver.solvation_model = 'cpcm'
+            driver.cpcm_custom_vdw_radii = ('Mg', '2.0', '1', '1.0')
+
+        scf_drv, scf_results = self.run_hf_scf(molecule, basis, configure)
+
+        assert scf_results is not None
+        assert scf_drv.checkpoint_file == str(checkpoint_file)
+
+        scf_keywords = {
+            key: val[0] for key, val in scf_drv._input_keywords["scf"].items()
+        }
+        method_keywords = {
+            key: val[0]
+            for key, val in scf_drv._input_keywords["method_settings"].items()
+        }
+
+        expected_scf = unparse_input(scf_drv, scf_keywords)
+        expected_method = unparse_input(scf_drv, method_keywords)
+
+        # test read_unparsed_input_from_hdf5
+
+        if self.is_master():
+            assert checkpoint_file.is_file()
+            checkpoint_scf_input = read_unparsed_input_from_hdf5(
+                str(checkpoint_file), group_name="scf_settings")
+            checkpoint_method_input = read_unparsed_input_from_hdf5(
+                str(checkpoint_file), group_name="method_settings")
+        else:
+            checkpoint_scf_input = None
+            checkpoint_method_input = None
+
+        checkpoint_scf_input = scf_drv.comm.bcast(checkpoint_scf_input,
+                                                  root=mpi_master())
+        checkpoint_method_input = scf_drv.comm.bcast(checkpoint_method_input,
+                                                     root=mpi_master())
+
+        assert checkpoint_scf_input == expected_scf
+        assert checkpoint_method_input == expected_method
+
+        # test update_settings
+
+        second_drv = ScfRestrictedDriver()
+        second_drv.ostream.mute()
+        second_drv.update_settings(checkpoint_scf_input,
+                                   checkpoint_method_input)
+
+        for key in scf_keywords:
+            assert getattr(second_drv, key) == getattr(scf_drv, key)
+        for key in method_keywords:
+            assert getattr(second_drv, key) == getattr(scf_drv, key)
+
+        # test restart_exact
+
+        third_drv = ScfRestrictedDriver()
+        third_drv.ostream.mute()
+        third_drv.checkpoint_file = str(checkpoint_file)
+
+        new_molecule, new_basis = read_molecule_and_basis(str(checkpoint_file))
+
+        third_results = third_drv.compute(new_molecule,
+                                          new_basis,
+                                          restart_exact=True)
+
+        for key in scf_keywords:
+            if key == 'restart':
+                continue
+            assert getattr(third_drv, key) == getattr(scf_drv, key)
+        for key in method_keywords:
+            assert getattr(third_drv, key) == getattr(scf_drv, key)
+
+        assert third_drv.restart
+
+        if self.is_master():
+            assert third_results['scf_type'] == scf_results['scf_type']
+            assert abs(third_results['scf_energy'] -
+                       scf_results['scf_energy']) < 1e-12
+            assert np.max(
+                np.abs(third_results['D_alpha'] -
+                       scf_results['D_alpha'])) < 1e-8
+
+        # test restart_exact with a different scf_type
+
+        fourth_drv = ScfUnrestrictedDriver()
+        fourth_drv.ostream.mute()
+        fourth_drv.checkpoint_file = str(checkpoint_file)
+
+        new_molecule, new_basis = read_molecule_and_basis(str(checkpoint_file))
+        new_molecule.set_charge(1)
+        new_molecule.set_multiplicity(2)
+
+        fourth_results_not_used = fourth_drv.compute(new_molecule,
+                                                     new_basis,
+                                                     restart_exact=True)
+
+        assert not fourth_drv.restart
+
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='skip pytest.raises for multiple MPI processes')
     def test_conflicting_ri_modes_raise(self):
@@ -216,3 +332,25 @@ class TestScfDriverMiscellaneous:
 
             assert 0.0 != scf_drv.scf_results["scf_energy"]
             assert 0.0 != np.max(np.abs(scf_drv.scf_results["C_alpha"]))
+
+    def test_mom(self):
+
+        molecule, basis = self.get_water_and_basis()
+
+        scf_drv, scf_results = self.run_hf_scf(molecule, basis)
+
+        uhf_drv = ScfUnrestrictedDriver()
+        uhf_drv.ostream.mute()
+
+        occ_beta = list(range(molecule.number_of_beta_occupied_orbitals(basis)))
+        occ_alpha = list(occ_beta)
+        occ_alpha[-1] += 1  # HOMO->LUMO excitation
+
+        uhf_drv.maximum_overlap(
+            molecule, basis, scf_drv.molecular_orbitals, occ_alpha, occ_beta
+        )
+
+        scf_results = uhf_drv.compute(molecule, basis)
+
+        if self.is_master():
+            assert abs(-74.54939063506086 - scf_results["scf_energy"]) < 1.0e-8
