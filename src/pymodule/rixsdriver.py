@@ -37,6 +37,7 @@ import h5py
 import sys
 
 from .veloxchemlib import hartree_in_ev, mpi_master, fine_structure_constant
+from .spectrumplot import plot_rixs_spectrum
 from .oneeints import compute_electric_dipole_integrals
 from .outputstream import OutputStream
 from .linearsolver import LinearSolver
@@ -228,7 +229,7 @@ class RixsDriver(LinearSolver):
     def compute_cpp(self, molecule, basis, scf_results,
                     rsp_results=None, cvs_rsp_results=None):
         """
-        Implements the CPP variant of LR-TDDFT RIXS.
+        Implements the 2x-CPP variant of LR-TDDFT RIXS.
         """
 
         # TODO: enable ECP
@@ -313,10 +314,6 @@ class RixsDriver(LinearSolver):
         self.elastic_cross_sections = np.zeros((len(self.photon_energy)))
         #self.scattering_amplitudes  = np.zeros((num_final_xsections, len(self.photon_energy),
         #                                       3, 3), dtype=complex)
-
-        sin2_theta = np.sin(self.theta) ** 2
-        a = 2.0 - 0.5 * sin2_theta
-        b = 0.75 * sin2_theta - 0.5
         
         # TODO: make stable for len(self.photon_energy) = 1
         for n_ind, w_ex in enumerate(self.photon_energy):
@@ -325,8 +322,9 @@ class RixsDriver(LinearSolver):
                     f'at photon energy: {w_ex*hartree_in_ev():.2f} eV.'
                 )
             self.ostream.print_blank()
-            # TODO: enable elastic cross-sections
 
+            # TODO: enable elastic cross-sections
+            
             #ret_cpp_solution_vector_x = core_rsp_drv.get_full_solution_vector(cvs_rsp_results['solutions'][('x', w_ex)])
             #ret_cpp_solution_vector_y = core_rsp_drv.get_full_solution_vector(cvs_rsp_results['solutions'][('y', w_ex)])
             #ret_cpp_solution_vector_z = core_rsp_drv.get_full_solution_vector(cvs_rsp_results['solutions'][('z', w_ex)])
@@ -337,16 +335,6 @@ class RixsDriver(LinearSolver):
                 for comp in self.components
             }
             A_adv = {comp: np.conjugate(vec) for comp, vec in A_ret.items()}
-            
-            #adv_cpp_solution_vector_x = np.conjugate(ret_cpp_solution_vector_x)
-            #adv_cpp_solution_vector_y = np.conjugate(ret_cpp_solution_vector_y)
-            #adv_cpp_solution_vector_z = np.conjugate(ret_cpp_solution_vector_z)
-            
-            A_mat = np.column_stack([A_adv[comp] for comp in self.components])
-
-            #rsp_grad_x = self.eff_excited_grad(molecule, basis, scf_results, ret_cpp_solution_vector_x, components=self.components)
-            #rsp_grad_y = self.eff_excited_grad(molecule, basis, scf_results, ret_cpp_solution_vector_y, components=self.components)
-            #rsp_grad_z = self.eff_excited_grad(molecule, basis, scf_results, ret_cpp_solution_vector_z, components=self.components)
 
             B_lambda = {}
             for lam in self.components:
@@ -363,78 +351,42 @@ class RixsDriver(LinearSolver):
                 B_lambda[lam] = rsp_drv.compute(
                     molecule, basis, scf_results, v_grad=exc_grad
                 )
-
-            """
-            # TODO: define components for exc-gradients properly
-            exc_grad_x = {
-                (op, w): g
-                for op, g in zip(core_rsp_drv.b_components, rsp_grad_x)
-                for w in rsp_drv.frequencies
-            }
-            exc_grad_y = {
-                (op, w): g
-                for op, g in zip(core_rsp_drv.b_components, rsp_grad_y)
-                for w in rsp_drv.frequencies
-            }
-            exc_grad_z = {
-                (op, w): g
-                for op, g in zip(core_rsp_drv.b_components, rsp_grad_z)
-                for w in rsp_drv.frequencies
-            }
-
-            Bvec_x = rsp_drv.compute(molecule, basis, scf_results, v_grad=exc_grad_x)
-            Bvec_y = rsp_drv.compute(molecule, basis, scf_results, v_grad=exc_grad_y)
-            Bvec_z = rsp_drv.compute(molecule, basis, scf_results, v_grad=exc_grad_z)
-
-            A_vecs_prime = {
-                'x': ret_cpp_solution_vector_x,
-                'y': ret_cpp_solution_vector_y,
-                'z': ret_cpp_solution_vector_z,
-            }
-            A_vecs = {
-                'x': adv_cpp_solution_vector_x,
-                'y': adv_cpp_solution_vector_y,
-                'z': adv_cpp_solution_vector_z,
-            }
-
-            B_lambda = {
-                    'x': Bvec_x,
-                    'y': Bvec_y,
-                    'z': Bvec_z,
-                }
-            """
+            
             for f_ind, w in enumerate(rsp_drv.frequencies):
                 w_em = w_ex - w
+                
+                rsp_func = 0.0
 
-                S1 = 0.0
-                S2 = 0.0
-                S3 = 0.0
-
-                for lam_i, lam in enumerate(self.components):
-                    for rho_i, rho in enumerate(self.components):
+                for lam in self.components:
+                    for rho in self.components:
                         B_rho_lam = rsp_drv.get_full_solution_vector(
                             B_lambda[lam]['solutions'][(rho, w)]
                         )
 
-                        exc_grads = self.eff_excited_grad(
-                            molecule, basis, scf_results, B_rho_lam, components=self.components
-                        )
+                        A_lam = A_adv[lam]
+                        lam_solutions = B_lambda[lam]['solutions']
 
-                        D = -np.imag(np.matmul(np.vstack(exc_grads), A_mat))
+                        for rho in self.components:
+                            B_rho_lam = rsp_drv.get_full_solution_vector(
+                                lam_solutions[(rho, w)]
+                            )
 
-                        S1 += D[rho_i, lam_i]
-                        S3 += D[lam_i, rho_i]
+                            mu_rho_B = self.eff_excited_grad(
+                                molecule,
+                                basis,
+                                scf_results,
+                                B_rho_lam,
+                                components=rho,
+                            )[0]
 
-                        if rho_i == lam_i:
-                            S2 += np.trace(D)
+                            rsp_func -= np.dot(mu_rho_B, A_lam).imag
 
-                angular_part = a * S1 + b * (S2 + S3)
                 # TODO: fix correct constants
                 pref = -16.0 * np.pi * w_em**3 * w_ex * fine_structure_constant()**2
 
                 self.ene_losses[f_ind, n_ind] = w
                 self.emission_enes[f_ind, n_ind] = w_em
-                self.cross_sections[f_ind, n_ind] = pref * angular_part
+                self.cross_sections[f_ind, n_ind] = pref * rsp_func
 
             if self.rank == mpi_master():
                 #self.elastic_cross_sections[w_ind] = self.cross_section(F_elastic).real
@@ -485,30 +437,6 @@ class RixsDriver(LinearSolver):
                 rsp_results=None, cvs_rsp_results=None):
         self._approach_string = 'Running RIXS calculation in the two-shot hybrid (CPP-SOS) approach'
 
-        if rsp_results is None:
-
-            rsp_keys = [
-                'nstates',
-                'conv_thresh',
-                'restart',
-            ]
-
-            if self.tamm_dancoff:
-                rsp_drv = TdaEigenSolver(self.comm, self.ostream)
-            else:
-                rsp_drv = LinearResponseEigenSolver(self.comm, self.ostream)
-
-            for key in rsp_keys:
-                if hasattr(self, key):
-                    setattr(rsp_drv, key, getattr(self, key))
-
-            if self.checkpoint_file is not None:
-                fpath = Path(self.checkpoint_file)
-                fpath = fpath.with_name(fpath.stem)
-                rsp_drv.checkpoint_file = str(fpath) + '_rixs.h5'
-
-            rsp_results = rsp_drv.compute(molecule, basis, scf_results)
-
         # TODO: rename cvs_rsp_results to something more general?
         if cvs_rsp_results is None:# and (not self.restricted_subspace):
             
@@ -551,6 +479,30 @@ class RixsDriver(LinearSolver):
                 core_rsp_results = core_rsp_drv.compute(molecule, basis, scf_results)
                 self.ostream.print_info('...done.')
 
+        if rsp_results is None:
+
+            rsp_keys = [
+                'nstates',
+                'conv_thresh',
+                'restart',
+            ]
+
+            if self.tamm_dancoff:
+                rsp_drv = TdaEigenSolver(self.comm, self.ostream)
+            else:
+                rsp_drv = LinearResponseEigenSolver(self.comm, self.ostream)
+
+            for key in rsp_keys:
+                if hasattr(self, key):
+                    setattr(rsp_drv, key, getattr(self, key))
+
+            if self.checkpoint_file is not None:
+                fpath = Path(self.checkpoint_file)
+                fpath = fpath.with_name(fpath.stem)
+                rsp_drv.checkpoint_file = str(fpath) + '_rixs.h5'
+
+            rsp_results = rsp_drv.compute(molecule, basis, scf_results)
+
         if self.rank == mpi_master():
             self._print_header(molecule)
         
@@ -580,12 +532,8 @@ class RixsDriver(LinearSolver):
 
         # TODO: make stable for len(self.photon_energy) = 1
         for n_ind, w_ex in enumerate(self.photon_energy):
-            #core_vecs = {comp: self.lrvec2mat(self.get_full_solution_vector(core_rsp_results['solutions'][(comp, w_ex)]), nocc, norb) for comp in components}
-            core_mats = [core_rsp_drv.get_full_solution_vector(core_rsp_results['solutions'][(comp, w_ex)]) for comp in components]
-            
-            #z_mat = eigvec[:eigvec.size // 2].reshape(nocc, -1)
-            #y_mat = eigvec[eigvec.size // 2:].reshape(nocc, -1)
-            #core_mats = {comp: (eigvec[:eigvec.size // 2].reshape(nocc, -1), eigvec[eigvec.size // 2:].reshape(nocc, -1)) for eigvec in core_vecs}
+
+            core_mats = [core_rsp_drv.get_full_solution_vector(core_rsp_results['solutions'][(comp, w_ex)]) for comp in components]            
             core_vecs = [(eigvec[:eigvec.size // 2].reshape(nocc, -1), eigvec[eigvec.size // 2:].reshape(nocc, -1)) for eigvec in core_mats]
 
             for f_ind, w in enumerate(rsp_results['eigenvalues']):
@@ -602,13 +550,10 @@ class RixsDriver(LinearSolver):
                 core_to_val = np.stack([self.get_tdms(mo_occ, mo_vir, z_val, y_val, z_core, y_core, gs2core=False) for (z_core, y_core) in core_vecs], axis=0)
 
                 omega_product = (w_ex - w) * w_ex
-                #self.scattering_amplitude[f_ind, n_ind] = omega_product * np.einsum('xmn, ymn -> xy', dip_mats, -core_to_val))
 
+                #F = omega_product * np.einsum('xmn, ymn -> xy', np.array(dipole_integrals), -core_to_val)
                 A = dipole_integrals.reshape(dipole_integrals.shape[0], -1)
                 B = (-core_to_val).reshape(core_to_val.shape[0], -1)
-
-                #self.scattering_amplitude[f_ind, n_ind] = omega_product * np.einsum('xmn, ymn -> xy', dipole_integrals, -core_to_val))
-                #F = omega_product * np.einsum('xmn, ymn -> xy', np.array(dipole_integrals), -core_to_val)
                 F = omega_product * np.matmul(A, B.T)
                 self.scattering_amplitudes[f_ind, n_ind] = F
 
@@ -618,6 +563,25 @@ class RixsDriver(LinearSolver):
                 
                 self.ene_losses[f_ind, n_ind] = w
                 self.emission_enes[f_ind, n_ind] = w_ex - w
+            
+            if self.rank == mpi_master():
+                #self.elastic_cross_sections[w_ind] = self.cross_section(F_elastic).real
+                #for start, end, em_en_part, loss_part, cs_part, amp_part in parts:
+                    #self.emission_enes[start:end, w_ind]         = em_en_part
+                    #self.ene_losses[start:end, w_ind]            = loss_part
+                    #self.cross_sections[start:end, w_ind]        = cs_part
+                    #self.scattering_amplitudes[start:end, w_ind] = amp_part
+
+                self.ostream.print_info(
+                    f'Computed RIXS cross sections for {num_final_states} energy-loss frequencies '
+                    f'at photon energy: {w_ex*hartree_in_ev():.2f} eV.'
+                )
+                self.ostream.print_blank()
+                self._print_rixs_data(f'RIXS cross sections at incident X-ray energy '
+                                      f'{w_ex*hartree_in_ev():.2f} eV, energy-loss mode',
+                                      self.ene_losses[:,n_ind], self.cross_sections[:,n_ind], self.elastic_cross_sections[n_ind])
+                self.ostream.print_blank()
+                self.ostream.flush()
         
         results_dict = {
             'cross_sections': self.cross_sections,
@@ -1585,3 +1549,49 @@ class RixsDriver(LinearSolver):
             self.ostream.print_header(valstr.ljust(92))
         self.ostream.print_blank()
         self.ostream.flush()
+
+
+    def plot_spectrum(self,
+                      results,
+                      broadening_type="lorentzian",
+                      broadening_value=0.15,
+                      x_unit='ev',
+                      energy_loss=True,
+                      photon_index=0,
+                      ax=None):
+        """
+        Plot the XPS spectrum for a single element from the computed results.
+
+        :param results:
+            The results dictionary from compute method.
+        :param element:
+            Element symbol to plot (e.g., 'C', 'O', 'N', 'F', 'S').
+            If None and results contains only one element, that element is plotted.
+            If None and results contains multiple elements, an error is raised.
+        :param broadening_type:
+            The type of broadening to use. Either 'lorentzian' or 'gaussian'.
+        :param broadening_value:
+            The broadening value (FWHM) in eV.
+        :param color:
+            Color scheme for plotting. Either 'vlx' for VeloxChem default color (darkcyan)
+            or 'cpk' for CPK coloring (element-specific colors). Default is 'vlx'.
+        :param show_atom_labels:
+            If True, display atom indices as labels above peaks. Default is True.
+        :param color_by_atom:
+            If True, color each peak according to its atom index instead of using 
+            element color. Default is False.
+        :param ax:
+            The matplotlib axis to plot on. If None, a new figure is created.
+
+        :return:
+            The matplotlib axis object.
+        """
+        plot_rixs_spectrum(results,
+                          broadening_type=broadening_type,
+                          broadening_value=broadening_value,
+                          photon_index=photon_index,
+                          x_unit=x_unit,
+                          energy_loss=energy_loss,
+                          ax=ax)
+        
+        
