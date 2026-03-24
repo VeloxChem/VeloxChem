@@ -391,6 +391,7 @@ class IMForceFieldGenerator:
         self.identfy_relevant_int_coordinates = True
         self.add_gpr_model = True
         self.use_opt_confidence_radius = [False, 'single', 0.5, 0.3]
+        self.exclude_non_core = True
 
         self.imp_int_coordinates = []
 
@@ -931,6 +932,26 @@ class IMForceFieldGenerator:
                         self.atom_transfer_reaction_path = {entry['root']: []}
                     self.atom_transfer_reaction_path[entry['root']].append(self.determine_atom_transfer_reaction_path(entry['reactants'], entry['products']))
 
+        if self.exclude_non_core:
+            new_exclusion = {}
+            new_inclusion = {}
+            for key, entry in self.symmetry_information.items():
+                if len(entry) == 0:
+                    continue
+                if key not in new_exclusion:
+                    new_exclusion[key] = None
+                    new_inclusion[key] = None
+                
+                new_exclusion[key] = [idx for idx, label in enumerate(molecule.get_labels()) if label == 'H' or idx in entry[4]]
+                new_inclusion[key] = [idx for idx, _ in enumerate(molecule.get_labels()) if idx not in new_exclusion[key]]
+            
+            for new_key in new_exclusion.keys():
+            
+                self.symmetry_information[new_key][4] = new_exclusion[new_key]
+                self.symmetry_information[new_key][3] = new_inclusion[new_key]
+            
+
+
         if self.add_conformal_structures and 0 in self.roots_to_follow:
 
             conformers_plus_ts = {0 : {}}
@@ -961,12 +982,24 @@ class IMForceFieldGenerator:
                                 conformal_structures['molecules'][entry_idx + global_counter].set_dihedral_in_degrees(dih_key, curr_dih + 10)
                             conformers_plus_ts[0][dih_key].append((conformal_structures['molecules'][entry_idx + global_counter], 'normal'))
                             
-                            ts_molecule = Molecule.from_xyz_string(conformal_structures['molecules'][entry_idx + global_counter].get_xyz_string())
-                            ts_molecule.set_dihedral(dih_key, ts_molecule.get_dihedral(dih_key, 'radian') + np.pi/periodicity, 'radian')
-                            
+                            for i in range(periodicity):
+                                mode = 'normal'
+                                if i == 0:
+                                    mode = 'transition'
+                                
+                                ts_molecule = Molecule.from_xyz_string(conformal_structures['molecules'][entry_idx + global_counter].get_xyz_string())
+                                ts_molecule.set_dihedral(dih_key, ts_molecule.get_dihedral(dih_key, 'radian') + np.pi/(periodicity + (i * 2)), 'radian')
+                                print(i, ts_molecule.get_xyz_string(), np.pi/(periodicity + i))
+                                
+                                conformers_plus_ts[0][dih_key].append((ts_molecule, mode))
+                                
+                                if i > 0:
+                                    ts_molecule = Molecule.from_xyz_string(conformal_structures['molecules'][entry_idx + global_counter].get_xyz_string())
+                                    ts_molecule.set_dihedral(dih_key, ts_molecule.get_dihedral(dih_key, 'radian') - np.pi/(periodicity + (i * 2)), 'radian')
+                                    print(i, ts_molecule.get_xyz_string(), np.pi/(periodicity + i))
+                                    conformers_plus_ts[0][dih_key].append((ts_molecule, mode))
 
-                            conformers_plus_ts[0][dih_key].append((ts_molecule, 'transition'))
-                            
+                                
                         if 1 == 2:
                             _, ts_molecule = self.determine_atom_transfer_reaction_path([conformers_plus_ts[0][dih_key][-2][0]], [conformers_plus_ts[0][dih_key][-1][0]], scf=False)
                         
@@ -3378,7 +3411,7 @@ class IMForceFieldGenerator:
                             org_labels, z_matrix = interpolation_driver.read_labels()
                             labels = [label for label in org_labels if '_symmetry' not in label]
                             sorted_labels = sorted(labels, key=lambda x: int(x.split('_')[1]))
-                        print(z_matrix)
+
                         label = None
                         grad = gradients[number].copy()
                         hess = hessians[number].copy()

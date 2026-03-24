@@ -4582,6 +4582,7 @@ class IMDatabasePointCollecter:
             if 0 in entries[2] and len(symmetry_information['gs']) != 0 and len(symmetry_information['gs'][2]) != 0:
                 symmetry_mapping_groups = [item for item in range(len(entries[0].get_labels()))]
                 symmetry_exclusion_groups = [item for element in symmetry_information['gs'][1] for item in element]
+
                 sym_dihedrals, periodicites, _, _ = self.adjust_symmetry_dihedrals(symmetry_information['gs'][1], symmetry_information['gs'][5], self.root_z_matrix[0])
                 
                 # Generate all combinations
@@ -5324,7 +5325,7 @@ class IMDatabasePointCollecter:
                         filtered_dihedrals.append(d)
             return filtered_dihedrals
         
-        all_dihedrals = [element for element in z_matrix if len(element) == 4]
+        all_dihedrals = [element for element in z_matrix['dihedrals']]
 
         symmetry_group_dihedral_dict = {} 
         angles_to_set = {}
@@ -5334,7 +5335,7 @@ class IMDatabasePointCollecter:
         for symmetry_group in symmetry_groups:
 
             symmetry_group_dihedral_list = symmetry_group_dihedral(symmetry_group, all_dihedrals, rot_bonds)
-
+        
             symmetry_group_dihedral_dict[tuple(symmetry_group)] = symmetry_group_dihedral_list
             if len(symmetry_group) == 3:
 
