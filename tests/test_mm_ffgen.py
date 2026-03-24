@@ -155,7 +155,20 @@ class TestMMForceFieldGenerator:
                         reason='rdkit not available')
     def test_ffgen_set_params_and_get_params(self):
 
-        mol = Molecule.read_smiles('C=COC')
+        xyzstr = """10
+            xyz
+            C        1.560000    -0.075662     2.503629
+            C        1.255506     0.490597     1.343469
+            O        1.434318    -0.214973     0.154595
+            C        1.118147     0.362263    -1.104238
+            H        1.422185     0.469784     3.428142
+            H        1.948080    -1.085628     2.537131
+            H        0.867900     1.502691     1.326870
+            H        1.336865    -0.370909    -1.907478
+            H        1.732304     1.272846    -1.269421
+            H        0.040051     0.626884    -1.140597
+        """
+        mol = Molecule.read_xyz_string(xyzstr)
 
         ff_gen = MMForceFieldGenerator()
         ff_gen.ostream.mute()

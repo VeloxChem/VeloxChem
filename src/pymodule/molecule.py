@@ -69,7 +69,10 @@ def _Molecule_smiles_formal_charge(smiles_str):
 
 
 @staticmethod
-def _Molecule_smiles_to_xyz(smiles_str, optimize=True, hydrogen=True):
+def _Molecule_smiles_to_xyz(smiles_str,
+                            optimize=True,
+                            hydrogen=True,
+                            reorder_hydrogens=False):
     """
     Converts SMILES string to xyz string.
 
@@ -79,6 +82,9 @@ def _Molecule_smiles_to_xyz(smiles_str, optimize=True, hydrogen=True):
         Boolean indicating whether to perform geometry optimization.
     :param hydrogen:
         Boolean indicating whether to include hydrogens.
+    :param reorder_hydrogens:
+        Boolean indicating whether to reorder hydrogen atoms such that they are
+        close to their bonded neighbor.
 
     :return:
         An xyz string (including number of atoms).
@@ -98,6 +104,29 @@ def _Molecule_smiles_to_xyz(smiles_str, optimize=True, hydrogen=True):
             AllChem.UFFOptimizeMolecule(mol_full)
 
         if hydrogen:
+            if reorder_hydrogens:
+                reordering = []
+                for atom in mol_full.GetAtoms():
+                    # add non-hydrogen atom
+                    if (atom.GetAtomicNum() != 1 and
+                            atom.GetIdx() not in reordering):
+                        reordering.append(atom.GetIdx())
+                        for nbr in atom.GetNeighbors():
+                            # add neighboring hydrogen atoms
+                            if (nbr.GetAtomicNum() == 1 and
+                                    nbr.GetIdx() not in reordering):
+                                reordering.append(nbr.GetIdx())
+                for atom in mol_full.GetAtoms():
+                    # For completeness, add remaining atoms
+                    # This is necessary for e.g. H2 molecule
+                    if atom.GetIdx() not in reordering:
+                        reordering.append(atom.GetIdx())
+                assert_msg_critical(
+                    len(reordering) == mol_full.GetNumAtoms(),
+                    'Molecule.smiles_to_xyz: Invalid list of indices for reordering'
+                )
+                mol_full_reordered = Chem.RenumberAtoms(mol_full, reordering)
+                mol_full = mol_full_reordered
             return Chem.MolToXYZBlock(mol_full)
         else:
             return Chem.MolToXYZBlock(Chem.RemoveHs(mol_full))
@@ -107,12 +136,15 @@ def _Molecule_smiles_to_xyz(smiles_str, optimize=True, hydrogen=True):
 
 
 @staticmethod
-def _Molecule_read_smiles(smiles_str):
+def _Molecule_read_smiles(smiles_str, reorder_hydrogens=False):
     """
     Reads molecule from SMILES string.
 
     :param smiles_str:
         The SMILES string.
+    :param reorder_hydrogens:
+        Boolean indicating whether to reorder hydrogen atoms such that they are
+        close to their bonded neighbor.
 
     :return:
         The molecule.
@@ -121,7 +153,9 @@ def _Molecule_read_smiles(smiles_str):
     if '.' in smiles_str:
         # multi-components
         sub_xyzs = [
-            Molecule.smiles_to_xyz(sub_smiles_str, optimize=True)
+            Molecule.smiles_to_xyz(sub_smiles_str,
+                                   optimize=True,
+                                   reorder_hydrogens=reorder_hydrogens)
             for sub_smiles_str in smiles_str.split('.')
         ]
         sub_mols = [Molecule.read_xyz_string(xyz) for xyz in sub_xyzs]
@@ -145,7 +179,9 @@ def _Molecule_read_smiles(smiles_str):
             mol = Molecule(mol, sub_mol)
     else:
         # single component
-        xyz = Molecule.smiles_to_xyz(smiles_str, optimize=True)
+        xyz = Molecule.smiles_to_xyz(smiles_str,
+                                     optimize=True,
+                                     reorder_hydrogens=reorder_hydrogens)
         mol = Molecule.read_xyz_string(xyz)
 
     mol_chg = Molecule.smiles_formal_charge(smiles_str)

@@ -1400,8 +1400,25 @@ class TestMolecule:
     def test_read_smiles_with_multi_components(self):
 
         mol = Molecule.read_smiles('CCO.C1CCCC1.c1ccccc1')
-
         assert mol.number_of_atoms() == 36
+
+    @pytest.mark.skipif("rdkit" not in sys.modules,
+                        reason="rdkit not available")
+    def test_read_smiles_with_reorder_hydrogens(self):
+
+        # with reorder_hydrogens, the first atom will be C and
+        # the second atom will be H
+        mol = Molecule.read_smiles('CCO', reorder_hydrogens=True)
+        labels = mol.get_labels()
+        assert labels[0] != 'H'
+        assert labels[1] == 'H'
+        assert labels[2] == 'H'
+
+        # H2 molecule
+        mol = Molecule.read_smiles('[H][H]', reorder_hydrogens=True)
+        labels = mol.get_labels()
+        assert labels[0] == 'H'
+        assert labels[1] == 'H'
 
     @pytest.mark.skipif("rdkit" not in sys.modules,
                         reason="rdkit not available")
