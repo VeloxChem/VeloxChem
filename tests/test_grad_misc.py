@@ -11,6 +11,7 @@ from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfgradientdriver import ScfGradientDriver
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
+from veloxchem.scfrestopendriver import ScfRestrictedOpenDriver
 
 
 @pytest.mark.solvers
@@ -78,6 +79,15 @@ class TestScfGradientDriverMiscellaneous:
         scf_results = scf_drv.compute(molecule, basis)
         return scf_drv, scf_results
 
+    @staticmethod
+    def run_restricted_openshell_scf(molecule, basis, xcfun='hf'):
+
+        scf_drv = ScfRestrictedOpenDriver()
+        scf_drv.ostream.mute()
+        scf_drv.xcfun = xcfun
+        scf_results = scf_drv.compute(molecule, basis)
+        return scf_drv, scf_results
+
     def test_compute_uses_internal_scf_results_for_numerical_gradient(
             self, monkeypatch):
 
@@ -109,15 +119,13 @@ class TestScfGradientDriverMiscellaneous:
     def test_compute_rejects_restricted_openshell_marker(self):
 
         molecule, basis = self.get_h2_molecule_and_basis()
-        scf_drv, scf_results = self.run_restricted_scf(molecule, basis)
+        scf_drv, scf_results = self.run_restricted_openshell_scf(
+            molecule, basis)
         grad_drv = ScfGradientDriver(scf_drv)
-
-        invalid_results = dict(scf_results)
-        invalid_results['scf_type'] = 'restricted_openshell'
 
         with pytest.raises(AssertionError,
                            match='Not implemented for restricted open-shell'):
-            grad_drv.compute(molecule, basis, invalid_results)
+            grad_drv.compute(molecule, basis)
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='skip pytest.raises for multiple MPI processes')
@@ -182,7 +190,7 @@ class TestScfGradientDriverMiscellaneous:
 
         assert np.max(np.abs(grad_drv.get_gradient())) > 0.0
 
-    def test_compute_energy_updates_results_and_restart_mode(self):
+    def test_compute_energy_and_restart_mode(self):
 
         molecule, basis = self.get_h2_molecule_and_basis()
         scf_drv, scf_results = self.run_restricted_scf(molecule, basis)
@@ -197,14 +205,10 @@ class TestScfGradientDriverMiscellaneous:
 
         scf_drv.compute = wrapped_compute
 
-        updated_results = {'sentinel': 'keep'}
-        energy = grad_drv.compute_energy(molecule, basis, updated_results)
+        energy = grad_drv.compute_energy(molecule, basis)
 
         assert restart_states == [True]
         assert np.isclose(energy, scf_drv.get_scf_energy())
-        if grad_drv.rank == mpi_master():
-            assert 'scf_energy' in updated_results
-            assert updated_results['sentinel'] == 'keep'
 
         grad_drv.numerical = True
         grad_drv.compute_energy(molecule, basis)
