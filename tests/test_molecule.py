@@ -1397,6 +1397,14 @@ class TestMolecule:
 
     @pytest.mark.skipif("rdkit" not in sys.modules,
                         reason="rdkit not available")
+    def test_read_smiles_with_multi_components(self):
+
+        mol = Molecule.read_smiles('CCO.C1CCCC1.c1ccccc1')
+
+        assert mol.number_of_atoms() == 36
+
+    @pytest.mark.skipif("rdkit" not in sys.modules,
+                        reason="rdkit not available")
     def test_draw_2d_uses_display(self, monkeypatch):
 
         ipython_display = pytest.importorskip("IPython.display")

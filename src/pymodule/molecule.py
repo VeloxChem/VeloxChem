@@ -118,8 +118,35 @@ def _Molecule_read_smiles(smiles_str):
         The molecule.
     """
 
-    xyz = Molecule.smiles_to_xyz(smiles_str, optimize=True)
-    mol = Molecule.read_xyz_string(xyz)
+    if '.' in smiles_str:
+        # multi-components
+        sub_xyzs = [
+            Molecule.smiles_to_xyz(sub_smiles_str, optimize=True)
+            for sub_smiles_str in smiles_str.split('.')
+        ]
+        sub_mols = [Molecule.read_xyz_string(xyz) for xyz in sub_xyzs]
+
+        mol = sub_mols[0]
+        for sub_mol in sub_mols[1:]:
+            center_a = mol.center_of_mass_in_bohr()
+            coords_a = mol.get_coordinates_in_bohr()
+
+            center_b = sub_mol.center_of_mass_in_bohr()
+            coords_b = sub_mol.get_coordinates_in_bohr()
+
+            translate = center_a - center_b
+            translate[0] += np.max(coords_a[:, 0]) - center_a[0]
+            translate[0] += center_b[0] - np.min(coords_b[:, 0])
+            translate[0] += 10.0  # add a space of 10 Bohr
+
+            for idx in range(coords_b.shape[0]):
+                sub_mol.set_atom_coordinates(idx, coords_b[idx] + translate)
+
+            mol = Molecule(mol, sub_mol)
+    else:
+        # single component
+        xyz = Molecule.smiles_to_xyz(smiles_str, optimize=True)
+        mol = Molecule.read_xyz_string(xyz)
 
     mol_chg = Molecule.smiles_formal_charge(smiles_str)
     mol.set_charge(mol_chg)
