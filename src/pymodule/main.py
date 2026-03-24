@@ -369,19 +369,39 @@ def main():
         else:
             scf_drv = select_scf_driver(task, scf_type)
             scf_drv.update_settings(scf_dict, method_dict)
-            scf_results = scf_drv.compute(task.molecule, task.ao_basis,
-                                          task.min_basis)
 
-            mol_orbs = scf_drv.molecular_orbitals
-            density = scf_drv.density
+            # For SCF geometry optimization, a common use case is to continue
+            # from a checkpoint. Here we check if this is the case, and if so,
+            # SCF for the input geometry will be skipped and will be taken care
+            # of by the optimization driver.
+            use_checkpoint_geometry = False
 
-            if not scf_drv.is_converged:
-                return
+            if task_type == 'optimize':
+                opt_dict = (dict(task.input_dict['optimize'])
+                            if 'optimize' in task.input_dict else {})
+                # not an excited state geometry optimization
+                if 'response' not in task.input_dict:
+                    # restart is default or True for optimization driver
+                    if ('restart' not in opt_dict) or opt_dict['restart']:
+                        # check validity of checkpoint
+                        use_checkpoint_geometry = scf_drv.validate_checkpoint(
+                            task.molecule.get_element_ids(),
+                            task.ao_basis.get_label(), scf_drv.scf_type)
 
-            if (scf_drv.electric_field is not None and
-                    task.molecule.get_charge() != 0):
-                task.finish()
-                return
+            if not use_checkpoint_geometry:
+                scf_results = scf_drv.compute(task.molecule, task.ao_basis,
+                                              task.min_basis)
+
+                mol_orbs = scf_drv.molecular_orbitals
+                density = scf_drv.density
+
+                if not scf_drv.is_converged:
+                    return
+
+                if (scf_drv.electric_field is not None and
+                        task.molecule.get_charge() != 0):
+                    task.finish()
+                    return
 
     # Gradient
 

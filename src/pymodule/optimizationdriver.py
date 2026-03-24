@@ -62,6 +62,7 @@ from .mmgradientdriver import MMGradientDriver
 from .inputparser import (parse_input, print_keywords,
                           get_random_string_parallel, unparse_input,
                           read_unparsed_input_from_hdf5)
+from .checkpoint import read_molecule_and_basis
 from .errorhandler import assert_msg_critical
 
 with redirect_stderr(StringIO()) as fg_err:
@@ -125,6 +126,8 @@ class OptimizationDriver:
 
         self.filename = None
 
+        self.restart = True
+
         self._debug = False
 
         # input keywords
@@ -142,6 +145,7 @@ class OptimizationDriver:
                 'hessian': ('str_lower', 'hessian flag'),
                 'ref_xyz': ('str', 'reference geometry'),
                 'keep_files': ('bool', 'flag to keep output files'),
+                'restart': ('bool', 'flag to restart from checkpoint'),
                 'conv_maxiter':
                     ('bool', 'consider converged if max_iter is reached'),
                 'conv_energy': ('float', ''),
@@ -163,9 +167,7 @@ class OptimizationDriver:
         """
 
         if hasattr(self.grad_drv, 'scf_driver'):
-            return isinstance(self.grad_drv.scf_driver,
-                              (ScfRestrictedDriver, ScfUnrestrictedDriver,
-                               ScfRestrictedOpenDriver))
+            return isinstance(self.grad_drv, ScfGradientDriver)
         else:
             return False
 
@@ -263,7 +265,7 @@ class OptimizationDriver:
             The same arguments as the "compute" function of the gradient driver.
 
         :return:
-            The tuple with final geometry, and energy of molecule.
+            A dictionary containing the results of the geometry optimization.
         """
 
         # update hessian option for transition state search
@@ -287,6 +289,22 @@ class OptimizationDriver:
         self.ostream.flush()
 
         start_time = tm.time()
+
+        if self.is_scf:
+            basis = args[0]
+            if self.restart:
+                valid_chkpnt = self.grad_drv.scf_driver.validate_checkpoint(
+                    molecule.get_element_ids(), basis.get_label(),
+                    self.grad_drv.scf_driver.scf_type)
+                if valid_chkpnt:
+                    if self.rank == mpi_master():
+                        molecule, basis = read_molecule_and_basis(
+                            self.grad_drv.scf_driver.get_checkpoint_file())
+                    molecule = self.comm.bcast(molecule, root=mpi_master())
+                    self.ostream.print_info(
+                        'Reading molecular geometry from checkpoint file...')
+                    self.ostream.print_blank()
+                    self.ostream.flush()
 
         opt_engine = OptimizationEngine(self.grad_drv, molecule, *args)
 
