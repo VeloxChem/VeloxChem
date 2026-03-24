@@ -282,7 +282,7 @@ class RixsDriver(LinearSolver):
 
             for key in rsp_keys:
                 if hasattr(self, key):
-                    setattr(rsp_drv, key, getattr(self, key))
+                    setattr(core_rsp_drv, key, getattr(self, key))
 
             core_rsp_drv.frequencies = self.photon_energy
             #core_rsp_drv.property = 'absorption'
@@ -485,9 +485,6 @@ class RixsDriver(LinearSolver):
                 rsp_results=None, cvs_rsp_results=None):
         self._approach_string = 'Running RIXS calculation in the two-shot hybrid (CPP-SOS) approach'
 
-        if self.rank == mpi_master():
-            self._print_header(molecule)
-
         if rsp_results is None:
 
             rsp_keys = [
@@ -527,13 +524,13 @@ class RixsDriver(LinearSolver):
                 ]
                 
                 core_rsp_drv = ComplexResponseSolver(self.comm, self.ostream)
-                core_rsp_drv.frequencies = self.photon_energy
 
                 for key in rsp_keys:
                     if hasattr(self, key):
                         setattr(core_rsp_drv, key, getattr(self, key))
 
                 #core_rsp_drv.property = 'absorption'
+                core_rsp_drv.frequencies = self.photon_energy
                 # given broadening is FWHM but CPP-driver takes HWHM -> HWHM
                 core_rsp_drv.damping = self.gamma / 2
                 
@@ -554,6 +551,9 @@ class RixsDriver(LinearSolver):
                 core_rsp_results = core_rsp_drv.compute(molecule, basis, scf_results)
                 self.ostream.print_info('...done.')
 
+        if self.rank == mpi_master():
+            self._print_header(molecule)
+        
         nocc = molecule.number_of_alpha_electrons()
         norb = scf_results['C_alpha'].shape[1]
         nvir = norb - nocc
@@ -571,17 +571,6 @@ class RixsDriver(LinearSolver):
         self.elastic_cross_sections = np.zeros((len(self.photon_energy)))
         self.scattering_amplitudes  = np.zeros((num_final_states, len(self.photon_energy),
                                                3, 3), dtype=complex)
-
-        # Store state and orbital information used in computation
-        #self._orb_and_state_dict = {
-            #'num_intermediate_states': num_intermediate_states,
-        #    'num_final_states': num_final_states,
-        #    'mo_core_indices': mo_core_indices,
-        #    'mo_valence_indices': mo_val_indices,
-        #    'mo_virtual_indices': mo_vir_indices,
-        #    'core_states': core_states,
-        #    'valence_states': val_states,
-        #}
         
         if self.rank == mpi_master():
             dipole_integrals = np.array(compute_electric_dipole_integrals(molecule, basis, [0.0,0.0,0.0]))
@@ -592,7 +581,7 @@ class RixsDriver(LinearSolver):
         # TODO: make stable for len(self.photon_energy) = 1
         for n_ind, w_ex in enumerate(self.photon_energy):
             #core_vecs = {comp: self.lrvec2mat(self.get_full_solution_vector(core_rsp_results['solutions'][(comp, w_ex)]), nocc, norb) for comp in components}
-            core_mats = [self.get_full_solution_vector(core_rsp_results['solutions'][(comp, w_ex)]) for comp in components]
+            core_mats = [core_rsp_drv.get_full_solution_vector(core_rsp_results['solutions'][(comp, w_ex)]) for comp in components]
             
             #z_mat = eigvec[:eigvec.size // 2].reshape(nocc, -1)
             #y_mat = eigvec[eigvec.size // 2:].reshape(nocc, -1)
