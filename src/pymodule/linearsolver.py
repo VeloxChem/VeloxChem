@@ -737,6 +737,53 @@ class LinearSolver:
 
         return nstates
 
+    def _add_frequencies_to_checkpoint(self):
+        """
+        Add frequencies to checkpoint file.
+        """
+
+        # For LR/CPP
+
+        if self.checkpoint_file is None:
+            return
+
+        if self.rank == mpi_master():
+            hf = h5py.File(self.checkpoint_file, 'a')
+            key = 'frequencies'
+            if key in hf:
+                del hf[key]
+            hf.create_dataset(key, data=np.array(self.frequencies))
+            hf.close()
+
+        self.comm.barrier()
+
+    def _read_frequencies_from_checkpoint(self):
+        """
+        Read frequencies from checkpoint file.
+
+        :return:
+            The frequencies.
+        """
+
+        # For LR/CPP
+
+        if self.checkpoint_file is None:
+            return None
+
+        frequencies = None
+
+        if self.rank == mpi_master():
+            hf = h5py.File(self.checkpoint_file, 'r')
+            key = 'frequencies'
+            if key in hf:
+                frequencies = np.array(hf.get(key))
+                frequencies = [float(x) for x in frequencies]
+            hf.close()
+
+        frequencies = self.comm.bcast(frequencies, root=mpi_master())
+
+        return frequencies
+
     def compute(self, molecule, basis, scf_results, v_grad=None):
         """
         Solves for the linear equations.

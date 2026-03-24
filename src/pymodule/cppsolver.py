@@ -270,10 +270,91 @@ class ComplexResponseSolver(ComplexResponseSolverBase):
                                               basis, dft_dict, pe_dict)
             self.restart = self.comm.bcast(self.restart, root=mpi_master())
 
+        # read initial guess from restart file
         if self.restart:
-            # read initial guess from restart file
             self._read_checkpoint(rsp_vector_labels)
-            # TODO: handle restarting with different frequencies
+
+            checkpoint_frequencies = self._read_frequencies_from_checkpoint()
+
+            # Note that we only handle the restart with additional frequencies when
+            # `self.nonlinear` is inactive
+
+            # print warning if frequencies is not present in the restart file
+            if checkpoint_frequencies is None and not self.nonlinear:
+                self.ostream.print_warning(
+                    'Could not find the frequencies key in the checkpoint file.'
+                )
+                self.ostream.print_blank()
+                self.ostream.print_info(
+                    'Assuming that frequencies is not changed before and after '
+                    + 'the restart.')
+                self.ostream.print_blank()
+                self.ostream.flush()
+
+            # generate necessary initial guesses if more frequencies are requested
+            # in a restart calculation
+            elif not self.nonlinear:
+                extra_freqs = []
+                for w in self.frequencies:
+                    if w not in checkpoint_frequencies:
+                        extra_freqs.append(w)
+
+                if extra_freqs:
+                    self.ostream.print_info(
+                        f'Generating initial guesses for {len(extra_freqs)} ' +
+                        'more frequencies...')
+                    self.ostream.print_blank()
+
+                    if self.rank == mpi_master():
+                        extra_v_grad = {
+                            (op, w): v
+                            for op, v in zip(self.b_components, b_grad)
+                            for w in extra_freqs
+                        }
+                        extra_op_freq_keys = list(extra_v_grad.keys())
+                    else:
+                        extra_op_freq_keys = None
+                    extra_op_freq_keys = self.comm.bcast(extra_op_freq_keys,
+                                                         root=mpi_master())
+
+                    extra_precond = {
+                        w: self._get_precond(orb_ene, nocc, norb, w, d)
+                        for w in extra_freqs
+                    }
+
+                    extra_dist_rhs = {}
+                    for key in extra_op_freq_keys:
+                        if self.rank == mpi_master():
+                            gradger, gradung = self._decomp_grad(
+                                extra_v_grad[key])
+                            grad_mat = np.hstack((
+                                gradger.real.reshape(-1, 1),
+                                gradung.real.reshape(-1, 1),
+                                gradung.imag.reshape(-1, 1),
+                                gradger.imag.reshape(-1, 1),
+                            ))
+                            rhs_mat = np.hstack((
+                                gradger.real.reshape(-1, 1),
+                                gradung.real.reshape(-1, 1),
+                                -gradung.imag.reshape(-1, 1),
+                                -gradger.imag.reshape(-1, 1),
+                            ))
+                        else:
+                            grad_mat = None
+                            rhs_mat = None
+                        dist_grad[key] = DistributedArray(grad_mat, self.comm)
+                        extra_dist_rhs[key] = DistributedArray(
+                            rhs_mat, self.comm)
+
+                    bger, bung = self._setup_trials(extra_dist_rhs,
+                                                    extra_precond)
+
+                    profiler.set_timing_key('Preparation')
+
+                    self._e2n_half_size(bger, bung, molecule, basis,
+                                        scf_results, eri_dict, dft_dict,
+                                        pe_dict, profiler)
+
         else:
             # generate initial guess from scratch
             bger, bung = self._setup_trials(dist_rhs, precond)
@@ -424,6 +505,7 @@ class ComplexResponseSolver(ComplexResponseSolverBase):
             if self.force_checkpoint:
                 self._write_checkpoint(molecule, basis, dft_dict, pe_dict,
                                        rsp_vector_labels)
+                self._add_frequencies_to_checkpoint()
 
             # creating new sigma and rho linear transformations
             self._e2n_half_size(new_trials_ger, new_trials_ung, molecule, basis,
@@ -438,6 +520,7 @@ class ComplexResponseSolver(ComplexResponseSolverBase):
 
         self._write_checkpoint(molecule, basis, dft_dict, pe_dict,
                                rsp_vector_labels)
+        self._add_frequencies_to_checkpoint()
 
         # converged?
         if self.rank == mpi_master():
