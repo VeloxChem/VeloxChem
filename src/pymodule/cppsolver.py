@@ -355,8 +355,8 @@ class ComplexResponseSolver(ComplexResponseSolverBase):
                                         scf_results, eri_dict, dft_dict,
                                         pe_dict, profiler)
 
+        # generate initial guess from scratch
         else:
-            # generate initial guess from scratch
             bger, bung = self._setup_trials(dist_rhs, precond)
 
             profiler.set_timing_key('Preparation')
