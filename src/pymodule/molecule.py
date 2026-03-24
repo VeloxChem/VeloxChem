@@ -729,12 +729,12 @@ def _Molecule_set_distance(self,
     i = distance_indices_one_based[0] - 1
     j = distance_indices_one_based[1] - 1
 
-    # disconnect i-j and find all atoms that at connected to j
+    # disconnect i-j and find all atoms that are connected to j
     connectivity_matrix = self.get_connectivity_matrix()
     connectivity_matrix[i, j] = 0
     connectivity_matrix[j, i] = 0
 
-    atoms_connected_to_j = self._find_connected_atoms(j, connectivity_matrix)
+    atoms_connected_to_j = self.find_connected_atoms(j, connectivity_matrix)
 
     assert_msg_critical(
         i not in atoms_connected_to_j,
@@ -901,7 +901,7 @@ def _Molecule_set_angle(self,
     connectivity_matrix[i, j] = 0
     connectivity_matrix[j, i] = 0
 
-    atoms_connected_to_j = self._find_connected_atoms(j, connectivity_matrix)
+    atoms_connected_to_j = self.find_connected_atoms(j, connectivity_matrix)
 
     assert_msg_critical(
         i not in atoms_connected_to_j, 'Molecule.set_angle: Cannot set angle ' +
@@ -1076,7 +1076,7 @@ def _Molecule_set_dihedral(self,
     connectivity_matrix[i, j] = 0
     connectivity_matrix[j, i] = 0
 
-    atoms_connected_to_j = self._find_connected_atoms(j, connectivity_matrix)
+    atoms_connected_to_j = self.find_connected_atoms(j, connectivity_matrix)
 
     assert_msg_critical(
         i not in atoms_connected_to_j,
@@ -1896,7 +1896,7 @@ def _Molecule_contains_water_molecule(self):
         if labels[i] != 'O':
             continue
 
-        connected_atoms = self._find_connected_atoms(i, conn)
+        connected_atoms = self.find_connected_atoms(i, conn)
         if len(connected_atoms) != 3:
             continue
 
@@ -2012,9 +2012,9 @@ def _Molecule_builder():
 
 
 Molecule._get_input_keywords = _Molecule_get_input_keywords
-Molecule._find_connected_atoms = _Molecule_find_connected_atoms
 Molecule._rotate_around_vector = _Molecule_rotate_around_vector
 
+Molecule.find_connected_atoms = _Molecule_find_connected_atoms
 Molecule.smiles_formal_charge = _Molecule_smiles_formal_charge
 Molecule.smiles_to_xyz = _Molecule_smiles_to_xyz
 Molecule.read_gro_file = _Molecule_read_gro_file

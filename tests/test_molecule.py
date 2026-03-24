@@ -925,13 +925,13 @@ class TestMolecule:
         assert np.array_equal(mol.get_connectivity_matrix(H2_factor=1.3),
                               np.array([[0, 0], [0, 0]]))
 
-    def test_find_connected_atoms(self):
+    def testfind_connected_atoms(self):
 
         mol = Molecule.read_str(self.nh3_h2o_xyzstr(), 'au')
         connectivity = mol.get_connectivity_matrix()
 
-        assert mol._find_connected_atoms(0, connectivity) == {0, 1, 2, 3}
-        assert mol._find_connected_atoms(4, connectivity) == {4, 5, 6}
+        assert mol.find_connected_atoms(0, connectivity) == {0, 1, 2, 3}
+        assert mol.find_connected_atoms(4, connectivity) == {4, 5, 6}
 
     def test_coordinates_in_bohr(self):
 
