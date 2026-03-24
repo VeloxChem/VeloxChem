@@ -150,3 +150,48 @@ class TestMMForceFieldGenerator:
                     data[key].append(valstr)
 
         return data
+
+    @pytest.mark.skipif('rdkit' not in sys.modules,
+                        reason='rdkit not available')
+    def test_ffgen_set_params_and_get_params(self):
+
+        mol = Molecule.read_smiles('C=COC')
+
+        ff_gen = MMForceFieldGenerator()
+        ff_gen.ostream.mute()
+        ff_gen.create_topology(mol, resp=False)
+
+        assert ff_gen.get_bond_params((1, 2)) == ff_gen.bonds[(0, 1)]
+        assert ff_gen.get_angle_params((3, 2, 7)) == ff_gen.angles[(2, 1, 6)]
+        assert ff_gen.get_dihedral_params(
+            (6, 1, 2, 7)) == ff_gen.dihedrals[(5, 0, 1, 6)]
+
+        bond_params = {
+            'type': 'harmonic',
+            'force_constant': 5.0e+5,
+            'equilibrium': 0.2,
+        }
+        angle_params = {
+            'type': 'harmonic',
+            'force_constant': 450.0,
+            'equilibrium': 100.0,
+        }
+        dihedral_params = {
+            'type': 'Fourier',
+            'multiple': False,
+            'barrier': 20.0,
+            'phase': 0.0,
+            'periodicity': 2,
+        }
+
+        assert ff_gen.get_bond_params((1, 2)) != bond_params
+        assert ff_gen.get_angle_params((3, 2, 7)) != angle_params
+        assert ff_gen.get_dihedral_params((6, 1, 2, 7)) != dihedral_params
+
+        ff_gen.set_bond_params((1, 2), bond_params)
+        ff_gen.set_angle_params((3, 2, 7), angle_params)
+        ff_gen.set_dihedral_params((6, 1, 2, 7), dihedral_params)
+
+        assert ff_gen.get_bond_params((1, 2)) == bond_params
+        assert ff_gen.get_angle_params((3, 2, 7)) == angle_params
+        assert ff_gen.get_dihedral_params((6, 1, 2, 7)) == dihedral_params
