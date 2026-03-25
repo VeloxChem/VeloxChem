@@ -8,6 +8,7 @@ from mpi4py import MPI
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
+from veloxchem.outputstream import OutputStream
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
 from veloxchem.dispersionmodel import DispersionModel
@@ -507,3 +508,108 @@ class TestScfDriverMiscellaneous:
         if self.is_master():
             assert np.allclose(scf_drv_copy.scf_results['D_alpha'],
                                scf_drv.scf_results['D_alpha'])
+
+    def test_guess_unpaired_electrons_warning_for_restricted(self, tmp_path):
+
+        molecule, basis = self.get_water_and_basis()
+
+        comm = MPI.COMM_WORLD
+        ostream = OutputStream.create_mpi_ostream(
+            comm, str(tmp_path / 'guess_restricted.out'))
+
+        scf_drv = ScfRestrictedDriver(comm, ostream)
+        scf_drv.guess_unpaired_electrons = '1(1.0)'
+        scf_drv.max_iter = 2
+        scf_drv.conv_thresh = 1.0e-12
+
+        scf_results = scf_drv.compute(molecule, basis)
+
+        assert scf_results is None
+        if self.is_master():
+            output = (tmp_path / 'guess_restricted.out').read_text()
+            assert 'Ignoring "guess_unpaired_electrons" in spin-restricted SCF calculation.' in output
+
+    def test_guess_unpaired_electrons_are_parsed_for_unrestricted(
+            self, tmp_path):
+
+        molecule, basis = self.get_water_and_basis()
+        molecule.set_charge(1)
+        molecule.set_multiplicity(2)
+
+        comm = MPI.COMM_WORLD
+        ostream = OutputStream.create_mpi_ostream(
+            comm, str(tmp_path / 'guess_unrestricted.out'))
+
+        scf_drv = ScfUnrestrictedDriver(comm, ostream)
+        scf_drv.guess_unpaired_electrons = '1(1.0), 2(-0.5)'
+        scf_drv.max_iter = 2
+        scf_drv.conv_thresh = 1.0e-12
+
+        scf_results = scf_drv.compute(molecule, basis)
+
+        assert scf_results is None
+        if self.is_master():
+            output = (tmp_path / 'guess_unrestricted.out').read_text()
+            assert 'Generating initial guess with user-provided information...' in output
+            assert '1.0 unpaired alpha electrons on atom 1 (O)' in output
+            assert '0.5 unpaired beta  electrons on atom 2 (H)' in output
+
+    def test_level_shifting_and_pfon_real_scf(self, tmp_path):
+
+        molecule, basis = self.get_water_and_basis()
+
+        comm = MPI.COMM_WORLD
+        ostream = OutputStream.create_mpi_ostream(
+            comm, str(tmp_path / 'level_pfon.out'))
+
+        scf_drv = ScfRestrictedDriver(comm, ostream)
+        scf_drv.acc_type = 'diis'
+        scf_drv.level_shifting = 0.2
+        scf_drv.level_shifting_delta = 0.5
+        scf_drv.pfon = True
+        scf_drv.pfon_temperature = 100
+        scf_drv.pfon_delta_temperature = 50
+        scf_drv.max_iter = 2
+        scf_drv.conv_thresh = 1.0e-12
+
+        scf_results = scf_drv.compute(molecule, basis)
+
+        assert scf_results is None
+        assert len(scf_drv.history) == 3
+        assert scf_drv.pfon_temperature == 0
+        assert scf_drv.level_shifting == 0.0
+        if self.is_master():
+            output = (tmp_path / 'level_pfon.out').read_text()
+            assert 'Applying level-shifting' in output
+            assert 'Applying pseudo-FON' in output
+
+    def test_density_damping_changes_real_scf_trajectory(self):
+
+        molecule, basis = self.get_water_and_basis()
+
+        ref_drv = ScfRestrictedDriver()
+        ref_drv.ostream.mute()
+        ref_drv.acc_type = 'diis'
+        ref_drv.max_iter = 2
+        ref_drv.conv_thresh = 1.0e-12
+        ref_results = ref_drv.compute(molecule, basis)
+
+        damped_drv = ScfRestrictedDriver()
+        damped_drv.ostream.mute()
+        damped_drv.acc_type = 'diis'
+        damped_drv.max_iter = 2
+        damped_drv.conv_thresh = 1.0e-12
+        damped_drv.density_damping = True
+        damped_results = damped_drv.compute(molecule, basis)
+
+        assert ref_results is None
+        assert damped_results is None
+        assert len(ref_drv.history) == len(damped_drv.history) == 3
+
+        if self.is_master():
+            ref_energies = np.array([step['energy'] for step in ref_drv.history])
+            damped_energies = np.array(
+                [step['energy'] for step in damped_drv.history])
+            assert np.max(np.abs(ref_energies - damped_energies)) > 1.0e-4
+            assert np.max(np.abs(ref_drv.density[0] -
+                                 damped_drv.density[0])) > 1.0e-4

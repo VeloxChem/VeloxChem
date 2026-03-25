@@ -1703,6 +1703,7 @@ class ScfDriver:
                     fock_mat[1] = np.linalg.multi_dot(
                         [S, C_beta, fmo_b, C_beta.T, S])
 
+            if self.level_shifting > 0.0 and i > 0:
                 self.level_shifting -= self.level_shifting_delta
                 if self.level_shifting < 0.0:
                     self.level_shifting = 0.0

@@ -8,6 +8,7 @@ from veloxchem.veloxchemlib import mpi_master
 from veloxchem.dispersionmodel import DispersionModel
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
+from veloxchem.outputstream import OutputStream
 from veloxchem.scfgradientdriver import ScfGradientDriver
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
@@ -113,6 +114,22 @@ class TestScfGradientDriverMiscellaneous:
         assert seen['basis'] is basis
         assert seen['scf_results'] is scf_drv.scf_results
         assert np.allclose(grad_drv.get_gradient(), 0.0)
+
+    def test_compute_runs_internal_scf_when_results_missing(self):
+
+        molecule, basis = self.get_h2_molecule_and_basis()
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_drv.xcfun = 'hf'
+
+        grad_drv = ScfGradientDriver(scf_drv)
+        grad_drv.compute(molecule, basis)
+
+        assert scf_drv.scf_results is not None
+        if scf_drv.rank == mpi_master():
+            assert scf_drv.scf_results['scf_type'] == 'restricted'
+        assert np.max(np.abs(grad_drv.get_gradient())) > 0.0
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='skip pytest.raises for multiple MPI processes')
@@ -248,6 +265,50 @@ class TestScfGradientDriverMiscellaneous:
                            match='Cannot use SMD in gradient calculation'):
             grad_drv.compute_analytical_unrestricted(molecule, basis,
                                                      scf_results)
+
+    def test_unrestricted_cpcm_gradient_and_timing_output(self, tmp_path):
+
+        molstr = """
+        N         -1.96309        1.59755       -0.01963
+        H         -1.95876        2.61528        0.03109
+        H         -2.48929        1.27814        0.79244
+        H         -2.52930        1.35928       -0.83265
+        """
+        molecule = Molecule.read_molecule_string(molstr, units='bohr')
+        molecule.set_charge(1)
+        molecule.set_multiplicity(2)
+        basis = MolecularBasis.read(molecule, 'def2-svp', ostream=None)
+
+        output_file = tmp_path / 'unrestricted_cpcm_gradient.out'
+        comm = MPI.COMM_WORLD
+        output_file = comm.bcast(output_file, root=mpi_master())
+        ostream = OutputStream.create_mpi_ostream(comm, str(output_file))
+
+        scf_drv = ScfUnrestrictedDriver(comm, ostream)
+        scf_drv.xcfun = 'hf'
+        scf_drv.solvation_model = 'cpcm'
+        scf_drv.cpcm_grid_per_sphere = (110, 110)
+        scf_drv.timing = True
+
+        scf_results = scf_drv.compute(molecule, basis)
+
+        grad_drv = ScfGradientDriver(scf_drv)
+        grad_drv.compute(molecule, basis, scf_results)
+
+        ref_grad = np.array([
+            [-2.50053996, 1.05721786, 0.11437744],
+            [-0.09280072, -2.53390389, -0.12426393],
+            [1.24618117, 0.84073729, -2.04587895],
+            [1.34715952, 0.63594873, 2.05576544],
+        ])
+
+        assert np.max(np.abs(grad_drv.get_gradient() - ref_grad)) < 1.0e-4
+
+        ostream.close()
+        if scf_drv.rank == mpi_master():
+            output_text = output_file.read_text()
+            assert 'Gradient timing decomposition' in output_text
+            assert 'CPCM_grad' in output_text
 
     @pytest.mark.skipif(not DispersionModel.is_available(),
                         reason='dftd4-python not available')
