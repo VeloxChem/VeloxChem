@@ -179,6 +179,7 @@ from .rspc6 import C6
 from .rspshg import SHG
 from .rsptpa import TPA
 from .rixsdriver import RixsDriver
+from .xpsdriver import XPSDriver
 from .localizationdriver import LocalizationDriver
 #from .rspcustomproperty import CustomProperty
 from .mpitask import MpiTask

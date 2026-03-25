@@ -56,7 +56,7 @@ except ImportError:
 
 class ValetAnalyzer:
     """
-    Visual Analysis of Electronic Transitionss (VALET).
+    Visual Analysis of Electronic Transitions (VALET).
     
     Implements NTO (Natural Transition Orbital) analysis, transition matrix
     calculation, and interactive visualization of excited state properties.
@@ -73,8 +73,8 @@ class ValetAnalyzer:
         """
         self.density_isovalue = 0.002
         self.density_opacity = 0.7
-        self.detachment_color = "#FFFFFF"  # White
-        self.attachment_color = "#FFFFFF"  # White
+        self.detachment_color = "#009966"  # Green
+        self.attachment_color = "#993399"  # Red
         
         # Results and molecular data
         self._molecule = None
@@ -611,6 +611,140 @@ class ValetAnalyzer:
 
         return fig, ax
     
+    def save_transition_diagram(self,
+                                scf_results,
+                                rsp_results,
+                                state_index=1,
+                                filename='transition_diagram.pdf',
+                                dpi=150,
+                                width=1000,
+                                height=800):
+        """
+        Save transition diagram(s) to a PDF file.
+
+        Only the subgroup transition diagram is exported (no density rendering).
+        The `state_index` argument accepts either a single state index or an
+        iterable of state indices, and each selected state is written as one
+        page in the output PDF.
+
+        :param scf_results:
+            The dictionary of results from converged SCF wavefunction.
+        :param rsp_results:
+            The dictionary containing the rsp results.
+        :param state_index:
+            One excited state index (1-based), or multiple indices.
+        :param filename:
+            Output PDF filename.
+        :param dpi:
+            Resolution for rendered pages.
+        :param width:
+            Diagram width in pixels.
+        :param height:
+            Diagram height in pixels. If `None`, uses `int(width * 0.6)`.
+
+        :return:
+            Written PDF filename.
+        """
+
+        assert_msg_critical('matplotlib' in sys.modules,
+                            'matplotlib is required for transition diagram export.')
+
+        assert_msg_critical(self._subgroups is not None,
+                            'ValetAnalyzer: subgroups are required for transition diagram.')
+
+        if height is None:
+            height = int(width * 0.6)
+
+        num_states = len(rsp_results['eigenvalues'])
+
+        if isinstance(state_index, (int, np.integer)):
+            state_indices = [int(state_index)]
+        else:
+            assert_msg_critical(not isinstance(state_index, (str, bytes)),
+                                'ValetAnalyzer: state_index must be an int or an iterable of ints.')
+            try:
+                state_indices = [int(idx) for idx in state_index]
+            except TypeError:
+                assert_msg_critical(False,
+                                    'ValetAnalyzer: state_index must be an int or an iterable of ints.')
+
+        assert_msg_critical(len(state_indices) > 0,
+                            'ValetAnalyzer: state_index cannot be empty.')
+
+        for idx in state_indices:
+            assert_msg_critical(1 <= idx <= num_states,
+                                f'ValetAnalyzer: Invalid state index {idx}.')
+
+        pdf_filename = str(filename)
+        if not pdf_filename.lower().endswith('.pdf'):
+            pdf_filename = f'{pdf_filename}.pdf'
+
+        import io
+        import math
+        from matplotlib.backends.backend_pdf import PdfPages
+
+        with PdfPages(pdf_filename) as pdf:
+            per_page = 4
+            for start in range(0, len(state_indices), per_page):
+                chunk = state_indices[start:start + per_page]
+                rows = min(2, max(1, math.ceil(len(chunk) / 2)))
+                cols = 2
+
+                page_fig, page_axes = plt.subplots(rows,
+                                                   cols,
+                                                   figsize=(11.69, 8.27),
+                                                   dpi=dpi)
+
+                axes = np.atleast_1d(page_axes).reshape(-1)
+                for ax in axes:
+                    ax.axis('off')
+
+                for ax, idx in zip(axes, chunk):
+                    trans_data = self.compute_transition_data(
+                        scf_results,
+                        rsp_results,
+                        self._subgroups,
+                        state_index=idx,
+                    )
+
+                    fig_diag, _ = self.plot_transition_diagram(
+                        trans_data,
+                        title=f'State {idx}',
+                        width=width,
+                        height=height,
+                        dpi=dpi,
+                    )
+
+                    buf = io.BytesIO()
+                    fig_diag.savefig(buf,
+                                     format='png',
+                                     dpi=dpi,
+                                     bbox_inches='tight',
+                                     facecolor='white')
+                    try:
+                        plt.close(fig_diag)
+                    except Exception:
+                        pass
+
+                    buf.seek(0)
+                    ax.imshow(plt.imread(buf))
+                    ax.axis('off')
+
+                page_fig.subplots_adjust(left=0.02,
+                                         right=0.98,
+                                         top=0.98,
+                                         bottom=0.02,
+                                         wspace=0.06,
+                                         hspace=0.10)
+
+                pdf.savefig(page_fig, dpi=dpi, bbox_inches='tight')
+                try:
+                    plt.close(page_fig)
+                except Exception:
+                    pass
+
+        return pdf_filename
+
     def show(self, scf_results, rsp_results, initial_state=1, aspect_ratio=0.6):
         """
         Display interactive viewer with transition diagram and density views.
