@@ -185,6 +185,9 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
         self.print_geometry(molecule)
         self.print_gradient(molecule, [self.state_deriv_index])
 
+        self.serenity_driver._invalidate_cache()
+        self.rsp_driver._invalidate_rsp_cache()
+
         self.ostream.print_blank()
         self.ostream.flush()
 
@@ -201,7 +204,6 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
 
         if self.rank != mpi_master():
             return None
-
 
         rsp_results = self.rsp_driver.compute(molecule, broadcast=False)
 
@@ -229,8 +231,8 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
 
         self._configure_excited_gradient_task(grad_task)
 
-        with self.serenity_driver._serenity_output_context():
-            grad_task.run()
+        # with self.serenity_driver._serenity_output_context():
+        grad_task.run()
 
         gradient = np.array(self.serenity_driver._system.getGeometry().getGradients(),
                             dtype=float)
@@ -276,6 +278,8 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
         if self.rsp_driver.small_grid_accuracy is not None:
             grad_task.settings.lrscfSettings.grid.smallGridAccuracy = int(
                 self.rsp_driver.small_grid_accuracy)
+        if self.rsp_driver.spinflip:
+            grad_task.settings.excMethod = 'sftda'
 
     def _extract_excitation_energy(self, rsp_results):
         eig = rsp_results['eigenvalues']
