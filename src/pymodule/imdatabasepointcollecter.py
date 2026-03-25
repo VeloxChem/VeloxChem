@@ -3762,7 +3762,7 @@ class IMDatabasePointCollecter:
             gi = g_im.ravel()
             denom = np.linalg.norm(gq) * np.linalg.norm(gi)
             cos_theta = 1.0 if denom < 1.0e-15 else float(np.dot(gq, gi) / denom)
-            print(e_diff)
+            print('xtb e_diff', e_diff)
             details[root] = {"e_diff_kcal_per_atom": e_diff, "g_rmsd": g_rmsd, "cos": cos_theta}
             if not (e_diff <= e_thr and g_rmsd <= g_thr and cos_theta >= c_thr):
                 all_ok = False
@@ -3911,7 +3911,7 @@ class IMDatabasePointCollecter:
                 current_state_difference[self.roots_to_follow[identification_state + e_idx]][1] = rmsd_gradient
                 current_state_difference[self.roots_to_follow[identification_state + e_idx]][2] = cos_theta
                 state_specific_gradients[self.roots_to_follow[identification_state + e_idx]] = [grad, self.impes_drivers[self.roots_to_follow[identification_state + e_idx]].impes_coordinate.gradient]
-
+ 
         if current_state_difference[self.current_state][0] > self.energy_threshold or current_state_difference[self.current_state][1] > self.gradient_rmsd_thrsh or current_state_difference[self.current_state][2] < self.force_orient_thrsh:
             print('The point would be added due to the thresholds')
             addition_of_state_specific_points.append(self.current_state)

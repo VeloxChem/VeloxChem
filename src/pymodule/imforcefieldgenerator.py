@@ -391,7 +391,7 @@ class IMForceFieldGenerator:
         self.identfy_relevant_int_coordinates = True
         self.add_gpr_model = True
         self.use_opt_confidence_radius = [False, 'single', 0.5, 0.3]
-        self.exclude_non_core = True
+        self.exclude_non_core = False
 
         self.imp_int_coordinates = []
 
@@ -983,7 +983,7 @@ class IMForceFieldGenerator:
                             conformers_plus_ts[0][dih_key].append((conformal_structures['molecules'][entry_idx + global_counter], 'normal'))
                             
                             for i in range(periodicity):
-                                mode = 'normal'
+                                mode = 'constraint'
                                 if i == 0:
                                     mode = 'transition'
                                 
@@ -1650,6 +1650,9 @@ class IMForceFieldGenerator:
                                 if mode == 'transition':
                                     transition = True
                                     constraints_global = []
+                                
+                                if mode == 'constraint':
+                                    constraints_global.append(dih_key)
 
                                 if self.use_minimized_structures[0]:       
                                     optimized_molecule = None

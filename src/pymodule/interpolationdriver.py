@@ -2005,237 +2005,519 @@ class InterpolationDriver():
         return weight_gradient
 
     
-    def trust_radius_weight_gradient(self, confidence_radius, distance):
+    # def trust_radius_weight_gradient(self, confidence_radius, distance):
         
 
-        denominator = (
-                (distance / confidence_radius)**(2 * self.exponent_p) +
-                (distance / confidence_radius)**(2 * self.exponent_q))
-        trust_radius_weight_gradient = -1.0 * ((( -2.0 * self.exponent_p * ((distance / confidence_radius)**(2 * self.exponent_p)) / confidence_radius) - 
-                                             (2.0 * self.exponent_q * ((distance / confidence_radius)**(2 * self.exponent_q) / confidence_radius))) / denominator**2)
+    #     denominator = (
+    #             (distance / confidence_radius)**(2 * self.exponent_p) +
+    #             (distance / confidence_radius)**(2 * self.exponent_q))
+    #     trust_radius_weight_gradient = -1.0 * ((( -2.0 * self.exponent_p * ((distance / confidence_radius)**(2 * self.exponent_p)) / confidence_radius) - 
+    #                                          (2.0 * self.exponent_q * ((distance / confidence_radius)**(2 * self.exponent_q) / confidence_radius))) / denominator**2)
+    #     return trust_radius_weight_gradient
+
+    
+    # def trust_radius_weight_gradient_gradient(self, confidence_radius, distance, distance_vector):
+        
+    #     # confidence_radius = datapoint.confidence_radius
+    #     # distance, _, _, _, distance_vector, _ = self.cartesian_distance(datapoint)
+    #     denominator = (
+    #             (distance / confidence_radius)**(2 * self.exponent_p) +
+    #             (distance / confidence_radius)**(2 * self.exponent_q))
+        
+        
+    #     trust_radius_weight_gradient_gradient_1_nominator = (((-4.0 * self.exponent_p**2 * distance_vector * distance**(2.0 * self.exponent_p - 2.0)) 
+    #                                             /(confidence_radius**(2.0 * self.exponent_p) * confidence_radius))
+    #                                             - (4.0 * self.exponent_q**2.0 * distance_vector * distance**(2.0 * self.exponent_q - 2.0)) 
+    #                                             /(confidence_radius**(2.0 * self.exponent_q) * confidence_radius)) 
+
+    #     trust_radius_weight_gradient_gradient_2_nominator = ( 2.0 * (((2.0 * self.exponent_p * distance_vector * distance**(2.0 * self.exponent_p - 2.0)) /(confidence_radius**(2.0 * self.exponent_p)))
+    #                                             + (2.0 * self.exponent_q * distance_vector * distance**(2.0 * self.exponent_q - 2.0)) / (confidence_radius**(2.0 * self.exponent_q))) 
+    #                                             * (((-2.0 * (distance/confidence_radius)**(2.0 * self.exponent_p) * self.exponent_p) / confidence_radius) 
+    #                                             - ((2.0 * (distance/confidence_radius)**(2.0 * self.exponent_q) * self.exponent_q) / confidence_radius))) 
+
+        
+    #     trust_radius_weight_gradient_gradient = -1.0 * trust_radius_weight_gradient_gradient_1_nominator / denominator**2 + trust_radius_weight_gradient_gradient_2_nominator / denominator**3
+
+
+    #     return trust_radius_weight_gradient_gradient
+    
+
+    # def shepard_weight_gradient(self, distance_vector, distance, confidence_radius):
+    #     """ Returns the derivative of an unormalized Shepard interpolation
+    #         weight with respect to the Cartesian coordinates in
+    #         self.impes_coordinate
+
+    #         :param distance_vector:
+    #             The Cartesian distance vector between
+    #             the current data_point and self.impes_coordinate.
+    #         :param distance:
+    #             The norm of the distance vector * sqrt(N), N number of atoms.
+    #     """
+        
+
+    #     denominator = (
+    #         (distance / confidence_radius)**(2 * self.exponent_p) +
+    #         (distance / confidence_radius)**(2 * self.exponent_q))
+    #     derivative_p = (self.exponent_p * distance_vector *
+    #                     distance**(2 * self.exponent_p - 2) /
+    #                     confidence_radius**(2 * self.exponent_p))
+    #     derivative_q = (self.exponent_q * distance_vector *
+    #                     distance**(2 * self.exponent_q - 2) /
+    #                     confidence_radius**(2 * self.exponent_q))
+        
+    #     weight_gradient = (-1.0 * (2.0 * (derivative_p + derivative_q)) *
+    #                    (1.0 / (denominator**2)))
+        
+        
+   
+    #     return  denominator, weight_gradient
+    
+
+    # def trust_radius_tc_weight_gradient(self, confidence_radius, distance, imp_int_coords_distance):
+        
+    #     combined_distance_sq = (distance**2 + imp_int_coords_distance)
+
+    #     denominator = (
+    #             (combined_distance_sq / confidence_radius**2)**(self.exponent_p) +
+    #             (combined_distance_sq / confidence_radius**2)**(self.exponent_q))
+        
+    #     trust_radius_weight_gradient = -1.0 * (((-2.0 * self.exponent_p * ((combined_distance_sq / confidence_radius**2)**(self.exponent_p)) / confidence_radius) - 
+    #                                          (2.0 * self.exponent_q * ((combined_distance_sq / confidence_radius**2)**(self.exponent_q) / confidence_radius))) / denominator**2)
+    #     return trust_radius_weight_gradient
+
+    
+    # def trust_radius_tc_weight_gradient_gradient(self, confidence_radius, distance, distance_vector, imp_int_coords_distance, imp_int_coords_dist_derivative):
+        
+    #     combined_distance_sq = (distance**2 + imp_int_coords_distance)
+        
+    #     denominator = (
+    #             (combined_distance_sq / confidence_radius**2)**(self.exponent_p) +
+    #             (combined_distance_sq / confidence_radius**2)**(self.exponent_q))
+        
+    #     print('confidence', confidence_radius, (confidence_radius**(2.0 * self.exponent_p)))
+    #     trust_radius_weight_gradient_gradient_1_nominator = (((-2.0 * self.exponent_p**2 * (imp_int_coords_dist_derivative + 2.0 * distance_vector.reshape(-1)) * combined_distance_sq**(self.exponent_p - 1.0)) 
+    #                                             /(confidence_radius**(2.0 * self.exponent_p) * confidence_radius))
+    #                                             - (2.0 * self.exponent_q**2.0 * (imp_int_coords_dist_derivative + 2.0 * distance_vector.reshape(-1)) * combined_distance_sq**(self.exponent_q - 1.0)) 
+    #                                             /(confidence_radius**(2.0 * self.exponent_q) * confidence_radius)).reshape(distance_vector.shape[0], 3)
+
+    #     trust_radius_weight_gradient_gradient_2_nominator = 2.0 * ((((self.exponent_p * (imp_int_coords_dist_derivative + 2.0 * distance_vector.reshape(-1)) * combined_distance_sq**(self.exponent_p - 1.0)) /(confidence_radius**(2.0 * self.exponent_p)))
+    #                                             + (self.exponent_q * (imp_int_coords_dist_derivative + 2.0 * distance_vector.reshape(-1)) * combined_distance_sq**(self.exponent_q - 1.0)) / (confidence_radius**(2.0 * self.exponent_q))) 
+    #                                             * (((-2.0 * (combined_distance_sq/confidence_radius**2)**(self.exponent_p) * self.exponent_p) / confidence_radius) 
+    #                                             - ((2.0 * (combined_distance_sq/confidence_radius**2)**(self.exponent_q) * self.exponent_q) / confidence_radius))).reshape(distance_vector.shape[0], 3)
+
+        
+    #     trust_radius_weight_gradient_gradient = -1.0 * trust_radius_weight_gradient_gradient_1_nominator / denominator**2 + trust_radius_weight_gradient_gradient_2_nominator / denominator**3
+
+        
+    #     return trust_radius_weight_gradient_gradient
+
+    def trust_radius_weight_gradient(self, confidence_radius, distance):
+        
+        R = confidence_radius
+        D = distance**2
+        
+        p = float(self.exponent_p)
+        q = float(self.exponent_q)
+        
+        # Dimensionless ratio u = (d/R)^2
+        u = D / (R**2)
+        
+        # Early Exit: If the distance is massively outside the confidence radius, 
+        # the trust weight gradient flattens to absolute zero.
+        if np.isscalar(u) and u > 1e6:
+            return 0.0
+            
+        denom_base = u**p + u**q
+        denom_base = np.clip(denom_base, a_min=1e-300, a_max=None)
+        
+        # Algebraically simplified numerator
+        numerator = p * u**p + q * u**q
+        
+        trust_radius_weight_gradient = (2.0 / R) * (numerator / denom_base**2)
+        
         return trust_radius_weight_gradient
 
     
     def trust_radius_weight_gradient_gradient(self, confidence_radius, distance, distance_vector):
         
-        # confidence_radius = datapoint.confidence_radius
-        # distance, _, _, _, distance_vector, _ = self.cartesian_distance(datapoint)
-        denominator = (
-                (distance / confidence_radius)**(2 * self.exponent_p) +
-                (distance / confidence_radius)**(2 * self.exponent_q))
+        R = confidence_radius
+        D = distance**2
+        v = distance_vector
         
+        p = float(self.exponent_p)
+        q = float(self.exponent_q)
         
-        trust_radius_weight_gradient_gradient_1_nominator = (((-4.0 * self.exponent_p**2 * distance_vector * distance**(2.0 * self.exponent_p - 2.0)) 
-                                                /(confidence_radius**(2.0 * self.exponent_p) * confidence_radius))
-                                                - (4.0 * self.exponent_q**2.0 * distance_vector * distance**(2.0 * self.exponent_q - 2.0)) 
-                                                /(confidence_radius**(2.0 * self.exponent_q) * confidence_radius)) 
-
-        trust_radius_weight_gradient_gradient_2_nominator = ( 2.0 * (((2.0 * self.exponent_p * distance_vector * distance**(2.0 * self.exponent_p - 2.0)) /(confidence_radius**(2.0 * self.exponent_p)))
-                                                + (2.0 * self.exponent_q * distance_vector * distance**(2.0 * self.exponent_q - 2.0)) / (confidence_radius**(2.0 * self.exponent_q))) 
-                                                * (((-2.0 * (distance/confidence_radius)**(2.0 * self.exponent_p) * self.exponent_p) / confidence_radius) 
-                                                - ((2.0 * (distance/confidence_radius)**(2.0 * self.exponent_q) * self.exponent_q) / confidence_radius))) 
-
+        u = D / (R**2)
         
-        trust_radius_weight_gradient_gradient = -1.0 * trust_radius_weight_gradient_gradient_1_nominator / denominator**2 + trust_radius_weight_gradient_gradient_2_nominator / denominator**3
-
+        # Early Exit
+        if np.isscalar(u) and u > 1e6:
+            return np.zeros_like(v, dtype=np.float64)
+            
+        denom_base = u**p + u**q
+        denom_base = np.clip(denom_base, a_min=1e-300, a_max=None)
+        
+        # Factored numerator components (the constants and R factors are moved to the multiplier)
+        term1 = (p**2 * u**(p - 1.0) + q**2 * u**(q - 1.0)) / (denom_base**2)
+        term2 = 2.0 * ((p * u**(p - 1.0) + q * u**(q - 1.0)) * (p * u**p + q * u**q)) / (denom_base**3)
+        
+        # Common scaling factor analytically pulled out of the original expressions
+        multiplier = (4.0 * v) / (R**3)
+        
+        trust_radius_weight_gradient_gradient = multiplier * (term1 - term2)
 
         return trust_radius_weight_gradient_gradient
     
 
     def shepard_weight_gradient(self, distance_vector, distance, confidence_radius):
-        """ Returns the derivative of an unormalized Shepard interpolation
-            weight with respect to the Cartesian coordinates in
-            self.impes_coordinate
-
-            :param distance_vector:
-                The Cartesian distance vector between
-                the current data_point and self.impes_coordinate.
-            :param distance:
-                The norm of the distance vector * sqrt(N), N number of atoms.
-        """
         
-
-        denominator = (
-            (distance / confidence_radius)**(2 * self.exponent_p) +
-            (distance / confidence_radius)**(2 * self.exponent_q))
-        derivative_p = (self.exponent_p * distance_vector *
-                        distance**(2 * self.exponent_p - 2) /
-                        confidence_radius**(2 * self.exponent_p))
-        derivative_q = (self.exponent_q * distance_vector *
-                        distance**(2 * self.exponent_q - 2) /
-                        confidence_radius**(2 * self.exponent_q))
+        R = confidence_radius
+        D = distance**2
+        v = distance_vector
         
-        weight_gradient = (-1.0 * (2.0 * (derivative_p + derivative_q)) *
-                       (1.0 / (denominator**2)))
+        p = float(self.exponent_p)
+        q = float(self.exponent_q)
         
+        u = D / (R**2)
         
-   
-        return  denominator, weight_gradient
+        # Early Exit: Return np.inf for the denominator and an array of zeros for the gradient
+        if np.isscalar(u) and u > 1e6:
+            return np.inf, np.zeros_like(v, dtype=np.float64)
+            
+        denom_base = u**p + u**q
+        denom_base = np.clip(denom_base, a_min=1e-300, a_max=None)
+        
+        numerator = p * u**(p - 1.0) + q * u**(q - 1.0)
+        
+        weight_gradient = -2.0 * (numerator / (R**2 * denom_base**2)) * v
+        
+        return denom_base, weight_gradient
     
 
     def trust_radius_tc_weight_gradient(self, confidence_radius, distance, imp_int_coords_distance):
         
-        combined_distance_sq = (distance**2 + imp_int_coords_distance)
-
-        denominator = (
-                (combined_distance_sq / confidence_radius**2)**(self.exponent_p) +
-                (combined_distance_sq / confidence_radius**2)**(self.exponent_q))
+        R = confidence_radius
+        # Incorporating the internal coordinates distance
+        D = distance**2 + imp_int_coords_distance
         
-        trust_radius_weight_gradient = -1.0 * (((-2.0 * self.exponent_p * ((combined_distance_sq / confidence_radius**2)**(self.exponent_p)) / confidence_radius) - 
-                                             (2.0 * self.exponent_q * ((combined_distance_sq / confidence_radius**2)**(self.exponent_q) / confidence_radius))) / denominator**2)
+        p = float(self.exponent_p)
+        q = float(self.exponent_q)
+        
+        u = D / (R**2)
+        
+        # Early Exit
+        if np.isscalar(u) and u > 1e6:
+            return 0.0
+            
+        denom_base = u**p + u**q
+        denom_base = np.clip(denom_base, a_min=1e-300, a_max=None)
+        
+        numerator = p * u**p + q * u**q
+        
+        trust_radius_weight_gradient = (2.0 / R) * (numerator / denom_base**2)
+        
         return trust_radius_weight_gradient
 
-    
     def trust_radius_tc_weight_gradient_gradient(self, confidence_radius, distance, distance_vector, imp_int_coords_distance, imp_int_coords_dist_derivative):
-        
-        combined_distance_sq = (distance**2 + imp_int_coords_distance)
-        
-        denominator = (
-                (combined_distance_sq / confidence_radius**2)**(self.exponent_p) +
-                (combined_distance_sq / confidence_radius**2)**(self.exponent_q))
-        
-        
-        trust_radius_weight_gradient_gradient_1_nominator = (((-2.0 * self.exponent_p**2 * (imp_int_coords_dist_derivative + 2.0 * distance_vector.reshape(-1)) * combined_distance_sq**(self.exponent_p - 1.0)) 
-                                                /(confidence_radius**(2.0 * self.exponent_p) * confidence_radius))
-                                                - (2.0 * self.exponent_q**2.0 * (imp_int_coords_dist_derivative + 2.0 * distance_vector.reshape(-1)) * combined_distance_sq**(self.exponent_q - 1.0)) 
-                                                /(confidence_radius**(2.0 * self.exponent_q) * confidence_radius)).reshape(distance_vector.shape[0], 3)
+            
+            # 1. Define base variables
+            R = confidence_radius
+            D = distance**2 + imp_int_coords_distance
+            v = imp_int_coords_dist_derivative + 2.0 * distance_vector.reshape(-1)
+            
+            p = float(self.exponent_p)
+            q = float(self.exponent_q)
+            
+            # 2. Compute the dimensionless ratio
+            u = D / (R**2)
+            
+            # --- THE FIX: Early Exit for massive ratios ---
+            # If u is so large that u**(3 * max(p,q)) exceeds ~1e308, float64 overflows.
+            # Physically, the weight gradient at this immense relative distance is practically 0.0.
+            if np.isscalar(u) and u > 1e6:
+                return np.zeros((distance_vector.shape[0], 3), dtype=np.float64)
+            
+            # 3. Base denominator
+            denom_base = u**p + u**q
+            denom_base = np.clip(denom_base, a_min=1e-300, a_max=None)
+            
+            # 4. Compute the grouped terms 
+            term1 = (p**2 * u**(p - 1.0) + q**2 * u**(q - 1.0)) / (denom_base**2)
+            term2 = 2.0 * ((p * u**(p - 1.0) + q * u**(q - 1.0)) * (p * u**p + q * u**q)) / (denom_base**3)
+            
+            # 5. Apply the common multiplier
+            multiplier = (2.0 * v) / (R**3)
+            
+            trust_radius_weight_gradient_gradient = multiplier * (term1 - term2)
 
-        trust_radius_weight_gradient_gradient_2_nominator = 2.0 * ((((self.exponent_p * (imp_int_coords_dist_derivative + 2.0 * distance_vector.reshape(-1)) * combined_distance_sq**(self.exponent_p - 1.0)) /(confidence_radius**(2.0 * self.exponent_p)))
-                                                + (self.exponent_q * (imp_int_coords_dist_derivative + 2.0 * distance_vector.reshape(-1)) * combined_distance_sq**(self.exponent_q - 1.0)) / (confidence_radius**(2.0 * self.exponent_q))) 
-                                                * (((-2.0 * (combined_distance_sq/confidence_radius**2)**(self.exponent_p) * self.exponent_p) / confidence_radius) 
-                                                - ((2.0 * (combined_distance_sq/confidence_radius**2)**(self.exponent_q) * self.exponent_q) / confidence_radius))).reshape(distance_vector.shape[0], 3)
+            return trust_radius_weight_gradient_gradient.reshape(distance_vector.shape[0], 3)
 
+
+    # def YM_target_customized_shepard_weight_gradient(self, distance_vector, distance, confidence_radius, imp_int_coords_distance, imp_int_coordinate_derivative):
+    #     """ Returns the derivative of an unormalized Shepard interpolation
+    #         weight with respect to the Cartesian coordinates in
+    #         self.impes_coordinate
+
+    #         :param distance_vector:
+    #             The Cartesian distance vector between
+    #             the current data_point and self.impes_coordinate.
+    #         :param distance:
+    #             The norm of the distance vector * sqrt(N), N number of atoms.
+    #     """
+
+    #     combined_distance = np.sqrt(imp_int_coords_distance)
+    #     combined_distance_sq = (distance**2 + imp_int_coords_distance)
         
-        trust_radius_weight_gradient_gradient = -1.0 * trust_radius_weight_gradient_gradient_1_nominator / denominator**2 + trust_radius_weight_gradient_gradient_2_nominator / denominator**3
-
-
-        return trust_radius_weight_gradient_gradient
-    
-    def YM_target_customized_shepard_weight_gradient(self, distance_vector, distance, confidence_radius, imp_int_coords_distance, imp_int_coordinate_derivative):
-        """ Returns the derivative of an unormalized Shepard interpolation
-            weight with respect to the Cartesian coordinates in
-            self.impes_coordinate
-
-            :param distance_vector:
-                The Cartesian distance vector between
-                the current data_point and self.impes_coordinate.
-            :param distance:
-                The norm of the distance vector * sqrt(N), N number of atoms.
-        """
-
-        combined_distance = np.sqrt(imp_int_coords_distance)
-        combined_distance_sq = (distance**2 + imp_int_coords_distance)
-        
-        denominator = (
-            ((combined_distance_sq) / confidence_radius**2)**(self.exponent_p) +
-            ((combined_distance_sq) / confidence_radius**2)**(self.exponent_q))
-        derivative_p = ((self.exponent_p * ((2.0 * distance_vector.reshape(-1) + imp_int_coordinate_derivative) ) *
-                        combined_distance_sq**(self.exponent_p - 1) /
-                        confidence_radius**(2 * self.exponent_p)))
-        derivative_q = ((self.exponent_q * ((2.0 * distance_vector.reshape(-1) + imp_int_coordinate_derivative)) *
-                        combined_distance_sq**(self.exponent_q - 1) /
-                        confidence_radius**(2 * self.exponent_q)))
+    #     denominator = (
+    #         ((combined_distance_sq) / confidence_radius**2)**(self.exponent_p) +
+    #         ((combined_distance_sq) / confidence_radius**2)**(self.exponent_q))
+    #     derivative_p = ((self.exponent_p * ((2.0 * distance_vector.reshape(-1) + imp_int_coordinate_derivative) ) *
+    #                     combined_distance_sq**(self.exponent_p - 1) /
+    #                     confidence_radius**(2 * self.exponent_p)))
+    #     derivative_q = ((self.exponent_q * ((2.0 * distance_vector.reshape(-1) + imp_int_coordinate_derivative)) *
+    #                     combined_distance_sq**(self.exponent_q - 1) /
+    #                     confidence_radius**(2 * self.exponent_q)))
         
 
         
-        weight_gradient = (-1.0 * ((derivative_p + derivative_q)) *
-                       (1.0 / (denominator**2)))
+    #     weight_gradient = (-1.0 * ((derivative_p + derivative_q)) *
+    #                    (1.0 / (denominator**2)))
         
    
-        return  denominator, weight_gradient.reshape(distance_vector.shape[0], 3)
+    #     return  denominator, weight_gradient.reshape(distance_vector.shape[0], 3)
     
+    # def VL_target_customized_shepard_weight_gradient(self, distance_vector, distance, confidence_radius, dq, dq_dx):
+    #     """ Returns the derivative of an unormalized Shepard interpolation
+    #         weight with respect to the Cartesian coordinates in
+    #         self.impes_coordinate
+
+    #         :param distance_vector:
+    #             The Cartesian distance vector between
+    #             the current data_point and self.impes_coordinate.
+    #         :param distance:
+    #             The norm of the distance vector * sqrt(N), N number of atoms.
+    #     """
+
+    #     denominator = (
+    #         (distance / confidence_radius)**(2 * self.exponent_p) +
+    #         (distance / confidence_radius)**(2 * self.exponent_q))
+    #     derivative_p = (self.exponent_p * distance_vector *
+    #                     distance**(2 * self.exponent_p - 2) /
+    #                     confidence_radius**(2 * self.exponent_p))
+    #     derivative_q = (self.exponent_q * distance_vector *
+    #                     distance**(2 * self.exponent_q - 2) /
+    #                     confidence_radius**(2 * self.exponent_q))
+        
+    #     weight_gradient = (-1.0 * (2.0 * (derivative_p + derivative_q)) *
+    #                    (1.0 / (denominator**2)))
+        
+    #     final_denominator = denominator * np.exp(self.alpha * dq) 
+
+    #     final_weight_gradient = (weight_gradient.reshape(-1) * np.exp(-self.alpha * dq) - 1.0/denominator * self.alpha * np.exp(-self.alpha * dq) * dq_dx).reshape(-1, 3)
+
+    #     return  final_denominator, final_weight_gradient
+    
+    # def trust_radius_weight_gradient_hessian(self, confidence_radius, distance, imp_int_coords_distance):
+
+    #     combined_distance_sq = (distance + imp_int_coords_distance)
+
+    #     denominator = (
+    #             (combined_distance_sq / confidence_radius**2)**(self.exponent_p) +
+    #             (combined_distance_sq / confidence_radius**2)**(self.exponent_q))
+    #     trust_radius_weight_gradient = -1.0 * ((( -2.0 * self.exponent_p * ((combined_distance_sq)**(self.exponent_p)) / (confidence_radius * confidence_radius**(2 * self.exponent_p))) - 
+    #                                          (2.0 * self.exponent_q * ((combined_distance_sq)**(self.exponent_q)) / (confidence_radius * confidence_radius**(2 * self.exponent_q)))) / denominator**2)
+
+    #     return trust_radius_weight_gradient
+    
+    # def trust_radius_weight_gradient_gradient_hessian(self, confidence_radius, distance, grad_s, imp_int_coords_distance, imp_int_coords_distance_derivative):
+        
+    #     combined_distance_sq = (distance + imp_int_coords_distance)
+    #     denominator = (
+    #             (combined_distance_sq / confidence_radius**2)**(self.exponent_p) +
+    #             (combined_distance_sq / confidence_radius**2)**(self.exponent_q))
+
+    #     trust_radius_weight_gradient_gradient_nominator_1_1 = ((self.exponent_p * (combined_distance_sq)**(self.exponent_p - 1) / (confidence_radius**(2 * self.exponent_p))) + (self.exponent_q * (combined_distance_sq)**(self.exponent_q - 1) / (confidence_radius**(2 * self.exponent_q))))
+    #     trust_radius_weight_gradient_gradient_nominator_1_2 = 2.0 * ((-2.0 * self.exponent_p * (combined_distance_sq)**(self.exponent_p) / (confidence_radius * confidence_radius**(2 * self.exponent_p))) - ( 2.0 * self.exponent_q * (combined_distance_sq)**(self.exponent_q) / (confidence_radius * confidence_radius**(2 * self.exponent_q))))
+
+    #     trust_radius_weight_gradient_gradient_nominator_2 = ((-2.0 * self.exponent_p**2 * (combined_distance_sq)**(self.exponent_p - 1) / (confidence_radius * confidence_radius**(2 * self.exponent_p))) - (2.0 * self.exponent_q**2 * (combined_distance_sq)**(self.exponent_q - 1) / (confidence_radius * confidence_radius**(2 * self.exponent_q))))
+        
+    #     trust_radius_weight_gradient_gradient = (((trust_radius_weight_gradient_gradient_nominator_1_1 * trust_radius_weight_gradient_gradient_nominator_1_2 ) / denominator**3) - trust_radius_weight_gradient_gradient_nominator_2 / denominator**2) * (grad_s + imp_int_coords_distance_derivative.reshape(-1, 3))
+
+
+    #     return trust_radius_weight_gradient_gradient
+    
+    # def shepard_weight_gradient_hessian(self, quad_distance, confidence_radius, grad_s, imp_int_coords_distance=0, imp_int_coords_distance_derivative=0):
+    #     """ Returns the derivative of an unormalized Shepard interpolation
+    #         weight with respect to the Cartesian coordinates in
+    #         self.impes_coordinate
+
+    #         :param distance_vector:
+    #             The Cartesian distance vector between
+    #             the current data_point and self.impes_coordinate.
+    #         :param distance:
+    #             The norm of the distance vector * sqrt(N), N number of atoms.
+    #     """
+
+    #     combined_distance_sq = (quad_distance + imp_int_coords_distance)
+
+    #     denominator = (
+    #         ((combined_distance_sq) / confidence_radius**2)**(self.exponent_p) +
+    #         ((combined_distance_sq) / confidence_radius**2)**(self.exponent_q))
+        
+    #     derivative_p = ((self.exponent_p * 
+    #                     combined_distance_sq**(self.exponent_p - 1) /
+    #                     confidence_radius**(2 * self.exponent_p)))
+    #     derivative_q = ((self.exponent_q *
+    #                     combined_distance_sq**(self.exponent_q - 1) /
+    #                     confidence_radius**(2 * self.exponent_q)))
+        
+
+        
+    #     weight_gradient = (-1.0 * (1.0 * (derivative_p + derivative_q) *
+    #                    (1.0 / (denominator**2)))) * (grad_s + imp_int_coords_distance_derivative.reshape(-1, 3))
+        
+    #     print(denominator, weight_gradient)
+    #     exit()
+
+    #     return  denominator, weight_gradient
+
+    def YM_target_customized_shepard_weight_gradient(self, distance_vector, distance, confidence_radius, imp_int_coords_distance, imp_int_coordinate_derivative):
+        
+        R = confidence_radius
+        D = distance**2 + imp_int_coords_distance
+        v = 2.0 * distance_vector.reshape(-1) + imp_int_coordinate_derivative
+        
+        p = float(self.exponent_p)
+        q = float(self.exponent_q)
+        
+        u = D / (R**2)
+        
+        # Early Exit
+        if np.isscalar(u) and u > 1e6:
+            return np.inf, np.zeros((distance_vector.shape[0], 3), dtype=np.float64)
+            
+        denom_base = u**p + u**q
+        denom_base = np.clip(denom_base, a_min=1e-300, a_max=None)
+        
+        numerator = p * u**(p - 1.0) + q * u**(q - 1.0)
+        
+        weight_gradient = -1.0 * (numerator / (R**2 * denom_base**2)) * v
+   
+        return denom_base, weight_gradient.reshape(distance_vector.shape[0], 3)
+    
+
     def VL_target_customized_shepard_weight_gradient(self, distance_vector, distance, confidence_radius, dq, dq_dx):
-        """ Returns the derivative of an unormalized Shepard interpolation
-            weight with respect to the Cartesian coordinates in
-            self.impes_coordinate
-
-            :param distance_vector:
-                The Cartesian distance vector between
-                the current data_point and self.impes_coordinate.
-            :param distance:
-                The norm of the distance vector * sqrt(N), N number of atoms.
-        """
-
-        denominator = (
-            (distance / confidence_radius)**(2 * self.exponent_p) +
-            (distance / confidence_radius)**(2 * self.exponent_q))
-        derivative_p = (self.exponent_p * distance_vector *
-                        distance**(2 * self.exponent_p - 2) /
-                        confidence_radius**(2 * self.exponent_p))
-        derivative_q = (self.exponent_q * distance_vector *
-                        distance**(2 * self.exponent_q - 2) /
-                        confidence_radius**(2 * self.exponent_q))
         
-        weight_gradient = (-1.0 * (2.0 * (derivative_p + derivative_q)) *
-                       (1.0 / (denominator**2)))
+        R = confidence_radius
+        D = distance**2
         
-        final_denominator = denominator * np.exp(self.alpha * dq) 
+        p = float(self.exponent_p)
+        q = float(self.exponent_q)
+        
+        u = D / (R**2)
+        
+        # Early Exit
+        if np.isscalar(u) and u > 1e6:
+            return np.inf, np.zeros((distance_vector.shape[0], 3), dtype=np.float64)
+            
+        denom_base = u**p + u**q
+        denom_base = np.clip(denom_base, a_min=1e-300, a_max=None)
+        
+        numerator = p * u**(p - 1.0) + q * u**(q - 1.0)
+        
+        # Original gradient logic simplified with factored terms
+        weight_gradient = -2.0 * (numerator / (R**2 * denom_base**2)) * distance_vector
+        
+        final_denominator = denom_base * np.exp(self.alpha * dq) 
+        
+        # 1.0/denominator is handled safely here because denom_base is clipped above 0
+        final_weight_gradient = (weight_gradient.reshape(-1) * np.exp(-self.alpha * dq) - 1.0/denom_base * self.alpha * np.exp(-self.alpha * dq) * dq_dx).reshape(-1, 3)
 
-        final_weight_gradient = (weight_gradient.reshape(-1) * np.exp(-self.alpha * dq) - 1.0/denominator * self.alpha * np.exp(-self.alpha * dq) * dq_dx).reshape(-1, 3)
-
-        return  final_denominator, final_weight_gradient
+        return final_denominator, final_weight_gradient
     
+
     def trust_radius_weight_gradient_hessian(self, confidence_radius, distance, imp_int_coords_distance):
 
-        combined_distance_sq = (distance + imp_int_coords_distance)
-
-        denominator = (
-                (combined_distance_sq / confidence_radius**2)**(self.exponent_p) +
-                (combined_distance_sq / confidence_radius**2)**(self.exponent_q))
-        trust_radius_weight_gradient = -1.0 * ((( -2.0 * self.exponent_p * ((combined_distance_sq)**(self.exponent_p)) / (confidence_radius * confidence_radius**(2 * self.exponent_p))) - 
-                                             (2.0 * self.exponent_q * ((combined_distance_sq)**(self.exponent_q)) / (confidence_radius * confidence_radius**(2 * self.exponent_q)))) / denominator**2)
+        R = confidence_radius
+        # Note: Your original code for this specific function does not square `distance` here. 
+        # I am preserving your exact mathematical intent.
+        D = distance + imp_int_coords_distance
+        
+        p = float(self.exponent_p)
+        q = float(self.exponent_q)
+        
+        u = D / (R**2)
+        
+        # Early Exit (returning 0.0 scalar if gradients flatten out)
+        if np.isscalar(u) and u > 1e6:
+            return 0.0
+            
+        denom_base = u**p + u**q
+        denom_base = np.clip(denom_base, a_min=1e-300, a_max=None)
+        
+        numerator = p * u**p + q * u**q
+        
+        trust_radius_weight_gradient = (2.0 / R) * (numerator / denom_base**2)
 
         return trust_radius_weight_gradient
     
+
     def trust_radius_weight_gradient_gradient_hessian(self, confidence_radius, distance, grad_s, imp_int_coords_distance, imp_int_coords_distance_derivative):
         
-        combined_distance_sq = (distance + imp_int_coords_distance)
-        denominator = (
-                (combined_distance_sq / confidence_radius**2)**(self.exponent_p) +
-                (combined_distance_sq / confidence_radius**2)**(self.exponent_q))
-
-        trust_radius_weight_gradient_gradient_nominator_1_1 = ((self.exponent_p * (combined_distance_sq)**(self.exponent_p - 1) / (confidence_radius**(2 * self.exponent_p))) + (self.exponent_q * (combined_distance_sq)**(self.exponent_q - 1) / (confidence_radius**(2 * self.exponent_q))))
-        trust_radius_weight_gradient_gradient_nominator_1_2 = 2.0 * ((-2.0 * self.exponent_p * (combined_distance_sq)**(self.exponent_p) / (confidence_radius * confidence_radius**(2 * self.exponent_p))) - ( 2.0 * self.exponent_q * (combined_distance_sq)**(self.exponent_q) / (confidence_radius * confidence_radius**(2 * self.exponent_q))))
-
-        trust_radius_weight_gradient_gradient_nominator_2 = ((-2.0 * self.exponent_p**2 * (combined_distance_sq)**(self.exponent_p - 1) / (confidence_radius * confidence_radius**(2 * self.exponent_p))) - (2.0 * self.exponent_q**2 * (combined_distance_sq)**(self.exponent_q - 1) / (confidence_radius * confidence_radius**(2 * self.exponent_q))))
+        R = confidence_radius
+        # Again, preserving the un-squared distance from your original logic
+        D = distance + imp_int_coords_distance
+        v = grad_s + imp_int_coords_distance_derivative.reshape(-1, 3)
         
-        trust_radius_weight_gradient_gradient = (((trust_radius_weight_gradient_gradient_nominator_1_1 * trust_radius_weight_gradient_gradient_nominator_1_2 ) / denominator**3) - trust_radius_weight_gradient_gradient_nominator_2 / denominator**2) * (grad_s + imp_int_coords_distance_derivative.reshape(-1, 3))
-
+        p = float(self.exponent_p)
+        q = float(self.exponent_q)
+        
+        u = D / (R**2)
+        
+        # Early Exit
+        if np.isscalar(u) and u > 1e6:
+            return np.zeros_like(v, dtype=np.float64)
+            
+        denom_base = u**p + u**q
+        denom_base = np.clip(denom_base, a_min=1e-300, a_max=None)
+        
+        # Factored numerator terms
+        term1 = (p**2 * u**(p - 1.0) + q**2 * u**(q - 1.0)) / (denom_base**2)
+        term2 = ((p * u**(p - 1.0) + q * u**(q - 1.0)) * (p * u**p + q * u**q)) / (denom_base**3)
+        
+        trust_radius_weight_gradient_gradient = (2.0 / R**3) * (term1 - term2) * v
 
         return trust_radius_weight_gradient_gradient
     
     def shepard_weight_gradient_hessian(self, quad_distance, confidence_radius, grad_s, imp_int_coords_distance=0, imp_int_coords_distance_derivative=0):
-        """ Returns the derivative of an unormalized Shepard interpolation
-            weight with respect to the Cartesian coordinates in
-            self.impes_coordinate
-
-            :param distance_vector:
-                The Cartesian distance vector between
-                the current data_point and self.impes_coordinate.
-            :param distance:
-                The norm of the distance vector * sqrt(N), N number of atoms.
-        """
-
-        combined_distance_sq = (quad_distance + imp_int_coords_distance)
-
-        denominator = (
-            ((combined_distance_sq) / confidence_radius**2)**(self.exponent_p) +
-            ((combined_distance_sq) / confidence_radius**2)**(self.exponent_q))
         
-        derivative_p = ((self.exponent_p * 
-                        combined_distance_sq**(self.exponent_p - 1) /
-                        confidence_radius**(2 * self.exponent_p)))
-        derivative_q = ((self.exponent_q *
-                        combined_distance_sq**(self.exponent_q - 1) /
-                        confidence_radius**(2 * self.exponent_q)))
+        # 1. Define base variables
+        R = confidence_radius
+        D = quad_distance + imp_int_coords_distance
         
-
+        p = float(self.exponent_p)
+        q = float(self.exponent_q)
         
-        weight_gradient = (-1.0 * (1.0 * (derivative_p + derivative_q) *
-                       (1.0 / (denominator**2)))) * (grad_s + imp_int_coords_distance_derivative.reshape(-1, 3))
-                    
-        return  denominator, weight_gradient
-    
+        # Evaluate the gradient multiplier early
+        grad_combined = grad_s + imp_int_coords_distance_derivative.reshape(-1, 3)
+        
+        # 2. Compute dimensionless ratio
+        u = D / (R**2)
+        
+        # 3. Early Exit: Protect against float64 overflow for massive relative distances
+        if np.isscalar(u) and u > 1e6:
+            return u**p + u**q, np.zeros_like(grad_combined, dtype=np.float64)
+        
+        # 4. Base denominator
+        denom_base = u**p + u**q
+        denom_base = np.clip(denom_base, a_min=1e-300, a_max=None)
+        
+        # 5. Algebraically factored numerator
+        numerator = p * u**(p - 1.0) + q * u**(q - 1.0)
+        
+        # 6. Assemble the final weight gradient
+        weight_gradient = -1.0 * (numerator / (R**2 * denom_base**2)) * grad_combined
+        
+        return denom_base, weight_gradient
     
     def calculate_translation_coordinates(self, given_coordinates, weights=None):
         """Center the molecule by translating its geometric center to (0, 0, 0)."""
@@ -2495,8 +2777,14 @@ class InterpolationDriver():
             rigid_idx = idx[:r_rigid]
             vib_idx   = idx[r_rigid:]
 
-            lam = np.abs(w)                 # stiffness magnitude
-            lam[rigid_idx] = 0.0            # keep rigid at exactly zero
+            lam = np.zeros_like(w)
+
+            # rigid handled separately
+            pos = np.setdiff1d(np.where(w > 0)[0], rigid_idx)
+            neg = np.setdiff1d(np.where(w < 0)[0], rigid_idx)
+
+            lam[pos] = w[pos]
+            lam[neg] = 0.5 * np.abs(w[neg])   # e.g. neg_scale = 0.25 or 0.5
 
             # Floor only the vibrational subspace if desired
             if vib_idx.size > 0:
@@ -2901,7 +3189,7 @@ class InterpolationDriver():
         lambda_hess = 0.5
         final_distance = org_distance + lambda_hess * distance
 
-        # print('org cart distance', org_distance, 'hessian metric', distance, 'final_distance',  final_distance)
+        # print('org cart distance', org_distance, 'hessian metric', distance)
 
         # sum of the derivative necessary 
         imp_int_coord_derivative_contribution = np.zeros_like(distance_vector).reshape(-1)
@@ -2914,7 +3202,6 @@ class InterpolationDriver():
         participation = V**2  # shape (n_coord, n_modes)
 
         # For each internal coordinate, find dominant eigenmode
-        dominant_mode_per_coord = np.argmax(participation, axis=1)
         coord_curvature = np.sum(eigval * (V**2), axis=1)
         
         dq = []
