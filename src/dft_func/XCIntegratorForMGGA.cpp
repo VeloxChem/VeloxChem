@@ -108,18 +108,12 @@ integrateVxcFockForMetaGgaClosedShell(const CMolecule&                  molecule
 
     // set up pointers to OMP data
 
-    auto ptr_counts = counts.data();
-
-    auto ptr_displacements = displacements.data();
-
     auto ptr_gto_blocks = gto_blocks.data();
-
-    auto ptr_gsDensityPointers = gsDensityPointers.data();
 
     auto ptr_xcFunctional = &xcFunctional;
 
-#pragma omp parallel shared(ptr_counts, ptr_displacements, xcoords, ycoords, zcoords, \
-                            ptr_gto_blocks, ptr_gsDensityPointers, ptr_xcFunctional, \
+#pragma omp parallel shared(displacements, xcoords, ycoords, zcoords, \
+                            ptr_gto_blocks, gsDensityPointers, ptr_xcFunctional, \
                             n_boxes, n_gto_blocks, naos, nele, xcene, mat_Vxc)
     {
 
@@ -460,18 +454,12 @@ integrateVxcFockForMetaGgaOpenShell(const CMolecule&                  molecule,
 
     // set up pointers to OMP data
 
-    auto ptr_counts = counts.data();
-
-    auto ptr_displacements = displacements.data();
-
     auto ptr_gto_blocks = gto_blocks.data();
-
-    auto ptr_gsDensityPointers = gsDensityPointers.data();
 
     auto ptr_xcFunctional = &xcFunctional;
 
-#pragma omp parallel shared(ptr_counts, ptr_displacements, xcoords, ycoords, zcoords, \
-                            ptr_gto_blocks, ptr_gsDensityPointers, ptr_xcFunctional, \
+#pragma omp parallel shared(displacements, xcoords, ycoords, zcoords, \
+                            ptr_gto_blocks, gsDensityPointers, ptr_xcFunctional, \
                             n_boxes, n_gto_blocks, naos, nele, xcene, mat_Vxc)
     {
 
@@ -843,18 +831,12 @@ integrateFxcFockForMetaGgaClosedShell(const std::vector<double*>&       aoFockPo
 
     // set up pointers to OMP data
 
-    auto ptr_counts = counts.data();
-
-    auto ptr_displacements = displacements.data();
-
     auto ptr_gto_blocks = gto_blocks.data();
-
-    auto ptr_gsDensityPointers = gsDensityPointers.data();
 
     auto ptr_xcFunctional = &xcFunctional;
 
-#pragma omp parallel shared(ptr_counts, ptr_displacements, xcoords, ycoords, zcoords, \
-                            ptr_gto_blocks, ptr_gsDensityPointers, ptr_xcFunctional, \
+#pragma omp parallel shared(displacements, xcoords, ycoords, zcoords, \
+                            ptr_gto_blocks, gsDensityPointers, ptr_xcFunctional, \
                             n_boxes, n_gto_blocks, n_rw_densities, naos, \
                             aoFockPointers, rwDensityPointers)
     {
@@ -1352,18 +1334,12 @@ integrateKxcFockForMetaGgaClosedShell(const std::vector<double*>& aoFockPointers
 
     // set up pointers to OMP data
 
-    auto ptr_counts = counts.data();
-
-    auto ptr_displacements = displacements.data();
-
     auto ptr_gto_blocks = gto_blocks.data();
-
-    auto ptr_gsDensityPointers = gsDensityPointers.data();
 
     auto ptr_xcFunctional = &xcFunctional;
 
-#pragma omp parallel shared(ptr_counts, ptr_displacements, xcoords, ycoords, zcoords, \
-                            ptr_gto_blocks, ptr_gsDensityPointers, ptr_xcFunctional, \
+#pragma omp parallel shared(displacements, xcoords, ycoords, zcoords, \
+                            ptr_gto_blocks, gsDensityPointers, ptr_xcFunctional, \
                             n_boxes, n_gto_blocks, n_rw2_densities, naos, \
                             aoFockPointers, rwDensityPointers, rw2DensityPointers)
     {
@@ -1829,18 +1805,12 @@ integrateKxcLxcFockForMetaGgaClosedShell(const std::vector<double*>& aoFockPoint
 
     // set up pointers to OMP data
 
-    auto ptr_counts = counts.data();
-
-    auto ptr_displacements = displacements.data();
-
     auto ptr_gto_blocks = gto_blocks.data();
-
-    auto ptr_gsDensityPointers = gsDensityPointers.data();
 
     auto ptr_xcFunctional = &xcFunctional;
 
-#pragma omp parallel shared(ptr_counts, ptr_displacements, xcoords, ycoords, zcoords, \
-                            ptr_gto_blocks, ptr_gsDensityPointers, ptr_xcFunctional, \
+#pragma omp parallel shared(displacements, xcoords, ycoords, zcoords, \
+                            ptr_gto_blocks, gsDensityPointers, ptr_xcFunctional, \
                             n_boxes, n_gto_blocks, n_rw2_densities, n_rw3_densities, naos, \
                             aoFockPointers, rwDensityPointers, rw2DensityPointers, \
                             rw3DensityPointers)
@@ -2525,10 +2495,7 @@ integratePartialKxcFockForMetaGgaClosedShell(const CXCFunctional&     xcFunction
 
     auto gam    = rwDensityGridPointers[0];
     auto rt_gam = rwDensityGridPointers[1];
-    auto rl_gam = rwDensityGridPointers[2];
     auto tt_gam = rwDensityGridPointers[3];
-    auto tl_gam = rwDensityGridPointers[4];
-    auto ll_gam = rwDensityGridPointers[5];
 
     auto gamx    = rwDensityGridPointers[6];
     auto gamy    = rwDensityGridPointers[7];
@@ -2536,9 +2503,6 @@ integratePartialKxcFockForMetaGgaClosedShell(const CXCFunctional&     xcFunction
     auto st_gamx = rwDensityGridPointers[9];
     auto st_gamy = rwDensityGridPointers[10];
     auto st_gamz = rwDensityGridPointers[11];
-    auto sl_gamx = rwDensityGridPointers[12];
-    auto sl_gamy = rwDensityGridPointers[13];
-    auto sl_gamz = rwDensityGridPointers[14];
 
     auto gamxx = rwDensityGridPointers[15];
     auto gamxy = rwDensityGridPointers[16];
@@ -2552,7 +2516,6 @@ integratePartialKxcFockForMetaGgaClosedShell(const CXCFunctional&     xcFunction
 
     auto rhow    = rw2DensityGridPointers[0];
     auto tauw    = rw2DensityGridPointers[1];
-    auto laplw   = rw2DensityGridPointers[2];
     auto gradw_x = rw2DensityGridPointers[3];
     auto gradw_y = rw2DensityGridPointers[4];
     auto gradw_z = rw2DensityGridPointers[5];
@@ -3214,10 +3177,7 @@ integratePartialLxcFockForMGGA(const CXCFunctional&     xcFunctional,
 
     auto gam    = rwDensityGridCubic.gam(iFock);
     auto rt_gam = rwDensityGridCubic.rt_gam(iFock);
-    auto rl_gam = rwDensityGridCubic.rl_gam(iFock);
     auto tt_gam = rwDensityGridCubic.tt_gam(iFock);
-    auto tl_gam = rwDensityGridCubic.tl_gam(iFock);
-    auto ll_gam = rwDensityGridCubic.ll_gam(iFock);
 
     auto gamx    = rwDensityGridCubic.gamX(iFock);
     auto gamy    = rwDensityGridCubic.gamY(iFock);
@@ -3225,9 +3185,6 @@ integratePartialLxcFockForMGGA(const CXCFunctional&     xcFunctional,
     auto st_gamx = rwDensityGridCubic.st_gamX(iFock);
     auto st_gamy = rwDensityGridCubic.st_gamY(iFock);
     auto st_gamz = rwDensityGridCubic.st_gamZ(iFock);
-    auto sl_gamx = rwDensityGridCubic.sl_gamX(iFock);
-    auto sl_gamy = rwDensityGridCubic.sl_gamY(iFock);
-    auto sl_gamz = rwDensityGridCubic.sl_gamZ(iFock);
 
     auto gamxx = rwDensityGridCubic.gamXX(iFock);
     auto gamxy = rwDensityGridCubic.gamXY(iFock);
@@ -3241,35 +3198,20 @@ integratePartialLxcFockForMGGA(const CXCFunctional&     xcFunctional,
 
     auto pi     = rwDensityGridCubic.pi(iFock);
     auto rrt_pi = rwDensityGridCubic.rrt_pi(iFock);
-    auto rrl_pi = rwDensityGridCubic.rrl_pi(iFock);
     auto rtt_pi = rwDensityGridCubic.rtt_pi(iFock);
-    auto rtl_pi = rwDensityGridCubic.rtl_pi(iFock);
-    auto rll_pi = rwDensityGridCubic.rll_pi(iFock);
     auto ttt_pi = rwDensityGridCubic.ttt_pi(iFock);
-    auto ttl_pi = rwDensityGridCubic.ttl_pi(iFock);
-    auto tll_pi = rwDensityGridCubic.tll_pi(iFock);
-    auto lll_pi = rwDensityGridCubic.lll_pi(iFock);
 
     auto pix    = rwDensityGridCubic.piX(iFock);
     auto rt_pix = rwDensityGridCubic.rt_piX(iFock);
-    auto rl_pix = rwDensityGridCubic.rl_piX(iFock);
-    auto ll_pix = rwDensityGridCubic.ll_piX(iFock);
     auto tt_pix = rwDensityGridCubic.tt_piX(iFock);
-    auto tl_pix = rwDensityGridCubic.tl_piX(iFock);
 
     auto piy    = rwDensityGridCubic.piY(iFock);
     auto rt_piy = rwDensityGridCubic.rt_piY(iFock);
-    auto rl_piy = rwDensityGridCubic.rl_piY(iFock);
-    auto ll_piy = rwDensityGridCubic.ll_piY(iFock);
     auto tt_piy = rwDensityGridCubic.tt_piY(iFock);
-    auto tl_piy = rwDensityGridCubic.tl_piY(iFock);
 
     auto piz    = rwDensityGridCubic.piZ(iFock);
     auto rt_piz = rwDensityGridCubic.rt_piZ(iFock);
-    auto rl_piz = rwDensityGridCubic.rl_piZ(iFock);
-    auto ll_piz = rwDensityGridCubic.ll_piZ(iFock);
     auto tt_piz = rwDensityGridCubic.tt_piZ(iFock);
-    auto tl_piz = rwDensityGridCubic.tl_piZ(iFock);
 
     auto pixx = rwDensityGridCubic.piXX(iFock);
     auto pixy = rwDensityGridCubic.piXY(iFock);
@@ -3280,16 +3222,6 @@ integratePartialLxcFockForMGGA(const CXCFunctional&     xcFunctional,
     auto pizx = rwDensityGridCubic.piZX(iFock);
     auto pizy = rwDensityGridCubic.piZY(iFock);
     auto pizz = rwDensityGridCubic.piZZ(iFock);
-
-    auto l_pixx = rwDensityGridCubic.l_piXX(iFock);
-    auto l_pixy = rwDensityGridCubic.l_piXY(iFock);
-    auto l_pixz = rwDensityGridCubic.l_piXZ(iFock);
-    auto l_piyx = rwDensityGridCubic.l_piYX(iFock);
-    auto l_piyy = rwDensityGridCubic.l_piYY(iFock);
-    auto l_piyz = rwDensityGridCubic.l_piYZ(iFock);
-    auto l_pizx = rwDensityGridCubic.l_piZX(iFock);
-    auto l_pizy = rwDensityGridCubic.l_piZY(iFock);
-    auto l_pizz = rwDensityGridCubic.l_piZZ(iFock);
 
     auto t_pixx = rwDensityGridCubic.t_piXX(iFock);
     auto t_pixy = rwDensityGridCubic.t_piXY(iFock);
@@ -3331,7 +3263,6 @@ integratePartialLxcFockForMGGA(const CXCFunctional&     xcFunctional,
 
     auto rhow    = rw3DensityGrid.alphaDensity(iFock);
     auto tauw    = rw3DensityGrid.alphaDensitytau(iFock);
-    auto laplw   = rw3DensityGrid.alphaDensitylapl(iFock);
     auto gradw_x = rw3DensityGrid.alphaDensityGradientX(iFock);
     auto gradw_y = rw3DensityGrid.alphaDensityGradientY(iFock);
     auto gradw_z = rw3DensityGrid.alphaDensityGradientZ(iFock);

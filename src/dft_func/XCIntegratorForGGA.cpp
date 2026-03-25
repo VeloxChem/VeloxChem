@@ -108,18 +108,12 @@ integrateVxcFockForGgaClosedShell(const CMolecule&                  molecule,
 
     // set up pointers to OMP data
 
-    auto ptr_counts = counts.data();
-
-    auto ptr_displacements = displacements.data();
-
     auto ptr_gto_blocks = gto_blocks.data();
-
-    auto ptr_gsDensityPointers = gsDensityPointers.data();
 
     auto ptr_xcFunctional = &xcFunctional;
 
-#pragma omp parallel shared(ptr_counts, ptr_displacements, xcoords, ycoords, zcoords, \
-                            ptr_gto_blocks, ptr_gsDensityPointers, ptr_xcFunctional, \
+#pragma omp parallel shared(displacements, xcoords, ycoords, zcoords, \
+                            ptr_gto_blocks, gsDensityPointers, ptr_xcFunctional, \
                             n_boxes, n_gto_blocks, naos, nele, xcene, mat_Vxc)
     {
 
@@ -416,18 +410,12 @@ integrateVxcFockForGgaOpenShell(const CMolecule&                  molecule,
 
     // set up pointers to OMP data
 
-    auto ptr_counts = counts.data();
-
-    auto ptr_displacements = displacements.data();
-
     auto ptr_gto_blocks = gto_blocks.data();
-
-    auto ptr_gsDensityPointers = gsDensityPointers.data();
 
     auto ptr_xcFunctional = &xcFunctional;
 
-#pragma omp parallel shared(ptr_counts, ptr_displacements, xcoords, ycoords, zcoords, \
-                            ptr_gto_blocks, ptr_gsDensityPointers, ptr_xcFunctional, \
+#pragma omp parallel shared(displacements, xcoords, ycoords, zcoords, \
+                            ptr_gto_blocks, gsDensityPointers, ptr_xcFunctional, \
                             n_boxes, n_gto_blocks, naos, nele, xcene, mat_Vxc)
     {
 
@@ -734,18 +722,12 @@ integrateFxcFockForGgaClosedShell(const std::vector<double*>&       aoFockPointe
 
     // set up pointers to OMP data
 
-    auto ptr_counts = counts.data();
-
-    auto ptr_displacements = displacements.data();
-
     auto ptr_gto_blocks = gto_blocks.data();
-
-    auto ptr_gsDensityPointers = gsDensityPointers.data();
 
     auto ptr_xcFunctional = &xcFunctional;
 
-#pragma omp parallel shared(ptr_counts, ptr_displacements, xcoords, ycoords, zcoords, \
-                            ptr_gto_blocks, ptr_gsDensityPointers, ptr_xcFunctional, \
+#pragma omp parallel shared(displacements, xcoords, ycoords, zcoords, \
+                            ptr_gto_blocks, gsDensityPointers, ptr_xcFunctional, \
                             n_boxes, n_gto_blocks, n_rw_densities, naos, \
                             aoFockPointers, rwDensityPointers)
     {
@@ -1120,18 +1102,12 @@ integrateFxcFockForGgaOpenShell(const std::vector<double*>&       aoFockPointers
 
     // set up pointers to OMP data
 
-    auto ptr_counts = counts.data();
-
-    auto ptr_displacements = displacements.data();
-
     auto ptr_gto_blocks = gto_blocks.data();
-
-    auto ptr_gsDensityPointers = gsDensityPointers.data();
 
     auto ptr_xcFunctional = &xcFunctional;
 
-#pragma omp parallel shared(ptr_counts, ptr_displacements, xcoords, ycoords, zcoords, \
-                            ptr_gto_blocks, ptr_gsDensityPointers, ptr_xcFunctional, \
+#pragma omp parallel shared(displacements, xcoords, ycoords, zcoords, \
+                            ptr_gto_blocks, gsDensityPointers, ptr_xcFunctional, \
                             n_boxes, n_gto_blocks, n_rw_densities, naos, \
                             aoFockPointers, rwDensityPointers)
     {
@@ -1566,18 +1542,12 @@ integrateKxcFockForGgaClosedShell(const std::vector<double*>& aoFockPointers,
 
     // set up pointers to OMP data
 
-    auto ptr_counts = counts.data();
-
-    auto ptr_displacements = displacements.data();
-
     auto ptr_gto_blocks = gto_blocks.data();
-
-    auto ptr_gsDensityPointers = gsDensityPointers.data();
 
     auto ptr_xcFunctional = &xcFunctional;
 
-#pragma omp parallel shared(ptr_counts, ptr_displacements, xcoords, ycoords, zcoords, \
-                            ptr_gto_blocks, ptr_gsDensityPointers, ptr_xcFunctional, \
+#pragma omp parallel shared(displacements, xcoords, ycoords, zcoords, \
+                            ptr_gto_blocks, gsDensityPointers, ptr_xcFunctional, \
                             n_boxes, n_gto_blocks, n_rw2_densities, naos, \
                             aoFockPointers, rwDensityPointers, rw2DensityPointers)
     {
@@ -1916,18 +1886,12 @@ integrateKxcLxcFockForGgaClosedShell(const std::vector<double*>& aoFockPointers,
 
     // set up pointers to OMP data
 
-    auto ptr_counts = counts.data();
-
-    auto ptr_displacements = displacements.data();
-
     auto ptr_gto_blocks = gto_blocks.data();
-
-    auto ptr_gsDensityPointers = gsDensityPointers.data();
 
     auto ptr_xcFunctional = &xcFunctional;
 
-#pragma omp parallel shared(ptr_counts, ptr_displacements, xcoords, ycoords, zcoords, \
-                            ptr_gto_blocks, ptr_gsDensityPointers, ptr_xcFunctional, \
+#pragma omp parallel shared(displacements, xcoords, ycoords, zcoords, \
+                            ptr_gto_blocks, gsDensityPointers, ptr_xcFunctional, \
                             n_boxes, n_gto_blocks, n_rw2_densities, n_rw3_densities, naos, \
                             aoFockPointers, rwDensityPointers, rw2DensityPointers, \
                             rw3DensityPointers)
