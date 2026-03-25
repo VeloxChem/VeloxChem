@@ -201,7 +201,7 @@ integrateVxcPDFTGradientForLDA(const CMolecule&                molecule,
 
             // go through GTO blocks
 
-            for (size_t i_block = 0, idx = 0; i_block < n_gto_blocks; i_block++)
+            for (int i_block = 0, idx = 0; i_block < static_cast<int>(n_gto_blocks); i_block++)
             {
                 const auto& gto_block = ptr_gto_blocks[i_block];
 
@@ -638,7 +638,7 @@ integrateVxcPDFTGradientForGGA(const CMolecule&                molecule,
 
             // go through GTO blocks
 
-            for (size_t i_block = 0, idx = 0; i_block < n_gto_blocks; i_block++)
+            for (int i_block = 0, idx = 0; i_block < static_cast<int>(n_gto_blocks); i_block++)
             {
                 const auto& gto_block = ptr_gto_blocks[i_block];
 
