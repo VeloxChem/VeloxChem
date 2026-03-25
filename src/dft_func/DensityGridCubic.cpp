@@ -12810,28 +12810,6 @@ CDensityGridCubic::DensityProdForMGGA_3PA(const CDensityGrid& rwDensityGrid,
                 auto rt_gam_bcf_xz_r = rt_gam(6 * j + 4);
                 auto rt_gam_bcf_yz_r = rt_gam(6 * j + 5);
 
-                auto tl_gam_bcf_xx_r = tl_gam(6 * j);
-                auto tl_gam_bcf_yy_r = tl_gam(6 * j + 1);
-                auto tl_gam_bcf_zz_r = tl_gam(6 * j + 2);
-                auto tl_gam_bcf_xy_r = tl_gam(6 * j + 3);
-                auto tl_gam_bcf_xz_r = tl_gam(6 * j + 4);
-                auto tl_gam_bcf_yz_r = tl_gam(6 * j + 5);
-
-                auto rl_gam_bcf_xx_r = rl_gam(6 * j);
-                auto rl_gam_bcf_yy_r = rl_gam(6 * j + 1);
-                auto rl_gam_bcf_zz_r = rl_gam(6 * j + 2);
-                auto rl_gam_bcf_xy_r = rl_gam(6 * j + 3);
-                auto rl_gam_bcf_xz_r = rl_gam(6 * j + 4);
-                auto rl_gam_bcf_yz_r = rl_gam(6 * j + 5);
-
-                auto ll_gam_bcf_xx_r = ll_gam(6 * j);
-                auto ll_gam_bcf_yy_r = ll_gam(6 * j + 1);
-                auto ll_gam_bcf_zz_r = ll_gam(6 * j + 2);
-                auto ll_gam_bcf_xy_r = ll_gam(6 * j + 3);
-                auto ll_gam_bcf_xz_r = ll_gam(6 * j + 4);
-                auto ll_gam_bcf_yz_r = ll_gam(6 * j + 5);
-
-
                 // For gam_bcf_xx_r = gam(6 * j);
                 auto gam_bcf_xx_X_r  = gamX(6 * j);
                 auto gam_bcf_xx_Y_r  = gamY(6 * j);
@@ -12844,9 +12822,6 @@ CDensityGridCubic::DensityProdForMGGA_3PA(const CDensityGrid& rwDensityGrid,
                 auto sl_gam_bcf_xx_X_r  = sl_gamX(6 * j);
                 auto sl_gam_bcf_xx_Y_r  = sl_gamY(6 * j);
                 auto sl_gam_bcf_xx_Z_r  = sl_gamZ(6 * j);
-
-
-
 
                 auto gam_bcf_xx_XX_r = gamXX(6 * j);
                 auto gam_bcf_xx_XY_r = gamXY(6 * j);

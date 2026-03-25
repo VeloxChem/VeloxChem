@@ -31,6 +31,7 @@
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from mpi4py import MPI
+from copy import deepcopy
 import numpy as np
 import time
 import math
@@ -46,6 +47,8 @@ from .veloxchemlib import bohr_in_angstrom, hartree_in_kjpermol
 from .molecularbasis import MolecularBasis
 from .dispersionmodel import DispersionModel
 from .gradientdriver import GradientDriver
+from .outputstream import OutputStream
+from .inputparser import write_unparsed_input_to_hdf5, unparse_input
 from .oneeints import compute_kinetic_energy_gradient
 from .oneeints import compute_overlap_gradient
 from .oneeints import compute_nuclear_potential_gradient
@@ -90,7 +93,19 @@ class ScfGradientDriver(GradientDriver):
         # D4 dispersion correction
         self.dispersion = scf_drv.dispersion
 
-    def compute(self, molecule, basis, scf_results=None):
+    def read_settings(self, checkpoint_file):
+        """
+        Reads opt settings from checkpoint file.
+
+        :param checkpoint_file:
+            The checkpoint file to read settings from.
+        """
+
+        super().read_settings(checkpoint_file)
+
+        self.scf_driver.read_settings(checkpoint_file)
+
+    def compute(self, molecule, basis, scf_results_not_used=None):
         """
         Performs calculation of gradient.
 
@@ -98,8 +113,8 @@ class ScfGradientDriver(GradientDriver):
             The molecule.
         :param basis:
             The AO basis set.
-        :param scf_results:
-            The dictionary containing converged SCF results.
+        :param scf_results_not_used:
+            For backward compatibility.
         """
 
         # TODO: enable RI-JK
@@ -107,7 +122,10 @@ class ScfGradientDriver(GradientDriver):
             not self.scf_driver.ri_jk,
             f'{type(self).__name__}.compute: RI-JK is not yet supported')
 
+        scf_results = self.scf_driver.scf_results
         if scf_results is None:
+            # run SCF if needed
+            scf_energy_not_used = self.compute_energy(molecule, basis)
             scf_results = self.scf_driver.scf_results
 
         start_time = time.time()
@@ -119,7 +137,7 @@ class ScfGradientDriver(GradientDriver):
         else:
             # sanity checks
             molecule_sanity_check(molecule)
-            scf_results_sanity_check(self, self.scf_driver.scf_results)
+            scf_results_sanity_check(self, scf_results)
             dft_sanity_check(self, 'compute')
 
             if self.rank == mpi_master():
@@ -144,6 +162,17 @@ class ScfGradientDriver(GradientDriver):
         # print gradient
         self.print_geometry(molecule)
         self.print_gradient(molecule)
+
+        # write grad_settings to checkpoint
+        checkpoint_file = self.scf_driver.get_checkpoint_file()
+        if self.rank == mpi_master() and checkpoint_file is not None:
+            grad_keywords = {
+                key: val[0]
+                for key, val in self._input_keywords['gradient'].items()
+            }
+            write_unparsed_input_to_hdf5(checkpoint_file,
+                                         unparse_input(self, grad_keywords),
+                                         group_name='grad_settings')
 
         valstr = '*** Time spent in gradient calculation: '
         valstr += '{:.2f} sec ***'.format(time.time() - start_time)
@@ -185,8 +214,8 @@ class ScfGradientDriver(GradientDriver):
 
         t0 = time.time()
 
-        gradient += compute_nuclear_potential_gradient(molecule, basis,
-                                                       D_total, local_atoms)
+        gradient += compute_nuclear_potential_gradient(molecule, basis, D_total,
+                                                       local_atoms)
 
         grad_timing['Nuclear_potential_grad'] += time.time() - t0
 
@@ -910,36 +939,53 @@ class ScfGradientDriver(GradientDriver):
                     self.ostream.print_info(f'    {key:<25}:  {val:.2f} sec')
             self.ostream.print_blank()
 
-    def compute_energy(self, molecule, ao_basis, scf_results=None):
+    def compute_energy(self, molecule, basis, scf_results_not_used=None):
         """
         Computes the energy at current geometry.
 
         :param molecule:
             The molecule.
-        :param ao_basis:
+        :param basis:
             The AO basis set.
-        :param scf_results:
-            The dictionary containing converged SCF results.
+        :param scf_results_not_used:
+            For backward compatibility.
 
         :return:
             The energy.
         """
 
         if self.numerical:
-            # disable restarting scf for numerical gradient
+            # disable restarting scf for numerical calculation
             self.scf_driver.restart = False
         else:
-            # always try restarting scf for analytical gradient
+            # always try restarting scf for analytical calculation
             self.scf_driver.restart = True
 
         self.scf_driver.ostream.mute()
-        new_scf_results = self.scf_driver.compute(molecule, ao_basis)
+        new_scf_results_not_used = self.scf_driver.compute(molecule, basis)
         self.scf_driver.ostream.unmute()
 
         assert_msg_critical(self.scf_driver.is_converged,
-                            'ScfGradientDriver: SCF did not converge')
-
-        if (self.rank == mpi_master()) and (scf_results is not None):
-            scf_results.update(new_scf_results)
+                            f'{type(self).__name__}: SCF did not converge')
 
         return self.scf_driver.get_scf_energy()
+
+    def __deepcopy__(self, memo):
+        """
+        Implements deepcopy.
+
+        :param memo:
+            The memo dictionary for deepcopy.
+
+        :return:
+            A deepcopy of self.
+        """
+
+        new_grad_drv = ScfGradientDriver(deepcopy(self.scf_driver))
+
+        for key, val in vars(self).items():
+            if isinstance(val, (MPI.Intracomm, OutputStream)):
+                continue
+            setattr(new_grad_drv, key, deepcopy(val))
+
+        return new_grad_drv

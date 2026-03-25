@@ -760,4 +760,25 @@ class MolecularOrbitals:
             A deepcopy of self.
         """
 
-        return MolecularOrbitals(self)
+        if self.is_empty():
+            return MolecularOrbitals()
+
+        if self._orbitals_type == molorb.rest:
+            return MolecularOrbitals([self.alpha_to_numpy()],
+                                     [self.ea_to_numpy()],
+                                     [self.occa_to_numpy()], molorb.rest)
+        elif self._orbitals_type == molorb.unrest:
+            return MolecularOrbitals([self.alpha_to_numpy(),
+                                      self.beta_to_numpy()],
+                                     [self.ea_to_numpy(),
+                                      self.eb_to_numpy()],
+                                     [self.occa_to_numpy(),
+                                      self.occb_to_numpy()], molorb.unrest)
+        elif self._orbitals_type == molorb.restopen:
+            return MolecularOrbitals([self.alpha_to_numpy()],
+                                     [self.ea_to_numpy()],
+                                     [self.occa_to_numpy(),
+                                      self.occb_to_numpy()],
+                                     molorb.restopen)
+        else:
+            return MolecularOrbitals()

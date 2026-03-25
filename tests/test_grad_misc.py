@@ -11,6 +11,7 @@ from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfgradientdriver import ScfGradientDriver
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
+from veloxchem.scfrestopendriver import ScfRestrictedOpenDriver
 
 
 @pytest.mark.solvers
@@ -69,9 +70,19 @@ class TestScfGradientDriverMiscellaneous:
         return scf_drv, scf_results
 
     @staticmethod
-    def run_unrestricted_scf(molecule, basis, xcfun='hf'):
+    def run_unrestricted_scf(molecule, basis, xcfun='hf', filename=None):
 
         scf_drv = ScfUnrestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_drv.xcfun = xcfun
+        scf_drv.filename = filename
+        scf_results = scf_drv.compute(molecule, basis)
+        return scf_drv, scf_results
+
+    @staticmethod
+    def run_restricted_openshell_scf(molecule, basis, xcfun='hf'):
+
+        scf_drv = ScfRestrictedOpenDriver()
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun
         scf_results = scf_drv.compute(molecule, basis)
@@ -108,15 +119,13 @@ class TestScfGradientDriverMiscellaneous:
     def test_compute_rejects_restricted_openshell_marker(self):
 
         molecule, basis = self.get_h2_molecule_and_basis()
-        scf_drv, scf_results = self.run_restricted_scf(molecule, basis)
+        scf_drv, scf_results = self.run_restricted_openshell_scf(
+            molecule, basis)
         grad_drv = ScfGradientDriver(scf_drv)
-
-        invalid_results = dict(scf_results)
-        invalid_results['scf_type'] = 'restricted_openshell'
 
         with pytest.raises(AssertionError,
                            match='Not implemented for restricted open-shell'):
-            grad_drv.compute(molecule, basis, invalid_results)
+            grad_drv.compute(molecule, basis)
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='skip pytest.raises for multiple MPI processes')
@@ -181,7 +190,7 @@ class TestScfGradientDriverMiscellaneous:
 
         assert np.max(np.abs(grad_drv.get_gradient())) > 0.0
 
-    def test_compute_energy_updates_results_and_restart_mode(self):
+    def test_compute_energy_and_restart_mode(self):
 
         molecule, basis = self.get_h2_molecule_and_basis()
         scf_drv, scf_results = self.run_restricted_scf(molecule, basis)
@@ -196,14 +205,10 @@ class TestScfGradientDriverMiscellaneous:
 
         scf_drv.compute = wrapped_compute
 
-        updated_results = {'sentinel': 'keep'}
-        energy = grad_drv.compute_energy(molecule, basis, updated_results)
+        energy = grad_drv.compute_energy(molecule, basis)
 
         assert restart_states == [True]
         assert np.isclose(energy, scf_drv.get_scf_energy())
-        if grad_drv.rank == mpi_master():
-            assert 'scf_energy' in updated_results
-            assert updated_results['sentinel'] == 'keep'
 
         grad_drv.numerical = True
         grad_drv.compute_energy(molecule, basis)
@@ -269,3 +274,48 @@ class TestScfGradientDriverMiscellaneous:
         assert np.max(
             np.abs((disp_gradient - base_gradient) -
                    d4_model.get_gradient())) < 1.0e-8
+
+    def test_gradient_driver_deepcopy(self):
+
+        molecule, basis = self.get_ch3_molecule_and_basis()
+
+        scf_drv, scf_results = self.run_unrestricted_scf(
+            molecule, basis, 'b3lyp')
+        grad_drv = ScfGradientDriver(scf_drv)
+        grad_drv.compute(molecule, basis, scf_results)
+
+        grad_drv_copy = deepcopy(grad_drv)
+
+        assert grad_drv_copy.xcfun == grad_drv.xcfun
+        assert np.allclose(grad_drv_copy.gradient, grad_drv.gradient)
+
+    def test_read_settings(self, tmp_path):
+
+        molecule, basis = self.get_ch3_molecule_and_basis()
+
+        filename = str(tmp_path / "grad_import_settings")
+
+        comm = MPI.COMM_WORLD
+        filename = comm.bcast(filename, root=mpi_master())
+
+        scf_drv, scf_results = self.run_unrestricted_scf(molecule,
+                                                         basis,
+                                                         'b3lyp',
+                                                         filename=filename)
+        grad_drv = ScfGradientDriver(scf_drv)
+        grad_drv.compute(molecule, basis, scf_results)
+
+        checkpoint_file = f'{filename}_scf.h5'
+
+        new_scf_drv = ScfUnrestrictedDriver()
+        new_grad_drv = ScfGradientDriver(new_scf_drv)
+        new_grad_drv.read_settings(checkpoint_file)
+
+        # these should be updated by read_settings
+        assert new_grad_drv.scf_driver.xcfun == scf_drv.xcfun
+        assert new_grad_drv.xcfun == scf_drv.xcfun
+
+        # these should not be updated by read_settings
+        assert new_grad_drv.scf_driver.filename is None
+        assert new_grad_drv.scf_driver.checkpoint_file is None
+        assert new_grad_drv.gradient is None

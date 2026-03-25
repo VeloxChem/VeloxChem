@@ -925,13 +925,13 @@ class TestMolecule:
         assert np.array_equal(mol.get_connectivity_matrix(H2_factor=1.3),
                               np.array([[0, 0], [0, 0]]))
 
-    def test_find_connected_atoms(self):
+    def testfind_connected_atoms(self):
 
         mol = Molecule.read_str(self.nh3_h2o_xyzstr(), 'au')
         connectivity = mol.get_connectivity_matrix()
 
-        assert mol._find_connected_atoms(0, connectivity) == {0, 1, 2, 3}
-        assert mol._find_connected_atoms(4, connectivity) == {4, 5, 6}
+        assert mol.find_connected_atoms(0, connectivity) == {0, 1, 2, 3}
+        assert mol.find_connected_atoms(4, connectivity) == {4, 5, 6}
 
     def test_coordinates_in_bohr(self):
 
@@ -1394,6 +1394,31 @@ class TestMolecule:
         assert isinstance(xyz_without_hydrogen, str)
         assert int(xyz_with_hydrogen.splitlines()[0]) == 3
         assert int(xyz_without_hydrogen.splitlines()[0]) == 1
+
+    @pytest.mark.skipif("rdkit" not in sys.modules,
+                        reason="rdkit not available")
+    def test_read_smiles_with_multi_components(self):
+
+        mol = Molecule.read_smiles('CCO.C1CCCC1.c1ccccc1')
+        assert mol.number_of_atoms() == 36
+
+    @pytest.mark.skipif("rdkit" not in sys.modules,
+                        reason="rdkit not available")
+    def test_read_smiles_with_reorder_hydrogens(self):
+
+        # with reorder_hydrogens, the first atom will be C and
+        # the second atom will be H
+        mol = Molecule.read_smiles('CCO', reorder_hydrogens=True)
+        labels = mol.get_labels()
+        assert labels[0] != 'H'
+        assert labels[1] == 'H'
+        assert labels[2] == 'H'
+
+        # H2 molecule
+        mol = Molecule.read_smiles('[H][H]', reorder_hydrogens=True)
+        labels = mol.get_labels()
+        assert labels[0] == 'H'
+        assert labels[1] == 'H'
 
     @pytest.mark.skipif("rdkit" not in sys.modules,
                         reason="rdkit not available")

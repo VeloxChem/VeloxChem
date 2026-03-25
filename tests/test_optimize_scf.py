@@ -41,7 +41,7 @@ class TestOptimizeSCF:
             'coordsys': 'tric',
             'filename': task.input_dict['filename'],
         })
-        opt_results = opt_drv.compute(task.molecule, task.ao_basis, scf_results)
+        opt_results = opt_drv.compute(task.molecule, task.ao_basis)
 
         if task.mpi_rank == mpi_master():
             opt_mol = opt_results['final_molecule']

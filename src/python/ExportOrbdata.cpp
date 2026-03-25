@@ -444,7 +444,8 @@ export_orbdata(py::module &m)
             "i_dens"_a)
         .def("number_of_density_matrices", &CAODensityMatrix::getNumberOfDensityMatrices, "Gets number of density matrices.")
         .def("get_density_type", &CAODensityMatrix::getDensityType, "Gets type of density matrix.")
-        .def(py::self == py::self);
+        .def(py::self == py::self)
+        .def("__deepcopy__", [](const CAODensityMatrix &self, py::dict) { return CAODensityMatrix(self); });
     
     // CBaseCorePotential class
     PyClass<CBaseCorePotential>(m, "BaseCorePotential")

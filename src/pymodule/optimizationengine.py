@@ -38,10 +38,11 @@ import numpy as np
 import time as tm
 
 from .veloxchemlib import mpi_master
-from .veloxchemlib import XCFunctional, MolecularGrid
 from .outputstream import OutputStream
+from .scfgradientdriver import ScfGradientDriver
 from .molecule import Molecule
 from .profiler import Profiler
+from .inputparser import write_unparsed_input_to_hdf5
 
 with redirect_stderr(StringIO()) as fg_err:
     import geometric
@@ -88,6 +89,9 @@ class OptimizationEngine(geometric.engine.Engine):
 
         self._debug = False
 
+        self.opt_unparsed_input = None
+        self.opt_current_step = 0
+
     def lower(self):
         """
         Required in order to get MECI optimization working in geomeTRIC
@@ -122,7 +126,7 @@ class OptimizationEngine(geometric.engine.Engine):
             new_mol = Molecule()
         new_mol = self.comm.bcast(new_mol, root=mpi_master())
 
-        title_txt = 'Optimization Step'
+        title_txt = f'Optimization Step {self.opt_current_step}'
         self.grad_drv.ostream.print_header(title_txt)
         self.grad_drv.ostream.print_header('=' * (len(title_txt) + 2))
         self.grad_drv.ostream.print_blank()
@@ -138,20 +142,23 @@ class OptimizationEngine(geometric.engine.Engine):
             self.grad_drv.ostream.print_blank()
             self.grad_drv.ostream.flush()
 
-        if not self._debug:
-            #self.grad_drv.ostream.mute()
-            pass
-
         energy = self.grad_drv.compute_energy(new_mol, *self.args)
         self.grad_drv.compute(new_mol, *self.args)
         gradient = self.grad_drv.get_gradient()
 
-        if not self._debug:
-            #self.grad_drv.ostream.unmute()
-            pass
+        if hasattr(self.grad_drv, "scf_driver") and isinstance(
+                self.grad_drv, ScfGradientDriver):
+            checkpoint_file = self.grad_drv.scf_driver.get_checkpoint_file()
+            if checkpoint_file is not None and self.opt_unparsed_input is not None:
+                if self.rank == mpi_master():
+                    write_unparsed_input_to_hdf5(checkpoint_file,
+                                                 self.opt_unparsed_input,
+                                                 group_name='opt_settings')
 
         energy = self.comm.bcast(energy, root=mpi_master())
         gradient = self.comm.bcast(gradient, root=mpi_master())
+
+        self.opt_current_step += 1
 
         if self.rank == mpi_master():
             grad2 = np.sum(gradient**2, axis=1)
@@ -206,16 +213,11 @@ class OptimizationEngine(geometric.engine.Engine):
 
         new_engine = OptimizationEngine(deepcopy(self.grad_drv),
                                         deepcopy(self.molecule),
-                                        deepcopy(self.args))
+                                        *deepcopy(self.args))
 
         for key, val in vars(self).items():
             if isinstance(val, (MPI.Intracomm, OutputStream)):
-                pass
-            elif isinstance(val, XCFunctional):
-                new_engine.key = XCFunctional(val)
-            elif isinstance(val, MolecularGrid):
-                new_engine.key = MolecularGrid(val)
-            else:
-                new_engine.key = deepcopy(val)
+                continue
+            setattr(new_engine, key, deepcopy(val))
 
         return new_engine

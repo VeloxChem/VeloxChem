@@ -239,8 +239,11 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
 
             checkpoint_nstates = self._read_nstates_from_checkpoint()
 
+            # Note that we only handle the restart with additional nstates when
+            # `self.nonlinear` is inactive
+
             # print warning if nstates is not present in the restart file
-            if checkpoint_nstates is None:
+            if checkpoint_nstates is None and not self.nonlinear:
                 self.ostream.print_warning(
                     'Could not find the nstates key in the checkpoint file.')
                 self.ostream.print_blank()
@@ -252,7 +255,7 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
 
             # generate necessary initial guesses if more states are requested
             # in a restart calculation
-            elif checkpoint_nstates < self.nstates:
+            elif checkpoint_nstates < self.nstates and not self.nonlinear:
                 self.ostream.print_info(
                     'Generating initial guesses for ' +
                     f'{self.nstates - checkpoint_nstates} more states...')

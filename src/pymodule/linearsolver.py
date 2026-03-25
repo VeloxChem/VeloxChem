@@ -737,6 +737,53 @@ class LinearSolver:
 
         return nstates
 
+    def _add_frequencies_to_checkpoint(self):
+        """
+        Add frequencies to checkpoint file.
+        """
+
+        # For LR/CPP
+
+        if self.checkpoint_file is None:
+            return
+
+        if self.rank == mpi_master():
+            hf = h5py.File(self.checkpoint_file, 'a')
+            key = 'frequencies'
+            if key in hf:
+                del hf[key]
+            hf.create_dataset(key, data=np.array(self.frequencies))
+            hf.close()
+
+        self.comm.barrier()
+
+    def _read_frequencies_from_checkpoint(self):
+        """
+        Read frequencies from checkpoint file.
+
+        :return:
+            The frequencies.
+        """
+
+        # For LR/CPP
+
+        if self.checkpoint_file is None:
+            return None
+
+        frequencies = None
+
+        if self.rank == mpi_master():
+            hf = h5py.File(self.checkpoint_file, 'r')
+            key = 'frequencies'
+            if key in hf:
+                frequencies = np.array(hf.get(key))
+                frequencies = [float(x) for x in frequencies]
+            hf.close()
+
+        frequencies = self.comm.bcast(frequencies, root=mpi_master())
+
+        return frequencies
+
     def compute(self, molecule, basis, scf_results, v_grad=None):
         """
         Solves for the linear equations.
@@ -1954,6 +2001,9 @@ class LinearSolver:
                 den_mat_for_ri_j.set_values(0.5 * (dens_Jab + dens_Jab.T))
 
                 fock_mat = self._ri_drv.compute(den_mat_for_ri_j, 'j')
+
+                fock_mat_a_np = fock_mat.to_numpy()
+                fock_mat_b_np = fock_mat.to_numpy()
             else:
                 # for now we calculate Ka, Kb and Jab separately for open-shell
                 den_mat_for_Ka = make_matrix(basis, mat_t.general)

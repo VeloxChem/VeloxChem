@@ -10075,7 +10075,6 @@ CDensityGridQuad::DensityProdForMGGA(const CDensityGrid& rwDensityGrid,
 
                 auto gam_fzz_r = gam(6 * j  + 2);
                 auto rt_gam_fzz_r = rt_gam(6 * j  + 2);
-                auto rl_gam_fzz_r = rl_gam(6 * j  + 2);
                 auto tt_gam_fzz_r = tt_gam(6 * j  + 2);
 
 
@@ -10104,7 +10103,6 @@ CDensityGridQuad::DensityProdForMGGA(const CDensityGrid& rwDensityGrid,
 
                 auto gam_fxy_r = gam(6 * j  + 3);
                 auto rt_gam_fxy_r = rt_gam(6 * j  + 3);
-                auto rl_gam_fxy_r = rl_gam(6 * j  + 3);
                 auto tt_gam_fxy_r = tt_gam(6 * j  + 3);
 
                 auto gam_fxy_X_r = gamX(6 * j  + 3);
@@ -10132,7 +10130,6 @@ CDensityGridQuad::DensityProdForMGGA(const CDensityGrid& rwDensityGrid,
 
                 auto gam_fxz_r = gam(6 * j  + 4);
                 auto rt_gam_fxz_r = rt_gam(6 * j  + 4);
-                auto rl_gam_fxz_r = rl_gam(6 * j  + 4);
                 auto tt_gam_fxz_r = tt_gam(6 * j  + 4);
 
                 auto gam_fxz_X_r = gamX(6 * j  + 4);
@@ -10160,7 +10157,6 @@ CDensityGridQuad::DensityProdForMGGA(const CDensityGrid& rwDensityGrid,
 
                 auto gam_fyz_r = gam(6 * j  + 5);
                 auto rt_gam_fyz_r = rt_gam(6 * j  + 5);
-                auto rl_gam_fyz_r = rl_gam(6 * j  + 5);
                 auto tt_gam_fyz_r = tt_gam(6 * j  + 5);
 
 

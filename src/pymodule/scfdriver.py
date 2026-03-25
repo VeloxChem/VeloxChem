@@ -66,8 +66,7 @@ from .cpcmdriver import CpcmDriver
 from .smddriver import SmdDriver
 from .dispersionmodel import DispersionModel
 from .inputparser import (parse_input, print_keywords, print_attributes,
-                          get_random_string_parallel, unparse_input,
-                          write_unparsed_input_to_hdf5,
+                          unparse_input, write_unparsed_input_to_hdf5,
                           read_unparsed_input_from_hdf5)
 from .dftutils import get_default_grid_level, print_xc_reference
 from .sanitychecks import (molecule_sanity_check, dft_sanity_check,
@@ -216,6 +215,7 @@ class ScfDriver:
         self.restart = True
         self.checkpoint_file = None
         self._ref_mol_orbs = None
+        self._use_start_orbitals = False
 
         # Maximum overlap constraint
         self._mom = None
@@ -523,8 +523,6 @@ class ScfDriver:
             self.program_end_time = scf_dict['program_end_time']
         if 'filename' in scf_dict:
             self.filename = scf_dict['filename']
-            if 'checkpoint_file' not in scf_dict:
-                self.checkpoint_file = f'{self.filename}_scf.h5'
 
         method_keywords = {
             key: val[0]
@@ -559,7 +557,53 @@ class ScfDriver:
                 'with polarizable embedding')
             # Note: we allow restarting SCF with point charges
 
-    def compute(self, molecule, basis, min_basis=None, restart_exact=False):
+    def read_settings(self, checkpoint_file):
+        """
+        Reads SCF and method settings from checkpoint file.
+
+        :param checkpoint_file:
+            The checkpoint file to read settings from.
+        """
+
+        if self.rank == mpi_master():
+            checkpoint_scf_input = read_unparsed_input_from_hdf5(
+                checkpoint_file, group_name='scf_settings')
+            checkpoint_method_input = read_unparsed_input_from_hdf5(
+                checkpoint_file, group_name='method_settings')
+        else:
+            checkpoint_scf_input = None
+            checkpoint_method_input = None
+
+        checkpoint_scf_input = self.comm.bcast(checkpoint_scf_input,
+                                               root=mpi_master())
+        checkpoint_method_input = self.comm.bcast(checkpoint_method_input,
+                                                  root=mpi_master())
+
+        # Avoid importing restart state or checkpoint/output targets when
+        # copying settings from an external file.
+        checkpoint_scf_input.pop('restart', None)
+        checkpoint_scf_input.pop('checkpoint_file', None)
+        checkpoint_scf_input.pop('filename', None)
+
+        self.update_settings(checkpoint_scf_input, checkpoint_method_input)
+
+    def get_checkpoint_file(self):
+        """
+        Gets the effective checkpoint file path.
+
+        :return:
+            The effective checkpoint file path, or None if unavailable.
+        """
+
+        if isinstance(self.checkpoint_file, str):
+            return self.checkpoint_file
+
+        if self.filename is not None:
+            return f'{self.filename}_scf.h5'
+
+        return None
+
+    def compute(self, molecule, basis, min_basis=None):
         """
         Performs SCF calculation using molecular data.
 
@@ -587,33 +631,13 @@ class ScfDriver:
                 min_basis = None
             min_basis = self.comm.bcast(min_basis, root=mpi_master())
 
-        if self.filename is not None and self.checkpoint_file is None:
-            self.checkpoint_file = f'{self.filename}_scf.h5'
-
         # validate checkpoint file
+        if not self._use_start_orbitals:
+            self._ref_mol_orbs = None
         if self.restart:
             self.restart = self.validate_checkpoint(molecule.get_element_ids(),
                                                     basis.get_label(),
                                                     self.scf_type)
-
-        # read SCF and method settings, if restart_exact is requested
-        if self.restart and restart_exact:
-            if self.rank == mpi_master():
-                checkpoint_scf_input = read_unparsed_input_from_hdf5(
-                    self.checkpoint_file, group_name="scf_settings")
-                checkpoint_method_input = read_unparsed_input_from_hdf5(
-                    self.checkpoint_file, group_name="method_settings")
-            else:
-                checkpoint_scf_input = None
-                checkpoint_method_input = None
-            checkpoint_scf_input = self.comm.bcast(checkpoint_scf_input,
-                                                   root=mpi_master())
-            checkpoint_method_input = self.comm.bcast(checkpoint_method_input,
-                                                      root=mpi_master())
-            # remove restart option from checkpoint_scf_input before calling
-            # update_settings, since we are already doing restart
-            checkpoint_scf_input.pop('restart', None)
-            self.update_settings(checkpoint_scf_input, checkpoint_method_input)
 
         # check molecule
         molecule_sanity_check(molecule, self.scf_type)
@@ -658,14 +682,14 @@ class ScfDriver:
         # check print level (verbosity of output)
         self.print_level = max(1, min(self.print_level, 3))
 
-        if self.restart:
+        if self._uses_custom_initial_guess():
             if self.acc_type.upper() == 'L2_C2DIIS':
                 self.acc_type = 'C2DIIS'
             elif self.acc_type.upper() == 'L2_DIIS':
                 self.acc_type = 'DIIS'
-            if self.rank == mpi_master():
+            if self.restart and self.rank == mpi_master():
                 self._ref_mol_orbs = MolecularOrbitals.read_hdf5(
-                    self.checkpoint_file)
+                    self.get_checkpoint_file())
 
         # nuclear repulsion energy
         self._nuc_energy = molecule.nuclear_repulsion_energy(basis)
@@ -924,6 +948,8 @@ class ScfDriver:
             if self.rank == mpi_master():
                 if self.restart:
                     den_mat = self.gen_initial_density_restart(molecule)
+                elif self._use_start_orbitals:
+                    den_mat = self.gen_initial_density_start_orbitals(molecule)
                 else:
                     den_mat = self.gen_initial_density_sad(
                         molecule, basis, min_basis)
@@ -934,7 +960,7 @@ class ScfDriver:
             if self._cpcm:
                 if self.restart and self.rank == mpi_master():
                     self.cpcm_drv._cpcm_q = read_cpcm_charges(
-                        self.checkpoint_file)
+                        self.get_checkpoint_file())
                 self.cpcm_drv._cpcm_q = self.comm.bcast(self.cpcm_drv._cpcm_q,
                                                         root=mpi_master())
 
@@ -1164,13 +1190,31 @@ class ScfDriver:
             The AO density matrix.
         """
 
-        self._molecular_orbitals = MolecularOrbitals.read_hdf5(
-            self.checkpoint_file)
+        checkpoint_file = self.get_checkpoint_file()
+        self._molecular_orbitals = MolecularOrbitals.read_hdf5(checkpoint_file)
         den_mat = self._molecular_orbitals.get_density(molecule, self.scf_type)
 
         restart_text = 'Restarting from checkpoint file: '
-        restart_text += self.checkpoint_file
+        restart_text += checkpoint_file
         self.ostream.print_info(restart_text)
+        self.ostream.print_blank()
+
+        return den_mat
+
+    def gen_initial_density_start_orbitals(self, molecule):
+        """
+        Generates initial AO density from user-supplied orbitals.
+
+        :param molecule:
+            The molecule.
+
+        :return:
+            The AO density matrix.
+        """
+
+        den_mat = self._molecular_orbitals.get_density(molecule, self.scf_type)
+
+        self.ostream.print_info('Starting from user supplied orbitals')
         self.ostream.print_blank()
 
         return den_mat
@@ -1192,17 +1236,25 @@ class ScfDriver:
         """
 
         valid = False
+        checkpoint_file = self.get_checkpoint_file()
 
         if self.rank == mpi_master():
-            if (isinstance(self.checkpoint_file, str) and
-                    Path(self.checkpoint_file).is_file()):
-                valid = MolecularOrbitals.match_hdf5(self.checkpoint_file,
+            if (isinstance(checkpoint_file, str) and
+                    Path(checkpoint_file).is_file()):
+                valid = MolecularOrbitals.match_hdf5(checkpoint_file,
                                                      nuclear_charges, basis_set,
                                                      scf_type)
 
         valid = self.comm.bcast(valid, root=mpi_master())
 
         return valid
+
+    def _uses_custom_initial_guess(self):
+        """
+        Returns whether SCF starts from checkpoint or user supplied orbitals.
+        """
+
+        return self.restart or self._use_start_orbitals
 
     def maximum_overlap(self, molecule, basis, orbitals, alpha_list, beta_list):
         """
@@ -1334,19 +1386,23 @@ class ScfDriver:
         else:
             self._molecular_orbitals = MolecularOrbitals()
 
-        # write checkpoint file and sychronize MPI processes
+        # Record that SCF should start from the supplied orbitals without
+        # forcing checkpoint I/O.
 
-        self.restart = True
-        if self.checkpoint_file is None:
-            if self.filename is not None:
-                base_fname = self.filename
-            else:
-                name_string = get_random_string_parallel(self.comm)
-                base_fname = 'vlx_' + name_string
-            self.checkpoint_file = f'{base_fname}_scf.h5'
-        self.write_checkpoint(molecule, basis)
+        self.restart = False
+        self._use_start_orbitals = True
+        if self.rank == mpi_master():
+            self._ref_mol_orbs = deepcopy(self._molecular_orbitals)
+        else:
+            self._ref_mol_orbs = None
 
-        self.comm.barrier()
+    def clear_start_orbitals(self):
+        """
+        Clears the user-supplied start orbitals mode.
+        """
+
+        self._use_start_orbitals = False
+        self._mom = None
 
     def write_checkpoint(self, molecule, basis):
         """
@@ -1361,8 +1417,12 @@ class ScfDriver:
         if self._skip_writing_h5:
             return
 
+        checkpoint_file = self.get_checkpoint_file()
+        if checkpoint_file is None:
+            return
+
         if self.rank == mpi_master():
-            if self.checkpoint_file and isinstance(self.checkpoint_file, str):
+            if checkpoint_file and isinstance(checkpoint_file, str):
                 if self._dft:
                     xc_label = self.xcfun.get_func_label()
                 else:
@@ -1374,12 +1434,11 @@ class ScfDriver:
                 else:
                     potfile_text = ''
 
-                create_hdf5(self.checkpoint_file, molecule, basis, xc_label,
+                create_hdf5(checkpoint_file, molecule, basis, xc_label,
                             potfile_text)
-                self.molecular_orbitals.write_hdf5(self.checkpoint_file)
+                self.molecular_orbitals.write_hdf5(checkpoint_file)
                 if self._cpcm:
-                    write_cpcm_charges(self.checkpoint_file,
-                                       self.cpcm_drv._cpcm_q)
+                    write_cpcm_charges(checkpoint_file, self.cpcm_drv._cpcm_q)
 
                 scf_keywords = {
                     key: val[0]
@@ -1390,17 +1449,17 @@ class ScfDriver:
                     self._input_keywords['method_settings'].items()
                 }
 
-                write_unparsed_input_to_hdf5(self.checkpoint_file,
+                write_unparsed_input_to_hdf5(checkpoint_file,
                                              unparse_input(self, scf_keywords),
                                              group_name='scf_settings')
-                write_unparsed_input_to_hdf5(self.checkpoint_file,
+                write_unparsed_input_to_hdf5(checkpoint_file,
                                              unparse_input(
                                                  self, method_keywords),
                                              group_name='method_settings')
 
                 self.ostream.print_blank()
                 self.ostream.print_info('Checkpoint written to file: ' +
-                                        self.checkpoint_file)
+                                        checkpoint_file)
 
     def _comp_diis(self, molecule, ao_basis, min_basis, den_mat, profiler):
         """
@@ -1579,7 +1638,7 @@ class ScfDriver:
 
             # set the current number of SCF iterations
             # (note the extra SCF cycle when starting from scratch)
-            if self.restart:
+            if self._uses_custom_initial_guess():
                 self._num_iter = i + 1
             else:
                 self._num_iter = i
@@ -2792,9 +2851,9 @@ class ScfDriver:
             e_grad = self._iter_data['gradient_norm']
 
             if e_grad < self.conv_thresh:
-                if self.restart:
-                    # Note: when restarting from checkpoint, double check that the
-                    # number of electrons are reasonable
+                if self._uses_custom_initial_guess():
+                    # Double check that the number of electrons are reasonable
+                    # when starting from externally provided orbitals.
                     nalpha = molecule.number_of_alpha_occupied_orbitals(
                         ao_basis)
                     nbeta = molecule.number_of_beta_occupied_orbitals(ao_basis)
@@ -2843,6 +2902,8 @@ class ScfDriver:
         # set the maximum number of SCF iterations
         # (note the extra SCF cycle when starting from scratch)
         if self.restart:
+            return range(self.max_iter)
+        elif self._use_start_orbitals:
             return range(self.max_iter)
         else:
             return range(self.max_iter + 1)
@@ -3057,6 +3118,8 @@ class ScfDriver:
 
         if self.restart:
             return 'Restart from Checkpoint'
+        elif self._use_start_orbitals:
+            return 'User Supplied Orbitals'
         else:
             return 'Superposition of Atomic Densities'
 

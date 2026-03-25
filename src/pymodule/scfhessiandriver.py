@@ -140,7 +140,7 @@ class ScfHessianDriver(HessianDriver):
 
         self.cphf_dict = dict(cphf_dict)
 
-    def compute(self, molecule, ao_basis, scf_results=None):
+    def compute(self, molecule, ao_basis, scf_results_not_used=None):
         """
         Computes the analytical or numerical nuclear Hessian.
 
@@ -148,7 +148,14 @@ class ScfHessianDriver(HessianDriver):
             The molecule.
         :param ao_basis:
             The AO basis set.
+        :param scf_results_not_used:
+            For backward compatibility.
         """
+
+        # TODO: enable RI-JK
+        assert_msg_critical(
+            not self.scf_driver.ri_jk,
+            f'{type(self).__name__}.compute: RI-JK is not yet supported')
 
         if self.rank == mpi_master():
             self.print_header()
@@ -162,7 +169,10 @@ class ScfHessianDriver(HessianDriver):
             'memory_tracing': self.memory_tracing,
         })
 
+        scf_results = self.scf_driver.scf_results
         if scf_results is None:
+            # run SCF if needed
+            scf_energy_not_used = self.compute_energy(molecule, ao_basis)
             scf_results = self.scf_driver.scf_results
 
         # Save the electronic energy
@@ -220,11 +230,6 @@ class ScfHessianDriver(HessianDriver):
         :param atom_pairs:
             The atom pairs to compute the Hessian for.
         """
-
-        assert_msg_critical(
-            self.scf_driver.scf_type == 'restricted',
-            'ScfHessianDriver: Analytical Hessian only implemented ' +
-            'for restricted case')
 
         assert_msg_critical(
             self.scf_driver.solvation_model is None,
@@ -1006,6 +1011,11 @@ class ScfHessianDriver(HessianDriver):
         assert_msg_critical(
             self.scf_driver.solvation_model is None,
             'ScfHessianDriver: Solvation model not implemented')
+
+        # sanity checks
+        molecule_sanity_check(molecule)
+        scf_results_sanity_check(self, self.scf_driver.scf_results)
+        dft_sanity_check(self, 'compute')
 
         # use _determine_xc_hessian_grid_level here to ensure early exit for
         # unsupported cases
@@ -2023,18 +2033,22 @@ class ScfHessianDriver(HessianDriver):
             The molecule.
         :param basis:
         """
-        self.scf_driver.restart = False
-        self.scf_driver.ostream.mute()
-        scf_results = self.scf_driver.compute(molecule, basis)
-        self.scf_driver.ostream.unmute()
-        assert_msg_critical(self.scf_driver.is_converged,
-                            'ScfHessianDriver: SCF did not converge')
 
-        if self.rank == mpi_master():
-            scf_energy = self.scf_driver.get_scf_energy()
-            return scf_energy
+        if self.numerical:
+            # disable restarting scf for numerical calculation
+            self.scf_driver.restart = False
         else:
-            return None
+            # always try restarting scf for analytical calculation
+            self.scf_driver.restart = True
+
+        self.scf_driver.ostream.mute()
+        scf_results_not_used = self.scf_driver.compute(molecule, basis)
+        self.scf_driver.ostream.unmute()
+
+        assert_msg_critical(self.scf_driver.is_converged,
+                            f'{type(self).__name__}: SCF did not converge')
+
+        return self.scf_driver.get_scf_energy()
 
     def compute_gradient(self, molecule, basis):
         """
@@ -2045,25 +2059,17 @@ class ScfHessianDriver(HessianDriver):
         :param basis:
             The AO basis set.
         """
-        # Recalculate the ground state energy for the new geometry
-        self.scf_driver.restart = False
-        self.scf_driver.ostream.mute()
-        scf_results = self.scf_driver.compute(molecule, basis)
-        self.scf_driver.ostream.unmute()
-        assert_msg_critical(self.scf_driver.is_converged,
-                            'ScfHessianDriver: SCF did not converge')
 
-        # Calculate the gradient.
+        scf_energy_not_used = self.compute_energy(molecule, basis)
+
         gradient_driver = ScfGradientDriver(self.scf_driver)
+
         gradient_driver.ostream.mute()
-        gradient_driver.compute(molecule, basis, scf_results)
+        gradient_driver.compute(molecule, basis)
         gradient_driver.ostream.unmute()
 
         return gradient_driver.gradient.copy()
 
-    # NOTE: This routine does not recalculate the SCF, so
-    # it has to be called after compute_gradient.
-    # TODO: Is there a better way to avoid re-running the SCF?
     def compute_electric_dipole_moment(self, molecule, basis):
         """
         Computes the electric dipole moment calculated in
@@ -2074,10 +2080,15 @@ class ScfHessianDriver(HessianDriver):
         :param basis:
             The AO basis set.
         """
-        # First-order properties for gradient of dipole moment
-        prop = FirstOrderProperties(self.comm, self.ostream)
+
+        # Note: This routine does not recalculate the SCF, so it needs to be
+        # called after compute_energy or compute_gradient.
+
         scf_results = self.scf_driver.scf_results
+
+        prop = FirstOrderProperties(self.comm, self.ostream)
         prop.compute_scf_prop(molecule, basis, scf_results)
+
         if self.rank == mpi_master():
             dipole_moment = prop.get_property('dipole moment')
             return dipole_moment
