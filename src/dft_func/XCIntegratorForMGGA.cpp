@@ -197,7 +197,7 @@ integrateVxcFockForMetaGgaClosedShell(const CMolecule&                  molecule
 
             // go through GTO blocks
 
-            for (size_t i_block = 0, idx = 0; i_block < n_gto_blocks; i_block++)
+            for (int i_block = 0, idx = 0; i_block < static_cast<int>(n_gto_blocks); i_block++)
             {
                 const auto& gto_block = ptr_gto_blocks[i_block];
 
@@ -544,7 +544,7 @@ integrateVxcFockForMetaGgaOpenShell(const CMolecule&                  molecule,
 
             // go through GTO blocks
 
-            for (size_t i_block = 0, idx = 0; i_block < n_gto_blocks; i_block++)
+            for (int i_block = 0, idx = 0; i_block < static_cast<int>(n_gto_blocks); i_block++)
             {
                 const auto& gto_block = ptr_gto_blocks[i_block];
 
@@ -902,7 +902,7 @@ integrateFxcFockForMetaGgaClosedShell(const std::vector<double*>&       aoFockPo
 
             std::vector<CDenseMatrix> rw_sub_dens_mat_vec(n_rw_densities);
 
-            for (size_t idensity = 0; idensity < n_rw_densities; idensity++)
+            for (int idensity = 0; idensity < static_cast<int>(n_rw_densities); idensity++)
             {
                 rw_sub_dens_mat_vec[idensity] = dftsubmat::getSubDensityMatrix(rwDensityPointers[idensity], aoinds, naos);
             }
@@ -928,7 +928,7 @@ integrateFxcFockForMetaGgaClosedShell(const std::vector<double*>&       aoFockPo
 
             // go through GTO blocks
 
-            for (size_t i_block = 0, idx = 0; i_block < n_gto_blocks; i_block++)
+            for (int i_block = 0, idx = 0; i_block < static_cast<int>(n_gto_blocks); i_block++)
             {
                 const auto& gto_block = ptr_gto_blocks[i_block];
 
@@ -1049,7 +1049,7 @@ integrateFxcFockForMetaGgaClosedShell(const std::vector<double*>&       aoFockPo
 
             // go through rhow density matrices
 
-            for (size_t idensity = 0; idensity < n_rw_densities; idensity++)
+            for (int idensity = 0; idensity < static_cast<int>(n_rw_densities); idensity++)
             {
                 omptimers[thread_id].start("Generate density grid");
 
@@ -1428,7 +1428,7 @@ integrateKxcFockForMetaGgaClosedShell(const std::vector<double*>& aoFockPointers
 
             // go through GTO blocks
 
-            for (size_t i_block = 0, idx = 0; i_block < n_gto_blocks; i_block++)
+            for (int i_block = 0, idx = 0; i_block < static_cast<int>(n_gto_blocks); i_block++)
             {
                 const auto& gto_block = ptr_gto_blocks[i_block];
 
@@ -1902,7 +1902,7 @@ integrateKxcLxcFockForMetaGgaClosedShell(const std::vector<double*>& aoFockPoint
 
             // go through GTO blocks
 
-            for (size_t i_block = 0, idx = 0; i_block < n_gto_blocks; i_block++)
+            for (int i_block = 0, idx = 0; i_block < static_cast<int>(n_gto_blocks); i_block++)
             {
                 const auto& gto_block = ptr_gto_blocks[i_block];
 
