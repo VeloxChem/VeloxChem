@@ -318,7 +318,7 @@ def main():
 
         traj_drv = TrajectoryDriver(task.mpi_comm, task.ostream)
         traj_drv.update_settings(traj_dict, spect_dict, rsp_dict, method_dict)
-        traj_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        traj_drv.compute(task.molecule, task.ao_basis)
 
     # Diatomic vibronic spectrum using Numerov
 
@@ -331,7 +331,7 @@ def main():
 
         numerov_drv = NumerovDriver(task.mpi_comm, task.ostream)
         numerov_drv.update_settings(numerov_dict, scf_dict, method_dict)
-        numerov_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        numerov_drv.compute(task.molecule, task.ao_basis)
 
     # Self-consistent field
     run_scf = task_type in [

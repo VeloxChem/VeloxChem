@@ -964,7 +964,7 @@ class ScfDriver:
                 self.cpcm_drv._cpcm_q = self.comm.bcast(self.cpcm_drv._cpcm_q,
                                                         root=mpi_master())
 
-            self._comp_diis(molecule, basis, min_basis, den_mat, profiler)
+            self._comp_diis(molecule, basis, den_mat, profiler)
 
         # two level DIIS method
         if self.acc_type.upper() in ['L2_C2DIIS', 'L2_DIIS']:
@@ -985,7 +985,7 @@ class ScfDriver:
             else:
                 den_mat = None
             den_mat = self.comm.bcast(den_mat, root=mpi_master())
-            self._comp_diis(molecule, val_basis, min_basis, den_mat, profiler)
+            self._comp_diis(molecule, val_basis, den_mat, profiler)
 
             # second step
             self._first_step = False
@@ -1000,7 +1000,7 @@ class ScfDriver:
             else:
                 den_mat = None
             den_mat = self.comm.bcast(den_mat, root=mpi_master())
-            self._comp_diis(molecule, basis, val_basis, den_mat, profiler)
+            self._comp_diis(molecule, basis, den_mat, profiler)
 
         self._fock_matrices_alpha.clear()
         self._fock_matrices_beta.clear()
@@ -1461,7 +1461,7 @@ class ScfDriver:
                 self.ostream.print_info('Checkpoint written to file: ' +
                                         checkpoint_file)
 
-    def _comp_diis(self, molecule, ao_basis, min_basis, den_mat, profiler):
+    def _comp_diis(self, molecule, ao_basis, den_mat, profiler):
         """
         Performs SCF calculation with DIIS acceleration.
 
@@ -1469,8 +1469,6 @@ class ScfDriver:
             The molecule.
         :param ao_basis:
             The AO basis set.
-        :param min_basis:
-            The minimal AO basis set.
         :param profiler:
             The profiler.
         """

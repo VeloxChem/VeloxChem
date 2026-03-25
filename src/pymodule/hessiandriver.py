@@ -168,7 +168,7 @@ class HessianDriver:
         self.method_dict = dict(method_dict)
         self.hess_dict = dict(hess_dict)
 
-    def compute(self, molecule, ao_basis=None, min_basis=None):
+    def compute(self, molecule, ao_basis=None):
         """
         Performs calculation of molecular Hessian.
 
@@ -176,8 +176,6 @@ class HessianDriver:
             The molecule.
         :param ao_basis:
             The AO basis set.
-        :param min_basis:
-            The minimal AO basis set.
         """
 
         return
