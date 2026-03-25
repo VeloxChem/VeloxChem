@@ -3202,8 +3202,6 @@ CXCFunctional::getFunctionalReference() const -> std::vector<std::string>
     {
         auto funcptr = xccomp.getFunctionalPointer();
 
-        auto info = funcptr->info;
-
         for (int i = 0; i < XC_MAX_REFERENCES; i++)
         {
             auto ref_ptr = xc_func_info_get_references(funcptr->info, i);
