@@ -32,7 +32,8 @@
 
 import numpy as np
 
-from .veloxchemlib import mpi_master
+from .veloxchemlib import mpi_master, hartree_in_ev
+
 from .errorhandler import assert_msg_critical
 from .gradientdriver import GradientDriver
 from .serenityscfdriver import SerenityScfDriver
@@ -216,9 +217,9 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
 
     def _compute_analytical_master(self, molecule):
 
-        rsp_results = self.rsp_driver.compute(molecule, broadcast=False)
+        # rsp_results = self.rsp_driver.compute(molecule, broadcast=False)
 
-        self.excited_state_energy = self._extract_excitation_energy(rsp_results)
+        # self.excited_state_energy = self._extract_excitation_energy(rsp_results)
 
         # Ensure SCF/system for current geometry is available and synchronized.
         self.serenity_driver._compute_energy_master(molecule)
@@ -231,13 +232,14 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
 
         self._configure_excited_gradient_task(grad_task)
 
-        # with self.serenity_driver._serenity_output_context():
-        grad_task.run()
-
+        with self.serenity_driver._serenity_output_context():
+            grad_task.run()
+        
+        self.excited_state_energy = grad_task.getLRSCFController().getExcitationEnergies(spy.ISOLATED) / hartree_in_ev()
         gradient = np.array(self.serenity_driver._system.getGeometry().getGradients(),
                             dtype=float)
         self.total_energy = float(self.serenity_driver.get_energy() +
-                                  self.excited_state_energy)
+                                  self.excited_state_energy[self.state_deriv_index])
 
         return gradient
 
@@ -291,4 +293,4 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
         errmsg += f'{state} but only {nst} state(s) are available.'
         assert_msg_critical(state <= nst, errmsg)
 
-        return float(eig[state - 1])
+        return float(eig[state])

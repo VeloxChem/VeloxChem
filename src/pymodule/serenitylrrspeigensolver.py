@@ -312,8 +312,8 @@ class SerenityLinearResponseSolver:
             self._configure_lr_task()
 
             
-            # with self.scf_driver._serenity_output_context():
-            self._lr_task.run()
+            with self.scf_driver._serenity_output_context():
+                self._lr_task.run()
             
             transitions = np.array(self._lr_task.getTransitions(), dtype=float)
             self._rsp_results = self._build_rsp_results(transitions)
