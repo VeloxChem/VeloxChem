@@ -87,8 +87,6 @@ class OptimizationEngine(geometric.engine.Engine):
         self.comm = grad_drv.comm
         self.rank = grad_drv.comm.Get_rank()
 
-        self._debug = False
-
         self.opt_unparsed_input = None
         self.opt_current_step = 0
 
@@ -133,15 +131,6 @@ class OptimizationEngine(geometric.engine.Engine):
         self.grad_drv.ostream.print_info('Computing energy and gradient...')
         self.grad_drv.ostream.flush()
 
-        if self._debug:
-            profiler = Profiler()
-            self.grad_drv.ostream.print_blank()
-            self.grad_drv.ostream.print_info(
-                '==DEBUG==   available memory before gradient: ' +
-                profiler.get_available_memory())
-            self.grad_drv.ostream.print_blank()
-            self.grad_drv.ostream.flush()
-
         energy = self.grad_drv.compute_energy(new_mol, *self.args)
         self.grad_drv.compute(new_mol, *self.args)
         gradient = self.grad_drv.get_gradient()
@@ -172,14 +161,6 @@ class OptimizationEngine(geometric.engine.Engine):
             self.grad_drv.ostream.print_info(valstr)
             valstr = '  Time     : {:.2f} sec'.format(tm.time() - start_time)
             self.grad_drv.ostream.print_info(valstr)
-            self.grad_drv.ostream.print_blank()
-            self.grad_drv.ostream.flush()
-
-        if self._debug:
-            profiler = Profiler()
-            self.grad_drv.ostream.print_info(
-                '==DEBUG==   available memory after  gradient: ' +
-                profiler.get_available_memory())
             self.grad_drv.ostream.print_blank()
             self.grad_drv.ostream.flush()
 

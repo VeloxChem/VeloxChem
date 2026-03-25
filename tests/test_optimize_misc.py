@@ -1,6 +1,9 @@
-from mpi4py import MPI
 from pathlib import Path
 from copy import deepcopy
+
+from mpi4py import MPI
+import numpy as np
+import h5py
 
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.molecule import Molecule
@@ -33,7 +36,9 @@ class TestOptimizeMiscellaneous:
                              basis,
                              xcfun='hf',
                              filename=None,
-                             constraints=None):
+                             constraints=None,
+                             first_hessian=False,
+                             last_hessian=False):
 
         scf_drv = ScfUnrestrictedDriver()
         scf_drv.ostream.mute()
@@ -42,6 +47,12 @@ class TestOptimizeMiscellaneous:
 
         opt_drv = OptimizationDriver(scf_drv)
         opt_drv.constraints = constraints
+        if first_hessian and last_hessian:
+            opt_drv.hessian = 'first+last'
+        elif first_hessian:
+            opt_drv.hessian = 'first'
+        elif last_hessian:
+            opt_drv.hessian = 'last'
         opt_results = opt_drv.compute(molecule, basis)
 
         return opt_drv, opt_results
@@ -108,3 +119,38 @@ class TestOptimizeMiscellaneous:
         assert new_opt_drv.grad_drv.scf_driver.filename is None
         assert new_opt_drv.grad_drv.scf_driver.checkpoint_file is None
         assert new_opt_drv.grad_drv.gradient is None
+
+    def test_opt_with_hessian(self, tmp_path):
+
+        molecule, basis = self.get_ch3_molecule_and_basis()
+
+        filename = str(tmp_path / "opt_with_hessian")
+
+        comm = MPI.COMM_WORLD
+        filename = comm.bcast(filename, root=mpi_master())
+
+        opt_drv, opt_results = self.run_unrestricted_opt(molecule,
+                                                         basis,
+                                                         'hf',
+                                                         filename=filename,
+                                                         first_hessian=True,
+                                                         last_hessian=True)
+
+        final_h5_file = f'{filename}.h5'
+
+        if opt_drv.rank == mpi_master():
+            hf = h5py.File(final_h5_file)
+            assert 'vib' in hf
+            assert 'vib_frequencies' in hf['vib']
+            assert 'ir_intensities' in hf['vib']
+            ref_vib_freqs = np.array(
+                [862.98, 1752.54, 1752.54, 3368.44, 3536.17, 3536.18])
+            ref_ir_intens = np.array(
+                [163.2794, 0.0232, 0.0232, 2.6263, 0.6178, 0.6178])
+            assert np.max(
+                np.abs(np.array(hf['vib/vib_frequencies']) -
+                       ref_vib_freqs)) < 0.1
+            assert np.max(
+                np.abs(np.array(hf['vib/ir_intensities']) -
+                       ref_ir_intens)) < 0.005
+            hf.close()
