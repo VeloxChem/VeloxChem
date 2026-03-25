@@ -541,8 +541,9 @@ class TestScfDriverMiscellaneous:
         density_b = np.array([[0.85, 0.0], [0.0, 0.15]])
 
         effective = driver._get_effective_fock((fock_a,), ovl, oao)
-        assert np.allclose(effective[0], fock_a)
-        assert effective[0] is fock_a
+        if self.is_master():
+            assert np.allclose(effective[0], fock_a)
+            assert effective[0] is fock_a
 
         driver.acc_type = 'c2diis'
         driver.diis_thresh = 1.0
@@ -550,14 +551,16 @@ class TestScfDriverMiscellaneous:
         driver._store_diis_data((fock_a,), (density_a,), ovl, 0.2)
 
         single_effective = driver._get_effective_fock((fock_b,), ovl, oao)
-        assert np.allclose(single_effective[0], fock_a)
-        assert single_effective[0] is not driver._fock_matrices_alpha[0]
+        if self.is_master():
+            assert np.allclose(single_effective[0], fock_a)
+            assert single_effective[0] is not driver._fock_matrices_alpha[0]
 
         driver._store_diis_data((fock_b,), (density_b,), ovl, 0.2)
-        diis_effective = driver._get_effective_fock((fock_b,), ovl, oao)
 
-        assert diis_effective[0].shape == fock_a.shape
-        assert np.allclose(diis_effective[0], diis_effective[0].T)
+        diis_effective = driver._get_effective_fock((fock_b,), ovl, oao)
+        if self.is_master():
+            assert diis_effective[0].shape == fock_a.shape
+            assert np.allclose(diis_effective[0], diis_effective[0].T)
 
         driver.embedding = {'settings': {'embedding_method': 'PE'}}
         assert driver.get_scf_type_str() == (
@@ -583,8 +586,9 @@ class TestScfDriverMiscellaneous:
         density_d = np.array([[0.1, 0.0], [0.0, 0.9]])
 
         passthrough = driver._get_effective_fock((fock_a, fock_b), ovl, oao)
-        assert np.allclose(passthrough[0], fock_a)
-        assert np.allclose(passthrough[1], fock_b)
+        if self.is_master():
+            assert np.allclose(passthrough[0], fock_a)
+            assert np.allclose(passthrough[1], fock_b)
 
         driver.acc_type = 'c2diis'
         driver.diis_thresh = 1.0
@@ -594,21 +598,23 @@ class TestScfDriverMiscellaneous:
 
         single_effective = driver._get_effective_fock((fock_c, fock_c), ovl,
                                                       oao)
-        assert np.allclose(single_effective[0], fock_a)
-        assert np.allclose(single_effective[1], fock_b)
+        if self.is_master():
+            assert np.allclose(single_effective[0], fock_a)
+            assert np.allclose(single_effective[1], fock_b)
 
         driver._store_diis_data((fock_c, fock_c), (density_c, density_d), ovl,
                                 0.2)
         driver._store_diis_data((fock_b, fock_a), (density_b, density_a), ovl,
                                 0.2)
-
-        assert len(driver._fock_matrices_alpha) == 2
-        assert np.allclose(driver._fock_matrices_alpha[0], fock_c)
-        assert np.allclose(driver._fock_matrices_beta[0], fock_c)
+        if self.is_master():
+            assert len(driver._fock_matrices_alpha) == 2
+            assert np.allclose(driver._fock_matrices_alpha[0], fock_c)
+            assert np.allclose(driver._fock_matrices_beta[0], fock_c)
 
         diis_effective = driver._get_effective_fock((fock_a, fock_b), ovl, oao)
-        assert diis_effective[0].shape == fock_a.shape
-        assert diis_effective[1].shape == fock_b.shape
+        if self.is_master():
+            assert diis_effective[0].shape == fock_a.shape
+            assert diis_effective[1].shape == fock_b.shape
 
         n_orbitals = basis.get_dimension_of_basis()
         pfon_fock_a = np.diag(np.linspace(-1.5, 1.5, n_orbitals))
@@ -619,27 +625,30 @@ class TestScfDriverMiscellaneous:
         driver.pfon_nocc = 1
         driver.pfon_nvir = 1
 
-        mol_orbs = driver._gen_molecular_orbitals(
-            molecule, basis, (pfon_fock_a, pfon_fock_b), np.eye(n_orbitals))
+        mol_orbs = driver._gen_molecular_orbitals(molecule, basis,
+                                                  (pfon_fock_a, pfon_fock_b),
+                                                  np.eye(n_orbitals))
 
         nocc_a = molecule.number_of_alpha_occupied_orbitals(basis)
         nocc_b = molecule.number_of_beta_occupied_orbitals(basis)
 
-        assert mol_orbs.get_orbitals_type() == molorb.unrest
-        assert mol_orbs.occa_to_numpy().sum() == pytest.approx(nocc_a)
-        assert mol_orbs.occb_to_numpy().sum() == pytest.approx(nocc_b)
-        assert 0.0 < mol_orbs.occa_to_numpy()[nocc_a] < 1.0
-        assert 0.0 < mol_orbs.occb_to_numpy()[nocc_b] < 1.0
+        if self.is_master():
+            assert mol_orbs.get_orbitals_type() == molorb.unrest
+            assert mol_orbs.occa_to_numpy().sum() == pytest.approx(nocc_a)
+            assert mol_orbs.occb_to_numpy().sum() == pytest.approx(nocc_b)
+            assert 0.0 < mol_orbs.occa_to_numpy()[nocc_a] < 1.0
+            assert 0.0 < mol_orbs.occb_to_numpy()[nocc_b] < 1.0
 
         scf_results = driver.compute(molecule, basis)
         natural_orbitals = driver.natural_orbitals()
 
         assert scf_results is not None
-        assert natural_orbitals.get_orbitals_type() == molorb.rest
-        occupations = natural_orbitals.occa_to_numpy()
-        assert np.all(occupations[:-1] >= occupations[1:])
-        assert np.all(occupations >= -1.0e-12)
-        assert np.all(occupations <= 2.0 + 1.0e-12)
+        if self.is_master():
+            assert natural_orbitals.get_orbitals_type() == molorb.rest
+            occupations = natural_orbitals.occa_to_numpy()
+            assert np.all(occupations[:-1] >= occupations[1:])
+            assert np.all(occupations >= -1.0e-12)
+            assert np.all(occupations <= 2.0 + 1.0e-12)
 
         driver.embedding = {'settings': {'embedding_method': 'PE'}}
         assert driver.get_scf_type_str() == (
@@ -682,8 +691,9 @@ class TestScfDriverMiscellaneous:
         assert np.allclose(projected, projected.T)
 
         passthrough = driver._get_effective_fock((fa, fb), s, s)
-        assert np.allclose(passthrough[0], fa)
-        assert np.allclose(passthrough[1], fb)
+        if self.is_master():
+            assert np.allclose(passthrough[0], fa)
+            assert np.allclose(passthrough[1], fb)
 
         driver.acc_type = 'c2diis'
         driver.diis_thresh = 1.0
@@ -691,8 +701,9 @@ class TestScfDriverMiscellaneous:
         driver._store_diis_data((fa, fb), (da, db), s, 0.2)
 
         single_effective = driver._get_effective_fock((fa, fb), s, s)
-        assert len(single_effective) == 1
-        assert np.allclose(single_effective[0], projected)
+        if self.is_master():
+            assert len(single_effective) == 1
+            assert np.allclose(single_effective[0], projected)
 
         fa_2 = np.array([[1.0, 0.2], [0.2, 0.6]])
         fb_2 = np.array([[0.7, 0.15], [0.15, 0.5]])
@@ -701,8 +712,9 @@ class TestScfDriverMiscellaneous:
         driver._store_diis_data((fa_2, fb_2), (da_2, db_2), s, 0.2)
 
         diis_effective = driver._get_effective_fock((fa_2, fb_2), s, s)
-        assert len(diis_effective) == 1
-        assert diis_effective[0].shape == fa.shape
+        if self.is_master():
+            assert len(diis_effective) == 1
+            assert diis_effective[0].shape == fa.shape
 
         n_orbitals = basis.get_dimension_of_basis()
         pfon_fock = np.diag(np.linspace(-1.5, 1.5, n_orbitals))
@@ -712,17 +724,18 @@ class TestScfDriverMiscellaneous:
         driver.pfon_nocc = 1
         driver.pfon_nvir = 1
 
-        mol_orbs = driver._gen_molecular_orbitals(
-            molecule, basis, (pfon_fock,), np.eye(n_orbitals))
+        mol_orbs = driver._gen_molecular_orbitals(molecule, basis, (pfon_fock,),
+                                                  np.eye(n_orbitals))
 
         nocc_a = molecule.number_of_alpha_occupied_orbitals(basis)
         nocc_b = molecule.number_of_beta_occupied_orbitals(basis)
 
-        assert mol_orbs.get_orbitals_type() == molorb.restopen
-        assert mol_orbs.occa_to_numpy().sum() == pytest.approx(nocc_a)
-        assert mol_orbs.occb_to_numpy().sum() == pytest.approx(nocc_b)
-        assert 0.0 < mol_orbs.occa_to_numpy()[nocc_a] < 1.0
-        assert 0.0 < mol_orbs.occb_to_numpy()[nocc_b] < 1.0
+        if self.is_master():
+            assert mol_orbs.get_orbitals_type() == molorb.restopen
+            assert mol_orbs.occa_to_numpy().sum() == pytest.approx(nocc_a)
+            assert mol_orbs.occb_to_numpy().sum() == pytest.approx(nocc_b)
+            assert 0.0 < mol_orbs.occa_to_numpy()[nocc_a] < 1.0
+            assert 0.0 < mol_orbs.occb_to_numpy()[nocc_b] < 1.0
 
         driver.embedding = {'settings': {'embedding_method': 'PE'}}
         assert driver.get_scf_type_str() == (
@@ -736,8 +749,9 @@ class TestScfDriverMiscellaneous:
         assert copied.ostream is driver.ostream
         assert copied.comm is driver.comm
         assert copied._scf_type == driver._scf_type
-        assert np.allclose(copied._fock_matrices_proj[0],
-                           driver._fock_matrices_proj[0])
+        if self.is_master():
+            assert np.allclose(copied._fock_matrices_proj[0],
+                               driver._fock_matrices_proj[0])
 
     def test_guess_unpaired_electrons_warning_for_restricted(self, tmp_path):
 
@@ -837,7 +851,8 @@ class TestScfDriverMiscellaneous:
         assert len(ref_drv.history) == len(damped_drv.history) == 3
 
         if self.is_master():
-            ref_energies = np.array([step['energy'] for step in ref_drv.history])
+            ref_energies = np.array(
+                [step['energy'] for step in ref_drv.history])
             damped_energies = np.array(
                 [step['energy'] for step in damped_drv.history])
             assert np.max(np.abs(ref_energies - damped_energies)) > 1.0e-4
