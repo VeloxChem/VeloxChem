@@ -2317,6 +2317,271 @@ class ScfDriver:
 
         return fock_mat, vxc_mat, e_emb, V_emb
 
+    def _prepare_for_ri_fock_build(self, fock_type):
+        """
+        Performs RI-specific SCF checks and broadcasts molecular orbitals when
+        RI-JK needs them on all ranks.
+
+        :param fock_type:
+            The requested Fock build type.
+        """
+
+        if self.ri_coulomb:
+            assert_msg_critical(
+                fock_type == 'j',
+                'SCF driver: RI-J is only applicable to pure DFT functional')
+        elif self.ri_jk:
+            assert_msg_critical(
+                fock_type != 'j',
+                'SCF driver: RI-JK is not applicable to pure DFT functional')
+            need_bcast_mo = self.comm.bcast(
+                (not self.molecular_orbitals.is_empty()), root=mpi_master())
+            if need_bcast_mo:
+                self._molecular_orbitals = self.molecular_orbitals.broadcast(
+                    self.comm, root=mpi_master())
+
+    def _get_2e_fock_build_params(self):
+        """
+        Determines common parameters for the 2e Fock build.
+
+        :return:
+            The Fock build type, exchange scaling factor, whether
+            range-separated exchange is needed, the error-function exchange
+            coefficient, and the range-separation parameter.
+        """
+
+        # determine fock_type and exchange_scaling_factor
+        fock_type = '2jk'
+        exchange_scaling_factor = 1.0
+        if self._dft and not self._first_step:
+            if self.xcfun.is_hybrid():
+                fock_type = '2jkx'
+                exchange_scaling_factor = self.xcfun.get_frac_exact_exchange()
+            else:
+                fock_type = 'j'
+                exchange_scaling_factor = 0.0
+
+        # further determine exchange_scaling_factor, erf_k_coef and omega
+        need_omega = (self._dft and (not self._first_step) and
+                      self.xcfun.is_range_separated())
+        if need_omega:
+            exchange_scaling_factor = (self.xcfun.get_rs_alpha() +
+                                       self.xcfun.get_rs_beta())
+            erf_k_coef = -self.xcfun.get_rs_beta()
+            omega = self.xcfun.get_rs_omega()
+        else:
+            erf_k_coef, omega = None, None
+
+        return (fock_type, exchange_scaling_factor, need_omega, erf_k_coef,
+                omega)
+
+    def _comp_restricted_2e_fock(self, den_mat, basis, screener, thresh_int):
+        """
+        Computes the restricted 2e Fock matrix.
+
+        :param den_mat:
+            The AO density matrix tuple.
+        :param basis:
+            The basis set.
+        :param screener:
+            The screening container object.
+        :param thresh_int:
+            The integral threshold exponent.
+        :return:
+            The restricted Fock matrix list or None on non-master ranks.
+        """
+
+        if self.rank == mpi_master():
+            den_mat_for_fock = make_matrix(basis, mat_t.symmetric)
+            den_mat_for_fock.set_values(den_mat[0])
+        else:
+            den_mat_for_fock = None
+
+        den_mat_for_fock = self.comm.bcast(den_mat_for_fock,
+                                           root=mpi_master())
+
+        fock_drv = FockDriver(self.comm)
+        fock_drv._set_block_size_factor(self._block_size_factor)
+
+        (fock_type, exchange_scaling_factor, need_omega, erf_k_coef,
+         omega) = self._get_2e_fock_build_params()
+
+        self._prepare_for_ri_fock_build(fock_type)
+
+        if self.ri_coulomb and fock_type == 'j':
+            fock_mat = self._ri_drv.compute(den_mat_for_fock, 'j')
+            fock_mat_np = fock_mat.to_numpy()
+        elif self.ri_jk and fock_type != 'j' and (
+                self.molecular_orbitals._orbitals is not None):
+            fock_mat_j = self._ri_drv.compute_screened_j_fock(
+                den_mat_for_fock, 'j', verbose=False)
+            fock_mat_k = self._ri_drv.compute_screened_k_fock(
+                den_mat_for_fock, self.molecular_orbitals, verbose=False)
+            fock_mat_np = (fock_mat_j.to_numpy() * 2.0 -
+                           fock_mat_k.to_numpy() * exchange_scaling_factor)
+        else:
+            fock_mat = fock_drv.compute(screener, den_mat_for_fock, fock_type,
+                                        exchange_scaling_factor, 0.0,
+                                        thresh_int)
+            fock_mat_np = fock_mat.to_numpy()
+        fock_mat = Matrix()
+
+        if fock_type == 'j':
+            # for pure functional
+            fock_mat_np *= 2.0
+
+        if need_omega:
+            assert_msg_critical(
+                not self.ri_jk,
+                'SCF driver: RI-JK not yet implemented for ' +
+                'range-separated functional')
+
+            # for range-separated functional
+            fock_mat = fock_drv.compute(screener, den_mat_for_fock, 'kx_rs',
+                                        erf_k_coef, omega, thresh_int)
+
+            fock_mat_np -= fock_mat.to_numpy()
+            fock_mat = Matrix()
+
+        fock_mat_np = self.comm.reduce(fock_mat_np, root=mpi_master())
+
+        if self.rank == mpi_master():
+            return [fock_mat_np]
+
+        return None
+
+    def _comp_open_shell_2e_fock(self, den_mat, basis, screener, thresh_int):
+        """
+        Computes the unrestricted/restricted-open-shell 2e Fock matrices.
+
+        :param den_mat:
+            The AO density matrix tuple.
+        :param basis:
+            The basis set.
+        :param screener:
+            The screening container object.
+        :param thresh_int:
+            The integral threshold exponent.
+        :return:
+            The open-shell Fock matrix list or None on non-master ranks.
+        """
+
+        if self.rank == mpi_master():
+            # for now we calculate Ka, Kb and Jab separately for open-shell
+            den_mat_for_Ka = make_matrix(basis, mat_t.symmetric)
+            den_mat_for_Ka.set_values(den_mat[0])
+
+            den_mat_for_Kb = make_matrix(basis, mat_t.symmetric)
+            den_mat_for_Kb.set_values(den_mat[1])
+
+            den_mat_for_Jab = make_matrix(basis, mat_t.symmetric)
+            den_mat_for_Jab.set_values(den_mat[0] + den_mat[1])
+        else:
+            den_mat_for_Ka = None
+            den_mat_for_Kb = None
+            den_mat_for_Jab = None
+
+        den_mat_for_Ka = self.comm.bcast(den_mat_for_Ka, root=mpi_master())
+        den_mat_for_Kb = self.comm.bcast(den_mat_for_Kb, root=mpi_master())
+        den_mat_for_Jab = self.comm.bcast(den_mat_for_Jab, root=mpi_master())
+
+        fock_drv = FockDriver(self.comm)
+        fock_drv._set_block_size_factor(self._block_size_factor)
+
+        (fock_type, exchange_scaling_factor, need_omega, erf_k_coef,
+         omega) = self._get_2e_fock_build_params()
+
+        self._prepare_for_ri_fock_build(fock_type)
+
+        if fock_type == 'j':
+            # for pure functional
+            # den_mat_for_Jab is D_total
+            if self.ri_coulomb:
+                fock_mat = self._ri_drv.compute(den_mat_for_Jab, 'j')
+            else:
+                fock_mat = fock_drv.compute(screener, den_mat_for_Jab, 'j',
+                                            0.0, 0.0, thresh_int)
+            J_ab_np = fock_mat.to_numpy()
+            fock_mat = Matrix()
+
+            fock_mat_a_np = J_ab_np
+            fock_mat_b_np = J_ab_np.copy()
+
+        else:
+            if self.ri_jk and (self.molecular_orbitals._orbitals is not None):
+                fock_mat = self._ri_drv.compute_screened_j_fock(
+                    den_mat_for_Jab, 'j', verbose=False)
+                J_ab_np = fock_mat.to_numpy()
+                fock_mat = Matrix()
+
+                fock_mat = self._ri_drv.compute_screened_k_fock(
+                    den_mat_for_Ka,
+                    self.molecular_orbitals,
+                    verbose=False,
+                    spin='alpha')
+                K_a_np = fock_mat.to_numpy() * exchange_scaling_factor
+                fock_mat = Matrix()
+
+                fock_mat = self._ri_drv.compute_screened_k_fock(
+                    den_mat_for_Kb,
+                    self.molecular_orbitals,
+                    verbose=False,
+                    spin='beta')
+                K_b_np = fock_mat.to_numpy() * exchange_scaling_factor
+                fock_mat = Matrix()
+
+            else:
+                fock_mat = fock_drv.compute(screener, den_mat_for_Ka, 'kx',
+                                            exchange_scaling_factor, 0.0,
+                                            thresh_int)
+
+                K_a_np = fock_mat.to_numpy()
+                fock_mat = Matrix()
+
+                fock_mat = fock_drv.compute(screener, den_mat_for_Kb, 'kx',
+                                            exchange_scaling_factor, 0.0,
+                                            thresh_int)
+
+                K_b_np = fock_mat.to_numpy()
+                fock_mat = Matrix()
+
+                fock_mat = fock_drv.compute(screener, den_mat_for_Jab, 'j',
+                                            exchange_scaling_factor, 0.0,
+                                            thresh_int)
+
+                J_ab_np = fock_mat.to_numpy()
+                fock_mat = Matrix()
+
+            fock_mat_a_np = J_ab_np - K_a_np
+            fock_mat_b_np = J_ab_np - K_b_np
+
+        if need_omega:
+            assert_msg_critical(
+                not self.ri_jk,
+                'SCF driver: RI-JK not yet implemented for ' +
+                'range-separated functional')
+
+            # for range-separated functional
+            fock_mat = fock_drv.compute(screener, den_mat_for_Ka, 'kx_rs',
+                                        erf_k_coef, omega, thresh_int)
+
+            fock_mat_a_np -= fock_mat.to_numpy()
+            fock_mat = Matrix()
+
+            fock_mat = fock_drv.compute(screener, den_mat_for_Kb, 'kx_rs',
+                                        erf_k_coef, omega, thresh_int)
+
+            fock_mat_b_np -= fock_mat.to_numpy()
+            fock_mat = Matrix()
+
+        fock_mat_a_np = self.comm.reduce(fock_mat_a_np, root=mpi_master())
+        fock_mat_b_np = self.comm.reduce(fock_mat_b_np, root=mpi_master())
+
+        if self.rank == mpi_master():
+            return [fock_mat_a_np, fock_mat_b_np]
+
+        return None
+
     def _comp_2e_fock_single_comm(self,
                                   den_mat,
                                   molecule,
@@ -2344,37 +2609,6 @@ class ScfDriver:
             The Fock matrix, AO Kohn-Sham (Vxc) matrix, etc.
         """
 
-        if self.scf_type == 'restricted':
-            if self.rank == mpi_master():
-                den_mat_for_fock = make_matrix(basis, mat_t.symmetric)
-                den_mat_for_fock.set_values(den_mat[0])
-            else:
-                den_mat_for_fock = None
-
-            den_mat_for_fock = self.comm.bcast(den_mat_for_fock,
-                                               root=mpi_master())
-
-        else:
-            if self.rank == mpi_master():
-                # for now we calculate Ka, Kb and Jab separately for open-shell
-                den_mat_for_Ka = make_matrix(basis, mat_t.symmetric)
-                den_mat_for_Ka.set_values(den_mat[0])
-
-                den_mat_for_Kb = make_matrix(basis, mat_t.symmetric)
-                den_mat_for_Kb.set_values(den_mat[1])
-
-                den_mat_for_Jab = make_matrix(basis, mat_t.symmetric)
-                den_mat_for_Jab.set_values(den_mat[0] + den_mat[1])
-            else:
-                den_mat_for_Ka = None
-                den_mat_for_Kb = None
-                den_mat_for_Jab = None
-
-            den_mat_for_Ka = self.comm.bcast(den_mat_for_Ka, root=mpi_master())
-            den_mat_for_Kb = self.comm.bcast(den_mat_for_Kb, root=mpi_master())
-            den_mat_for_Jab = self.comm.bcast(den_mat_for_Jab,
-                                              root=mpi_master())
-
         if e_grad is None:
             thresh_int = int(-math.log10(self.eri_thresh))
         else:
@@ -2382,211 +2616,15 @@ class ScfDriver:
 
         eri_t0 = tm.time()
 
-        fock_drv = FockDriver(self.comm)
-        fock_drv._set_block_size_factor(self._block_size_factor)
-
-        # determine fock_type and exchange_scaling_factor
-        fock_type = '2jk'
-        exchange_scaling_factor = 1.0
-        if self._dft and not self._first_step:
-            if self.xcfun.is_hybrid():
-                fock_type = '2jkx'
-                exchange_scaling_factor = self.xcfun.get_frac_exact_exchange()
-            else:
-                fock_type = 'j'
-                exchange_scaling_factor = 0.0
-
-        # further determine exchange_scaling_factor, erf_k_coef and omega
-        need_omega = (self._dft and (not self._first_step) and
-                      self.xcfun.is_range_separated())
-        if need_omega:
-            exchange_scaling_factor = (self.xcfun.get_rs_alpha() +
-                                       self.xcfun.get_rs_beta())
-            erf_k_coef = -self.xcfun.get_rs_beta()
-            omega = self.xcfun.get_rs_omega()
-        else:
-            erf_k_coef, omega = None, None
-
         fock_mat = None
 
         if self.scf_type == 'restricted':
-            # restricted SCF
-            if self.ri_coulomb:
-                assert_msg_critical(
-                    fock_type == 'j',
-                    'SCF driver: RI-J is only applicable to pure DFT functional'
-                )
-            elif self.ri_jk:
-                assert_msg_critical(
-                    fock_type != 'j',
-                    'SCF driver: RI-JK is not applicable to pure DFT functional'
-                )
-                # ri_jk needs molecular_orbitals on all ranks
-                need_bcast_mo = self.comm.bcast(
-                    (not self.molecular_orbitals.is_empty()), root=mpi_master())
-                if need_bcast_mo:
-                    self._molecular_orbitals = self.molecular_orbitals.broadcast(
-                        self.comm, root=mpi_master())
-
-            if self.ri_coulomb and fock_type == 'j':
-                fock_mat = self._ri_drv.compute(den_mat_for_fock, 'j')
-                fock_mat_np = fock_mat.to_numpy()
-            elif self.ri_jk and fock_type != 'j' and (
-                    self.molecular_orbitals._orbitals is not None):
-                fock_mat_j = self._ri_drv.compute_screened_j_fock(
-                    den_mat_for_fock, 'j', verbose=False)
-                fock_mat_k = self._ri_drv.compute_screened_k_fock(
-                    den_mat_for_fock, self.molecular_orbitals, verbose=False)
-                fock_mat_np = (fock_mat_j.to_numpy() * 2.0 -
-                               fock_mat_k.to_numpy() * exchange_scaling_factor)
-            else:
-                fock_mat = fock_drv.compute(screener, den_mat_for_fock,
-                                            fock_type, exchange_scaling_factor,
-                                            0.0, thresh_int)
-                fock_mat_np = fock_mat.to_numpy()
-            fock_mat = Matrix()
-
-            if fock_type == 'j':
-                # for pure functional
-                fock_mat_np *= 2.0
-
-            if need_omega:
-                assert_msg_critical(
-                    not self.ri_jk,
-                    'SCF driver: RI-JK not yet implemented for ' +
-                    'range-separated functional')
-
-                # for range-separated functional
-                fock_mat = fock_drv.compute(screener, den_mat_for_fock, 'kx_rs',
-                                            erf_k_coef, omega, thresh_int)
-
-                fock_mat_np -= fock_mat.to_numpy()
-                fock_mat = Matrix()
-
-            fock_mat_np = self.comm.reduce(fock_mat_np, root=mpi_master())
-
-            den_mat_for_fock = Matrix()
-
-            if self.rank == mpi_master():
-                # Note: make fock_mat a list
-                fock_mat = [fock_mat_np]
-            else:
-                fock_mat = None
+            fock_mat = self._comp_restricted_2e_fock(den_mat, basis, screener,
+                                                     thresh_int)
 
         else:
-            # unrestricted SCF or restricted open-shell SCF
-
-            if self.ri_coulomb:
-                assert_msg_critical(
-                    fock_type == 'j',
-                    'SCF driver: RI-J is only applicable to pure DFT functional'
-                )
-            elif self.ri_jk:
-                assert_msg_critical(
-                    fock_type != 'j',
-                    'SCF driver: RI-JK is not applicable to pure DFT functional'
-                )
-                # ri_jk needs molecular_orbitals on all ranks
-                need_bcast_mo = self.comm.bcast(
-                    (not self.molecular_orbitals.is_empty()), root=mpi_master())
-                if need_bcast_mo:
-                    self._molecular_orbitals = self.molecular_orbitals.broadcast(
-                        self.comm, root=mpi_master())
-
-            if fock_type == 'j':
-                # for pure functional
-                # den_mat_for_Jab is D_total
-                if self.ri_coulomb:
-                    fock_mat = self._ri_drv.compute(den_mat_for_Jab, 'j')
-                else:
-                    fock_mat = fock_drv.compute(screener, den_mat_for_Jab, 'j',
-                                                0.0, 0.0, thresh_int)
-                J_ab_np = fock_mat.to_numpy()
-                fock_mat = Matrix()
-
-                fock_mat_a_np = J_ab_np
-                fock_mat_b_np = J_ab_np.copy()
-
-            else:
-                if self.ri_jk and (self.molecular_orbitals._orbitals
-                                   is not None):
-                    fock_mat = self._ri_drv.compute_screened_j_fock(
-                        den_mat_for_Jab, 'j', verbose=False)
-                    J_ab_np = fock_mat.to_numpy()
-                    fock_mat = Matrix()
-
-                    fock_mat = self._ri_drv.compute_screened_k_fock(
-                        den_mat_for_Ka,
-                        self.molecular_orbitals,
-                        verbose=False,
-                        spin='alpha')
-                    K_a_np = fock_mat.to_numpy() * exchange_scaling_factor
-                    fock_mat = Matrix()
-
-                    fock_mat = self._ri_drv.compute_screened_k_fock(
-                        den_mat_for_Kb,
-                        self.molecular_orbitals,
-                        verbose=False,
-                        spin='beta')
-                    K_b_np = fock_mat.to_numpy() * exchange_scaling_factor
-                    fock_mat = Matrix()
-
-                else:
-                    fock_mat = fock_drv.compute(screener, den_mat_for_Ka, 'kx',
-                                                exchange_scaling_factor, 0.0,
-                                                thresh_int)
-
-                    K_a_np = fock_mat.to_numpy()
-                    fock_mat = Matrix()
-
-                    fock_mat = fock_drv.compute(screener, den_mat_for_Kb, 'kx',
-                                                exchange_scaling_factor, 0.0,
-                                                thresh_int)
-
-                    K_b_np = fock_mat.to_numpy()
-                    fock_mat = Matrix()
-
-                    fock_mat = fock_drv.compute(screener, den_mat_for_Jab, 'j',
-                                                exchange_scaling_factor, 0.0,
-                                                thresh_int)
-
-                    J_ab_np = fock_mat.to_numpy()
-                    fock_mat = Matrix()
-
-                fock_mat_a_np = J_ab_np - K_a_np
-                fock_mat_b_np = J_ab_np - K_b_np
-
-            if need_omega:
-                assert_msg_critical(
-                    not self.ri_jk,
-                    'SCF driver: RI-JK not yet implemented for ' +
-                    'range-separated functional')
-
-                # for range-separated functional
-                fock_mat = fock_drv.compute(screener, den_mat_for_Ka, 'kx_rs',
-                                            erf_k_coef, omega, thresh_int)
-
-                fock_mat_a_np -= fock_mat.to_numpy()
-                fock_mat = Matrix()
-
-                fock_mat = fock_drv.compute(screener, den_mat_for_Kb, 'kx_rs',
-                                            erf_k_coef, omega, thresh_int)
-
-                fock_mat_b_np -= fock_mat.to_numpy()
-                fock_mat = Matrix()
-
-            fock_mat_a_np = self.comm.reduce(fock_mat_a_np, root=mpi_master())
-            fock_mat_b_np = self.comm.reduce(fock_mat_b_np, root=mpi_master())
-
-            den_mat_for_Ka = Matrix()
-            den_mat_for_Kb = Matrix()
-            den_mat_for_Jab = Matrix()
-
-            if self.rank == mpi_master():
-                # Note: make fock_mat a list
-                fock_mat = [fock_mat_a_np, fock_mat_b_np]
-            else:
-                fock_mat = None
+            fock_mat = self._comp_open_shell_2e_fock(den_mat, basis, screener,
+                                                     thresh_int)
 
         if self.timing:
             profiler.add_timing_info('FockERI', tm.time() - eri_t0)
