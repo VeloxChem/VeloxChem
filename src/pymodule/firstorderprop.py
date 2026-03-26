@@ -108,8 +108,7 @@ class FirstOrderProperties:
 
         # choose center of nuclear charges as origin
         coords = molecule.get_coordinates_in_bohr()
-        nuclear_charges = molecule.get_element_ids()
-        nuclear_charges -= basis.get_number_of_ecp_core_electrons()
+        nuclear_charges = molecule.get_effective_nuclear_charges(basis)
         origin = np.sum(coords.T * nuclear_charges,
                         axis=1) / np.sum(nuclear_charges)
 
@@ -137,8 +136,7 @@ class FirstOrderProperties:
 
             # nuclear contribution
             coords = molecule.get_coordinates_in_bohr()
-            nuclear_charges = molecule.get_element_ids()
-            nuclear_charges -= basis.get_number_of_ecp_core_electrons()
+            nuclear_charges = molecule.get_effective_nuclear_charges(basis)
             nuclear_dipole = np.sum((coords - origin).T * nuclear_charges,
                                     axis=1)
 

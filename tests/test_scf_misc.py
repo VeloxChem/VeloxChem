@@ -867,14 +867,17 @@ class TestScfDriverMiscellaneous:
             def get_element_ids():
                 return np.array([8.0, 1.0])
 
+            @staticmethod
+            def number_of_atoms():
+                return 2
+
         class BasisStub:
 
             @staticmethod
             def get_number_of_ecp_core_electrons():
                 return np.array([2.0, 0.0])
 
-        driver = ScfRestrictedDriver()
-        effective_charges = driver._get_effective_nuclear_charges(
+        effective_charges = Molecule.get_effective_nuclear_charges(
             MoleculeStub(), BasisStub())
 
         assert np.allclose(effective_charges, np.array([6.0, 1.0]))

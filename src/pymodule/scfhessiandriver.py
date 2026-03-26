@@ -458,8 +458,7 @@ class ScfHessianDriver(HessianDriver):
         # Parts related to second-order integral derivatives
         hessian_2nd_order_derivatives = np.zeros((natm, natm, 3, 3))
 
-        mol_charges = molecule.get_element_ids()
-        mol_charges -= ao_basis.get_number_of_ecp_core_electrons()
+        mol_charges = molecule.get_effective_nuclear_charges(ao_basis)
         mol_coords = molecule.get_coordinates_in_bohr()
 
         for i in local_atoms:
@@ -792,8 +791,7 @@ class ScfHessianDriver(HessianDriver):
             hessian_point_charges = np.zeros((natm, natm, 3, 3))
 
             qm_coords = molecule.get_coordinates_in_bohr()
-            nuclear_charges = molecule.get_element_ids()
-            nuclear_charges -= ao_basis.get_number_of_ecp_core_electrons()
+            nuclear_charges = molecule.get_effective_nuclear_charges(ao_basis)
 
             for i in range(self.rank, natm, self.nodes):
                 if atom_pairs is not None:
@@ -1256,8 +1254,7 @@ class ScfHessianDriver(HessianDriver):
         # Parts related to second-order integral derivatives
         hessian_2nd_order_derivatives = np.zeros((natm, natm, 3, 3))
 
-        mol_charges = molecule.get_element_ids()
-        mol_charges -= ao_basis.get_number_of_ecp_core_electrons()
+        mol_charges = molecule.get_effective_nuclear_charges(ao_basis)
         mol_coords = molecule.get_coordinates_in_bohr()
 
         for i in local_atoms:
@@ -1649,8 +1646,7 @@ class ScfHessianDriver(HessianDriver):
             hessian_point_charges = np.zeros((natm, natm, 3, 3))
 
             qm_coords = molecule.get_coordinates_in_bohr()
-            nuclear_charges = molecule.get_element_ids()
-            nuclear_charges -= ao_basis.get_number_of_ecp_core_electrons()
+            nuclear_charges = molecule.get_effective_nuclear_charges(ao_basis)
 
             for i in range(self.rank, natm, self.nodes):
                 if atom_pairs is not None:
@@ -1793,8 +1789,7 @@ class ScfHessianDriver(HessianDriver):
 
         # Number of atoms and atomic charges
         natm = molecule.number_of_atoms()
-        nuclear_charges = molecule.get_element_ids()
-        nuclear_charges -= ao_basis.get_number_of_ecp_core_electrons()
+        nuclear_charges = molecule.get_effective_nuclear_charges(ao_basis)
 
         # Dipole integrals
         dipole_mats = compute_electric_dipole_integrals(molecule, ao_basis,
@@ -1906,8 +1901,7 @@ class ScfHessianDriver(HessianDriver):
 
         # Number of atoms and atomic charges
         natm = molecule.number_of_atoms()
-        nuclear_charges = molecule.get_element_ids()
-        nuclear_charges -= ao_basis.get_number_of_ecp_core_electrons()
+        nuclear_charges = molecule.get_effective_nuclear_charges(ao_basis)
 
         # Dipole integrals
         dipole_mats = compute_electric_dipole_integrals(molecule, ao_basis,

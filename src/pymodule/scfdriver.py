@@ -910,8 +910,7 @@ class ScfDriver:
 
             natoms = molecule.number_of_atoms()
             coords = molecule.get_coordinates_in_bohr()
-            nuclear_charges = self._get_effective_nuclear_charges(
-                molecule, basis)
+            nuclear_charges = molecule.get_effective_nuclear_charges(basis)
             npoints = self.point_charges.shape[1]
 
             for a in range(self.rank, natoms, self.nodes):
@@ -1806,8 +1805,7 @@ class ScfDriver:
 
                 self._ef_nuc_energy = 0.0
                 coords = molecule.get_coordinates_in_bohr()
-                elem_ids = self._get_effective_nuclear_charges(
-                    molecule, ao_basis)
+                elem_ids = molecule.get_effective_nuclear_charges(ao_basis)
                 for atom_idx in range(molecule.number_of_atoms()):
                     self._ef_nuc_energy -= np.dot(
                         elem_ids[atom_idx] *
@@ -2160,24 +2158,6 @@ class ScfDriver:
 
         return self._pe or self.point_charges is not None
 
-    def _get_effective_nuclear_charges(self, molecule, basis):
-        """
-        Returns effective nuclear charges after subtracting ECP core electrons.
-
-        :param molecule:
-            The molecule.
-        :param basis:
-            The AO basis set.
-
-        :return:
-            Effective nuclear charges.
-        """
-
-        nuclear_charges = molecule.get_element_ids()
-        nuclear_charges -= basis.get_number_of_ecp_core_electrons()
-
-        return nuclear_charges
-
     def _parse_point_charge_line(self, content, idx, expect_vdw):
         """
         Parses one point-charge line with explicit validation.
@@ -2283,8 +2263,7 @@ class ScfDriver:
         if molecule.number_of_atoms() >= self.nodes and self.nodes > 1:
             npot_mat = self._comp_npot_mat_parallel(molecule, basis)
         else:
-            mol_charges = molecule.get_element_ids()
-            mol_charges -= basis.get_number_of_ecp_core_electrons()
+            mol_charges = molecule.get_effective_nuclear_charges(basis)
             mol_coords = molecule.get_coordinates_in_bohr()
             npot_mat = compute_nuclear_potential_integrals(
                 molecule, basis, mol_charges, mol_coords)
@@ -2298,8 +2277,7 @@ class ScfDriver:
         if self.electric_field is not None:
             if molecule.get_charge() != 0:
                 coords = molecule.get_coordinates_in_bohr()
-                nuclear_charges = self._get_effective_nuclear_charges(
-                    molecule, basis)
+                nuclear_charges = molecule.get_effective_nuclear_charges(basis)
                 self._dipole_origin = np.sum(coords.T * nuclear_charges,
                                              axis=1) / np.sum(nuclear_charges)
             else:
@@ -2354,8 +2332,7 @@ class ScfDriver:
         start = sum(counts[:self.rank])
         end = sum(counts[:self.rank + 1])
 
-        charges = molecule.get_element_ids()[start:end]
-        charges -= basis.get_number_of_ecp_core_electrons()[start:end]
+        charges = molecule.get_effective_nuclear_charges(basis)[start:end]
         coords = molecule.get_coordinates_in_bohr()[start:end, :]
 
         npot_mat = compute_nuclear_potential_integrals(molecule, basis, charges,

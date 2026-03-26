@@ -1043,8 +1043,7 @@ class EspChargesDriver:
         # nuclear contribution
 
         coords = molecule.get_coordinates_in_bohr()
-        elem_ids = molecule.get_element_ids()
-        elem_ids -= basis.get_number_of_ecp_core_electrons()
+        elem_ids = molecule.get_effective_nuclear_charges(basis)
 
         for a in range(molecule.number_of_atoms()):
             esp += elem_ids[a] / np.sqrt(

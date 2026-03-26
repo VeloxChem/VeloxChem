@@ -445,8 +445,7 @@ class ScfGradientDriver(GradientDriver):
             # distribute nuclei-point-charge terms over atoms
             natoms = molecule.number_of_atoms()
             coords = molecule.get_coordinates_in_bohr()
-            nuclear_charges = molecule.get_element_ids()
-            nuclear_charges -= basis.get_number_of_ecp_core_electrons()
+            nuclear_charges = molecule.get_effective_nuclear_charges(basis)
             npoints = self.scf_driver.point_charges.shape[1]
 
             for a in range(self.rank, natoms, self.nodes):

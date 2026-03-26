@@ -266,7 +266,7 @@ class CpcmDriver:
         gradA += self.grad_Aii(molecule, self._cpcm_grid, self._cpcm_sw_func,
                                self._cpcm_q, self.epsilon, self.x)
 
-        gradB = self.grad_B(molecule, self._cpcm_grid, self._cpcm_q)
+        gradB = self.grad_B(molecule, basis, self._cpcm_grid, self._cpcm_q)
 
         gradC = self.grad_C(molecule, basis, self._cpcm_grid, self._cpcm_q,
                             density)
@@ -584,8 +584,7 @@ class CpcmDriver:
         Bzvec = np.zeros(grid.shape[0])
 
         atom_coords = molecule.get_coordinates_in_bohr()
-        elem_ids = molecule.get_element_ids()
-        elem_ids -= basis.get_number_of_ecp_core_electrons()
+        elem_ids = molecule.get_effective_nuclear_charges(basis)
 
         grid_coords = np.copy(grid[:, :3])
         grid_zeta = np.copy(grid[:, 4])
@@ -797,12 +796,14 @@ class CpcmDriver:
 
         return grad_Aii
 
-    def grad_B(self, molecule, grid, q):
+    def grad_B(self, molecule, basis, grid, q):
         """
         Calculates the nuclear-cavity gradient contribution.
 
         :param molecule:
             The molecule.
+        :param basis:
+            The atomic basis.
         :param grid:
             The grid object containing the grid positions, weights,
             the Gaussian exponents, and indices for which atom they belong to.
@@ -822,7 +823,7 @@ class CpcmDriver:
 
         two_sqrt_invpi = 2.0 / np.sqrt(np.pi)
 
-        elem_ids = molecule.get_element_ids()
+        elem_ids = molecule.get_effective_nuclear_charges(basis)
         gradB_vec = np.zeros((natoms, 3))
 
         # np.einsum('ia,bia,iac,i,a->bc', dB_dr, factor, dr_iA, q, Z)
