@@ -596,6 +596,9 @@ class ComplexResponseSolver(ComplexResponseSolverBase):
                         'solutions': solutions,
                     }
 
+                    ret_dict = self._attach_molecular_metadata(
+                        ret_dict, molecule)
+
                     self._print_results(ret_dict)
 
                     # write spectrum to h5 file
