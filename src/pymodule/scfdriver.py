@@ -1660,21 +1660,13 @@ class ScfDriver:
             profiler.start_timer('CPCM')
 
             if self._cpcm:
-                if self.scf_type == 'restricted':
-                    e_sol, Fock_sol = self.cpcm_drv.compute_gs_fock(
-                        molecule, ao_basis, den_mat[0] * 2.0,
-                        self.cpcm_cg_thresh)
-                else:
-                    e_sol, Fock_sol = self.cpcm_drv.compute_gs_fock(
-                        molecule, ao_basis, den_mat[0] + den_mat[1],
-                        self.cpcm_cg_thresh)
+                e_sol, Fock_sol = self.cpcm_drv.compute_gs_fock(
+                    molecule, ao_basis, self._get_total_density_matrix(den_mat),
+                    self.cpcm_cg_thresh)
 
                 if self.rank == mpi_master():
                     e_el += e_sol
-
-                    fock_mat[0] += Fock_sol
-                    if self.scf_type != 'restricted':
-                        fock_mat[1] += Fock_sol
+                    self._add_onee_contribution(fock_mat, Fock_sol)
 
             profiler.stop_timer('CPCM')
             profiler.start_timer('ErrVec')
@@ -1714,14 +1706,9 @@ class ScfDriver:
                     for ef, mat in zip(self.electric_field, dipole_ints)
                 ])
 
-                if self.scf_type == 'restricted':
-                    e_el += 2.0 * np.trace(np.matmul(efpot, den_mat[0]))
-                    fock_mat[0] += efpot
-                else:
-                    e_el += np.trace(np.matmul(efpot,
-                                               (den_mat[0] + den_mat[1])))
-                    fock_mat[0] += efpot
-                    fock_mat[1] += efpot
+                e_el += np.trace(
+                    np.matmul(efpot, self._get_total_density_matrix(den_mat)))
+                self._add_onee_contribution(fock_mat, efpot)
 
                 self._ef_nuc_energy = 0.0
                 coords = molecule.get_coordinates_in_bohr()
@@ -2013,6 +2000,91 @@ class ScfDriver:
         self.ostream.flush()
 
         sys.exit(0)
+
+    def _is_restricted(self):
+        """
+        Returns whether the current SCF calculation is spin-restricted.
+        """
+
+        return self.scf_type == 'restricted'
+
+    def _get_spin_matrices(self, matrices):
+        """
+        Returns alpha and beta matrices for the current SCF type.
+
+        :param matrices:
+            The matrix tuple/list.
+
+        :return:
+            The alpha and beta matrices.
+        """
+
+        alpha_matrix = matrices[0]
+        beta_matrix = matrices[0] if self._is_restricted() else matrices[1]
+
+        return alpha_matrix, beta_matrix
+
+    def _get_total_density_matrix(self, den_mat):
+        """
+        Returns the total AO density matrix.
+
+        :param den_mat:
+            The density matrix tuple.
+
+        :return:
+            The total AO density matrix.
+        """
+
+        d_alpha, d_beta = self._get_spin_matrices(den_mat)
+
+        return d_alpha + d_beta
+
+    def _add_onee_contribution(self, matrices, contribution):
+        """
+        Adds the same one-electron contribution to all spin-specific Fock
+        matrices.
+
+        :param matrices:
+            The list of Fock matrices.
+        :param contribution:
+            The matrix contribution to add.
+        """
+
+        for matrix in matrices:
+            matrix += contribution
+
+    def _has_embedded_potential(self):
+        """
+        Returns whether an external one-electron potential is active.
+        """
+
+        return self._pe or self.point_charges is not None
+
+    def _compute_embedded_potential(self, den_mat):
+        """
+        Computes external one-electron potential contributions.
+
+        :param den_mat:
+            The density matrix tuple.
+
+        :return:
+            The embedding energy and matrix contribution.
+        """
+
+        density_matrix = self._get_total_density_matrix(den_mat)
+
+        if self._pe:
+            from .embedding import PolarizableEmbeddingSCF
+            assert_msg_critical(
+                isinstance(self._embedding_drv, PolarizableEmbeddingSCF),
+                'ScfDriver: Inconsistent embedding driver for SCF')
+            return self._embedding_drv.compute_pe_contributions(
+                density_matrix=density_matrix)
+
+        if self.point_charges is not None:
+            return np.sum(density_matrix * self._V_es), self._V_es
+
+        return 0.0, None
 
     def _comp_one_ints(self, molecule, basis):
         """
@@ -2463,24 +2535,8 @@ class ScfDriver:
             profiler.add_timing_info('FockXC', tm.time() - vxc_t0)
         pe_t0 = tm.time()
 
-        if self._pe and not self._first_step:
-            if self.scf_type == 'restricted':
-                density_matrix = 2.0 * den_mat[0]
-            else:
-                density_matrix = den_mat[0] + den_mat[1]
-            from .embedding import PolarizableEmbeddingSCF
-            assert_msg_critical(
-                isinstance(self._embedding_drv, PolarizableEmbeddingSCF),
-                'ScfDriver: Inconsistent embedding driver for SCF')
-            e_emb, V_emb = self._embedding_drv.compute_pe_contributions(
-                density_matrix=density_matrix)
-        elif self.point_charges is not None and not self._first_step:
-            if self.scf_type == 'restricted':
-                density_matrix = 2.0 * den_mat[0]
-            else:
-                density_matrix = den_mat[0] + den_mat[1]
-            e_emb = np.sum(density_matrix * self._V_es)
-            V_emb = self._V_es
+        if self._has_embedded_potential() and not self._first_step:
+            e_emb, V_emb = self._compute_embedded_potential(den_mat)
         else:
             e_emb, V_emb = 0.0, None
 
@@ -2520,33 +2576,23 @@ class ScfDriver:
             xc_ene = self.comm.reduce(vxc_mat.get_energy(), root=mpi_master())
 
         if self.rank == mpi_master():
-            # electronic, kinetic, nuclear energy
-            D = den_mat
-            F = fock_mat
-            T = kin_mat
-            V = npot_mat
-            if self.scf_type == 'restricted':
-                e_ee = np.sum(D[0] * F[0])
-                e_kin = 2.0 * np.sum(D[0] * T)
-                e_en = 2.0 * np.sum(D[0] * V)
-                if ecp_mat is not None:
-                    e_en += 2.0 * np.sum(D[0] * ecp_mat)
-            else:
-                e_ee = 0.5 * (np.sum(D[0] * F[0]) + np.sum(D[1] * F[1]))
-                e_kin = np.sum((D[0] + D[1]) * T)
-                e_en = np.sum((D[0] + D[1]) * V)
-                if ecp_mat is not None:
-                    e_en += np.sum((D[0] + D[1]) * ecp_mat)
+            D_alpha, D_beta = self._get_spin_matrices(den_mat)
+            fock_alpha, fock_beta = self._get_spin_matrices(fock_mat)
+            D_total = D_alpha + D_beta
+
+            e_twoe = 0.5 * np.sum(D_alpha * fock_alpha)
+            e_twoe += 0.5 * np.sum(D_beta * fock_beta)
+            e_onee = np.sum(D_total * (kin_mat + npot_mat))
+            if ecp_mat is not None:
+                e_onee += np.sum(D_total * ecp_mat)
 
             if self._dft and not self._first_step:
-                e_ee += xc_ene
+                e_twoe += xc_ene
 
-            if self._pe and not self._first_step:
-                e_ee += e_emb
-            elif self.point_charges is not None and not self._first_step:
-                e_ee += e_emb
+            if self._has_embedded_potential() and not self._first_step:
+                e_onee += e_emb
 
-            e_sum = e_ee + e_kin + e_en
+            e_sum = e_twoe + e_onee
         else:
             e_sum = 0.0
         e_sum = self.comm.bcast(e_sum, root=mpi_master())
@@ -2583,29 +2629,17 @@ class ScfDriver:
                                               root=mpi_master())
 
         if self.rank == mpi_master():
-            T = kin_mat
-            V = npot_mat
-            fock_mat[0] += (T + V)
+            self._add_onee_contribution(fock_mat, kin_mat + npot_mat)
             if ecp_mat is not None:
-                fock_mat[0] += ecp_mat
-            if self.scf_type != 'restricted':
-                fock_mat[1] += (T + V)
-                if ecp_mat is not None:
-                    fock_mat[1] += ecp_mat
+                self._add_onee_contribution(fock_mat, ecp_mat)
 
             if self._dft and not self._first_step:
                 fock_mat[0] += np_xcmat_a
-                if self.scf_type != 'restricted':
+                if not self._is_restricted():
                     fock_mat[1] += np_xcmat_b
 
-            if self._pe and not self._first_step:
-                fock_mat[0] += V_emb
-                if self.scf_type != 'restricted':
-                    fock_mat[1] += V_emb
-            elif self.point_charges is not None and not self._first_step:
-                fock_mat[0] += V_emb
-                if self.scf_type != 'restricted':
-                    fock_mat[1] += V_emb
+            if self._has_embedded_potential() and not self._first_step:
+                self._add_onee_contribution(fock_mat, V_emb)
 
     def _comp_gradient(self, fock_mat, ovl_mat, den_mat, oao_mat):
         """
@@ -2876,12 +2910,7 @@ class ScfDriver:
         """
 
         if self.rank == mpi_master():
-            if self.scf_type == 'restricted':
-                D_alpha = self._density[0]
-                D_beta = self._density[0]
-            else:
-                D_alpha = self._density[0]
-                D_beta = self._density[1]
+            D_alpha, D_beta = self._get_spin_matrices(self._density)
             S = ovl_mat
             calc_nelec = (np.sum(D_alpha * S), np.sum(D_beta * S))
         else:
