@@ -125,12 +125,14 @@ class CpcmDriver:
         self.ostream.print_blank()
         self.ostream.flush()
 
-    def init(self, molecule, do_nuclear=True):
+    def init(self, molecule, basis, do_nuclear=True):
         """
         Initialize the driver for energy calculations.
 
         :param molecule:
             The molecule.
+        :param basis:
+            The AO basis set.
         :param do_nuclear:
             Flag to compute or not the nuclear contribution.
         """
@@ -145,7 +147,7 @@ class CpcmDriver:
         self._cpcm_precond = np.hstack(self._cpcm_precond)
 
         if do_nuclear:
-            self._cpcm_Bzvec = self.form_vector_Bz(self._cpcm_grid, molecule)
+            self._cpcm_Bzvec = self.form_vector_Bz(self._cpcm_grid, molecule, basis)
         else:
             self._cpcm_Bzvec = None
 
@@ -562,7 +564,7 @@ class CpcmDriver:
 
         return local_precond
 
-    def form_vector_Bz(self, grid, molecule):
+    def form_vector_Bz(self, grid, molecule, basis):
         """
         Forms the nuclear-cavity interaction vector.
 
@@ -571,6 +573,8 @@ class CpcmDriver:
             the Gaussian exponents, and indices for which atom they belong to.
         :param molecule:
             The molecule.
+        :param basis:
+            The AO basis set.
 
         :return:
             The (nuclear) electrostatic potential at each grid point due to
@@ -581,6 +585,7 @@ class CpcmDriver:
 
         atom_coords = molecule.get_coordinates_in_bohr()
         elem_ids = molecule.get_element_ids()
+        elem_ids -= basis.get_number_of_ecp_core_electrons()
 
         grid_coords = np.copy(grid[:, :3])
         grid_zeta = np.copy(grid[:, 4])

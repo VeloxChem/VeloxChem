@@ -763,7 +763,7 @@ class ScfDriver:
             cpcm_grid_t0 = tm.time()
 
             self.cpcm_drv.print_cpcm_info()
-            self.cpcm_drv.init(molecule, do_nuclear=True)
+            self.cpcm_drv.init(molecule, basis, do_nuclear=True)
 
             if self.print_level > 1:
                 self.ostream.print_info(

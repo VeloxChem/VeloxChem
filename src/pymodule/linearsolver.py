@@ -527,12 +527,14 @@ class LinearSolver:
             'potfile_text': potfile_text,
         }
 
-    def _init_cpcm(self, molecule):
+    def _init_cpcm(self, molecule, basis):
         """
         Initializes C-PCM.
 
         :param molecule:
             The molecule.
+        :param basis:
+            The AO basis set.
         """
 
         # C-PCM setup
@@ -549,7 +551,7 @@ class LinearSolver:
 
             cpcm_grid_t0 = tm.time()
 
-            self.cpcm_drv.init(molecule, do_nuclear=False)
+            self.cpcm_drv.init(molecule, basis, do_nuclear=False)
 
             if self.print_level > 1:
                 self.ostream.print_info(

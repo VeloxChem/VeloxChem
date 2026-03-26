@@ -230,7 +230,7 @@ class ComplexResponseUnrestrictedSolver(ComplexResponseSolverBase):
         # PE information
         pe_dict = self._init_pe(molecule, basis)
         # CPCM information
-        self._init_cpcm(molecule)
+        self._init_cpcm(molecule, basis)
 
         # TODO: enable PE
         assert_msg_critical(

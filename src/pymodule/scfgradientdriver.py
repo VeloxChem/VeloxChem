@@ -427,12 +427,14 @@ class ScfGradientDriver(GradientDriver):
 
                 grad_timing['D4_grad'] += time.time() - t0
 
-    def _add_point_charge_classical_gradient(self, molecule, grad_timing):
+    def _add_point_charge_classical_gradient(self, molecule, basis, grad_timing):
         """
         Adds nuclei-point-charge and optional QM/MM vdW contributions.
 
         :param molecule:
             The molecule.
+        :param basis:
+            The AO basis set.
         :param grad_timing:
             The timing dictionary to update.
         """
@@ -444,6 +446,7 @@ class ScfGradientDriver(GradientDriver):
             natoms = molecule.number_of_atoms()
             coords = molecule.get_coordinates_in_bohr()
             nuclear_charges = molecule.get_element_ids()
+            nuclear_charges -= basis.get_number_of_ecp_core_electrons()
             npoints = self.scf_driver.point_charges.shape[1]
 
             for a in range(self.rank, natoms, self.nodes):
@@ -662,7 +665,7 @@ class ScfGradientDriver(GradientDriver):
 
         # nuclei-point charges contribution to gradient
 
-        self._add_point_charge_classical_gradient(molecule, grad_timing)
+        self._add_point_charge_classical_gradient(molecule, basis, grad_timing)
 
         # collect gradient
 
@@ -879,7 +882,7 @@ class ScfGradientDriver(GradientDriver):
 
         # nuclei-point charges contribution to gradient
 
-        self._add_point_charge_classical_gradient(molecule, grad_timing)
+        self._add_point_charge_classical_gradient(molecule, basis, grad_timing)
 
         # collect gradient
 
