@@ -167,9 +167,6 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
             The molecule.
         """
 
-        
-        self.ostream.mute()
-
         if self.numerical:
             if self.rank == mpi_master():
                 self.compute_numerical(molecule)

@@ -73,7 +73,6 @@ class SerenityLinearResponseSolver:
         self.comm = serenity_scf_drv.comm
         self.rank = self.comm.Get_rank()
         self.nodes = self.comm.Get_size()
-        self.ostream = serenity_scf_drv.ostream
 
         self.exc_method = 'tda'
         self.spinflip = False
@@ -221,7 +220,6 @@ class SerenityLinearResponseSolver:
         errmsg = 'SerenityLinearResponseSolver: qcserenity is not available. '
         errmsg += 'Please install/build Serenity python bindings.'
         assert_msg_critical(self.is_available(), errmsg)
-        self.ostream.mute()
     
         if self.rank == mpi_master():
             rsp_results = self._compute_master(molecule)
@@ -398,7 +396,7 @@ class SerenityLinearResponseSolver:
         }
 
     def _serenity_output_context(self):
-        if self.scf_driver.serenity_verbose and not self.ostream.is_muted:
+        if self.scf_driver.serenity_verbose and not self.scf_driver.ostream.is_muted:
             return nullcontext()
         return qc.redirectOutputToFile(os.devnull)
     

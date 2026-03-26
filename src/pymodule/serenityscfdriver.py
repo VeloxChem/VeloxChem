@@ -274,7 +274,6 @@ class SerenityScfDriver:
         errmsg = 'SerenityScfDriver: qcserenity is not available. '
         errmsg += 'Please install/build Serenity python bindings.'
         assert_msg_critical(self.is_available(), errmsg)
-        self.ostream.mute()
         if self.rank == mpi_master():
             results = self._compute_energy_master(molecule)
             energy = float(results['energy'])
@@ -545,6 +544,7 @@ class SerenityScfDriver:
         return hasher.hexdigest()
 
     def _serenity_output_context(self):
+        print(self.serenity_verbose, self.ostream.is_muted)
         if self.serenity_verbose and not self.ostream.is_muted:
             return nullcontext()
         return qc.redirectOutputToFile(os.devnull)

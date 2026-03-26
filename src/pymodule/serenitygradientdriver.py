@@ -62,7 +62,7 @@ class SerenityGradientDriver(GradientDriver):
         :param molecule:
             The molecule.
         """
-        self.ostream.mute()
+
 
         if self.numerical:
             if self.rank == mpi_master():
@@ -70,9 +70,9 @@ class SerenityGradientDriver(GradientDriver):
             else:
                 self.gradient = None
         else:
-            self.ostream.mute()
+
             self.serenity_driver.compute_gradient(molecule)
-            self.ostream.unmute()
+
             self.gradient = self.serenity_driver.get_gradient()
 
         self.gradient = self.comm.bcast(self.gradient, root=mpi_master())
@@ -91,8 +91,6 @@ class SerenityGradientDriver(GradientDriver):
             The molecule.
         """
 
-        self.ostream.mute()
         self.serenity_driver.compute(molecule)
-        self.ostream.unmute()
 
         return self.serenity_driver.get_energy()
