@@ -60,7 +60,7 @@ try:
 except ImportError:
     pass
 
-# All positions are in Angsrom unless otherwise stated
+# All positions are in Angstrom unless otherwise stated
 
 
 class TransitionStateGuesser():
@@ -90,7 +90,18 @@ class TransitionStateGuesser():
         self.results = {}
         self.lambda_vector = list(np.round(np.linspace(0, 1, 21), 3))
         self.mute_ff_build = True
+
+        # File I/O controls
+        # Set save_intermediates=True to write reactant/product JSON and
+        # system XML files to disk — useful for debugging but off by default
+        # to avoid unnecessary file I/O on HPC shared filesystems.
+        self.save_intermediates = False
+        # Set save_results_file=True (default) to write the HDF5 results file
+        # after each scan. This enables crash recovery and load_results().
+        self.save_results_file = True
+
         timing_str = str(int(time.time()))
+        # folder_name is only used when save_intermediates=True
         self.folder_name = f'ts_data_{timing_str}'
         self.results_file = f'ts_results_{timing_str}.h5'
 
@@ -154,7 +165,6 @@ class TransitionStateGuesser():
 
         # Scan QM
         if self.do_qm_scan:
-            # assert False, 'Not implemented yet'
             self.scan_qm(self.results)
 
         return self.results
@@ -189,14 +199,16 @@ class TransitionStateGuesser():
         self.mol_charge = self.molecule.get_charge()
         self.mol_multiplicity = self.molecule.get_multiplicity()
 
-        self.ostream.print_info(
-            f"Saving reactant and product forcefield as json to {self.folder_name}"
-        )
-        self.ostream.flush()
-        self.reactant.save_forcefield_as_json(
-            self.reactant, f"{self.folder_name}/reactant.json")
-        self.product.save_forcefield_as_json(
-            self.product, f"{self.folder_name}/product.json")
+        if self.save_intermediates:
+            os.makedirs(self.folder_name, exist_ok=True)
+            self.ostream.print_info(
+                f"Saving reactant and product forcefield as json to {self.folder_name}"
+            )
+            self.ostream.flush()
+            self.reactant.save_forcefield_as_json(
+                self.reactant, f"{self.folder_name}/reactant.json")
+            self.product.save_forcefield_as_json(
+                self.product, f"{self.folder_name}/product.json")
 
         rea_bonds = set(self.reactant.bonds.keys())
         pro_bonds = set(self.product.bonds.keys())
@@ -231,16 +243,18 @@ class TransitionStateGuesser():
             self.ostream.print_blank()
             self.ostream.flush()
             sysbuilder.ostream.unmute()
-        self.ostream.print_info(
-            f"Saving systems as xml to {self.folder_name}/systems")
-        self.ostream.flush()
-        sysbuilder.save_systems_as_xml(self.systems,
-                                       self.folder_name + "/systems")
+
+        if self.save_intermediates:
+            systems_dir = self.folder_name + "/systems"
+            os.makedirs(systems_dir, exist_ok=True)
+            self.ostream.print_info(
+                f"Saving systems as xml to {systems_dir}")
+            self.ostream.flush()
+            sysbuilder.save_systems_as_xml(self.systems, systems_dir)
+
         self.results.update({'lambda_vec': self.lambda_vector})
 
     def scan_mm(self):
-
-        self.folder = Path().cwd() / self.folder_name
 
         # pdbs are saved in angstrom
         exception = None
@@ -259,7 +273,6 @@ class TransitionStateGuesser():
         )
 
         # pos in angstrom
-        # pos = self.initial_positions
         rea_init_pos = self.reactant.molecule.get_coordinates_in_angstrom()
         pro_init_pos = self.product.molecule.get_coordinates_in_angstrom()
         scan_dict = {}
@@ -269,7 +282,6 @@ class TransitionStateGuesser():
                     "force_conformer_search true. Doing conformer search at every lambda."
                 )
                 self.ostream.flush()
-                # positions, V, E1, E2, E_int, N_conf = self._run_mm_scan(
                 scan_dict = self._run_mm_scan(
                     self.lambda_vector,
                     rea_sim,
@@ -288,7 +300,6 @@ class TransitionStateGuesser():
                     backward_init_pos=pro_init_pos,
                 )
 
-                #     # Find peak
                 searched_conformers_indices = []
                 V, E1, E2, conf_indices = self._get_best_mm_E_from_scan_dict(
                     scan_dict)
@@ -331,7 +342,6 @@ class TransitionStateGuesser():
                     )
                     for l in scan_dict_peak_conf.keys():
                         scan_dict[l] += scan_dict_peak_conf[l]
-                    pass
 
                 if self.discont_conformer_search:
                     discont_indices = self._check_discontinuities(E1, E2)
@@ -401,19 +411,16 @@ class TransitionStateGuesser():
             )
             self.ostream.print_blank()
             self.results.update({
-                'scan':
-                scan_dict,
-                'max_mm_xyz':
-                max_mm_xyz,
-                'max_mm_lambda':
-                max_mm_lambda,
-                'min_mm_conformer_index':
-                min_mm_conformer_index,
+                'scan': scan_dict,
+                'max_mm_xyz': max_mm_xyz,
+                'max_mm_lambda': max_mm_lambda,
+                'min_mm_conformer_index': min_mm_conformer_index,
             })
             self.molecule = Molecule.read_xyz_string(max_mm_xyz)
             self.molecule.set_multiplicity(self.mol_multiplicity)
             self.molecule.set_charge(self.mol_charge)
-            self.save_results(self.results_file, self.results)
+            if self.save_results_file:
+                self.save_results(self.results_file, self.results)
             return self.results
         else:
             self.ostream.flush()
@@ -421,6 +428,8 @@ class TransitionStateGuesser():
             self.ostream.print_warning(
                 "The force field scan crashed. Saving results in self.results and raising exception"
             )
+            if self.save_results_file:
+                self.save_results(self.results_file, self.results)
             raise exception
 
     def _check_discontinuities(self, E1, E2):
@@ -536,52 +545,40 @@ class TransitionStateGuesser():
         prosim,
         conformer_search,
     ):
-        result = {}
-        # else:
         opm_dyn = OpenMMDynamics()
         opm_dyn.ostream.mute()
-        # platform settings for small molecule
         opm_dyn.openmm_platform = "CPU"
-        # opm_dyn.create_system_from_molecule(mol, ff_gen)
-        pdb_name = self.folder_name + f'/conf_top_{l}.pdb'
 
-        pdb = mmapp.PDBFile.writeFile(
-            topology,
-            init_pos * mmunit.angstrom,
-            pdb_name,
-        )
-        opm_dyn.pdb = mmapp.PDBFile(pdb_name)
+        # Set positions directly in memory — no file I/O at all.
+        # _InMemoryPDB holds topology + positions as an OpenMM Quantity,
+        # which is the only interface conformational_sampling uses from self.pdb.
+        opm_dyn.set_positions_from_array(init_pos, topology)
         opm_dyn.system = system
 
-        if conformer_search:
-            snapshots = self.conformer_snapshots
-        else:
-            snapshots = 1
+        snapshots = self.conformer_snapshots if conformer_search else 1
         conformers_dict = opm_dyn.conformational_sampling(
             ensemble='NVT',
             nsteps=self.mm_steps * snapshots,
             snapshots=snapshots,
             temperature=self.mm_temperature,
         )
+
         result = []
         for e_int, temp_mol in zip(conformers_dict['energies'],
                                    conformers_dict['molecules']):
             pos = temp_mol.get_coordinates_in_angstrom()
             v, e1, e2 = self._recalc_mm_energy(pos, l, reasim, prosim)
-            avg_x = np.mean(pos[:, 0])
-            avg_y = np.mean(pos[:, 1])
-            avg_z = np.mean(pos[:, 2])
-            pos -= [avg_x, avg_y, avg_z]
+            # Centre positions so conformers are translation-invariant
+            pos -= pos.mean(axis=0)
             xyz = temp_mol.get_xyz_string()
-            temp_result = {
+            result.append({
                 'v': v,
                 'e1': e1,
                 'e2': e2,
                 'e_int': e_int,
                 'pos': pos,
-                'xyz': xyz
-            }
-            result.append(temp_result)
+                'xyz': xyz,
+            })
 
         return result
 
@@ -619,7 +616,6 @@ class TransitionStateGuesser():
                 min_conf_index = 0
                 scan = sorted(results['scan'][l], key=lambda x: x['v'])
                 results['scan'][l] = scan
-                # Pick out lowest 5 conformers from scan
 
                 scan_range = min(self.max_qm_conformers, len(scan))
                 for i, conformer in enumerate(scan[:scan_range]):
@@ -642,11 +638,10 @@ class TransitionStateGuesser():
                 if max_qm_energy is None or min_qm_conf_E > max_qm_energy:
                     max_qm_energy = min_qm_conf_E
                     max_qm_lambda = l
-                    # min_qm_conf_index = min_conf_index
-                    # max_qm_xyz = scan[min_conf_index]['xyz']
                 qm_scan = results['scan'][l][:scan_range]
                 rest = results['scan'][l][scan_range:]
-                sorted_qm_scan = sorted(qm_scan, key=lambda x: x['qm_energy'])
+                sorted_qm_scan = sorted(qm_scan,
+                                        key=lambda x: x['qm_energy'])
                 results['scan'][l] = sorted_qm_scan + rest
 
             self.ostream.print_blank()
@@ -673,7 +668,8 @@ class TransitionStateGuesser():
             self.ostream.print_warning(f"Error in the QM scan: {e}")
             self.ostream.flush()
             self.results.update(results)
-        self.save_results(self.results_file, self.results)
+        if self.save_results_file:
+            self.save_results(self.results_file, self.results)
         return self.results
 
     def _get_qm_energy(self, xyz):
@@ -723,7 +719,8 @@ class TransitionStateGuesser():
         try:
             import ipywidgets
         except ImportError:
-            raise ImportError('ipywidgets is required for this functionality.')
+            raise ImportError(
+                'ipywidgets is required for this functionality.')
 
         ostream = OutputStream(sys.stdout)
 
@@ -742,9 +739,6 @@ class TransitionStateGuesser():
                     "No results provided. Provide either ts_results or filename."
                 )
         lambda_vec = [round(float(l), 3) for l in ts_results['lambda_vec']]
-
-        # if there are qm energies, get the best qm energies and everything corresponding to that
-        # otherwise, get the best mm energies
 
         if ts_results['scan'][0][0].get('qm_energy', None) is not None:
             final_lambda = round(float(ts_results.get('max_qm_lambda', 0)), 3)
@@ -784,11 +778,10 @@ class TransitionStateGuesser():
         try:
             import ipywidgets
         except ImportError:
-            raise ImportError('ipywidgets is required for this functionality.')
+            raise ImportError(
+                'ipywidgets is required for this functionality.')
 
-        # conformer_dropdown =
         options = list(range(1, len(scan[step]) + 1))
-        # options = list(range(0,len(scan[step])+0))
         best_index = 0
         min_energy = None
         if scan[0][0].get('qm_energy', None) is not None:
@@ -837,9 +830,9 @@ class TransitionStateGuesser():
         try:
             import matplotlib.pyplot as plt
         except ImportError:
-            raise ImportError('matplotlib is required for this functionality.')
+            raise ImportError(
+                'matplotlib is required for this functionality.')
 
-        # todo add a nicer visualisation to this
         mm_energies, _, _, _ = TransitionStateGuesser._get_best_mm_E_from_scan_dict(
             scan)
         mm_min = np.min(mm_energies)
@@ -858,8 +851,8 @@ class TransitionStateGuesser():
             qm_min = np.min(qm_energies)
             rel_qm_energies = np.asarray(qm_energies) - qm_min
             print("  {:>9} {:>18} {:>19}  ".format("conformer",
-                                                   "MM energy [kJ/mol]",
-                                                   "QM energy [kJ/mol]"))
+                                                    "MM energy [kJ/mol]",
+                                                    "QM energy [kJ/mol]"))
 
             for i, conf in enumerate(scan[step]):
                 conf_str = f"{i+1}"
@@ -890,7 +883,8 @@ class TransitionStateGuesser():
                 print(print_str)
 
         else:
-            print("  {:>9} {:>19}  ".format("conformer", "MM energy [kJ/mol]"))
+            print("  {:>9} {:>19}  ".format("conformer",
+                                             "MM energy [kJ/mol]"))
             rel_qm_energies = None
             for i, conf in enumerate(scan[step]):
                 conf_str = f"{i+1}"
@@ -941,7 +935,6 @@ class TransitionStateGuesser():
         ax1.set_ylabel('Relative MM energy [kJ/mol]')
 
         if rel_qm_energies is not None:
-            # ax2 = ax1.twinx()
             ax1.plot(
                 x,
                 np.interp(x, lambda_vec, rel_qm_energies),
@@ -976,7 +969,6 @@ class TransitionStateGuesser():
                    bbox_to_anchor=(1, 1),
                    bbox_transform=ax1.transAxes)
         ax1.set_title("Transition state finder")
-        # Ensure x-axis displays as integers
         ax1.set_xticks(lambda_vec[::2])
         fig.tight_layout()
         plt.show()
@@ -1098,7 +1090,8 @@ class TransitionStateGuesser():
 
             max_qm_xyz = results.get('max_qm_xyz', None)
             max_qm_lambda = results.get('max_qm_lambda', None)
-            min_qm_conformer_index = results.get('min_qm_conformer_index', None)
+            min_qm_conformer_index = results.get('min_qm_conformer_index',
+                                                  None)
             if max_qm_xyz is not None:
                 hf.create_dataset('max_qm_xyz', data=[max_qm_xyz])
                 hf.create_dataset('max_qm_lambda',
@@ -1113,7 +1106,6 @@ class TransitionStateGuesser():
                 l_grp = scan_grp.create_group(f'{l}')
                 for i, conf in enumerate(conf_scan):
                     conf_grp = l_grp.create_group(str(i))
-                    # v e1 e2 e_int xyz qm
                     conf_grp.create_dataset('v', data=conf['v'], dtype='f')
                     conf_grp.create_dataset('e1', data=conf['e1'], dtype='f')
                     conf_grp.create_dataset('e2', data=conf['e2'], dtype='f')
@@ -1275,8 +1267,6 @@ class TransitionStateGuesser():
         self.ostream.print_header(valstr)
         self.ostream.flush()
 
-    #todo add option for reading geometry (bond distances, angles, etc.) from transition state instead of averaging them
-    #todo add option for recalculating charges from ts_mol
     def get_ts_ffgen(self,
                      reaffgen=None,
                      proffgen=None,
@@ -1334,7 +1324,6 @@ class TransitionStateGuesser():
             if id in reaparams.keys() and id in proparams.keys():
                 reaparam = reaparams[id]
                 proparam = proparams[id]
-                #todo change this to measurement from molecule
                 eq = (1 -
                       l) * reaparam['equilibrium'] + l * proparam['equilibrium']
                 fc = (1 - l) * reaparam['force_constant'] + l * proparam[
@@ -1363,7 +1352,6 @@ class TransitionStateGuesser():
         ts_params = {}
         for dict, scaling in zip([rea_dihedrals, pro_dihedrals], [1 - l, l]):
             for id, param in dict.items():
-                #todo reassign value of phase?
                 new_param = copy.copy(param)
                 if new_param.get('multiple'):
                     new_param['barrier'] = [
