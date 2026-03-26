@@ -945,24 +945,12 @@ class ScfDriver:
 
         # DIIS method
         if self.acc_type.upper() in ['C2DIIS', 'DIIS']:
-            if self.rank == mpi_master():
-                if self.restart:
-                    den_mat = self.gen_initial_density_restart(molecule)
-                elif self._use_start_orbitals:
-                    den_mat = self.gen_initial_density_start_orbitals(molecule)
-                else:
-                    den_mat = self.gen_initial_density_sad(
-                        molecule, basis, min_basis)
-            else:
-                den_mat = None
-            den_mat = self.comm.bcast(den_mat, root=mpi_master())
+            den_mat = self._prepare_initial_density(
+                self._gen_single_step_initial_density, molecule, basis,
+                min_basis)
 
             if self._cpcm:
-                if self.restart and self.rank == mpi_master():
-                    self.cpcm_drv._cpcm_q = read_cpcm_charges(
-                        self.get_checkpoint_file())
-                self.cpcm_drv._cpcm_q = self.comm.bcast(self.cpcm_drv._cpcm_q,
-                                                        root=mpi_master())
+                self._load_cpcm_restart_charges()
 
             self._comp_diis(molecule, basis, den_mat, profiler)
 
@@ -979,12 +967,9 @@ class ScfDriver:
             self.max_iter = 5
 
             val_basis = basis.reduce_to_valence_basis()
-            if self.rank == mpi_master():
-                den_mat = self.gen_initial_density_sad(molecule, val_basis,
-                                                       min_basis)
-            else:
-                den_mat = None
-            den_mat = self.comm.bcast(den_mat, root=mpi_master())
+            den_mat = self._prepare_initial_density(
+                self._gen_l2_first_step_initial_density, molecule, val_basis,
+                min_basis)
             self._comp_diis(molecule, val_basis, den_mat, profiler)
 
             # second step
@@ -994,12 +979,9 @@ class ScfDriver:
             self.conv_thresh = old_thresh
             self.max_iter = old_max_iter
 
-            if self.rank == mpi_master():
-                den_mat = self.gen_initial_density_proj(
-                    molecule, basis, val_basis, self._molecular_orbitals)
-            else:
-                den_mat = None
-            den_mat = self.comm.bcast(den_mat, root=mpi_master())
+            den_mat = self._prepare_initial_density(
+                self._gen_l2_second_step_initial_density, molecule, basis,
+                val_basis, self._molecular_orbitals)
             self._comp_diis(molecule, basis, den_mat, profiler)
 
         self._fock_matrices_alpha.clear()
@@ -1218,6 +1200,101 @@ class ScfDriver:
         self.ostream.print_blank()
 
         return den_mat
+
+    def _prepare_initial_density(self, generator, *args):
+        """
+        Generates the initial density matrix and makes it available on all
+        ranks.
+
+        :param generator:
+            The density generator method.
+        :param args:
+            Positional arguments passed to the generator.
+
+        :return:
+            The broadcast density matrix.
+        """
+
+        if self.rank == mpi_master():
+            den_mat = generator(*args)
+        else:
+            den_mat = None
+
+        return self.comm.bcast(den_mat, root=mpi_master())
+
+    def _gen_single_step_initial_density(self, molecule, ao_basis, min_basis):
+        """
+        Generates the initial density used for single-step DIIS.
+
+        :param molecule:
+            The molecule.
+        :param ao_basis:
+            The AO basis set.
+        :param min_basis:
+            The minimal AO basis set.
+
+        :return:
+            The AO density matrix.
+        """
+
+        if self.restart:
+            return self.gen_initial_density_restart(molecule)
+
+        if self._use_start_orbitals:
+            return self.gen_initial_density_start_orbitals(molecule)
+
+        return self.gen_initial_density_sad(molecule, ao_basis, min_basis)
+
+    def _gen_l2_first_step_initial_density(self, molecule, ao_basis, min_basis):
+        """
+        Generates the initial density used in the first L2-DIIS step.
+
+        :param molecule:
+            The molecule.
+        :param ao_basis:
+            The AO basis set.
+        :param min_basis:
+            The minimal AO basis set.
+
+        :return:
+            The AO density matrix.
+        """
+
+        return self.gen_initial_density_sad(molecule, ao_basis, min_basis)
+
+    def _gen_l2_second_step_initial_density(self, molecule, ao_basis,
+                                            valence_basis, valence_mo):
+        """
+        Generates the initial density used in the second L2-DIIS step.
+
+        :param molecule:
+            The molecule.
+        :param ao_basis:
+            The AO basis set.
+        :param valence_basis:
+            The valence AO basis set.
+        :param valence_mo:
+            The molecular orbitals obtained in the first L2-DIIS step.
+
+        :return:
+            The AO density matrix.
+        """
+
+        return self.gen_initial_density_proj(molecule, ao_basis, valence_basis,
+                                             valence_mo)
+
+    def _load_cpcm_restart_charges(self):
+        """
+        Loads CPCM charges from checkpoint on the master rank and broadcasts
+        them to all ranks.
+        """
+
+        if self.restart and self.rank == mpi_master():
+            self.cpcm_drv._cpcm_q = read_cpcm_charges(
+                self.get_checkpoint_file())
+
+        self.cpcm_drv._cpcm_q = self.comm.bcast(self.cpcm_drv._cpcm_q,
+                                                root=mpi_master())
 
     def validate_checkpoint(self, nuclear_charges, basis_set, scf_type):
         """
