@@ -667,11 +667,13 @@ class ScfDriver:
         # set up SMD Solvation Model
         # note that SMD also uses CPCM, but with a different scaling factor for radii
         if self._smd:
+            assert_msg_critical(self._cpcm,
+                                f'type(self).__name__: CPCM is needed by SMD')
             self.smd_drv = SmdDriver(self.comm, self.ostream)
             self.smd_drv.solute = molecule
             self.smd_drv.solvent = self.smd_solvent
             self.smd_cds_energy = self.smd_drv.get_CDS_contribution()
-            self.smd_energy = self.smd_cds_energy
+            self.smd_energy = 0.0
             self.cpcm_drv.epsilon = self.smd_drv.epsilon
             # apply intrinsic Coulomb radii for SMD
             self.cpcm_drv.custom_vdw_radii = self.smd_drv.get_intrinsic_coulomb_radii(
@@ -852,7 +854,9 @@ class ScfDriver:
                         self.point_charges = np.zeros((6, npoints))
                         for idx, line in enumerate(lines[2:]):
                             content = line.split()
-                            label, x, y, z, q = content[:5]
+                            expect_vdw = (self.qm_vdw_params is not None)
+                            label, x, y, z, q, sigma, epsilon = self._parse_point_charge_line(
+                                content, idx, expect_vdw)
                             self.point_charges[0, idx] = (float(x) /
                                                           bohr_in_angstrom())
                             self.point_charges[1, idx] = (float(y) /
@@ -863,7 +867,6 @@ class ScfDriver:
                             if self.qm_vdw_params is not None:
                                 # Note: read MM vdw parameters only when QM vdw
                                 # parameters are present
-                                sigma, epsilon = content[5:7]
                                 self.point_charges[4, idx] = float(sigma)
                                 self.point_charges[5, idx] = float(epsilon)
                 else:
@@ -884,9 +887,19 @@ class ScfDriver:
                     self.qm_vdw_params = np.zeros((natoms, 2))
                     with Path(vdw_param_file).open('r') as fh:
                         for a in range(natoms):
-                            sigma, epsilon = fh.readline().split()
-                            self.qm_vdw_params[a, 0] = float(sigma)
-                            self.qm_vdw_params[a, 1] = float(epsilon)
+                            content = fh.readline().split()
+                            assert_msg_critical(
+                                len(content) == 2,
+                                f'qm_vdw_params: Invalid data on line {a + 1}')
+                            try:
+                                sigma, epsilon = map(float, content)
+                            except ValueError:
+                                assert_msg_critical(
+                                    False,
+                                    f'qm_vdw_params: Invalid numeric data on line {a + 1}'
+                                )
+                            self.qm_vdw_params[a, 0] = sigma
+                            self.qm_vdw_params[a, 1] = epsilon
                 else:
                     self.qm_vdw_params = None
                 self.qm_vdw_params = self.comm.bcast(self.qm_vdw_params,
@@ -897,7 +910,8 @@ class ScfDriver:
 
             natoms = molecule.number_of_atoms()
             coords = molecule.get_coordinates_in_bohr()
-            nuclear_charges = molecule.get_element_ids()
+            nuclear_charges = self._get_effective_nuclear_charges(
+                molecule, basis)
             npoints = self.point_charges.shape[1]
 
             for a in range(self.rank, natoms, self.nodes):
@@ -1745,6 +1759,9 @@ class ScfDriver:
                     e_el += e_sol
                     self._add_onee_contribution(fock_mat, Fock_sol)
 
+                    if self._smd:
+                        self.smd_energy = self.smd_cds_energy + e_sol
+
             profiler.stop_timer('CPCM')
             profiler.start_timer('ErrVec')
 
@@ -1789,10 +1806,12 @@ class ScfDriver:
 
                 self._ef_nuc_energy = 0.0
                 coords = molecule.get_coordinates_in_bohr()
-                elem_ids = molecule.get_element_ids()
-                for i in range(molecule.number_of_atoms()):
+                elem_ids = self._get_effective_nuclear_charges(
+                    molecule, ao_basis)
+                for atom_idx in range(molecule.number_of_atoms()):
                     self._ef_nuc_energy -= np.dot(
-                        elem_ids[i] * (coords[i] - self._dipole_origin),
+                        elem_ids[atom_idx] *
+                        (coords[atom_idx] - self._dipole_origin),
                         self.electric_field)
 
             e_grad, max_grad = self._comp_gradient(fock_mat, ovl_mat, den_mat,
@@ -1811,6 +1830,10 @@ class ScfDriver:
 
             e_scf = (e_el + self._nuc_energy + self._nuc_mm_energy +
                      self._d4_energy + self._ef_nuc_energy)
+
+            if self._smd and self.rank == mpi_master():
+                # do not double count e_sol
+                e_scf += self.smd_cds_energy
 
             e_scf = self.comm.bcast(e_scf, root=mpi_master())
 
@@ -2137,6 +2160,62 @@ class ScfDriver:
 
         return self._pe or self.point_charges is not None
 
+    def _get_effective_nuclear_charges(self, molecule, basis):
+        """
+        Returns effective nuclear charges after subtracting ECP core electrons.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+
+        :return:
+            Effective nuclear charges.
+        """
+
+        nuclear_charges = molecule.get_element_ids()
+        nuclear_charges -= basis.get_number_of_ecp_core_electrons()
+
+        return nuclear_charges
+
+    def _parse_point_charge_line(self, content, idx, expect_vdw):
+        """
+        Parses one point-charge line with explicit validation.
+
+        :param content:
+            Tokenized point-charge line.
+        :param idx:
+            Zero-based point-charge index.
+        :param expect_vdw:
+            Whether MM vdW parameters are required.
+        :return:
+            Parsed label, coordinates, charge, and optional vdW values.
+        """
+
+        min_fields = 7 if expect_vdw else 5
+        assert_msg_critical(
+            len(content) >= min_fields,
+            f'potfile: Invalid data on point charge line {idx + 3}')
+
+        label = content[0]
+
+        try:
+            x = float(content[1])
+            y = float(content[2])
+            z = float(content[3])
+            q = float(content[4])
+            if expect_vdw:
+                sigma = float(content[5])
+                epsilon = float(content[6])
+            else:
+                sigma, epsilon = None, None
+        except ValueError:
+            assert_msg_critical(
+                False, f'potfile: Invalid numeric data on point charge line {idx + 3}'
+            )
+
+        return label, x, y, z, q, sigma, epsilon
+
     def _compute_embedded_potential(self, den_mat):
         """
         Computes external one-electron potential contributions.
@@ -2219,7 +2298,8 @@ class ScfDriver:
         if self.electric_field is not None:
             if molecule.get_charge() != 0:
                 coords = molecule.get_coordinates_in_bohr()
-                nuclear_charges = molecule.get_element_ids()
+                nuclear_charges = self._get_effective_nuclear_charges(
+                    molecule, basis)
                 self._dipole_origin = np.sum(coords.T * nuclear_charges,
                                              axis=1) / np.sum(nuclear_charges)
             else:
@@ -3396,9 +3476,8 @@ class ScfDriver:
 
         e_el = etot - enuc - enuc_mm - e_d4 - e_ef_nuc
 
-        # note: handle e_el differently for SMD and CPCM
+        # note: exclude solvation energies since they will be printed separately
         if self._smd:
-            self.smd_energy += self.cpcm_drv.cpcm_epol
             e_el -= self.smd_energy
         elif self._cpcm:
             e_el -= self.cpcm_drv.cpcm_epol

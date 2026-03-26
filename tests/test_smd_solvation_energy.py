@@ -31,10 +31,9 @@ class TestSmdSolvation:
 
         if scf_drv.rank == mpi_master():
             assert scf_drv.cpcm_drv.epsilon == ref_epsilon
-
-        if scf_drv.rank == mpi_master():
             assert abs(ref_solv_energy[0] - scf_drv.cpcm_drv.cpcm_epol) < 1.0e-4
             assert abs(ref_solv_energy[1] - scf_drv.smd_cds_energy) < 1.0e-3
+            assert abs(sum(ref_solv_energy) - scf_drv.smd_energy) < 1.0e-3
 
     @pytest.mark.skipif("rdkit" not in sys.modules,
                         reason="rdkit not available")

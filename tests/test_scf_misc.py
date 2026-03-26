@@ -858,3 +858,23 @@ class TestScfDriverMiscellaneous:
             assert np.max(np.abs(ref_energies - damped_energies)) > 1.0e-4
             assert np.max(np.abs(ref_drv.density[0] -
                                  damped_drv.density[0])) > 1.0e-4
+
+    def test_effective_nuclear_charges_subtract_ecp_core(self):
+
+        class MoleculeStub:
+
+            @staticmethod
+            def get_element_ids():
+                return np.array([8.0, 1.0])
+
+        class BasisStub:
+
+            @staticmethod
+            def get_number_of_ecp_core_electrons():
+                return np.array([2.0, 0.0])
+
+        driver = ScfRestrictedDriver()
+        effective_charges = driver._get_effective_nuclear_charges(
+            MoleculeStub(), BasisStub())
+
+        assert np.allclose(effective_charges, np.array([6.0, 1.0]))
