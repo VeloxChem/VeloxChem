@@ -165,6 +165,7 @@ class TestCPP:
         scf_results = scf_drv.compute(mol, bas)
 
         lr_drv = ComplexResponseSolver()
+        lr_drv.ostream.mute()
         lr_drv.property = cpp_property
         lr_drv.frequencies = list(ref_x_data)
         lr_results = lr_drv.compute(mol, bas, scf_results)
