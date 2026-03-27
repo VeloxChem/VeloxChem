@@ -4851,8 +4851,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             //       so we need to sync stream here
             //       otherwise it may be overwritten
             gpuSafe(gpuStreamSynchronize(stream));
-        }
-        if (ss_prim_pair_count > 0) {
+
             double *d_mat_J2_2kernels, *d_mat_J2_ref;
             gpuSafe(gpuMalloc(&d_mat_J2_2kernels, sizeof(double) * ss_prim_pair_count_local));
             gpuSafe(gpuMalloc(&d_mat_J2_ref, sizeof(double) * ss_prim_pair_count_local));
@@ -4983,9 +4982,8 @@ computeFockOnGPU(const              CMolecule& molecule,
             */
 
             gpuSafe(gpuStreamSynchronize(stream));
-        }
 
-        if (ss_prim_pair_count > 0) {
+
             double *d_mat_J2_2kernels, *d_mat_J2_ref;
             gpuSafe(gpuMalloc(&d_mat_J2_2kernels, sizeof(double) * ss_prim_pair_count_local));
             gpuSafe(gpuMalloc(&d_mat_J2_ref, sizeof(double) * ss_prim_pair_count_local));
@@ -5154,8 +5152,8 @@ computeFockOnGPU(const              CMolecule& molecule,
             */
 
             gpuSafe(gpuStreamSynchronize(stream));
-        }
-        if (ss_prim_pair_count > 0) {
+
+
             double *d_mat_J2_2kernels, *d_mat_J2_ref;
             gpuSafe(gpuMalloc(&d_mat_J2_2kernels, sizeof(double) * ss_prim_pair_count_local));
             gpuSafe(gpuMalloc(&d_mat_J2_ref, sizeof(double) * ss_prim_pair_count_local));
@@ -5374,6 +5372,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             gpuSafe(gpuMemcpyAsync(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
+            /*
             gpu::computeCoulombFockSPSS<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_s_prim_info,
@@ -5394,10 +5393,11 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
+            */
 
             gpuSafe(gpuStreamSynchronize(stream));
-        }
-        if (sp_prim_pair_count > 0) {
+
+
             double *d_mat_J2_2kernels, *d_mat_J2_ref;
             gpuSafe(gpuMalloc(&d_mat_J2_2kernels, sizeof(double) * sp_prim_pair_count_local));
             gpuSafe(gpuMalloc(&d_mat_J2_ref, sizeof(double) * sp_prim_pair_count_local));
@@ -5451,6 +5451,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuMalloc(&d_p_prim_info_f, sizeof(float) * p_prim_info_f.size()));
             gpuSafe(gpuMemcpyAsync(d_p_prim_info_f, p_prim_info_f.data(), p_prim_info_f.size() * sizeof(float), gpuMemcpyHostToDevice, stream));
         
+            gpuSafe(gpuStreamSynchronize(stream));
 
             // 1. Original (Baseline Reference)
             gpu::computeCoulombFockSPSS<<<num_blocks, threads_per_block, 0, stream>>>(
@@ -5462,17 +5463,19 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             // 2. FP64 Part (Two Kernels)
             gpu::computeCoulombFockSPSS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_s_prim_info, static_cast<uint32_t>(s_prim_count), d_p_prim_info, static_cast<uint32_t>(p_prim_count), d_mat_D2,
+                               d_mat_J, d_s_prim_info, static_cast<uint32_t>(s_prim_count), d_p_prim_info, static_cast<uint32_t>(p_prim_count), d_mat_D2,
                                d_sp_first_inds_local, d_sp_second_inds_local, d_sp_pair_data_local, static_cast<uint32_t>(sp_prim_pair_count_local),
                                d_ss_first_inds, d_ss_second_inds, d_ss_pair_data, static_cast<uint32_t>(ss_prim_pair_count),
                                d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
             
             // 3. FP32 Part (Two Kernels)
             gpu::computeCoulombFockSPSS_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_s_prim_info_f, static_cast<uint32_t>(s_prim_count), d_p_prim_info_f, static_cast<uint32_t>(p_prim_count), d_ss_mat_D_f,
+                               d_mat_J, d_s_prim_info_f, static_cast<uint32_t>(s_prim_count), d_p_prim_info_f, static_cast<uint32_t>(p_prim_count), d_ss_mat_D_f,
                                d_sp_first_inds_local, d_sp_second_inds_local, d_sp_pair_data_local_f, static_cast<uint32_t>(sp_prim_pair_count_local),
                                d_ss_first_inds, d_ss_second_inds, d_ss_pair_data_f, static_cast<uint32_t>(ss_prim_pair_count),
                                d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
+
+            gpuSafe(gpuStreamSynchronize(stream));
 
             std::vector<double> h_mat_J2_2kernels(sp_prim_pair_count_local, 0.0);
             std::vector<double> h_mat_J2_ref(sp_prim_pair_count_local, 0.0);
@@ -5507,6 +5510,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             gpuSafe(gpuMemcpyAsync(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
+            /*
             gpu::computeCoulombFockSPSP<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_s_prim_info,
@@ -5527,10 +5531,11 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
+            */
 
             gpuSafe(gpuStreamSynchronize(stream));
-        }
-        if (sp_prim_pair_count > 0) {
+
+
             double *d_mat_J2_2kernels, *d_mat_J2_ref;
             gpuSafe(gpuMalloc(&d_mat_J2_2kernels, sizeof(double) * sp_prim_pair_count_local));
             gpuSafe(gpuMalloc(&d_mat_J2_ref, sizeof(double) * sp_prim_pair_count_local));
@@ -5584,6 +5589,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuMalloc(&d_p_prim_info_f, sizeof(float) * p_prim_info_f.size()));
             gpuSafe(gpuMemcpyAsync(d_p_prim_info_f, p_prim_info_f.data(), p_prim_info_f.size() * sizeof(float), gpuMemcpyHostToDevice, stream));
         
+            gpuSafe(gpuStreamSynchronize(stream));
 
             // 1. Original (Baseline Reference)
             gpu::computeCoulombFockSPSP<<<num_blocks, threads_per_block, 0, stream>>>(
@@ -5595,17 +5601,19 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             // 2. FP64 Part (Two Kernels)
             gpu::computeCoulombFockSPSP_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_s_prim_info, static_cast<uint32_t>(s_prim_count), d_p_prim_info, static_cast<uint32_t>(p_prim_count), d_mat_D2,
+                               d_mat_J, d_s_prim_info, static_cast<uint32_t>(s_prim_count), d_p_prim_info, static_cast<uint32_t>(p_prim_count), d_mat_D2,
                                d_sp_first_inds_local, d_sp_second_inds_local, d_sp_pair_data_local, static_cast<uint32_t>(sp_prim_pair_count_local),
                                d_sp_first_inds, d_sp_second_inds, d_sp_pair_data, static_cast<uint32_t>(sp_prim_pair_count),
                                d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
             
             // 3. FP32 Part (Two Kernels)
             gpu::computeCoulombFockSPSP_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_s_prim_info_f, static_cast<uint32_t>(s_prim_count), d_p_prim_info_f, static_cast<uint32_t>(p_prim_count), d_sp_mat_D_f,
+                               d_mat_J, d_s_prim_info_f, static_cast<uint32_t>(s_prim_count), d_p_prim_info_f, static_cast<uint32_t>(p_prim_count), d_sp_mat_D_f,
                                d_sp_first_inds_local, d_sp_second_inds_local, d_sp_pair_data_local_f, static_cast<uint32_t>(sp_prim_pair_count_local),
                                d_sp_first_inds, d_sp_second_inds, d_sp_pair_data_f, static_cast<uint32_t>(sp_prim_pair_count),
                                d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
+
+            gpuSafe(gpuStreamSynchronize(stream));
 
             std::vector<double> h_mat_J2_2kernels(sp_prim_pair_count_local, 0.0);
             std::vector<double> h_mat_J2_ref(sp_prim_pair_count_local, 0.0);
@@ -5673,6 +5681,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             gpuSafe(gpuMemcpyAsync(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
+            /*
             gpu::computeCoulombFockSPPP<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_s_prim_info,
@@ -5693,10 +5702,11 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
+            */
 
             gpuSafe(gpuStreamSynchronize(stream));
-        }
-        if (sp_prim_pair_count > 0) {
+
+
             double *d_mat_J2_2kernels, *d_mat_J2_ref;
             gpuSafe(gpuMalloc(&d_mat_J2_2kernels, sizeof(double) * sp_prim_pair_count_local));
             gpuSafe(gpuMalloc(&d_mat_J2_ref, sizeof(double) * sp_prim_pair_count_local));
@@ -5750,6 +5760,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuMalloc(&d_p_prim_info_f, sizeof(float) * p_prim_info_f.size()));
             gpuSafe(gpuMemcpyAsync(d_p_prim_info_f, p_prim_info_f.data(), p_prim_info_f.size() * sizeof(float), gpuMemcpyHostToDevice, stream));
         
+            gpuSafe(gpuStreamSynchronize(stream));
 
             // 1. Original (Baseline Reference)
             gpu::computeCoulombFockSPPP<<<num_blocks, threads_per_block, 0, stream>>>(
@@ -5761,17 +5772,19 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             // 2. FP64 Part (Two Kernels)
             gpu::computeCoulombFockSPPP_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_s_prim_info, static_cast<uint32_t>(s_prim_count), d_p_prim_info, static_cast<uint32_t>(p_prim_count), d_mat_D2,
+                               d_mat_J, d_s_prim_info, static_cast<uint32_t>(s_prim_count), d_p_prim_info, static_cast<uint32_t>(p_prim_count), d_mat_D2,
                                d_sp_first_inds_local, d_sp_second_inds_local, d_sp_pair_data_local, static_cast<uint32_t>(sp_prim_pair_count_local),
                                d_pp_first_inds, d_pp_second_inds, d_pp_pair_data, static_cast<uint32_t>(pp_prim_pair_count),
                                d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
             
             // 3. FP32 Part (Two Kernels)
             gpu::computeCoulombFockSPPP_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_s_prim_info_f, static_cast<uint32_t>(s_prim_count), d_p_prim_info_f, static_cast<uint32_t>(p_prim_count), d_pp_mat_D_f,
+                               d_mat_J, d_s_prim_info_f, static_cast<uint32_t>(s_prim_count), d_p_prim_info_f, static_cast<uint32_t>(p_prim_count), d_pp_mat_D_f,
                                d_sp_first_inds_local, d_sp_second_inds_local, d_sp_pair_data_local_f, static_cast<uint32_t>(sp_prim_pair_count_local),
                                d_pp_first_inds, d_pp_second_inds, d_pp_pair_data_f, static_cast<uint32_t>(pp_prim_pair_count),
                                d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
+
+            gpuSafe(gpuStreamSynchronize(stream));
 
             std::vector<double> h_mat_J2_2kernels(sp_prim_pair_count_local, 0.0);
             std::vector<double> h_mat_J2_ref(sp_prim_pair_count_local, 0.0);
@@ -5946,8 +5959,8 @@ computeFockOnGPU(const              CMolecule& molecule,
             */
 
             gpuSafe(gpuStreamSynchronize(stream));
-        }
-        if (pp_prim_pair_count > 0) {
+
+
             double *d_mat_J2_2kernels, *d_mat_J2_ref;
             gpuSafe(gpuMalloc(&d_mat_J2_2kernels, sizeof(double) * pp_prim_pair_count_local));
             gpuSafe(gpuMalloc(&d_mat_J2_ref, sizeof(double) * pp_prim_pair_count_local));
@@ -6084,8 +6097,8 @@ computeFockOnGPU(const              CMolecule& molecule,
             */
 
             gpuSafe(gpuStreamSynchronize(stream));
-        }
-        if (pp_prim_pair_count > 0) {
+
+
             double *d_mat_J2_2kernels, *d_mat_J2_ref;
             gpuSafe(gpuMalloc(&d_mat_J2_2kernels, sizeof(double) * pp_prim_pair_count_local));
             gpuSafe(gpuMalloc(&d_mat_J2_ref, sizeof(double) * pp_prim_pair_count_local));
