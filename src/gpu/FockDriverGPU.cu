@@ -4922,17 +4922,16 @@ computeFockOnGPU(const              CMolecule& molecule,
                                eri_threshold);
             */
 
-            auto prec_cut_ij_tile_h = build_cut_ij_tile(ss_mat_Q_local, ss_mat_Q, ss_mat_D, (uint32_t)ss_prim_pair_count_local, (uint32_t)ss_prim_pair_count, TILE_DIM, tau_precision);
             const uint32_t nij_tiles = (ss_prim_pair_count_local + TILE_DIM - 1) / TILE_DIM;
+
+            auto prec_cut_ij_tile_h = build_cut_ij_tile(ss_mat_Q_local, ss_mat_Q, ss_mat_D, (uint32_t)ss_prim_pair_count_local, (uint32_t)ss_prim_pair_count, TILE_DIM, tau_precision);
+
             gpuSafe(gpuMemcpyAsync(d_prec_cut_ij_tile, prec_cut_ij_tile_h.data(), nij_tiles * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
             auto screen_cut_ij_tile_h = build_cut_ij_tile(ss_mat_Q_local, ss_mat_Q, ss_mat_D, (uint32_t)ss_prim_pair_count_local, (uint32_t)ss_prim_pair_count, TILE_DIM, eri_threshold);
+
             gpuSafe(gpuMemcpyAsync(d_screen_cut_ij_tile, screen_cut_ij_tile_h.data(), nij_tiles * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-
-
-            gpuSafe(gpuStreamSynchronize(stream));
-        
 
             // 2. FP64 Part (Two Kernels)
             gpu::computeCoulombFockSSSS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
@@ -4985,16 +4984,15 @@ computeFockOnGPU(const              CMolecule& molecule,
             */
 
 
-            auto prec_cut_ij_tile_h = build_cut_ij_tile(ss_mat_Q_local, sp_mat_Q, sp_mat_D, (uint32_t)ss_prim_pair_count_local, (uint32_t)sp_prim_pair_count, TILE_DIM, tau_precision);
             const uint32_t nij_tiles = (ss_prim_pair_count_local + TILE_DIM - 1) / TILE_DIM;
+
+            auto prec_cut_ij_tile_h = build_cut_ij_tile(ss_mat_Q_local, sp_mat_Q, sp_mat_D, (uint32_t)ss_prim_pair_count_local, (uint32_t)sp_prim_pair_count, TILE_DIM, tau_precision);
+
             gpuSafe(gpuMemcpyAsync(d_prec_cut_ij_tile, prec_cut_ij_tile_h.data(), nij_tiles * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
             auto screen_cut_ij_tile_h = build_cut_ij_tile(ss_mat_Q_local, sp_mat_Q, sp_mat_D, (uint32_t)ss_prim_pair_count_local, (uint32_t)sp_prim_pair_count, TILE_DIM, eri_threshold);
+
             gpuSafe(gpuMemcpyAsync(d_screen_cut_ij_tile, screen_cut_ij_tile_h.data(), nij_tiles * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-
-
-
-            gpuSafe(gpuStreamSynchronize(stream));
 
 
             // 2. FP64 Part (Two Kernels)
@@ -5076,16 +5074,15 @@ computeFockOnGPU(const              CMolecule& molecule,
             */
 
 
-            auto prec_cut_ij_tile_h = build_cut_ij_tile(ss_mat_Q_local, pp_mat_Q, pp_mat_D, (uint32_t)ss_prim_pair_count_local, (uint32_t)pp_prim_pair_count, TILE_DIM, tau_precision);
             const uint32_t nij_tiles = (ss_prim_pair_count_local + TILE_DIM - 1) / TILE_DIM;
+
+            auto prec_cut_ij_tile_h = build_cut_ij_tile(ss_mat_Q_local, pp_mat_Q, pp_mat_D, (uint32_t)ss_prim_pair_count_local, (uint32_t)pp_prim_pair_count, TILE_DIM, tau_precision);
+
             gpuSafe(gpuMemcpyAsync(d_prec_cut_ij_tile, prec_cut_ij_tile_h.data(), nij_tiles * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
             auto screen_cut_ij_tile_h = build_cut_ij_tile(ss_mat_Q_local, pp_mat_Q, pp_mat_D, (uint32_t)ss_prim_pair_count_local, (uint32_t)pp_prim_pair_count, TILE_DIM, eri_threshold);
+
             gpuSafe(gpuMemcpyAsync(d_screen_cut_ij_tile, screen_cut_ij_tile_h.data(), nij_tiles * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-
-
-
-            gpuSafe(gpuStreamSynchronize(stream));
 
 
             // 2. FP64 Part (Two Kernels)
@@ -5243,16 +5240,15 @@ computeFockOnGPU(const              CMolecule& molecule,
             */
 
 
-            auto prec_cut_ij_tile_h = build_cut_ij_tile(sp_mat_Q_local, ss_mat_Q, ss_mat_D, (uint32_t)sp_prim_pair_count_local, (uint32_t)ss_prim_pair_count, TILE_DIM, tau_precision);
             const uint32_t nij_tiles = (sp_prim_pair_count_local + TILE_DIM - 1) / TILE_DIM;
+
+            auto prec_cut_ij_tile_h = build_cut_ij_tile(sp_mat_Q_local, ss_mat_Q, ss_mat_D, (uint32_t)sp_prim_pair_count_local, (uint32_t)ss_prim_pair_count, TILE_DIM, tau_precision);
+
             gpuSafe(gpuMemcpyAsync(d_prec_cut_ij_tile, prec_cut_ij_tile_h.data(), nij_tiles * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
             auto screen_cut_ij_tile_h = build_cut_ij_tile(sp_mat_Q_local, ss_mat_Q, ss_mat_D, (uint32_t)sp_prim_pair_count_local, (uint32_t)ss_prim_pair_count, TILE_DIM, eri_threshold);
+
             gpuSafe(gpuMemcpyAsync(d_screen_cut_ij_tile, screen_cut_ij_tile_h.data(), nij_tiles * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-
-
-
-            gpuSafe(gpuStreamSynchronize(stream));
 
 
             // 2. FP64 Part (Two Kernels)
@@ -5304,16 +5300,15 @@ computeFockOnGPU(const              CMolecule& molecule,
             */
 
 
-            auto prec_cut_ij_tile_h = build_cut_ij_tile(sp_mat_Q_local, sp_mat_Q, sp_mat_D, (uint32_t)sp_prim_pair_count_local, (uint32_t)sp_prim_pair_count, TILE_DIM, tau_precision);
             const uint32_t nij_tiles = (sp_prim_pair_count_local + TILE_DIM - 1) / TILE_DIM;
+
+            auto prec_cut_ij_tile_h = build_cut_ij_tile(sp_mat_Q_local, sp_mat_Q, sp_mat_D, (uint32_t)sp_prim_pair_count_local, (uint32_t)sp_prim_pair_count, TILE_DIM, tau_precision);
+
             gpuSafe(gpuMemcpyAsync(d_prec_cut_ij_tile, prec_cut_ij_tile_h.data(), nij_tiles * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
             auto screen_cut_ij_tile_h = build_cut_ij_tile(sp_mat_Q_local, sp_mat_Q, sp_mat_D, (uint32_t)sp_prim_pair_count_local, (uint32_t)sp_prim_pair_count, TILE_DIM, eri_threshold);
+
             gpuSafe(gpuMemcpyAsync(d_screen_cut_ij_tile, screen_cut_ij_tile_h.data(), nij_tiles * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-
-
-
-            gpuSafe(gpuStreamSynchronize(stream));
 
 
             // 2. FP64 Part (Two Kernels)
@@ -5398,15 +5393,15 @@ computeFockOnGPU(const              CMolecule& molecule,
             */
 
 
-            auto prec_cut_ij_tile_h = build_cut_ij_tile(sp_mat_Q_local, pp_mat_Q, pp_mat_D, (uint32_t)sp_prim_pair_count_local, (uint32_t)pp_prim_pair_count, TILE_DIM, tau_precision);
             const uint32_t nij_tiles = (sp_prim_pair_count_local + TILE_DIM - 1) / TILE_DIM;
+
+            auto prec_cut_ij_tile_h = build_cut_ij_tile(sp_mat_Q_local, pp_mat_Q, pp_mat_D, (uint32_t)sp_prim_pair_count_local, (uint32_t)pp_prim_pair_count, TILE_DIM, tau_precision);
+
             gpuSafe(gpuMemcpyAsync(d_prec_cut_ij_tile, prec_cut_ij_tile_h.data(), nij_tiles * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
             auto screen_cut_ij_tile_h = build_cut_ij_tile(sp_mat_Q_local, pp_mat_Q, pp_mat_D, (uint32_t)sp_prim_pair_count_local, (uint32_t)pp_prim_pair_count, TILE_DIM, eri_threshold);
+
             gpuSafe(gpuMemcpyAsync(d_screen_cut_ij_tile, screen_cut_ij_tile_h.data(), nij_tiles * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-
-
-            gpuSafe(gpuStreamSynchronize(stream));
 
 
             // 2. FP64 Part (Two Kernels)
@@ -5573,16 +5568,15 @@ computeFockOnGPU(const              CMolecule& molecule,
             */
 
 
+            const uint32_t nij_tiles = (pp_prim_pair_count_local + TILE_DIM - 1) / TILE_DIM;
 
             auto prec_cut_ij_tile_h = build_cut_ij_tile(pp_mat_Q_local, ss_mat_Q, ss_mat_D, (uint32_t)pp_prim_pair_count_local, (uint32_t)ss_prim_pair_count, TILE_DIM, tau_precision);
-            const uint32_t nij_tiles = (pp_prim_pair_count_local + TILE_DIM - 1) / TILE_DIM;
+
             gpuSafe(gpuMemcpyAsync(d_prec_cut_ij_tile, prec_cut_ij_tile_h.data(), nij_tiles * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
             auto screen_cut_ij_tile_h = build_cut_ij_tile(pp_mat_Q_local, ss_mat_Q, ss_mat_D, (uint32_t)pp_prim_pair_count_local, (uint32_t)ss_prim_pair_count, TILE_DIM, eri_threshold);
+
             gpuSafe(gpuMemcpyAsync(d_screen_cut_ij_tile, screen_cut_ij_tile_h.data(), nij_tiles * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-
-
-            gpuSafe(gpuStreamSynchronize(stream));
 
 
             // 2. FP64 Part (Two Kernels)
@@ -5634,15 +5628,15 @@ computeFockOnGPU(const              CMolecule& molecule,
             */
 
 
-            auto prec_cut_ij_tile_h = build_cut_ij_tile(pp_mat_Q_local, sp_mat_Q, sp_mat_D, (uint32_t)pp_prim_pair_count_local, (uint32_t)sp_prim_pair_count, TILE_DIM, tau_precision);
             const uint32_t nij_tiles = (pp_prim_pair_count_local + TILE_DIM - 1) / TILE_DIM;
+
+            auto prec_cut_ij_tile_h = build_cut_ij_tile(pp_mat_Q_local, sp_mat_Q, sp_mat_D, (uint32_t)pp_prim_pair_count_local, (uint32_t)sp_prim_pair_count, TILE_DIM, tau_precision);
+
             gpuSafe(gpuMemcpyAsync(d_prec_cut_ij_tile, prec_cut_ij_tile_h.data(), nij_tiles * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
             auto screen_cut_ij_tile_h = build_cut_ij_tile(pp_mat_Q_local, sp_mat_Q, sp_mat_D, (uint32_t)pp_prim_pair_count_local, (uint32_t)sp_prim_pair_count, TILE_DIM, eri_threshold);
+
             gpuSafe(gpuMemcpyAsync(d_screen_cut_ij_tile, screen_cut_ij_tile_h.data(), nij_tiles * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-
-
-            gpuSafe(gpuStreamSynchronize(stream));
 
 
             // 2. FP64 Part (Two Kernels)
@@ -5703,8 +5697,8 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             gpuSafe(gpuMemcpyAsync(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
+            const uint32_t nij_tiles = (pp_prim_pair_count_local + TILE_DIM - 1) / TILE_DIM;
 
-            // 1) CPU 端算 cut_ij_tile（per block/ij-tile）
             auto prec_cut_ij_tile_h = build_cut_ij_tile(
                 pp_mat_Q_local,
                 pp_mat_Q,
@@ -5714,14 +5708,8 @@ computeFockOnGPU(const              CMolecule& molecule,
                 TILE_DIM,
                 tau_precision);
 
-            // 2) 分配 + 拷到 GPU (Async)
-            const uint32_t nij_tiles = (pp_prim_pair_count_local + TILE_DIM - 1) / TILE_DIM;
             gpuSafe(gpuMemcpyAsync(d_prec_cut_ij_tile, prec_cut_ij_tile_h.data(), nij_tiles * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-
-            // cut2
-
-            // 1) CPU 端算 cut2_ij_tile（per block/ij-tile）
             auto screen_cut_ij_tile_h = build_cut_ij_tile(
                 pp_mat_Q_local,
                 pp_mat_Q,
@@ -5731,11 +5719,8 @@ computeFockOnGPU(const              CMolecule& molecule,
                 TILE_DIM,
                 eri_threshold);
 
-            // 2) 分配 + 拷到 GPU (Async)
             gpuSafe(gpuMemcpyAsync(d_screen_cut_ij_tile, screen_cut_ij_tile_h.data(), nij_tiles * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-
-            gpuSafe(gpuStreamSynchronize(stream));
             
             gpu::computeCoulombFockPPPP_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
