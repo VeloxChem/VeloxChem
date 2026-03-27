@@ -507,24 +507,21 @@ def _Molecule_from_input_dict(mol_dict):
     return mol
 
 
-def _Molecule_nuclear_repulsion_energy(self, basis=None):
+def _Molecule_effective_nuclear_repulsion_energy(self, basis):
     """
-    Computes nuclear potential energy of a molecule.
+    Computes effective nuclear repulsion energy of a molecule.
 
     :param basis:
-        Optional AO basis set object (for taking care of ECP core electrons).
+        AO basis set object (for taking care of ECP core electrons).
     :return:
-        The nuclear potential energy.
+        The effective nuclear repulsion energy.
     """
 
     coords_in_au = self.get_coordinates_in_bohr()
-    elem_ids = self.get_element_ids()
+    elem_ids = self.get_effective_nuclear_charges(basis)
 
     natoms = coords_in_au.shape[0]
     e_nuc = 0.0
-
-    if basis is not None:
-        elem_ids = self.get_effective_nuclear_charges(basis)
 
     for i in range(natoms):
         z_i = elem_ids[i]
@@ -536,6 +533,22 @@ def _Molecule_nuclear_repulsion_energy(self, basis=None):
             e_nuc += z_i * z_j / distance
 
     return e_nuc
+
+
+def _Molecule_nuclear_repulsion_energy(self, basis=None):
+    """
+    Deprecated compatibility shim for effective nuclear repulsion energy.
+
+    :param basis:
+        Deprecated. Use effective_nuclear_repulsion_energy(basis) instead.
+    :return:
+        This function always raises.
+    """
+
+    assert_msg_critical(
+        False,
+        'Molecule.nuclear_repulsion_energy is deprecated; use Molecule.effective_nuclear_repulsion_energy(basis)'
+    )
 
 
 def _Molecule_get_effective_nuclear_charges(self, basis):
@@ -2082,6 +2095,7 @@ Molecule.read_molecule_string = _Molecule_read_molecule_string
 Molecule.read_xyz_file = _Molecule_read_xyz_file
 Molecule.read_xyz_string = _Molecule_read_xyz_string
 Molecule.from_input_dict = _Molecule_from_input_dict
+Molecule.effective_nuclear_repulsion_energy = _Molecule_effective_nuclear_repulsion_energy
 Molecule.nuclear_repulsion_energy = _Molecule_nuclear_repulsion_energy
 Molecule.get_effective_nuclear_charges = _Molecule_get_effective_nuclear_charges
 Molecule.get_connectivity_matrix = _Molecule_get_connectivity_matrix
