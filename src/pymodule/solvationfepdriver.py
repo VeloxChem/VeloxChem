@@ -133,8 +133,8 @@ class SolvationFepDriver:
         self.resname = None 
         
         # Ensemble and MD options
-        self.temperature = 298.15 * unit.kelvin
-        self.kT = (unit.AVOGADRO_CONSTANT_NA * unit.BOLTZMANN_CONSTANT_kB * self.temperature).in_units_of(unit.kilojoule_per_mole)
+        self.temperature = 298.15 
+        self.kT = (unit.AVOGADRO_CONSTANT_NA * unit.BOLTZMANN_CONSTANT_kB * (self.temperature * unit.kelvin)).in_units_of(unit.kilojoule_per_mole)
         self.pressure = 1 * unit.atmospheres
         self.timestep = 2.0 * unit.femtoseconds 
         self.num_em_steps = 0  # no limit
@@ -207,7 +207,7 @@ class SolvationFepDriver:
                             equilibrate=True)
         
         self.solvent_name = solvent
-        sol_builder.write_gromacs_files(ff_gen_solute, ff_gen_solvent)
+        sol_builder.write_openmm_files(ff_gen_solute, ff_gen_solvent)
         
         if self.save_trajectory_xtc or self.save_system_xml or self.save_energies_txt:
             self.output_folder.mkdir(parents=True, exist_ok=True)
@@ -500,30 +500,28 @@ class SolvationFepDriver:
         # From molecule and ffgenerator
         else:
             if self.solvent_name != 'itself':
-                gro = app.GromacsGroFile('system.gro')
-                initial_system_ff = app.GromacsTopFile('system.top', 
-                                                        periodicBoxVectors=gro.getPeriodicBoxVectors())
-                topology = initial_system_ff.topology
-                positions = gro.positions
+                pdb = app.PDBFile('system.pdb')
+                initial_system_ff = app.ForceField('solute.xml', 'solvent_1.xml')
+                topology = pdb.topology
+                positions = pdb.positions
             else:
-                gro = app.GromacsGroFile('liquid.gro')
-                initial_system_ff = app.GromacsTopFile('liquid.top',
-                                                    periodicBoxVectors=gro.getPeriodicBoxVectors())
-                topology = initial_system_ff.topology
-                positions = gro.positions
+                pdb = app.PDBFile('liquid.pdb')
+                initial_system_ff = app.ForceField('liquid.xml')
+                topology = pdb.topology
+                positions = pdb.positions
         
         # createSystem from a top file does not require the topology as an argument
-        if self.solvent_name == 'omm_files':
-            sys_arguments = [topology, self.nonbondedMethod, self.cutoff, self.constraints]
-        else:
+        if self.solvent_name == 'gro_files':
             sys_arguments = [self.nonbondedMethod, self.cutoff, self.constraints]
+        else:
+            sys_arguments = [topology, self.nonbondedMethod, self.cutoff, self.constraints]
 
         solvated_systems = []
         for lambda_val in lambdas:
             solvated_system = initial_system_ff.createSystem(*sys_arguments)
 
             # Add barostat
-            solvated_system.addForce(mm.MonteCarloBarostat(self.pressure, self.temperature))
+            solvated_system.addForce(mm.MonteCarloBarostat(self.pressure, self.temperature* unit.kelvin))
 
             # Define alchemical regions
             alchemical_region, chemical_region = self._get_alchemical_region(topology)
@@ -579,19 +577,19 @@ class SolvationFepDriver:
 
         # From molecule and ffgenerator
         else:
-            self.solute_ff.write_gromacs_files('solute_vacuum', 'MOL')
-            gro = app.GromacsGroFile('solute_vacuum.gro')
-            forcefield_solute = app.GromacsTopFile('solute_vacuum.top')
-            topology = forcefield_solute.topology
-            positions = gro.positions
+            self.solute_ff.write_openmm_files('solute_vacuum', 'MOL')
+            pdb = app.PDBFile('solute_vacuum.pdb')
+            forcefield_solute = app.ForceField('solute_vacuum.xml')
+            topology = pdb.topology
+            positions = pdb.positions
 
 
         vacuum_systems = []
         for lambda_val in lambdas:
-            if self.solvent_name == 'omm_files':
-                vacuum_system = forcefield_solute.createSystem(topology, nonbondedMethod=app.NoCutoff, constraints=self.constraints)
-            else:
+            if self.solvent_name == 'gro_files':
                 vacuum_system = forcefield_solute.createSystem(nonbondedMethod=app.NoCutoff, constraints=self.constraints)
+            else:
+                vacuum_system = forcefield_solute.createSystem(topology, nonbondedMethod=app.NoCutoff, constraints=self.constraints)
         
             gsc_force = self._get_gaussian_softcore_force(lambda_val)
 
@@ -635,7 +633,7 @@ class SolvationFepDriver:
         Run the simulation using OpenMM. Return simulated time in ns and real elapsed time in seconds.
         """
 
-        integrator = mm.LangevinIntegrator(self.temperature, 1.0 / unit.picoseconds, self.timestep)
+        integrator = mm.LangevinIntegrator(self.temperature * unit.kelvin, 1.0 / unit.picoseconds, self.timestep)
         simulation = app.Simulation(topology, system, integrator, platform=self._create_platform())
         simulation.context.setPositions(positions)
 

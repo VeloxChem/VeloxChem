@@ -95,6 +95,18 @@ class MMForceFieldGenerator:
         - scan_geometries: The optimized geometries from QM scan (list of list).
         - target_dihedrals: The target dihedral angles for parameterization.
         - workdir: The working directory.
+        - force_field: The force field to use for sigma/epsilon lookup.
+          Supported values: 'gaff' (default), 'opls'.
+          Set via   mmgen.force_field = 'opls'   before calling create_topology().
+          OPLS-AA sigma/epsilon parameters are sourced from an embedded table
+          transcribed from GROMACS 2026.1 oplsaa.ff/ffnonbonded.itp.
+          Atoms with no OPLS-AA equivalent (opls: None in atomtypeidentifier)
+          fall back to GAFF sigma/epsilon with a printed warning.
+          OPLS-AA also sets comb_rule=3 and fudgeLJ=fudgeQQ=0.5 in the .top file.
+          Note: full OPLS-AA sigma/epsilon lookup requires a bundled OPLS-AA
+          parameter file; until that is available the code falls back to GAFF
+          parameters and emits a warning for any atom type that has no OPLS-AA
+          equivalent (i.e. where atomtypeidentifier set 'opls': None).
     """
 
     def __init__(self, comm=None, ostream=None):
@@ -173,6 +185,19 @@ class MMForceFieldGenerator:
         # Summary of fitting
         self.fitting_summary = None
 
+        # Force field selection: 'gaff' (default), 'opls',
+        # 'openff-2.0.0', 'openff-2.1.0', or 'openff-2.2.0'.
+        # Set via   mmgen.force_field = 'openff-2.0.0'   before create_topology().
+        # OPLS-AA uses geometric-mean LJ mixing (comb_rule 3 in GROMACS); this
+        # is applied automatically in write_top() when force_field == 'opls'.
+        # sigma/epsilon values are looked up from an embedded table derived from
+        # GROMACS 2026.1 oplsaa.ff/ffnonbonded.itp via get_oplsaa_data_dict().
+        # Atoms with no OPLS-AA equivalent fall back to GAFF with a warning.
+        # OpenFF 2.x (Sage) uses SMIRKS-based typing via SmirnoffTyper;
+        # all bonded and nonbonded parameters come directly from the toolkit.
+        # Requires:  pip install openff-toolkit openff-forcefields
+        self.force_field = 'gaff'
+
     def update_settings(self, ffg_dict, resp_dict=None):
         """
         Updates settings in force field generator.
@@ -204,6 +229,7 @@ class MMForceFieldGenerator:
             'partial_charges': 'seq_fixed',
             'original_top_file': 'str',
             'keep_files': 'bool',
+            'force_field': 'str',
         }
 
         parse_input(self, ffg_keywords, ffg_dict)
@@ -1063,6 +1089,391 @@ class MMForceFieldGenerator:
 
         return data
 
+    @staticmethod
+    def get_oplsaa_data_dict():
+        """
+        Returns a dictionary of OPLS-AA nonbonded (sigma, epsilon) parameters
+        keyed by OPLS type string (e.g. 'opls_135').
+
+        Data sourced from the GROMACS oplsaa.ff/ffnonbonded.itp file
+        (GROMACS 2026.1, https://github.com/gromacs/gromacs).
+        Units: sigma in nm, epsilon in kJ/mol (GROMACS convention).
+
+        References:
+          W. L. Jorgensen, D. S. Maxwell, J. Tirado-Rives,
+          J. Am. Chem. Soc. 118, 11225-11236 (1996).
+          W. L. Jorgensen, N. A. McDonald, J. Phys. Chem. B 102, 8049 (1998).
+          E. K. Watkins, W. L. Jorgensen, J. Phys. Chem. A 105, 4118 (2001).
+        """
+
+        # fmt: off
+        # Each entry: (sigma [nm], epsilon [kJ/mol])
+        # Transcribed verbatim from GROMACS 2026.1 oplsaa.ff/ffnonbonded.itp
+        _raw = {
+            'opls_001': (3.75000e-01, 4.39320e-01),
+            'opls_002': (2.96000e-01, 8.78640e-01),
+            'opls_003': (3.25000e-01, 7.11280e-01),
+            'opls_004': (0.00000e+00, 0.00000e+00),
+            'opls_032': (3.55000e-01, 1.04600e+00),
+            'opls_033': (0.00000e+00, 0.00000e+00),
+            'opls_035': (3.55000e-01, 1.04600e+00),
+            'opls_038': (3.55000e-01, 1.04600e+00),
+            'opls_040': (3.25000e-01, 7.11280e-01),
+            'opls_041': (0.00000e+00, 0.00000e+00),
+            'opls_042': (3.25000e-01, 7.11280e-01),
+            'opls_062': (3.00000e-01, 7.11280e-01),
+            'opls_108': (3.00000e-01, 7.11280e-01),
+            'opls_135': (3.50000e-01, 2.76144e-01),
+            'opls_136': (3.50000e-01, 2.76144e-01),
+            'opls_137': (3.50000e-01, 2.76144e-01),
+            'opls_138': (3.50000e-01, 2.76144e-01),
+            'opls_139': (3.50000e-01, 2.76144e-01),
+            'opls_140': (2.50000e-01, 1.25520e-01),
+            'opls_141': (3.55000e-01, 3.17984e-01),
+            'opls_142': (3.55000e-01, 3.17984e-01),
+            'opls_143': (3.55000e-01, 3.17984e-01),
+            'opls_144': (2.42000e-01, 1.25520e-01),
+            'opls_145': (3.55000e-01, 2.92880e-01),
+            'opls_146': (2.42000e-01, 1.25520e-01),
+            'opls_147': (3.55000e-01, 2.92880e-01),
+            'opls_148': (3.50000e-01, 2.76144e-01),
+            'opls_149': (3.50000e-01, 2.76144e-01),
+            'opls_151': (3.40000e-01, 1.25520e+00),
+            'opls_154': (3.12000e-01, 7.11280e-01),
+            'opls_155': (0.00000e+00, 0.00000e+00),
+            'opls_157': (3.50000e-01, 2.76144e-01),
+            'opls_158': (3.50000e-01, 2.76144e-01),
+            'opls_159': (3.50000e-01, 2.76144e-01),
+            'opls_164': (2.94000e-01, 2.55224e-01),
+            'opls_166': (3.55000e-01, 2.92880e-01),
+            'opls_167': (3.07000e-01, 7.11280e-01),
+            'opls_168': (0.00000e+00, 0.00000e+00),
+            'opls_169': (3.07000e-01, 7.11280e-01),
+            'opls_170': (0.00000e+00, 0.00000e+00),
+            'opls_171': (3.07000e-01, 7.11280e-01),
+            'opls_172': (0.00000e+00, 0.00000e+00),
+            'opls_178': (3.55000e-01, 3.17984e-01),
+            'opls_179': (2.90000e-01, 5.85760e-01),
+            'opls_180': (2.90000e-01, 5.85760e-01),
+            'opls_181': (3.50000e-01, 2.76144e-01),
+            'opls_182': (3.50000e-01, 2.76144e-01),
+            'opls_183': (3.50000e-01, 2.76144e-01),
+            'opls_184': (3.50000e-01, 2.76144e-01),
+            'opls_185': (3.50000e-01, 2.76144e-01),
+            'opls_186': (2.90000e-01, 5.85760e-01),
+            'opls_187': (3.07000e-01, 7.11280e-01),
+            'opls_188': (0.00000e+00, 0.00000e+00),
+            'opls_200': (3.60000e-01, 1.77820e+00),
+            'opls_201': (3.70000e-01, 1.04600e+00),
+            'opls_202': (3.60000e-01, 1.48532e+00),
+            'opls_203': (3.55000e-01, 1.04600e+00),
+            'opls_204': (0.00000e+00, 0.00000e+00),
+            'opls_205': (0.00000e+00, 0.00000e+00),
+            'opls_206': (3.50000e-01, 2.76144e-01),
+            'opls_207': (3.50000e-01, 2.76144e-01),
+            'opls_208': (3.50000e-01, 2.76144e-01),
+            'opls_209': (3.50000e-01, 2.76144e-01),
+            'opls_210': (3.50000e-01, 2.76144e-01),
+            'opls_211': (3.50000e-01, 2.76144e-01),
+            'opls_212': (3.50000e-01, 2.76144e-01),
+            'opls_222': (3.55000e-01, 1.04600e+00),
+            'opls_226': (3.40000e-01, 1.25520e+00),
+            'opls_231': (3.75000e-01, 4.39320e-01),
+            'opls_232': (3.75000e-01, 4.39320e-01),
+            'opls_233': (3.75000e-01, 4.39320e-01),
+            'opls_234': (3.75000e-01, 4.39320e-01),
+            'opls_235': (3.75000e-01, 4.39320e-01),
+            'opls_236': (2.96000e-01, 8.78640e-01),
+            'opls_237': (3.25000e-01, 7.11280e-01),
+            'opls_238': (3.25000e-01, 7.11280e-01),
+            'opls_239': (3.25000e-01, 7.11280e-01),
+            'opls_240': (0.00000e+00, 0.00000e+00),
+            'opls_241': (0.00000e+00, 0.00000e+00),
+            'opls_247': (3.75000e-01, 4.39320e-01),
+            'opls_248': (2.96000e-01, 8.78640e-01),
+            'opls_249': (3.25000e-01, 7.11280e-01),
+            'opls_250': (0.00000e+00, 0.00000e+00),
+            'opls_251': (3.25000e-01, 7.11280e-01),
+            'opls_252': (3.75000e-01, 4.39320e-01),
+            'opls_253': (2.96000e-01, 8.78640e-01),
+            'opls_254': (0.00000e+00, 0.00000e+00),
+            'opls_260': (3.55000e-01, 2.92880e-01),
+            'opls_261': (3.65000e-01, 6.27600e-01),
+            'opls_262': (3.20000e-01, 7.11280e-01),
+            'opls_263': (3.55000e-01, 2.92880e-01),
+            'opls_264': (3.40000e-01, 1.25520e+00),
+            'opls_265': (3.25000e-01, 7.11280e-01),
+            'opls_266': (3.55000e-01, 2.92880e-01),
+            'opls_267': (3.75000e-01, 4.39320e-01),
+            'opls_268': (3.00000e-01, 7.11280e-01),
+            'opls_269': (2.96000e-01, 8.78640e-01),
+            'opls_270': (0.00000e+00, 0.00000e+00),
+            'opls_271': (3.75000e-01, 4.39320e-01),
+            'opls_272': (2.96000e-01, 8.78640e-01),
+            'opls_279': (2.42000e-01, 6.27600e-02),
+            'opls_280': (3.75000e-01, 4.39320e-01),
+            'opls_281': (2.96000e-01, 8.78640e-01),
+            'opls_282': (2.42000e-01, 6.27600e-02),
+            'opls_287': (3.25000e-01, 7.11280e-01),
+            'opls_288': (3.25000e-01, 7.11280e-01),
+            'opls_289': (0.00000e+00, 0.00000e+00),
+            'opls_290': (0.00000e+00, 0.00000e+00),
+            'opls_291': (3.50000e-01, 2.76144e-01),
+            'opls_296': (3.50000e-01, 2.76144e-01),
+            'opls_300': (3.25000e-01, 7.11280e-01),
+            'opls_301': (0.00000e+00, 0.00000e+00),
+            'opls_302': (2.25000e-01, 2.09200e-01),
+            'opls_303': (3.25000e-01, 7.11280e-01),
+            'opls_304': (0.00000e+00, 0.00000e+00),
+            'opls_311': (3.25000e-01, 7.11280e-01),
+            'opls_312': (3.50000e-01, 3.34720e-01),
+            'opls_313': (3.25000e-01, 7.11280e-01),
+            'opls_314': (0.00000e+00, 0.00000e+00),
+            'opls_315': (3.50000e-01, 3.34720e-01),
+            'opls_316': (2.50000e-01, 2.09200e-01),
+            'opls_317': (3.50000e-01, 3.34720e-01),
+            'opls_318': (2.50000e-01, 2.09200e-01),
+            'opls_319': (3.25000e-01, 7.11280e-01),
+            'opls_320': (3.75000e-01, 4.39320e-01),
+            'opls_321': (3.25000e-01, 7.11280e-01),
+            'opls_322': (3.75000e-01, 4.39320e-01),
+            'opls_323': (3.50000e-01, 3.34720e-01),
+            'opls_324': (3.50000e-01, 3.34720e-01),
+            'opls_325': (0.00000e+00, 0.00000e+00),
+            'opls_326': (2.96000e-01, 8.78640e-01),
+            'opls_327': (0.00000e+00, 0.00000e+00),
+            'opls_328': (2.96000e-01, 8.78640e-01),
+            'opls_329': (2.50000e-01, 2.09200e-01),
+            'opls_330': (2.50000e-01, 2.09200e-01),
+            'opls_331': (3.50000e-01, 3.34720e-01),
+            'opls_332': (2.50000e-01, 2.09200e-01),
+            'opls_333': (3.25000e-01, 7.11280e-01),
+            'opls_334': (3.75000e-01, 4.39320e-01),
+            'opls_335': (3.25000e-01, 7.11280e-01),
+            'opls_336': (3.50000e-01, 3.34720e-01),
+            'opls_337': (3.50000e-01, 3.34720e-01),
+            'opls_338': (3.50000e-01, 3.34720e-01),
+            'opls_339': (0.00000e+00, 0.00000e+00),
+            'opls_340': (2.96000e-01, 8.78640e-01),
+            'opls_341': (3.25000e-01, 7.11280e-01),
+            'opls_342': (0.00000e+00, 0.00000e+00),
+            'opls_343': (0.00000e+00, 0.00000e+00),
+            'opls_344': (2.50000e-01, 2.09200e-01),
+            'opls_345': (2.50000e-01, 2.09200e-01),
+            'opls_346': (3.25000e-01, 7.11280e-01),
+            'opls_347': (3.50000e-01, 3.34720e-01),
+            'opls_348': (3.25000e-01, 7.11280e-01),
+            'opls_349': (3.50000e-01, 3.34720e-01),
+            'opls_350': (3.50000e-01, 3.34720e-01),
+            'opls_351': (3.50000e-01, 3.34720e-01),
+            'opls_352': (3.25000e-01, 7.11280e-01),
+            'opls_353': (3.50000e-01, 3.34720e-01),
+            'opls_354': (3.25000e-01, 7.11280e-01),
+            'opls_355': (2.50000e-01, 2.09200e-01),
+            'opls_356': (3.25000e-01, 7.11280e-01),
+            'opls_357': (0.00000e+00, 0.00000e+00),
+            'opls_358': (0.00000e+00, 0.00000e+00),
+            'opls_359': (2.50000e-01, 2.09200e-01),
+            'opls_360': (0.00000e+00, 0.00000e+00),
+            'opls_361': (3.25000e-01, 7.11280e-01),
+            'opls_362': (3.50000e-01, 3.34720e-01),
+            'opls_363': (3.25000e-01, 7.11280e-01),
+            'opls_364': (3.50000e-01, 3.34720e-01),
+            'opls_365': (3.50000e-01, 3.34720e-01),
+            'opls_366': (3.75000e-01, 4.39320e-01),
+            'opls_367': (0.00000e+00, 0.00000e+00),
+            'opls_368': (3.25000e-01, 7.11280e-01),
+            'opls_369': (0.00000e+00, 0.00000e+00),
+            'opls_370': (2.96000e-01, 8.78640e-01),
+            'opls_371': (3.50000e-01, 3.34720e-01),
+            'opls_372': (2.50000e-01, 2.09200e-01),
+            'opls_373': (3.50000e-01, 3.34720e-01),
+            'opls_374': (2.50000e-01, 2.09200e-01),
+            'opls_375': (3.50000e-01, 3.34720e-01),
+            'opls_376': (2.50000e-01, 2.09200e-01),
+            'opls_377': (3.25000e-01, 7.11280e-01),
+            'opls_378': (3.75000e-01, 4.39320e-01),
+            'opls_379': (3.25000e-01, 7.11280e-01),
+            'opls_380': (3.50000e-01, 3.34720e-01),
+            'opls_381': (3.50000e-01, 3.34720e-01),
+            'opls_382': (3.50000e-01, 3.34720e-01),
+            'opls_383': (0.00000e+00, 0.00000e+00),
+            'opls_384': (2.96000e-01, 8.78640e-01),
+            'opls_385': (0.00000e+00, 0.00000e+00),
+            'opls_386': (3.25000e-01, 7.11280e-01),
+            'opls_387': (0.00000e+00, 0.00000e+00),
+            'opls_388': (0.00000e+00, 0.00000e+00),
+            'opls_389': (2.50000e-01, 2.09200e-01),
+            'opls_390': (2.50000e-01, 2.09200e-01),
+            'opls_391': (3.50000e-01, 3.34720e-01),
+            'opls_392': (2.50000e-01, 2.09200e-01),
+            'opls_393': (3.74000e-01, 8.36800e-01),
+            'opls_394': (2.96000e-01, 8.78640e-01),
+            'opls_395': (3.00000e-01, 7.11280e-01),
+            'opls_396': (3.55000e-01, 2.76144e-01),
+            'opls_440': (3.74000e-01, 8.36800e-01),
+            'opls_441': (3.15000e-01, 8.36800e-01),
+            'opls_442': (2.90000e-01, 5.85760e-01),
+            'opls_443': (3.50000e-01, 2.76144e-01),
+            'opls_444': (2.50000e-01, 1.25520e-01),
+            'opls_445': (3.74000e-01, 8.36800e-01),
+            'opls_446': (3.15000e-01, 8.36800e-01),
+            'opls_447': (2.90000e-01, 5.85760e-01),
+            'opls_450': (3.74000e-01, 8.36800e-01),
+            'opls_451': (3.15000e-01, 8.36800e-01),
+            'opls_452': (2.90000e-01, 5.85760e-01),
+            'opls_465': (3.75000e-01, 4.39320e-01),
+            'opls_466': (2.96000e-01, 8.78640e-01),
+            'opls_467': (3.00000e-01, 7.11280e-01),
+            'opls_468': (3.50000e-01, 2.76144e-01),
+            'opls_469': (2.42000e-01, 6.27600e-02),
+            'opls_470': (3.75000e-01, 4.39320e-01),
+            'opls_471': (3.75000e-01, 4.39320e-01),
+            'opls_472': (3.55000e-01, 2.92880e-01),
+            'opls_473': (3.00000e-01, 7.11280e-01),
+            'opls_474': (3.55000e-01, 1.04600e+00),
+            'opls_475': (2.96000e-01, 7.11280e-01),
+            'opls_478': (3.25000e-01, 7.11280e-01),
+            'opls_479': (0.00000e+00, 0.00000e+00),
+            'opls_480': (3.25000e-01, 7.11280e-01),
+            'opls_481': (0.00000e+00, 0.00000e+00),
+            'opls_500': (3.55000e-01, 2.92880e-01),
+            'opls_501': (3.55000e-01, 2.92880e-01),
+            'opls_502': (3.55000e-01, 2.92880e-01),
+            'opls_503': (3.25000e-01, 7.11280e-01),
+            'opls_504': (0.00000e+00, 0.00000e+00),
+            'opls_505': (3.50000e-01, 2.76144e-01),
+            'opls_506': (3.55000e-01, 2.92880e-01),
+            'opls_507': (3.55000e-01, 2.92880e-01),
+            'opls_508': (3.55000e-01, 2.92880e-01),
+            'opls_509': (3.55000e-01, 2.92880e-01),
+            'opls_510': (3.55000e-01, 2.92880e-01),
+            'opls_511': (3.25000e-01, 7.11280e-01),
+            'opls_512': (3.25000e-01, 7.11280e-01),
+            'opls_513': (0.00000e+00, 0.00000e+00),
+            'opls_514': (3.55000e-01, 2.92880e-01),
+            'opls_515': (3.50000e-01, 2.76144e-01),
+            'opls_516': (3.50000e-01, 2.76144e-01),
+            'opls_517': (3.55000e-01, 3.17984e-01),
+            'opls_518': (3.55000e-01, 3.17984e-01),
+            'opls_520': (3.25000e-01, 7.11280e-01),
+            'opls_521': (3.55000e-01, 2.92880e-01),
+            'opls_522': (3.55000e-01, 2.92880e-01),
+            'opls_523': (3.55000e-01, 2.92880e-01),
+            'opls_524': (2.42000e-01, 1.25520e-01),
+            'opls_525': (2.42000e-01, 1.25520e-01),
+            'opls_526': (2.42000e-01, 1.25520e-01),
+            'opls_527': (3.25000e-01, 7.11280e-01),
+            'opls_528': (3.55000e-01, 2.92880e-01),
+            'opls_529': (2.42000e-01, 1.25520e-01),
+            'opls_530': (3.25000e-01, 7.11280e-01),
+            'opls_531': (3.55000e-01, 2.92880e-01),
+            'opls_532': (3.55000e-01, 2.92880e-01),
+            'opls_533': (3.55000e-01, 2.92880e-01),
+            'opls_534': (2.42000e-01, 1.25520e-01),
+            'opls_535': (2.42000e-01, 1.25520e-01),
+            'opls_536': (2.42000e-01, 1.25520e-01),
+            'opls_537': (3.25000e-01, 7.11280e-01),
+            'opls_538': (3.55000e-01, 2.92880e-01),
+            'opls_539': (3.55000e-01, 2.92880e-01),
+            'opls_540': (2.42000e-01, 1.25520e-01),
+            'opls_541': (2.42000e-01, 1.25520e-01),
+            'opls_542': (3.25000e-01, 7.11280e-01),
+            'opls_543': (3.55000e-01, 2.92880e-01),
+            'opls_544': (3.55000e-01, 2.92880e-01),
+            'opls_545': (0.00000e+00, 0.00000e+00),
+            'opls_546': (2.42000e-01, 1.25520e-01),
+            'opls_547': (2.42000e-01, 1.25520e-01),
+            'opls_548': (3.25000e-01, 7.11280e-01),
+            'opls_549': (3.25000e-01, 7.11280e-01),
+            'opls_550': (3.55000e-01, 2.92880e-01),
+            'opls_551': (3.55000e-01, 2.92880e-01),
+            'opls_552': (3.55000e-01, 2.92880e-01),
+            'opls_553': (0.00000e+00, 0.00000e+00),
+            'opls_554': (2.42000e-01, 1.25520e-01),
+            'opls_555': (2.42000e-01, 1.25520e-01),
+            'opls_556': (2.42000e-01, 1.25520e-01),
+            'opls_557': (3.25000e-01, 7.11280e-01),
+            'opls_558': (3.55000e-01, 2.92880e-01),
+            'opls_559': (3.25000e-01, 7.11280e-01),
+            'opls_560': (3.55000e-01, 2.92880e-01),
+            'opls_561': (3.55000e-01, 2.92880e-01),
+            'opls_562': (0.00000e+00, 0.00000e+00),
+            'opls_563': (2.42000e-01, 1.25520e-01),
+            'opls_564': (2.42000e-01, 1.25520e-01),
+            'opls_565': (2.42000e-01, 1.25520e-01),
+            'opls_566': (2.90000e-01, 5.85760e-01),
+            'opls_567': (3.55000e-01, 2.92880e-01),
+            'opls_568': (3.55000e-01, 3.17984e-01),
+            'opls_569': (2.42000e-01, 1.25520e-01),
+            'opls_570': (2.42000e-01, 1.25520e-01),
+            'opls_571': (2.90000e-01, 5.85760e-01),
+            'opls_572': (3.55000e-01, 2.92880e-01),
+            'opls_573': (3.25000e-01, 7.11280e-01),
+            'opls_574': (3.55000e-01, 2.92880e-01),
+            'opls_575': (3.55000e-01, 2.92880e-01),
+            'opls_576': (2.42000e-01, 1.25520e-01),
+            'opls_577': (2.42000e-01, 1.25520e-01),
+            'opls_578': (2.42000e-01, 1.25520e-01),
+            'opls_579': (2.90000e-01, 5.85760e-01),
+            'opls_580': (3.25000e-01, 7.11280e-01),
+            'opls_581': (3.55000e-01, 2.92880e-01),
+            'opls_582': (3.55000e-01, 2.92880e-01),
+            'opls_583': (3.55000e-01, 2.92880e-01),
+            'opls_584': (2.42000e-01, 1.25520e-01),
+            'opls_585': (2.42000e-01, 1.25520e-01),
+            'opls_586': (2.42000e-01, 1.25520e-01),
+            'opls_587': (3.25000e-01, 7.11280e-01),
+            'opls_588': (3.55000e-01, 2.92880e-01),
+            'opls_589': (3.55000e-01, 2.92880e-01),
+            'opls_633': (3.55000e-01, 1.04600e+00),
+            'opls_634': (3.55000e-01, 2.92880e-01),
+            'opls_635': (3.25000e-01, 7.11280e-01),
+            'opls_636': (3.55000e-01, 2.92880e-01),
+            'opls_637': (3.55000e-01, 2.92880e-01),
+            'opls_638': (2.42000e-01, 1.25520e-01),
+            'opls_639': (2.42000e-01, 1.25520e-01),
+            'opls_640': (2.42000e-01, 1.25520e-01),
+            'opls_700': (3.55000e-01, 3.17984e-01),
+            'opls_711': (3.50000e-01, 2.76144e-01),
+            'opls_712': (3.50000e-01, 2.76144e-01),
+            'opls_713': (3.50000e-01, 2.76144e-01),
+            'opls_719': (2.85000e-01, 2.55224e-01),
+            'opls_720': (3.55000e-01, 2.92880e-01),
+            'opls_721': (2.85000e-01, 2.55224e-01),
+            'opls_722': (3.47000e-01, 1.96648e+00),
+            'opls_724': (3.55000e-01, 2.92880e-01),
+            'opls_725': (3.25000e-01, 2.59408e-01),
+            'opls_726': (2.94000e-01, 2.55224e-01),
+            'opls_727': (3.55000e-01, 2.92880e-01),
+            'opls_728': (2.85000e-01, 2.55224e-01),
+            'opls_729': (3.55000e-01, 2.92880e-01),
+            'opls_730': (3.47000e-01, 1.96648e+00),
+            'opls_731': (3.55000e-01, 2.92880e-01),
+            'opls_732': (3.67000e-01, 2.42672e+00),
+            'opls_733': (3.50000e-01, 2.76144e-01),
+            'opls_734': (3.55000e-01, 1.04600e+00),
+            'opls_749': (3.25000e-01, 7.11280e-01),
+            'opls_750': (3.20000e-01, 7.11280e-01),
+            'opls_751': (3.25000e-01, 7.11280e-01),
+            'opls_752': (2.25000e-01, 2.09200e-01),
+            'opls_753': (3.20000e-01, 7.11280e-01),
+            'opls_754': (3.30000e-01, 2.76144e-01),
+            'opls_760': (3.25000e-01, 5.02080e-01),
+            'opls_761': (2.96000e-01, 7.11280e-01),
+            'opls_771': (2.96000e-01, 8.78640e-01),
+            'opls_772': (3.75000e-01, 4.39320e-01),
+            'opls_773': (3.00000e-01, 7.11280e-01),
+            'opls_787': (3.15000e-01, 7.11280e-01),
+            'opls_788': (2.86000e-01, 8.78640e-01),
+            'opls_900': (3.30000e-01, 7.11280e-01),
+            'opls_901': (3.30000e-01, 7.11280e-01),
+            'opls_902': (3.30000e-01, 7.11280e-01),
+        }
+        # fmt: on
+
+        return _raw
+
     def create_topology(self,
                         molecule,
                         basis=None,
@@ -1087,6 +1498,13 @@ class MMForceFieldGenerator:
 
         ff_data_dict = None
         ff_data_lines = None
+
+        # Check OpenFF version, if no version is set, use 2.2.0
+        if self.force_field.strip().lower() == ('openff'):
+                self.force_field = 'openff-2.2.0'
+                self.ostream.print_info("No OpenFF version explicitly specified. Defaulting to 'openff-2.2.0'.")
+                self.ostream.print_blank()
+                self.ostream.flush()
 
         # Read the force field data
 
@@ -1251,48 +1669,75 @@ class MMForceFieldGenerator:
 
         # Read the force field and include the data in the topology dictionary.
 
-        # Atomtypes analysis
+        if self.force_field.startswith('openff'):
+            # OpenFF Sage: all parameters come from SmirnoffTyper
+            # via SMIRKS-based assignment — bypass the individual populate_*
+            # methods entirely.
+            (
+                self.atoms,
+                self.bonds,
+                self.angles,
+                self.dihedrals,
+                self.rotatable_bonds,
+                self.impropers,
+            ) = self.populate_from_openff(
+                coords,
+                bond_indices,
+                angle_indices,
+                dihedral_indices,
+                list(atomtypeidentifier.equivalent_atoms),
+            )
+            self.ostream.print_info(f'Using OpenFF {self.force_field} (Sage) parameters.')
+            openff_ref = f'OpenFF {self.force_field}, https://github.com/openforcefield/openff-forcefields (MIT)'
+            self.ostream.print_reference('Reference: ' + openff_ref)
+            self.ostream.print_blank()
+            self.ostream.flush()
 
-        self.atoms = self.populate_atoms(
-            use_xml,
-            ff_data_dict,
-            ff_data_lines,
-            gaff_version,
-            list(atomtypeidentifier.equivalent_atoms),
-        )
+        else:
+            # GAFF / OPLS path — use the existing populate_* methods.
 
-        self.bonds = self.populate_bonds(
-            use_xml,
-            ff_data_dict,
-            ff_data_lines,
-            coords,
-            bond_indices,
-        )
+            # Atomtypes analysis
 
-        self.angles = self.populate_angles(
-            use_xml,
-            ff_data_dict,
-            ff_data_lines,
-            coords,
-            angle_indices,
-        )
+            self.atoms = self.populate_atoms(
+                use_xml,
+                ff_data_dict,
+                ff_data_lines,
+                gaff_version,
+                list(atomtypeidentifier.equivalent_atoms),
+            )
 
-        # Dihedrals analysis
-        self.dihedrals, self.rotatable_bonds = self.populate_dihedrals(
-            use_xml,
-            ff_data_dict,
-            ff_data_lines,
-            dihedral_indices,
-            atomtypeidentifier,
-        )
+            self.bonds = self.populate_bonds(
+                use_xml,
+                ff_data_dict,
+                ff_data_lines,
+                coords,
+                bond_indices,
+            )
 
-        self.impropers = self.populate_impropers(
-            use_xml,
-            ff_data_dict,
-            ff_data_lines,
-            n_atoms,
-            angle_indices,
-        )
+            self.angles = self.populate_angles(
+                use_xml,
+                ff_data_dict,
+                ff_data_lines,
+                coords,
+                angle_indices,
+            )
+
+            # Dihedrals analysis
+            self.dihedrals, self.rotatable_bonds = self.populate_dihedrals(
+                use_xml,
+                ff_data_dict,
+                ff_data_lines,
+                dihedral_indices,
+                atomtypeidentifier,
+            )
+
+            self.impropers = self.populate_impropers(
+                use_xml,
+                ff_data_dict,
+                ff_data_lines,
+                n_atoms,
+                angle_indices,
+            )
 
         # Process water model if requested
         if use_water_model:
@@ -1385,26 +1830,26 @@ class MMForceFieldGenerator:
 
         labels = self.molecule.get_labels()
         atoms = self.atoms
-        
+
         hydrogen_indices = [idx for idx, atom in atoms.items() if atom['type'] == 'hw']
         oxygen_indices = [idx for idx, atom in atoms.items() if atom['type'] == 'ow']
-        
+
         water_bonds = [idx for idx, bond in self.bonds.items() if (idx[0] in oxygen_indices or idx[1] in oxygen_indices)]
         water_angles = [idx for idx, angle in self.angles.items() if (idx[1] in oxygen_indices)]
-        
+
         for hydrogen_idx in hydrogen_indices:
             self.atoms[hydrogen_idx]['sigma'] = water_params['hw']['sigma']
             self.atoms[hydrogen_idx]['epsilon'] = water_params['hw']['epsilon']
-            
+
             # Do not overwrite partial charges if the molecule is part of a larger system
             # This can cause the total charge to become a non-integer
             if self.molecule.is_water_molecule():
                 self.atoms[hydrogen_idx]['charge'] = water_params['hw']['charge']
-        
+
         for oxygen_idx in oxygen_indices:
             self.atoms[oxygen_idx]['sigma'] = water_params['ow']['sigma']
             self.atoms[oxygen_idx]['epsilon'] = water_params['ow']['epsilon']
-            
+
             if self.molecule.is_water_molecule():
                 self.atoms[oxygen_idx]['charge'] = water_params['ow']['charge']
 
@@ -1655,6 +2100,7 @@ class MMForceFieldGenerator:
                        equivalent_atoms):
 
         use_gaff = False
+        use_opls = False
         use_uff = False
         use_tm = False
 
@@ -1667,6 +2113,40 @@ class MMForceFieldGenerator:
 
         for i, atom_type in enumerate(self.atom_types_dict.values()):
             atom_type_found = False
+
+            # OPLS-AA branch: look up sigma/epsilon from the embedded parameter table.
+            if self.force_field == 'opls' and 'opls' in atom_type:
+                oplstype = atom_type.get('opls')
+                if oplstype is None:
+                    # atomtypeidentifier.py set 'opls': None — no standard
+                    # OPLS-AA equivalent for this GAFF type.  Fall through to
+                    # GAFF below and warn the user.
+                    gafftype_str = (atom_type['gaff'].strip()
+                                    if 'gaff' in atom_type else '?')
+                    warnmsg = (
+                        f'MMForceFieldGenerator: no OPLS-AA type for GAFF '
+                        f'type {gafftype_str!r} (atom index {i + 1}). '
+                        'Falling back to GAFF sigma/epsilon parameters.')
+                    self.ostream.print_warning(warnmsg)
+                else:
+                    oplsaa_dict = self.get_oplsaa_data_dict()
+                    if oplstype in oplsaa_dict:
+                        sigma, epsilon = oplsaa_dict[oplstype]
+                        comment = 'OPLS-AA'
+                        atom_type_found = True
+                        use_opls = True
+                        atom_type = oplstype
+                    else:
+                        # Type is named but absent from our embedded table —
+                        # warn and fall through to GAFF.
+                        gafftype_str = (atom_type['gaff'].strip()
+                                        if 'gaff' in atom_type else '?')
+                        warnmsg = (
+                            f'MMForceFieldGenerator: OPLS-AA type {oplstype!r}'
+                            f' (GAFF {gafftype_str!r}, atom index {i + 1}) '
+                            'not found in parameter table. '
+                            'Falling back to GAFF sigma/epsilon parameters.')
+                        self.ostream.print_warning(warnmsg)
 
             if 'gaff' in atom_type:
                 # Note: need strip() for converting e.g. 'c ' to 'c'
@@ -1736,11 +2216,215 @@ class MMForceFieldGenerator:
                 'comment': comment,
             }
 
-        self.print_references(gaff_version, use_gaff, use_uff, use_tm)
+        self.print_references(gaff_version, use_gaff, use_opls, use_uff, use_tm)
 
         return atoms
 
-    def print_references(self, gaff_version, use_gaff, use_uff, use_tm):
+    def populate_from_openff(self, coords, bond_indices, angle_indices,
+                             dihedral_indices, equivalent_atoms):
+        """
+        Parametrize all bonded and nonbonded terms using an OpenFF Sage
+        force field via SmirnoffTyper.
+
+        Builds a hybrid RDKit molecule: uses VeloxChem's exact connectivity 
+        to prevent dropped bonds, attempts 3D bond order perception for exact 
+        SMIRKS matching, and falls back to a GAFF-aromaticity graph on failure.
+        """
+        # Enforce OpenFF Element Limits 
+        allowed_elements = {
+            'C', 'H', 'O', 'N', 'P', 'S', 'F', 'Cl', 'Br', 'I', 'Xe',
+            'Li', 'Na', 'K', 'Rb', 'Cs'
+        }
+        unsupported = set(label.strip() for label in self.molecule.get_labels()) - allowed_elements
+        if unsupported:
+            assert_msg_critical(
+                False,
+                f"MMForceFieldGenerator: OpenFF Sage does not support elements "
+                f"{unsupported}. Please switch to 'gaff' to use UFF/literature fallbacks."
+            )
+
+        from rdkit import Chem
+        from .smirnofftyper import SmirnoffTyper
+
+        # Build RDKit Mol Skeleton (Bypass DetermineConnectivity) 
+        elem_symbols = self.molecule.get_labels()
+        n_atoms      = self.molecule.number_of_atoms()
+        total_charge = int(round(self.molecule.get_charge()))
+        conn         = self.connectivity_matrix
+
+        rw = Chem.RWMol()
+        for elem in elem_symbols:
+            rw.AddAtom(Chem.Atom(elem.strip()))
+
+        # Add only SINGLE bonds to establish the exact graph topology
+        for i in range(n_atoms):
+            for j in range(i + 1, n_atoms):
+                if conn[i, j] == 1:
+                    rw.AddBond(i, j, Chem.BondType.SINGLE)
+
+        rdmol = rw.GetMol()
+
+        # Add the 3D conformer so DetermineBondOrders can measure lengths
+        conf = Chem.Conformer(n_atoms)
+        for i in range(n_atoms):
+            # coords is passed in Angstroms from create_topology
+            conf.SetAtomPosition(i, (float(coords[i][0]), float(coords[i][1]), float(coords[i][2])))
+        rdmol.AddConformer(conf)
+
+        # Assign True Bond Orders and Formal Charges
+        if n_atoms == 1:
+            rdmol.GetAtomWithIdx(0).SetFormalCharge(total_charge)
+            rdmol.UpdatePropertyCache(strict=False)
+        else:
+            from rdkit.Chem import rdDetermineBonds
+            try:
+                # Safely assigns DOUBLE/TRIPLE bonds and exact formal charges!
+                rdDetermineBonds.DetermineBondOrders(rdmol, charge=total_charge)
+            except Exception as e:
+                # ── 3. The Ultimate Fallback (GAFF-Aromaticity Method) ──
+                self.ostream.print_warning(
+                    f"RDKit bond order perception failed ({e}). Falling back to "
+                    "GAFF-based aromaticity graph. WARNING: OpenFF may assign "
+                    "generic parameters for complex double/triple bonds."
+                )
+                
+                _GAFF_AROM = frozenset([
+                    'ca', 'cp', 'cq',       # aromatic C (benzene-like)
+                    'cc', 'cd',             # aromatic C in non-pure-aromatic rings
+                    'nb',                   # aromatic N (no H, pyridine-like)
+                    'nc', 'nd',             # aromatic N conjugated
+                    'na',                   # aromatic N-H (pyrrole-like)
+                    'pb', 'pc', 'pd',       # aromatic P
+                ])
+                gaff_types = [t.strip() for t in self.atom_types]
+                is_arom = [gaff_types[i] in _GAFF_AROM for i in range(n_atoms)]
+
+                for i in range(n_atoms):
+                    atom = rdmol.GetAtomWithIdx(i)
+                    atom.SetIsAromatic(is_arom[i])
+                    atom.SetNoImplicit(True)
+
+                for bond in rdmol.GetBonds():
+                    i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+                    if is_arom[i] and is_arom[j]:
+                        bond.SetBondType(Chem.BondType.AROMATIC)
+
+                san_flags = (Chem.SanitizeFlags.SANITIZE_ALL ^ 
+                             Chem.SanitizeFlags.SANITIZE_SETAROMATICITY)
+                Chem.SanitizeMol(rdmol, catchErrors=False, sanitizeOps=san_flags)
+
+        # Load FF and assign all parameters 
+        ff_name     = self.force_field
+        offxml_path = getattr(self, 'openff_offxml_path', None)
+        typer = SmirnoffTyper(ff_name=ff_name, offxml_path=offxml_path)
+        raw   = typer.assign_all(rdmol, bond_indices, angle_indices,
+                                 dihedral_indices)
+
+        # Atoms 
+        atom_names  = self.get_atom_names()
+        atom_masses = self.molecule.get_masses()
+        atoms = {}
+        for i in range(n_atoms):
+            vdw = raw['atoms'].get(i, {'sigma': 0.0, 'epsilon': 0.0})
+            atoms[i] = {
+                'type':            f'openff_{i}',
+                'name':            atom_names[i],
+                'mass':            atom_masses[i],
+                'charge':          self.partial_charges[i],
+                'sigma':           vdw['sigma'],
+                'epsilon':         vdw['epsilon'],
+                'equivalent_atom': equivalent_atoms[i],
+                'comment':         'OpenFF',
+            }
+
+        # Bonds 
+        bonds = {}
+        for ij, bp in raw['bonds'].items():
+            bonds[ij] = {
+                'type':           'harmonic',
+                'equilibrium':    bp['length'],
+                'force_constant': bp['k'],
+                'comment':        f'openff bond {ij[0]+1}-{ij[1]+1}',
+            }
+
+        # Angles 
+        angles = {}
+        for ijk, ap in raw['angles'].items():
+            angles[ijk] = {
+                'type':           'harmonic',
+                'equilibrium':    ap['angle'],  # Degrees directly from Typer
+                'force_constant': ap['k'],
+                'comment':        f'openff angle {ijk[0]+1}-{ijk[1]+1}-{ijk[2]+1}',
+            }
+
+        # Proper dihedrals 
+        dihedrals       = {}
+        candidate_bonds = set()
+        for ijkl, terms in raw['propers'].items():
+            barriers      = [t['k']           for t in terms]
+            phases        = [t['phase']       for t in terms]   # degrees
+            periodicities = [t['periodicity'] for t in terms]
+            comments      = [f'openff proper {ijkl[0]+1}-{ijkl[1]+1}-'
+                              f'{ijkl[2]+1}-{ijkl[3]+1}'] * len(terms)
+
+            if any(k != 0.0 for k in barriers):
+                j, k = ijkl[1], ijkl[2]
+                candidate_bonds.add((min(j, k), max(j, k)))
+
+            multiple = len(barriers) > 1
+            if multiple:
+                dihedrals[ijkl] = {
+                    'type':        'Fourier',
+                    'multiple':    True,
+                    'barrier':     barriers,
+                    'phase':       phases,
+                    'periodicity': periodicities,
+                    'comment':     comments,
+                }
+            else:
+                dihedrals[ijkl] = {
+                    'type':        'Fourier',
+                    'multiple':    False,
+                    'barrier':     barriers[0],
+                    'phase':       phases[0],
+                    'periodicity': periodicities[0],
+                    'comment':     comments[0],
+                }
+
+        rotatable_bonds = []
+        for (j, k) in sorted(candidate_bonds):
+            if self.is_bond_in_ring(j, k):
+                continue
+            j_conns = int(self.connectivity_matrix[j].sum())
+            k_conns = int(self.connectivity_matrix[k].sum())
+            if j_conns <= 1 or k_conns <= 1:
+                continue
+            rotatable_bonds.append([j + 1, k + 1])   
+
+        # Impropers
+        impropers = {}
+        for ijkl, terms in raw['impropers'].items():
+            if not terms:
+                continue
+            term   = terms[0]
+            centre = ijkl[1]
+            a, b, c = ijkl[0], ijkl[2], ijkl[3]
+            imp_entry = {
+                'type':        'Fourier',
+                'multiple':    False,
+                'barrier':     term['k'],         
+                'phase':       term['phase'],      
+                'periodicity': term['periodicity'],
+                'comment':     f'openff improper center={centre+1}',
+            }
+            # Write all three permutations so GROMACS gets the full restoring force
+            for pa, pb, pc in [(a, b, c), (b, a, c), (c, a, b)]:
+                key = (centre, pa, pb, pc)
+                impropers[key] = dict(imp_entry)
+
+        return atoms, bonds, angles, dihedrals, rotatable_bonds, impropers
+    
+    def print_references(self, gaff_version, use_gaff, use_opls, use_uff, use_tm):
         if use_gaff:
             if gaff_version is not None:
                 self.ostream.print_info(
@@ -1750,6 +2434,20 @@ class MMForceFieldGenerator:
             gaff_ref = 'J. Wang, R. M. Wolf, J. W. Caldwell, P. A. Kollman,'
             gaff_ref += ' D. A. Case, J. Comput. Chem. 2004, 25, 1157-1174.'
             self.ostream.print_reference('Reference: ' + gaff_ref)
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+        if use_opls:
+            self.ostream.print_info('Using OPLS-AA parameters.')
+            opls_ref1 = ('W. L. Jorgensen, D. S. Maxwell, J. Tirado-Rives, '
+                         'J. Am. Chem. Soc. 1996, 118, 11225-11236.')
+            opls_ref2 = ('W. L. Jorgensen, N. A. McDonald, '
+                         'J. Phys. Chem. B 1998, 102, 8049-8059.')
+            opls_ref3 = ('E. K. Watkins, W. L. Jorgensen, '
+                         'J. Phys. Chem. A 2001, 105, 4118-4125.')
+            self.ostream.print_reference('References: ' + opls_ref1)
+            self.ostream.print_reference('           ' + opls_ref2)
+            self.ostream.print_reference('           ' + opls_ref3)
             self.ostream.print_blank()
             self.ostream.flush()
 
@@ -2767,9 +3465,20 @@ class MMForceFieldGenerator:
                 cur_str += '        fudgeLJ   fudgeQQ\n'
                 f_top.write(cur_str)
                 gen_pairs = 'yes' if self.gen_pairs else 'no'
+                # OPLS-AA and OpenFF both use geometric-mean LJ mixing
+                # (comb_rule 3) and equal 1-4 scaling (fudgeLJ = fudgeQQ = 0.5).
+                # GAFF/AMBER uses Lorentz-Berthelot mixing (comb_rule 2) and
+                # fudgeQQ = 1/1.2.
+                if self.force_field in ('opls',) or self.force_field.startswith('openff'):
+                    comb_rule = 3
+                    fudgeLJ = 0.5
+                    fudgeQQ = 0.5
+                else:
+                    comb_rule = self.comb_rule
+                    fudgeLJ = self.fudgeLJ
+                    fudgeQQ = self.fudgeQQ
                 f_top.write('{}{:16}{:>18}{:21.6f}{:10.6f}\n'.format(
-                    self.nbfunc, self.comb_rule, gen_pairs, self.fudgeLJ,
-                    self.fudgeQQ))
+                    self.nbfunc, comb_rule, gen_pairs, fudgeLJ, fudgeQQ))
 
             # include itp
 
@@ -2809,17 +3518,22 @@ class MMForceFieldGenerator:
             line_str = ';name   bond_type     mass     charge'
             line_str += '   ptype   sigma         epsilon\n'
             f_itp.write(line_str)
-            # TODO: Make unique_atom_types and atom['type'] more consistent
-            for at in self.unique_atom_types:
-                for i, atom in self.atoms.items():
-                    # Note: need strip() for converting e.g. 'c ' to 'c'
-                    if (atom['type'].strip() == at.strip()) or (atom['type'].strip() + '_unknown' == at.strip()):
-                        line_str = '{:>3}{:>9}{:17.5f}{:9.5f}{:>4}'.format(
-                            atom['type'], atom['type'], 0., 0., 'A')
-                        line_str += '{:16.5e}{:14.5e}\n'.format(
-                            atom['sigma'], atom['epsilon'])
-                        f_itp.write(line_str)
-                        break
+            # For OPLS, opls_NNN types are already defined in the system-wide
+            # oplsaa.ff/ffnonbonded.itp and must NOT be redeclared in the
+            # molecule itp. For GAFF/UFF, types are non-standard and must be
+            # declared explicitly.
+            if self.force_field not in ('opls',) and not self.force_field.startswith('openff'):
+                # TODO: Make unique_atom_types and atom['type'] more consistent
+                for at in self.unique_atom_types:
+                    for i, atom in self.atoms.items():
+                        # Note: need strip() for converting e.g. 'c ' to 'c'
+                        if (atom['type'].strip() == at.strip()) or (atom['type'].strip() + '_unknown' == at.strip()):
+                            line_str = '{:>3}{:>9}{:17.5f}{:9.5f}{:>4}'.format(
+                                atom['type'], atom['type'], 0., 0., 'A')
+                            line_str += '{:16.5e}{:14.5e}\n'.format(
+                                atom['sigma'], atom['epsilon'])
+                            f_itp.write(line_str)
+                            break
 
             # Molecule type
             f_itp.write('\n[ moleculetype ]\n')
@@ -3040,13 +3754,21 @@ class MMForceFieldGenerator:
                 ET.SubElement(Dihedrals, "Proper", **attributes)
 
         # Improper dihedrals
+        # OpenMM PeriodicTorsionForce <Improper> convention: class3 is the central atom.
+        # Our improper key stores centre at index 0: (centre, p1, p2, p3).
+        # Reorder to (p1, p2, centre, p3) so that class3 = centre.
         for improper_id, improper_data in self.impropers.items():
-
+            centre_idx = improper_id[0]
+            p1_idx     = improper_id[1]
+            p2_idx     = improper_id[2]
+            p3_idx     = improper_id[3]
+            # Reorder: class1=p1, class2=p2, class3=centre, class4=p3
+            ordered = (p1_idx, p2_idx, centre_idx, p3_idx)
             attributes = {
-                "class1": str(improper_id[0] + 1) + f'_{mol_name}',
-                "class2": str(improper_id[1] + 1) + f'_{mol_name}',
-                "class3": str(improper_id[2] + 1) + f'_{mol_name}',
-                "class4": str(improper_id[3] + 1) + f'_{mol_name}',
+                "class1": str(ordered[0] + 1) + f'_{mol_name}',
+                "class2": str(ordered[1] + 1) + f'_{mol_name}',
+                "class3": str(ordered[2] + 1) + f'_{mol_name}',
+                "class4": str(ordered[3] + 1) + f'_{mol_name}',
                 "periodicity1": str(improper_data['periodicity']),
                 "phase1": str(improper_data['phase'] * np.pi / 180),
                 "k1": str(improper_data['barrier'])
@@ -3127,27 +3849,6 @@ class MMForceFieldGenerator:
             The name of the molecule.
         """
 
-        # PDB format from http://deposit.rcsb.org/adit/docs/pdb_atom_format.html
-
-        # COLUMNS        DATA TYPE       CONTENTS
-        # --------------------------------------------------------------------------------
-        #  1 -  6        Record name     "HETATM" or "ATOM  "
-        #  7 - 11        Integer         Atom serial number.
-        # 13 - 16        Atom            Atom name.
-        # 17             Character       Alternate location indicator.
-        # 18 - 20        Residue name    Residue name.
-        # 22             Character       Chain identifier.
-        # 23 - 26        Integer         Residue sequence number.
-        # 27             AChar           Code for insertion of residues.
-        # 31 - 38        Real(8.3)       Orthogonal coordinates for X in Angstroms.
-        # 39 - 46        Real(8.3)       Orthogonal coordinates for Y in Angstroms.
-        # 47 - 54        Real(8.3)       Orthogonal coordinates for Z in Angstroms.
-        # 55 - 60        Real(6.2)       Occupancy (Default = 1.0).
-        # 61 - 66        Real(6.2)       Temperature factor (Default = 0.0).
-        # 73 - 76        LString(4)      Segment identifier, left-justified.
-        # 77 - 78        LString(2)      Element symbol, right-justified.
-        # 79 - 80        LString(2)      Charge on the atom.
-
         pdb_filename = str(pdb_file)
         if mol_name is None:
             mol_name = Path(self.molecule_name).stem
@@ -3168,8 +3869,6 @@ class MMForceFieldGenerator:
                 occupancy = 1.00
                 temp_factor = 0.00
                 element_symbol = element[:2].rjust(2)
-
-                # Format string from https://cupnet.net/pdb-format/
 
                 line_str = "{:6s}{:5d} {:^4s}{:1s}{:3s} {:1s}{:4d}{:1s}   ".format(
                     'HETATM', i, atom_name[:4], '', mol_name[:3], 'A', 1, '')
@@ -3235,6 +3934,17 @@ class MMForceFieldGenerator:
 
         if mol_name is None:
             mol_name = Path(self.molecule_name).stem
+
+        if self.force_field in ('opls',) or self.force_field.startswith('openff'):
+            warnmsg = (
+                'MMForceFieldGenerator: OPLS-AA uses geometric-mean combining '
+                'rules (comb-rule 3) for LJ interactions. OpenMM only supports '
+                'Lorentz-Berthelot (arithmetic) combining rules natively. '
+                'To use OPLS-AA with OpenMM you must apply geometric combining '
+                'rules via a CustomNonbondedForce. '
+                'See: https://github.com/openmm/openmm/issues/1918'
+            )
+            self.ostream.print_warning(warnmsg)
 
         xml_file = Path(filename).with_suffix('.xml')
         pdb_file = Path(filename).with_suffix('.pdb')
