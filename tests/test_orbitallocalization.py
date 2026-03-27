@@ -61,8 +61,8 @@ class TestOrbitalLocalization:
         molecule, basis, C, S = self._build_system()
         dip_ints = self._compute_dipoles(molecule, basis)
 
-        loc = vlx.OrbitalLocalization(C.copy())
-        C_loc = loc.boys(dip_ints)
+        loc = vlx.OrbitalLocalization()
+        C_loc = loc.boys(C.copy(), dip_ints)
 
         # Load reference
         ref_path = Path(__file__).parent / "data" / "boys_C.npy"
@@ -82,9 +82,9 @@ class TestOrbitalLocalization:
         molecule, basis, C, S = self._build_system()
         atom_map = self._get_atom_map(molecule, basis)
 
-        loc = vlx.OrbitalLocalization(C.copy())
+        loc = vlx.OrbitalLocalization()
         C_loc = loc.pipek_mezey(
-            S, atom_map,
+            C.copy(), S, atom_map,
             projector="mulliken"
         )
 
@@ -106,9 +106,9 @@ class TestOrbitalLocalization:
         molecule, basis, C, S = self._build_system()
         atom_map = self._get_atom_map(molecule, basis)
 
-        loc = vlx.OrbitalLocalization(C.copy())
+        loc = vlx.OrbitalLocalization()
         C_loc = loc.pipek_mezey(
-            S, atom_map,
+            C.copy(), S, atom_map,
             projector="lowdin"
         )
 

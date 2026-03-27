@@ -43,97 +43,141 @@ class OrbitalLocalization:
         - edmiston_ruedenberg(eri)  # placeholder
     """
 
-    def __init__(self, C):
+    def __init__(self):
         """
-        Parameters
-        ----------
-        C : np.ndarray
-            MO coefficients
+        Initializes the orbital localization driver
         """
-
-        self.C = np.array(C, copy=True)
-        self.nao, self.norb = self.C.shape
+        self.max_iter = 100
+        self.thresh = 1e-6
 
     # ============================================================
     # Core rotation
     # ============================================================
 
-    def _rotate(self, i, j, theta, projector=""):
+    def _rotate(self, i, j, theta, method="boys"):
+        """
+        Rotate MO pair around theta
+        """
 
         c = np.cos(theta)
         s = np.sin(theta)
 
+        # rotate MOs
         Ci = self.C[:, i].copy()
         Cj = self.C[:, j].copy()
 
-        self.C[:, i] = c*Ci + s*Cj
-        self.C[:, j] = -s*Ci + c*Cj
+        self.C[:, i] = c * Ci + s * Cj
+        self.C[:, j] = -s * Ci + c * Cj
 
-        if projector == "lowdin":
-            Ci = self.C_ortho[:, i].copy()
-            Cj = self.C_ortho[:, j].copy()
+        if method == "pm":
+            # rotate transformed MOs
+            Ci = self.C_eff[:, i].copy()
+            Cj = self.C_eff[:, j].copy()
 
-            self.C_ortho[:, i] = c*Ci + s*Cj
-            self.C_ortho[:, j] = -s*Ci + c*Cj
+            self.C_eff[:, i] = c * Ci + s * Cj
+            self.C_eff[:, j] = -s * Ci + c * Cj
+
+        elif method == "boys":
+            # rotate dipole integrals
+            ri = self.r[:, i, :].copy()
+            rj = self.r[:, j, :].copy()
+
+            self.r[:, i, :] = c * ri + s * rj
+            self.r[:, j, :] = -s * ri + c * rj
+
+            ri = self.r[:, :, i].copy()
+            rj = self.r[:, :, j].copy()
+
+            self.r[:, :, i] = c * ri + s * rj
+            self.r[:, :, j] = -s * ri + c * rj
+
+        else:
+            raise ValueError(f"Unknown method {method} "
+                              "provided in _rotate")
 
     # ============================================================
-    # ---------------- PIPEK–MEZEY -------------------------------
+    # ---------------- PROJECTORS -------------------------------
     # ============================================================
+    
+    def _build_atom_projector(self):
+        """
+        Compute AO to atom projector
+        """
+        n_atoms = len(self.atom_indices)
+        n_basis = self.C.shape[0]
 
-    def _pm_pair_lowdin(self, i, j):
+        P = np.zeros((n_atoms, n_basis))
 
-        Ci = self.C_ortho[:, i]
-        Cj = self.C_ortho[:, j]
+        for a, mask in enumerate(self.atom_indices):
+            P[a, mask] = 1.0
 
-        Qi = np.array([np.dot(Ci[idx], Ci[idx]) for idx in self.atom_indices])
-        Qj = np.array([np.dot(Cj[idx], Cj[idx]) for idx in self.atom_indices])
-        Pij = np.array([np.dot(Ci[idx], Cj[idx]) for idx in self.atom_indices])
+        self.P_atom = P
 
-        return Qi, Qj, Pij
+    def _pm_pair(self, i, j):
+        """
+        Compute prerequesites for analytical Jacobian
+        """
+        Ci = self.C_eff[:, i]
+        Cj = self.C_eff[:, j]
 
-    def _pm_pair_mulliken(self, i, j):
+        return (
+            np.matmul(self.P_atom, (Ci * Ci)),
+            np.matmul(self.P_atom, (Cj * Cj)),
+            np.matmul(self.P_atom, (Ci * Cj))
+        )
 
-        Ci = self.C[:, i]
-        Cj = self.C[:, j]
-
-        Qi = np.zeros(self.n_atoms)
-        Qj = np.zeros(self.n_atoms)
-        Pij = np.zeros(self.n_atoms)
-
-        for A, idx in enumerate(self.atom_indices):
-            SAA = self.S[np.ix_(idx, idx)]
-
-            CiA = Ci[idx]
-            CjA = Cj[idx]
-
-            Qi[A] = CiA @ SAA @ CiA
-            Qj[A] = CjA @ SAA @ CjA
-            Pij[A] = CiA @ SAA @ CjA
-
-        return Qi, Qj, Pij
+    # ============================================================
+    # ---------------- THETA FUNCTIONS ---------------------------
+    # ============================================================
 
     def _pm_optimal_theta(self, Qi, Qj, Pij):
-        # This is not the exact analytical expression,
-        # but in order to obtain a compact form neglects
-        # the "quartic" order terms
-        # 10.1021/ct401016x
+        """
+        Approximate analytical angle for PM rotation
+        (neglecting quartic terms)
+
+        DOI: 10.1021/ct401016x
+        """
 
         dQ = Qi - Qj
 
-        K2 = np.sum(dQ**2 - 4*Pij**2)
-        L2 = 4*np.sum(dQ * Pij)
+        K2 = np.sum(dQ * dQ - 4 * Pij * Pij)
+        L2 = 4 * np.sum(dQ * Pij)
 
         if abs(K2) < 1e-14 and abs(L2) < 1e-14:
             return 0.0
 
         return 0.5 * np.arctan2(L2, K2)
 
-    def pipek_mezey(self, S, atom_map, projector="lowdin", max_iter=50, tol=1e-6):
+    def _boys_optimal_theta(self, ri, rj, dij):
+        """
+        Exact boys rotation angle
+
+        DOI: 10.1063/1.1681683
+        """
+
+        rij = ri - rj
+
+        g = 2 * np.dot(rij, dij)
+        h = np.dot(rij, rij) - 4 * np.dot(dij, dij)
+
+        if abs(g) < 1e-14 and abs(h) < 1e-14:
+            return 0.0
+
+        return 0.25 * np.arctan2(g, h)
+
+    # ============================================================
+    # ---------------- PIPEK–MEZEY -------------------------------
+    # ============================================================
+
+    def pipek_mezey(self, C, S, atom_map, projector="lowdin"):
         """
         Pipek–Mezey orbital localization
 
         Parameters
         ----------
+        C : np.ndarray
+            MO coefficients
+
         projector : str
             "lowdin"
             "mulliken"
@@ -150,58 +194,66 @@ class OrbitalLocalization:
             Localized MO coefficients
         """
 
-        pair_func = (
-            self._pm_pair_lowdin
-            if projector == "lowdin"
-            else self._pm_pair_mulliken
-        )
-
+        self.C = np.array(C, copy=True)
+        self.nao, self.norb = self.C.shape
         self.S = np.array(S)
+
+        # transform MOs according to projector
+        eigs, U = np.linalg.eigh(self.S)
+        if projector == "lowdin":
+            self.X = np.matmul(U, np.matmul(np.diag(1.0 / np.sqrt(eigs)), U.T))
+        elif projector == "mulliken":
+            self.X = np.matmul(U, np.matmul(np.diag(np.sqrt(eigs)), U.T))
+        else:
+            raise NotImplementedError(f"requested projector {projector} "
+                                       "not implemented")
+        
+        self.C_eff = np.matmul(self.X.T, self.C)
+
         self.atom_map = np.array(atom_map)
         self.n_atoms = np.max(atom_map) + 1
 
-        if projector == "lowdin":
-            # Löwdin orthogonalization
-            eigs, U = np.linalg.eigh(self.S)
-            self.X = U @ np.diag(1.0 / np.sqrt(eigs)) @ U.T
+        # masks for AO to atom map
+        self.atom_indices = [
+            np.where(self.atom_map == A)[0]
+            for A in range(self.n_atoms)
+        ]
 
-            self.C_ortho = self.X.T @ self.C
+        self._build_atom_projector()
 
-        # atom masks
-        self.atom_indices = [np.where(self.atom_map == A)[0]
-                             for A in range(self.n_atoms)]
-
-        for it in range(max_iter):
+        for it in range(self.max_iter):
 
             delta = 0.0
 
             for i in range(self.norb):
-                for j in range(i+1, self.norb):
+                for j in range(i + 1, self.norb):
 
-                    Qi, Qj, Pij = pair_func(i, j)
+                    Qi, Qj, Pij = self._pm_pair(i, j)
 
                     theta = self._pm_optimal_theta(Qi, Qj, Pij)
 
                     if abs(theta) < 1e-12:
                         continue
 
-                    # loose monotonic safeguard
-                    self._rotate(i, j, theta, projector=projector)
+                    # safeguard
+                    theta *= 0.5
 
-                    Qi2, Qj2, Pij2 = pair_func(i, j)
-                    f_new = np.sum(Qi2**2 + Qj2**2)
-                    f_old = np.sum(Qi**2 + Qj**2)
-
-                    if f_new < f_old:
-                        theta *= 0.5
-                        self._rotate(i, j, -theta, projector=projector)
+                    self._rotate(i, j, theta, method="pm")
 
                     delta += abs(theta)
 
-            print(f"PM Iter {it:3d}  delta = {delta:.6e}")
+            #print(f"PM Iter {it:3d}  delta = {delta:.6e}")
 
-            if delta < tol:
+            if delta < self.thresh:
+                print(f"PM converged after {it:3d}  iterations")
                 break
+
+            if it == self.max_iter - 1:
+                # return the object anyway, since unlike for SCF,
+                # reaching the convergence threshold is not necessarily
+                # required, as the physics are unchanged.
+                print(f"PM only converged to delta = {delta:.6e} , "
+                      f"instead of {self.thresh:.2e}")
 
         return self.C
 
@@ -209,12 +261,15 @@ class OrbitalLocalization:
     # -------------------- BOYS ----------------------------------
     # ============================================================
 
-    def boys(self, dipole_integrals, max_iter=50, tol=1e-6):
+    def boys(self, C, dipole_integrals):
         """
         Boys orbital localization
 
         Parameters
         ----------
+        C : np.ndarray
+            MO coefficients
+
         dipole integrals : np.ndarray, tuple(np.ndarray), list(np.ndarray)
 
         Returns
@@ -223,58 +278,57 @@ class OrbitalLocalization:
             Localized MO coefficients
         """
 
+        self.C = np.array(C, copy=True)
+        self.nao, self.norb = self.C.shape
         mu = dipole_integrals
 
-        for it in range(max_iter):
+        self.r = np.array([
+            np.matmul(self.C.T, np.matmul(mu[k], self.C))
+            for k in range(3)
+        ])
+
+        for it in range(self.max_iter):
 
             delta = 0.0
 
             for i in range(self.norb):
-                for j in range(i+1, self.norb):
+                for j in range(i + 1, self.norb):
 
-                    ri = np.array([
-                        self.C[:, i] @ mu[k] @ self.C[:, i]
-                        for k in range(3)
-                    ])
+                    ri = self.r[:, i, i]
+                    rj = self.r[:, j, j]
+                    dij = self.r[:, i, j]
 
-                    rj = np.array([
-                        self.C[:, j] @ mu[k] @ self.C[:, j]
-                        for k in range(3)
-                    ])
+                    theta = self._boys_optimal_theta(ri, rj, dij)
 
-                    rij = np.array([
-                        self.C[:, i] @ mu[k] @ self.C[:, j]
-                        for k in range(3)
-                    ])
-
-                    A = np.dot(ri - rj, ri - rj)
-                    B = 2*np.dot(ri - rj, rij)
-
-                    if abs(B) < 1e-12:
+                    if abs(theta) < 1e-12:
                         continue
 
-                    # exact analytical angle for Jacobian
-                    # 10.1063/1.1681683
-                    theta = 0.25 * np.arctan2(2*B, A)
+                    self._rotate(i, j, theta, method="boys")
 
-                    self._rotate(i, j, theta)
                     delta += abs(theta)
 
-            print(f"Boys Iter {it:3d}  delta = {delta:.6e}")
+            #print(f"Boys Iter {it:3d}  delta = {delta:.6e}")
 
-            if delta < tol:
+            if delta < self.thresh:
+                print(f"Boys converged after {it:3d}  iterations")
                 break
+
+            if it == self.max_iter - 1:
+                # return the object anyway, since unlike for SCF,
+                # reaching the convergence threshold is not necessarily
+                # required, as the physics are unchanged.
+                print(f"Boys only converged to delta = {delta:.6e} , "
+                      f"instead of {self.thresh:.2e}")
 
         return self.C
 
     # ============================================================
-    # -------- EDMISTON–RUEDENBERG (STRUCTURE ONLY) --------------
+    # -------- EDMISTON–RUEDENBERG -------------------------------
     # ============================================================
 
-    def edmiston_ruedenberg(self, eri, max_iter=20):
+    def edmiston_ruedenberg(self, eri):
         """
-        eri: (nao, nao, nao, nao)
-        WARNING: placeholder (needs density fitting / AO→MO transform)
+        Placeholder for ER localization scheme
         """
 
         raise NotImplementedError(
