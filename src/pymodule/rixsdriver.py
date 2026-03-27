@@ -807,8 +807,8 @@ class RixsDriver(LinearSolver):
         core_eigvals    = self.comm.bcast(core_eigvals, root=mpi_master())
         valence_eigvals = self.comm.bcast(valence_eigvals, root=mpi_master())
 
-        core_eigvecs    = self._get_eigvecs(cvs_rsp_results, core_states, "core")
-        valence_eigvecs = self._get_eigvecs(rsp_results, val_states, "valence")
+        core_eigvecs    = self._get_eigvecs(cvs_rsp_results, core_states)#, "core")
+        valence_eigvecs = self._get_eigvecs(rsp_results, val_states)#, "valence")
 
         core_mats = self._preprocess_core_eigvecs(core_eigvecs, occupied_core,
                                                   num_valence_orbitals, num_vir_orbitals)
@@ -1122,13 +1122,13 @@ class RixsDriver(LinearSolver):
         # F_xx (F^(yy))^*
         tr_F2 = np.abs(np.trace(F))**2
 
-        sigma_f = omegaprime_omega * (1.0/15.0) * (
+        sigma_f = (fine_structure_constant()**4) * omegaprime_omega * (1.0/15.0) * (
             (2.0 - 0.5*np.sin(self.theta)**2) * F2 +
             (0.75*np.sin(self.theta)**2 - 0.5) * (FF_T_conj + tr_F2))
         
         return sigma_f
     
-    def _get_eigvecs(self, rsp_results, states, label):
+    def _get_eigvecs(self, rsp_results, states):
         """
         Gets eigenvectors.
 
