@@ -1,6 +1,7 @@
+from mpi4py import MPI
 from pathlib import Path
 import pytest
-from mpi4py import MPI
+import sys
 
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.molecule import Molecule
@@ -118,6 +119,8 @@ class TestScfEnergyComponents:
                                        bas,
                                        solvation_model='cpcm')
 
+    @pytest.mark.skipif("rdkit" not in sys.modules,
+                        reason="rdkit not available")
     def test_scf_with_smd(self, tmp_path):
 
         mol, bas = self.get_molecule_and_basis()
