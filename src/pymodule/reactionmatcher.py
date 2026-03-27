@@ -350,7 +350,7 @@ class ReactionMatcher:
         # # Upper bound for a starting guess. A linear molecule would need at least N/2 range to cover the entire molecule
         # depth = int((len(rea_graph.nodes) - H_count) / 4)
 
-        min_depth = 3
+        min_depth = 2
         assisting_map = {}
         rea_cc = list(nx.connected_components(rea_graph))
         range_spans_cc = [False] * len(rea_cc)
@@ -681,12 +681,19 @@ class ReactionMatcher:
                 least_changing_bonds_H_bond_counts).max()
             least_changing_bonds_index = np.where(
                 least_changing_bonds_H_bond_counts == best_H_bond_count)[0]
+
             best_index = least_changing_bonds_indices[
                 least_changing_bonds_index[0]]
-
             if len(least_changing_bonds_index):
                 self.ostream.print_info(
-                    "Multiple equally good mappings found, picking first one.")
+                    f"{len(least_changing_bonds_index)} equally good mappings found, picking first one."
+                )
+                for i in least_changing_bonds_index:
+                    temp_i = least_changing_bonds_indices[i]
+                    self.ostream.print_info(
+                        f"Mapping {maps[temp_i]} with breaking bonds: {breaking_edges_list[temp_i]} and forming bonds: {forming_edges_list[temp_i]}"
+                    )
+                self.ostream.flush()
         else:
             best_index = least_changing_bonds_indices[0]
         self.ostream.print_info(

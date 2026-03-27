@@ -128,6 +128,7 @@ class EvbSystemBuilder():
         # self.bonded_integration: bool = True  # If the integration potential should use bonded (harmonic/morse) forces for forming/breaking bonds, instead of replacing them with nonbonded potentials
         self.bonded_integration_bond_fac: float = 0.2  # Scaling factor for the bonded integration forces.
         self.bonded_integration_angle_fac: float = 0.1  # Scaling factor for the bonded integration forces.
+        self.angle_lambda_switch: float = 0.5
         self.torsion_lambda_switch: float = 0.25  # The minimum (1-maximum) lambda value at which to start turning on (have turned of) the proper torsion for the product (reactant)
 
         self.int_nb_const_exceptions = True  # If the exceptions for the integration nonbonded force should be kept constant over the entire simulation
@@ -1672,8 +1673,14 @@ class EvbSystemBuilder():
             atom_ids = self._key_to_id(key, self.reaction_atoms)
             if atom_ids is None:
                 continue
+            reascale, proscale = self._get_lambda_scaling(
+                lam, self.angle_lambda_switch)
+            reascale = 1
+            proscale = 1
             if (key in self.reactant.angles.keys()
                     and key in self.product.angles.keys()):
+                self.ostream.flush()
+
                 angleA = self.reactant.angles[key]
                 angleB = self.product.angles[key]
 
@@ -1682,12 +1689,13 @@ class EvbSystemBuilder():
 
                 fcB = angleB['force_constant']
                 eqB = angleB['equilibrium']
+
             elif key in self.reactant.angles.keys():
                 # take angle from reactant, and from product structure
                 angleA = self.reactant.angles[key]
-                fcA = angleA['force_constant']
+                
+                fcA = angleA['force_constant'] * reascale
                 eqA = angleA['equilibrium']
-
                 if model_broken:
                     coords = self.product.molecule.get_coordinates_in_angstrom()
                     eqB = self.measure_angle(coords[key[0]],
@@ -1702,10 +1710,9 @@ class EvbSystemBuilder():
                     eqB = eqA
                     fcB = 0
             else:
-
                 angleB = self.product.angles[key]
                 eqB = angleB['equilibrium']
-                fcB = angleB['force_constant']
+                fcB = angleB['force_constant'] * proscale
                 fcA = fcB
                 if model_broken:
                     coords = self.reactant.molecule.get_coordinates_in_angstrom(
@@ -1746,36 +1753,39 @@ class EvbSystemBuilder():
                     and key in self.product.dihedrals.keys()):
                 dihedA = self.reactant.dihedrals[key]
                 dihedB = self.product.dihedrals[key]
+                # if the torsion on one side of the reaction completely disapears, then turn of the torsion much earlier / turn it on later
                 if dihedA['barrier'] == 0 or dihedB['barrier'] == 0:
-                    x0 = self.torsion_lambda_switch
-                    a = -1 / x0
-                    b = 1
-                    reascale = a * lam + b
-                    a = 1 / (1 - x0)
-                    b = 1 - a
-                    proscale = a * lam + b
+                    reascale, proscale = self._get_lambda_scaling(
+                        lam, self.torsion_lambda_switch)
                 else:
                     reascale = 1 - lam
                     proscale = lam
                 self._add_torsion(fourier_force, dihedA, atom_ids, reascale)
                 self._add_torsion(fourier_force, dihedB, atom_ids, proscale)
             else:
-                # Create a linear switching function that turns on the proper torsions only past a certain lambda value
+
+                # if the torsion on one side of the reaction completely disapears, then turn of the torsion much earlier / turn it on later
+                reascale, proscale = self._get_lambda_scaling(
+                    lam, self.torsion_lambda_switch)
                 if key in self.reactant.dihedrals.keys():
-                    x0 = self.torsion_lambda_switch
-                    a = -1 / x0
-                    b = 1
-                    scale = a * lam + b
+                    scale = reascale
                     dihed = self.reactant.dihedrals[key]
                 else:
-                    x0 = self.torsion_lambda_switch
-                    a = 1 / (1 - x0)
-                    b = 1 - a
-                    scale = a * lam + b
+                    scale = proscale
                     dihed = self.product.dihedrals[key]
                 if scale > 0:
                     self._add_torsion(fourier_force, dihed, atom_ids, scale)
         return fourier_force
+
+    # Create a linear switching function that turns the force on only past the lambda-switch
+    def _get_lambda_scaling(self, lam, lambda_switch):
+        a = -1 / lambda_switch
+        b = 1
+        reascale = a * lam + b
+        a = 1 / (1 - lambda_switch)
+        b = 1 - a
+        proscale = a * lam + b
+        return reascale, proscale
 
     def _create_improper_torsion_forces(self, lam):
 
@@ -1799,13 +1809,8 @@ class EvbSystemBuilder():
                 dihedB = self.product.impropers[key]
 
                 if dihedA['barrier'] == 0 or dihedB['barrier'] == 0:
-                    x0 = self.torsion_lambda_switch
-                    a = -1 / x0
-                    b = 1
-                    reascale = a * lam + b
-                    a = 1 / (1 - x0)
-                    b = 1 - a
-                    proscale = a * lam + b
+                    reascale, proscale = self._get_lambda_scaling(
+                        lam, self.torsion_lambda_switch)
                 else:
                     reascale = 1 - lam
                     proscale = lam
@@ -1821,17 +1826,13 @@ class EvbSystemBuilder():
                                   proscale,
                                   improper=True)
             else:
+                reascale, proscale = self._get_lambda_scaling(
+                    lam, self.torsion_lambda_switch)
                 if key in self.reactant.impropers.keys():
-                    x0 = self.torsion_lambda_switch
-                    a = -1 / x0
-                    b = 1
-                    scale = a * lam + b
+                    scale = reascale
                     dihed = self.reactant.impropers[key]
                 else:
-                    x0 = self.torsion_lambda_switch
-                    a = 1 / (1 - x0)
-                    b = 1 - a
-                    scale = a * lam + b
+                    scale = proscale
                     dihed = self.product.impropers[key]
                 if scale > 0:
                     self._add_torsion(fourier_force,
@@ -2166,9 +2167,8 @@ class EvbSystemBuilder():
             if i != base_particle:
                 exclusions.add(i)
             if current_level > 0:
-                EvbSystemBuilder._add_exclusions_to_set(bonded12, exclusions,
-                                                        base_particle, i,
-                                                        current_level - 1)
+                EvbSystemBuilder._add_exclusions_to_set(
+                    bonded12, exclusions, base_particle, i, current_level - 1)
 
     def _create_constraint_forces(self, lam):
 
