@@ -93,7 +93,8 @@ class MOIntegralsDriver:
                           basis,
                           mol_orbs,
                           moints_name,
-                          moints_spin='aaaa'):
+                          moints_spin='aaaa',
+                          n_frozen=0):
         """
         Performs in-memory MO integrals calculation for a molecule and a basis
         set.
@@ -108,6 +109,8 @@ class MOIntegralsDriver:
             The name of MO integrals to be calculated, such as 'chem_oovv'.
         :param moints_spin:
             The spin of MO integrals to be calculated, such as 'aabb'.
+        :param n_frozen:
+            The number of frozen molecular orbitals (assumed to be the lowest ones).
 
         :return:
             The computed MO integrals.
@@ -119,10 +122,10 @@ class MOIntegralsDriver:
         nocc_a = molecule.number_of_alpha_occupied_orbitals(basis)
         nocc_b = molecule.number_of_beta_occupied_orbitals(basis)
 
-        mo_occ_a = mo_a[:, :nocc_a].copy()
+        mo_occ_a = mo_a[:, n_frozen:nocc_a].copy()
         mo_vir_a = mo_a[:, nocc_a:].copy()
 
-        mo_occ_b = mo_b[:, :nocc_b].copy()
+        mo_occ_b = mo_b[:, n_frozen:nocc_b].copy()
         mo_vir_b = mo_b[:, nocc_b:].copy()
 
         # get the type of MO integral, such as 'oovv'
