@@ -33,9 +33,6 @@
 #ifndef GpuWrapper_hpp
 #define GpuWrapper_hpp
 
-// TODO: Use hipFreeAsync for gpuFreeAsync with newer rocm
-//       At the moment we use hipFree due to rocm 6.3
-
 #if defined(USE_CUDA)
 
     #define gpuSafe(e)                          cudaSafe(e)
@@ -78,7 +75,7 @@
     #define gpuMalloc(ptr, size)                hipMalloc(ptr, size)
     #define gpuMallocAsync(ptr, size, s)        hipMallocAsync(ptr, size, s)
     #define gpuFree(ptr)                        hipFree(ptr)
-    #define gpuFreeAsync(ptr, s)                hipFree(ptr)
+    #define gpuFreeAsync(ptr, s)                hipFreeAsync(ptr, s)
     #define gpuDeviceSynchronize()              hipDeviceSynchronize()
     #define gpuMemGetInfo(p_free, p_total)      hipMemGetInfo(p_free, p_total)
     #define gpuMemcpy(dst, src, size, kind)     hipMemcpy(dst, src, size, kind)

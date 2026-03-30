@@ -85,16 +85,6 @@
         }                                                                                         \
     }
 
-#define magmaSafe(e)                                                                                                   \
-    {                                                                                                                  \
-        magma_int_t err = (e);                                                                                         \
-        if (err != MAGMA_SUCCESS) {                                                                                    \
-            std::cerr << "MAGMA error in " << __FILE__ << ":" << __LINE__ << ": " << magma_strerror(err) << std::endl; \
-            std::exit(EXIT_FAILURE);                                                                                   \
-        }                                                                                                              \
-    }
-
-/*
 #define hipsolverSafe(e)                                                                            \
     {                                                                                               \
         hipsolverStatus_t err = (e);                                                                \
@@ -104,6 +94,5 @@
             std::exit(EXIT_FAILURE);                                                                \
         }                                                                                           \
     }
-*/
 
 #endif /* GpuSafeChecks_hpp */
