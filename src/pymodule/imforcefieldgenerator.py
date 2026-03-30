@@ -949,7 +949,6 @@ class IMForceFieldGenerator:
             
                 self.symmetry_information[new_key][4] = new_exclusion[new_key]
                 self.symmetry_information[new_key][3] = new_inclusion[new_key]
-            
 
 
         if self.add_conformal_structures and 0 in self.roots_to_follow:
@@ -1164,13 +1163,16 @@ class IMForceFieldGenerator:
         rank = comm.Get_rank()
         root = mpi_master()
 
+        if self.reference_struc_energy_file is not None and not os.path.exists(self.reference_struc_energy_file):
+            self.reference_struc_energy_file = None
+
         # First set up the system for which the database needs to be constructed
         states_basis = {'gs':self.gs_basis_set_label, 'es':self.es_basis_set_label}
         root_extract_z_matrix = None
         if self.imforcefieldfiles is not None:
             root_extract_z_matrix = {}
             for i, root in enumerate(self.roots_to_follow):
-                if root not in self.imforcefieldfiles:
+                if root not in self.imforcefieldfiles or not os.path.exists(self.imforcefieldfiles[root]):
                     self.imforcefieldfiles[self.roots_to_follow[i]] = f'im_database_{root}.h5'
                     self.sampling_imforcefieldfiles[self.roots_to_follow[i]] = f'im_database_sampling_{root}.h5'
                     root_extract_z_matrix[self.roots_to_follow[i]] = False
@@ -2793,11 +2795,14 @@ class IMForceFieldGenerator:
                         old_label = qm_data_point.point_label
                         impes_driver.qm_symmetry_data_points[old_label] = [qm_data_point]
                         impes_driver.qm_data_points.append(qm_data_point)
+                        if impes_driver.impes_coordinate.eq_bond_lengths is None:
+                            impes_driver.impes_coordinate.eq_bond_lengths = qm_data_point.eq_bond_lengths
                     else:
                         symmetry_data_point = InterpolationDatapoint(self.roots_z_matrix[root])
                         symmetry_data_point.read_hdf5(current_datafile, label)
                         impes_driver.qm_symmetry_data_points[old_label].append(symmetry_data_point)
-
+                
+                
                 struct_to_check = [
                     self._deserialize_molecule_from_mpi(mol_info)
                     for mol_info in payload.get('random_struct_info', [])
@@ -3316,7 +3321,7 @@ class IMForceFieldGenerator:
                     states = [state for state in entries[2] if state > 0]
                     adjusted_molecule['es'].append((entries[0], entries[1], 1, None, states, symmetry_point, entries[3])) 
 
-        
+        eq_bond_length = []
         
         for key, entries in adjusted_molecule.items():
             if len(entries) == 0:
@@ -3432,14 +3437,14 @@ class IMForceFieldGenerator:
                         else:
                             label = f'{old_label}_symmetry_{label_counter}'
 
-                        eq_bond_length = []
-                        for idx, element in enumerate(z_matrix):
-                            if len(element) == 2 and self.use_minimized_structures[0]:
-                                eq_bond_length.append(mol_basis[0].get_distance([element[0] + 1, element[1] + 1], 'bohr'))
-                            elif len(element) == 2:
-                                eq_bond_length.append(0.0)
-                        eq_bond_length = [2.724954366417468, 1.8341168646042718, 1.8341161804706632]
-
+                        if len(eq_bond_length) == 0:
+                            for idx, element in enumerate(z_matrix['bonds']):
+                                if len(element) == 2 and self.use_minimized_structures[0]:
+                                    eq_bond_length.append(mol_basis[0].get_distance([element[0] + 1, element[1] + 1], 'bohr'))
+                                elif len(element) == 2:
+                                    eq_bond_length.append(0.0)
+                            # eq_bond_length = [2.724954366417468, 1.8341168646042718, 1.8341161804706632]
+                        print(eq_bond_length)
                         print('Here is the angle 4,1,2,3',  mol_basis[0].get_dihedral((4,1,2,3), 'radian'))
                         impes_coordinate = InterpolationDatapoint(z_matrix)
                         impes_coordinate.eq_bond_lengths = eq_bond_length
@@ -3451,7 +3456,7 @@ class IMForceFieldGenerator:
                         impes_coordinate.gradient =  mw_grad_vec.reshape(grad.shape)
                         impes_coordinate.hessian = mw_hess_mat.reshape(hess.shape)
                         impes_coordinate.transform_gradient_and_hessian()
-            
+                 
                         if mol_basis[2] > 1:
                             
                             rotation_combinations = None

@@ -78,6 +78,7 @@ def _init_worker(z_matrix, impes_dict, sym_dict, sym_datapoints, dps, idx, expon
     driver.symmetry_information = sym_dict
     driver.qm_symmetry_data_points = sym_datapoints
     driver.impes_coordinate.inv_sqrt_masses = dps[0].inv_sqrt_masses
+    driver.impes_coordinate.eq_bond_lengths = dps[0].eq_bond_lengths
     driver.distance_thrsh = 1000
     driver.exponent_p = exponent_p_q[0]
     driver.exponent_q = exponent_p_q[1]
@@ -126,9 +127,11 @@ def _eval_structure(payload):
     
     # Residuals in kcal/mol
     dE_res  = (E_interp - E_qm) * conv                                          # ()
+
     # ----- loss (your anisotropic force term) -----
-    g_sub   = (G_interp[idx] - G_qm_flat[idx]) * conv
-    h_sub   = (G_qm_flat[idx]) * conv
+    g_sub   = (G_interp[idx] - G_qm_flat[idx]) * conv / bohr_in_angstrom()   # (nsub,) in kcal/mol/Angstrom
+
+    h_sub   = (G_qm_flat[idx]) * conv / bohr_in_angstrom()   # (nsub,) in kcal/mol/Angstrom
     nh      = np.linalg.norm(h_sub)
     L_iso   = (g_sub @ g_sub) / nsub
 
@@ -157,9 +160,9 @@ def _eval_structure(payload):
     G_interp_sub = G_interp[idx]
     w_x_alpha_sub = w_x_alpha[:, idx]
     S_x_sub = S_x[idx]
-    term1 = (w_x_alpha_sub * (P - E_interp)[:, None]) * (conv / S)                  # (M,nsub)
-    term2 = (w_dα[:, None] * (G_sub - G_interp_sub[None, :])) * (conv / S)          # (M,nsub)
-    term3 = ((w_dα * (P - E_interp)) / (S**2))[:, None] * (conv * S_x_sub[None, :]) # (M,nsub)
+    term1 = (w_x_alpha_sub * (P - E_interp)[:, None]) * (conv/bohr_in_angstrom() / S)                  # (M,nsub)
+    term2 = (w_dα[:, None] * (G_sub - G_interp_sub[None, :])) * (conv/bohr_in_angstrom() / S)          # (M,nsub)
+    term3 = ((w_dα * (P - E_interp)) / (S**2))[:, None] * (conv/bohr_in_angstrom() * S_x_sub[None, :]) # (M,nsub)
     dG_dα_sub = term1 + term2 - term3                                                # (M,nsub)
 
     # dL/dg in subspace
@@ -171,8 +174,7 @@ def _eval_structure(payload):
     grad_force_part  = dG_dα_sub @ dL_dg_sub                     # (M,)
     grad_energy_part = 2.0 * e_x * dE_res * dE_dα                # (M,)
     grad_s = grad_energy_part + 0.5 * (1.0 - e_x) * grad_force_part   # (M,)
-
-    return float(loss_s), grad_s
+    return float(loss_s), grad_s, float(L_e), float(L_F)
 
 
 
@@ -205,6 +207,7 @@ class AlphaOptimizer:
         )
         self._cache_key = None
         self._cache_grad = None
+        self._cache_metrics = None
         self._closed = False
 
     @staticmethod
@@ -224,18 +227,34 @@ class AlphaOptimizer:
         futs = self._pool.map(_eval_structure, payloads, chunksize=chunksize)
         sum_loss = 0.0
         sum_grad = np.zeros(self.M, dtype=np.float64)
+        sum_energy = 0.0
+        sum_force = 0.0
         counter = 0
-        for loss_s, grad_s in futs:
+        for loss_s, grad_s, energy_s, force_s in futs:
             sum_loss += loss_s
             sum_grad += grad_s
+            sum_energy += energy_s
+            sum_force += force_s
             counter += 1
 
+        mean_loss = float(sum_loss / self.S)
+        mean_energy = float(sum_energy / self.S)
+        mean_force = float(sum_force / self.S)
         self._cache_key  = key
         self._cache_grad = sum_grad / self.S
+        self._cache_metrics = {
+            'loss_total': mean_loss,
+            'loss_energy': mean_energy,
+            'loss_force': mean_force,
+        }
         if self.verbose:
-            print('loss function', float(sum_loss / self.S))
+            print(
+                'loss function',
+                mean_loss,
+                f"(energy={mean_energy:.6f}, force={mean_force:.6f})"
+            )
 
-        return float(sum_loss / self.S)
+        return mean_loss
 
     def jac(self, alphas):
         key = self._key(alphas)
@@ -244,6 +263,27 @@ class AlphaOptimizer:
         # Fallback: compute once (will also cache)
         _ = self.fun(alphas)
         return self._cache_grad
+
+    def get_metrics(self, alphas=None, evaluate_if_missing=True):
+        """
+        Returns last cached objective components.
+
+        If ``alphas`` is provided and cache does not match, optionally evaluates
+        the objective once to populate the cache.
+        """
+
+        if alphas is None:
+            return dict(self._cache_metrics) if self._cache_metrics is not None else None
+
+        key = self._key(alphas)
+        if key == self._cache_key and self._cache_metrics is not None:
+            return dict(self._cache_metrics)
+
+        if evaluate_if_missing:
+            _ = self.fun(alphas)
+            return dict(self._cache_metrics) if self._cache_metrics is not None else None
+
+        return None
 
     def close(self):
         if not self._closed:

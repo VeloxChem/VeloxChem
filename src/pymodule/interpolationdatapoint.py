@@ -107,7 +107,7 @@ class InterpolationDatapoint:
         self.inv_sqrt_masses = None
 
         self.b_matrix = None
-        
+        self.switching_value = []
 
         # copy of Willson B matrix in r and phi
         # (needed for converting the b2_matrix in 1/r and/or cos(phi)).
@@ -275,6 +275,22 @@ class InterpolationDatapoint:
 
         return self._b_matrix_row_cache
 
+    def _get_eq_bond_lengths_array(self, n_bonds):
+        """
+        Returns equilibrium bond lengths with shape validation.
+        """
+        assert_msg_critical(
+            self.eq_bond_lengths is not None,
+            'InterpolationDatapoint: No equilibrium bond lengths are defined.'
+        )
+        eq_values = np.asarray(self.eq_bond_lengths, dtype=np.float64).reshape(-1)
+        assert_msg_critical(
+            eq_values.size == int(n_bonds),
+            'InterpolationDatapoint: Equilibrium bond-length size mismatch '
+            f'(expected {int(n_bonds)}, got {eq_values.size}).'
+        )
+        return eq_values
+
     def calculate_b_matrix_legacy(self):
         """
         Legacy Wilson B-matrix construction used for validation/reference.
@@ -342,7 +358,7 @@ class InterpolationDatapoint:
         if self.inv_sqrt_masses is not None:
             self.b_matrix = self.b_matrix * self.inv_sqrt_masses
             if self.use_inverse_bond_length or self.use_eq_bond_length:
-                self.original_b_matrix = self.original_b_matrix * self.inv_sqrt_masses
+                self.original_b_matrix = self.original_b_matrix
 
             # self.b_matrix[i] = derivative
         # self.b_matrix = self.b_matrix * self.inv_sqrt_masses[np.newaxis, :]
@@ -387,8 +403,11 @@ class InterpolationDatapoint:
             if self.use_inverse_bond_length:
                 row_scale[bond_rows] = -1.0 / np.square(bond_values)
             elif self.use_eq_bond_length:
-                eq_values = np.asarray(self.eq_bond_lengths[bond_rows], dtype=np.float64)
-                row_scale[bond_rows] = np.exp(-0.4 * (bond_values - eq_values))
+                eq_values = self._get_eq_bond_lengths_array(bond_rows.size)
+                _, dq_dr, _ = self._switched_bond_transform(
+                    bond_values, eq_values, eps_inner=0.01, eps_outer=0.15)
+                row_scale[bond_rows] = dq_dr
+                # print(dq_dr)
 
         if self.use_cosine_dihedral:
             dihedral_rows = row_cache['dihedral_rows']
@@ -406,7 +425,7 @@ class InterpolationDatapoint:
         if self.inv_sqrt_masses is not None:
             self.b_matrix = self.b_matrix * self.inv_sqrt_masses
             if self.use_inverse_bond_length or self.use_eq_bond_length:
-                self.original_b_matrix = self.original_b_matrix * self.inv_sqrt_masses
+                self.original_b_matrix = self.original_b_matrix
 
     def _validate_vectorized_b_matrix_against_legacy(self):
         """
@@ -512,41 +531,44 @@ class InterpolationDatapoint:
         # self.b2_matrix = np.zeros((len(self.z_matrix), n_atoms * 3, n_atoms * 3))
         self.b2_matrix = np.zeros((len(self.z_matrix), n_atoms * 3, n_atoms * 3))
 
+        eq_bond_values = None
+        if self.use_eq_bond_length:
+            bond_rows = self._get_b_matrix_row_cache()['bond_rows']
+            eq_bond_values = self._get_eq_bond_lengths_array(bond_rows.size)
+
         
         prev_dihedral = None
+        bond_counter = 0
         for i, z in enumerate(self.z_matrix):
             q = self.internal_coordinates[i]
             second_derivative = q.second_derivative(coords).reshape(-1, n_atoms * 3)
 
-            if len(z) == 2 and self.use_inverse_bond_length:
-                
-                r = q.value(coords)
-                r_inv_2 = 1.0 / (r * r)
-                r_inv_3 = r_inv_2 / r
-                self.b2_matrix[i] = -r_inv_2 * second_derivative
+            if len(z) == 2:
+                if self.use_inverse_bond_length:
 
-                for m in range(n_atoms):
-                    for n in range(n_atoms):
-                        self.b2_matrix[i, m*3:(m+1)*3, n*3:(n+1)*3] += 2 * r_inv_3 * np.outer(self.original_b_matrix[i, m*3:(m+1)*3], self.original_b_matrix[i, n*3:(n+1)*3])
-                # self.b2_matrix[i] = 0.5 * (self.b2_matrix[i] + self.b2_matrix[i].T)
+                    r = q.value(coords)
+                    r_inv_2 = 1.0 / (r * r)
+                    r_inv_3 = r_inv_2 / r
+                    self.b2_matrix[i] = -r_inv_2 * second_derivative
 
-            elif len(z) == 2 and self.use_eq_bond_length:
+                    for m in range(n_atoms):
+                        for n in range(n_atoms):
+                            self.b2_matrix[i, m*3:(m+1)*3, n*3:(n+1)*3] += 2 * r_inv_3 * np.outer(self.original_b_matrix[i, m*3:(m+1)*3], self.original_b_matrix[i, n*3:(n+1)*3])
 
-                r = q.value(coords)
-                
-                r_e = self.eq_bond_lengths[i]
-                # r_deriv_2 = 4.0 * r_e / (r + r_e)**2
-                
-                # r_deriv_3 = - 8.0 * r_e / (r + r_e)**3
-                
-                r_deriv_2 = np.exp(-0.4 * (q.value(coords) - r_e))
-                r_deriv_3 = -0.4 * np.exp(-0.4 * (q.value(coords) - r_e))
-                
-                self.b2_matrix[i] = r_deriv_2 * second_derivative
-                for m in range(n_atoms):
-                    for n in range(n_atoms):
-                        self.b2_matrix[i, m*3:(m+1)*3, n*3:(n+1)*3] += r_deriv_3 * np.outer(self.original_b_matrix[i, m*3:(m+1)*3], self.original_b_matrix[i, n*3:(n+1)*3])
-            
+                elif self.use_eq_bond_length:
+                    r = q.value(coords)
+                    _, r_deriv_2, r_deriv_3 = self._switched_bond_transform(
+                        r, eq_bond_values[bond_counter], eps_inner=0.01, eps_outer=0.15)
+                    self.b2_matrix[i] = r_deriv_2 * second_derivative
+                    for m in range(n_atoms):
+                        for n in range(n_atoms):
+                            self.b2_matrix[i, m*3:(m+1)*3, n*3:(n+1)*3] += r_deriv_3 * np.outer(self.original_b_matrix[i, m*3:(m+1)*3], self.original_b_matrix[i, n*3:(n+1)*3])
+
+                else:
+                    self.b2_matrix[i] = second_derivative
+
+                bond_counter += 1
+
             elif len(z) == 4 and self.use_cosine_dihedral:
 
                 if prev_dihedral != z:
@@ -574,7 +596,7 @@ class InterpolationDatapoint:
             
             else:
                 self.b2_matrix[i] = second_derivative
-        
+
         if self.inv_sqrt_masses is not None:
             self.b2_matrix = (self.b2_matrix *
                 self.inv_sqrt_masses.reshape(1, -1, 1) *
@@ -921,13 +943,19 @@ class InterpolationDatapoint:
         row_cache = self._get_b_matrix_row_cache()
 
         bond_rows = row_cache['bond_rows']
+
         if bond_rows.size > 0:
             if self.use_inverse_bond_length:
                 int_coords[bond_rows] = 1.0 / base_values[bond_rows]
             elif self.use_eq_bond_length:
-                eq_values = np.asarray(self.eq_bond_lengths[bond_rows], dtype=np.float64)
-                int_coords[bond_rows] = (
-                    1.0 - np.exp(-0.4 * (base_values[bond_rows] - eq_values))) / 0.4
+                eq_values = self._get_eq_bond_lengths_array(bond_rows.size)
+                q_values, _, _ = self._switched_bond_transform(
+                    base_values[bond_rows],
+                    eq_values,
+                    eps_inner=0.01,
+                    eps_outer=0.15)
+                int_coords[bond_rows] = q_values
+
 
         if self.use_cosine_dihedral:
             dihedral_rows = row_cache['dihedral_rows']
@@ -942,6 +970,90 @@ class InterpolationDatapoint:
                     int_coords[second_rows] = np.sin(dihedral_values[~dihedral_first])
 
         self.internal_coordinates_values = int_coords
+    
+    def smoothstep5(self, t):
+        return 1.0 - 10.0*t**3 + 15.0*t**4 - 6.0*t**5
+
+    def dsmoothstep5_dt(self, t):
+        return -30.0*t**2 + 60.0*t**3 - 30.0*t**4
+
+    def d2smoothstep5_dt2(self, t):
+        return -60.0*t + 180.0*t**2 - 120.0*t**3
+
+
+    def _switched_bond_transform(self, r, r_eq, eps_inner=0.05, eps_outer=0.15):
+        """
+        Returns q(r), dq/dr, d2q/dr2 for a bond coordinate that is
+        smoothly switched from local r behavior near equilibrium to 1/r outside.
+        """
+        r_input = np.asarray(r, dtype=np.float64)
+        r_eq_input = np.asarray(r_eq, dtype=np.float64)
+        scalar_input = (r_input.ndim == 0 and r_eq_input.ndim == 0)
+
+        r_arr, r_eq_arr = np.broadcast_arrays(np.atleast_1d(r_input),
+                                              np.atleast_1d(r_eq_input))
+        r_arr = r_arr.astype(np.float64, copy=False)
+        r_eq_arr = r_eq_arr.astype(np.float64, copy=False)
+
+        L = r_arr - r_eq_arr
+        dL = np.ones_like(r_arr)
+        d2L = np.zeros_like(r_arr)
+
+        R = - np.square(r_eq_arr) * (1.0 / r_arr - 1.0 / r_eq_arr)
+        dR = np.square(r_eq_arr) / np.square(r_arr)
+        d2R = -np.square(r_eq_arr) * 2.0 / np.power(r_arr, 3)
+
+        x = np.log(r_arr / r_eq_arr)
+        y = np.square(x)
+
+        y1 = np.log(1.0 + eps_inner)**2
+        y2 = np.log(1.0 + eps_outer)**2
+        denom = y2 - y1
+
+        s = np.ones_like(y)
+        ds = np.zeros_like(y)
+        d2s = np.zeros_like(y)
+
+        mask_inner = (y <= y1)
+        mask_outer = (y >= y2)
+        mask_transition = (~mask_inner) & (~mask_outer)
+
+        if np.any(mask_transition):
+            t = (y[mask_transition] - y1) / denom
+            P = self.smoothstep5(t)
+            dP = self.dsmoothstep5_dt(t)
+            d2P = self.d2smoothstep5_dt2(t)
+
+            dy_dr = 2.0 * x[mask_transition] / r_arr[mask_transition]
+            d2y_dr2 = 2.0 * (1.0 - x[mask_transition]) / np.square(r_arr[mask_transition])
+            dt_dr = dy_dr / denom
+            d2t_dr2 = d2y_dr2 / denom
+
+            s[mask_transition] = P
+            ds[mask_transition] = dP * dt_dr
+            d2s[mask_transition] = d2P * np.square(dt_dr) + dP * d2t_dr2
+
+        s[mask_outer] = 0.0
+        ds[mask_outer] = 0.0
+        d2s[mask_outer] = 0.0
+
+        q = s * L + (1.0 - s) * R
+        dq_dr = ds * (L - R) + s * dL + (1.0 - s) * dR
+        d2q_dr2 = d2s * (L - R) + 2.0 * ds * (dL - dR) + s * d2L + (1.0 - s) * d2R
+
+        # print("r =", r)
+        # print("x =", x)
+        # print("y =", y)
+        # print("s =", s)
+        # print("ds_dr =", ds)
+        # print("L =", L)
+        # print("R =", R)
+        # print("L-R =", L-R)
+        # print("dq_dr =", dq_dr)
+        if scalar_input:
+            return float(q[0]), float(dq_dr[0]), float(d2q_dr2[0])
+
+        return q, dq_dr, d2q_dr2
 
     def compare_internal_coordinate_value_implementations(self, atol=1.0e-12, rtol=1.0e-10):
         """

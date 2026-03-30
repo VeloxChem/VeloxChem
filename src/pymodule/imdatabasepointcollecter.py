@@ -91,6 +91,10 @@ try:
 except ImportError:
     pass
 
+from .trust_radius_grouping_analysis import (improved_group_by_connected_components, 
+    explain_grouping_result_for_non_experts,
+    TrustRadiusOptimizationAnalyzer,
+    summarize_report_for_console)
 
 def _rank_root_print(*args, **kwargs):
     """
@@ -1702,6 +1706,10 @@ class IMDatabasePointCollecter:
             drv.qm_data_points = self.sampling_qm_data_point_dict[root]
             drv.qm_symmetry_data_points = self.sampling_qm_symmetry_datapoint_dict[root]
             drv.prepare_runtime_data_cache(force=True)
+            
+            if len(self.sampling_qm_data_point_dict[root]) > 0:
+                drv.impes_coordinate.eq_bond_lengths = self.sampling_qm_data_point_dict[root][0].eq_bond_lengths
+            
             self.sampling_impes_drivers[root] = drv
     
     def _reload_interpolation_root_from_hdf5(self, root, inv_sqrt_masses):
@@ -3492,7 +3500,7 @@ class IMDatabasePointCollecter:
                 mean_bond_rmsd = float(np.mean(bond_rmsd_values)) if bond_rmsd_values.size else 0.0
                 mean_angle_rmsd = float(np.mean(angle_rmsd_values)) if angle_rmsd_values.size else 0.0
                 mean_dihedral_rmsd = float(np.mean(dihedral_rmsd_values)) if dihedral_rmsd_values.size else 0.0
-                
+
                 if mean_bond_rmsd > 0.01 or mean_angle_rmsd > 0.01 or mean_dihedral_rmsd > 1.0:
 
                     K = 5  # Number of closest previous matches to cache
@@ -3590,8 +3598,8 @@ class IMDatabasePointCollecter:
                 if self.skipping_value < 0:
                     self.skipping_value = 0
             
-            if self.step % 50 == 0 and self.step > self.collect_qm_points:
-                self.add_a_point = True
+            # if self.step % 50 == 0 and self.step > self.collect_qm_points:
+            #     self.add_a_point = True
             
             # if self.current_state != self.prev_state:
             #     self.add_a_point = True
@@ -4233,6 +4241,7 @@ class IMDatabasePointCollecter:
         if self.add_a_point and self.expansion:
             print('✨ A point is added! ✨', self.point_checker)
             print(molecule.get_xyz_string())
+
             ############# Implement constraint optimization ############
             
             state_specific_molecules = []
@@ -4263,11 +4272,21 @@ class IMDatabasePointCollecter:
                     corr_new_dp_distrib = False
                     # primary_constraint.append([2,3])
                     # primary_constraint = [[2,3]]
-                    main_constraint_list = backup_constraint
+                    # primary_constraint = [(5,9)]
+                    imp_coord_constraint = ranked_block.copy()
+                    main_constraint_list = ranked_block.copy()
                     old_const_len = len(main_constraint_list)
                     opt_results = None
+                    for dihedral in self.root_z_matrix[self.current_state]['dihedrals']:
+                            for rot_bond in self.impes_drivers[state_to_optim].symmetry_information[5]:
+                                if set(sorted([dihedral[1], dihedral[2]])) == set(sorted(list(rot_bond))):
+                                    if dihedral not in main_constraint_list:
+                                        main_constraint_list.append(dihedral)
+                                   
+                    print('Main CONSTRAINTS', main_constraint_list)
+
                     while not corr_new_dp_distrib:
-                        print('CONSTRAINTS', primary_constraint, backup_constraint, ranked_block)
+
                         if state_to_optim == 0 and isinstance(self.drivers['gs'][0], ScfRestrictedDriver) or state_to_optim == 0 and isinstance(self.drivers['gs'][0], ScfUnrestrictedDriver):
                             _, scf_tensors, rsp_results = self._compute_energy_mpi_safe(self.drivers['gs'][0], molecule, current_basis)
         
@@ -4404,7 +4423,8 @@ class IMDatabasePointCollecter:
                             current_basis = MolecularBasis.read(optimized_molecule, current_basis.get_main_basis_label())       
                         
                         imp_int_coord = {'bonds': [], 'angles': [], 'dihedrals': [], 'impropers': []}
-                        for element in main_constraint_list:
+                        for element in imp_coord_constraint:
+                        
                             if element in self.root_z_matrix[self.current_state]['bonds']:
                                 imp_int_coord['bonds'].append(element)
                             elif element in self.root_z_matrix[self.current_state]['angles']:
@@ -4413,7 +4433,7 @@ class IMDatabasePointCollecter:
                                 imp_int_coord['dihedrals'].append(element)
                             elif element in self.root_z_matrix[self.current_state]['impropers']:
                                 imp_int_coord['impropers'].append(element)
-
+                        print(imp_int_coord)
                         # same = False
                         # sum_of_values = 0
                         # old_sorted_shorted = []
@@ -4534,8 +4554,9 @@ class IMDatabasePointCollecter:
                             #         same = True
                         corr_new_dp_distrib = True
                     state_specific_molecules.append((optimized_molecule, current_basis, [state_to_optim], imp_int_coord))
-                    
-                print('New optimized molecule \n', optimized_molecule.get_xyz_string())
+                   
+                    print('New optimized molecule \n', optimized_molecule.get_xyz_string())
+
                 self.add_point(state_specific_molecules, self.non_core_symmetry_groups)
                 self.last_point_added = self.point_checker - 1
                 self.point_checker = 0
@@ -4548,7 +4569,7 @@ class IMDatabasePointCollecter:
                     current_basis = MolecularBasis.read(molecule, self.basis_set_label['gs'])
                 else:
                     current_basis = MolecularBasis.read(molecule, self.basis_set_label['es'])
-                state_specific_molecules.append((molecule, current_basis, addition_of_state_specific_points, []))
+                state_specific_molecules.append((molecule, current_basis, addition_of_state_specific_points, {'bonds': [], 'angles': [], 'dihedrals': [], 'impropers':[]}))
                     
                 
                 self.add_point(state_specific_molecules, self.non_core_symmetry_groups)
@@ -5128,80 +5149,198 @@ class IMDatabasePointCollecter:
 
 
         return D_db, D_ref, D_dpref
+    
+    def _clone_datapoints_with_alphas(self, datapoints, alphas):
+        cloned = [copy.deepcopy(dp) for dp in datapoints]
+        alpha_vec = np.asarray(alphas, dtype=np.float64).reshape(-1)
+        if len(cloned) != alpha_vec.size:
+            raise ValueError(
+                f"Alpha/datapoint size mismatch: n_dp={len(cloned)} vs n_alpha={alpha_vec.size}"
+            )
+        for i, dp in enumerate(cloned):
+            dp.confidence_radius = float(alpha_vec[i])
+        return cloned
+    
+    def _build_interp_driver_for_trust_radius_eval(
+        self,
+        *,
+        z_matrix,
+        interpolation_setting,
+        sym_dict,
+        sym_datapoints,
+        exponent_p_q,
+        datapoints_eval,
+    ):
+        drv = InterpolationDriver(z_matrix)
+        drv.update_settings(interpolation_setting)
+        drv.use_symmetry = bool(sym_datapoints)
+        drv.symmetry_information = sym_dict
+        drv.qm_symmetry_data_points = sym_datapoints
+        drv.distance_thrsh = 1000
+        drv.print = False
+        drv.calc_optim_trust_radius = False
+        drv.exponent_p = exponent_p_q[0]
+        drv.exponent_q = exponent_p_q[1]
 
+        drv.impes_coordinate.eq_bond_lengths = datapoints_eval[0].eq_bond_lengths
 
-    def group_by_connected_components(self, D_db, D_ref, D_dpref, cutoff_distance=3.0):
-        """
-        Groups datapoints and reference points into distinct basins based on a physical 
-        distance threshold, naturally isolating outliers without forcing a cluster count.
-        """
-        n_dp = D_db.shape[0]
-        n_ref = D_ref.shape[0]
-        n_tot = n_dp + n_ref
-        
-        # 1. Assemble the Global Distance Matrix
-        D_global = np.block([
-            [D_db,       D_dpref],
-            [D_dpref.T,  D_ref  ]
-        ])
-        
-        # 2. Construct the Adjacency Matrix (The Graph Edges)
-        # If the distance is less than the cutoff, the nodes share an edge (1). 
-        # Otherwise, the edge is severed (0).
-        adjacency_matrix = (D_global <= cutoff_distance).astype(int)
-        
-        # Remove self-loops
-        np.fill_diagonal(adjacency_matrix, 0)
-        
-        # Convert to sparse matrix for the graph solver
-        graph = csr_matrix(adjacency_matrix)
-        
-        # 3. Solve for Connected Components
-        # This automatically finds exactly how many distinct topological islands exist
-        n_components, labels = connected_components(csgraph=graph, directed=False, return_labels=True)
-        
-        # 4. Extract the Valid Basins
-        ref_global_indices = np.arange(n_dp, n_tot)
-        optimization_groups = []
-        
-        for cluster_id in range(n_components):
-            # Find references in this isolated island
-            refs_in_cluster = [
-                (global_idx - n_dp) for global_idx in ref_global_indices 
-                if labels[global_idx] == cluster_id
-            ]
-            
-            # Only keep islands that actually contain reference points to drive the fit
-            if len(refs_in_cluster) > 0:
-                dps_in_cluster = [
-                    i for i in range(n_dp) 
-                    if labels[i] == cluster_id
-                ]
-                
-                # Only return groups where uncharacterized datapoints actually exist
-                if len(dps_in_cluster) > 0:
-                    optimization_groups.append({
-                        'basin_id': int(cluster_id), # Cast to standard int
-                        'datapoint_indices': dps_in_cluster,
-                        'reference_indices': refs_in_cluster
-                    })
-                    
-        return optimization_groups
+        if len(datapoints_eval) > 0 and hasattr(datapoints_eval[0], "inv_sqrt_masses"):
+            drv.impes_coordinate.inv_sqrt_masses = datapoints_eval[0].inv_sqrt_masses
+        elif getattr(self, "inv_sqrt_masses", None) is not None:
+            drv.impes_coordinate.inv_sqrt_masses = self.inv_sqrt_masses
 
+        if getattr(self, "eq_bond_force_constants", None) is not None:
+            drv.eq_bond_force_constants = self.eq_bond_force_constants
+            drv.impes_coordinate.eq_bond_force_constants = self.eq_bond_force_constants
 
+        drv.qm_data_points = datapoints_eval
+        drv.prepare_runtime_data_cache(force=True)
+        return drv
+    
+    def _evaluate_interpolation_errors_on_reference_set(
+        self,
+        *,
+        scenario_name,
+        molecules,
+        qm_energies,
+        qm_gradients,
+        datapoints_eval,
+        z_matrix,
+        interpolation_setting,
+        sym_dict,
+        sym_datapoints,
+        exponent_p_q,
+    ):
+        if len(molecules) == 0:
+            return {
+                "scenario": scenario_name,
+                "n_dp": int(len(datapoints_eval)),
+                "n_ref": 0,
+                "energy_errors_kcal": [],
+                "gradient_rmsd_kcal_per_mol_A": [],
+                "summary": {
+                    "energy_mae": math.nan,
+                    "energy_rmse": math.nan,
+                    "energy_max_abs": math.nan,
+                    "gradient_mean_rmsd": math.nan,
+                    "gradient_rmse_rmsd": math.nan,
+                    "gradient_max_rmsd": math.nan,
+                },
+            }
+
+        drv = self._build_interp_driver_for_trust_radius_eval(
+            z_matrix=z_matrix,
+            interpolation_setting=interpolation_setting,
+            sym_dict=sym_dict,
+            sym_datapoints=sym_datapoints,
+            exponent_p_q=exponent_p_q,
+            datapoints_eval=datapoints_eval,
+        )
+
+        e_conv = hartree_in_kcalpermol()
+        g_conv = hartree_in_kcalpermol() * bohr_in_angstrom()
+
+        e_err = []
+        g_rmsd = []
+
+        for i, mol in enumerate(molecules):
+            self._interp_compute_root_local_serial(drv, mol)
+            e_im = float(drv.get_energy())
+            g_im = np.asarray(drv.get_gradient(), dtype=np.float64)
+
+            e_qm = float(np.asarray(qm_energies[i], dtype=np.float64).reshape(-1)[0])
+            g_qm = np.asarray(qm_gradients[i], dtype=np.float64)
+
+            de = (e_im - e_qm) * e_conv
+            dg = (g_im - g_qm) * g_conv
+            rmsd = float(np.sqrt(np.mean(dg**2)))
+
+            e_err.append(float(de))
+            g_rmsd.append(rmsd)
+
+        e_arr = np.asarray(e_err, dtype=np.float64)
+        g_arr = np.asarray(g_rmsd, dtype=np.float64)
+
+        return {
+            "scenario": scenario_name,
+            "n_dp": int(len(datapoints_eval)),
+            "n_ref": int(len(molecules)),
+            "energy_errors_kcal": e_arr.tolist(),
+            "gradient_rmsd_kcal_per_mol_A": g_arr.tolist(),
+            "summary": {
+                "energy_mae": float(np.mean(np.abs(e_arr))),
+                "energy_rmse": float(np.sqrt(np.mean(e_arr**2))),
+                "energy_max_abs": float(np.max(np.abs(e_arr))),
+                "gradient_mean_rmsd": float(np.mean(g_arr)),
+                "gradient_rmse_rmsd": float(np.sqrt(np.mean(g_arr**2))),
+                "gradient_max_rmsd": float(np.max(g_arr)),
+            },
+        }
+    
+    def _print_trust_radius_stage_comparison(self, stage_results):
+        order = [
+            "without_last_datapoint",
+            "with_new_datapoint_pre_opt",
+            "with_new_datapoint_post_opt",
+        ]
+        by_name = {row["scenario"]: row for row in stage_results}
+
+        print("[trust-radius-eval] Interpolation comparison on fixed reference set")
+        print(
+            "scenario".ljust(32),
+            "n_dp".rjust(6),
+            "E_MAE".rjust(12),
+            "E_RMSE".rjust(12),
+            "E_MAX".rjust(12),
+            "G_MEAN".rjust(12),
+            "G_RMSE".rjust(12),
+            "G_MAX".rjust(12),
+        )
+
+        for key in order:
+            row = by_name.get(key)
+            if row is None:
+                continue
+            s = row["summary"]
+            print(
+                key.ljust(32),
+                f"{row['n_dp']:6d}",
+                f"{s['energy_mae']:12.5f}",
+                f"{s['energy_rmse']:12.5f}",
+                f"{s['energy_max_abs']:12.5f}",
+                f"{s['gradient_mean_rmsd']:12.5f}",
+                f"{s['gradient_rmse_rmsd']:12.5f}",
+                f"{s['gradient_max_rmsd']:12.5f}",
+            )
+
+        def _delta(a_name, b_name, field):
+            a = by_name.get(a_name, {}).get("summary", {}).get(field, math.nan)
+            b = by_name.get(b_name, {}).get("summary", {}).get(field, math.nan)
+            return b - a
+
+        print(
+            "[trust-radius-eval][delta] pre_opt - without_last:",
+            f"dE_MAE={_delta('without_last_datapoint', 'with_new_datapoint_pre_opt', 'energy_mae'):.6f}",
+            f"dG_MEAN={_delta('without_last_datapoint', 'with_new_datapoint_pre_opt', 'gradient_mean_rmsd'):.6f}",
+        )
+        print(
+            "[trust-radius-eval][delta] post_opt - pre_opt:",
+            f"dE_MAE={_delta('with_new_datapoint_pre_opt', 'with_new_datapoint_post_opt', 'energy_mae'):.6f}",
+            f"dG_MEAN={_delta('with_new_datapoint_pre_opt', 'with_new_datapoint_post_opt', 'gradient_mean_rmsd'):.6f}",
+        )
 
     def determine_trust_radius_gradient(self, molecules, qm_energies, qm_gradients, im_energies, datapoints, interpolation_setting, sym_datapoints, sym_dict, z_matrix, exponent_p_q):
         
-        def optimize_trust_radius(alphas, geom_list, E_ref_list, G_ref_list, E_im_list, dps, impes_dict, sym_datapoints, sym_dict, exponent_p_q):
+        def optimize_trust_radius(alphas, geom_list, E_ref_list, G_ref_list, E_im_list, dps, impes_dict, sym_datapoints, sym_dict, exponent_p_q, basin_id=None):
             """
             Perform the gradient-based optimization to find R*
             that minimizes the sum of squared errors to reference QM energies.
             """
 
-            bounds = [(1e-6, 1.5)] * len(dps)
+            bounds = [(1e-4, 10.5)] * len(dps)
             sample_size = len(geom_list)
 
-            if sample_size < 50:
+            if sample_size < 500:
                 size_label = 'small'
                 n_bh_iter = 10
                 gtol = 1e-4
@@ -5221,37 +5360,200 @@ class IMDatabasePointCollecter:
                 maxiter = 140
 
              
+            # Backward compatible interpretation:
+            # [enabled, mode, init_confidence_radius, e_x]
+            # Older input may provide only three entries; then fall back to idx 2.
+            if isinstance(self.use_opt_confidence_radius, (list, tuple)) and len(self.use_opt_confidence_radius) > 3:
+                energy_weight = float(self.use_opt_confidence_radius[3])
+            else:
+                energy_weight = float(self.use_opt_confidence_radius[2])
+
             opt = AlphaOptimizer(z_matrix, impes_dict, sym_dict, sym_datapoints, dps,
                  geom_list, E_ref_list, G_ref_list, exponent_p_q,
-                 e_x=self.use_opt_confidence_radius[2],
+                 e_x=energy_weight,
                  beta=0.8, n_workers=os.cpu_count())  # pick sensible n_workers
+
+            history = []
+            iter_counter = {"value": 0}
+            basin_label = "?"
+            if basin_id is not None:
+                basin_label = str(int(basin_id))
+
+            def _fmt_float(value):
+                if value is None:
+                    return "nan"
+                try:
+                    v = float(value)
+                except Exception:
+                    return "nan"
+                if not np.isfinite(v):
+                    return "nan"
+                return f"{v:.6e}"
+
+            def _append_history(tag, x, **extra):
+                x_arr = np.asarray(x, dtype=np.float64).reshape(-1)
+                metrics = opt.get_metrics(x_arr, evaluate_if_missing=True)
+                entry = {
+                    "tag": str(tag),
+                    "iteration": int(iter_counter["value"]),
+                    "alphas": x_arr.tolist(),
+                    "loss_total": float(metrics["loss_total"]) if metrics else math.nan,
+                    "loss_energy": float(metrics["loss_energy"]) if metrics else math.nan,
+                    "loss_force": float(metrics["loss_force"]) if metrics else math.nan,
+                }
+                try:
+                    jac = opt.jac(x_arr)
+                    entry["jac_l2"] = float(np.linalg.norm(jac))
+                except Exception:
+                    entry["jac_l2"] = math.nan
+                for key, value in extra.items():
+                    if isinstance(value, (np.floating, float)):
+                        entry[str(key)] = float(value)
+                    elif isinstance(value, (np.integer, int)):
+                        entry[str(key)] = int(value)
+                    elif isinstance(value, (np.bool_, bool)):
+                        entry[str(key)] = bool(value)
+                    else:
+                        entry[str(key)] = value
+                history.append(entry)
+                print(
+                    f"[trust-opt][basin {basin_label}][{entry['tag']}][iter={entry['iteration']}] "
+                    f"L={_fmt_float(entry['loss_total'])} "
+                    f"Le={_fmt_float(entry['loss_energy'])} "
+                    f"Lf={_fmt_float(entry['loss_force'])} "
+                    f"|g|={_fmt_float(entry['jac_l2'])}"
+                )
+
+            def _local_minimizer_callback(xk):
+                iter_counter["value"] += 1
+                _append_history("local_iter", xk)
+
+            def _basinhop_callback(x, f, accept):
+                _append_history(
+                    "basinhop_step",
+                    x,
+                    basinhop_fun=float(f),
+                    basinhop_accept=bool(accept))
+                return False
 
             minimizer_kwargs = {
                 "method": "L-BFGS-B",
                 "jac": opt.jac,
                 "bounds": bounds,
-                "options": {"disp": True, "gtol": gtol, "ftol": ftol, "maxls": 10, "maxiter": maxiter}
+                "callback": _local_minimizer_callback,
+                "options": {"disp": False, "gtol": gtol, "ftol": ftol, "maxls": 10, "maxiter": maxiter}
             }
 
             print(f"Trust-radius optimization regime: {size_label} (S={sample_size}, basinhopping niter={n_bh_iter})")
             try:
+                _append_history("initial", alphas)
                 if n_bh_iter > 0:
-                    res = basinhopping(opt.fun, x0=alphas, minimizer_kwargs=minimizer_kwargs, niter=n_bh_iter)
+                    res = basinhopping(
+                        opt.fun,
+                        x0=alphas,
+                        minimizer_kwargs=minimizer_kwargs,
+                        niter=n_bh_iter,
+                        callback=_basinhop_callback,
+                        disp=False)
                 else:
-                    res = minimize(opt.fun, x0=alphas, jac=opt.jac, method="L-BFGS-B", bounds=bounds, options=minimizer_kwargs["options"])
-                print(res)
+                    res = minimize(
+                        opt.fun,
+                        x0=alphas,
+                        jac=opt.jac,
+                        method="L-BFGS-B",
+                        bounds=bounds,
+                        callback=_local_minimizer_callback,
+                        options=minimizer_kwargs["options"])
+                _append_history("final", res.x)
+                setattr(res, "history", history)
+                setattr(res, "component_summary", opt.get_metrics(res.x, evaluate_if_missing=True))
+                print(
+                    "Trust-radius optimization result:",
+                    f"fun={float(res.fun):.6f}",
+                    f"x={np.asarray(res.x, dtype=np.float64)}")
+                
                 return res
             finally:
                 opt.close()
         
-        inital_alphas = [dp.confidence_radius for dp in datapoints]
+        initial_alphas = np.array(
+            [float(np.asarray(dp.confidence_radius).reshape(-1)[0]) for dp in datapoints],
+            dtype=float
+        )
+        print('INPUT Trust radius', initial_alphas)
 
-        print('INPUT Trust radius', inital_alphas)
+        if isinstance(self.use_opt_confidence_radius, (list, tuple)) and len(self.use_opt_confidence_radius) > 3:
+            energy_weight = float(self.use_opt_confidence_radius[3])
+        else:
+            energy_weight = float(self.use_opt_confidence_radius[2])
 
+        
+        
+        has_last = len(datapoints) >= 2
+        if has_last:
+            dp_wo_last = datapoints[:-1]
+            alphas_wo_last = initial_alphas[:-1]
+        else:
+            dp_wo_last = datapoints
+            alphas_wo_last = initial_alphas
+        
+        
+        stage_results = []
+        
+        # combined = [(molecules[i], qm_energies[i], qm_gradients[i]) for i in range(len(molecules) -1)]
+
+        # rand_comb = random.sample(combined, int(len(molecules)/3))
+        
+        # molecules = [comb[0] for comb in rand_comb]
+        # qm_energies = [comb[1] for comb in rand_comb]
+        # qm_gradients = [comb[2] for comb in rand_comb]
+
+        dp_molecule = Molecule(molecules[0].get_labels(), datapoints[-1].cartesian_coordinates, 'bohr')
+        print('Here is the string', dp_molecule.get_xyz_string())
+
+        dp_eval_a = self._clone_datapoints_with_alphas(dp_wo_last, alphas_wo_last)
+        stage_results.append(
+            self._evaluate_interpolation_errors_on_reference_set(
+                scenario_name="without_last_datapoint",
+                molecules=molecules,
+                qm_energies=qm_energies,
+                qm_gradients=qm_gradients,
+                datapoints_eval=dp_eval_a,
+                z_matrix=z_matrix,
+                interpolation_setting=interpolation_setting,
+                sym_dict=sym_dict,
+                sym_datapoints=sym_datapoints,
+                exponent_p_q=exponent_p_q,
+            )
+        )
+
+        dp_eval_b = self._clone_datapoints_with_alphas(datapoints, initial_alphas)
+        stage_results.append(
+            self._evaluate_interpolation_errors_on_reference_set(
+                scenario_name="with_new_datapoint_pre_opt",
+                molecules=molecules,
+                qm_energies=qm_energies,
+                qm_gradients=qm_gradients,
+                datapoints_eval=dp_eval_b,
+                z_matrix=z_matrix,
+                interpolation_setting=interpolation_setting,
+                sym_dict=sym_dict,
+                sym_datapoints=sym_datapoints,
+                exponent_p_q=exponent_p_q,
+            )
+        )
+        
+        
+        
+        
+        
+        
+        
         D_dp, D_ref, D_dpref = self._build_dp_ref_distance_matrix(datapoints, molecules, sym_dict)
+        
+        # groups = self.group_by_connected_components(D_dp, D_ref, D_dpref)
 
-        groups = self.group_by_connected_components(D_dp, D_ref, D_dpref)
-        print(groups)
+        groups = improved_group_by_connected_components(D_dp, D_ref, D_dpref)
 
         # additional_molecules = []
         # additional_energies = []
@@ -5264,14 +5566,14 @@ class IMDatabasePointCollecter:
         # qm_energies.extend(additional_energies)
         # qm_gradients.extend(additional_gradients)
 
-        final_alphas = np.ones_like(datapoints)
+        final_alphas = initial_alphas.copy()
 
-        for i, dp in enumerate(datapoints):
+        basin_results = []
+        basin_payloads = []
+
+        for group in groups['groups']:
             
-            final_alphas[i] = dp.confidence_radius
-
-        for group in groups:
-
+            print(group)
             dp_mask = group['datapoint_indices']
             ref_mask = group['reference_indices']
             # dp_mask = [i for i in range(len(datapoints))]
@@ -5281,11 +5583,153 @@ class IMDatabasePointCollecter:
             qm_energies_sub = [qm_energies[i] for i in ref_mask]
             qm_gradients_sub = [qm_gradients[i] for i in ref_mask]
             im_energies_sub = [im_energies[i] for i in ref_mask]
+            alphas_sub = [initial_alphas[i] for i in dp_mask]
 
-            trust_radius = optimize_trust_radius(final_alphas[dp_mask], molecules_sub, qm_energies_sub, qm_gradients_sub, im_energies_sub, datapoints_sub, interpolation_setting, sym_datapoints, sym_dict, exponent_p_q)
+            res = optimize_trust_radius(
+                alphas_sub,
+                molecules_sub,
+                qm_energies_sub,
+                qm_gradients_sub,
+                im_energies_sub,
+                datapoints_sub,
+                interpolation_setting,
+                sym_datapoints,
+                sym_dict,
+                exponent_p_q,
+                basin_id=group["basin_id"])
 
-            final_alphas[dp_mask] = trust_radius['x']
-            print('FINAL Trust radius', trust_radius['x'])
+            final_alphas[dp_mask] = res['x']
+            print('FINAL Trust radius', res['x'])
+
+            basin_results.append({
+                "basin_id": group["basin_id"],
+                "n_datapoints": len(group["datapoint_indices"]),
+                "n_references": len(group["reference_indices"]),
+                "result": res,
+            })
+            basin_payloads.append({
+                "basin_id": int(group["basin_id"]),
+                "dp_mask": np.asarray(dp_mask, dtype=int),
+                "molecules_sub": molecules_sub,
+                "qm_energies_sub": qm_energies_sub,
+                "qm_gradients_sub": qm_gradients_sub,
+                "datapoints_sub": datapoints_sub,
+            })
+    
+        sensitivity_optimizers = []
+        objective_fn = None
+        if len(basin_payloads) > 0:
+            n_workers_sens = max(1, min(4, os.cpu_count() or 1))
+            for payload in basin_payloads:
+                sens_opt = AlphaOptimizer(
+                    z_matrix,
+                    interpolation_setting,
+                    sym_dict,
+                    sym_datapoints,
+                    payload["datapoints_sub"],
+                    payload["molecules_sub"],
+                    payload["qm_energies_sub"],
+                    payload["qm_gradients_sub"],
+                    exponent_p_q,
+                    e_x=energy_weight,
+                    beta=0.8,
+                    n_workers=n_workers_sens,
+                    verbose=False,
+                )
+                sensitivity_optimizers.append({
+                    "dp_mask": payload["dp_mask"],
+                    "optimizer": sens_opt,
+                })
+
+            def objective_fn(alpha_global):
+                alpha_vec = np.asarray(alpha_global, dtype=np.float64).reshape(-1)
+                if alpha_vec.size != len(datapoints):
+                    raise ValueError(
+                        f"objective_fn expects alpha size {len(datapoints)}, got {alpha_vec.size}")
+                if len(sensitivity_optimizers) == 0:
+                    return 0.0
+                losses = []
+                for item in sensitivity_optimizers:
+                    sub_alpha = alpha_vec[item["dp_mask"]]
+                    losses.append(float(item["optimizer"].fun(sub_alpha)))
+                return float(np.mean(losses))
+
+        dp_labels = None
+        if (isinstance(getattr(self, 'sorted_state_spec_im_labels', None), dict)
+                and self.current_state in self.sorted_state_spec_im_labels):
+            cand = self.sorted_state_spec_im_labels[self.current_state]
+            if len(cand) == len(datapoints):
+                dp_labels = list(cand)
+
+        analyzer = TrustRadiusOptimizationAnalyzer()
+        try:
+            report = analyzer.analyze(
+                initial_alphas=initial_alphas,
+                final_alphas=final_alphas,
+                groups=groups['groups'],
+                d_dpref=D_dpref,
+                grouping_diagnostics=groups["diagnostics"],
+                basin_optimizer_results=basin_results,
+                datapoint_labels=dp_labels,
+                objective_fn=objective_fn,
+            )
+        finally:
+            for item in sensitivity_optimizers:
+                try:
+                    item["optimizer"].close()
+                except Exception:
+                    pass
+
+        self.last_trust_radius_report = report
+
+        print(summarize_report_for_console(report, top_k=10))
+        print(report["summary"])
+        print(report["problematic_datapoints"][:5])
+        if "basin_optimizer_results" in report:
+            print("Trust-radius basin convergence summary")
+            for basin_entry in report["basin_optimizer_results"]:
+                basin_id = basin_entry.get("basin_id", "?")
+                result_info = basin_entry.get("result", {})
+                history = result_info.get("history", [])
+                comp = result_info.get("component_summary", {})
+
+                loss_start = math.nan
+                loss_end = math.nan
+                if len(history) > 0:
+                    loss_start = float(history[0].get("loss_total", math.nan))
+                    loss_end = float(history[-1].get("loss_total", math.nan))
+
+                print(
+                    f"[trust-opt][basin {basin_id}] "
+                    f"success={result_info.get('success', False)} "
+                    f"nit={result_info.get('nit', -1)} "
+                    f"nfev={result_info.get('nfev', -1)} "
+                    f"hist={len(history)} "
+                    f"L0={loss_start:.6e} "
+                    f"Lf={loss_end:.6e} "
+                    f"Le_f={float(comp.get('loss_energy', math.nan)):.6e} "
+                    f"Lf_f={float(comp.get('loss_force', math.nan)):.6e}"
+                )
+        
+        
+        
+        dp_eval_c = self._clone_datapoints_with_alphas(datapoints, final_alphas)
+        stage_results.append(
+            self._evaluate_interpolation_errors_on_reference_set(
+                scenario_name="with_new_datapoint_post_opt",
+                molecules=molecules,
+                qm_energies=qm_energies,
+                qm_gradients=qm_gradients,
+                datapoints_eval=dp_eval_c,
+                z_matrix=z_matrix,
+                interpolation_setting=interpolation_setting,
+                sym_dict=sym_dict,
+                sym_datapoints=sym_datapoints,
+                exponent_p_q=exponent_p_q,
+            )
+        )
+        
+        self._print_trust_radius_stage_comparison(stage_results)
 
         return final_alphas
     
