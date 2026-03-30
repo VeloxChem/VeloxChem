@@ -197,6 +197,11 @@ class CMolecularBasis
 
     /// @brief Determines number of basis functions with specific angular
     /// momentum in molecular basis.
+    /// @return The number of basis functions.
+    auto number_of_basis_functions() const -> size_t;
+    
+    /// @brief Determines number of basis functions with specific angular
+    /// momentum in molecular basis.
     /// @param angular_momentum The angular momentum of basis functions.
     /// @return The number of basis functions.
     auto number_of_basis_functions(const int angular_momentum) const -> size_t;

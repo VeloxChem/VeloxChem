@@ -350,6 +350,19 @@ CMolecularBasis::atomic_indices(const std::vector<int> &atoms, const int angular
 }
 
 auto
+CMolecularBasis::number_of_basis_functions() const -> size_t
+{
+    size_t nbfs = 0;
+    
+    for (int i = 0; i <= max_angular_momentum(); i++)
+    {
+        nbfs += number_of_basis_functions(i); 
+    }
+    
+    return nbfs;
+}
+
+auto
 CMolecularBasis::number_of_basis_functions(const int angular_momentum) const -> size_t
 {
     return std::accumulate(_indices.begin(), _indices.end(), size_t{0}, [&](const int &sum, const int &i) {
