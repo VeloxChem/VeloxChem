@@ -51,7 +51,11 @@ from. veloxchemlib import hartree_in_kcalpermol, bohr_in_angstrom
 from .errorhandler import assert_msg_critical
 from .inputparser import (parse_input, print_keywords, print_attributes)
 
-from .interpolation_preload_mpi import InterpolationMPIPreloadEngine, StepPacket
+from .interpolation_preload_mpi import (
+    InterpolationMPIPreloadEngine,
+    StepPacket,
+    evaluate_candidate_taylor,
+)
 
 with redirect_stderr(StringIO()) as fg_err:
     import geometric
@@ -207,6 +211,7 @@ class InterpolationDriver():
                     'use_cosine_dihedral':('bool', 'wether to use cosine and sin for the diehdral in the Z-matrix'),
                     'use_tc_weights':('bool', 'weither to use target coustomized weights'),
                     'use_mpi_preload': ('bool', 'enable MPI preload backend for compute_potential'),
+                    'use_symmetry': ('bool', 'enable symmetry-expanded candidate evaluation'),
                 'labels': ('seq_fixed_str', 'the list of QM data point labels'),
             }
         }
@@ -402,6 +407,70 @@ class InterpolationDriver():
             self.dihedral_rmsd.append(float(rmsd_diag.get('dihedral_mean', 0.0)))
 
         return pes, grad, 0.0
+
+    def _use_symmetry_for_label(self, dp_label):
+        sym_list = (self.qm_symmetry_data_points or {}).get(dp_label, [])
+        return bool(self.use_symmetry and len(sym_list) > 1)
+    
+    def _get_datapoint_by_label(self, dp_label):
+        for dp in (self.qm_data_points or []):
+            if getattr(dp, 'point_label', None) == dp_label:
+                return dp
+        raise KeyError(
+            f"InterpolationDriver: datapoint label '{dp_label}' was not found in qm_data_points.")
+
+    def _get_internal_coordinate_partitions(self):
+        """
+        Returns canonical internal-coordinate index partitions.
+
+        Layout:
+            bonds:            [0, bond_end)
+            angles:           [bond_end, angle_end)
+            proper dihedrals: [dihedral_start, dihedral_end)
+            impropers/tail:   [dihedral_end, n_ic)
+        """
+        zmat_dict = getattr(self.impes_coordinate, 'z_matrix_dict', None)
+        if isinstance(zmat_dict, dict):
+            n_bonds = len(zmat_dict.get('bonds', []))
+            n_angles = len(zmat_dict.get('angles', []))
+            n_dihedrals = len(zmat_dict.get('dihedrals', []))
+            dihedral_start = n_bonds + n_angles
+            dihedral_end = dihedral_start + n_dihedrals
+            return {
+                'bond_end': int(n_bonds),
+                'angle_end': int(dihedral_start),
+                'dihedral_start': int(dihedral_start),
+                'dihedral_end': int(dihedral_end),
+            }
+
+        # Fallback for legacy datasets that rely on symmetry metadata.
+        if self.symmetry_information is not None:
+            dihedral_start = int(self.symmetry_information[-1][0])
+            dihedral_end = int(self.symmetry_information[-1][1])
+            return {
+                'bond_end': int(dihedral_start),
+                'angle_end': int(dihedral_start),
+                'dihedral_start': int(dihedral_start),
+                'dihedral_end': int(dihedral_end),
+            }
+
+        n_ic = 0
+        if getattr(self.impes_coordinate, 'z_matrix', None) is not None:
+            n_ic = len(self.impes_coordinate.z_matrix)
+        return {
+            'bond_end': 0,
+            'angle_end': 0,
+            'dihedral_start': 0,
+            'dihedral_end': int(n_ic),
+        }
+
+    def _build_candidates_for_label(self, dp_label):
+        if self._use_symmetry_for_label(dp_label):
+            return self._get_symmetry_task_entries(dp_label)
+        dp = self._get_datapoint_by_label(dp_label)   # from qm_data_points
+        n_ic = len(dp.internal_coordinates_values)
+        ident = np.arange(n_ic, dtype=np.int64)
+        return [(dp, ident, ident)]
 
     def _get_symmetry_task_entries(self, dp_label):
         """
@@ -814,7 +883,7 @@ class InterpolationDriver():
                 distances_and_gradients.append((distance, dihedral_dist, i, denominator, weight_gradient, distance_vec))
 
         elif self.weightfunction_type == 'internal':
-            for i, data_point in enumerate(self.qm_data_points[:2]):
+            for i, data_point in enumerate(self.qm_data_points[:]):
                 if self.external_weights is not None:
                     data_point.confidence_radius = self.external_weights[i]
                 distance, dihedral_dist, denominator, weight_gradient, distance_vec, _, _, dw_da_dx = self.internal_distance(data_point)
@@ -824,7 +893,7 @@ class InterpolationDriver():
                 distances_and_gradients.append((distance, dihedral_dist, i, denominator, weight_gradient, distance_vec))
 
         elif self.weightfunction_type == 'cartesian-hessian':
-            for i, data_point in enumerate(self.qm_data_points[:2]):
+            for i, data_point in enumerate(self.qm_data_points[:]):
                 
                 distance, dihedral_dist, denominator, weight_gradient, distance_vec, _, _, dw_da_dx = self.cartesian_hessian_distance(data_point)
 
@@ -841,7 +910,7 @@ class InterpolationDriver():
                 distances_and_gradients.append((distance, dihedral_dist, i, denominator, weight_gradient, distance_vec))
         
         elif self.weightfunction_type == 'cartesian-hessian-combined':
-            for i, data_point in enumerate(self.qm_data_points[:2]):
+            for i, data_point in enumerate(self.qm_data_points[:]):
                 # if data_point.point_label != "point_3_rinv_dihedral":
                 #     continue
                 distance, dihedral_dist, denominator, weight_gradient, distance_vec, _, _, dw_da_dx = self.cartesian_hessian_combined_distance(data_point)
@@ -1225,7 +1294,19 @@ class InterpolationDriver():
             row indices for periodicity-3 and periodicity-2 contributions.
         """
 
-        dihedral_start = self.symmetry_information[-1][0]
+        bounds = self._get_internal_coordinate_partitions()
+        dihedral_start = bounds['dihedral_start']
+
+        if self.symmetry_information is None or len(self.symmetry_information) <= 7:
+            return {
+                'sym3_keys': (),
+                'sym3_rows': np.array([], dtype=np.int64),
+                'sym3_center_ids': np.array([], dtype=np.int64),
+                'sym2_rows': np.array([], dtype=np.int64),
+                'dihedral_start': int(bounds['dihedral_start']),
+                'dihedral_end': int(bounds['dihedral_end']),
+            }
+
         sym3_keys = tuple(self.symmetry_information[7][3].keys())
         sym3_key_to_idx = {key: idx for idx, key in enumerate(sym3_keys)}
         sym2_set = {tuple(sorted(entry)) for entry in self.symmetry_information[7][2]}
@@ -1247,6 +1328,8 @@ class InterpolationDriver():
             'sym3_rows': np.asarray(sym3_rows, dtype=np.int64),
             'sym3_center_ids': np.asarray(sym3_center_ids, dtype=np.int64),
             'sym2_rows': np.asarray(sym2_rows, dtype=np.int64),
+            'dihedral_start': int(bounds['dihedral_start']),
+            'dihedral_end': int(bounds['dihedral_end']),
         }
     
     def _build_symmetry_phase_candidates(self, dp_label, torsion_meta):
@@ -1547,6 +1630,11 @@ class InterpolationDriver():
         
         symmetry_data_points = (self.qm_symmetry_data_points or {}).get(dp_label, [])
         use_symmetry_branch = (len(symmetry_data_points) > 1 and self.use_symmetry)
+        bounds = self._get_internal_coordinate_partitions()
+        bond_end = int(bounds['bond_end'])
+        angle_end = int(bounds['angle_end'])
+        dihedral_start = int(bounds['dihedral_start'])
+        dihedral_end = int(bounds['dihedral_end'])
 
         symmetry_task_entries = ()
         if use_symmetry_branch:
@@ -1565,10 +1653,6 @@ class InterpolationDriver():
 
             r_cut = 1.5
             torsion_meta = self._get_symmetry_torsion_meta()
-
-
-            dihedral_start = self.symmetry_information[-1][0]
-            dihedral_end = self.symmetry_information[-1][1]
             b_matrix = self.impes_coordinate.b_matrix
 
             # # Current full methyl-rotor phases
@@ -1617,40 +1701,28 @@ class InterpolationDriver():
                 candidate_labels.append((symmetry_data_point.point_label, tuple(mask)))
                 # candidate_phase_vectors.append(candidate_full_phases)
 
-                # reshuffle derivatives
-                grad = symmetry_data_point.internal_gradient.copy()
-                grad[mask0] = grad[mask]
-
-                hessian = symmetry_data_point.internal_hessian.copy()
-                hessian[np.ix_(mask0, mask0)] = hessian[np.ix_(mask, mask)]
-
-                dist_org = org_int_coords.copy() - symmetry_data_point.internal_coordinates_values[mask]
-                dist_check = org_int_coords.copy() - symmetry_data_point.internal_coordinates_values[mask]
-                dist_correlation = org_int_coords.copy() - symmetry_data_point.internal_coordinates_values[mask]
-
-                if not self.use_cosine_dihedral:
-                    dist_check[dihedral_start:dihedral_end] = np.sin(dist_org[dihedral_start:dihedral_end])
-
-                dist_correlation[dihedral_start:dihedral_end] = dist_check[dihedral_start:dihedral_end]
-
-                # (
-                #     sum_sym_3_dihedral_cos,
-                #     sum_sym_3_dihedral_prime_cos
-                # ) = self._vectorized_symmetry_dihedral_terms(
-                #     dist_org,
-                #     dist_correlation,
-                #     b_matrix,
-                #     torsion_meta
-                # )
+                pes_i, pes_prime_i, dist_org, dist_correlation = evaluate_candidate_taylor(
+                    energy=energy,
+                    grad=symmetry_data_point.internal_gradient,
+                    hess=symmetry_data_point.internal_hessian,
+                    ref_coords=symmetry_data_point.internal_coordinates_values,
+                    mask0=mask0,
+                    mask=mask,
+                    org_int_coords=org_int_coords,
+                    b_matrix=b_matrix,
+                    use_cosine_dihedral=bool(self.use_cosine_dihedral),
+                    dihedral_start=dihedral_start,
+                    dihedral_end=dihedral_end,
+                )
 
                 self.bond_rmsd.append(
-                    np.sqrt(np.mean(np.sum((dist_org[:self.symmetry_information[-1][0]])**2)))
+                    np.sqrt(np.mean(np.sum((dist_org[:bond_end])**2)))
                 )
                 self.angle_rmsd.append(
-                    np.sqrt(np.mean(np.sum(dist_org[self.symmetry_information[-1][0]:self.symmetry_information[-1][1]]**2)))
+                    np.sqrt(np.mean(np.sum(dist_org[bond_end:angle_end]**2)))
                 )
                 self.dihedral_rmsd.append(
-                    np.sqrt(np.mean(np.sum(dist_correlation[self.symmetry_information[-1][1]:]**2)))
+                    np.sqrt(np.mean(np.sum(dist_correlation[dihedral_start:dihedral_end]**2)))
                 )
 
                 # current local support factor from your symmetry dihedral terms
@@ -1683,22 +1755,7 @@ class InterpolationDriver():
                 # symmetry_weights_local.append(W_local)
                 # symmetry_weight_gradients_local.append(grad_W_local)
 
-                # Taylor model
-                pes_i = (
-                    energy
-                    + np.matmul(dist_check.T, grad)
-                    + 0.5 * np.linalg.multi_dot([dist_check.T, hessian, dist_check])
-                )
                 potentials.append(pes_i)
-
-                dist_hessian = np.matmul(dist_check.T, hessian)
-
-                if not self.use_cosine_dihedral:
-                    cos_dist = np.cos(dist_org[dihedral_start:dihedral_end])
-                    grad[dihedral_start:dihedral_end] *= cos_dist
-                    dist_hessian[dihedral_start:dihedral_end] *= cos_dist
-
-                pes_prime_i = np.matmul(b_matrix.T, (grad + dist_hessian)).reshape(natm, 3)
                 pot_gradients.append(pes_prime_i)
 
             # ----------------------------------------
@@ -1816,16 +1873,14 @@ class InterpolationDriver():
             dist_org = (org_int_coords.copy() - data_point.internal_coordinates_values)
             dist_check = (org_int_coords.copy() - data_point.internal_coordinates_values)
 
-            dihedral_start = self.symmetry_information[-1][0]
-            dihedral_end = self.symmetry_information[-1][1]
             if not self.use_cosine_dihedral:
                 dist_check[dihedral_start:dihedral_end] = np.sin(dist_org[dihedral_start:dihedral_end])
             
     
             # print(data_point.point_label, dist_check[dihedral_start:], np.max(hessian[dihedral_start:, dihedral_start:]))
 
-            self.bond_rmsd.append(np.sqrt(np.mean(np.sum((dist_org[:self.symmetry_information[-1][0]])**2))))
-            self.angle_rmsd.append(np.sqrt(np.mean(np.sum(dist_org[self.symmetry_information[-1][0]:dihedral_start]**2))))
+            self.bond_rmsd.append(np.sqrt(np.mean(np.sum((dist_org[:bond_end])**2))))
+            self.angle_rmsd.append(np.sqrt(np.mean(np.sum(dist_org[bond_end:angle_end]**2))))
             self.dihedral_rmsd.append(np.sqrt(np.mean(np.sum(dist_check[dihedral_start:dihedral_end]**2))))
 
             pes = (
@@ -3456,9 +3511,8 @@ class InterpolationDriver():
         
 
         return distance, dihedral_dist, denominator, weight_gradient_full, distance_vector, grad_s, dw_dalpha_i, dw_dX_dalpha_i
-    
-    
-    
+
+
     def determine_important_internal_coordinates(
         self,
         qm_energy,
@@ -3466,32 +3520,34 @@ class InterpolationDriver():
         molecule,
         z_matrix,
         datapoints,
-        dihedral_diff_const: bool = True,
+        dihedral_diff_const: bool = True,  # kept only for API compatibility
     ):
         """
-        New acquisition-oriented selection scheme.
+        Error-source-focused selection scheme.
 
-        Main idea:
+        Philosophy
         ----------
-        1) Diagnose each important datapoint locally.
-        2) Build per-coordinate scores from:
-            - hybrid relevance score
-            - source displacement score
-            - error score
-            - causal source score
-        3) Aggregate across important datapoints.
-        4) Build coupled candidate blocks instead of selecting only one coordinate.
-        5) Rank blocks using:
-            - coordinate score
-            - pair/coupling score
-            - support across datapoints
-            - novelty / redundancy penalty
-        6) Return:
-            - primary_constraint: best anchor coordinate
-            - candidate_constraints: coordinates in the best block
-            - ranked_blocks: rich metadata for downstream use
-        """
+        This version explicitly separates three questions:
 
+        1) Where does the local model fail?
+        -> response score from |g_qm - g_model|
+
+        2) Which displaced coordinates drive that failure?
+        -> source blame score from a leave-one-source-out test
+
+        3) Which coordinates should be constrained together?
+        -> build local coupled blocks from a blame-derived pair graph
+
+        Proper dihedrals:
+            wrapped and represented with dq_eff = sin(dq_raw), chain = cos(dq_raw)
+
+        Impropers:
+            wrapped to principal interval if needed, but kept linear:
+            dq_eff = dq_raw, chain = 1
+
+        No novelty bonuses are used here.
+        No torsion exploration bonuses are used here.
+        """
         # ------------------------------------------------------------------
         # Hyperparameters
         # ------------------------------------------------------------------
@@ -3500,57 +3556,47 @@ class InterpolationDriver():
         coverage_mass = 0.80
         topk = None
 
-        rho_cap = 5.0
-        alpha_trust = 0.4
-        use_hybrid_score = True
+        # final global score = source + response + support - helpful
+        w_source = 0.60
+        w_response = 0.30
+        w_support = 0.10
+        helpful_penalty = 0.15
 
-        # Aggregation weights for coordinate-level global score
-        w_hybrid = 0.45
-        w_source = 0.10
-        w_error = 0.20
-        w_causal = 0.25
+        # local support
+        support_top_frac = 0.20
 
-        # Build blocks
+        # block construction / ranking
         max_anchor_candidates = 8
         max_block_partners = 4
-        min_partner_pair_frac = 0.15      # partner pair-score relative to best partner
-        min_partner_coord_frac = 0.20     # partner coord-score relative to anchor
-
-        # Block ranking
+        min_partner_pair_frac = 0.15
+        min_partner_coord_frac = 0.20
         pair_weight = 0.35
-        support_weight = 0.40
+        support_weight = 0.25
 
-        novelty_sigma = 0.20              # subspace-distance scale (tune)
-        support_top_frac = 0.20           # top fraction in a datapoint to count "support"
-        top_err_for_causal = 4
-        top_src_per_err = 8
-
-
-        novelty_weight = 0.4          # stronger than before, but not dominant
-        redundancy_weight = 0.55       # softer penalty than before
-
-        # extra preference for torsional exploration
-        dihedral_anchor_bonus = 0.35
-        dihedral_in_block_bonus = 0.20
-        dihedral_novelty_bonus = 0.40
-
-        # automatic constraint selection
-        max_constraints_to_return = int(len(self.molecule.get_labels()) / 3)
-        dihedral_score_frac = 0.20     # torsion considered relevant if >= 35% of top block coord score
-        secondary_score_frac = 0.20    # secondary constraints should be meaningful
-
+        # final selection from best block
+        max_constraints_to_return = max(1, int(len(molecule.get_labels()) / 3))
+        singleton_dominance = 1.35
+        singleton_source_frac = 0.85
+        singleton_response_frac = 0.85
+        secondary_score_frac = 0.25
+        min_secondary_pair_frac = 0.15
 
         eps = 1e-12
+
+        coords_flat, kinds_flat = self._flatten_internal_coordinates(z_matrix)
+        N = len(coords_flat)
+
+        if N == 0:
+            return [], [], []
 
         constraints_to_exclude = []
         per_dp_results = []
 
         # ------------------------------------------------------------------
-        # Exclude near-linear angles from being chosen as direct constraints
+        # Exclude near-linear angles from direct constraint selection
+        # (but they still remain in diagnostics)
         # ------------------------------------------------------------------
-        z_matrix_array = z_matrix['bonds'] + z_matrix['angles'] + z_matrix['dihedrals'] + z_matrix['impropers']
-        for element in self.z_matrix['angles']:
-
+        for element in z_matrix.get("angles", []):
             current_angle = molecule.get_angle_in_degrees(
                 (element[0] + 1, element[1] + 1, element[2] + 1)
             )
@@ -3563,18 +3609,13 @@ class InterpolationDriver():
         qm_gradient_mw = qm_gradient.reshape(-1) * sqrt_masses
 
         q_current = np.asarray(self.impes_coordinate.internal_coordinates_values, dtype=float)
-        N = len(z_matrix['bonds']) + len(z_matrix['angles']) + len(z_matrix['dihedrals']) + len(z_matrix['impropers'])
-
-        global_coord_novelty = np.zeros(N, dtype=float)
 
         # ------------------------------------------------------------------
         # Per-datapoint diagnostic pass
         # ------------------------------------------------------------------
         for datapoint, total_weight_contribution in datapoints:
-
             q_dp = np.asarray(datapoint.internal_coordinates_values, dtype=float)
 
-            # raw and effective internal differences
             dq_raw, dq_eff, chain = self._compute_internal_differences(
                 q_current=q_current,
                 q_ref=q_dp,
@@ -3582,10 +3623,10 @@ class InterpolationDriver():
                 symmetry_information=self.symmetry_information,
             )
 
-            # model and qm gradients in internal coordinates
             pred_E, pred_G_mw, _ = self.compute_potential(
                 datapoint, self.impes_coordinate.internal_coordinates_values
             )
+
             pred_im_G_int = self.transform_gradient_to_internal_coordinates(
                 molecule, pred_G_mw, self.impes_coordinate.b_matrix
             )
@@ -3593,106 +3634,30 @@ class InterpolationDriver():
                 molecule, qm_gradient_mw.reshape(qm_gradient.shape), self.impes_coordinate.b_matrix
             )
 
-            coord_novelty_local_abs = self._compute_acquisition_novelty(
-                dq_raw=dq_raw,
-                z_matrix=z_matrix,
-            )
-            coord_novelty_local_rel = self._normalize_nonnegative(coord_novelty_local_abs)
-
-            # local diagnostic without printing
             diag_result = self.compute_internal_gradient_diagnostics(
                 z_matrix=z_matrix,
                 dq_raw=dq_raw,
-                H=datapoint.internal_hessian,
-                g0=datapoint.internal_gradient,
-                g_qm=pred_qm_G_int,
-            )
-
-            rho = np.asarray(diag_result["rho"], dtype=float)
-            abs_delta_g_err = np.abs(np.asarray(diag_result["delta_g_err"], dtype=float))
-            abs_dq = np.abs(np.asarray(diag_result["dq_eff"], dtype=float))
-            abs_Hdq = np.abs(np.asarray(diag_result["Hdq"], dtype=float))
-
-            # bounded trust factor in [0,1)
-            rho_capped = np.minimum(rho, rho_cap)
-            trust_factor = rho_capped / (1.0 + rho_capped)
-
-            # --------------------------------------------------------------
-            # Your existing combined energy/gradient local importance score
-            # --------------------------------------------------------------
-            delta_E = abs(qm_energy - pred_E)
-            delta_G = np.linalg.norm(pred_qm_G_int - pred_im_G_int)
-            delta_g = pred_qm_G_int - pred_im_G_int
-
-            partial_energies, partial_gradient = self._compute_partial_taylor_contributions(
-                dq_eff=dq_eff,
-                chain=chain,
                 H=np.asarray(datapoint.internal_hessian, dtype=float),
                 g0=np.asarray(datapoint.internal_gradient, dtype=float),
+                g_qm=np.asarray(pred_qm_G_int, dtype=float),
             )
 
-            abs_pE = np.abs(partial_energies)
-            abs_work = np.abs(delta_g) * np.abs(dq_eff)
-            w_E_raw = abs_pE * abs_work
-            w_E = w_E_raw / (w_E_raw.sum() + eps)
-            e_i = delta_E * w_E
+            response_score = np.asarray(diag_result["response_score"], dtype=float)
+            source_blame_score = np.asarray(diag_result["source_blame_score"], dtype=float)
+            helpful_source_score = np.asarray(diag_result["helpful_source_score"], dtype=float)
+            pair_score = np.asarray(diag_result["pair_score"], dtype=float)
+            rho = np.asarray(diag_result["rho"], dtype=float)
 
-            abs_pG = np.abs(partial_gradient)
-            sum_abs_pG = abs_pG.sum()
-            if sum_abs_pG < eps:
-                w_G = np.zeros_like(abs_pG)
-                g_i = np.zeros_like(abs_pG)
-            else:
-                w_G = abs_pG / (sum_abs_pG + eps)
-                g_i = delta_G * w_G
-
-            E_kcal = e_i * hartree_in_kcalpermol()
-
-            L_ref = 0.1
-            G_as_energy = g_i * L_ref
-            G_kcal = G_as_energy * hartree_in_kcalpermol()
-
-            lambda_grad = 0.5
-            score_i_kcal = (1.0 - lambda_grad) * E_kcal + lambda_grad * G_kcal
-            score_i_kcal = np.maximum(score_i_kcal, 0.0)
-
-            w_tot = score_i_kcal / (score_i_kcal.sum() + eps)
-
-            if use_hybrid_score:
-                hybrid_score = w_tot * (alpha_trust + (1.0 - alpha_trust) * (1.0 - trust_factor))
-            else:
-                hybrid_score = w_tot.copy()
-
-            hybrid_score = self._normalize_nonnegative(hybrid_score)
-
-            # --------------------------------------------------------------
-            # Additional explicit source / error / causal scores
-            # --------------------------------------------------------------
-            source_score = self._normalize_nonnegative(abs_dq)
-            error_score = self._normalize_nonnegative(abs_delta_g_err)
-
-            causal_score, pair_score = self._compute_causal_scores(
-                z_matrix=z_matrix,
-                dq_eff=dq_eff,
-                H=np.asarray(datapoint.internal_hessian, dtype=float),
-                abs_err=abs_delta_g_err,
-                top_err=top_err_for_causal,
-                top_src=top_src_per_err,
+            # local ranking used only for support counting
+            local_coord_score = self._normalize_nonnegative(
+                0.65 * source_blame_score + 0.35 * response_score
             )
 
-            # support mask: which coordinates are in the top part for this datapoint?
-            dp_coord_score = (
-                w_hybrid * hybrid_score
-                + w_source * source_score
-                + w_error * error_score
-                + w_causal * causal_score
-            )
-            dp_coord_score = self._normalize_nonnegative(dp_coord_score)
-
-            order_dp = np.argsort(-dp_coord_score)
-            k_support = max(1, int(np.ceil(support_top_frac * N)))
             support_mask = np.zeros(N, dtype=float)
-            support_mask[order_dp[:k_support]] = 1.0
+            if local_coord_score.sum() > eps:
+                order_dp = np.argsort(-local_coord_score)
+                k_support = max(1, int(np.ceil(support_top_frac * N)))
+                support_mask[order_dp[:k_support]] = 1.0
 
             per_dp_results.append({
                 "datapoint": datapoint,
@@ -3701,19 +3666,14 @@ class InterpolationDriver():
                 "dq_eff": dq_eff.copy(),
                 "chain": chain.copy(),
                 "rho": rho.copy(),
-                "hybrid_score": hybrid_score.copy(),
-                "source_score": source_score.copy(),
-                "error_score": error_score.copy(),
-                "causal_score": causal_score.copy(),
+                "response_score": response_score.copy(),
+                "source_blame_score": source_blame_score.copy(),
+                "helpful_source_score": helpful_source_score.copy(),
                 "pair_score": pair_score.copy(),
-                "coord_score": dp_coord_score.copy(),
+                "local_coord_score": local_coord_score.copy(),
                 "support_mask": support_mask.copy(),
-                "coord_novelty_local_abs": coord_novelty_local_abs.copy(),
-                "coord_novelty_local_rel": coord_novelty_local_rel.copy(),
-                "coords": [tuple(int(x) for x in c) for key in z_matrix.keys() for c in z_matrix[key]],
+                "rows": diag_result["rows"],
             })
-
-            
 
         if not per_dp_results:
             return [], [], []
@@ -3740,48 +3700,44 @@ class InterpolationDriver():
             keep_indices = np.append(keep_indices, next_idx)
 
         # ------------------------------------------------------------------
-        # Aggregate coordinate-level and pair-level information
+        # Aggregate global response/source/pair information
         # ------------------------------------------------------------------
-        global_hybrid = np.zeros(N, dtype=float)
-        global_source = np.zeros(N, dtype=float)
-        global_error = np.zeros(N, dtype=float)
-        global_causal = np.zeros(N, dtype=float)
+        global_response = np.zeros(N, dtype=float)
+        global_source_blame = np.zeros(N, dtype=float)
+        global_helpful = np.zeros(N, dtype=float)
         global_support = np.zeros(N, dtype=float)
         global_rho = np.zeros(N, dtype=float)
         global_pair = np.zeros((N, N), dtype=float)
-        global_coord_novelty_abs = np.zeros(N, dtype=float)
-        global_coord_novelty_rel = np.zeros(N, dtype=float)
-
 
         for idx in keep_indices:
             wk = dp_weights[idx]
             r = per_dp_results[idx]
 
-            global_hybrid += wk * r["hybrid_score"]
-            global_source += wk * r["source_score"]
-            global_error += wk * r["error_score"]
-            global_causal += wk * r["causal_score"]
+            global_response += wk * r["response_score"]
+            global_source_blame += wk * r["source_blame_score"]
+            global_helpful += wk * r["helpful_source_score"]
             global_support += wk * r["support_mask"]
             global_rho += wk * r["rho"]
             global_pair += wk * r["pair_score"]
-            
-            global_coord_novelty_abs += wk * r["coord_novelty_local_abs"]
-            global_coord_novelty_rel += wk * r["coord_novelty_local_rel"]
 
-        global_hybrid = self._normalize_nonnegative(global_hybrid)
-        global_source = self._normalize_nonnegative(global_source)
-        global_error = self._normalize_nonnegative(global_error)
-        global_causal = self._normalize_nonnegative(global_causal)
-        global_coord_novelty_rel = self._normalize_nonnegative(global_coord_novelty_rel)
-        global_support = global_support / (global_support.max() + eps)
+        global_response = self._normalize_nonnegative(global_response)
+        global_source_blame = self._normalize_nonnegative(global_source_blame)
+        global_helpful = self._normalize_nonnegative(global_helpful)
 
-        global_coord_score = (
-            w_hybrid * global_hybrid
-            + w_source * global_source
-            + w_error * global_error
-            + w_causal * global_causal
+        if global_support.max() > eps:
+            global_support = global_support / (global_support.max() + eps)
+
+        if np.max(global_pair) > eps:
+            global_pair = global_pair / (np.max(global_pair) + eps)
+
+        raw_global_score = (
+            w_source * global_source_blame
+            + w_response * global_response
+            + w_support * global_support
+            - helpful_penalty * global_helpful
         )
-        global_coord_score = self._normalize_nonnegative(global_coord_score)
+        raw_global_score = np.maximum(raw_global_score, 0.0)
+        global_coord_score = self._normalize_nonnegative(raw_global_score)
 
         # ------------------------------------------------------------------
         # Select anchor coordinates according to the chosen rule
@@ -3819,25 +3775,22 @@ class InterpolationDriver():
 
         candidate_anchor_indices = [int(sorted_idx[pos]) for pos in selected_pos]
         candidate_anchor_indices = candidate_anchor_indices[:max_anchor_candidates]
-        
 
         # ------------------------------------------------------------------
-        # Build and rank coupled blocks
+        # Build and rank coupled repair blocks
         # ------------------------------------------------------------------
         ranked_blocks = []
         seen_blocks = set()
 
         for anchor_idx in candidate_anchor_indices:
-            anchor_coord = tuple(int(x) for x in z_matrix_array[anchor_idx])
+            anchor_coord = tuple(int(x) for x in coords_flat[anchor_idx])
 
-            # skip excluded anchors
             if anchor_coord in constraints_to_exclude:
                 continue
 
-            # For symmetric torsions excluded upstream, also skip as anchors
             if (
-                len(anchor_coord) == 4
-                and anchor_coord[1:3] in self.symmetry_information[7][3]
+                kinds_flat[anchor_idx] == "dihedral"
+                and tuple(anchor_coord[1:3]) in self._get_symmetric_dihedral_centers(self.symmetry_information)
             ):
                 continue
 
@@ -3845,7 +3798,8 @@ class InterpolationDriver():
                 anchor_idx=anchor_idx,
                 global_coord_score=global_coord_score,
                 global_pair=global_pair,
-                z_matrix=z_matrix_array,
+                z_matrix=coords_flat,
+                coord_kinds=kinds_flat,
                 constraints_to_exclude=constraints_to_exclude,
                 max_partners=max_block_partners,
                 min_partner_pair_frac=min_partner_pair_frac,
@@ -3858,8 +3812,7 @@ class InterpolationDriver():
             seen_blocks.add(key)
 
             coord_mass = float(np.sum(global_coord_score[block_indices]))
-            support_mass = float(np.mean(global_support[block_indices]))
-            coord_novelty_mass = float(np.sum(global_coord_novelty_abs[block_indices]))
+            support_mass = float(np.mean(global_support[block_indices])) if block_indices else 0.0
 
             pair_mass = 0.0
             for a in range(len(block_indices)):
@@ -3868,620 +3821,140 @@ class InterpolationDriver():
                     j = block_indices[b]
                     pair_mass += global_pair[i, j]
 
-            dmin = self._min_block_distance_to_existing_datapoints(
-                block_indices=block_indices,
-                q_current=q_current,
-                datapoints=[r["datapoint"] for r in per_dp_results],
-                z_matrix=z_matrix,
-                symmetry_information=self.symmetry_information,
-            )
+            acq_score = coord_mass + pair_weight * pair_mass + support_weight * support_mass
 
-            novelty = dmin / (dmin + novelty_sigma + eps)
-            redundancy = np.exp(- (dmin / (novelty_sigma + eps)) ** 2)
-
-            # --- type-aware torsion preference ---
-            anchor_type = self.coord_type(anchor_coord)
-        
-            dihedral_indices_in_block = [
-                i for i in block_indices
-                if self.coord_type(tuple(int(x) for x in z_matrix_array[i])) == "dihedral"
-            ]
-            print('dihedral indices: ', z_matrix_array, dihedral_indices_in_block)
-          
-            dihedral_bonus = 0.0
-
-            if anchor_type == "dihedral":
-                dihedral_bonus += dihedral_anchor_bonus
-
-            if dihedral_indices_in_block:
-                dihedral_bonus += dihedral_in_block_bonus
-
-                # reward torsional novelty specifically
-                torsion_novelty = float(np.sum(global_coord_novelty_abs[dihedral_indices_in_block]))
-                dihedral_bonus += dihedral_novelty_bonus * torsion_novelty
-
-            # --- repair and explore split ---
-            repair_score = (
-                coord_mass
-                + pair_weight * pair_mass
-            ) * (
-                1.0 + support_weight * support_mass
-            )
-
-            explore_score = (
-                1.0 + novelty_weight * novelty
-                + 0.5 * novelty_weight * coord_novelty_mass
-            ) * (
-                1.0 - redundancy_weight * redundancy
-            )
-
-            acq_score = repair_score * explore_score * (1.0 + dihedral_bonus)
-
-            block_coords = [tuple(int(x) for x in z_matrix_array[i]) for i in block_indices]
+            block_coords = [tuple(int(x) for x in coords_flat[i]) for i in block_indices]
+            block_types = [kinds_flat[i] for i in block_indices]
 
             ranked_blocks.append({
                 "anchor_idx": int(anchor_idx),
                 "anchor_coord": anchor_coord,
-                "anchor_type": self.coord_type(anchor_coord),
+                "anchor_type": kinds_flat[anchor_idx],
                 "block_indices": [int(i) for i in block_indices],
                 "block_coords": block_coords,
+                "block_types": block_types,
                 "coord_mass": float(coord_mass),
                 "pair_mass": float(pair_mass),
                 "support_mass": float(support_mass),
-                "dmin": float(dmin),
-                "novelty": float(novelty),
-                "redundancy": float(redundancy),
                 "acq_score": float(acq_score),
             })
 
         ranked_blocks = sorted(ranked_blocks, key=lambda x: x["acq_score"], reverse=True)
-        
+
         if not ranked_blocks:
             return [], [], []
-        
-        ranked_torsions = self._rank_torsion_exploration_candidates(
-            z_matrix=z_matrix_array,
+
+        best_block = ranked_blocks[0]
+
+        candidate_constraints, primary_constraint = self._select_constraints_from_block(
+            block_indices=best_block["block_indices"],
             global_coord_score=global_coord_score,
-            global_support=global_support,
-            global_torsion_novelty=global_coord_novelty_abs,
-            global_source=global_source,
-            constraints_to_exclude=constraints_to_exclude,
-            top_n=10,
-        )
-        best_repair_block = ranked_blocks[0]
-
-        selection_mode, chosen_torsion = self._choose_repair_vs_exploration(
-            best_repair_block=best_repair_block,
-            ranked_torsions=ranked_torsions,
-            global_coord_score=global_coord_score,
-            torsion_novelty_threshold=0.20,
-            exploration_competitiveness=0.55,
-        )
-
-
-        # ------------------------------------------------------------------
-        # Best block -> primary constraint and candidate constraints
-        # ------------------------------------------------------------------
-        if selection_mode == "exploration":
-            torsion_idx = chosen_torsion["idx"]
-
-            exploration_block_indices = self._build_local_block_around_torsion(
-                torsion_idx=torsion_idx,
-                global_coord_score=global_coord_score,
-                global_pair=global_pair,
-                z_matrix=z_matrix_array,
-                max_neighbors=max_constraints_to_return - 1,
-                min_pair_frac=0.10,
-                min_score_frac=0.15,
-            )
-
-            selected_constraints, primary_constraint = self._select_constraints_for_torsion_block(
-                torsion_idx=torsion_idx,
-                block_indices=exploration_block_indices,
-                global_coord_score=global_coord_score,
-                global_torsion_novelty=global_coord_novelty_abs,
-                z_matrix=z_matrix_array,
-                max_constraints=max_constraints_to_return,
-            )
-
-            candidate_constraints = selected_constraints
-            best_block = {
-                "anchor_idx": torsion_idx,
-                "anchor_coord": tuple(int(x) for x in z_matrix_array[torsion_idx]),
-                "anchor_type": "dihedral",
-                "block_indices": exploration_block_indices,
-                "block_coords": [tuple(int(x) for x in z_matrix_array[i]) for i in exploration_block_indices],
-                "coord_mass": float(np.sum(global_coord_score[exploration_block_indices])),
-                "pair_mass": float(np.sum([
-                    global_pair[i, j]
-                    for a, i in enumerate(exploration_block_indices)
-                    for j in exploration_block_indices[a+1:]
-                ])),
-                "support_mass": float(np.mean(global_support[exploration_block_indices])),
-                "dmin": self._min_block_distance_to_existing_datapoints(
-                    block_indices=exploration_block_indices,
-                    q_current=q_current,
-                    datapoints=[r["datapoint"] for r in per_dp_results],
-                    z_matrix=z_matrix,
-                    symmetry_information=self.symmetry_information,
-                ),
-                "novelty": float(chosen_torsion["novelty"]),
-                "redundancy": 0.0,
-                "acq_score": float(chosen_torsion["explore_score"]),
-            }
-
-        else:
-            best_block = best_repair_block
-
-            selected_constraints, primary_constraint = self._select_constraints_from_block(
-                block_indices=best_block["block_indices"],
-                global_coord_score=global_coord_score,
-                global_coord_novelty=global_coord_novelty_abs,
-                z_matrix=z_matrix_array,
-                max_constraints=max_constraints_to_return,
-                dihedral_score_frac=dihedral_score_frac,
-                secondary_score_frac=secondary_score_frac,
-            )
-
-            candidate_constraints = selected_constraints
-
-        candidate_constraints = self._augment_constraints_with_high_exploration_torsions(
-            candidate_constraints=candidate_constraints,
-            ranked_torsions=ranked_torsions,
-            exploration_include_threshold=0.30,
+            global_source_blame=global_source_blame,
+            global_response_score=global_response,
+            global_pair=global_pair,
+            z_matrix=coords_flat,
+            coord_kinds=kinds_flat,
             max_constraints=max_constraints_to_return,
+            singleton_dominance=singleton_dominance,
+            singleton_source_frac=singleton_source_frac,
+            singleton_response_frac=singleton_response_frac,
+            secondary_score_frac=secondary_score_frac,
+            min_secondary_pair_frac=min_secondary_pair_frac,
         )
 
         # ------------------------------------------------------------------
         # Debug printout
         # ------------------------------------------------------------------
-        print("\n=== Global coordinate scores ===")
-        print(f"{'rank':>4} {'idx':>4} {'type':>9} {'coord':>18} "
-            f"{'score':>12} {'support':>12} {'rho':>12}")
-        print("-" * 82)
+        print("\n=== Global coordinate scores (error-source focused) ===")
+        print(
+            f"{'rank':>4} {'idx':>4} {'type':>10} {'coord':>18} "
+            f"{'score':>12} {'source':>12} {'response':>12} "
+            f"{'support':>12} {'rho':>12} {'helpful':>12}"
+        )
+        print("-" * 122)
         for rank, idx in enumerate(np.argsort(-global_coord_score)[:12]):
-            coord = tuple(int(x) for x in z_matrix_array[idx])
+            coord = tuple(int(x) for x in coords_flat[idx])
             print(
-                f"{rank:4d} {idx:4d} {self.coord_type(coord):>9} {self.format_coord(coord):>18} "
-                f"{global_coord_score[idx]:12.6e} {global_support[idx]:12.6e} {global_rho[idx]:12.6e}"
+                f"{rank:4d} {idx:4d} {kinds_flat[idx]:>10} {self.format_coord(coord):>18} "
+                f"{global_coord_score[idx]:12.6e} "
+                f"{global_source_blame[idx]:12.6e} "
+                f"{global_response[idx]:12.6e} "
+                f"{global_support[idx]:12.6e} "
+                f"{global_rho[idx]:12.6e} "
+                f"{global_helpful[idx]:12.6e}"
             )
 
-        print("\n=== Ranked candidate blocks ===")
-        print(f"{'rank':>4} {'anchor':>18} {'type':>9} {'|block|':>8} "
-            f"{'coord':>12} {'pair':>12} {'support':>12} "
-            f"{'dmin':>12} {'novelty':>12} {'acq':>12}")
-        print("-" * 118)
+        print("\n=== Ranked candidate repair blocks ===")
+        print(
+            f"{'rank':>4} {'anchor':>18} {'type':>10} {'|block|':>8} "
+            f"{'coord':>12} {'pair':>12} {'support':>12} {'acq':>12}"
+        )
+        print("-" * 102)
         for rank, blk in enumerate(ranked_blocks[:10]):
             print(
                 f"{rank:4d} "
                 f"{self.format_coord(blk['anchor_coord']):>18} "
-                f"{blk['anchor_type']:>9} "
+                f"{blk['anchor_type']:>10} "
                 f"{len(blk['block_indices']):8d} "
                 f"{blk['coord_mass']:12.6e} "
                 f"{blk['pair_mass']:12.6e} "
                 f"{blk['support_mass']:12.6e} "
-                f"{blk['dmin']:12.6e} "
-                f"{blk['novelty']:12.6e} "
                 f"{blk['acq_score']:12.6e}"
             )
             print(f"      block coords: {blk['block_coords']}")
-        
-        print("\n=== Ranked torsional exploration candidates ===")
-        print(f"{'rank':>4} {'idx':>4} {'coord':>18} {'novelty':>12} {'coord':>12} {'source':>12} {'support':>12} {'explore':>12}")
-        print("-" * 94)
-        for rank, t in enumerate(ranked_torsions[:10]):
-            print(
-                f"{rank:4d} {t['idx']:4d} {self.format_coord(t['coord']):>18} "
-                f"{t['novelty']:12.6e} {t['coord_score']:12.6e} "
-                f"{t['source_score']:12.6e} {t['support']:12.6e} "
-                f"{t['explore_score']:12.6e}"
-            )
-
-        print("\nSelection mode:", selection_mode)
+            print(f"      block types : {blk['block_types']}")
 
         print("\nPrimary constraint:", primary_constraint)
-        print("Candidate constraints (best block):", candidate_constraints)
-        print("ranked blocks):", ranked_blocks)
+        print("Candidate constraints:", candidate_constraints)
 
-        return primary_constraint, candidate_constraints, ranked_blocks[0]['block_coords']
+        return primary_constraint, candidate_constraints, best_block["block_coords"]
 
 
     # ======================================================================
     # Helper methods
     # ======================================================================
-    def _augment_constraints_with_high_exploration_torsions(
+
+    def _flatten_internal_coordinates(
         self,
-        candidate_constraints: List[Tuple[int, ...]],
-        ranked_torsions: List[Dict[str, Any]],
-        exploration_include_threshold: float = 0.30,
-        max_constraints: Optional[int] = None,
-    ) -> List[Tuple[int, ...]]:
+        z_matrix: Dict[str, List[Tuple[int, ...]]]
+    ) -> Tuple[List[Tuple[int, ...]], List[str]]:
         """
-        Always include torsions whose exploration score exceeds a fixed threshold,
-        independent of block membership or final repair/exploration mode.
+        Flatten z_matrix into a single coordinate list with explicit kinds.
 
-        Parameters
-        ----------
-        candidate_constraints
-            Constraints already selected by the normal logic.
-        ranked_torsions
-            Output of _rank_torsion_exploration_candidates.
-        exploration_include_threshold
-            Hard inclusion threshold for torsional exploration score.
-        max_constraints
-            Optional cap on total number of returned constraints.
-
-        Returns
-        -------
-        augmented_constraints
-            Candidate constraints with strong exploration torsions added.
+        Order is fixed and must remain consistent everywhere.
         """
-        selected = [tuple(int(x) for x in c) for c in candidate_constraints]
-        selected_set = set(selected)
+        coords = []
+        kinds = []
 
-        forced_torsions = []
-        for t in ranked_torsions:
-            coord = tuple(int(x) for x in t["coord"])
-            explore_score = float(t["explore_score"])
+        for coord in z_matrix.get("bonds", []):
+            coords.append(tuple(int(x) for x in coord))
+            kinds.append("bond")
 
-            if explore_score >= exploration_include_threshold:
-                if coord not in selected_set:
-                    forced_torsions.append(coord)
-                    selected_set.add(coord)
+        for coord in z_matrix.get("angles", []):
+            coords.append(tuple(int(x) for x in coord))
+            kinds.append("angle")
 
-        augmented = selected + forced_torsions
+        for coord in z_matrix.get("dihedrals", []):
+            coords.append(tuple(int(x) for x in coord))
+            kinds.append("dihedral")
 
-        if max_constraints is not None and len(augmented) > max_constraints:
-            # keep already selected constraints first, then highest exploration torsions
-            forced_sorted = sorted(
-                [t for t in ranked_torsions if tuple(int(x) for x in t["coord"]) in forced_torsions],
-                key=lambda x: x["explore_score"],
-                reverse=True,
-            )
-            augmented = list(selected)
-            for t in forced_sorted:
-                coord = tuple(int(x) for x in t["coord"])
-                if coord not in augmented:
-                    augmented.append(coord)
-                if len(augmented) >= max_constraints:
-                    break
+        for coord in z_matrix.get("impropers", []):
+            coords.append(tuple(int(x) for x in coord))
+            kinds.append("improper")
 
-        return augmented
+        return coords, kinds
 
-    def _select_constraints_for_torsion_block(
-        self,
-        torsion_idx: int,
-        block_indices: List[int],
-        global_coord_score: np.ndarray,
-        global_torsion_novelty: np.ndarray,
-        z_matrix: List[Tuple[int, ...]],
-        max_constraints: int = 3,
-    ):
+
+    def _get_symmetric_dihedral_centers(self, symmetry_information) -> set:
         """
-        Select constraints for a torsion-led acquisition.
-
-        Strategy
-        --------
-        - primary: the torsion itself
-        - secondary/tertiary: best non-dihedral local stabilizers in the torsion block
+        Return central atom pairs of torsions that should be symmetry-excluded.
         """
-        primary = [tuple(int(x) for x in z_matrix[torsion_idx])]
-        selected = [tuple(int(x) for x in z_matrix[torsion_idx])]
+        try:
+            return set(tuple(int(y) for y in x) for x in symmetry_information[7][3])
+        except Exception:
+            return set()
 
-        remaining = [i for i in block_indices if i != torsion_idx]
 
-        def rank_key(i):
-            coord = tuple(int(x) for x in z_matrix[i])
-            ctype = self.coord_type(coord)
-
-            # prefer non-dihedrals as stabilizers
-            type_pref = 0 if ctype != "dihedral" else 1
-            return (
-                type_pref,
-                -float(global_coord_score[i]),
-                -float(global_torsion_novelty[i]) if ctype == "dihedral" else 0.0
-            )
-
-        remaining = sorted(remaining, key=rank_key)
-
-        for i in remaining:
-            if len(selected) >= max_constraints:
-                break
-            selected.append(tuple(int(x) for x in z_matrix[i]))
-
-        return selected, primary
-    
-    def _choose_repair_vs_exploration(
-        self,
-        best_repair_block: Dict[str, Any],
-        ranked_torsions: List[Dict[str, Any]],
-        global_coord_score: np.ndarray,
-        torsion_novelty_threshold: float = 0.45,
-        exploration_competitiveness: float = 0.55,
-    ):
-        """
-        Decide whether to use the best repair block or switch to torsional exploration.
-
-        Decision rule
-        -------------
-        Use exploration if:
-        - there is a torsion candidate,
-        - its torsional novelty is high enough,
-        - and its exploration score is sufficiently competitive relative to the repair block.
-
-        Returns
-        -------
-        mode : str, one of {"repair", "exploration"}
-        chosen_torsion : dict or None
-        """
-        if not ranked_torsions:
-            return "repair", None
-
-        best_torsion = ranked_torsions[0]
-        repair_score = float(best_repair_block["acq_score"])
-        torsion_score = float(best_torsion["explore_score"])
-        torsion_novelty = float(best_torsion["novelty"])
-
-        if torsion_novelty >= torsion_novelty_threshold and torsion_score >= exploration_competitiveness * repair_score:
-            return "exploration", best_torsion
-
-        return "repair", None
-    
-    def _build_local_block_around_torsion(
-        self,
-        torsion_idx: int,
-        global_coord_score: np.ndarray,
-        global_pair: np.ndarray,
-        z_matrix: List[Tuple[int, ...]],
-        max_neighbors: int = 4,
-        min_pair_frac: float = 0.10,
-        min_score_frac: float = 0.15,
-    ) -> List[int]:
-        """
-        Build a local block around a chosen torsion.
-
-        Strategy
-        --------
-        Start from the torsion and add strong nearby non-dihedral partners based on:
-        - pair coupling
-        - coordinate score
-        - atom overlap preference
-
-        Returns
-        -------
-        block_indices : list[int]
-        """
-        torsion_coord = tuple(int(x) for x in z_matrix[torsion_idx])
-        torsion_atoms = set(torsion_coord)
-
-        pair_row = np.asarray(global_pair[torsion_idx], dtype=float).copy()
-        best_pair = np.max(pair_row[np.arange(len(pair_row)) != torsion_idx]) if len(pair_row) > 1 else 0.0
-        if best_pair < 1e-12:
-            best_pair = 1.0
-
-        candidates = []
-        best_score = float(global_coord_score[torsion_idx])
-
-        for j in range(len(z_matrix)):
-            if j == torsion_idx:
-                continue
-
-            coord_j = tuple(int(x) for x in z_matrix[j])
-            atoms_j = set(coord_j)
-
-            pair_val = float(pair_row[j])
-            score_val = float(global_coord_score[j])
-            overlap = len(torsion_atoms.intersection(atoms_j))
-
-            # prefer non-dihedrals as local stabilizers
-            type_penalty = 0.0 if self.coord_type(coord_j) != "dihedral" else -0.05
-
-            if pair_val < min_pair_frac * best_pair and score_val < min_score_frac * best_score:
-                continue
-
-            local_score = 0.55 * pair_val + 0.25 * score_val + 0.20 * overlap + type_penalty
-
-            candidates.append((j, local_score))
-
-        candidates = sorted(candidates, key=lambda x: x[1], reverse=True)
-
-        block = [int(torsion_idx)]
-        for j, _ in candidates[:max_neighbors]:
-            block.append(int(j))
-
-        return block
-
-    def _rank_torsion_exploration_candidates(
-        self,
-        z_matrix: List[Tuple[int, ...]],
-        global_coord_score: np.ndarray,
-        global_support: np.ndarray,
-        global_torsion_novelty: np.ndarray,
-        global_source: np.ndarray,
-        constraints_to_exclude: List[Tuple[int, ...]],
-        top_n: int = 10,
-    ):
-        """
-        Rank dihedrals as exploration candidates.
-
-        Philosophy
-        ----------
-        A torsional exploration candidate should be rewarded for:
-        - raw torsional novelty
-        - some coordinate relevance (so we do not choose irrelevant torsions)
-        - some source importance (so it actually moves the structure)
-        - support across important datapoints
-
-        Returns
-        -------
-        ranked_torsions : list of dicts
-        """
-        ranked = []
-        
-        for i, coord in enumerate(z_matrix):
-            coord = tuple(int(x) for x in coord)
-
-            if self.coord_type(coord) != "dihedral":
-                continue
-
-            if coord in constraints_to_exclude:
-                continue
-
-            # skip symmetry-excluded torsions
-            if len(coord) == 4 and coord[1:3] in self.symmetry_information[7][3]:
-                continue
-
-            novelty = float(global_torsion_novelty[i])
-            coord_score = float(global_coord_score[i])
-            source_score = float(global_source[i])
-            support = float(global_support[i])
-
-            # exploration score: novelty dominates, but not novelty alone
-            explore_score = (
-                0.60 * novelty
-                + 0.20 * coord_score
-                + 0.15 * source_score
-                + 0.05 * support
-            )
-
-            ranked.append({
-                "idx": int(i),
-                "coord": coord,
-                "novelty": novelty,
-                "coord_score": coord_score,
-                "source_score": source_score,
-                "support": support,
-                "explore_score": explore_score,
-            })
-
-        ranked = sorted(ranked, key=lambda x: x["explore_score"], reverse=True)
-        return ranked[:top_n]
-
-    def _compute_acquisition_novelty(
-        self,
-        dq_raw: np.ndarray,
-        z_matrix: List[Tuple[int, ...]],
-        bond_angle_scale: float = 0.25,
-    ) -> np.ndarray:
-        """
-        Acquisition novelty metric.
-
-        Purpose
-        -------
-        This is separate from dq_eff used in the interpolation model.
-        For acquisition, we want torsional novelty to reflect true wrapped angular distance.
-
-        Definitions
-        -----------
-        - bonds / angles:
-            novelty ~ |dq_raw| scaled by bond_angle_scale and clipped to [0, 1]
-        - dihedrals:
-            novelty = |wrapped angle difference| / pi
-
-        Returns
-        -------
-        novelty : np.ndarray, shape (N,), values in [0, 1]
-        """
-        dq_raw = np.asarray(dq_raw, dtype=float).reshape(-1)
-        novelty = np.zeros_like(dq_raw)
-        
-        off_set = 0
-        for key, coords in z_matrix.items():
-
-            for i, _ in enumerate(coords):
-                idx = i + off_set
-                # coord = tuple(int(x) for x in coord)
-
-                if key == 'dihedrals':
-                    # wrapped torsional distance normalized by pi
-                    novelty[idx] = abs(dq_raw[idx]) / np.pi
-                else:
-                    # rough bounded novelty for non-torsions
-                    novelty[idx] = min(abs(dq_raw[idx]) / bond_angle_scale, 1.0)
-            
-            off_set += len(z_matrix[key])
-
-        return novelty
-
-    def _select_constraints_from_block(
-        self,
-        block_indices: List[int],
-        global_coord_score: np.ndarray,
-        global_coord_novelty: np.ndarray,
-        z_matrix: List[Tuple[int, ...]],
-        max_constraints: int = 3,
-        dihedral_score_frac: float = 0.35,
-        secondary_score_frac: float = 0.20,
-    ):
-        """
-        Automatically choose a reasonable constraint set from the winning block.
-
-        Strategy
-        --------
-        1) If a meaningful dihedral exists in the block, choose it as primary.
-        2) Then add 1-2 local stabilizing coordinates (prefer angle/bond).
-        3) If no meaningful dihedral exists, use the best overall coordinate as primary.
-        """
-
-        block_indices = list(block_indices)
-        block_scores = {i: float(global_coord_score[i]) for i in block_indices}
-        block_novel = {i: float(global_coord_novelty[i]) for i in block_indices}
-
-        # combined steering score: prioritize novelty more for torsions
-        steering_score = {}
-        for i in block_indices:
-            coord = tuple(int(x) for x in z_matrix[i])
-            ctype = self.coord_type(coord)
-
-            s = block_scores[i] + 0.35 * block_novel[i]
-            if ctype == "dihedral":
-                s += 0.25 * block_novel[i] + 0.10 * block_scores[i]
-            steering_score[i] = s
-
-        best_block_score = max(block_scores.values()) if block_scores else 0.0
-
-        dihedral_candidates = []
-        non_dihedral_candidates = []
-
-        for i in block_indices:
-            coord = tuple(int(x) for x in z_matrix[i])
-            ctype = self.coord_type(coord)
-
-            if ctype == "dihedral" and block_scores[i] >= dihedral_score_frac * best_block_score:
-                dihedral_candidates.append(i)
-            else:
-                non_dihedral_candidates.append(i)
-
-        # primary: prefer dihedral if relevant
-        if dihedral_candidates:
-            primary_idx = max(dihedral_candidates, key=lambda i: steering_score[i])
-        else:
-            primary_idx = max(block_indices, key=lambda i: steering_score[i])
-
-        primary_constraint = [tuple(int(x) for x in z_matrix[primary_idx])]
-
-        # secondary/tertiary: prefer local shape stabilizers that are not torsions
-        remaining = [i for i in block_indices if i != primary_idx]
-
-        # prioritize non-dihedrals first as stabilizers
-        remaining_sorted = sorted(
-            remaining,
-            key=lambda i: (self.coord_type(tuple(int(x) for x in z_matrix[i])) == "dihedral",
-                        -block_scores[i],
-                        -block_novel[i])
-        )
-
-        selected = [tuple(int(x) for x in z_matrix[primary_idx])]
-
-        for i in remaining_sorted:
-            if len(selected) >= max_constraints:
-                break
-            if block_scores[i] < secondary_score_frac * best_block_score:
-                continue
-            selected.append(tuple(int(x) for x in z_matrix[i]))
-
-        return selected, primary_constraint
-        
     def _normalize_nonnegative(self, x: np.ndarray, eps: float = 1e-12) -> np.ndarray:
         x = np.asarray(x, dtype=float)
         x = np.maximum(x, 0.0)
@@ -4492,63 +3965,95 @@ class InterpolationDriver():
 
 
     def _principal_torsion_delta(self, delta: float) -> float:
-        """Wrap torsional difference to (-pi, pi]."""
+        """Wrap angular difference to (-pi, pi]."""
         return (delta + np.pi) % (2.0 * np.pi) - np.pi
+
+
+    def coord_type(self, coord: Tuple[int, ...], kind: Optional[str] = None) -> str:
+        """
+        Prefer explicit kind if available. Fall back to tuple-length classification.
+        """
+        if kind is not None:
+            return kind
+
+        n = len(coord)
+        if n == 2:
+            return "bond"
+        elif n == 3:
+            return "angle"
+        elif n == 4:
+            return "dihedral"
+        return "unknown"
+
+
+    def format_coord(self, coord: Tuple[int, ...]) -> str:
+        return str(tuple(int(x) for x in coord))
 
 
     def _compute_internal_differences(
         self,
         q_current: np.ndarray,
         q_ref: np.ndarray,
-        z_matrix: List[Tuple[int, ...]],
+        z_matrix: Dict[str, List[Tuple[int, ...]]],
         symmetry_information,
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         Returns
         -------
         dq_raw : raw internal differences
-        dq_eff : effective differences used in your interpolation
-        chain  : derivative chain factors (1 for non-torsions, cos(dq_raw) for torsions)
+        dq_eff : effective differences used in the interpolation model
+        chain  : derivative chain factors
+
+        Proper dihedrals:
+            dq_raw wrapped to (-pi, pi]
+            dq_eff = sin(dq_raw)
+            chain  = cos(dq_raw)
+
+        Impropers:
+            dq_raw wrapped to (-pi, pi]
+            dq_eff = dq_raw
+            chain  = 1
+
+        Bonds/angles:
+            dq_eff = dq_raw
+            chain  = 1
         """
         q_current = np.asarray(q_current, dtype=float)
         q_ref = np.asarray(q_ref, dtype=float)
 
-        N = len(z_matrix['bonds']) + len(z_matrix['angles']) + len(z_matrix['dihedrals']) + len(z_matrix['impropers'])
+        coords_flat, kinds_flat = self._flatten_internal_coordinates(z_matrix)
+        N = len(coords_flat)
+
         dq_raw = np.zeros(N, dtype=float)
         dq_eff = np.zeros(N, dtype=float)
         chain = np.ones(N, dtype=float)
 
-        sym_torsion_centers = set()
-        try:
-            sym_torsion_centers = set(tuple(x) for x in symmetry_information[7][3])
-        except Exception:
-            sym_torsion_centers = set()
-        
-        off_set = 0
-        for key in z_matrix.keys():
-            for i, coord in enumerate(z_matrix[key]):
-                coord = tuple(int(x) for x in coord)
-                idx = i + off_set
-                if key == 'dihedrals':
-                    # excluded/symmetric torsions -> zero effective displacement
-                    if tuple(coord[1:3]) in sym_torsion_centers:
-                        dq_raw[idx] = 0.0
-                        dq_eff[idx] = 0.0
-                        chain[idx] = 0.0
-                        continue
-                    
-                    d = self._principal_torsion_delta(q_current[idx] - q_ref[idx])
-                    dq_raw[idx] = d
-                    dq_eff[idx] = np.sin(d)
-                    chain[idx] = np.cos(d)
-                else:
-                    d = q_current[idx] - q_ref[idx]
-                    dq_raw[idx] = d
-                    dq_eff[idx] = d
-                    chain[idx] = 1.0
+        sym_torsion_centers = self._get_symmetric_dihedral_centers(symmetry_information)
 
-            
-            off_set += len(z_matrix[key])
+        for idx, (coord, kind) in enumerate(zip(coords_flat, kinds_flat)):
+            if kind == "dihedral":
+                if tuple(coord[1:3]) in sym_torsion_centers:
+                    dq_raw[idx] = 0.0
+                    dq_eff[idx] = 0.0
+                    chain[idx] = 0.0
+                    continue
+
+                d = self._principal_torsion_delta(q_current[idx] - q_ref[idx])
+                dq_raw[idx] = d
+                dq_eff[idx] = np.sin(d)
+                chain[idx] = np.cos(d)
+
+            elif kind == "improper":
+                d = self._principal_torsion_delta(q_current[idx] - q_ref[idx])
+                dq_raw[idx] = d
+                dq_eff[idx] = d
+                chain[idx] = 1.0
+
+            else:
+                d = q_current[idx] - q_ref[idx]
+                dq_raw[idx] = d
+                dq_eff[idx] = d
+                chain[idx] = 1.0
 
         return dq_raw, dq_eff, chain
 
@@ -4561,8 +4066,10 @@ class InterpolationDriver():
         g0: np.ndarray,
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Compute per-coordinate split of Taylor energy and gradient contributions.
-        Mirrors the logic you already had.
+        Per-coordinate split of Taylor energy and gradient contributions.
+
+        Energy is decomposed in the transformed displacement dq_eff.
+        Gradient follows the chain-weighted form used by the local model.
         """
         dq_eff = np.asarray(dq_eff, dtype=float)
         chain = np.asarray(chain, dtype=float)
@@ -4594,215 +4101,6 @@ class InterpolationDriver():
         return partial_energies, partial_gradient
 
 
-    def _compute_causal_scores(
-        self,
-        z_matrix: List[Tuple[int, ...]],
-        dq_eff: np.ndarray,
-        H: np.ndarray,
-        abs_err: np.ndarray,
-        top_err: int = 4,
-        top_src: int = 8,
-        eps: float = 1e-12,
-    ) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Build:
-        causal_score[j] ~ how much coordinate j drives top failing responses
-        pair_score[i,j] ~ coupling graph between response i and source j
-
-        We use source terms |H[i,j] * dq_eff[j]|, weighted by top response error size.
-        """
-        dq_eff = np.asarray(dq_eff, dtype=float)
-        H = np.asarray(H, dtype=float)
-        abs_err = np.asarray(abs_err, dtype=float)
-
-        N = len(z_matrix['bonds']) + len(z_matrix['angles']) + len(z_matrix['dihedrals']) + len(z_matrix['impropers'])
-        causal_score = np.zeros(N, dtype=float)
-        pair_score = np.zeros((N, N), dtype=float)
-
-        err_order = np.argsort(-abs_err)
-        top_err_idx = err_order[:min(top_err, N)]
-
-        if abs_err.sum() < eps:
-            return causal_score, pair_score
-
-        err_weights = abs_err / (abs_err.sum() + eps)
-
-        for i in top_err_idx:
-            source_terms = np.abs(H[i, :] * dq_eff)
-            src_order = np.argsort(-source_terms)
-            src_keep = src_order[:min(top_src, N)]
-
-            for j in src_keep:
-                val = source_terms[j] * err_weights[i]
-                causal_score[j] += val
-
-                # symmetrize into a graph-like pair matrix
-                pair_score[i, j] += val
-                pair_score[j, i] += val
-
-        causal_score = self._normalize_nonnegative(causal_score)
-
-        # normalize pair matrix by max for easier downstream use
-        pmax = np.max(pair_score)
-        if pmax > eps:
-            pair_score = pair_score / pmax
-
-        return causal_score, pair_score
-
-
-    def _build_candidate_block(
-        self,
-        anchor_idx: int,
-        global_coord_score: np.ndarray,
-        global_pair: np.ndarray,
-        z_matrix: List[Tuple[int, ...]],
-        constraints_to_exclude: List[Tuple[int, ...]],
-        max_partners: int = 4,
-        min_partner_pair_frac: float = 0.15,
-        min_partner_coord_frac: float = 0.20,
-    ) -> List[int]:
-        """
-        Build a coupled block around an anchor using:
-        - strong pair/causal connectivity
-        - non-negligible global coordinate score
-        """
-        N = len(z_matrix)
-        anchor_score = global_coord_score[anchor_idx]
-
-        pair_row = np.asarray(global_pair[anchor_idx], dtype=float).copy()
-        partner_order = np.argsort(-pair_row)
-
-        block = [int(anchor_idx)]
-
-        # best pair value excluding self
-        best_pair = 0.0
-        for j in partner_order:
-            if j == anchor_idx:
-                continue
-            best_pair = pair_row[j]
-            break
-
-        if best_pair <= 0.0:
-            return block
-
-        for j in partner_order:
-            if j == anchor_idx:
-                continue
-
-            coord_j = tuple(int(x) for x in z_matrix[j])
-
-            if coord_j in constraints_to_exclude:
-                continue
-
-            # skip excluded symmetric torsions as direct block members
-            if len(coord_j) == 4 and coord_j[1:3] in self.symmetry_information[7][3]:
-                continue
-
-            pair_ok = pair_row[j] >= min_partner_pair_frac * best_pair
-            coord_ok = global_coord_score[j] >= min_partner_coord_frac * anchor_score
-
-            if pair_ok and coord_ok:
-                block.append(int(j))
-
-            if len(block) >= 1 + max_partners:
-                break
-
-        # small cleanup: sort block by descending coordinate score, keep anchor first
-        partners = [i for i in block if i != anchor_idx]
-        partners = sorted(partners, key=lambda i: global_coord_score[i], reverse=True)
-        block = [int(anchor_idx)] + partners
-
-        return block
-
-
-    def _block_subspace_distance(
-        self,
-        block_indices: List[int],
-        q_a: np.ndarray,
-        q_b: np.ndarray,
-        z_matrix: List[Tuple[int, ...]],
-        symmetry_information,
-    ) -> float:
-        """
-        Distance in the subspace of block_indices using your effective displacement definition.
-        """
-        q_a = np.asarray(q_a, dtype=float)
-        q_b = np.asarray(q_b, dtype=float)
-
-        d2 = 0.0
-        sym_torsion_centers = set()
-        try:
-            sym_torsion_centers = set(tuple(x) for x in symmetry_information[7][3])
-        except Exception:
-            sym_torsion_centers = set()
-
-        for i in block_indices:
-            wanted_coord = None
-            off_set = 0
-            for key in z_matrix.keys():
-                for z_idx, coord in enumerate(z_matrix[key]):
-                    if i == z_idx + off_set:
-                        if key == 'dihedral':
-                            if tuple(coord[1:3]) in sym_torsion_centers:
-                                continue
-                            d = self._principal_torsion_delta(q_a[i] - q_b[i])
-                            x = d / np.pi
-                        else:
-                            x = q_a[i] - q_b[i]
-                        d2 += x * x
-                off_set += len(z_matrix[key])
-        return float(np.sqrt(d2))
-
-
-    def _min_block_distance_to_existing_datapoints(
-        self,
-        block_indices: List[int],
-        q_current: np.ndarray,
-        datapoints: List[Any],
-        z_matrix: List[Tuple[int, ...]],
-        symmetry_information,
-    ) -> float:
-        """
-        Minimal subspace distance between current structure and any existing datapoint
-        in the candidate block.
-        """
-        if len(datapoints) == 0:
-            return 1.0
-
-        dmin = np.inf
-        for dp in datapoints:
-            q_dp = np.asarray(dp.internal_coordinates_values, dtype=float)
-            d = self._block_subspace_distance(
-                block_indices=block_indices,
-                q_a=q_current,
-                q_b=q_dp,
-                z_matrix=z_matrix,
-                symmetry_information=symmetry_information,
-            )
-            if d < dmin:
-                dmin = d
-
-        if not np.isfinite(dmin):
-            dmin = 1.0
-
-        return float(dmin)
-
-    def coord_type(self, coord: Tuple[int, ...]) -> str:
-        """Classify coordinate type from tuple length."""
-        n = len(coord)
-        if n == 2:
-            return "bond"
-        elif n == 3:
-            return "angle"
-        elif n == 4:
-            return "dihedral"
-        return "unknown"
-
-
-    def format_coord(self, coord: Tuple[int, ...]) -> str:
-            return str(tuple(int(x) for x in coord))
-
-
     def compute_internal_gradient_diagnostics(
         self,
         z_matrix,
@@ -4815,27 +4113,34 @@ class InterpolationDriver():
         """
         Compute local Taylor diagnostics in internal coordinates.
 
-        dq_raw: raw internal difference q - q0 (wrapped to (-pi, pi] for torsions upstream)
-        For torsions:
-            dq_eff = sin(dq_raw)
-            chain  = cos(dq_raw)
-        For non-torsions:
-            dq_eff = dq_raw
-            chain  = 1
+        Core model:
+            g_model = chain * (g0 + H @ dq_eff)
 
-        IMPORTANT:
-        Your interpolated internal gradient uses the mapping
-            g_phi ≈ chain * ( g0 + H @ dq_eff )
-        Therefore, the inverse-response operator in raw-gradient space is NOT H,
-        but approximately:  H_eff = diag(chain) @ H @ diag(chain)
-        (optionally plus a small diagonal correction term; see below).
+        Proper dihedrals:
+            dq_eff = sin(dq_raw), chain = cos(dq_raw)
+
+        Impropers:
+            dq_eff = dq_raw, chain = 1
+
+        Important new object:
+            source_contrib[i,j] = chain[i] * H[i,j] * dq_eff[j]
+
+        This is the modeled contribution from source coordinate j into response row i.
+
+        Error-source score:
+            err_i = g_qm[i] - g_model[i]
+            blame_ij = |err_i| - |err_i + source_contrib[i,j]|
+
+        If blame_ij > 0, removing source j would reduce the error in row i.
         """
         dq_raw = np.asarray(dq_raw, dtype=float).reshape(-1)
         H = np.asarray(H, dtype=float)
         g0 = np.asarray(g0, dtype=float).reshape(-1)
         g_qm = np.asarray(g_qm, dtype=float).reshape(-1)
 
-        N = dq_raw.shape[0]
+        coords_flat, kinds_flat = self._flatten_internal_coordinates(z_matrix)
+        N = len(coords_flat)
+
         if dq_raw.shape[0] != N:
             raise ValueError("dq_raw has wrong length")
         if g0.shape[0] != N:
@@ -4845,81 +4150,109 @@ class InterpolationDriver():
         if H.shape != (N, N):
             raise ValueError("H has wrong shape")
 
-        dq_eff = dq_raw.copy()
-        chain = np.ones(N)
-        
-        off_set = 0
-        for key in z_matrix:
-            for i, coord in enumerate(z_matrix[key]):
-                idx = i + off_set
-                if len(coord) == 4:
+        sym_torsion_centers = self._get_symmetric_dihedral_centers(self.symmetry_information)
+
+        dq_eff = np.zeros(N, dtype=float)
+        chain = np.ones(N, dtype=float)
+
+        for idx, (coord, kind) in enumerate(zip(coords_flat, kinds_flat)):
+            if kind == "dihedral":
+                if tuple(coord[1:3]) in sym_torsion_centers:
+                    dq_eff[idx] = 0.0
+                    chain[idx] = 0.0
+                else:
                     dq_eff[idx] = np.sin(dq_raw[idx])
                     chain[idx] = np.cos(dq_raw[idx])
-            
-            off_set += len(z_matrix[key])
-        # Forward (matches your PES code)
-        Hdq_raw = H @ dq_eff
-        diag_resp_raw = np.diag(H) * dq_eff
 
-        g0_eff = g0 * chain
-        Hdq = Hdq_raw * chain
-        diag_resp = diag_resp_raw * chain
+            elif kind == "improper":
+                dq_eff[idx] = dq_raw[idx]
+                chain[idx] = 1.0
+
+            else:
+                dq_eff[idx] = dq_raw[idx]
+                chain[idx] = 1.0
+
+        Hdq_raw = H @ dq_eff
+        Hdq = chain * Hdq_raw
+
+        diag_resp_raw = np.diag(H) * dq_eff
+        diag_resp = chain * diag_resp_raw
         offdiag_resp = Hdq - diag_resp
 
-        g_model = g0_eff + Hdq
+        g_model = chain * (g0 + Hdq_raw)
         delta_g_err = g_qm - g_model
         rho = np.abs(delta_g_err) / (np.abs(Hdq) + eps)
 
-        # Energy decomposition (kept as you had it; it mirrors your energy quadratic form)
-        linear_energy = g0_eff * dq_eff
-        diag_quad_energy = 0.5 * np.diag(H) * dq_eff * dq_eff
+        partial_energies, partial_gradient = self._compute_partial_taylor_contributions(
+            dq_eff=dq_eff,
+            chain=chain,
+            H=H,
+            g0=g0,
+        )
 
-        cross_energy_split = np.zeros(N)
-        for i in range(N):
-            for j in range(i + 1, N):
-                cross = dq_eff[i] * H[i, j] * dq_eff[j]
-                cross_energy_split[i] += 0.5 * cross
-                cross_energy_split[j] += 0.5 * cross
+        # ------------------------------------------------------------------
+        # New source-blame analysis
+        # ------------------------------------------------------------------
+        source_contrib = (chain[:, None] * H) * dq_eff[None, :]
 
-        pE_total = linear_energy + diag_quad_energy + cross_energy_split
+        # removing source j changes row-i error from err_i to err_i + contrib_ij
+        blame_matrix = np.abs(delta_g_err)[:, None] - np.abs(delta_g_err[:, None] + source_contrib)
 
+        harmful_matrix = np.maximum(blame_matrix, 0.0)
+        helpful_matrix = np.maximum(-blame_matrix, 0.0)
+
+        response_score = self._normalize_nonnegative(np.abs(delta_g_err))
+
+        err_weights = np.abs(delta_g_err)
+        err_weights = err_weights / (err_weights.sum() + eps)
+
+        source_blame_score = harmful_matrix.T @ err_weights
+        helpful_source_score = helpful_matrix.T @ err_weights
+
+        source_blame_score = self._normalize_nonnegative(source_blame_score)
+        helpful_source_score = self._normalize_nonnegative(helpful_source_score)
+
+        pair_score = harmful_matrix + harmful_matrix.T
+        np.fill_diagonal(pair_score, 0.0)
+
+        if np.max(pair_score) > eps:
+            pair_score = pair_score / (np.max(pair_score) + eps)
 
         rows = []
-        off_set = 0
-        for key in z_matrix:
-            for i, coord in enumerate(z_matrix[key]):
-                idx = i + off_set
-                rows.append({
-                    "idx": idx,
-                    "coord": tuple(coord),
-                    "type": self.coord_type(tuple(coord)),
-                    "dq_raw": dq_raw[idx],
-                    "dq_eff": dq_eff[idx],
-                    "abs_dq": abs(dq_eff[idx]),
-                    "chain": chain[idx],
-                    "g0_eff": g0_eff[idx],
-                    "diag_resp": diag_resp[idx],
-                    "abs_diag_resp": abs(diag_resp[idx]),
-                    "offdiag_resp": offdiag_resp[idx],
-                    "abs_offdiag_resp": abs(offdiag_resp[idx]),
-                    "Hdq": Hdq[idx],
-                    "abs_Hdq": abs(Hdq[idx]),
-                    "g_model": g_model[idx],
-                    "g_qm": g_qm[idx],
-                    "delta_g_err": delta_g_err[idx],
-                    "abs_delta_g_err": abs(delta_g_err[idx]),
-                    "rho": rho[idx],
-                    "pE_total": pE_total[idx],
-                    "abs_pE_total": abs(pE_total[idx]),
-
-                })
-            off_set += len(z_matrix[key])
+        for idx, (coord, kind) in enumerate(zip(coords_flat, kinds_flat)):
+            rows.append({
+                "idx": idx,
+                "coord": tuple(coord),
+                "type": self.coord_type(tuple(coord), kind),
+                "dq_raw": dq_raw[idx],
+                "dq_eff": dq_eff[idx],
+                "abs_dq": abs(dq_eff[idx]),
+                "chain": chain[idx],
+                "g0": g0[idx],
+                "diag_resp": diag_resp[idx],
+                "abs_diag_resp": abs(diag_resp[idx]),
+                "offdiag_resp": offdiag_resp[idx],
+                "abs_offdiag_resp": abs(offdiag_resp[idx]),
+                "Hdq": Hdq[idx],
+                "abs_Hdq": abs(Hdq[idx]),
+                "g_model": g_model[idx],
+                "g_qm": g_qm[idx],
+                "delta_g_err": delta_g_err[idx],
+                "abs_delta_g_err": abs(delta_g_err[idx]),
+                "rho": rho[idx],
+                "pE_total": partial_energies[idx],
+                "abs_pE_total": abs(partial_energies[idx]),
+                "source_blame_score": source_blame_score[idx],
+                "helpful_source_score": helpful_source_score[idx],
+                "response_score": response_score[idx],
+            })
 
         by_abs_dq = sorted(rows, key=lambda r: r["abs_dq"], reverse=True)
         by_abs_Hdq = sorted(rows, key=lambda r: r["abs_Hdq"], reverse=True)
         by_abs_err = sorted(rows, key=lambda r: r["abs_delta_g_err"], reverse=True)
         by_rho = sorted(rows, key=lambda r: r["rho"], reverse=True)
         by_abs_pE = sorted(rows, key=lambda r: r["abs_pE_total"], reverse=True)
+        by_source_blame = sorted(rows, key=lambda r: r["source_blame_score"], reverse=True)
 
         return {
             "rows": rows,
@@ -4931,29 +4264,204 @@ class InterpolationDriver():
             "g_model": g_model,
             "delta_g_err": delta_g_err,
             "rho": rho,
-            "pE_total": pE_total,
-
-
+            "pE_total": partial_energies,
+            "source_contrib": source_contrib,
+            "blame_matrix": blame_matrix,
+            "harmful_matrix": harmful_matrix,
+            "helpful_matrix": helpful_matrix,
+            "response_score": response_score,
+            "source_blame_score": source_blame_score,
+            "helpful_source_score": helpful_source_score,
+            "pair_score": pair_score,
             "by_abs_dq": by_abs_dq,
             "by_abs_Hdq": by_abs_Hdq,
             "by_abs_err": by_abs_err,
             "by_rho": by_rho,
             "by_abs_pE": by_abs_pE,
+            "by_source_blame": by_source_blame,
         }
 
 
-    def print_ranked_table(self,
+    def _build_candidate_block(
+        self,
+        anchor_idx: int,
+        global_coord_score: np.ndarray,
+        global_pair: np.ndarray,
+        z_matrix: List[Tuple[int, ...]],
+        coord_kinds: List[str],
+        constraints_to_exclude: List[Tuple[int, ...]],
+        max_partners: int = 4,
+        min_partner_pair_frac: float = 0.15,
+        min_partner_coord_frac: float = 0.20,
+    ) -> List[int]:
+        """
+        Build a coupled block around an anchor using blame-derived pair coupling
+        plus global coordinate relevance.
+
+        No dihedral bonus is used here.
+        """
+        N = len(z_matrix)
+        anchor_score = float(global_coord_score[anchor_idx])
+
+        pair_row = np.asarray(global_pair[anchor_idx], dtype=float).copy()
+        partner_order = np.argsort(-pair_row)
+
+        block = [int(anchor_idx)]
+
+        best_pair = 0.0
+        for j in partner_order:
+            if j == anchor_idx:
+                continue
+            best_pair = float(pair_row[j])
+            break
+
+        if best_pair <= 0.0:
+            return block
+
+        anchor_atoms = set(z_matrix[anchor_idx])
+        sym_torsion_centers = self._get_symmetric_dihedral_centers(self.symmetry_information)
+
+        candidates = []
+        for j in range(N):
+            if j == anchor_idx:
+                continue
+
+            coord_j = tuple(int(x) for x in z_matrix[j])
+
+            if coord_j in constraints_to_exclude:
+                continue
+
+            if coord_kinds[j] == "dihedral" and tuple(coord_j[1:3]) in sym_torsion_centers:
+                continue
+
+            pair_ok = pair_row[j] >= min_partner_pair_frac * best_pair
+            coord_ok = global_coord_score[j] >= min_partner_coord_frac * anchor_score
+
+            if not (pair_ok and coord_ok):
+                continue
+
+            atoms_j = set(coord_j)
+            overlap = len(anchor_atoms.intersection(atoms_j)) / max(1, len(anchor_atoms.union(atoms_j)))
+
+            local_value = 0.65 * float(pair_row[j]) + 0.30 * float(global_coord_score[j]) + 0.05 * float(overlap)
+            candidates.append((int(j), local_value))
+
+        candidates = sorted(candidates, key=lambda x: x[1], reverse=True)
+
+        for j, _ in candidates[:max_partners]:
+            block.append(int(j))
+
+        partners = [i for i in block if i != anchor_idx]
+        partners = sorted(partners, key=lambda i: global_coord_score[i], reverse=True)
+        block = [int(anchor_idx)] + partners
+
+        return block
+
+
+    def _select_constraints_from_block(
+        self,
+        block_indices: List[int],
+        global_coord_score: np.ndarray,
+        global_source_blame: np.ndarray,
+        global_response_score: np.ndarray,
+        global_pair: np.ndarray,
+        z_matrix: List[Tuple[int, ...]],
+        coord_kinds: List[str],
+        max_constraints: int = 3,
+        singleton_dominance: float = 1.35,
+        singleton_source_frac: float = 0.85,
+        singleton_response_frac: float = 0.85,
+        secondary_score_frac: float = 0.25,
+        min_secondary_pair_frac: float = 0.15,
+    ):
+        """
+        Choose final constraints from the winning block.
+
+        Critical behavior:
+        ------------------
+        If one coordinate clearly dominates as both
+        - a source of error and
+        - a response channel,
+        then return only that coordinate.
+
+        This means:
+        if a dihedral is truly the problematic piece, it is returned alone.
+        No artificial non-dihedral is added in that case.
+        """
+        block_indices = list(block_indices)
+        if not block_indices:
+            return [], []
+
+        eps = 1e-12
+
+        block_scores = {i: float(global_coord_score[i]) for i in block_indices}
+        steering_score = {
+            i: float(0.70 * global_source_blame[i] + 0.30 * global_response_score[i])
+            for i in block_indices
+        }
+
+        primary_idx = max(block_indices, key=lambda i: steering_score[i])
+        primary_coord = tuple(int(x) for x in z_matrix[primary_idx])
+        primary_constraint = [primary_coord]
+
+        selected = [primary_coord]
+        remaining = [i for i in block_indices if i != primary_idx]
+
+        second_best = max([block_scores[i] for i in remaining], default=0.0)
+        block_max_source = max([float(global_source_blame[i]) for i in block_indices], default=0.0)
+        block_max_response = max([float(global_response_score[i]) for i in block_indices], default=0.0)
+
+        # singleton rule:
+        # if one coordinate clearly dominates, return only that coordinate
+        if (
+            block_scores[primary_idx] >= singleton_dominance * max(second_best, eps)
+            and float(global_source_blame[primary_idx]) >= singleton_source_frac * max(block_max_source, eps)
+            and float(global_response_score[primary_idx]) >= singleton_response_frac * max(block_max_response, eps)
+        ):
+            return selected, primary_constraint
+
+        pair_row = np.asarray(global_pair[primary_idx], dtype=float)
+        best_pair = max([float(pair_row[i]) for i in remaining], default=0.0)
+
+        def secondary_rank_key(i):
+            return 0.70 * float(pair_row[i]) + 0.30 * float(global_coord_score[i])
+
+        remaining_sorted = sorted(remaining, key=secondary_rank_key, reverse=True)
+
+        for i in remaining_sorted:
+            if len(selected) >= max_constraints:
+                break
+
+            if block_scores[i] < secondary_score_frac * max(block_scores[primary_idx], eps):
+                continue
+
+            if best_pair > eps:
+                pair_ok = float(pair_row[i]) >= min_secondary_pair_frac * best_pair
+                if not pair_ok and block_scores[i] < 0.60 * max(block_scores[primary_idx], eps):
+                    continue
+
+            coord_i = tuple(int(x) for x in z_matrix[i])
+            if coord_i not in selected:
+                selected.append(coord_i)
+
+        return selected, primary_constraint
+
+
+    def print_ranked_table(
+        self,
         rows: List[Dict[str, Any]],
         title: str,
         n: int = 10,
     ) -> None:
-        """Pretty-print a ranked summary table."""
+        """
+        Pretty-print a ranked summary table.
+        """
         print(f"\n{title}")
         print("-" * len(title))
         header = (
-            f"{'rank':>4} {'idx':>4} {'type':>9} {'coord':>18} "
+            f"{'rank':>4} {'idx':>4} {'type':>10} {'coord':>18} "
             f"{'|dq|':>12} {'|diag|':>12} {'|offdiag|':>12} "
-            f"{'|Hdq|':>12} {'|err|':>12} {'rho':>12}"
+            f"{'|Hdq|':>12} {'|err|':>12} {'rho':>12} {'src_blame':>12}"
         )
         print(header)
         print("-" * len(header))
@@ -4962,76 +4470,22 @@ class InterpolationDriver():
             print(
                 f"{rank:4d} "
                 f"{r['idx']:4d} "
-                f"{r['type']:>9} "
+                f"{r['type']:>10} "
                 f"{self.format_coord(r['coord']):>18} "
                 f"{r['abs_dq']:12.6e} "
                 f"{r['abs_diag_resp']:12.6e} "
                 f"{r['abs_offdiag_resp']:12.6e} "
                 f"{r['abs_Hdq']:12.6e} "
                 f"{r['abs_delta_g_err']:12.6e} "
-                f"{r['rho']:12.6e}"
-            )
-
-
-    def print_source_decomposition(self,
-        z_matrix: List[Tuple[int, ...]],
-        dq: np.ndarray,
-        H: np.ndarray,
-        target_idx: int,
-        top_m: int = 8,
-    ) -> None:
-        """
-        For one response coordinate i, print the largest source terms H[i,j] * dq[j].
-        This identifies which displaced coordinates drive the response in coordinate i.
-        """
-        z_matrix = [tuple(c) for c in z_matrix]
-        dq = np.asarray(dq, dtype=float).reshape(-1)
-        H = np.asarray(H, dtype=float)
-
-        N = len(z_matrix)
-        if target_idx < 0 or target_idx >= N:
-            raise IndexError(f"target_idx {target_idx} out of range 0..{N-1}")
-
-        terms = []
-        for j in range(N):
-            contrib = H[target_idx, j] * dq[j]
-            terms.append({
-                "j": j,
-                "coord_j": z_matrix[j],
-                "type_j": self.coord_type(z_matrix[j]),
-                "dq_j": dq[j],
-                "H_ij": H[target_idx, j],
-                "contrib": contrib,
-                "abs_contrib": abs(contrib),
-            })
-
-        terms_sorted = sorted(terms, key=lambda t: t["abs_contrib"], reverse=True)
-
-        target_coord = z_matrix[target_idx]
-        total = np.sum([t["contrib"] for t in terms])
-
-        print(f"\nSource decomposition for target idx={target_idx}, coord={self.format_coord(target_coord)}")
-        print(f"Total response sum_j H[i,j] * dq[j] = {total:.6e}")
-        print(
-            f"{'rank':>4} {'j':>4} {'type':>9} {'coord_j':>18} "
-            f"{'dq_j':>12} {'H[i,j]':>12} {'H[i,j]*dq_j':>15}"
-        )
-        print("-" * 86)
-
-        for rank, t in enumerate(terms_sorted[:top_m]):
-            print(
-                f"{rank:4d} "
-                f"{t['j']:4d} "
-                f"{t['type_j']:>9} "
-                f"{self.format_coord(t['coord_j']):>18} "
-                f"{t['dq_j']:12.6e} "
-                f"{t['H_ij']:12.6e} "
-                f"{t['contrib']:15.6e}"
+                f"{r['rho']:12.6e} "
+                f"{r['source_blame_score']:12.6e}"
             )
 
 
     def print_type_summary(self, rows: List[Dict[str, Any]]) -> None:
-        """Aggregate diagnostics by coordinate type."""
+        """
+        Aggregate diagnostics by coordinate type.
+        """
         buckets: Dict[str, Dict[str, float]] = {}
         for r in rows:
             t = r["type"]
@@ -5042,50 +4496,127 @@ class InterpolationDriver():
                     "sum_abs_Hdq": 0.0,
                     "sum_abs_err": 0.0,
                     "sum_abs_pE": 0.0,
+                    "sum_src_blame": 0.0,
                 }
             buckets[t]["count"] += 1
             buckets[t]["sum_abs_dq"] += r["abs_dq"]
             buckets[t]["sum_abs_Hdq"] += r["abs_Hdq"]
             buckets[t]["sum_abs_err"] += r["abs_delta_g_err"]
             buckets[t]["sum_abs_pE"] += r["abs_pE_total"]
+            buckets[t]["sum_src_blame"] += r["source_blame_score"]
 
         print("\nSummary by coordinate type")
         print("--------------------------")
         print(
-            f"{'type':>9} {'count':>7} {'sum|dq|':>14} "
-            f"{'sum|Hdq|':>14} {'sum|err|':>14} {'sum|pE|':>14}"
+            f"{'type':>10} {'count':>7} {'sum|dq|':>14} "
+            f"{'sum|Hdq|':>14} {'sum|err|':>14} {'sum|pE|':>14} {'sum src':>14}"
         )
-        print("-" * 76)
+        print("-" * 94)
         for t, vals in buckets.items():
             print(
-                f"{t:>9} "
+                f"{t:>10} "
                 f"{vals['count']:7d} "
                 f"{vals['sum_abs_dq']:14.6e} "
                 f"{vals['sum_abs_Hdq']:14.6e} "
                 f"{vals['sum_abs_err']:14.6e} "
-                f"{vals['sum_abs_pE']:14.6e}"
+                f"{vals['sum_abs_pE']:14.6e} "
+                f"{vals['sum_src_blame']:14.6e}"
             )
 
 
-    def run_full_internal_diagnostic(self,
-        z_matrix: List[Tuple[int, ...]],
-        dq: np.ndarray,
+    def print_source_decomposition(
+        self,
+        z_matrix,
+        dq_raw: np.ndarray,
         H: np.ndarray,
         g0: np.ndarray,
         g_qm: np.ndarray,
-        g_im: Optional[np.ndarray] = None,
+        target_idx: int,
+        top_m: int = 8,
+    ) -> None:
+        """
+        For one response coordinate i, print the largest modeled source terms and their blame.
+
+        contrib_ij = chain[i] * H[i,j] * dq_eff[j]
+        blame_ij   = |err_i| - |err_i + contrib_ij|
+
+        Positive blame means source j worsens the error in target row i.
+        """
+        result = self.compute_internal_gradient_diagnostics(
+            z_matrix=z_matrix,
+            dq_raw=dq_raw,
+            H=H,
+            g0=g0,
+            g_qm=g_qm,
+        )
+
+        coords_flat, kinds_flat = self._flatten_internal_coordinates(z_matrix)
+        source_contrib = np.asarray(result["source_contrib"], dtype=float)
+        blame_matrix = np.asarray(result["blame_matrix"], dtype=float)
+        dq_eff = np.asarray(result["dq_eff"], dtype=float)
+        delta_g_err = np.asarray(result["delta_g_err"], dtype=float)
+
+        N = len(coords_flat)
+        if target_idx < 0 or target_idx >= N:
+            raise IndexError(f"target_idx {target_idx} out of range 0..{N-1}")
+
+        terms = []
+        for j in range(N):
+            terms.append({
+                "j": j,
+                "coord_j": coords_flat[j],
+                "type_j": kinds_flat[j],
+                "dq_eff_j": dq_eff[j],
+                "H_ij": H[target_idx, j],
+                "contrib": source_contrib[target_idx, j],
+                "blame": blame_matrix[target_idx, j],
+                "abs_contrib": abs(source_contrib[target_idx, j]),
+            })
+
+        terms_sorted = sorted(
+            terms,
+            key=lambda t: (max(t["blame"], 0.0), t["abs_contrib"]),
+            reverse=True,
+        )
+
+        target_coord = coords_flat[target_idx]
+        print(f"\nSource decomposition for target idx={target_idx}, coord={self.format_coord(target_coord)}")
+        print(f"Row error err_i = {delta_g_err[target_idx]:.6e}")
+        print(
+            f"{'rank':>4} {'j':>4} {'type':>10} {'coord_j':>18} "
+            f"{'dq_eff_j':>12} {'H[i,j]':>12} {'contrib':>15} {'blame':>12}"
+        )
+        print("-" * 104)
+
+        for rank, t in enumerate(terms_sorted[:top_m]):
+            print(
+                f"{rank:4d} "
+                f"{t['j']:4d} "
+                f"{t['type_j']:>10} "
+                f"{self.format_coord(t['coord_j']):>18} "
+                f"{t['dq_eff_j']:12.6e} "
+                f"{t['H_ij']:12.6e} "
+                f"{t['contrib']:15.6e} "
+                f"{t['blame']:12.6e}"
+            )
+
+
+    def run_full_internal_diagnostic(
+        self,
+        z_matrix,
+        dq_raw: np.ndarray,
+        H: np.ndarray,
+        g0: np.ndarray,
+        g_qm: np.ndarray,
         top_n: int = 10,
         decompose_top_err: int = 3,
     ) -> Dict[str, Any]:
         """
         Run the full diagnostic workflow and print useful summaries.
-
-        Suggested usage:
-            result = run_full_internal_diagnostic(z_matrix, dq, H, g0, g_qm)
         """
         result = self.compute_internal_gradient_diagnostics(
             z_matrix=z_matrix,
-            dq_raw=dq,
+            dq_raw=dq_raw,
             H=H,
             g0=g0,
             g_qm=g_qm,
@@ -5093,26 +4624,26 @@ class InterpolationDriver():
 
         rows = result["rows"]
 
-        self.print_ranked_table(result["by_abs_dq"], "Ranked by |dq| (source displacement candidates)", n=top_n)
-        self.print_ranked_table(result["by_abs_Hdq"], "Ranked by |H dq| (response channels)", n=top_n)
-        self.print_ranked_table(result["by_abs_err"], "Ranked by |g_qm - g_model| (actual model failure)", n=top_n)
-        self.print_ranked_table(result["by_rho"], "Ranked by rho = |err| / (|H dq| + eps)", n=top_n)
-        self.print_ranked_table(result["by_abs_pE"], "Ranked by |partial energy contribution|", n=top_n)
+        self.print_ranked_table(result["by_abs_dq"], "Ranked by |dq_eff| (moved coordinates)", n=top_n)
+        self.print_ranked_table(result["by_abs_Hdq"], "Ranked by |H dq_eff| (response channels)", n=top_n)
+        self.print_ranked_table(result["by_abs_err"], "Ranked by |g_qm - g_model| (failing response coordinates)", n=top_n)
+        self.print_ranked_table(result["by_rho"], "Ranked by rho = |err| / (|H dq_eff| + eps)", n=top_n)
+        self.print_ranked_table(result["by_source_blame"], "Ranked by source blame (most harmful source coordinates)", n=top_n)
 
         self.print_type_summary(rows)
 
-
-        # Decompose the top few error coordinates to find their source coordinates
         for r in result["by_abs_err"][:decompose_top_err]:
             self.print_source_decomposition(
                 z_matrix=z_matrix,
-                dq=dq,
+                dq_raw=dq_raw,
                 H=H,
+                g0=g0,
+                g_qm=g_qm,
                 target_idx=r["idx"],
                 top_m=8,
             )
-        
-        return result   
+
+        return result
     
 
 

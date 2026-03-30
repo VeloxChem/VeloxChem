@@ -5541,13 +5541,7 @@ class IMDatabasePointCollecter:
                 sym_datapoints=sym_datapoints,
                 exponent_p_q=exponent_p_q,
             )
-        )
-        
-        
-        
-        
-        
-        
+        )  
         
         D_dp, D_ref, D_dpref = self._build_dp_ref_distance_matrix(datapoints, molecules, sym_dict)
         
@@ -5566,6 +5560,7 @@ class IMDatabasePointCollecter:
         # qm_energies.extend(additional_energies)
         # qm_gradients.extend(additional_gradients)
 
+
         final_alphas = initial_alphas.copy()
 
         basin_results = []
@@ -5583,7 +5578,7 @@ class IMDatabasePointCollecter:
             qm_energies_sub = [qm_energies[i] for i in ref_mask]
             qm_gradients_sub = [qm_gradients[i] for i in ref_mask]
             im_energies_sub = [im_energies[i] for i in ref_mask]
-            alphas_sub = [initial_alphas[i] for i in dp_mask]
+            alphas_sub = [0.5 for i in dp_mask]
 
             res = optimize_trust_radius(
                 alphas_sub,

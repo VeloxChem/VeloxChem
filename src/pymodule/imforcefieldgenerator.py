@@ -692,7 +692,6 @@ class IMForceFieldGenerator:
                 neighbors_a2 = sum(conn[a2])
                 element_a1 = labels[a1][0]
                 element_a2 = labels[a2][0]
-
                 # NH2 rule
                 if (element_a1 == 'N' and neighbors_a1 == 2) or (element_a2 == 'N' and neighbors_a2 == 2):
                     return 'gs'
@@ -728,7 +727,6 @@ class IMForceFieldGenerator:
             # Apply the separation logic to fix lumped groups before iterating
             groups = determine_similar_groups(groups)
 
-            print(groups)
 
             for group in groups:
                 if len(group) > 3:
@@ -1171,14 +1169,15 @@ class IMForceFieldGenerator:
         root_extract_z_matrix = None
         if self.imforcefieldfiles is not None:
             root_extract_z_matrix = {}
+            self.sampling_imforcefieldfiles = {}
             for i, root in enumerate(self.roots_to_follow):
                 if root not in self.imforcefieldfiles or not os.path.exists(self.imforcefieldfiles[root]):
                     self.imforcefieldfiles[self.roots_to_follow[i]] = f'im_database_{root}.h5'
-                    self.sampling_imforcefieldfiles[self.roots_to_follow[i]] = f'im_database_sampling_{root}.h5'
                     root_extract_z_matrix[self.roots_to_follow[i]] = False
                 else:
                     root_extract_z_matrix[self.roots_to_follow[i]] = True
 
+                self.sampling_imforcefieldfiles[self.roots_to_follow[i]] = f'im_database_sampling_{root}.h5'
         else:
             self.imforcefieldfiles = {}
             self.sampling_imforcefieldfiles = {}
@@ -1216,7 +1215,8 @@ class IMForceFieldGenerator:
                                     'use_eq_bond_length':self.use_eq_bond_length,
                                     'use_cosine_dihedral':self.use_cosine_dihedral,
                                     'use_tc_weights':self.use_tc_weights,
-                                    'use_mpi_preload': self.use_mpi_preload
+                                    'use_mpi_preload': self.use_mpi_preload,
+                                    'use_symmetry': self.use_symmetry,
                                 }
                 self.sampling_states_interpolation_settings[root] = {
                     'interpolation_type': self.interpolation_type,
@@ -1230,6 +1230,7 @@ class IMForceFieldGenerator:
                     'use_cosine_dihedral': self.use_cosine_dihedral,
                     'use_tc_weights': self.use_tc_weights,
                     'use_mpi_preload': self.use_mpi_preload,
+                    'use_symmetry': self.use_symmetry,
                 }
                 
             self.dynamics_settings = {  'drivers':self.drivers,
@@ -1547,7 +1548,8 @@ class IMForceFieldGenerator:
                                 'use_eq_bond_length':self.use_eq_bond_length,
                                 'use_cosine_dihedral':self.use_cosine_dihedral,
                                 'use_tc_weights':self.use_tc_weights,
-                                'use_mpi_preload': self.use_mpi_preload
+                                'use_mpi_preload': self.use_mpi_preload,
+                                'use_symmetry': self.use_symmetry,
                             }
             self.sampling_states_interpolation_settings[self.roots_to_follow[0]] = {
                     'interpolation_type': self.interpolation_type,
@@ -1561,6 +1563,7 @@ class IMForceFieldGenerator:
                     'use_cosine_dihedral': self.use_cosine_dihedral,
                     'use_tc_weights': self.use_tc_weights,
                     'use_mpi_preload': self.use_mpi_preload,
+                    'use_symmetry': self.use_symmetry,
                 }
 
             self.dynamics_settings = {  'drivers':self.drivers,
@@ -3534,7 +3537,7 @@ class IMForceFieldGenerator:
                         impes_coordinate.confidence_radius = trust_radius
                         
                         impes_coordinate.write_hdf5(target_file, label)
-                        impes_coordinate.write_hdf5('im_database_{target_root}_org.h5}', label)
+                        impes_coordinate.write_hdf5(f'im_database_{target_root}_org.h5', label)
                         interpolation_driver.imforcefield_file = target_file
                         
                         labels, z_matrix = interpolation_driver.read_labels()

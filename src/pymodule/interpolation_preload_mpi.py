@@ -56,6 +56,7 @@ class StaticLabelPack:
     bond_end: int
     angle_end: int
     dihedral_start: int
+    dihedral_end: int
     sym3_rows: np.ndarray
     sym3_center_ids: np.ndarray
     n_sym3: int
@@ -183,10 +184,64 @@ def _segment_rmsd(segment: np.ndarray) -> float:
     return float(np.sqrt(np.mean(np.sum(segment ** 2))))
 
 
+def evaluate_candidate_taylor(
+        *,
+        energy: float,
+        grad: np.ndarray,
+        hess: np.ndarray,
+        ref_coords: np.ndarray,
+        mask0: np.ndarray,
+        mask: np.ndarray,
+        org_int_coords: np.ndarray,
+        b_matrix: np.ndarray,
+        use_cosine_dihedral: bool,
+        dihedral_start: int,
+        dihedral_end: int) -> Tuple[float, np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Evaluates one masked Taylor candidate in a parity-safe way shared by
+    serial and MPI preload paths.
+    """
+    grad_eff = np.asarray(grad, dtype=np.float64).copy()
+    hess_eff = np.asarray(hess, dtype=np.float64).copy()
+    ref = np.asarray(ref_coords, dtype=np.float64)
+    mask0_arr = np.asarray(mask0, dtype=np.int64)
+    mask_arr = np.asarray(mask, dtype=np.int64)
+    org = np.asarray(org_int_coords, dtype=np.float64)
+    bmat = np.asarray(b_matrix, dtype=np.float64)
+
+    grad_eff[mask0_arr] = grad_eff[mask_arr]
+    hess_eff[np.ix_(mask0_arr, mask0_arr)] = hess_eff[np.ix_(mask_arr, mask_arr)]
+
+    dist_org = org - ref[mask_arr]
+    dist_check = dist_org.copy()
+    if not use_cosine_dihedral:
+        dist_check[dihedral_start:dihedral_end] = np.sin(
+            dist_org[dihedral_start:dihedral_end])
+
+    dist_correlation = dist_check.copy()
+
+    U_i = float(
+        energy
+        + dist_check @ grad_eff
+        + 0.5 * np.linalg.multi_dot([dist_check, hess_eff, dist_check])
+    )
+
+    dist_hess = dist_check @ hess_eff
+    if not use_cosine_dihedral:
+        c = np.cos(dist_org[dihedral_start:dihedral_end])
+        grad_eff[dihedral_start:dihedral_end] *= c
+        dist_hess[dihedral_start:dihedral_end] *= c
+
+    natm = bmat.shape[1] // 3
+    dU_i = (bmat.T @ (grad_eff + dist_hess)).reshape(natm, 3)
+
+    return U_i, dU_i, dist_org, dist_correlation
+
+
 def _build_pack_for_label(driver: Any, dp_label: str, size: int) -> StaticLabelPack:
-    entries = driver._get_symmetry_task_entries(dp_label)
+    entries = driver._build_candidates_for_label(dp_label)
     if len(entries) == 0:
-        raise ValueError(f"No symmetry entries found for label '{dp_label}'.")
+        raise ValueError(f"No candidate entries found for label '{dp_label}'.")
 
     uniq = []
     idx_by_obj = {}
@@ -222,7 +277,17 @@ def _build_pack_for_label(driver: Any, dp_label: str, size: int) -> StaticLabelP
             )
         )
 
-    torsion_meta = driver._get_symmetry_torsion_meta()
+    use_symmetry = bool(driver._use_symmetry_for_label(dp_label))
+    if use_symmetry:
+        torsion_meta = driver._get_symmetry_torsion_meta()
+    else:
+        torsion_meta = {
+            'sym3_rows': np.array([], dtype=np.int64),
+            'sym3_center_ids': np.array([], dtype=np.int64),
+            'sym3_keys': (),
+        }
+
+    bounds = driver._get_internal_coordinate_partitions()
 
     layout = RankLayout.from_n_items(len(tasks), size)
     return StaticLabelPack(
@@ -235,9 +300,10 @@ def _build_pack_for_label(driver: Any, dp_label: str, size: int) -> StaticLabelP
         int_coords=int_coords,
         tasks=tasks,
         layout=layout,
-        bond_end=int(driver.symmetry_information[-1][0]),
-        angle_end=int(driver.symmetry_information[-1][1]),
-        dihedral_start=int(driver.symmetry_information[-1][1]),
+        bond_end=int(bounds['bond_end']),
+        angle_end=int(bounds['angle_end']),
+        dihedral_start=int(bounds['dihedral_start']),
+        dihedral_end=int(bounds['dihedral_end']),
         sym3_rows=np.asarray(torsion_meta['sym3_rows'], dtype=np.int64),
         sym3_center_ids=np.asarray(torsion_meta['sym3_center_ids'], dtype=np.int64),
         n_sym3=int(len(torsion_meta['sym3_keys'])),
@@ -259,6 +325,7 @@ def _serialize_static_pack(pack: StaticLabelPack) -> Dict[str, Any]:
         'bond_end': int(pack.bond_end),
         'angle_end': int(pack.angle_end),
         'dihedral_start': int(pack.dihedral_start),
+        'dihedral_end': int(pack.dihedral_end),
         'sym3_rows': pack.sym3_rows,
         'sym3_center_ids': pack.sym3_center_ids,
         'n_sym3': int(pack.n_sym3),
@@ -304,6 +371,7 @@ def _deserialize_static_pack(payload: Dict[str, Any]) -> StaticLabelPack:
         bond_end=int(payload['bond_end']),
         angle_end=int(payload['angle_end']),
         dihedral_start=int(payload['dihedral_start']),
+        dihedral_end=int(payload['dihedral_end']),
         sym3_rows=np.asarray(payload['sym3_rows'], dtype=np.int64),
         sym3_center_ids=np.asarray(payload['sym3_center_ids'], dtype=np.int64),
         n_sym3=int(payload['n_sym3']),
@@ -351,20 +419,9 @@ def _evaluate_local_tasks(local_pack: LocalLabelPack, packet: StepPacket) -> Lab
         sym = task.sym_idx
 
         energy = gp.energies[sym]
-        grad = gp.int_grad[sym].copy()
-        hess = gp.int_hess[sym].copy()
+        grad = gp.int_grad[sym]
+        hess = gp.int_hess[sym]
         ref = gp.int_coords[sym]
-
-        grad[task.mask0] = grad[task.mask]
-        hess[np.ix_(task.mask0, task.mask0)] = hess[np.ix_(task.mask, task.mask)]
-
-        dist_org = packet.org_int_coords - ref[task.mask]
-        dist_check = dist_org.copy()
-        if not packet.use_cosine_dihedral:
-            d0 = gp.dihedral_start
-            dist_check[d0:] = np.sin(dist_org[d0:])
-
-        dist_correlation = dist_check.copy()
 
         if grouped_rows:
             ref_masked = ref[task.mask]
@@ -390,21 +447,19 @@ def _evaluate_local_tasks(local_pack: LocalLabelPack, packet: StepPacket) -> Lab
             W_i = 1.0
             dW_i = np.zeros((natm, 3), dtype=np.float64)
 
-        U_i = float(
-            energy
-            + dist_check @ grad
-            + 0.5 * np.linalg.multi_dot([dist_check, hess, dist_check])
+        U_i, dU_i, dist_org, dist_correlation = evaluate_candidate_taylor(
+            energy=energy,
+            grad=grad,
+            hess=hess,
+            ref_coords=ref,
+            mask0=task.mask0,
+            mask=task.mask,
+            org_int_coords=packet.org_int_coords,
+            b_matrix=packet.b_matrix,
+            use_cosine_dihedral=packet.use_cosine_dihedral,
+            dihedral_start=gp.dihedral_start,
+            dihedral_end=gp.dihedral_end,
         )
-
-        dist_hess = dist_check @ hess
-
-        if not packet.use_cosine_dihedral:
-            d0 = gp.dihedral_start
-            c = np.cos(dist_org[d0:])
-            grad[d0:] *= c
-            dist_hess[d0:] *= c
-
-        dU_i = (packet.b_matrix.T @ (grad + dist_hess)).reshape(natm, 3)
 
         red.S += W_i
         red.N += W_i * U_i
@@ -413,7 +468,7 @@ def _evaluate_local_tasks(local_pack: LocalLabelPack, packet: StepPacket) -> Lab
 
         red.rmsd_bond_sum += _segment_rmsd(dist_org[:gp.bond_end])
         red.rmsd_angle_sum += _segment_rmsd(dist_org[gp.bond_end:gp.angle_end])
-        red.rmsd_dihedral_sum += _segment_rmsd(dist_correlation[gp.dihedral_start:])
+        red.rmsd_dihedral_sum += _segment_rmsd(dist_correlation[gp.dihedral_start:gp.dihedral_end])
         red.rmsd_count += 1
 
     return red
