@@ -35,7 +35,8 @@ class TestTpaTransition:
 
         return scf_results, molecule, basis
 
-    def run_tpatransition(self, xcfun_label, ref_results, ri_coulomb=False):
+    def run_tpatransition(self, xcfun_label, ref_energies, ref_strengths,
+                          ri_coulomb=False):
 
         tpa_nstates = 2
         tpa_conv_thresh = 1.0e-7
@@ -52,9 +53,13 @@ class TestTpaTransition:
 
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
             tpa_str = tpa_results['tpa_strengths']['linear']
-            for (freq, val), (ref_freq, ref_val) in zip(tpa_str.items(),
-                                                        ref_results.items()):
+            assert list(tpa_str.keys()) == list(range(len(ref_strengths)))
+
+            for freq, ref_freq in zip(tpa_results['photon_energies'],
+                                      ref_energies):
                 assert abs(freq / ref_freq - 1.0) < 1.0e-6
+
+            for val, ref_val in zip(tpa_str.values(), ref_strengths):
                 assert abs(val / ref_val - 1.0) < 1.0e-6
 
     def compute_tpatransition(self, xcfun_label, ri_coulomb=False):
@@ -91,43 +96,36 @@ class TestTpaTransition:
 
     def test_tpatransition_hf(self):
 
-        ref_result = {
-            -0.1656922537003149: 4.130284073574981,
-            -0.21190963394768278: 15.83816511497292,
-        }
-        self.run_tpatransition('hf', ref_result)
+        ref_energies = [0.1656922537003149, 0.21190963394768278]
+        ref_strengths = [4.130284073574981, 15.83816511497292]
+        self.run_tpatransition('hf', ref_energies, ref_strengths)
 
     def test_tpatransition_lda(self):
 
-        ref_result = {
-            -0.13269116242012727: 12.922686324743287,
-            -0.18051942347838879: 55.35603386346646,
-        }
-        self.run_tpatransition('slda', ref_result)
+        ref_energies = [0.13269116242012727, 0.18051942347838879]
+        ref_strengths = [12.922686324743287, 55.35603386346646]
+        self.run_tpatransition('slda', ref_energies, ref_strengths)
 
     def test_tpatransition_gga(self):
 
-        ref_result = {
-            -0.13304132289794054: 13.068064328595725,
-            -0.179389130413857: 57.062788455439296,
-        }
-        self.run_tpatransition('bp86', ref_result)
+        ref_energies = [0.13304132289794054, 0.179389130413857]
+        ref_strengths = [13.068064328595725, 57.062788455439296]
+        self.run_tpatransition('bp86', ref_energies, ref_strengths)
 
     def test_tpatransition_mgga(self):
 
-        ref_result = {
-            -0.1381414072229231: 9.579957827267322,
-            -0.18265658100098003: 41.94340887233736,
-        }
-        self.run_tpatransition('tpssh', ref_result)
+        ref_energies = [0.1381414072229231, 0.18265658100098003]
+        ref_strengths = [9.579957827267322, 41.94340887233736]
+        self.run_tpatransition('tpssh', ref_energies, ref_strengths)
 
     def test_tpatransition_ri_blyp(self):
 
-        ref_result = {
-            -0.12580806392701718: 13.672823155898364,
-            -0.1710157238983142: 60.526749482300374,
-        }
-        self.run_tpatransition('blyp', ref_result, ri_coulomb=True)
+        ref_energies = [0.12580806392701718, 0.1710157238983142]
+        ref_strengths = [13.672823155898364, 60.526749482300374]
+        self.run_tpatransition('blyp',
+                               ref_energies,
+                               ref_strengths,
+                               ri_coulomb=True)
 
     def test_get_spectrum(self):
 

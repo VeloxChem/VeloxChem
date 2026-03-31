@@ -592,7 +592,7 @@ class TpaTransitionDriver(NonlinearSolver):
                 m[1, 2] = val_E3 + val_A2 + val_X2
                 m[2, 1] = val_E3 + val_A2 + val_X2
 
-                M_tensors.update({w: m})
+                M_tensors.update({w_ind: m})
 
         diagonalized_tensors = {}
 
@@ -610,14 +610,14 @@ class TpaTransitionDriver(NonlinearSolver):
         if self.rank == mpi_master():
             tpa_strengths = {'linear': {}, 'circular': {}}
 
-            for w in M_tensors.keys():
+            for state_ind in M_tensors.keys():
                 Df = 0.0
                 Dg = 0.0
                 for i in range(3):
                     for j in range(3):
-                        Mii = M_tensors[w][(i, i)]
-                        Mij = M_tensors[w][(i, j)]
-                        Mjj = M_tensors[w][(j, j)]
+                        Mii = M_tensors[state_ind][(i, i)]
+                        Mij = M_tensors[state_ind][(i, j)]
+                        Mjj = M_tensors[state_ind][(j, j)]
                         Df += (Mii * Mjj).real
                         Dg += (Mij * Mij).real
                 Df /= 30.0
@@ -626,8 +626,8 @@ class TpaTransitionDriver(NonlinearSolver):
                 D_linear = 2.0 * Df + 4.0 * Dg
                 D_circular = -2.0 * Df + 6.0 * Dg
 
-                tpa_strengths['linear'][w] = D_linear
-                tpa_strengths['circular'][w] = D_circular
+                tpa_strengths['linear'][state_ind] = D_linear
+                tpa_strengths['circular'][state_ind] = D_circular
 
             profiler.check_memory_usage('End of QRF')
 
@@ -1019,12 +1019,12 @@ class TpaTransitionDriver(NonlinearSolver):
         for w_ind, w in enumerate(freqs):
             exec_str = '{:7d}   '.format(w_ind + 1)
             exec_str += '{:11.6f} eV'.format(w * hartree_in_ev())
-            exec_str += '{:11.4f}'.format(M_tensors[-w][0, 0].real)
-            exec_str += '{:11.4f}'.format(M_tensors[-w][1, 1].real)
-            exec_str += '{:11.4f}'.format(M_tensors[-w][2, 2].real)
-            exec_str += '{:11.4f}'.format(M_tensors[-w][0, 1].real)
-            exec_str += '{:11.4f}'.format(M_tensors[-w][0, 2].real)
-            exec_str += '{:11.4f}'.format(M_tensors[-w][1, 2].real)
+            exec_str += '{:11.4f}'.format(M_tensors[w_ind][0, 0].real)
+            exec_str += '{:11.4f}'.format(M_tensors[w_ind][1, 1].real)
+            exec_str += '{:11.4f}'.format(M_tensors[w_ind][2, 2].real)
+            exec_str += '{:11.4f}'.format(M_tensors[w_ind][0, 1].real)
+            exec_str += '{:11.4f}'.format(M_tensors[w_ind][0, 2].real)
+            exec_str += '{:11.4f}'.format(M_tensors[w_ind][1, 2].real)
             self.ostream.print_header(exec_str.ljust(width))
         self.ostream.print_blank()
         self.ostream.print_blank()
@@ -1043,7 +1043,7 @@ class TpaTransitionDriver(NonlinearSolver):
         for w_ind, w in enumerate(freqs):
             exec_str = '{:7d}   '.format(w_ind + 1)
             exec_str += '{:11.6f} eV'.format(w * hartree_in_ev())
-            exec_str += '{:20.6f} a.u.'.format(tpa_strengths['linear'][-w])
+            exec_str += '{:20.6f} a.u.'.format(tpa_strengths['linear'][w_ind])
             self.ostream.print_header(exec_str.ljust(width))
         self.ostream.print_blank()
         self.ostream.print_blank()
@@ -1060,7 +1060,7 @@ class TpaTransitionDriver(NonlinearSolver):
         for w_ind, w in enumerate(freqs):
             exec_str = '{:7d}   '.format(w_ind + 1)
             exec_str += '{:11.6f} eV'.format(w * hartree_in_ev())
-            exec_str += '{:20.6f} a.u.'.format(tpa_strengths['circular'][-w])
+            exec_str += '{:20.6f} a.u.'.format(tpa_strengths['circular'][w_ind])
             self.ostream.print_header(exec_str.ljust(width))
         self.ostream.print_blank()
         self.ostream.print_blank()
@@ -1111,8 +1111,8 @@ class TpaTransitionDriver(NonlinearSolver):
         tpa_ene_au = []
         tpa_str = []
 
-        for w, s in rsp_results['tpa_strengths']['linear'].items():
-            tpa_ene_au.append(-w)
+        for state_ind, s in rsp_results['tpa_strengths']['linear'].items():
+            tpa_ene_au.append(rsp_results['photon_energies'][state_ind])
             tpa_str.append(s)
 
         spectrum = {}
