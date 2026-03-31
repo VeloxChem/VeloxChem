@@ -607,17 +607,8 @@ class TpaTransitionDriver(NonlinearSolver):
         self.ostream.print_header('=' * (len(w_str) + 2))
         self.ostream.print_blank()
 
-        # conversion factor for TPA cross-sections in GM
-        # a0 in cm, c in cm/s, gamma (0.1 eV) in au
-        alpha = fine_structure_constant()
-        a0 = bohr_in_angstrom() * 1.0e-8
-        c = speed_of_light_in_vacuum_in_SI() * 100.0
-        gamma = 0.1 / hartree_in_ev()
-        au2gm = (8.0 * np.pi**2 * alpha * a0**5) / (c * gamma) * 1.0e+50
-
         if self.rank == mpi_master():
             tpa_strengths = {'linear': {}, 'circular': {}}
-            tpa_cross_sections = {'linear': {}, 'circular': {}}
 
             for w in M_tensors.keys():
                 Df = 0.0
@@ -638,15 +629,11 @@ class TpaTransitionDriver(NonlinearSolver):
                 tpa_strengths['linear'][w] = D_linear
                 tpa_strengths['circular'][w] = D_circular
 
-                tpa_cross_sections['linear'][w] = au2gm * w**2 * D_linear
-                tpa_cross_sections['circular'][w] = au2gm * w**2 * D_circular
-
             profiler.check_memory_usage('End of QRF')
 
             ret_dict = {
                 'photon_energies': [-w for w in freqs],
                 'transition_moments': M_tensors,
-                'cross_sections': tpa_cross_sections,
                 'tpa_strengths': tpa_strengths,
                 'excited_state_dipole_moments': excited_state_dipole_moments,
                 'ground_state_dipole_moments':
@@ -1043,15 +1030,13 @@ class TpaTransitionDriver(NonlinearSolver):
         self.ostream.print_blank()
 
         tpa_strengths = rsp_results['tpa_strengths']
-        tpa_cross_sections = rsp_results['cross_sections']
 
-        title = 'TPA Strength and Cross-Section (Linear Polarization)'
+        title = 'TPA Strength (Linear Polarization)'
         self.ostream.print_header(title)
         self.ostream.print_header('-' * width)
 
-        title = '  {:<9s} {:>12s}{:>28s}{:>28s}'.format(
-            'Ex. State', 'Ex. Energy', 'TPA strength    ',
-            'TPA cross-section    ')
+        title = '  {:<9s} {:>12s}{:>28s}'.format('Ex. State', 'Ex. Energy',
+                                                  'TPA strength    ')
         self.ostream.print_header(title.ljust(width))
         self.ostream.print_header('-' * width)
 
@@ -1059,18 +1044,16 @@ class TpaTransitionDriver(NonlinearSolver):
             exec_str = '{:7d}   '.format(w_ind + 1)
             exec_str += '{:11.6f} eV'.format(w * hartree_in_ev())
             exec_str += '{:20.6f} a.u.'.format(tpa_strengths['linear'][-w])
-            exec_str += '{:20.6f} GM'.format(tpa_cross_sections['linear'][-w])
             self.ostream.print_header(exec_str.ljust(width))
         self.ostream.print_blank()
         self.ostream.print_blank()
 
-        title = 'TPA Strength and Cross-Section (Circular Polarization)'
+        title = 'TPA Strength (Circular Polarization)'
         self.ostream.print_header(title)
         self.ostream.print_header('-' * width)
 
-        title = '  {:<9s} {:>12s}{:>28s}{:>28s}'.format(
-            'Ex. State', 'Ex. Energy', 'TPA strength    ',
-            'TPA cross-section    ')
+        title = '  {:<9s} {:>12s}{:>28s}'.format('Ex. State', 'Ex. Energy',
+                                                  'TPA strength    ')
         self.ostream.print_header(title.ljust(width))
         self.ostream.print_header('-' * width)
 
@@ -1078,7 +1061,6 @@ class TpaTransitionDriver(NonlinearSolver):
             exec_str = '{:7d}   '.format(w_ind + 1)
             exec_str += '{:11.6f} eV'.format(w * hartree_in_ev())
             exec_str += '{:20.6f} a.u.'.format(tpa_strengths['circular'][-w])
-            exec_str += '{:20.6f} GM'.format(tpa_cross_sections['circular'][-w])
             self.ostream.print_header(exec_str.ljust(width))
         self.ostream.print_blank()
         self.ostream.print_blank()

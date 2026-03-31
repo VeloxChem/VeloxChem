@@ -224,17 +224,10 @@ class TestTpaTransition:
             first_strengths = list(first_results['tpa_strengths']['linear'].values())
             fresh_strengths = list(fresh_results['tpa_strengths']['linear'].values())
 
-            restarted_cross_sections = list(
-                restarted_results['cross_sections']['linear'].values())
-            fresh_cross_sections = list(
-                fresh_results['cross_sections']['linear'].values())
-
             assert restarted_strengths == pytest.approx(fresh_strengths,
                                                         abs=1.0e-7)
             assert first_strengths == pytest.approx(fresh_strengths,
                                                     abs=1.0e-7)
-            assert restarted_cross_sections == pytest.approx(
-                fresh_cross_sections, abs=1.0e-7)
 
             for suffix in [
                     '.h5',
