@@ -592,7 +592,19 @@ class TpaTransitionDriver(NonlinearSolver):
                 m[1, 2] = val_E3 + val_A2 + val_X2
                 m[2, 1] = val_E3 + val_A2 + val_X2
 
-                M_tensors.update({w_ind: m})
+                abs_tol = 1.0e-10
+                rel_tol = 1.0e-8
+                real_norm = np.linalg.norm(m.real)
+                imag_norm = np.linalg.norm(m.imag)
+                assert_msg_critical(
+                    imag_norm <= abs_tol + rel_tol * real_norm,
+                    'TpaTransitionDriver: unexpected imaginary part in '
+                    f'TPA transition tensor for excited state {w_ind} '
+                    f'(||Im||_F = {imag_norm:.3e}, '
+                    f'||Re||_F = {real_norm:.3e}, '
+                    f'abs_tol = {abs_tol:.1e}, rel_tol = {rel_tol:.1e})')
+
+                M_tensors.update({w_ind: m.real.copy()})
 
         diagonalized_tensors = {}
 
