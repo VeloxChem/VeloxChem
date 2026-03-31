@@ -23,7 +23,7 @@ class TestOrbitalViewer:
         task = MpiTask([inpfile, None])
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
 
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        scf_drv.compute(task.molecule, task.ao_basis)
 
         if scf_drv.rank == mpi_master():
             mo_coefs = scf_drv.molecular_orbitals.alpha_to_numpy()

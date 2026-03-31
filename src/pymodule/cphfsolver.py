@@ -399,7 +399,7 @@ class CphfSolver(LinearSolver):
         pe_dict = self._init_pe(molecule, basis)
 
         # CPCM_information
-        self._init_cpcm(molecule)
+        self._init_cpcm(molecule, basis)
 
         cphf_rhs_dict = self.compute_rhs(molecule, basis, scf_results, eri_dict,
                                          dft_dict, pe_dict, *args)

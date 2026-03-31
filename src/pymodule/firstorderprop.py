@@ -38,7 +38,7 @@ import sys
 from .veloxchemlib import mpi_master
 from .veloxchemlib import dipole_in_debye
 from .outputstream import OutputStream
-from .oneeints import compute_electric_dipole_integrals
+from .firstorderpropdriver import FirstOrderPropertyDriver
 
 
 class FirstOrderProperties:
@@ -75,6 +75,8 @@ class FirstOrderProperties:
 
         self.properties = {}
 
+        self._prop_drv = FirstOrderPropertyDriver(self.comm, self.ostream)
+
     def compute_scf_prop(self, molecule, basis, scf_results):
         """
         Computes first-order properties for SCF.
@@ -106,43 +108,11 @@ class FirstOrderProperties:
             The total electron density.
         """
 
-        # choose center of nuclear charges as origin
-        coords = molecule.get_coordinates_in_bohr()
-        nuclear_charges = molecule.get_element_ids()
-        origin = np.sum(coords.T * nuclear_charges,
-                        axis=1) / np.sum(nuclear_charges)
+        dipole_dict = self._prop_drv.compute_electric_dipole_moment(
+            molecule, basis, total_density)
 
-        dipole_moment = None
-        if self.rank == mpi_master():
-            dipole_ints = compute_electric_dipole_integrals(
-                molecule, basis, origin)
+        dipole_moment = dipole_dict['total']
 
-            # electronic contribution
-
-            # multiple states:
-            if len(total_density.shape) > 2:
-                dof = total_density.shape[0]
-                electronic_dipole = np.zeros((dof, 3))
-                for i in range(dof):
-                    electronic_dipole[i] = np.array([
-                        np.sum(dipole_ints[d] * total_density[i])
-                        for d in range(3)
-                    ])
-
-            # or single state:
-            else:
-                electronic_dipole = np.array(
-                    [np.sum(dipole_ints[d] * total_density) for d in range(3)])
-
-            # nuclear contribution
-            coords = molecule.get_coordinates_in_bohr()
-            nuclear_charges = molecule.get_element_ids()
-            nuclear_charges -= basis.get_number_of_ecp_core_electrons()
-            nuclear_dipole = np.sum((coords - origin).T * nuclear_charges,
-                                    axis=1)
-
-            dipole_moment = nuclear_dipole + electronic_dipole
-        dipole_moment = self.comm.bcast(dipole_moment, root=mpi_master())
         self.properties['dipole moment'] = dipole_moment
         self.properties['dipole_moment'] = dipole_moment
 

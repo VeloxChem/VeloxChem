@@ -507,33 +507,21 @@ def _Molecule_from_input_dict(mol_dict):
     return mol
 
 
-def _Molecule_nuclear_repulsion_energy(self, basis=None):
+def _Molecule_effective_nuclear_repulsion_energy(self, basis):
     """
-    Computes nuclear potential energy of a molecule.
+    Computes effective nuclear repulsion energy of a molecule.
 
     :param basis:
-        Optional AO basis set object (for taking care of ECP core electrons).
+        AO basis set object (for taking care of ECP core electrons).
     :return:
-        The nuclear potential energy.
+        The effective nuclear repulsion energy.
     """
 
     coords_in_au = self.get_coordinates_in_bohr()
-    elem_ids = self.get_element_ids()
+    elem_ids = self.get_effective_nuclear_charges(basis)
 
     natoms = coords_in_au.shape[0]
     e_nuc = 0.0
-
-    if basis is not None:
-        core_electrons = basis.get_number_of_ecp_core_electrons()
-        assert_msg_critical(
-            len(core_electrons) == natoms,
-            'Molecule.nuclear_repulsion_energy: ECP core electron list must match number of atoms'
-        )
-        assert_msg_critical(
-            np.all(np.array(core_electrons) >= 0),
-            'Molecule.nuclear_repulsion_energy: ECP core electrons must be non-negative'
-        )
-        elem_ids -= core_electrons
 
     for i in range(natoms):
         z_i = elem_ids[i]
@@ -545,6 +533,51 @@ def _Molecule_nuclear_repulsion_energy(self, basis=None):
             e_nuc += z_i * z_j / distance
 
     return e_nuc
+
+
+def _Molecule_nuclear_repulsion_energy(self, basis=None):
+    """
+    Deprecated compatibility shim for effective nuclear repulsion energy.
+
+    :param basis:
+        Deprecated. Use effective_nuclear_repulsion_energy(basis) instead.
+    :return:
+        This function always raises.
+    """
+
+    assert_msg_critical(
+        False,
+        'Molecule.nuclear_repulsion_energy is deprecated; use Molecule.effective_nuclear_repulsion_energy(basis)'
+    )
+
+
+def _Molecule_get_effective_nuclear_charges(self, basis):
+    """
+    Returns effective nuclear charges after subtracting ECP core electrons.
+
+    :param basis:
+        The AO basis set.
+
+    :return:
+        Effective nuclear charges.
+    """
+
+    elem_ids = self.get_element_ids()
+    core_electrons = basis.get_number_of_ecp_core_electrons()
+
+    natoms = self.number_of_atoms()
+    assert_msg_critical(
+        len(core_electrons) == natoms,
+        'Molecule.get_effective_nuclear_charges: ECP core electron list must match number of atoms'
+    )
+    assert_msg_critical(
+        np.all(np.array(core_electrons) >= 0),
+        'Molecule.get_effective_nuclear_charges: ECP core electrons must be non-negative'
+    )
+
+    elem_ids -= core_electrons
+
+    return elem_ids
 
 
 def _Molecule_get_connectivity_matrix(self, factor=1.3, H2_factor=1.8):
@@ -2062,7 +2095,9 @@ Molecule.read_molecule_string = _Molecule_read_molecule_string
 Molecule.read_xyz_file = _Molecule_read_xyz_file
 Molecule.read_xyz_string = _Molecule_read_xyz_string
 Molecule.from_input_dict = _Molecule_from_input_dict
+Molecule.effective_nuclear_repulsion_energy = _Molecule_effective_nuclear_repulsion_energy
 Molecule.nuclear_repulsion_energy = _Molecule_nuclear_repulsion_energy
+Molecule.get_effective_nuclear_charges = _Molecule_get_effective_nuclear_charges
 Molecule.get_connectivity_matrix = _Molecule_get_connectivity_matrix
 Molecule.get_distance = _Molecule_get_distance
 Molecule.set_distance = _Molecule_set_distance

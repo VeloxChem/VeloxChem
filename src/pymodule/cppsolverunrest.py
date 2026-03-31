@@ -132,11 +132,6 @@ class ComplexResponseUnrestrictedSolver(ComplexResponseSolverBase):
         for convergence.
         """
 
-        # TODO: enable ECP
-        assert_msg_critical(
-            not basis.has_ecp(),
-            f'{type(self).__name__}.compute: ECP is not yet supported')
-
         # take care of quadrupole components
         if self.is_quadrupole(self.a_operator):
             if isinstance(self.a_components, str):
@@ -220,8 +215,8 @@ class ComplexResponseUnrestrictedSolver(ComplexResponseSolverBase):
 
         norb = orb_ene_a.shape[0]
 
-        nocc_a = molecule.number_of_alpha_electrons()
-        nocc_b = molecule.number_of_beta_electrons()
+        nocc_a = molecule.number_of_alpha_occupied_orbitals(basis)
+        nocc_b = molecule.number_of_beta_occupied_orbitals(basis)
 
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
@@ -230,7 +225,7 @@ class ComplexResponseUnrestrictedSolver(ComplexResponseSolverBase):
         # PE information
         pe_dict = self._init_pe(molecule, basis)
         # CPCM information
-        self._init_cpcm(molecule)
+        self._init_cpcm(molecule, basis)
 
         # TODO: enable PE
         assert_msg_critical(
@@ -1025,8 +1020,8 @@ class ComplexResponseUnrestrictedSolver(ComplexResponseSolverBase):
         a_grad_beta /= sqrt_2
 
         if self.rank == mpi_master():
-            nocc_a = molecule.number_of_alpha_electrons()
-            nocc_b = molecule.number_of_beta_electrons()
+            nocc_a = molecule.number_of_alpha_occupied_orbitals(basis)
+            nocc_b = molecule.number_of_beta_occupied_orbitals(basis)
             norb = scf_results['E_alpha'].shape[0]
 
             nvir_a = norb - nocc_a

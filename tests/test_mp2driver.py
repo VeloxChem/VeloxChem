@@ -16,8 +16,7 @@ class TestMp2Driver:
             scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
         else:
             scf_drv = ScfUnrestrictedDriver(task.mpi_comm, task.ostream)
-        scf_results = scf_drv.compute(task.molecule, task.ao_basis,
-                                      task.min_basis)
+        scf_results = scf_drv.compute(task.molecule, task.ao_basis)
 
         mp2_drv = Mp2Driver(task.mpi_comm, task.ostream)
         if mp2_type.lower() == 'conventional':

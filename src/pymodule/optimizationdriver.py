@@ -1061,9 +1061,8 @@ class OptimizationDriver:
                 scan_coordinates_au = []
                 for xyzstr in opt_results['scan_geometries']:
                     mol = Molecule.read_xyz_string(xyzstr)
-                    # TODO: take care of ECP core electrons
                     nuclear_repulsion_energies.append(
-                        mol.nuclear_repulsion_energy(basis))
+                        mol.effective_nuclear_repulsion_energy(basis))
                     scan_coordinates_au.append(mol.get_coordinates_in_bohr())
 
                 hf.create_dataset(opt_group + 'scan_coordinates_au',
@@ -1077,9 +1076,8 @@ class OptimizationDriver:
                 opt_coordinates_au = []
                 for xyzstr in opt_results['opt_geometries']:
                     mol = Molecule.read_xyz_string(xyzstr)
-                    # TODO: take care of ECP core electrons
                     nuclear_repulsion_energies.append(
-                        mol.nuclear_repulsion_energy(basis))
+                        mol.effective_nuclear_repulsion_energy(basis))
                     opt_coordinates_au.append(mol.get_coordinates_in_bohr())
 
                 hf.create_dataset(opt_group + 'opt_coordinates_au',

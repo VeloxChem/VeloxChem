@@ -1,6 +1,7 @@
 from pathlib import Path
 import numpy as np
 import pytest
+from mpi4py import MPI
 
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.molecule import Molecule
@@ -78,3 +79,38 @@ class TestPointCharges:
 
         self.run_scf_with_point_charges('b3lyp', ref_energy, 1.0e-9, ref_grad,
                                         1.0e-4)
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='requires standard single-process assertions')
+    def test_invalid_point_charge_line_raises(self, tmp_path):
+
+        mol, bas = self.get_molecule_and_basis()
+        potfile = tmp_path / 'invalid_point_charges.pot'
+        potfile.write_text('1\ninvalid\nQ 0.0 0.0 0.0\n')
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.point_charges = str(potfile)
+        scf_drv.ostream.mute()
+
+        with pytest.raises(AssertionError,
+                           match='potfile: Invalid data on point charge line 3'):
+            scf_drv.compute(mol, bas)
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='requires standard single-process assertions')
+    def test_invalid_qm_vdw_line_raises(self, tmp_path):
+
+        mol, bas = self.get_molecule_and_basis()
+        potfile = tmp_path / 'valid_point_charges.pot'
+        vdwfile = tmp_path / 'invalid_qm_vdw.txt'
+        potfile.write_text('1\nvalid\nQ 0.0 0.0 0.0 0.1 1.0 2.0\n')
+        vdwfile.write_text('1.0 2.0\n3.0\n')
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.point_charges = str(potfile)
+        scf_drv.qm_vdw_params = str(vdwfile)
+        scf_drv.ostream.mute()
+
+        with pytest.raises(AssertionError,
+                           match='qm_vdw_params: Invalid data on line 2'):
+            scf_drv.compute(mol, bas)

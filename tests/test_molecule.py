@@ -15,6 +15,7 @@ from veloxchem.veloxchemlib import get_vdw_radii_data_in_bohr
 from veloxchem.veloxchemlib import chemical_element_identifier
 from veloxchem.mpitask import MpiTask
 from veloxchem.molecule import Molecule
+from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.dispersionmodel import DispersionModel
 from veloxchem.optimizationdriver import OptimizationDriver
 from veloxchem.inputparser import get_random_string_serial
@@ -460,17 +461,18 @@ class TestMolecule:
         assert mol.atom_indices('N') == [0]
         assert mol.atom_indices('H') == [1, 2, 3]
 
-    def test_nuclear_repulsion_energy(self):
+    def test_effective_nuclear_repulsion_energy(self):
 
         tol = 1.0e-12
 
         mol = Molecule.read_str(self.h2o_xyzstr(), 'au')
-        assert math.isclose(mol.nuclear_repulsion_energy(),
+        basis = MolecularBasis.read(mol, 'sto-3g', ostream=None)
+        assert math.isclose(mol.effective_nuclear_repulsion_energy(basis),
                             9.34363815797054450919,
                             rel_tol=tol,
                             abs_tol=tol)
 
-    def test_nuclear_repulsion_energy_with_ecp_basis(self):
+    def test_effective_nuclear_repulsion_energy_with_ecp_basis(self):
 
         tol = 1.0e-12
 
@@ -486,31 +488,31 @@ class TestMolecule:
                 distance = np.linalg.norm(coords[j] - coords[i])
                 ref_energy += charges[i] * charges[j] / distance
 
-        assert math.isclose(mol.nuclear_repulsion_energy(basis),
+        assert math.isclose(mol.effective_nuclear_repulsion_energy(basis),
                             ref_energy,
                             rel_tol=tol,
                             abs_tol=tol)
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='skip pytest.raises for multiple MPI processes')
-    def test_nuclear_repulsion_energy_rejects_ecp_length_mismatch(self):
+    def test_effective_nuclear_repulsion_energy_rejects_ecp_length_mismatch(self):
 
         mol = Molecule.read_str(self.h2o_xyzstr(), 'au')
 
         with pytest.raises(
                 AssertionError,
                 match='ECP core electron list must match number of atoms'):
-            mol.nuclear_repulsion_energy(FakeBasis([2, 0]))
+            mol.effective_nuclear_repulsion_energy(FakeBasis([2, 0]))
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='skip pytest.raises for multiple MPI processes')
-    def test_nuclear_repulsion_energy_rejects_negative_ecp_electrons(self):
+    def test_effective_nuclear_repulsion_energy_rejects_negative_ecp_electrons(self):
 
         mol = Molecule.read_str(self.h2o_xyzstr(), 'au')
 
         with pytest.raises(AssertionError,
                            match='ECP core electrons must be non-negative'):
-            mol.nuclear_repulsion_energy(FakeBasis([2, -1, 0]))
+            mol.effective_nuclear_repulsion_energy(FakeBasis([2, -1, 0]))
 
     def test_check_proximity(self):
 

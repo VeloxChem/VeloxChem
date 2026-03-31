@@ -8,7 +8,10 @@ from mpi4py import MPI
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
+from veloxchem.molecularorbitals import molorb
+from veloxchem.outputstream import OutputStream
 from veloxchem.scfrestdriver import ScfRestrictedDriver
+from veloxchem.scfrestopendriver import ScfRestrictedOpenDriver
 from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
 from veloxchem.dispersionmodel import DispersionModel
 from veloxchem.checkpoint import read_molecule_and_basis
@@ -42,6 +45,23 @@ class TestScfDriverMiscellaneous:
         """
 
         molecule = Molecule.read_xyz_string(xyz_string)
+        basis = MolecularBasis.read(molecule, "sto-3g", ostream=None)
+
+        return molecule, basis
+
+    @staticmethod
+    def get_open_shell_water_and_basis(charge=1, multiplicity=2):
+
+        xyz_string = """3
+        xyz
+        O   -0.1858140  -1.1749469   0.7662596
+        H   -0.1285513  -0.8984365   1.6808606
+        H   -0.0582782  -0.3702550   0.2638279
+        """
+
+        molecule = Molecule.read_xyz_string(xyz_string)
+        molecule.set_charge(charge)
+        molecule.set_multiplicity(multiplicity)
         basis = MolecularBasis.read(molecule, "sto-3g", ostream=None)
 
         return molecule, basis
@@ -507,3 +527,357 @@ class TestScfDriverMiscellaneous:
         if self.is_master():
             assert np.allclose(scf_drv_copy.scf_results['D_alpha'],
                                scf_drv.scf_results['D_alpha'])
+
+    def test_restricted_driver_helper_branches(self):
+
+        driver = ScfRestrictedDriver()
+        driver.ostream.mute()
+
+        ovl = np.eye(2)
+        oao = np.eye(2)
+        fock_a = np.array([[1.0, 0.2], [0.2, 0.4]])
+        fock_b = np.array([[0.8, 0.1], [0.1, 0.3]])
+        density_a = np.array([[1.0, 0.0], [0.0, 0.0]])
+        density_b = np.array([[0.85, 0.0], [0.0, 0.15]])
+
+        effective = driver._get_effective_fock((fock_a,), ovl, oao)
+        if self.is_master():
+            assert np.allclose(effective[0], fock_a)
+            assert effective[0] is fock_a
+
+        driver.acc_type = 'c2diis'
+        driver.diis_thresh = 1.0
+        driver.max_err_vecs = 2
+        driver._store_diis_data((fock_a,), (density_a,), ovl, 0.2)
+
+        single_effective = driver._get_effective_fock((fock_b,), ovl, oao)
+        if self.is_master():
+            assert np.allclose(single_effective[0], fock_a)
+            assert single_effective[0] is not driver._fock_matrices_alpha[0]
+
+        driver._store_diis_data((fock_b,), (density_b,), ovl, 0.2)
+
+        diis_effective = driver._get_effective_fock((fock_b,), ovl, oao)
+        if self.is_master():
+            assert diis_effective[0].shape == fock_a.shape
+            assert np.allclose(diis_effective[0], diis_effective[0].T)
+
+        driver.embedding = {'settings': {'embedding_method': 'PE'}}
+        assert driver.get_scf_type_str() == (
+            'Spin-Restricted Hartree-Fock with PE')
+
+        driver._dft = True
+        assert driver.get_scf_type_str() == 'Spin-Restricted Kohn-Sham with PE'
+
+    def test_unrestricted_helper_branches_and_natural_orbitals(self):
+
+        molecule, basis = self.get_open_shell_water_and_basis()
+        driver = ScfUnrestrictedDriver()
+        driver.ostream.mute()
+
+        ovl = np.eye(2)
+        oao = np.eye(2)
+        fock_a = np.array([[1.0, 0.2], [0.2, 0.5]])
+        fock_b = np.array([[0.9, 0.1], [0.1, 0.3]])
+        fock_c = np.array([[0.7, 0.05], [0.05, 0.2]])
+        density_a = np.array([[1.0, 0.0], [0.0, 0.0]])
+        density_b = np.array([[0.0, 0.0], [0.0, 1.0]])
+        density_c = np.array([[0.8, 0.0], [0.0, 0.2]])
+        density_d = np.array([[0.1, 0.0], [0.0, 0.9]])
+
+        passthrough = driver._get_effective_fock((fock_a, fock_b), ovl, oao)
+        if self.is_master():
+            assert np.allclose(passthrough[0], fock_a)
+            assert np.allclose(passthrough[1], fock_b)
+
+        driver.acc_type = 'c2diis'
+        driver.diis_thresh = 1.0
+        driver.max_err_vecs = 2
+        driver._store_diis_data((fock_a, fock_b), (density_a, density_b), ovl,
+                                0.2)
+
+        single_effective = driver._get_effective_fock((fock_c, fock_c), ovl,
+                                                      oao)
+        if self.is_master():
+            assert np.allclose(single_effective[0], fock_a)
+            assert np.allclose(single_effective[1], fock_b)
+
+        driver._store_diis_data((fock_c, fock_c), (density_c, density_d), ovl,
+                                0.2)
+        driver._store_diis_data((fock_b, fock_a), (density_b, density_a), ovl,
+                                0.2)
+        if self.is_master():
+            assert len(driver._fock_matrices_alpha) == 2
+            assert np.allclose(driver._fock_matrices_alpha[0], fock_c)
+            assert np.allclose(driver._fock_matrices_beta[0], fock_c)
+
+        diis_effective = driver._get_effective_fock((fock_a, fock_b), ovl, oao)
+        if self.is_master():
+            assert diis_effective[0].shape == fock_a.shape
+            assert diis_effective[1].shape == fock_b.shape
+
+        n_orbitals = basis.get_dimension_of_basis()
+        pfon_fock_a = np.diag(np.linspace(-1.5, 1.5, n_orbitals))
+        pfon_fock_b = np.diag(np.linspace(-1.2, 1.8, n_orbitals))
+
+        driver.pfon = True
+        driver.pfon_temperature = 200000.0
+        driver.pfon_nocc = 1
+        driver.pfon_nvir = 1
+
+        mol_orbs = driver._gen_molecular_orbitals(molecule, basis,
+                                                  (pfon_fock_a, pfon_fock_b),
+                                                  np.eye(n_orbitals))
+
+        nocc_a = molecule.number_of_alpha_occupied_orbitals(basis)
+        nocc_b = molecule.number_of_beta_occupied_orbitals(basis)
+
+        if self.is_master():
+            assert mol_orbs.get_orbitals_type() == molorb.unrest
+            assert mol_orbs.occa_to_numpy().sum() == pytest.approx(nocc_a)
+            assert mol_orbs.occb_to_numpy().sum() == pytest.approx(nocc_b)
+            assert 0.0 < mol_orbs.occa_to_numpy()[nocc_a] < 1.0
+            assert 0.0 < mol_orbs.occb_to_numpy()[nocc_b] < 1.0
+
+        scf_results = driver.compute(molecule, basis)
+        natural_orbitals = driver.natural_orbitals()
+
+        assert scf_results is not None
+        if self.is_master():
+            assert natural_orbitals.get_orbitals_type() == molorb.rest
+            occupations = natural_orbitals.occa_to_numpy()
+            assert np.all(occupations[:-1] >= occupations[1:])
+            assert np.all(occupations >= -1.0e-12)
+            assert np.all(occupations <= 2.0 + 1.0e-12)
+
+        driver.embedding = {'settings': {'embedding_method': 'PE'}}
+        assert driver.get_scf_type_str() == (
+            'Spin-Unrestricted Hartree-Fock with PE')
+
+        driver._dft = True
+        assert driver.get_scf_type_str() == (
+            'Spin-Unrestricted Kohn-Sham with PE')
+
+        copied = deepcopy(driver)
+        assert copied.ostream is driver.ostream
+        assert copied.comm is driver.comm
+        assert copied.xcfun == driver.xcfun
+        if self.is_master():
+            assert np.allclose(copied.scf_results['D_alpha'],
+                               driver.scf_results['D_alpha'])
+
+    def test_restricted_open_helper_branches(self):
+
+        molecule, basis = self.get_open_shell_water_and_basis()
+        driver = ScfRestrictedOpenDriver()
+        driver.ostream.mute()
+
+        fa = np.array([[1.2, 0.3], [0.3, 0.4]])
+        fb = np.array([[0.8, 0.1], [0.1, 0.2]])
+        da = np.array([[1.0, 0.0], [0.0, 0.0]])
+        db = np.array([[0.3, 0.0], [0.0, 0.1]])
+        s = np.eye(2)
+
+        projected = driver.get_projected_fock(fa, fb, da, db, s)
+        f0 = 0.5 * (fa + fb)
+        inactive = np.matmul(s, db)
+        active = np.matmul(s, da - db)
+        virtual = np.eye(2) - np.matmul(s, da)
+        expected = f0 + np.linalg.multi_dot([inactive, fb - f0, active.T])
+        expected += np.linalg.multi_dot([active, fa - f0, virtual.T])
+        expected += (expected - f0).T
+
+        assert np.allclose(projected, expected)
+        assert np.allclose(projected, projected.T)
+
+        passthrough = driver._get_effective_fock((fa, fb), s, s)
+        if self.is_master():
+            assert np.allclose(passthrough[0], fa)
+            assert np.allclose(passthrough[1], fb)
+
+        driver.acc_type = 'c2diis'
+        driver.diis_thresh = 1.0
+        driver.max_err_vecs = 2
+        driver._store_diis_data((fa, fb), (da, db), s, 0.2)
+
+        single_effective = driver._get_effective_fock((fa, fb), s, s)
+        if self.is_master():
+            assert len(single_effective) == 1
+            assert np.allclose(single_effective[0], projected)
+
+        fa_2 = np.array([[1.0, 0.2], [0.2, 0.6]])
+        fb_2 = np.array([[0.7, 0.15], [0.15, 0.5]])
+        da_2 = np.array([[0.9, 0.0], [0.0, 0.1]])
+        db_2 = np.array([[0.2, 0.0], [0.0, 0.2]])
+        driver._store_diis_data((fa_2, fb_2), (da_2, db_2), s, 0.2)
+
+        diis_effective = driver._get_effective_fock((fa_2, fb_2), s, s)
+        if self.is_master():
+            assert len(diis_effective) == 1
+            assert diis_effective[0].shape == fa.shape
+
+        n_orbitals = basis.get_dimension_of_basis()
+        pfon_fock = np.diag(np.linspace(-1.5, 1.5, n_orbitals))
+
+        driver.pfon = True
+        driver.pfon_temperature = 200000.0
+        driver.pfon_nocc = 1
+        driver.pfon_nvir = 1
+
+        mol_orbs = driver._gen_molecular_orbitals(molecule, basis, (pfon_fock,),
+                                                  np.eye(n_orbitals))
+
+        nocc_a = molecule.number_of_alpha_occupied_orbitals(basis)
+        nocc_b = molecule.number_of_beta_occupied_orbitals(basis)
+
+        if self.is_master():
+            assert mol_orbs.get_orbitals_type() == molorb.restopen
+            assert mol_orbs.occa_to_numpy().sum() == pytest.approx(nocc_a)
+            assert mol_orbs.occb_to_numpy().sum() == pytest.approx(nocc_b)
+            assert 0.0 < mol_orbs.occa_to_numpy()[nocc_a] < 1.0
+            assert 0.0 < mol_orbs.occb_to_numpy()[nocc_b] < 1.0
+
+        driver.embedding = {'settings': {'embedding_method': 'PE'}}
+        assert driver.get_scf_type_str() == (
+            'Spin-Restricted Open-Shell Hartree-Fock with PE')
+
+        driver._dft = True
+        assert driver.get_scf_type_str() == (
+            'Spin-Restricted Open-Shell Kohn-Sham with PE')
+
+        copied = deepcopy(driver)
+        assert copied.ostream is driver.ostream
+        assert copied.comm is driver.comm
+        assert copied._scf_type == driver._scf_type
+        if self.is_master():
+            assert np.allclose(copied._fock_matrices_proj[0],
+                               driver._fock_matrices_proj[0])
+
+    def test_guess_unpaired_electrons_warning_for_restricted(self, tmp_path):
+
+        molecule, basis = self.get_water_and_basis()
+
+        comm = MPI.COMM_WORLD
+        ostream = OutputStream.create_mpi_ostream(
+            comm, str(tmp_path / 'guess_restricted.out'))
+
+        scf_drv = ScfRestrictedDriver(comm, ostream)
+        scf_drv.guess_unpaired_electrons = '1(1.0)'
+        scf_drv.max_iter = 2
+        scf_drv.conv_thresh = 1.0e-12
+
+        scf_results = scf_drv.compute(molecule, basis)
+
+        assert scf_results is None
+        if self.is_master():
+            output = (tmp_path / 'guess_restricted.out').read_text()
+            assert 'Ignoring "guess_unpaired_electrons" in spin-restricted SCF calculation.' in output
+
+    def test_guess_unpaired_electrons_are_parsed_for_unrestricted(
+            self, tmp_path):
+
+        molecule, basis = self.get_water_and_basis()
+        molecule.set_charge(1)
+        molecule.set_multiplicity(2)
+
+        comm = MPI.COMM_WORLD
+        ostream = OutputStream.create_mpi_ostream(
+            comm, str(tmp_path / 'guess_unrestricted.out'))
+
+        scf_drv = ScfUnrestrictedDriver(comm, ostream)
+        scf_drv.guess_unpaired_electrons = '1(1.0), 2(-0.5)'
+        scf_drv.max_iter = 2
+        scf_drv.conv_thresh = 1.0e-12
+
+        scf_results = scf_drv.compute(molecule, basis)
+
+        assert scf_results is None
+        if self.is_master():
+            output = (tmp_path / 'guess_unrestricted.out').read_text()
+            assert 'Generating initial guess with user-provided information...' in output
+            assert '1.0 unpaired alpha electrons on atom 1 (O)' in output
+            assert '0.5 unpaired beta  electrons on atom 2 (H)' in output
+
+    def test_level_shifting_and_pfon_real_scf(self, tmp_path):
+
+        molecule, basis = self.get_water_and_basis()
+
+        comm = MPI.COMM_WORLD
+        ostream = OutputStream.create_mpi_ostream(
+            comm, str(tmp_path / 'level_pfon.out'))
+
+        scf_drv = ScfRestrictedDriver(comm, ostream)
+        scf_drv.acc_type = 'diis'
+        scf_drv.level_shifting = 0.2
+        scf_drv.level_shifting_delta = 0.5
+        scf_drv.pfon = True
+        scf_drv.pfon_temperature = 100
+        scf_drv.pfon_delta_temperature = 50
+        scf_drv.max_iter = 2
+        scf_drv.conv_thresh = 1.0e-12
+
+        scf_results = scf_drv.compute(molecule, basis)
+
+        assert scf_results is None
+        assert len(scf_drv.history) == 3
+        assert scf_drv.pfon_temperature == 0
+        assert scf_drv.level_shifting == 0.0
+        if self.is_master():
+            output = (tmp_path / 'level_pfon.out').read_text()
+            assert 'Applying level-shifting' in output
+            assert 'Applying pseudo-FON' in output
+
+    def test_density_damping_changes_real_scf_trajectory(self):
+
+        molecule, basis = self.get_water_and_basis()
+
+        ref_drv = ScfRestrictedDriver()
+        ref_drv.ostream.mute()
+        ref_drv.acc_type = 'diis'
+        ref_drv.max_iter = 2
+        ref_drv.conv_thresh = 1.0e-12
+        ref_results = ref_drv.compute(molecule, basis)
+
+        damped_drv = ScfRestrictedDriver()
+        damped_drv.ostream.mute()
+        damped_drv.acc_type = 'diis'
+        damped_drv.max_iter = 2
+        damped_drv.conv_thresh = 1.0e-12
+        damped_drv.density_damping = True
+        damped_results = damped_drv.compute(molecule, basis)
+
+        assert ref_results is None
+        assert damped_results is None
+        assert len(ref_drv.history) == len(damped_drv.history) == 3
+
+        if self.is_master():
+            ref_energies = np.array(
+                [step['energy'] for step in ref_drv.history])
+            damped_energies = np.array(
+                [step['energy'] for step in damped_drv.history])
+            assert np.max(np.abs(ref_energies - damped_energies)) > 1.0e-4
+            assert np.max(np.abs(ref_drv.density[0] -
+                                 damped_drv.density[0])) > 1.0e-4
+
+    def test_effective_nuclear_charges_subtract_ecp_core(self):
+
+        class MoleculeStub:
+
+            @staticmethod
+            def get_element_ids():
+                return np.array([8.0, 1.0])
+
+            @staticmethod
+            def number_of_atoms():
+                return 2
+
+        class BasisStub:
+
+            @staticmethod
+            def get_number_of_ecp_core_electrons():
+                return np.array([2.0, 0.0])
+
+        effective_charges = Molecule.get_effective_nuclear_charges(
+            MoleculeStub(), BasisStub())
+
+        assert np.allclose(effective_charges, np.array([6.0, 1.0]))

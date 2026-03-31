@@ -1214,8 +1214,7 @@ class VibrationalAnalysis:
         nmodes = len(self.vib_frequencies)
         nfreqs = len(self.frequencies)
 
-        # TODO: take care of ECP core electrons
-        nuc_rep = molecule.nuclear_repulsion_energy(basis)
+        nuc_rep = molecule.effective_nuclear_repulsion_energy(basis)
         hf.create_dataset(vib_group + 'nuclear_repulsion', data=nuc_rep)
 
         hf.create_dataset(vib_group + "number_of_modes", data=np.array([nmodes]))

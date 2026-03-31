@@ -206,7 +206,7 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
         pe_dict = self._init_pe(molecule, basis)
 
         # CPCM_information
-        self._init_cpcm(molecule)
+        self._init_cpcm(molecule, basis)
 
         if self.nonlinear:
             rsp_vector_labels = [

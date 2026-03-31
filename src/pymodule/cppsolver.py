@@ -98,11 +98,6 @@ class ComplexResponseSolver(ComplexResponseSolverBase):
         for convergence.
         """
 
-        # TODO: enable ECP
-        assert_msg_critical(
-            not basis.has_ecp(),
-            f'{type(self).__name__}.compute: ECP is not yet supported')
-
         # take care of quadrupole components
         if self.is_quadrupole(self.a_operator):
             if isinstance(self.a_components, str):
@@ -179,7 +174,7 @@ class ComplexResponseSolver(ComplexResponseSolverBase):
             orb_ene = None
         orb_ene = self.comm.bcast(orb_ene, root=mpi_master())
         norb = orb_ene.shape[0]
-        nocc = molecule.number_of_alpha_electrons()
+        nocc = molecule.number_of_alpha_occupied_orbitals(basis)
 
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
@@ -188,7 +183,7 @@ class ComplexResponseSolver(ComplexResponseSolverBase):
         # PE information
         pe_dict = self._init_pe(molecule, basis)
         # CPCM information
-        self._init_cpcm(molecule)
+        self._init_cpcm(molecule, basis)
 
         # right-hand side (gradient)
         if self.rank == mpi_master():
@@ -830,7 +825,7 @@ class ComplexResponseSolver(ComplexResponseSolverBase):
                                                  basis, scf_results)
 
         if self.rank == mpi_master():
-            nocc = molecule.number_of_alpha_electrons()
+            nocc = molecule.number_of_alpha_occupied_orbitals(basis)
             norb = scf_results['E_alpha'].shape[0]
             nvir = norb - nocc
             n_ov = nocc * nvir

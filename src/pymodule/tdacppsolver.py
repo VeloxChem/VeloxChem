@@ -370,7 +370,7 @@ class ComplexResponseTDA(LinearSolver):
         pe_dict = self._init_pe(molecule, basis)
 
         # CPCM information
-        self._init_cpcm(molecule)
+        self._init_cpcm(molecule, basis)
 
         # right-hand side (gradient)
         if self.rank == mpi_master():

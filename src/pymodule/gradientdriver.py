@@ -449,9 +449,8 @@ class GradientDriver:
         coords = molecule.get_coordinates_in_bohr()
 
         # atomic charges
-        nuclear_charges = molecule.get_element_ids()
-        if basis is not None:
-            nuclear_charges -= basis.get_number_of_ecp_core_electrons()
+        nuclear_charges = (molecule.get_effective_nuclear_charges(basis)
+                           if basis is not None else molecule.get_element_ids())
 
         # loop over all distinct atom pairs and add energy contribution
         for i in range(natm):
