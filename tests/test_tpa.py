@@ -138,7 +138,7 @@ class TestTPA:
         alpha = fine_structure_constant()
         a0_in_cm = bohr_in_angstrom() * 1.0e-8
         c_in_cm_per_s = speed_of_light_in_vacuum_in_SI() * 100.0
-        au2gm = ((8.0 * pytest.importorskip('numpy').pi**2 * alpha *
+        au2gm = ((4.0 * pytest.importorskip('numpy').pi**2 * alpha *
                   a0_in_cm**5) / c_in_cm_per_s * 1.0e+50)
 
         rsp_results = {
