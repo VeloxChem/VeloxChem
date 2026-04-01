@@ -32,6 +32,7 @@
 
 from mpi4py import MPI
 from pathlib import Path
+from copy import deepcopy
 import numpy as np
 import time
 import sys
@@ -96,7 +97,7 @@ class ExcitedStateMomentDriver(NonlinearSolver):
 
         self.initial_state = 3
         self.final_state = 3
-        self.nstates = max(self.initial_state, self.final_state)
+        self.nstates = max(self.initial_state, self.final_state, 3)
 
         # input keywords
         self._input_keywords['response'].update({
@@ -241,7 +242,7 @@ class ExcitedStateMomentDriver(NonlinearSolver):
             '_block_size_factor', 'ri_coulomb'
         ]
 
-        self.nstates = max(self.initial_state, self.final_state)
+        self.nstates = max(self.initial_state, self.final_state, 3)
 
         for key in rpa_keywords:
             setattr(rpa_drv, key, getattr(self, key))
@@ -259,10 +260,6 @@ class ExcitedStateMomentDriver(NonlinearSolver):
             f'initial_state={self.initial_state} and '
             f'final_state={self.final_state}, but only '
             f'{available_states} excited states are available')
-
-        excitation_details = rpa_results['excitation_details']
-        oscillator_strengths = rpa_results['oscillator_strengths']
-        elec_trans_dipoles = rpa_results['electric_transition_dipoles']
 
         Xf = {}
         inv_sqrt_2 = 1.0 / np.sqrt(2.0)
@@ -342,13 +339,6 @@ class ExcitedStateMomentDriver(NonlinearSolver):
 
         profiler.end(self.ostream)
 
-        if self.rank == mpi_master():
-            ret_dict.update({
-                'oscillator_strengths': oscillator_strengths,
-                'elec_trans_dipoles': elec_trans_dipoles,
-                'excitation_details': excitation_details
-            })
-
         return ret_dict
 
     def compute_quad_components(self, Focks, freqs, X, d_a_mo, Nx, scf_results,
@@ -411,7 +401,6 @@ class ExcitedStateMomentDriver(NonlinearSolver):
 
         profiler.check_memory_usage('E[3]')
 
-        ret_dict = {}
         excited_state_dipole_moments = {}
 
         # Compute dipole vector
@@ -464,12 +453,12 @@ class ExcitedStateMomentDriver(NonlinearSolver):
                 # For diagonal elements, add ground state dipole moment
                 excited_state_dipole_moments.update({
                     ('x', self.initial_state, self.final_state):
-                        (val_E3 + val_A2 + ground_state_dipole_x).real
+                        (-(val_E3 + val_A2) + ground_state_dipole_x).real
                 })
             else:
                 excited_state_dipole_moments.update({
                     ('x', self.initial_state, self.final_state):
-                        (val_E3 + val_A2).real
+                        -(val_E3 + val_A2).real
                 })
 
             # Double residue y-component
@@ -490,12 +479,12 @@ class ExcitedStateMomentDriver(NonlinearSolver):
                 # For diagonal elements, add ground state dipole moment
                 excited_state_dipole_moments.update({
                     ('y', self.initial_state, self.final_state):
-                        (val_E3 + val_A2 + ground_state_dipole_y).real
+                        (-(val_E3 + val_A2) + ground_state_dipole_y).real
                 })
             else:
                 excited_state_dipole_moments.update({
                     ('y', self.initial_state, self.final_state):
-                        (val_E3 + val_A2).real
+                        -(val_E3 + val_A2).real
                 })
 
             # Double residue z-component
@@ -517,12 +506,12 @@ class ExcitedStateMomentDriver(NonlinearSolver):
                 # For diagonal elements, add ground state dipole moment
                 excited_state_dipole_moments.update({
                     ('z', self.initial_state, self.final_state):
-                        (val_E3 + val_A2 + ground_state_dipole_z).real
+                        (-(val_E3 + val_A2) + ground_state_dipole_z).real
                 })
             else:
                 excited_state_dipole_moments.update({
                     ('z', self.initial_state, self.final_state):
-                        (val_E3 + val_A2).real
+                        -(val_E3 + val_A2).real
                 })
 
         self.ostream.print_blank()
@@ -538,26 +527,31 @@ class ExcitedStateMomentDriver(NonlinearSolver):
             self._print_transition_dipoles("Transition dipole moments",
                                            excited_state_dipole_moments)
 
+        profiler.check_memory_usage('End of QRF')
+
+        ret_dict = {}
+
         if self.rank == mpi_master():
+            ret_dict['ground_state_dipole_moment'] = deepcopy(
+                scf_prop.get_property('dipole moment'))
 
-            profiler.check_memory_usage('End of QRF')
-
-            ret_dict = {
-                'photon_energies': freqs,
-                'ground_state_dipole_moments':
-                    scf_prop.get_property('dipole moment'),
-            }
+            esm_items = excited_state_dipole_moments.items()
+            esm_x = [val for key, val in esm_items if 'x' in key]
+            esm_y = [val for key, val in esm_items if 'y' in key]
+            esm_z = [val for key, val in esm_items if 'z' in key]
+            assert_msg_critical(
+                len(esm_x) == 1 and len(esm_y) == 1 and len(esm_z) == 1,
+                'ExcitedStateMomentDriver: Too many entries in ' +
+                'excited_state_dipole_moments')
+            esm_arr = np.array([esm_x[0], esm_y[0], esm_z[0]])
 
             if self.initial_state == self.final_state:
-                ret_dict[
-                    'excited_state_dipole_moments'] = excited_state_dipole_moments
+                ret_dict['excited_state_dipole_moment'] = esm_arr
             else:
-                ret_dict[
-                    'transition_dipole_moments'] = excited_state_dipole_moments
+                ret_dict['transition_dipole_moment'] = esm_arr
+                ret_dict['photon_energy'] = freqs[0]
 
-            return ret_dict
-        else:
-            return None
+        return ret_dict
 
     def _print_transition_dipoles(self, title, trans_dipoles):
         """

@@ -53,21 +53,21 @@ class TestTransitionDipoleMomentQR:
         tsm_results = tsm_drv.compute(mol, bas, scf_results)
 
         if tsm_drv.rank == mpi_master():
-            assert tsm_results['photon_energies'][0] > 0.0
-            calc_tsm = tsm_results['transition_dipole_moments']
-            assert abs(abs(calc_tsm[('x', 5, 8)]) - 0.0) < tol
-            assert abs(abs(calc_tsm[('y', 5, 8)]) - 0.0) < tol
-            assert abs(abs(calc_tsm[('z', 5, 8)]) - 0.523176) < tol
+            assert tsm_results['photon_energy'] > 0.0
+            calc_tsm = tsm_results['transition_dipole_moment']
+            assert abs(calc_tsm[0]) < tol
+            assert abs(calc_tsm[1]) < tol
+            assert abs(abs(calc_tsm[2]) - 0.523176) < tol
 
         tsm_drv.initial_state = 7
         tsm_drv.final_state = 7
         tsm_results = tsm_drv.compute(mol, bas, scf_results)
 
         if tsm_drv.rank == mpi_master():
-            calc_esm = tsm_results['excited_state_dipole_moments']
-            assert abs(abs(calc_esm[('x', 7, 7)]) - 0.0) < tol
-            assert abs(abs(calc_esm[('y', 7, 7)]) - 0.0) < tol
-            assert abs(abs(calc_esm[('z', 7, 7)]) - 0.538214) < tol
+            calc_esm = tsm_results['excited_state_dipole_moment']
+            assert abs(calc_esm[0]) < tol
+            assert abs(calc_esm[1]) < tol
+            assert abs(calc_esm[2] - 0.053558) < tol
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='pytest.raises only valid in serial')

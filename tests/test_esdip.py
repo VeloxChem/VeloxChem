@@ -8,6 +8,7 @@ from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.lreigensolver import LinearResponseEigenSolver
 from veloxchem.firstorderprop import FirstOrderProperties
 from veloxchem.tddftgradientdriver import TddftGradientDriver
+from veloxchem.excitedstatemomentdriver import ExcitedStateMomentDriver
 
 
 @pytest.mark.solvers
@@ -48,6 +49,7 @@ class TestExcitedStateDipole:
 
         unrelaxed_es_dipoles = []
         relaxed_es_dipoles = []
+        qrf_es_dipoles = []
 
         for s in range(nstates):
 
@@ -72,8 +74,23 @@ class TestExcitedStateDipole:
                 unrelaxed_prop.properties['dipole_moment'])
             relaxed_es_dipoles.append(relaxed_prop.properties['dipole_moment'])
 
+            esm_drv = ExcitedStateMomentDriver()
+            esm_drv.ostream.mute()
+            esm_drv.xcfun = xcfun_label
+            esm_drv.initial_state = s + 1
+            esm_drv.final_state = s + 1
+            esm_results = esm_drv.compute(mol, bas, scf_results)
+
+            if scf_drv.rank == mpi_master():
+                esm_arr = esm_results['excited_state_dipole_moment']
+            else:
+                esm_arr = None
+            esm_arr = scf_drv.comm.bcast(esm_arr, root=mpi_master())
+            qrf_es_dipoles.append(esm_arr)
+
         unrelaxed_es_dipoles = np.array(unrelaxed_es_dipoles)
         relaxed_es_dipoles = np.array(relaxed_es_dipoles)
+        qrf_es_dipoles = np.array(qrf_es_dipoles)
 
         ref_unrelaxed_es_dipoles = np.array([
             [0.0, 0.0, -0.623834],
@@ -91,7 +108,16 @@ class TestExcitedStateDipole:
             [0.0, 0.0, -0.117703],
         ])
 
+        ref_qrf_es_dipoles = np.array([
+            [0.0, 0.0, -0.327997589],
+            [0.0, 0.0, -0.181916586],
+            [0.0, 0.0, -0.406908758],
+            [0.0, 0.0, -0.329942339],
+            [0.0, 0.0, -0.117702195],
+        ])
+
         assert np.max(np.abs(ref_unrelaxed_es_dipoles -
                              unrelaxed_es_dipoles)) < 1.0e-4
         assert np.max(np.abs(ref_relaxed_es_dipoles -
                              relaxed_es_dipoles)) < 1.0e-4
+        assert np.max(np.abs(ref_qrf_es_dipoles - qrf_es_dipoles)) < 1.0e-6
