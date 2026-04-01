@@ -459,14 +459,15 @@ class LinearSolver:
             return
 
         if self.rank == mpi_master():
-            write_unparsed_input_to_hdf5(
-                checkpoint_file,
-                unparse_input(self, self._get_response_keywords()),
-                group_name='response_settings')
-            write_unparsed_input_to_hdf5(
-                checkpoint_file,
-                unparse_input(self, self._get_method_keywords()),
-                group_name='method_settings')
+            write_unparsed_input_to_hdf5(checkpoint_file,
+                                         unparse_input(
+                                             self,
+                                             self._get_response_keywords()),
+                                         group_name='response_settings')
+            write_unparsed_input_to_hdf5(checkpoint_file,
+                                         unparse_input(
+                                             self, self._get_method_keywords()),
+                                         group_name='method_settings')
 
     def match_settings(self, checkpoint_file):
         """
@@ -482,17 +483,27 @@ class LinearSolver:
             True if settings match or are unavailable, False otherwise.
         """
 
-        valid_checkpoint = (checkpoint_file and isinstance(checkpoint_file, str)
-                            and Path(checkpoint_file).is_file())
+        valid_checkpoint = (checkpoint_file and
+                            isinstance(checkpoint_file, str) and
+                            Path(checkpoint_file).is_file())
 
         if not valid_checkpoint:
             return False
 
-        excluded_rsp_keys = {'restart', 'filename', 'checkpoint_file'}
+        # Avoid comparing restart state or checkpoint/output targets
+        # Also avoid comparing nstates or frequencies such that restarting with
+        # more states or frequencies is possible
+        excluded_rsp_keys = {
+            'restart',
+            'filename',
+            'checkpoint_file',
+            'nstates',
+            'frequencies',
+        }
 
+        # for backward compatibility
         with h5py.File(checkpoint_file, 'r') as h5f:
-            if ('response_settings' not in h5f or
-                    'method_settings' not in h5f):
+            if ('response_settings' not in h5f or 'method_settings' not in h5f):
                 return True
 
         checkpoint_rsp_input = read_unparsed_input_from_hdf5(

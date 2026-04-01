@@ -1,4 +1,3 @@
-from mpi4py import MPI
 from pathlib import Path
 import h5py
 import numpy as np
@@ -425,7 +424,7 @@ def test_match_settings_rejects_restart_with_mismatched_settings(tmp_path):
     _configure_lr(mismatch_drv, filename)
     mismatch_drv.checkpoint_file = checkpoint_file
     mismatch_drv.restart = True
-    mismatch_drv.frequencies = (0.0, 0.10)
+    mismatch_drv.a_components = 'xy'
 
     assert mismatch_drv.match_settings(checkpoint_file) is False
 
