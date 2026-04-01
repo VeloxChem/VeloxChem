@@ -222,6 +222,8 @@ class TdaUnrestrictedEigenSolver(TdaEigenSolverBase):
                     molecule, basis, dft_dict, pe_dict, self.ostream)
                 self.restart = (rst_trial_mat is not None and
                                 rst_sig_mat is not None)
+                if self.restart:
+                    self.restart = self.match_settings(self.checkpoint_file)
             self.restart = self.comm.bcast(self.restart, root=mpi_master())
 
         if self.restart:

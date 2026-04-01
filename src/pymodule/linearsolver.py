@@ -30,6 +30,7 @@
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+from pathlib import Path
 from datetime import datetime
 import numpy as np
 import time as tm
@@ -466,6 +467,48 @@ class LinearSolver:
                 checkpoint_file,
                 unparse_input(self, self._get_method_keywords()),
                 group_name='method_settings')
+
+    def match_settings(self, checkpoint_file):
+        """
+        Checks whether response and method settings match a checkpoint file.
+
+        Missing settings groups are treated as a match for backward
+        compatibility.
+
+        :param checkpoint_file:
+            The checkpoint file to validate.
+
+        :return:
+            True if settings match or are unavailable, False otherwise.
+        """
+
+        valid_checkpoint = (checkpoint_file and isinstance(checkpoint_file, str)
+                            and Path(checkpoint_file).is_file())
+
+        if not valid_checkpoint:
+            return False
+
+        excluded_rsp_keys = {'restart', 'filename', 'checkpoint_file'}
+
+        with h5py.File(checkpoint_file, 'r') as h5f:
+            if ('response_settings' not in h5f or
+                    'method_settings' not in h5f):
+                return True
+
+        checkpoint_rsp_input = read_unparsed_input_from_hdf5(
+            checkpoint_file, group_name='response_settings')
+        checkpoint_method_input = read_unparsed_input_from_hdf5(
+            checkpoint_file, group_name='method_settings')
+
+        current_rsp_input = unparse_input(self, self._get_response_keywords())
+        current_method_input = unparse_input(self, self._get_method_keywords())
+
+        for key in excluded_rsp_keys:
+            checkpoint_rsp_input.pop(key, None)
+            current_rsp_input.pop(key, None)
+
+        return (checkpoint_rsp_input == current_rsp_input and
+                checkpoint_method_input == current_method_input)
 
     def _init_eri(self, molecule, basis):
         """
