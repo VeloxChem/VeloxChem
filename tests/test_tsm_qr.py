@@ -1,5 +1,7 @@
 import pytest
+from mpi4py import MPI
 
+import veloxchem.excitedstatemomentdriver as esm_driver_module
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
@@ -27,13 +29,19 @@ class TestTransitionDipoleMomentQR:
 
         return mol, bas
 
-    def test_tsm_qr(self):
+    def get_scf_results(self):
 
         mol, bas = self.get_molecule_and_basis()
 
         scf_drv = ScfRestrictedDriver()
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(mol, bas)
+
+        return mol, bas, scf_results
+
+    def test_tsm_qr(self):
+
+        mol, bas, scf_results = self.get_scf_results()
 
         tsm_drv = ExcitedStateMomentDriver()
         tsm_drv.ostream.mute()
@@ -45,6 +53,7 @@ class TestTransitionDipoleMomentQR:
         tsm_results = tsm_drv.compute(mol, bas, scf_results)
 
         if tsm_drv.rank == mpi_master():
+            assert tsm_results['photon_energies'][0] > 0.0
             calc_tsm = tsm_results['transition_dipole_moments']
             assert abs(abs(calc_tsm[('x', 5, 8)]) - 0.0) < tol
             assert abs(abs(calc_tsm[('y', 5, 8)]) - 0.0) < tol
@@ -59,3 +68,59 @@ class TestTransitionDipoleMomentQR:
             assert abs(abs(calc_esm[('x', 7, 7)]) - 0.0) < tol
             assert abs(abs(calc_esm[('y', 7, 7)]) - 0.0) < tol
             assert abs(abs(calc_esm[('z', 7, 7)]) - 0.538214) < tol
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='pytest.raises only valid in serial')
+    def test_tsm_qr_rejects_nonpositive_state_indices(self):
+
+        mol, bas, scf_results = self.get_scf_results()
+
+        tsm_drv = ExcitedStateMomentDriver()
+        tsm_drv.ostream.mute()
+        tsm_drv.initial_state = 0
+        tsm_drv.final_state = 1
+
+        with pytest.raises(AssertionError,
+                           match='Expecting positive 1-based state indices'):
+            tsm_drv.compute(mol, bas, scf_results)
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='pytest.raises only valid in serial')
+    def test_tsm_qr_rejects_downward_transitions(self):
+
+        mol, bas, scf_results = self.get_scf_results()
+
+        tsm_drv = ExcitedStateMomentDriver()
+        tsm_drv.ostream.mute()
+        tsm_drv.initial_state = 8
+        tsm_drv.final_state = 5
+
+        with pytest.raises(
+                AssertionError,
+                match='Expecting final_state >= initial_state'):
+            tsm_drv.compute(mol, bas, scf_results)
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='pytest.raises only valid in serial')
+    def test_tsm_qr_rejects_unconverged_complex_response(self, monkeypatch):
+
+        mol, bas, scf_results = self.get_scf_results()
+
+        original_compute = esm_driver_module.ComplexResponseSolver.compute
+
+        def wrapped_compute(self, *args, **kwargs):
+            result = original_compute(self, *args, **kwargs)
+            self._is_converged = False
+            return result
+
+        monkeypatch.setattr(esm_driver_module.ComplexResponseSolver, 'compute',
+                            wrapped_compute)
+
+        tsm_drv = ExcitedStateMomentDriver()
+        tsm_drv.ostream.mute()
+        tsm_drv.initial_state = 1
+        tsm_drv.final_state = 1
+
+        with pytest.raises(AssertionError,
+                           match='Complex response solver did not converge'):
+            tsm_drv.compute(mol, bas, scf_results)

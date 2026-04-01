@@ -172,7 +172,15 @@ class ExcitedStateMomentDriver(NonlinearSolver):
         nbeta = molecule.number_of_beta_electrons()
         assert_msg_critical(
             nalpha == nbeta,
-            'DoubleQuadResDriver: not implemented for unrestricted case')
+            'ExcitedStateMomentDriver: not implemented for unrestricted case')
+        assert_msg_critical(
+            self.initial_state >= 1 and self.final_state >= 1,
+            'ExcitedStateMomentDriver.compute: Expecting positive 1-based '
+            'state indices in initial_state and final_state')
+        assert_msg_critical(
+            self.final_state >= self.initial_state,
+            'ExcitedStateMomentDriver.compute: Expecting final_state >= '
+            'initial_state because downward transitions are not supported')
 
         if self.rank == mpi_master():
             S = scf_results['S']
@@ -244,6 +252,13 @@ class ExcitedStateMomentDriver(NonlinearSolver):
             rpa_drv.checkpoint_file = str(fpath) + '_doublequadres_rpa.h5'
 
         rpa_results = rpa_drv.compute(molecule, ao_basis, scf_results)
+        available_states = len(rpa_results['eigenvalues'])
+        assert_msg_critical(
+            available_states >= self.nstates,
+            'ExcitedStateMomentDriver.compute: Requested '
+            f'initial_state={self.initial_state} and '
+            f'final_state={self.final_state}, but only '
+            f'{available_states} excited states are available')
 
         excitation_details = rpa_results['excitation_details']
         oscillator_strengths = rpa_results['oscillator_strengths']
@@ -304,6 +319,10 @@ class ExcitedStateMomentDriver(NonlinearSolver):
         N_results = N_drv.compute(molecule, ao_basis, scf_results, B)
 
         self._is_converged = N_drv.is_converged
+        assert_msg_critical(
+            self._is_converged,
+            'ExcitedStateMomentDriver.compute: Complex response solver ' +
+            'did not converge')
 
         Nx = N_results['solutions']
         Focks = N_results['focks']
@@ -524,7 +543,7 @@ class ExcitedStateMomentDriver(NonlinearSolver):
             profiler.check_memory_usage('End of QRF')
 
             ret_dict = {
-                'photon_energies': [-w for w in freqs],
+                'photon_energies': freqs,
                 'ground_state_dipole_moments':
                     scf_prop.get_property('dipole moment'),
             }
