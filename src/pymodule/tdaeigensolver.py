@@ -329,6 +329,7 @@ class TdaEigenSolver(TdaEigenSolverBase):
                 write_rsp_hdf5(self.checkpoint_file, [trials, sigmas],
                                ['TDA_trials', 'TDA_sigmas'], molecule, basis,
                                dft_dict, pe_dict, self.ostream)
+            self._write_settings_to_checkpoint()
             self._add_nstates_to_checkpoint()
 
             # finish TDA after convergence

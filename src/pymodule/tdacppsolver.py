@@ -1476,6 +1476,8 @@ class ComplexResponseTDA(LinearSolver):
         success = self.comm.bcast(success, root=mpi_master())
 
         if success:
+            self._write_settings_to_checkpoint(self.checkpoint_file)
+
             if self.nonlinear:
                 dist_arrays = [
                     self._dist_bger, self._dist_e2bger, self._dist_fock_ger

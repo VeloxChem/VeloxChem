@@ -58,7 +58,9 @@ from .sanitychecks import (dft_sanity_check, ri_sanity_check, pe_sanity_check,
                            solvation_model_sanity_check)
 from .errorhandler import assert_msg_critical
 from .inputparser import (parse_input, print_keywords, print_attributes,
-                          get_random_string_parallel)
+                          get_random_string_parallel, unparse_input,
+                          write_unparsed_input_to_hdf5,
+                          read_unparsed_input_from_hdf5)
 from .dftutils import get_default_grid_level, print_xc_reference
 from .checkpoint import write_rsp_hdf5
 from .batchsize import get_batch_size
@@ -347,9 +349,7 @@ class LinearSolver:
         if method_dict is None:
             method_dict = {}
 
-        rsp_keywords = {
-            key: val[0] for key, val in self._input_keywords['response'].items()
-        }
+        rsp_keywords = self._get_response_keywords()
 
         parse_input(self, rsp_keywords, rsp_dict)
 
@@ -360,10 +360,7 @@ class LinearSolver:
             if 'checkpoint_file' not in rsp_dict:
                 self.checkpoint_file = f'{self.filename}_rsp.h5'
 
-        method_keywords = {
-            key: val[0]
-            for key, val in self._input_keywords['method_settings'].items()
-        }
+        method_keywords = self._get_method_keywords()
 
         parse_input(self, method_keywords, method_dict)
 
@@ -390,6 +387,85 @@ class LinearSolver:
             # checkpoint file does not contain information about the electric
             # field
             self.restart = False
+
+    def _get_response_keywords(self):
+        """
+        Gets response keyword types.
+
+        :return:
+            The response keyword types.
+        """
+
+        return {
+            key: val[0] for key, val in self._input_keywords['response'].items()
+        }
+
+    def _get_method_keywords(self):
+        """
+        Gets method keyword types.
+
+        :return:
+            The method keyword types.
+        """
+
+        return {
+            key: val[0]
+            for key, val in self._input_keywords['method_settings'].items()
+        }
+
+    def read_settings(self, checkpoint_file):
+        """
+        Reads response and method settings from checkpoint file.
+
+        :param checkpoint_file:
+            The checkpoint file to read settings from.
+        """
+
+        if self.rank == mpi_master():
+            checkpoint_rsp_input = read_unparsed_input_from_hdf5(
+                checkpoint_file, group_name='response_settings')
+            checkpoint_method_input = read_unparsed_input_from_hdf5(
+                checkpoint_file, group_name='method_settings')
+        else:
+            checkpoint_rsp_input = None
+            checkpoint_method_input = None
+
+        checkpoint_rsp_input = self.comm.bcast(checkpoint_rsp_input,
+                                               root=mpi_master())
+        checkpoint_method_input = self.comm.bcast(checkpoint_method_input,
+                                                  root=mpi_master())
+
+        # Avoid importing restart state or checkpoint/output targets when
+        # copying settings from an external file.
+        checkpoint_rsp_input.pop('restart', None)
+        checkpoint_rsp_input.pop('checkpoint_file', None)
+        checkpoint_rsp_input.pop('filename', None)
+
+        self.update_settings(checkpoint_rsp_input, checkpoint_method_input)
+
+    def _write_settings_to_checkpoint(self, checkpoint_file=None):
+        """
+        Writes response and method settings to checkpoint file.
+
+        :param checkpoint_file:
+            The checkpoint file name.
+        """
+
+        if checkpoint_file is None:
+            checkpoint_file = self.checkpoint_file
+
+        if checkpoint_file is None:
+            return
+
+        if self.rank == mpi_master():
+            write_unparsed_input_to_hdf5(
+                checkpoint_file,
+                unparse_input(self, self._get_response_keywords()),
+                group_name='response_settings')
+            write_unparsed_input_to_hdf5(
+                checkpoint_file,
+                unparse_input(self, self._get_method_keywords()),
+                group_name='method_settings')
 
     def _init_eri(self, molecule, basis):
         """
@@ -2598,6 +2674,8 @@ class LinearSolver:
         success = self.comm.bcast(success, root=mpi_master())
 
         if success:
+            self._write_settings_to_checkpoint(self.checkpoint_file)
+
             if self.nonlinear:
                 dist_arrays = [
                     self._dist_bger, self._dist_bung, self._dist_e2bger,
