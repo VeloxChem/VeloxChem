@@ -53,7 +53,7 @@ from .lreigensolver import LinearResponseEigenSolver
 from .firstorderprop import FirstOrderProperties
 
 
-class DoubleResBetaDriver(NonlinearSolver):
+class ExcitedStateMomentDriver(NonlinearSolver):
     """
     Implements a general quadratic response driver.
 

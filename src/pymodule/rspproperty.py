@@ -48,7 +48,7 @@ from .tdaeigensolverunrest import TdaUnrestrictedEigenSolver
 from .rixsdriver import RixsDriver
 from .shgdriver import ShgDriver
 from .tpatransitiondriver import TpaTransitionDriver
-from .doubleresbeta import DoubleResBetaDriver
+from .excitedstatemomentdriver import ExcitedStateMomentDriver
 from .threepatransitiondriver import ThreePATransitionDriver
 from .tpafulldriver import TpaFullDriver
 from .tpareddriver import TpaReducedDriver
@@ -314,7 +314,7 @@ class ResponseProperty:
                 'ResponseProperty: This response property is ' +
                 'only implemented for restricted case')
 
-            self._rsp_driver = DoubleResBetaDriver(self.comm, self.ostream)
+            self._rsp_driver = ExcitedStateMomentDriver(self.comm, self.ostream)
 
         # Cubic response driver
         elif (self.prop_type == 'custom' and

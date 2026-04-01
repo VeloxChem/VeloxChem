@@ -4,7 +4,7 @@ from veloxchem.veloxchemlib import mpi_master
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
-from veloxchem.doubleresbeta import DoubleResBetaDriver
+from veloxchem.excitedstatemomentdriver import ExcitedStateMomentDriver
 
 
 @pytest.mark.solvers
@@ -35,7 +35,7 @@ class TestTransitionDipoleMomentQR:
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(mol, bas)
 
-        tsm_drv = DoubleResBetaDriver()
+        tsm_drv = ExcitedStateMomentDriver()
         tsm_drv.ostream.mute()
 
         tol = 1.0e-5
