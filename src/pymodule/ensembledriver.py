@@ -547,6 +547,7 @@ class EnsembleDriver:
         2) common aliases (HN <-> H, HT1-3 <-> H1-3)
         3) terminal oxygen aliases (O1/O2 <-> OT1/OT2, OC1/OC2, O/OXT)
         4) hydrogen digit conventions (HB1 <-> 1HB, HD11 <-> 1HD1, etc.)
+        5) cysteine thiol hydrogen naming alias (HG1 <-> HG)
 
         :param atom_name:
             Atom name from the trajectory/topology.
