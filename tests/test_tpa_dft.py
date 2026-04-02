@@ -18,8 +18,7 @@ class TestTPA:
         method_settings = {'xcfun': 'BP86'}
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
         scf_drv.update_settings(scf_settings, method_settings)
-        scf_results = scf_drv.compute(task.molecule, task.ao_basis,
-                                      task.min_basis)
+        scf_results = scf_drv.compute(task.molecule, task.ao_basis)
 
         return scf_results
 

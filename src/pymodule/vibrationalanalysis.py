@@ -47,7 +47,7 @@ from .xtbdriver import XtbDriver
 from .xtbhessiandriver import XtbHessianDriver
 from .polarizabilitygradient import PolarizabilityGradient
 from .lrsolver import LinearResponseSolver
-from .cppsolver import ComplexResponse
+from .cppsolver import ComplexResponseSolver
 from .veloxchemlib import (mpi_master, bohr_in_angstrom, avogadro_constant,
                            fine_structure_constant, electron_mass_in_amu,
                            amu_in_kg, speed_of_light_in_vacuum_in_SI)
@@ -296,7 +296,7 @@ class VibrationalAnalysis:
         self.rsp_dict = dict(rsp_dict)
         self.polgrad_dict = dict(polgrad_dict)
 
-    def compute(self, molecule, ao_basis=None, min_basis=None):
+    def compute(self, molecule, ao_basis=None):
         """
         Drives the computation of the vibrational analysis and
         associated properties.
@@ -305,8 +305,6 @@ class VibrationalAnalysis:
             The molecule.
         :param ao_basis:
             The AO basis set.
-        :param min_basis:
-            The minimal AO basis set.
 
         :returns:
             The dictionary with vibrational analysis results.
@@ -725,7 +723,7 @@ class VibrationalAnalysis:
         # perform a linear response calculation
         if self.do_resonance_raman:
             polgrad_drv.is_complex = True
-            lr_drv = ComplexResponse(self.comm, self.ostream)
+            lr_drv = ComplexResponseSolver(self.comm, self.ostream)
             lr_drv.update_settings(self.rsp_dict, self.method_dict)
             lr_drv.damping = polgrad_drv.damping
             # get absorption cross section from CPP calculations
@@ -1216,8 +1214,7 @@ class VibrationalAnalysis:
         nmodes = len(self.vib_frequencies)
         nfreqs = len(self.frequencies)
 
-        # TODO: take care of ECP core electrons
-        nuc_rep = molecule.nuclear_repulsion_energy(basis)
+        nuc_rep = molecule.effective_nuclear_repulsion_energy(basis)
         hf.create_dataset(vib_group + 'nuclear_repulsion', data=nuc_rep)
 
         hf.create_dataset(vib_group + "number_of_modes", data=np.array([nmodes]))
@@ -1254,6 +1251,12 @@ class VibrationalAnalysis:
             if self.do_resonance_raman:
                 raman_type = 'resonance'
             hf.create_dataset(vib_group + 'raman_type', data=np.bytes_([raman_type]))
+
+        valstr = 'Vibrational analysis results written to file: '
+        valstr += fname
+        self.ostream.print_info(valstr)
+        self.ostream.print_blank()
+        self.ostream.flush()
 
         hf.close()
 

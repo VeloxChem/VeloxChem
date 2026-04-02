@@ -41,6 +41,7 @@
 #include "MolecularBasis.hpp"
 #include "Molecule.hpp"
 #include "ProjectedCorePotentialGeom010Func.hpp"
+#include "ProjectedCorePotentialGeom020Func.hpp"
 #include "OpenMPFunc.hpp"
 #include "Point.hpp"
 #include "T2CDistributor.hpp"
@@ -143,6 +144,10 @@ CProjectedCorePotentialGeom0X0Driver<N>::compute(const CMolecularBasis     &basi
                     if constexpr (N == 1)
                     {
                         t2pecp::compute_geom_010(distributor, bra_gtos, ket_gtos, local_ecp_pot, ecp_momentum, bra_indices, ket_indices, bkequal);
+                    }
+                    if constexpr (N == 2)
+                    {
+                        t2pecp::compute_geom_020(distributor, bra_gtos, ket_gtos, local_ecp_pot, ecp_momentum, bra_indices, ket_indices, bkequal);
                     }
                 }
             });

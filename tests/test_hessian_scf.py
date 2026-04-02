@@ -23,7 +23,7 @@ class TestScfHessianDriver:
 
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
         scf_drv.acc_type = 'l2_c2diis'
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        scf_drv.compute(task.molecule, task.ao_basis)
 
         vib_settings = {
             'do_ir': 'yes',
@@ -73,7 +73,7 @@ class TestScfHessianDriver:
         task = MpiTask([inpfile, None])
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
 
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        scf_drv.compute(task.molecule, task.ao_basis)
 
         method_settings = {}
         cphf_settings = {'conv_thresh': 1e-8}
@@ -114,7 +114,7 @@ class TestScfHessianDriver:
         scf_settings = {}
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
         scf_drv.update_settings(scf_settings, method_settings)
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        scf_drv.compute(task.molecule, task.ao_basis)
 
         cphf_settings = {'conv_thresh': 1e-8}
         hess_settings = {'numerical': 'no'}
@@ -155,7 +155,7 @@ class TestScfHessianDriver:
         scf_settings = {}
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
         scf_drv.update_settings(scf_settings, method_settings)
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        scf_drv.compute(task.molecule, task.ao_basis)
 
         cphf_settings = {'conv_thresh': 1e-8}
         hess_settings = {'numerical': 'no'}

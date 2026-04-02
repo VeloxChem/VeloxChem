@@ -38,7 +38,7 @@ class TestProjectedSECPGeom200Driver:
         npyfile = str(here / 'data' / 'auh2.def2svp.au.ecp.only.ul.geom.200.au1.au1.npy')
         ref_mat = np.load(npyfile)
         
-        print(ref_mat.shape)
+        #print(ref_mat.shape)
 
         # dimension of molecular basis
         basdims = [0, 10, 25, 35, 42]
@@ -86,7 +86,7 @@ class TestProjectedSECPGeom200Driver:
         npyfile = str(here / 'data' / 'auh2.def2svp.au.ecp.only.ul.geom.200.h2.h2.npy')
         ref_mat = np.load(npyfile)
         
-        print(ref_mat.shape)
+        #print(ref_mat.shape)
 
         # dimension of molecular basis
         basdims = [0, 10, 25, 35, 42]

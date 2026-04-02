@@ -40,7 +40,7 @@ from .veloxchemlib import (mpi_master, bohr_in_angstrom, hartree_in_ev,
                            fine_structure_constant,
                            speed_of_light_in_vacuum_in_SI)
 from .profiler import Profiler
-from .cppsolver import ComplexResponse
+from .cppsolver import ComplexResponseSolver
 from .linearsolver import LinearSolver
 from .nonlinearsolver import NonlinearSolver
 from .distributedarray import DistributedArray
@@ -228,7 +228,7 @@ class TpaDriver(NonlinearSolver):
         self.comp = self.comm.bcast(self.comp, root=mpi_master())
 
         # Computing the first-order response vectors (3 per frequency)
-        Nb_drv = ComplexResponse(self.comm, self.ostream)
+        Nb_drv = ComplexResponseSolver(self.comm, self.ostream)
 
         cpp_keywords = {
             'frequencies', 'damping', 'norm_thresh', 'lindep_thresh',
@@ -736,9 +736,9 @@ class TpaDriver(NonlinearSolver):
         for i in range(len(freqs)):
             w = float(track[i * (len(track) // len(freqs))].split(",")[1])
 
-            na_x = ComplexResponse.get_full_solution_vector(Nx[('x', w)])
-            na_y = ComplexResponse.get_full_solution_vector(Nx[('y', w)])
-            na_z = ComplexResponse.get_full_solution_vector(Nx[('z', w)])
+            na_x = ComplexResponseSolver.get_full_solution_vector(Nx[('x', w)])
+            na_y = ComplexResponseSolver.get_full_solution_vector(Nx[('y', w)])
+            na_z = ComplexResponseSolver.get_full_solution_vector(Nx[('z', w)])
 
             if self.rank == mpi_master():
 
@@ -792,15 +792,15 @@ class TpaDriver(NonlinearSolver):
         w = inp_dict['freq']
         A = inp_dict['A']
 
-        Na = ComplexResponse.get_full_solution_vector(inp_dict['Na'])
+        Na = ComplexResponseSolver.get_full_solution_vector(inp_dict['Na'])
 
         if inp_dict['flag'] == 'CD':
-            Ncd = ComplexResponse.get_full_solution_vector(inp_dict['Ncd'])
-            Nb = ComplexResponse.get_full_solution_vector(inp_dict['Nb'])
+            Ncd = ComplexResponseSolver.get_full_solution_vector(inp_dict['Ncd'])
+            Nb = ComplexResponseSolver.get_full_solution_vector(inp_dict['Nb'])
 
         elif inp_dict['flag'] == 'BD':
-            Nbd = ComplexResponse.get_full_solution_vector(inp_dict['Nbd'])
-            Nc = ComplexResponse.get_full_solution_vector(inp_dict['Nc'])
+            Nbd = ComplexResponseSolver.get_full_solution_vector(inp_dict['Nbd'])
+            Nc = ComplexResponseSolver.get_full_solution_vector(inp_dict['Nc'])
 
         if self.rank == mpi_master():
 

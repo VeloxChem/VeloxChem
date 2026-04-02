@@ -39,6 +39,7 @@ from .molecularbasis import MolecularBasis
 from .visualizationdriver import VisualizationDriver
 from .densityviewer import DensityViewer
 from .errorhandler import assert_msg_critical
+from .mathutils import symmetric_matrix_function
 
 try:
     import matplotlib.pyplot as plt
@@ -254,11 +255,9 @@ class ValetAnalyzer:
         
         # Compute attachment charges using Lowdin analysis
         S = scf_results['S']
-        S_eigvals, S_eigvecs = np.linalg.eigh(S)
-        S_eigvals = np.where(S_eigvals > 1.0e-12, S_eigvals,
-                             0.0)
-        S_sqrt = np.matmul(S_eigvecs * np.sqrt(S_eigvals),
-                           S_eigvecs.T)
+        S_sqrt = symmetric_matrix_function(S,
+                                           np.sqrt,
+                                           thresh=1.0e-12)
 
         diag_DS = np.diag(
             np.linalg.multi_dot([S_sqrt, detach_dens_ao, S_sqrt]))

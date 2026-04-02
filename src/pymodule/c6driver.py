@@ -44,7 +44,8 @@ from .linearsolver import LinearSolver
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            ri_sanity_check, dft_sanity_check, pe_sanity_check,
                            solvation_model_sanity_check)
-from .errorhandler import assert_msg_critical, safe_solve
+from .errorhandler import assert_msg_critical
+from .mathutils import safe_solve
 from .checkpoint import (check_rsp_hdf5, write_rsp_solution_with_multiple_keys)
 
 
@@ -254,7 +255,7 @@ class C6Driver(LinearSolver):
         self._dist_e2bung = None
 
         # check molecule
-        molecule_sanity_check(molecule)
+        molecule_sanity_check(molecule, 'restricted')
 
         # check SCF results
         scf_results_sanity_check(self, scf_results)
@@ -297,13 +298,6 @@ class C6Driver(LinearSolver):
                                n_points=self.n_points)
 
         self.start_time = tm.time()
-
-        # sanity check
-        nalpha = molecule.number_of_alpha_electrons()
-        nbeta = molecule.number_of_beta_electrons()
-        assert_msg_critical(nalpha == nbeta,
-                            'C6Driver: not implemented for unrestricted case')
-
         if self.rank == mpi_master():
             orb_ene = scf_results['E_alpha']
         else:
@@ -322,7 +316,7 @@ class C6Driver(LinearSolver):
         pe_dict = self._init_pe(molecule, basis)
 
         # CPCM information
-        self._init_cpcm(molecule)
+        self._init_cpcm(molecule, basis)
 
         # right-hand side (gradient)
         b_grad = self.get_complex_prop_grad(self.b_operator, self.b_components,

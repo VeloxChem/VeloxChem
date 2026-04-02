@@ -39,7 +39,8 @@ from .symmetryoperations import (Inversion, Rotation, Reflection,
                                  ImproperRotation)
 from .symmetryoperations import rotation_matrix
 from .sanitychecks import molecule_sanity_check
-from .errorhandler import assert_msg_critical, safe_arccos, safe_arcsin
+from .errorhandler import assert_msg_critical
+from .mathutils import safe_arccos, safe_arcsin
 
 
 class SymmetryAnalyzer:
