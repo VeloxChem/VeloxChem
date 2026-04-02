@@ -189,7 +189,7 @@ class EnsembleDriver:
             rsp_dict = {}
 
         self.scf_dict = dict(scf_dict)
-        self.method_dict = dict(method_dict)
+        self.method_dict = dict(method_dict) 
         self.rsp_dict = dict(rsp_dict)
 
         # Auto-enable response if response settings are provided
@@ -788,7 +788,11 @@ class EnsembleDriver:
         pc[3, :] = q
         return pc
 
-    def write_pot_files(self, snapshots, outdir: str | Path):
+    def write_pot_files(
+        self,
+        snapshots,
+        outdir: str | Path = "pot_frames",
+    ):
         """
         Write PE environment snapshots to .pot files.
         Generates one .pot file per snapshot.
