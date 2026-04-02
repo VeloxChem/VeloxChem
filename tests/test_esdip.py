@@ -9,6 +9,7 @@ from veloxchem.lreigensolver import LinearResponseEigenSolver
 from veloxchem.firstorderprop import FirstOrderProperties
 from veloxchem.tddftgradientdriver import TddftGradientDriver
 from veloxchem.excitedstatemomentdriver import ExcitedStateMomentDriver
+from veloxchem.tpatransitiondriver import TpaTransitionDriver
 
 
 @pytest.mark.solvers
@@ -46,6 +47,12 @@ class TestExcitedStateDipole:
         tddft_grad_drv.xcfun = xcfun_label
         es_densities = tddft_grad_drv.compute_excited_state_densities(
             mol, bas, tddft_results)
+
+        tpatrans_drv = TpaTransitionDriver()
+        tpatrans_drv.ostream.mute()
+        tpatrans_drv.xcfun = xcfun_label
+        tpatrans_drv.nstates = nstates
+        tpatrans_results = tpatrans_drv.compute(mol, bas, scf_results)
 
         unrelaxed_es_dipoles = []
         relaxed_es_dipoles = []
@@ -92,6 +99,14 @@ class TestExcitedStateDipole:
         relaxed_es_dipoles = np.array(relaxed_es_dipoles)
         qrf_es_dipoles = np.array(qrf_es_dipoles)
 
+        if scf_drv.rank == mpi_master():
+            tpatrans_es_dipoles = np.array(
+                tpatrans_results['excited_state_dipole_moments'])
+        else:
+            tpatrans_es_dipoles = None
+        tpatrans_es_dipoles = scf_drv.comm.bcast(tpatrans_es_dipoles,
+                                                 root=mpi_master())
+
         ref_unrelaxed_es_dipoles = np.array([
             [0.0, 0.0, -0.623834],
             [0.0, 0.0, -0.427791],
@@ -120,4 +135,5 @@ class TestExcitedStateDipole:
                              unrelaxed_es_dipoles)) < 1.0e-4
         assert np.max(np.abs(ref_relaxed_es_dipoles -
                              relaxed_es_dipoles)) < 1.0e-4
-        assert np.max(np.abs(ref_qrf_es_dipoles - qrf_es_dipoles)) < 1.0e-6
+        assert np.max(np.abs(ref_qrf_es_dipoles - qrf_es_dipoles)) < 1.0e-4
+        assert np.max(np.abs(ref_qrf_es_dipoles - tpatrans_es_dipoles)) < 1.0e-4

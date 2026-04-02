@@ -387,7 +387,7 @@ class TpaTransitionDriver(NonlinearSolver):
 
         ret_dict = {}
         M_tensors = {}
-        # excited_state_dipole_moments = {}
+        excited_state_dipole_moments = np.zeros((len(freqs), 3))
 
         # Compute dipole vector
         scf_prop = FirstOrderProperties(self.comm, self.ostream)
@@ -444,10 +444,8 @@ class TpaTransitionDriver(NonlinearSolver):
                 val_A2 = -(Nc_starA2Nc + NcA2Nc_star)
                 val_E3 = NaE3NbNc
 
-                # TODO: double check
-                # excited_state_dipole_moments.update({
-                #     (w, 'x'): (val_E3 + val_A2 + ground_state_dipole_x).real
-                # })
+                excited_state_dipole_moments[w_ind, 0] = (
+                    -(val_E3 + val_A2) + ground_state_dipole_x).real
 
                 # Double residue y-component
 
@@ -465,10 +463,8 @@ class TpaTransitionDriver(NonlinearSolver):
                 val_A2 = -(Nc_starA2Nc + NcA2Nc_star)
                 val_E3 = NaE3NbNc
 
-                # TODO: double check
-                # excited_state_dipole_moments.update({
-                #     (w, 'y'): (val_E3 + val_A2 + ground_state_dipole_y).real
-                # })
+                excited_state_dipole_moments[w_ind, 1] = (
+                    -(val_E3 + val_A2) + ground_state_dipole_y).real
 
                 # Double residue z-component
 
@@ -486,10 +482,8 @@ class TpaTransitionDriver(NonlinearSolver):
                 val_A2 = -(Nc_starA2Nc + NcA2Nc_star)
                 val_E3 = NaE3NbNc
 
-                # TODO: double check
-                # excited_state_dipole_moments.update({
-                #     (w, 'z'): (val_E3 + val_A2 + ground_state_dipole_z).real
-                # })
+                excited_state_dipole_moments[w_ind, 2] = (
+                    -(val_E3 + val_A2) + ground_state_dipole_z).real
 
                 # xx
 
@@ -650,6 +644,7 @@ class TpaTransitionDriver(NonlinearSolver):
                 'photon_energies': [-w for w in freqs],
                 'transition_moments': M_tensors,
                 'tpa_strengths': tpa_strengths,
+                'excited_state_dipole_moments': excited_state_dipole_moments,
                 'ground_state_dipole_moments':
                     scf_prop.get_property('dipole moment')
             }
