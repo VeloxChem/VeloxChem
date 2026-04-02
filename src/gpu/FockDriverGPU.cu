@@ -4976,8 +4976,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             gpuSafe(gpuStreamSynchronize(stream));
         }
-
-        if (ss_prim_pair_count > 0) {
+        if (sp_prim_pair_count > 0) {
             double *d_mat_J2_2kernels, *d_mat_J2_ref;
             gpuSafe(gpuMalloc(&d_mat_J2_2kernels, sizeof(double) * ss_prim_pair_count_local));
             gpuSafe(gpuMalloc(&d_mat_J2_ref, sizeof(double) * ss_prim_pair_count_local));
@@ -5141,7 +5140,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             gpuSafe(gpuStreamSynchronize(stream));
         }
-        if (ss_prim_pair_count > 0) {
+        if (pp_prim_pair_count > 0) {
             double *d_mat_J2_2kernels, *d_mat_J2_ref;
             gpuSafe(gpuMalloc(&d_mat_J2_2kernels, sizeof(double) * ss_prim_pair_count_local));
             gpuSafe(gpuMalloc(&d_mat_J2_ref, sizeof(double) * ss_prim_pair_count_local));
@@ -5380,7 +5379,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             gpuSafe(gpuStreamSynchronize(stream));
         }
-        if (sp_prim_pair_count > 0) {
+        if (ss_prim_pair_count > 0) {
             double *d_mat_J2_2kernels, *d_mat_J2_ref;
             gpuSafe(gpuMalloc(&d_mat_J2_2kernels, sizeof(double) * sp_prim_pair_count_local));
             gpuSafe(gpuMalloc(&d_mat_J2_ref, sizeof(double) * sp_prim_pair_count_local));
@@ -5679,7 +5678,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             gpuSafe(gpuStreamSynchronize(stream));
         }
-        if (sp_prim_pair_count > 0) {
+        if (pp_prim_pair_count > 0) {
             double *d_mat_J2_2kernels, *d_mat_J2_ref;
             gpuSafe(gpuMalloc(&d_mat_J2_2kernels, sizeof(double) * sp_prim_pair_count_local));
             gpuSafe(gpuMalloc(&d_mat_J2_ref, sizeof(double) * sp_prim_pair_count_local));
@@ -5928,7 +5927,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             gpuSafe(gpuStreamSynchronize(stream));
         }
-        if (pp_prim_pair_count > 0) {
+        if (ss_prim_pair_count > 0) {
             double *d_mat_J2_2kernels, *d_mat_J2_ref;
             gpuSafe(gpuMalloc(&d_mat_J2_2kernels, sizeof(double) * pp_prim_pair_count_local));
             gpuSafe(gpuMalloc(&d_mat_J2_ref, sizeof(double) * pp_prim_pair_count_local));
@@ -6061,7 +6060,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             gpuSafe(gpuStreamSynchronize(stream));
         }
-        if (pp_prim_pair_count > 0) {
+        if (sp_prim_pair_count > 0) {
             double *d_mat_J2_2kernels, *d_mat_J2_ref;
             gpuSafe(gpuMalloc(&d_mat_J2_2kernels, sizeof(double) * pp_prim_pair_count_local));
             gpuSafe(gpuMalloc(&d_mat_J2_ref, sizeof(double) * pp_prim_pair_count_local));
