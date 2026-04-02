@@ -3012,6 +3012,11 @@ class LinearSolver:
 
         dist_new_ger, dist_new_ung = self._precond_trials(vectors, precond)
 
+        if self.rank == mpi_master():
+            assert_msg_critical(
+                dist_new_ger.data.size > 0 or dist_new_ung.data.size > 0,
+                'LinearSolver: trial vectors are empty')
+
         if dist_new_ger.data.size == 0:
             dist_new_ger.data = np.zeros((dist_new_ung.shape(0), 0))
 
@@ -3044,11 +3049,6 @@ class LinearSolver:
                 dist_new_ung = self._orthogonalize_gram_schmidt_half_size(
                     dist_new_ung)
                 dist_new_ung = self._normalize_half_size(dist_new_ung)
-
-        if self.rank == mpi_master():
-            assert_msg_critical(
-                dist_new_ger.data.size > 0 or dist_new_ung.data.size > 0,
-                'LinearSolver: trial vectors are empty')
 
         return dist_new_ger, dist_new_ung
 

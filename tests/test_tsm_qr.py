@@ -48,19 +48,17 @@ class TestTransitionDipoleMomentQR:
 
         tol = 1.0e-5
 
-        tsm_drv.initial_state = 5
-        tsm_drv.final_state = 8
-        tsm_results = tsm_drv.compute(mol, bas, scf_results)
+        # tsm_drv._initial_state = 5
+        # tsm_drv._final_state = 8
+        # tsm_results = tsm_drv.compute(mol, bas, scf_results)
 
-        if tsm_drv.rank == mpi_master():
-            assert tsm_results['photon_energy'] > 0.0
-            calc_tsm = tsm_results['transition_dipole_moment']
-            assert abs(calc_tsm[0]) < tol
-            assert abs(calc_tsm[1]) < tol
-            assert abs(abs(calc_tsm[2]) - 0.523176) < tol
+        # if tsm_drv.rank == mpi_master():
+        #     calc_tsm = tsm_results['transition_dipole_moment']
+        #     assert abs(calc_tsm[0]) < tol
+        #     assert abs(calc_tsm[1]) < tol
+        #     assert abs(abs(calc_tsm[2]) - 0.523176) < tol
 
-        tsm_drv.initial_state = 7
-        tsm_drv.final_state = 7
+        tsm_drv.state = 7
         tsm_results = tsm_drv.compute(mol, bas, scf_results)
 
         if tsm_drv.rank == mpi_master():
@@ -77,27 +75,10 @@ class TestTransitionDipoleMomentQR:
 
         tsm_drv = ExcitedStateMomentDriver()
         tsm_drv.ostream.mute()
-        tsm_drv.initial_state = 0
-        tsm_drv.final_state = 1
+        tsm_drv.state = 0
 
         with pytest.raises(AssertionError,
-                           match='Expecting positive 1-based state indices'):
-            tsm_drv.compute(mol, bas, scf_results)
-
-    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
-                        reason='pytest.raises only valid in serial')
-    def test_tsm_qr_rejects_downward_transitions(self):
-
-        mol, bas, scf_results = self.get_scf_results()
-
-        tsm_drv = ExcitedStateMomentDriver()
-        tsm_drv.ostream.mute()
-        tsm_drv.initial_state = 8
-        tsm_drv.final_state = 5
-
-        with pytest.raises(
-                AssertionError,
-                match='Expecting final_state >= initial_state'):
+                           match='Expecting positive 1-based state index'):
             tsm_drv.compute(mol, bas, scf_results)
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
@@ -118,8 +99,7 @@ class TestTransitionDipoleMomentQR:
 
         tsm_drv = ExcitedStateMomentDriver()
         tsm_drv.ostream.mute()
-        tsm_drv.initial_state = 1
-        tsm_drv.final_state = 1
+        tsm_drv.state = 1
 
         with pytest.raises(AssertionError,
                            match='Complex response solver did not converge'):

@@ -84,8 +84,7 @@ class TestExcitedStateDipole:
             esm_drv = ExcitedStateMomentDriver()
             esm_drv.ostream.mute()
             esm_drv.xcfun = xcfun_label
-            esm_drv.initial_state = s + 1
-            esm_drv.final_state = s + 1
+            esm_drv.state = s + 1
             esm_results = esm_drv.compute(mol, bas, scf_results)
 
             if scf_drv.rank == mpi_master():

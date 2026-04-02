@@ -123,10 +123,10 @@ class TestFirstOrderPropertyDriver:
             mol, bas, 'hf', np.array([0.13230065, 0.77405262, 0.29507959]))
 
         prop_drv = FirstOrderPropertyDriver()
-        prop_drv.property = 'electric_dipole_moment'
+        prop_drv.property = 'electric dipole moment'
 
         prop = prop_drv.compute(mol, bas, scf_results)
-        dipole_dict = prop['electric_dipole_moment']
+        dipole_dict = prop['electric dipole moment']
 
         assert np.allclose(dipole_dict['total'], ref_dipole['total'])
         assert np.allclose(prop['electric dipole moment']['total'],
@@ -192,13 +192,12 @@ class TestFirstOrderPropertyDriver:
 
         dipole_moment = scf_prop.get_property('dipole moment')
         assert np.allclose(dipole_moment,
-                           scf_prop.get_property('dipole_moment'))
+                           scf_prop.get_property('dipole moment'))
 
         scf_prop.print_properties(mol, title='Ground State Test')
 
         excited_state_dipoles = np.vstack([dipole_moment, 2.0 * dipole_moment])
         scf_prop.properties['dipole moment'] = excited_state_dipoles
-        scf_prop.properties['dipole_moment'] = excited_state_dipoles
         mol.set_charge(1)
         scf_prop.print_properties(mol,
                                   title='Excited State Test',

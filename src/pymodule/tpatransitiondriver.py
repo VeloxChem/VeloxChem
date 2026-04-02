@@ -1019,8 +1019,8 @@ class TpaTransitionDriver(NonlinearSolver):
         self.ostream.print_header(title)
         self.ostream.print_header('-' * width)
 
-        title = '  {:<9s} {:>12s}{:>11s}{:>11s}{:>11s}{:>11s}{:>11s}{:>11s} '.format(
-            'Ex. State', 'Ex. Energy', 'Sxx  ', 'Syy  ', 'Szz  ', 'Sxy  ',
+        title = '  {:<9s}{:>13s}{:>11s}{:>11s}{:>11s}{:>11s}{:>11s}{:>11s} '.format(
+            'State', 'Photon Energy', 'Sxx  ', 'Syy  ', 'Szz  ', 'Sxy  ',
             'Sxz  ', 'Syz  ')
         self.ostream.print_header(title.ljust(width))
         self.ostream.print_header('-' * width)
@@ -1044,8 +1044,8 @@ class TpaTransitionDriver(NonlinearSolver):
         self.ostream.print_header(title)
         self.ostream.print_header('-' * width)
 
-        title = '  {:<9s} {:>12s}{:>28s}'.format('Ex. State', 'Ex. Energy',
-                                                  'TPA strength    ')
+        title = '  {:<9s}{:>13s}{:>28s}'.format('State', 'Photon Energy',
+                                                'TPA strength    ')
         self.ostream.print_header(title.ljust(width))
         self.ostream.print_header('-' * width)
 
@@ -1061,8 +1061,8 @@ class TpaTransitionDriver(NonlinearSolver):
         self.ostream.print_header(title)
         self.ostream.print_header('-' * width)
 
-        title = '  {:<9s} {:>12s}{:>28s}'.format('Ex. State', 'Ex. Energy',
-                                                  'TPA strength    ')
+        title = '  {:<9s}{:>13s}{:>28s}'.format('State', 'Photon Energy',
+                                                'TPA strength    ')
         self.ostream.print_header(title.ljust(width))
         self.ostream.print_header('-' * width)
 

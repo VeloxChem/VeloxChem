@@ -228,6 +228,10 @@ def write_lr_rsp_results_to_hdf5(fname, rsp_results, group_label='rsp'):
             if "vector" in key or "cube" in key or "file" in key or "details" in key:
                 continue
 
+            # Do not write esa_results
+            if key == "esa_results":
+                continue
+
             label = group_label + '/' + key
             if label in hf:
                 del hf[label]

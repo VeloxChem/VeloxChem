@@ -93,11 +93,14 @@ class ExcitedStateMomentDriver(NonlinearSolver):
         # cpp settings
         self.damping = 0.0
 
+        self.property = 'electric dipole moment'
+
         # tpa transition settings
 
-        self.initial_state = 3
-        self.final_state = 3
-        self.nstates = max(self.initial_state, self.final_state, 3)
+        self.state = 1
+        self.nstates = None
+        self._initial_state = None
+        self._final_state = None
 
         # input keywords
         self._input_keywords['response'].update({
@@ -135,13 +138,29 @@ class ExcitedStateMomentDriver(NonlinearSolver):
               A dictonary containing the E[3], X[2], A[2] contractions
         """
 
+        assert_msg_critical(
+            self.property.lower() in [
+                'electric dipole moment',
+            ],
+            f'{type(self).__name__}: Property {self.property} not yet supported'
+        )
+
+        assert_msg_critical(
+            self.state >= 1,
+            'ExcitedStateMomentDriver.compute: Expecting positive 1-based '
+            'state index')
+
+        # for now we keep initial_state and final_state as internal variables
+        self._initial_state = self.state
+        self._final_state = self.state
+
         if self.norm_thresh is None:
             self.norm_thresh = self.conv_thresh * 1.0e-6
         if self.lindep_thresh is None:
             self.lindep_thresh = self.conv_thresh * 1.0e-6
 
         # check molecule
-        molecule_sanity_check(molecule)
+        molecule_sanity_check(molecule, 'restricted')
 
         # check SCF results
         scf_results_sanity_check(self, scf_results)
@@ -167,21 +186,6 @@ class ExcitedStateMomentDriver(NonlinearSolver):
             self.print_header()
 
         start_time = time.time()
-
-        # sanity check
-        nalpha = molecule.number_of_alpha_electrons()
-        nbeta = molecule.number_of_beta_electrons()
-        assert_msg_critical(
-            nalpha == nbeta,
-            'ExcitedStateMomentDriver: not implemented for unrestricted case')
-        assert_msg_critical(
-            self.initial_state >= 1 and self.final_state >= 1,
-            'ExcitedStateMomentDriver.compute: Expecting positive 1-based '
-            'state indices in initial_state and final_state')
-        assert_msg_critical(
-            self.final_state >= self.initial_state,
-            'ExcitedStateMomentDriver.compute: Expecting final_state >= '
-            'initial_state because downward transitions are not supported')
 
         if self.rank == mpi_master():
             S = scf_results['S']
@@ -231,6 +235,17 @@ class ExcitedStateMomentDriver(NonlinearSolver):
                 if operator == 'dipole':
                     b_grad[ind] *= -1.0
 
+        # make a reasonable choice of nstates
+        if self.rank == mpi_master():
+            norb = scf_results['E_alpha'].shape[0]
+            nocc = molecule.number_of_alpha_occupied_orbitals(ao_basis)
+            max_nstates = nocc * (norb - nocc)
+        else:
+            max_nstates = None
+        max_nstates = self.comm.bcast(max_nstates, root=mpi_master())
+        self.nstates = max(self.state, min(3, max_nstates))
+
+        # run RPA
         rpa_drv = LinearResponseEigenSolver(self.comm, self.ostream)
         rpa_drv.nonlinear = True
 
@@ -241,8 +256,6 @@ class ExcitedStateMomentDriver(NonlinearSolver):
             'electric_field', 'program_end_time', '_debug',
             '_block_size_factor', 'ri_coulomb'
         ]
-
-        self.nstates = max(self.initial_state, self.final_state, 3)
 
         for key in rpa_keywords:
             setattr(rpa_drv, key, getattr(self, key))
@@ -256,10 +269,8 @@ class ExcitedStateMomentDriver(NonlinearSolver):
         available_states = len(rpa_results['eigenvalues'])
         assert_msg_critical(
             available_states >= self.nstates,
-            'ExcitedStateMomentDriver.compute: Requested '
-            f'initial_state={self.initial_state} and '
-            f'final_state={self.final_state}, but only '
-            f'{available_states} excited states are available')
+            f'ExcitedStateMomentDriver.compute: Requested state={self.state}, '
+            f'but only {available_states} excited states are available')
 
         Xf = {}
         inv_sqrt_2 = 1.0 / np.sqrt(2.0)
@@ -270,8 +281,8 @@ class ExcitedStateMomentDriver(NonlinearSolver):
                 distribute=False)
 
         freqs = [
-            rpa_results['eigenvalues'][self.final_state - 1] -
-            rpa_results['eigenvalues'][self.initial_state - 1]
+            rpa_results['eigenvalues'][self._final_state - 1] -
+            rpa_results['eigenvalues'][self._initial_state - 1]
         ]
         freqs_for_response_vectors = freqs + [0.0]
 
@@ -415,9 +426,9 @@ class ExcitedStateMomentDriver(NonlinearSolver):
                                                                   freqs[0])])
 
         Nf = LinearResponseEigenSolver.get_full_solution_vector(
-            Xf[self.initial_state - 1])
+            Xf[self._initial_state - 1])
         Ng_ = LinearResponseEigenSolver.get_full_solution_vector(
-            Xf[self.final_state - 1])
+            Xf[self._final_state - 1])
 
         if self.rank == mpi_master():
 
@@ -449,15 +460,15 @@ class ExcitedStateMomentDriver(NonlinearSolver):
             val_A2 = -(Nc_starA2Nc + NcA2Nc_star)
             val_E3 = NaE3NbNc
 
-            if self.initial_state == self.final_state:
+            if self._initial_state == self._final_state:
                 # For diagonal elements, add ground state dipole moment
                 excited_state_dipole_moments.update({
-                    ('x', self.initial_state, self.final_state):
+                    ('x', self._initial_state, self._final_state):
                         (-(val_E3 + val_A2) + ground_state_dipole_x).real
                 })
             else:
                 excited_state_dipole_moments.update({
-                    ('x', self.initial_state, self.final_state):
+                    ('x', self._initial_state, self._final_state):
                         -(val_E3 + val_A2).real
                 })
 
@@ -475,15 +486,15 @@ class ExcitedStateMomentDriver(NonlinearSolver):
             val_A2 = -(Nc_starA2Nc + NcA2Nc_star)
             val_E3 = NaE3NbNc
 
-            if self.initial_state == self.final_state:
+            if self._initial_state == self._final_state:
                 # For diagonal elements, add ground state dipole moment
                 excited_state_dipole_moments.update({
-                    ('y', self.initial_state, self.final_state):
+                    ('y', self._initial_state, self._final_state):
                         (-(val_E3 + val_A2) + ground_state_dipole_y).real
                 })
             else:
                 excited_state_dipole_moments.update({
-                    ('y', self.initial_state, self.final_state):
+                    ('y', self._initial_state, self._final_state):
                         -(val_E3 + val_A2).real
                 })
 
@@ -502,15 +513,15 @@ class ExcitedStateMomentDriver(NonlinearSolver):
             val_A2 = -(Nc_starA2Nc + NcA2Nc_star)
             val_E3 = NaE3NbNc
 
-            if self.initial_state == self.final_state:
+            if self._initial_state == self._final_state:
                 # For diagonal elements, add ground state dipole moment
                 excited_state_dipole_moments.update({
-                    ('z', self.initial_state, self.final_state):
+                    ('z', self._initial_state, self._final_state):
                         (-(val_E3 + val_A2) + ground_state_dipole_z).real
                 })
             else:
                 excited_state_dipole_moments.update({
-                    ('z', self.initial_state, self.final_state):
+                    ('z', self._initial_state, self._final_state):
                         -(val_E3 + val_A2).real
                 })
 
@@ -520,7 +531,7 @@ class ExcitedStateMomentDriver(NonlinearSolver):
         self.ostream.print_header('=' * (len(w_str) + 2))
         self.ostream.print_blank()
 
-        if self.initial_state == self.final_state:
+        if self._initial_state == self._final_state:
             self._print_transition_dipoles("Excited state dipole moments",
                                            excited_state_dipole_moments)
         else:
@@ -545,11 +556,10 @@ class ExcitedStateMomentDriver(NonlinearSolver):
                 'excited_state_dipole_moments')
             esm_arr = np.array([esm_x[0], esm_y[0], esm_z[0]])
 
-            if self.initial_state == self.final_state:
+            if self._initial_state == self._final_state:
                 ret_dict['excited_state_dipole_moment'] = esm_arr
             else:
                 ret_dict['transition_dipole_moment'] = esm_arr
-                ret_dict['photon_energy'] = freqs[0]
 
         return ret_dict
 
@@ -613,9 +623,9 @@ class ExcitedStateMomentDriver(NonlinearSolver):
         distributed_density_2 = None
 
         Nf = LinearResponseEigenSolver.get_full_solution_vector(
-            Xf[self.initial_state - 1])
+            Xf[self._initial_state - 1])
         Ng = LinearResponseEigenSolver.get_full_solution_vector(
-            Xf[self.final_state - 1])
+            Xf[self._final_state - 1])
 
         if self.rank == mpi_master():
 
@@ -790,16 +800,16 @@ class ExcitedStateMomentDriver(NonlinearSolver):
 
         vec_pack = np.array([
             fo['F(fg_)'][wi[0]].data,
-            fo2[self.initial_state - 1].data,
-            fo2[self.final_state - 1].data,
+            fo2[self._initial_state - 1].data,
+            fo2[self._final_state - 1].data,
         ]).T.copy()
 
         vec_pack = self._collect_vectors_in_columns(vec_pack)
 
         Nf = LinearResponseEigenSolver.get_full_solution_vector(
-            Xf[self.initial_state - 1])
+            Xf[self._initial_state - 1])
         Ng_ = LinearResponseEigenSolver.get_full_solution_vector(
-            Xf[self.final_state - 1])
+            Xf[self._final_state - 1])
 
         if self.rank == mpi_master():
 
