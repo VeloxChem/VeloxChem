@@ -601,6 +601,13 @@ class EnsembleDriver:
         if atom_name == "OXT":
             candidates.append("OT2")
 
+        # Cysteine thiol hydrogen naming:
+        # CHARMM/GROMAS often uses HG1, while CP3 entires use HG.
+        if atom_name == "HG1":
+            candidates.append("HG")
+        elif atom_name == "HG":
+            candidates.append("HG1")
+
         # Hydrogen digit conventions:
         #   - CHARMM: HD11, HD12, HD13  <->  AMBER: 1HD1, 2HD1, 3HD1
         #   - Also HB1 <-> 1HB, HG2 <-> 2HG, etc.

@@ -239,6 +239,7 @@ class EnsembleParser:
 
         - GLU + HE1/HE2 -> GLH
         - ASP + HD1/HD2 -> ASH
+        - CYS without HG/HG1 -> CYX
 
         :param env_atoms (MDAnalysis.core.groups.AtomGroup)
             AtomGroup corresponding to the environment selection used in
@@ -258,6 +259,9 @@ class EnsembleParser:
                 prot_map[res.resindex] = "GLH"
             elif resname == "ASP" and ({"HD1", "HD2"} & atom_names):
                 prot_map[res.resindex] = "ASH"
+            elif resname == "CYS" and not ({"HG", "HG1"} & atom_names):
+                # Distinguish thiol-less/disulfide cysteine from protonated CYS.
+                prot_map[res.resindex] = "CYX"
 
         return prot_map
 
