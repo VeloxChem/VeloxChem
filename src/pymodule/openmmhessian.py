@@ -503,27 +503,36 @@ class MMHessianDriver:
     # ════════════════════════════════════════════════════════════════════════
     # Core computation
     # ════════════════════════════════════════════════════════════════════════
-
     def _run(self, molecule, sim):
         """
         Compute the Cartesian Hessian, mass-weight it, project out
-        translations and rotations, and convert to frequencies.
+        translations and rotations in mass-weighted space, and convert
+        to frequencies.
+
+        The projection must be applied in mass-weighted coordinates because
+        the projection matrix P is built from mass-weighted displacement
+        vectors (sqrt(m_i) * ...).  Applying P to the raw Cartesian Hessian
+        is a unit mismatch and leaves residual near-zero modes that corrupt
+        the vibrational partition function.
+
         Results are stored in self.hessian, self.mw_hessian, self.frequencies.
         """
-        masses    = self._get_masses(molecule)
-        step_map  = self._adaptive_steps(molecule, sim, masses)
-        proj      = self._projection_matrix(molecule)
+        masses   = self._get_masses(molecule)
+        step_map = self._adaptive_steps(molecule, sim, masses)
+        proj     = self._projection_matrix(molecule)
 
-        hessian   = self._numerical_hessian(molecule, sim, step_map)
+        hessian_raw = self._numerical_hessian(molecule, sim, step_map)
 
-        # Project out translations / rotations
-        hessian   = proj @ hessian @ proj
+        # Project and symmetrise in mass-weighted space
+        mw_raw  = self._mass_weight(hessian_raw, masses)
+        mw_proj = proj @ mw_raw @ proj
+        mw_proj = 0.5 * (mw_proj + mw_proj.T)
 
-        # Symmetrise
-        hessian   = 0.5 * (hessian + hessian.T)
-
-        self.hessian    = hessian
-        self.mw_hessian = self._mass_weight(hessian, masses)
+        # Back-transform to Cartesian so self.hessian stays in Hartree/Bohr²
+        # (needed by save() and the TS Hessian massage code)
+        sqm = np.repeat(np.sqrt(masses), 3)   # (3N,)
+        self.hessian    = mw_proj * np.outer(sqm, sqm)
+        self.mw_hessian = mw_proj
         self.frequencies = self._hessian_to_frequencies(self.mw_hessian)
         self.ts_mode    = None   # reset; set by _identify_ts_mode if needed
 
