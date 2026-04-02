@@ -192,7 +192,14 @@ class TestFirstOrderPropertyDriver:
 
         dipole_moment = scf_prop.get_property('dipole moment')
         assert np.allclose(dipole_moment,
-                           scf_prop.get_property('dipole moment'))
+                           scf_prop.get_property('dipole_moment'))
+        assert np.allclose(dipole_moment,
+                           scf_prop.get_property('electric_dipole_moment'))
+        assert np.allclose(dipole_moment,
+                           scf_prop.get_property('electric dipole moment'))
+
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+            assert np.allclose(dipole_moment, scf_results['dipole_moment'])
 
         scf_prop.print_properties(mol, title='Ground State Test')
 

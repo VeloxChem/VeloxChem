@@ -78,8 +78,9 @@ class TestExcitedStateDipole:
             relaxed_prop.compute(mol, bas, relaxed_es_dens)
 
             unrelaxed_es_dipoles.append(
-                unrelaxed_prop.properties['dipole_moment'])
-            relaxed_es_dipoles.append(relaxed_prop.properties['dipole_moment'])
+                unrelaxed_prop.get_property('dipole_moment'))
+            relaxed_es_dipoles.append(
+                relaxed_prop.get_property('dipole_moment'))
 
             esm_drv = ExcitedStateMomentDriver()
             esm_drv.ostream.mute()
