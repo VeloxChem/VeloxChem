@@ -177,3 +177,43 @@ def test_solvate_rejects_unknown_solvent_name():
                         solvent='not-a-solvent',
                         neutralize=False,
                         box=[10.0, 10.0, 10.0])
+
+
+def test_counterion_molecules_rejects_unknown_ion_name():
+
+    builder = SolvationBuilder(ostream=RecordingOutput())
+    builder.ion_name = 'Ca'
+
+    with pytest.raises(AssertionError, match='Unsupported counterion'):
+        builder._counterion_molecules()
+
+
+def test_solvate_rejects_box_smaller_than_solute_volume():
+
+    solute = _make_methane_solute()
+    solvent = _make_water()
+    builder = SolvationBuilder(ostream=RecordingOutput())
+
+    with pytest.raises(AssertionError, match='available solvent volume must be positive'):
+        builder.solvate(solute,
+                        solvent='other',
+                        solvent_molecule=solvent,
+                        target_density=1000,
+                        neutralize=False,
+                        box=[1.0, 1.0, 1.0])
+
+
+@pytest.mark.parametrize('target_density', [0, -100])
+def test_solvate_rejects_non_positive_target_density(target_density):
+
+    solute = _make_methane_solute()
+    solvent = _make_water()
+    builder = SolvationBuilder(ostream=RecordingOutput())
+
+    with pytest.raises(AssertionError, match='target density must be positive'):
+        builder.solvate(solute,
+                        solvent='other',
+                        solvent_molecule=solvent,
+                        target_density=target_density,
+                        neutralize=False,
+                        box=[10.0, 10.0, 10.0])

@@ -211,6 +211,11 @@ class SolvationBuilder:
             self._define_box(*box)
             box_center = [box[0]/2,box[1]/2,box[2]/2]
 
+        assert_msg_critical(
+            volume_nm3 > 0.0,
+            'SolvationBuilder: The available solvent volume must be positive. '
+            'Increase the box size or padding.')
+
         # Determine the solute volume and convert it to nm^3
         self.ostream.print_info("The volume of the solute is: {:.2f} nm^3".format(solute_volume))
         self.ostream.flush()
@@ -1135,19 +1140,18 @@ class SolvationBuilder:
         """
         coords = np.array([[0.0, 0.0, 0.0]])
 
-        if self.ion_name == 'Na':
-            labels = ['Na']
-            charge = 1.0
-        elif self.ion_name == 'K':
-            labels = ['K']
-            charge = 1.0
-        elif self.ion_name == 'Li':
-            labels = ['Li']
-            charge = 1.0
-        elif self.ion_name == 'Cl':
-            labels = ['Cl']
-            charge = -1.0
-        
+        ion_definitions = {
+            'Na': (['Na'], 1.0),
+            'K': (['K'], 1.0),
+            'Li': (['Li'], 1.0),
+            'Cl': (['Cl'], -1.0),
+        }
+        assert_msg_critical(
+            self.ion_name in ion_definitions,
+            f"Unsupported counterion '{self.ion_name}'. Supported counterions are: "
+            f"{', '.join(ion_definitions)}.")
+        labels, charge = ion_definitions[self.ion_name]
+
         ion_mol = Molecule(labels, coords, 'angstrom')
         ion_mol.set_charge(charge)
 
@@ -1182,6 +1186,10 @@ class SolvationBuilder:
         :return:
             The number of moles per nm^3.
         """
+        assert_msg_critical(
+            density > 0.0,
+            'SolvationBuilder: The target density must be positive.')
+
         # Get the mass in kg/mol
         mass = sum(molecule.get_masses()) * 1e-3 / 6.022e23
 
