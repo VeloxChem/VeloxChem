@@ -1,23 +1,17 @@
 from mpi4py import MPI
 from pathlib import Path
 import pytest
-import sys
 
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.molecule import Molecule
 from veloxchem.mmforcefieldgenerator import MMForceFieldGenerator
 
-try:
-    import rdkit
-except ImportError:
-    pass
-
 
 class TestMMForceFieldGenerator:
 
-    @pytest.mark.skipif('rdkit' not in sys.modules,
-                        reason='rdkit not available')
     def test_ffgen_water(self):
+
+        pytest.importorskip('rdkit')
 
         water = Molecule.read_smiles('O')
 
@@ -151,9 +145,9 @@ class TestMMForceFieldGenerator:
 
         return data
 
-    @pytest.mark.skipif('rdkit' not in sys.modules,
-                        reason='rdkit not available')
     def test_ffgen_set_params_and_get_params(self):
+
+        pytest.importorskip('rdkit')
 
         xyzstr = """10
             xyz
