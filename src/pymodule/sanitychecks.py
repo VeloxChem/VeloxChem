@@ -62,66 +62,6 @@ def molecule_sanity_check(mol, method_type=None):
 
     assert_msg_critical(mol.check_proximity(0.1), 'Molecule: Atoms too close')
 
-# IULIA's comment: this is an example routine that we can use to ensure
-# instance variables from ensemble_driver are passed on to the scf_driver
-# TODO: make sure all variables available in ensemble_driver's __init__
-# are added here.
-def ensemble_driver_scf_sanity_check(scf_driver, ensemble_driver):
-    """ Updates the settings of scf_driver to be consistent
-        with the settings in ensemble_driver.
-
-        :param scf_driver:
-            The SCF driver.
-        :param ensemble_driver:
-            The ensemble driver.
-    """
-    updated_scf_info = {}
-
-    if scf_driver.rank == mpi_master():
-        if ensemble_driver.xcfun is not None:
-            updated_scf_info['xcfun'] = ensemble_driver.xcfun
-        if ensemble_driver.eri_thresh is not None:
-            updated_scf_info['eri_thresh'] = ensemble_driver.eri_thresh
-        if ensemble_driver.ri_coulomb is not None:
-            updated_scf_info['ri_coulomb'] = ensemble_driver.ri_coulomb
-        if ensemble_driver.grid_level is not None:
-            updated_scf_info['grid_level'] = ensemble_driver.grid_level
-        if ensemble_driver.potfile is not None:
-            updated_scf_info['potfile'] = ensemble_driver.potfile
-        if ensemble_driver.embedding is not None:
-            updated_scf_info['embedding'] = ensemble_driver.embedding
-
-    updated_scf_info = scf_driver.comm.bcast(updated_scf_info, root=mpi_master())
-
-    for key, val in updated_scf_info.items():
-        setattr(scf_driver, key, val)
-
-def ensemble_driver_rsp_sanity_check(rsp_driver, ensemble_driver):
-    """ Updates the settings of rsp_driver to be consistent
-        with the settings in ensemble_driver.
-
-        :param rsp_driver:
-            The response driver.
-        :param ensemble_driver:
-            The ensemble driver.
-    """
-    updated_rsp_info = {}
-
-    if rsp_driver.rank == mpi_master():
-        if ensemble_driver.nstates is not None:
-            updated_rsp_info['nstates'] = ensemble_driver.nstates
-        if ensemble_driver.nto is not None:
-            updated_rsp_info['nto'] = ensemble_driver.nto
-        if ensemble_driver.core_excitation is not None:
-            updated_rsp_info['core_excitation'] = ensemble_driver.core_excitation
-        if ensemble_driver.num_core_orbitals is not None:
-            updated_rsp_info['num_core_orbitals'] = ensemble_driver.num_core_orbitals
-
-    updated_rsp_info = rsp_driver.comm.bcast(updated_rsp_info, root=mpi_master())
-
-    for key, val in updated_rsp_info.items():
-        setattr(rsp_driver, key, val)
-
         
 def scf_results_sanity_check(obj, scf_results):
     """

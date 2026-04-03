@@ -33,10 +33,12 @@
 from mpi4py import MPI
 import numpy as np
 import sys
+from pathlib import Path
 
 from .veloxchemlib import mpi_master, bohr_in_angstrom
 from .outputstream import OutputStream
 from .espchargesdriver import EspChargesDriver
+from .checkpoint import write_scf_property_to_hdf5
 from .inputparser import parse_input, print_keywords
 from .errorhandler import assert_msg_critical, safe_solve
 
@@ -267,10 +269,41 @@ class RespChargesDriver(EspChargesDriver):
 
         if self.rank == mpi_master():
             q = self.compute_resp_charges([molecule], [grid_m], [esp_m], [1.0])
+
+            if scf_results is not None:
+                scf_results['charges_resp'] = np.array(q, dtype=float)
+
+            h5_fname = self._resolve_h5_filename(scf_results)
+            if h5_fname is not None and Path(h5_fname).is_file():
+                write_scf_property_to_hdf5(h5_fname, 'charges_resp',
+                                           np.array(q, dtype=float))
         else:
             q = None
 
         return q
+
+    def _resolve_h5_filename(self, scf_results):
+        """
+        Resolves HDF5 filename used for writing RESP charges.
+
+        :param scf_results:
+            The SCF results dictionary.
+
+        :return:
+            HDF5 filename or None.
+        """
+
+        base = self.filename
+        if base is None and isinstance(scf_results, dict):
+            base = scf_results.get('filename')
+
+        if not isinstance(base, str) or base == '':
+            return None
+
+        if base.endswith('.h5'):
+            return base
+
+        return f'{base}.h5'
 
     def _compute_multiple_molecules(self, molecules, basis_sets=None):
         """

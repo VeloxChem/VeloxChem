@@ -42,6 +42,66 @@ from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 
 
+def _set_atomic_metadata(dset, description):
+    """Attach standard metadata for atom-resolved scalar datasets."""
+    dset.attrs['atomic_property'] = description
+
+
+def _atomic_description_for_label(label):
+    """Return metadata label for known atomic datasets."""
+    atomic_labels = {
+        'nuclear_charges': 'Nuclear Charges',
+        'scf/charges_resp': 'RESP Charges',
+        'scf/population_analysis': 'Population Analysis',
+        'rsp/detachment_charges': 'Detachment Charges',
+        'rsp/attachment_charges': 'Attachment Charges',
+    }
+
+    if label in atomic_labels:
+        return atomic_labels[label]
+
+    detach_prefix = 'rsp/detach_attach/detach_charges_'
+    attach_prefix = 'rsp/detach_attach/attach_charges_'
+
+    if label.startswith(detach_prefix):
+        state_label = label[len(detach_prefix):]
+        return f'Detachment Charges ({state_label})' if state_label else 'Detachment Charges'
+
+    if label.startswith(attach_prefix):
+        state_label = label[len(attach_prefix):]
+        return f'Attachment Charges ({state_label})' if state_label else 'Attachment Charges'
+
+    return None
+
+
+def _apply_atomic_metadata_for_label(dset, label):
+    """Attach metadata when dataset path matches a known atomic property."""
+    description = _atomic_description_for_label(label)
+    if description is not None:
+        _set_atomic_metadata(dset, description)
+
+
+def _set_temporal_metadata(dset, description):
+    """Attach standard metadata for time-series (frame-stacked) datasets."""
+    dset.attrs['temporal_property'] = description
+
+
+def _temporal_description_for_label(label):
+    """Return metadata label for known temporal datasets."""
+    temporal_labels = {
+        'nuclear_repulsion': 'Nuclear Repulsion',
+        'scf/scf_energy': 'SCF Energy',
+    }
+    return temporal_labels.get(label)
+
+
+def _apply_temporal_metadata_for_label(dset, label):
+    """Attach metadata when dataset path matches a known temporal property."""
+    description = _temporal_description_for_label(label)
+    if description is not None:
+        _set_temporal_metadata(dset, description)
+
+
 def create_hdf5(fname, molecule, basis, dft_func_label, potfile_text):
     """
     Creates HDF5 file for a calculation.
@@ -67,7 +127,8 @@ def create_hdf5(fname, molecule, basis, dft_func_label, potfile_text):
 
         hf.create_dataset('nuclear_repulsion', data=np.array([e_nuc]))
 
-        hf.create_dataset('nuclear_charges', data=molecule.get_element_ids())
+        dset = hf.create_dataset('nuclear_charges', data=molecule.get_element_ids())
+        _apply_atomic_metadata_for_label(dset, 'nuclear_charges')
 
         hf.create_dataset('atom_coordinates',
                           data=molecule.get_coordinates_in_bohr())
@@ -132,11 +193,12 @@ def write_scf_results_to_hdf5(fname, scf_results, scf_history):
         for key in keys:
             # TODO: remove this if statement since all keys should be available
             if key in scf_results:
-                scf_group.create_dataset(key, data=scf_results[key])
+                dset = scf_group.create_dataset(key, data=scf_results[key])
+                _apply_atomic_metadata_for_label(dset, f'scf/{key}')
 
         # write dipole moment
         scf_group.create_dataset('dipole_moment',
-                                 data=scf_results['dipole_moment'])
+                     data=scf_results['dipole_moment'])
 
         # write SCF energy
         scf_group.create_dataset('scf_type',
@@ -149,6 +211,35 @@ def write_scf_results_to_hdf5(fname, scf_results, scf_history):
         for key in keys:
             data = np.array([step[key] for step in scf_history])
             scf_group.create_dataset(f'scf_history_{key}', data=data)
+
+        hf.close()
+
+
+def write_scf_property_to_hdf5(fname, key, data):
+    """
+    Writes a single SCF property dataset to the scf group in HDF5 file.
+
+    :param fname:
+        Name of the HDF5 file.
+    :param key:
+        Dataset name inside the scf group.
+    :param data:
+        Dataset values.
+    """
+
+    valid_checkpoint = (fname and isinstance(fname, str) and
+                        Path(fname).is_file())
+
+    if valid_checkpoint:
+        hf = h5py.File(fname, 'a')
+
+        scf_group = hf.require_group('scf')
+        label = f'scf/{key}'
+        if label in hf:
+            del hf[label]
+
+        dset = scf_group.create_dataset(key, data=data)
+        _apply_atomic_metadata_for_label(dset, label)
 
         hf.close()
 
@@ -231,7 +322,8 @@ def write_lr_rsp_results_to_hdf5(fname, rsp_results, group_label='rsp'):
             label = group_label + '/' + key
             if label in hf:
                 del hf[label]
-            hf.create_dataset(label, data=rsp_results[key])
+            dset = hf.create_dataset(label, data=rsp_results[key])
+            _apply_atomic_metadata_for_label(dset, label)
 
         hf.close()
 
@@ -335,14 +427,16 @@ def write_detach_attach_to_hdf5(fname,
                             state_label)
             if detach_label in hf:
                 del hf[detach_label]
-            hf.create_dataset(detach_label, data=chg_detach)
+            dset = hf.create_dataset(detach_label, data=chg_detach)
+            _apply_atomic_metadata_for_label(dset, detach_label)
 
         if chg_attach is not None:
             attach_label = (group_label + "/detach_attach/attach_charges_" +
                             state_label)
             if attach_label in hf:
                 del hf[attach_label]
-            hf.create_dataset(attach_label, data=chg_attach)
+            dset = hf.create_dataset(attach_label, data=chg_attach)
+            _apply_atomic_metadata_for_label(dset, attach_label)
 
         hf.close()
 
