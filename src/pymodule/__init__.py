@@ -237,7 +237,6 @@ from .cppsolver import ComplexResponseSolver as ComplexResponse
 from .peforcefieldgenerator import PEForceFieldGenerator as LoPropDriver
 
 # Python functions
-from .qmtrajectoryanalyzer import show_trajectory
 from .errorhandler import assert_msg_critical
 from .features import print_features
 from .oneeints import compute_overlap_integrals
