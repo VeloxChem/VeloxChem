@@ -44,7 +44,8 @@ from .scfunrestdriver import ScfUnrestrictedDriver
 from .scfrestopendriver import ScfRestrictedOpenDriver
 from .lreigensolver import LinearResponseEigenSolver
 from .cppsolver import ComplexResponseSolver
-from .veloxchemlib import mpi_master
+from .veloxchemlib import mpi_master, hartree_in_ev, hartree_in_kjpermol
+from .errorhandler import assert_msg_critical
 
 
 class QMTrajectoryDriver:
@@ -581,16 +582,37 @@ class QMTrajectoryDriver:
                     if arr is None:
                         continue
                     if key not in scf_grp:
+                        # All axes unbounded so variable-length history arrays
+                        # (scf_history_*) can grow in both dimensions.
+                        mshape = (None,) + tuple(None for _ in arr.shape)
                         scf_grp.create_dataset(
                             key,
                             data=arr.reshape((1,) + arr.shape),
-                            maxshape=(None,) + arr.shape,
+                            maxshape=mshape,
                         )
                         self._apply_atomic_metadata(scf_grp[key], "scf", key)
                         self._apply_temporal_metadata(scf_grp[key], "scf", key)
                     else:
                         dset = scf_grp[key]
                         n = dset.shape[0]
+                        # Handle variable-length trailing dimension
+                        # (e.g. scf_history_* arrays differ per frame).
+                        if arr.ndim >= 1 and dset.ndim == arr.ndim + 1:
+                            cur_w = dset.shape[1]
+                            new_w = arr.shape[0]
+                            if new_w > cur_w:
+                                # Grow width; back-fill old rows with NaN.
+                                dset.resize(cur_w if dset.dtype.kind != 'f'
+                                            else cur_w, axis=1)
+                                dset.resize(new_w, axis=1)
+                                if dset.dtype.kind == 'f':
+                                    dset[:n, cur_w:] = np.nan
+                            elif new_w < cur_w:
+                                # Pad incoming array with NaN to match width.
+                                padded = np.full(cur_w, np.nan,
+                                                 dtype=dset.dtype)
+                                padded[:new_w] = arr
+                                arr = padded
                         dset.resize(n + 1, axis=0)
                         dset[n] = arr
 
@@ -612,10 +634,11 @@ class QMTrajectoryDriver:
                     if arr is None:
                         continue
                     if key not in rsp_grp:
+                        mshape = (None,) + tuple(None for _ in arr.shape)
                         rsp_grp.create_dataset(
                             key,
                             data=arr.reshape((1,) + arr.shape),
-                            maxshape=(None,) + arr.shape,
+                            maxshape=mshape,
                         )
                         self._apply_atomic_metadata(rsp_grp[key], "rsp", key)
                         self._apply_temporal_metadata(rsp_grp[key], "rsp", key)
@@ -947,9 +970,19 @@ class QMTrajectoryDriver:
                 total_frames=len(snapshots),
             )
 
+        # ── Wipe any stale guess from a previous run before starting ──────────
+        if guess_h5 is not None and guess_h5.is_file():
+            guess_h5.unlink()
+
         # ── Main trajectory loop ───────────────────────────────────────────────
-        for snap in snapshots:
+        n_total = len(snapshots)
+        for i_snap, snap in enumerate(snapshots):
             frame = int(snap["frame"])
+            if self.rank == mpi_master():
+                self.ostream.print_info(
+                    f"Frame {i_snap + 1}/{n_total}"
+                )
+                self.ostream.print_blank()
 
             labels = [str(x) for x in snap["qm_elements"]]
             coords = np.asarray(snap["qm_coords"], dtype=float)
@@ -991,8 +1024,9 @@ class QMTrajectoryDriver:
             if guess_fallback and not scf_driver.is_converged:
                 if self.rank == mpi_master():
                     self.ostream.print_info(
-                        f"Frame {frame}: SCF did not converge with the "
-                        "propagated guess.  Retrying with SAD initial guess..."
+                        f"Frame {i_snap + 1}/{n_total}: SCF did not converge "
+                        "with the propagated guess.  Retrying with SAD initial "
+                        "guess..."
                     )
                     self.ostream.print_blank()
 
@@ -1016,7 +1050,7 @@ class QMTrajectoryDriver:
             if scf_results is None:
                 if self.rank == mpi_master():
                     self.ostream.print_info(
-                        f"Frame {frame}: SCF did not converge — "
+                        f"Frame {i_snap + 1}/{n_total}: SCF did not converge — "
                         "recording as non-converged frame."
                     )
                     self.ostream.print_blank()
@@ -1065,9 +1099,155 @@ class QMTrajectoryDriver:
                     prop_driver=rsp_driver if do_rsp else None,
                 )
 
+        # ── End-of-run summary ────────────────────────────────────────────────
+        if self.rank == mpi_master():
+            non_conv = [
+                i_snap + 1
+                for i_snap, (_, res) in enumerate(scf_all)
+                if res is None
+            ]
+            n_conv = n_total - len(non_conv)
+            self.ostream.print_info(
+                f"QMTrajectoryDriver: {n_total} frames processed, "
+                f"{n_conv} converged, {len(non_conv)} non-converged."
+            )
+            if non_conv:
+                self.ostream.print_info(
+                    "Non-converged frames (1-based): "
+                    + ", ".join(str(f) for f in non_conv)
+                )
+            self.ostream.print_blank()
+
         results = {"scf_all": scf_all, "scf_history_all": scf_history_all}
         if do_rsp:
             results["prop_all"] = rsp_all
 
         return results
+
+    def plot_scf(self, results, y_unit='a.u.', ax=None):
+        """
+        Plot the SCF energy **relative to the minimum energy frame** as a
+        function of trajectory frame.
+
+        Non-converged frames are omitted from the line but highlighted as
+        red crosses at the bottom of the plot so that gaps are visible.
+
+        :param results:
+            The dictionary returned by :meth:`compute`.
+        :param y_unit:
+            Unit for the y-axis energy values.  Accepted values (case-
+            insensitive): ``'a.u.'`` (Hartree, default), ``'ev'``,
+            ``'kj/mol'``.
+        :param ax:
+            Optional matplotlib ``Axes`` to plot into.  If ``None`` a new
+            figure is created.
+        """
+        try:
+            import matplotlib.pyplot as plt
+        except ImportError:
+            raise ImportError(
+                "matplotlib is required for plot_scf. "
+                "Install it with: conda install -c conda-forge matplotlib"
+            )
+
+        assert_msg_critical(
+            y_unit.lower() in ['a.u.', 'ev', 'kj/mol'],
+            "plot_scf: Invalid y_unit. Choose 'a.u.', 'ev', or 'kj/mol'."
+        )
+
+        _unit = y_unit.lower()
+        if _unit == 'ev':
+            _factor = hartree_in_ev()
+            _ylabel = 'Relative SCF Energy [eV]'
+        elif _unit == 'kj/mol':
+            _factor = hartree_in_kjpermol()
+            _ylabel = 'Relative SCF Energy [kJ mol$^{-1}$]'
+        else:
+            _factor = 1.0
+            _ylabel = 'Relative SCF Energy [Hartree]'
+
+        frames_conv, energies_conv = [], []
+        frames_nonconv = []
+
+        for frame, scf_res in results['scf_all']:
+            if scf_res is not None:
+                frames_conv.append(frame)
+                energies_conv.append(float(scf_res['scf_energy']) * _factor)
+            else:
+                frames_nonconv.append(frame)
+
+        if energies_conv:
+            e_min = min(energies_conv)
+            energies_conv = [e - e_min for e in energies_conv]
+
+        if ax is None:
+            fig, ax = plt.subplots(figsize=(6.5, 4))
+        else:
+            fig = None
+
+        if frames_conv:
+            ax.plot(
+                frames_conv,
+                energies_conv,
+                color='black',
+                alpha=0.9,
+                linewidth=2.5,
+                ls='-',
+                zorder=0,
+            )
+            ax.scatter(
+                frames_conv,
+                energies_conv,
+                facecolors='none',
+                edgecolors='darkcyan',
+                linewidths=1.5,
+                s=40,
+                zorder=1,
+            )
+
+        if frames_nonconv:
+            y_min = 0.0
+            ax.scatter(
+                frames_nonconv,
+                [y_min] * len(frames_nonconv),
+                marker='x',
+                color='red',
+                s=60,
+                zorder=2,
+                label='non-converged',
+            )
+            ax.legend(frameon=False)
+
+        ax.set_xlabel('Frame')
+        ax.set_ylabel(_ylabel)
+        ax.set_title('SCF Energy along Trajectory')
+        if fig is not None:
+            fig.tight_layout()
+            plt.show()
+
+    def show_trajectory(self, frames, mode='animate', stride=1, width=600,
+                        height=400, interval=100, loop='forward'):
+        """
+        Display a list of parsed frames using py3Dmol.
+
+        :param frames:
+            List of frame dicts as returned by :class:`QMTrajectoryParser`.
+        :param mode:
+            Visualisation mode: ``'animate'`` plays frames as a movie;
+            ``'superimpose'`` overlays all selected frames simultaneously.
+        :param stride:
+            Use every ``stride``-th frame (default: 1, i.e. all frames).
+        :param width:
+            Viewer width in pixels.
+        :param height:
+            Viewer height in pixels.
+        :param interval:
+            Playback delay between frames in milliseconds (``'animate'`` only).
+        :param loop:
+            Animation loop mode: ``'forward'`` or ``'backAndForth'``
+            (``'animate'`` only).
+        """
+        from .qmtrajectoryanalyzer import show_trajectory as _show_trajectory
+        _show_trajectory(frames, mode=mode, stride=stride, width=width,
+                         height=height, interval=interval, loop=loop)
 

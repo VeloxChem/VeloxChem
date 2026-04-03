@@ -37,28 +37,7 @@ import numpy as np
 
 from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
-
-# Atomic number → element symbol (Z = 1–118)
-_ATOMIC_NUMBER_TO_SYMBOL = {
-    1: 'H',  2: 'He', 3: 'Li', 4: 'Be', 5: 'B',  6: 'C',  7: 'N',  8: 'O',
-    9: 'F',  10: 'Ne', 11: 'Na', 12: 'Mg', 13: 'Al', 14: 'Si', 15: 'P',
-    16: 'S',  17: 'Cl', 18: 'Ar', 19: 'K',  20: 'Ca', 21: 'Sc', 22: 'Ti',
-    23: 'V',  24: 'Cr', 25: 'Mn', 26: 'Fe', 27: 'Co', 28: 'Ni', 29: 'Cu',
-    30: 'Zn', 31: 'Ga', 32: 'Ge', 33: 'As', 34: 'Se', 35: 'Br', 36: 'Kr',
-    37: 'Rb', 38: 'Sr', 39: 'Y',  40: 'Zr', 41: 'Nb', 42: 'Mo', 43: 'Tc',
-    44: 'Ru', 45: 'Rh', 46: 'Pd', 47: 'Ag', 48: 'Cd', 49: 'In', 50: 'Sn',
-    51: 'Sb', 52: 'Te', 53: 'I',  54: 'Xe', 55: 'Cs', 56: 'Ba', 57: 'La',
-    58: 'Ce', 59: 'Pr', 60: 'Nd', 61: 'Pm', 62: 'Sm', 63: 'Eu', 64: 'Gd',
-    65: 'Tb', 66: 'Dy', 67: 'Ho', 68: 'Er', 69: 'Tm', 70: 'Yb', 71: 'Lu',
-    72: 'Hf', 73: 'Ta', 74: 'W',  75: 'Re', 76: 'Os', 77: 'Ir', 78: 'Pt',
-    79: 'Au', 80: 'Hg', 81: 'Tl', 82: 'Pb', 83: 'Bi', 84: 'Po', 85: 'At',
-    86: 'Rn', 87: 'Fr', 88: 'Ra', 89: 'Ac', 90: 'Th', 91: 'Pa', 92: 'U',
-    93: 'Np', 94: 'Pu', 95: 'Am', 96: 'Cm', 97: 'Bk', 98: 'Cf', 99: 'Es',
-    100: 'Fm', 101: 'Md', 102: 'No', 103: 'Lr', 104: 'Rf', 105: 'Db',
-    106: 'Sg', 107: 'Bh', 108: 'Hs', 109: 'Mt', 110: 'Ds', 111: 'Rg',
-    112: 'Cn', 113: 'Nh', 114: 'Fl', 115: 'Mc', 116: 'Lv', 117: 'Ts',
-    118: 'Og',
-}
+from .molecule import Molecule
 
 
 def _resolve_element(token):
@@ -66,11 +45,8 @@ def _resolve_element(token):
     atomic number (integer string such as '6' for carbon)."""
     try:
         z = int(token)
-        sym = _ATOMIC_NUMBER_TO_SYMBOL.get(z)
-        if sym is None:
-            raise ValueError(f'Unknown atomic number: {z}')
-        return sym
-    except ValueError:
+        return Molecule([z], [[0.0, 0.0, 0.0]], units='bohr').get_label(0)
+    except (ValueError, Exception):
         pass  # not an integer — treat as symbol
     return token.capitalize()
 
@@ -279,7 +255,7 @@ class QMTrajectoryParser:
         else:
             return self._structures_mda(
                 trajectory_file, topology_file, trajectory_name, num_frames,
-                qm_region, qm_charge, qm_multiplicity, start, end,
+                qm_region, qm_charge, qm_multiplicity, start_frame, end_frame,
             )
 
     def _structures_xyz(
@@ -360,8 +336,8 @@ class QMTrajectoryParser:
         qm_region,
         qm_charge,
         qm_multiplicity,
-        start,
-        end,
+        start_frame,
+        end_frame,
     ):
         """Parse a trajectory via MDAnalysis and return snapshots."""
         try:
@@ -394,41 +370,17 @@ class QMTrajectoryParser:
         else:
             qm_atoms = universe.atoms
 
-        use_time_window = (start is not None or end is not None)
-
-        if use_time_window:
-            if trajectory_file.lower().endswith(".pdb"):
-                raise ValueError(
-                    "Time window selection (start/end) is only supported for "
-                    "time-resolved trajectories (.xtc), not .pdb."
-                )
-            universe.trajectory[0]
-            traj_start = float(universe.trajectory.ts.time)
-            universe.trajectory[total_traj_frames - 1]
-            traj_end = float(universe.trajectory.ts.time)
-
-            if start is None:
-                start = traj_start
-            if end is None:
-                end = traj_end
-
-            if float(end) < float(start):
-                raise ValueError("end time must be >= start time.")
-
-            window_frames = []
-            for iframe in range(total_traj_frames):
-                universe.trajectory[iframe]
-                t = float(universe.trajectory.ts.time)
-                if float(start) <= t <= float(end):
-                    window_frames.append(iframe)
-
-            if not window_frames:
-                raise ValueError(
-                    f"No frames found in time window [{start}, {end}] ps."
-                )
-            frame_indices = np.array(window_frames, dtype=int)
-        else:
-            frame_indices = np.arange(total_traj_frames, dtype=int)
+        s = 0 if start_frame is None else max(0, int(start_frame))
+        e = (
+            total_traj_frames
+            if end_frame is None
+            else min(total_traj_frames, int(end_frame))
+        )
+        if s >= e:
+            raise ValueError(
+                f"start_frame ({s}) must be less than end_frame ({e})."
+            )
+        frame_indices = np.arange(s, e, dtype=int)
 
         if num_frames is not None:
             num_frames = int(num_frames)
@@ -449,9 +401,11 @@ class QMTrajectoryParser:
             universe.trajectory[iframe]
 
             qm_coords = np.asarray(qm_atoms.positions, dtype=float).copy()
-            qm_elements = np.asarray(
-                [guess_atom_element(n) for n in qm_atoms.names], dtype=object
-            )
+            _elems = []
+            for atom in qm_atoms:
+                el = getattr(atom, 'element', '').strip()
+                _elems.append(el.capitalize() if el else guess_atom_element(atom.name))
+            qm_elements = np.asarray(_elems, dtype=object)
             qm_atom_indices = np.asarray(qm_atoms.indices, dtype=int).copy()
 
             snapshots.append({

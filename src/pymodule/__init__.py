@@ -230,12 +230,14 @@ from .smddriver import SmdDriver
 from .atombdedriver import AtomBdeDriver
 from .qmtrajectoryparser import QMTrajectoryParser
 from .qmtrajectorydriver import QMTrajectoryDriver
+from .qmtrajectoryanalyzer import QMTrajectoryAnalyzer
 from .spectrumaverager import SpectrumAverager
 # for backward compatibility only
 from .cppsolver import ComplexResponseSolver as ComplexResponse
 from .peforcefieldgenerator import PEForceFieldGenerator as LoPropDriver
 
 # Python functions
+from .qmtrajectoryanalyzer import show_trajectory
 from .errorhandler import assert_msg_critical
 from .features import print_features
 from .oneeints import compute_overlap_integrals
