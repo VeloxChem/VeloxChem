@@ -311,7 +311,8 @@ class SolvationBuilder:
                 self.ion_name = self.ncharge
                 self.counterion = self._counterion_molecules()
                 # Update the required number of solvents
-                number_of_solvents -= abs(charge)
+                number_of_solvents = max(number_of_solvents - abs(charge), 0)
+                self._set_last_solvent_quantity(number_of_solvents)
 
             elif charge < 0:
                 self.ostream.print_info(f"The solute has a charge of {charge}, adding {abs(charge)} {self.pcharge} counterions")
@@ -319,7 +320,8 @@ class SolvationBuilder:
 
                 self.ion_name = self.pcharge
                 self.counterion = self._counterion_molecules()
-                number_of_solvents -= abs(charge)
+                number_of_solvents = max(number_of_solvents - abs(charge), 0)
+                self._set_last_solvent_quantity(number_of_solvents)
 
         # Solvate the solute with the solvent molecules
         # This dynamic batch size is used to avoid building too often the KDTree.
@@ -865,6 +867,7 @@ class SolvationBuilder:
         self.solvent_labels.clear()
         self.quantities.clear()
         self.added_solvent_counts.clear()
+        self.random_rotation = True
 
     def _clear_counterions(self):
         """
@@ -887,6 +890,17 @@ class SolvationBuilder:
         self.solvents.append(solvent)
         self.quantities.append(quantity)
         self.solvent_labels.append(solvent.get_labels())
+
+    def _set_last_solvent_quantity(self, quantity):
+        """
+        Update the quantity of the most recently registered solvent molecule.
+
+        :param quantity:
+            The quantity of the solvent molecules to be added.
+        """
+
+        if self.quantities:
+            self.quantities[-1] = quantity
 
     def _insert_molecule(self, new_molecule, tree):
         """
@@ -1107,6 +1121,11 @@ class SolvationBuilder:
             mols_per_nm3 = 7.78
             density = 944
             smiles_code = 'CN(C)C=O'
+
+        else:
+            raise ValueError(
+                f"Unsupported solvent '{solvent}'. "
+                "Use 'other' with solvent_molecule for a custom solvent.")
 
         return mols_per_nm3, density, smiles_code
 
