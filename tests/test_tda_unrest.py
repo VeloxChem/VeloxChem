@@ -219,11 +219,12 @@ class TestUnrestrictedTDA:
         reference_scf_results['filename'] = filename
 
         reference_results = driver.compute(mol, bas, reference_scf_results)
-        checkpoint_file = Path(driver.comm.bcast(driver.checkpoint_file,
-                                                 root=mpi_master()))
+        checkpoint_file = Path(
+            driver.comm.bcast(driver.checkpoint_file, root=mpi_master()))
 
         rsp_keywords = {
-            key: val[0] for key, val in driver._input_keywords['response'].items()
+            key: val[0]
+            for key, val in driver._input_keywords['response'].items()
         }
         method_keywords = {
             key: val[0]
@@ -253,25 +254,25 @@ class TestUnrestrictedTDA:
 
         second_drv = TdaUnrestrictedEigenSolver()
         second_drv.ostream.mute()
-        second_drv.update_settings(checkpoint_rsp_input, checkpoint_method_input)
+        second_drv.update_settings(checkpoint_rsp_input,
+                                   checkpoint_method_input)
 
         for key in rsp_keywords:
-            assert self.normalize_setting(getattr(second_drv,
-                                                 key)) == self.normalize_setting(
-                                                     getattr(driver, key))
+            assert self.normalize_setting(
+                getattr(second_drv,
+                        key)) == self.normalize_setting(getattr(driver, key))
         for key in method_keywords:
-            assert self.normalize_setting(getattr(second_drv,
-                                                 key)) == self.normalize_setting(
-                                                     getattr(driver, key))
+            assert self.normalize_setting(
+                getattr(second_drv,
+                        key)) == self.normalize_setting(getattr(driver, key))
 
         third_drv = TdaUnrestrictedEigenSolver()
         third_drv.ostream.mute()
         third_drv.restart = False
-        copied_filename = driver.comm.bcast(
-            str(tmp_path / 'tdaunrestrictedeigensolver_copy'), root=mpi_master())
+        third_filename = str(tmp_path / 'tdaunrestrictedeigensolver_copy')
+        copied_filename = driver.comm.bcast(third_filename, root=mpi_master())
         copied_checkpoint_file = driver.comm.bcast(
-            str(tmp_path / 'tdaunrestrictedeigensolver_copy.h5'),
-            root=mpi_master())
+            f'{third_filename}_chkpnt.h5', root=mpi_master())
         third_drv.filename = copied_filename
         third_drv.checkpoint_file = copied_checkpoint_file
 
@@ -289,13 +290,11 @@ class TestUnrestrictedTDA:
         for key in rsp_keywords:
             if key in ('restart', 'filename', 'checkpoint_file'):
                 continue
-            assert self.normalize_setting(getattr(third_drv,
-                                                  key)) == self.normalize_setting(
-                                                      getattr(driver, key))
+            assert self.normalize_setting(getattr(
+                third_drv, key)) == self.normalize_setting(getattr(driver, key))
         for key in method_keywords:
-            assert self.normalize_setting(getattr(third_drv,
-                                                  key)) == self.normalize_setting(
-                                                      getattr(driver, key))
+            assert self.normalize_setting(getattr(
+                third_drv, key)) == self.normalize_setting(getattr(driver, key))
 
         if third_drv.rank == mpi_master():
             assert np.max(
@@ -332,7 +331,8 @@ class TestUnrestrictedTDA:
         restarted_drv.checkpoint_file = checkpoint_file
         restarted_drv.restart = True
 
-        restarted_results = restarted_drv.compute(mol, bas, reference_scf_results)
+        restarted_results = restarted_drv.compute(mol, bas,
+                                                  reference_scf_results)
 
         assert restarted_drv.restart is True
 
@@ -340,6 +340,81 @@ class TestUnrestrictedTDA:
             assert np.max(
                 np.abs(restarted_results['eigenvalues'] -
                        reference_results['eigenvalues'])) < 1.0e-8
+
+    def test_core_excitation_water_cation_sto3g(self):
+
+        mol, bas = self.get_water_cation_system('sto-3g')
+        scf_results = self.run_unrestricted_scf(mol, bas)
+
+        lr_drv = TdaUnrestrictedEigenSolver()
+        lr_drv.ostream.mute()
+        lr_drv.nstates = 3
+        lr_drv.core_excitation = True
+        lr_drv.num_core_orbitals = 1
+        lr_results = lr_drv.compute(mol, bas, scf_results)
+
+        if lr_drv.rank == mpi_master():
+            ref_exc_enes = np.array([19.686416716, 20.394059829, 20.435127623])
+            ref_osc_str = np.array([0.051629296, 0.002793567, 0.013583490])
+
+            assert np.max(np.abs(lr_results['eigenvalues'] -
+                                 ref_exc_enes)) < 1.0e-7
+            assert np.max(
+                np.abs(lr_results['oscillator_strengths'] -
+                       ref_osc_str)) < 1.0e-5
+
+    def test_nto_and_detach_attach_water_cation_sto3g(self, tmp_path):
+
+        mol, bas = self.get_water_cation_system('sto-3g')
+        scf_results = self.run_unrestricted_scf(mol, bas)
+        filename = str(tmp_path / 'tda_unrest_nto')
+
+        lr_drv = TdaUnrestrictedEigenSolver()
+        lr_drv.ostream.mute()
+        lr_drv.nstates = 2
+        lr_drv.nto = True
+        lr_drv.detach_attach = True
+        scf_results['filename'] = lr_drv.comm.bcast(filename, root=mpi_master())
+        lr_results = lr_drv.compute(mol, bas, scf_results)
+
+        if lr_drv.rank == mpi_master():
+            ref_nto_lambdas_a = np.array([
+                [2.44269e-05, 0.0],
+                [2.1066556e-03, 0.0],
+            ])
+            ref_nto_lambdas_b = np.array([
+                [9.99975573e-01, 0.0, 0.0],
+                [9.97893344e-01, 0.0, 0.0],
+            ])
+
+            assert 'nto_lambdas_a' in lr_results
+            assert 'nto_lambdas_b' in lr_results
+            assert len(lr_results['nto_lambdas_a']) == 2
+            assert len(lr_results['nto_lambdas_b']) == 2
+            assert np.max(
+                np.abs(
+                    np.array(lr_results['nto_lambdas_a']) -
+                    ref_nto_lambdas_a)) < 1.0e-6
+            assert np.max(
+                np.abs(
+                    np.array(lr_results['nto_lambdas_b']) -
+                    ref_nto_lambdas_b)) < 1.0e-6
+            assert lr_results['number_of_states'] == 2
+            assert len(lr_results['eigenvalues']) == 2
+            assert np.all(np.isfinite(lr_results['eigenvalues']))
+
+            final_h5_file = Path(f'{filename}.h5')
+            assert final_h5_file.is_file()
+
+            with h5py.File(final_h5_file, 'r') as h5f:
+                for label in (
+                        'rsp/detach_attach/detach_S1',
+                        'rsp/detach_attach/attach_S1',
+                        'rsp/detach_attach/detach_S2',
+                        'rsp/detach_attach/attach_S2',
+                ):
+                    assert label in h5f
+                    assert np.all(np.isfinite(h5f[label][()]))
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='skip pytest.raises for multiple MPI processes')
@@ -370,8 +445,7 @@ class TestUnrestrictedTDA:
         lr_drv.num_core_orbitals = 5
         lr_drv.nstates = 2
 
-        with pytest.raises(AssertionError,
-                           match='num_core_orbitals too large'):
+        with pytest.raises(AssertionError, match='num_core_orbitals too large'):
             lr_drv.compute(mol, bas, scf_results)
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,

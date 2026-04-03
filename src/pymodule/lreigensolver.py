@@ -574,9 +574,10 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
                     if self.detach_attach_charges:
                         atom_to_ao = vis_drv.map_atom_to_atomic_orbitals(
                             molecule, basis)
-                        S = scf_results['S']
-                        S_sqrt = symmetric_matrix_function(
-                            S, np.sqrt, thresh=1.0e-12)
+                        if self.rank == mpi_master():
+                            S = scf_results['S']
+                            S_sqrt = symmetric_matrix_function(
+                                S, np.sqrt, thresh=1.0e-12)
 
                     if self.cube_origin is None or self.cube_stepsize is None:
                         cubic_grid = vis_drv.gen_cubic_grid(

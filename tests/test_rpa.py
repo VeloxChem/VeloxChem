@@ -4,6 +4,7 @@ from mpi4py import MPI
 import pytest
 
 from veloxchem.veloxchemlib import mpi_master
+from veloxchem.distributedarray import DistributedArray
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
@@ -153,6 +154,105 @@ class TestRPA:
 
         self.run_rpa('tpssh', 'def2-svp', ref_exc_enes, ref_osc_str, 1.0e-5)
 
+    def test_detach_attach_charges_water_631g(self):
+
+        xyz_string = """3
+        xyz
+        O   -0.1858140  -1.1749469   0.7662596
+        H   -0.1285513  -0.8984365   1.6808606
+        H   -0.0582782  -0.3702550   0.2638279
+        """
+        mol = Molecule.read_xyz_string(xyz_string)
+        bas = MolecularBasis.read(mol, '6-31g', ostream=None)
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_results = scf_drv.compute(mol, bas)
+
+        lr_drv = LinearResponseEigenSolver()
+        lr_drv.ostream.mute()
+        lr_drv.nstates = 3
+        lr_drv.detach_attach = True
+        lr_drv.detach_attach_charges = True
+        lr_results = lr_drv.compute(mol, bas, scf_results)
+
+        if lr_drv.rank == mpi_master():
+            detachment = lr_results['detachment_charges']
+            attachment = lr_results['attachment_charges']
+            ref_detachment = np.array([
+                [-1.0001863412, 9.31706e-05, 9.31706e-05],
+                [-1.0004727906, 2.363953e-04, 2.363953e-04],
+                [-0.9115710485, -4.42144757e-02, -4.42144758e-02],
+            ])
+            ref_attachment = np.array([
+                [0.2873499273, 0.3563249945, 0.3563250781],
+                [0.3025686881, 0.3487157020, 0.3487156098],
+                [0.2760202908, 0.3619898252, 0.3619898840],
+            ])
+
+            assert detachment.shape == (3, mol.number_of_atoms())
+            assert attachment.shape == (3, mol.number_of_atoms())
+            assert np.max(np.abs(detachment - ref_detachment)) < 1.0e-6
+            assert np.max(np.abs(attachment - ref_attachment)) < 1.0e-6
+
+    def test_esa_water_631g(self):
+
+        xyz_string = """3
+        xyz
+        O   -0.1858140  -1.1749469   0.7662596
+        H   -0.1285513  -0.8984365   1.6808606
+        H   -0.0582782  -0.3702550   0.2638279
+        """
+        mol = Molecule.read_xyz_string(xyz_string)
+        bas = MolecularBasis.read(mol, '6-31g', ostream=None)
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_results = scf_drv.compute(mol, bas)
+
+        lr_drv = LinearResponseEigenSolver()
+        lr_drv.ostream.mute()
+        lr_drv.nstates = 3
+        lr_drv.esa = True
+        lr_drv.esa_from_state = 1
+        lr_results = lr_drv.compute(mol, bas, scf_results)
+
+        if lr_drv.rank == mpi_master():
+            esa_results = lr_results['esa_results']
+
+            ref_excitation_energies = np.array([0.0706309931, 0.0887848965])
+            ref_oscillator_strengths = np.array([0.1379665336, 0.0013975526])
+            ref_transition_dipoles = np.array([
+                [-0.0794559666, -0.5972010928, 1.6022021187],
+                [0.1515690613, -0.0251919303, -0.0018734103],
+            ])
+
+            src_states = [item['from_state'] for item in esa_results]
+            dest_states = [item['to_state'] for item in esa_results]
+
+            excitation_energies = np.array(
+                [item['excitation_energy'] for item in esa_results])
+            oscillator_strengths = np.array(
+                [item['oscillator_strength'] for item in esa_results])
+            transition_dipoles = np.array(
+                [item['transition_dipole'] for item in esa_results])
+
+            for i in range(transition_dipoles.shape[0]):
+                if np.vdot(transition_dipoles[i],
+                           ref_transition_dipoles[i]) < 0.0:
+                    transition_dipoles[i] *= -1.0
+
+            assert len(esa_results) == 2
+            assert src_states == ['S1', 'S1']
+            assert dest_states == ['S2', 'S3']
+            assert np.max(np.abs(excitation_energies -
+                                 ref_excitation_energies)) < 1.0e-8
+            assert np.max(
+                np.abs(oscillator_strengths -
+                       ref_oscillator_strengths)) < 1.0e-5
+            assert np.max(np.abs(transition_dipoles -
+                                 ref_transition_dipoles)) < 1.0e-5
+
     def run_rpa_with_ecp(self, ref_exc_enes, ref_osc_str, tol):
 
         xyz_string = """2
@@ -294,14 +394,16 @@ class TestRPA:
         assert restarted_drv.restart is True
 
         if restarted_drv.rank == mpi_master():
-            assert restarted_results['number_of_states'] == restarted_drv.nstates
+            assert restarted_results[
+                'number_of_states'] == restarted_drv.nstates
 
-    def test_get_e2_h2(self):
+    def test_get_e2_h2o(self):
 
-        xyz_string = """2
+        xyz_string = """3
         xyz
-        H   0.000000   0.000000   0.000000
-        H   0.000000   0.000000   0.740000
+        O   -0.1858140  -1.1749469   0.7662596
+        H   -0.1285513  -0.8984365   1.6808606
+        H   -0.0582782  -0.3702550   0.2638279
         """
         mol = Molecule.read_xyz_string(xyz_string)
         bas = MolecularBasis.read(mol, 'sto-3g', ostream=None)
@@ -315,7 +417,7 @@ class TestRPA:
         e2_matrix = lr_drv.get_e2(mol, bas, scf_results)
 
         if lr_drv.rank == mpi_master():
-            assert e2_matrix.shape == (2, 2)
+            assert e2_matrix.shape == (20, 20)
             assert np.max(np.abs(e2_matrix - e2_matrix.T)) < 1.0e-10
             assert np.all(np.diag(e2_matrix) > 0.0)
 
@@ -327,16 +429,25 @@ class TestRPA:
         lr_drv.initial_guess_multiplier = 2
         lr_drv.guess_scaling_threshold = 5
 
-        full_guesses = lr_drv._initial_excitations(2, np.array([-0.9, -0.4, 0.2]),
-                                                   1, 3)
+        full_guesses = lr_drv._initial_excitations(
+            2,
+            np.array([-0.9, -0.4, 0.2]),
+            1,
+            3,
+        )
         assert len(full_guesses) == 2
-        assert full_guesses[0].data.shape == (2, 2)
+        full_guess_matrix = full_guesses[0].get_full_matrix()
+        if lr_drv.rank == mpi_master():
+            assert full_guess_matrix.shape == (2, 2)
 
         lr_drv.core_excitation = True
         lr_drv.num_core_orbitals = 1
-        core_guesses = lr_drv._initial_excitations(1,
-                                                   np.array([-0.9, -0.4, 0.2]),
-                                                   2, 3)
+        core_guesses = lr_drv._initial_excitations(
+            1,
+            np.array([-0.9, -0.4, 0.2]),
+            2,
+            3,
+        )
         assert len(core_guesses) == 1
 
         lr_drv.core_excitation = False
@@ -350,5 +461,62 @@ class TestRPA:
 
         precond = lr_drv._get_precond(np.array([-0.9, -0.4, 0.2, 0.6]), 2, 4,
                                       0.1)
-        assert precond.data.shape == (2, 2)
-        assert np.all(np.isfinite(precond.data))
+        full_precond = precond.get_full_matrix()
+        if lr_drv.rank == mpi_master():
+            assert full_precond.shape == (2, 2)
+            assert np.all(np.isfinite(full_precond))
+
+        nrows = 16
+        pa = np.arange(2.0, 2.0 + nrows)
+        pb = np.ones(nrows)
+        dist_precond = DistributedArray(
+            np.column_stack((pa, pb)),
+            lr_drv.comm,
+        )
+        v_rg = np.arange(1.0, nrows + 1.0)
+        v_ru = np.arange(31.0, 31.0 + nrows)
+        v_in = DistributedArray(
+            np.column_stack((v_rg, v_ru)),
+            lr_drv.comm,
+        )
+
+        v_out = lr_drv._preconditioning(dist_precond, v_in)
+        full_v_out = v_out.get_full_matrix()
+
+        if lr_drv.rank == mpi_master():
+            expected_v_out = np.column_stack(
+                (pa * v_rg + pb * v_ru, pb * v_rg + pa * v_ru))
+            assert np.allclose(full_v_out, expected_v_out)
+
+        lr_drv.norm_thresh = 0.5
+        trial_vectors = {
+            0: DistributedArray(
+                np.column_stack((np.arange(1.0, nrows + 1.0), np.zeros(nrows))),
+                lr_drv.comm,
+            ),
+            1: DistributedArray(
+                np.column_stack(
+                    (np.zeros(nrows), np.arange(101.0, 101.0 + nrows))),
+                lr_drv.comm,
+            ),
+            2: DistributedArray(
+                np.zeros((nrows, 2)),
+                lr_drv.comm,
+            ),
+        }
+        diag_precond = {
+            k: DistributedArray(
+                np.column_stack((np.ones(nrows), np.zeros(nrows))),
+                lr_drv.comm,
+            ) for k in (0, 1, 2)
+        }
+
+        new_ger, new_ung = lr_drv._precond_trials(trial_vectors, diag_precond)
+        full_new_ger = new_ger.get_full_matrix()
+        full_new_ung = new_ung.get_full_matrix()
+
+        if lr_drv.rank == mpi_master():
+            assert np.allclose(full_new_ger,
+                               np.arange(1.0, nrows + 1.0).reshape(-1, 1))
+            assert np.allclose(full_new_ung,
+                               np.arange(101.0, 101.0 + nrows).reshape(-1, 1))
