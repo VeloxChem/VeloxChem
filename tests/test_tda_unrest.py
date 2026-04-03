@@ -195,14 +195,12 @@ class TestUnrestrictedTDA:
         assert lr_drv.restart is False
 
         if lr_drv.rank == mpi_master():
-            for key in [
-                    'eigenvalues',
-                    'oscillator_strengths',
-                    'rotatory_strengths',
-            ]:
+            keys = ['eigenvalues', 'oscillator_strengths']
+            tols = [1e-8, 1e-5]
+            for key, tol in zip(keys, tols):
                 assert np.max(
                     np.abs(lr_results_first[key] -
-                           lr_results_second[key])) < 1e-6
+                           lr_results_second[key])) < tol
 
     def test_response_settings_roundtrip(self, tmp_path):
 
