@@ -40,7 +40,8 @@ from .outputstream import OutputStream
 from .espchargesdriver import EspChargesDriver
 from .checkpoint import write_scf_property_to_hdf5
 from .inputparser import parse_input, print_keywords
-from .errorhandler import assert_msg_critical, safe_solve
+from .errorhandler import assert_msg_critical
+from .mathutils import safe_solve
 
 
 class RespChargesDriver(EspChargesDriver):

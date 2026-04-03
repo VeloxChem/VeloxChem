@@ -123,7 +123,7 @@ def create_hdf5(fname, molecule, basis, dft_func_label, potfile_text):
     if valid_checkpoint:
         hf = h5py.File(fname, 'w')
 
-        e_nuc = molecule.nuclear_repulsion_energy(basis)
+        e_nuc = molecule.effective_nuclear_repulsion_energy(basis)
 
         hf.create_dataset('nuclear_repulsion', data=np.array([e_nuc]))
 
@@ -519,7 +519,7 @@ def check_rsp_hdf5(fname, labels, molecule, basis, dft_dict, pe_dict):
     if not valid_checkpoint:
         return False
 
-    e_nuc = molecule.nuclear_repulsion_energy(basis)
+    e_nuc = molecule.effective_nuclear_repulsion_energy(basis)
 
     nuclear_charges = molecule.get_element_ids()
     basis_set = basis.get_label()

@@ -400,8 +400,6 @@ computeElectricFieldFockGradient(const CMolecule& molecule, const CMolecularBasi
     std::vector<std::vector<double>> efield_ints_grad_i(3, std::vector<double>(max_prim_pair_count, 0.0));
     std::vector<std::vector<double>> efield_ints_grad_j(3, std::vector<double>(max_prim_pair_count, 0.0));
 
-    auto nthreads = omp_get_max_threads();
-
     const double delta[3][3] = {{1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}};
 
     const int d_cart_inds[6][2] = {

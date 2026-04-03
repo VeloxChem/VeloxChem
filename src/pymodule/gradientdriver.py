@@ -40,7 +40,7 @@ from .griddriver import GridDriver
 from .outputstream import OutputStream
 from .molecule import Molecule
 from .dftutils import get_default_grid_level
-from .inputparser import parse_input
+from .inputparser import parse_input, read_unparsed_input_from_hdf5
 from .sanitychecks import dft_sanity_check
 
 
@@ -97,8 +97,6 @@ class GradientDriver:
 
         self.potfile = None
 
-        self.checkpoint_file = None
-
         # verbosity of output (1-3)
         self.print_level = 1
 
@@ -144,6 +142,30 @@ class GradientDriver:
         parse_input(self, method_keywords, method_dict)
 
         dft_sanity_check(self, 'update_settings')
+
+    def read_settings(self, checkpoint_file):
+        """
+        Reads opt settings from checkpoint file.
+
+        :param checkpoint_file:
+            The checkpoint file to read settings from.
+        """
+
+        if self.rank == mpi_master():
+            checkpoint_grad_input = read_unparsed_input_from_hdf5(
+                checkpoint_file, group_name='grad_settings')
+            checkpoint_method_input = read_unparsed_input_from_hdf5(
+                checkpoint_file, group_name='method_settings')
+        else:
+            checkpoint_grad_input = None
+            checkpoint_method_input = None
+
+        checkpoint_grad_input = self.comm.bcast(checkpoint_grad_input,
+                                                root=mpi_master())
+        checkpoint_method_input = self.comm.bcast(checkpoint_method_input,
+                                                root=mpi_master())
+
+        self.update_settings(checkpoint_grad_input, checkpoint_method_input)
 
     def compute(self, molecule, *args):
         """
@@ -427,9 +449,8 @@ class GradientDriver:
         coords = molecule.get_coordinates_in_bohr()
 
         # atomic charges
-        nuclear_charges = molecule.get_element_ids()
-        if basis is not None:
-            nuclear_charges -= basis.get_number_of_ecp_core_electrons()
+        nuclear_charges = (molecule.get_effective_nuclear_charges(basis)
+                           if basis is not None else molecule.get_element_ids())
 
         # loop over all distinct atom pairs and add energy contribution
         for i in range(natm):

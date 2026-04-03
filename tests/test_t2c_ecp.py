@@ -147,7 +147,7 @@ class TestECPDriver:
         indexes = np.triu_indices(5)
         basdims = [0, 16, 43, 63, 84, 93]
         
-        print(ref_mat.shape)
+        #print(ref_mat.shape)
         
         # check individual overlap submatrices
         for i, j in zip(indexes[0], indexes[1]):
@@ -202,7 +202,7 @@ class TestECPDriver:
         indexes = np.triu_indices(5)
         basdims = [0, 19, 58, 98, 126, 144]
         
-        print(ref_mat.shape)
+        #print(ref_mat.shape)
         
         # check individual overlap submatrices
         for i, j in zip(indexes[0], indexes[1]):

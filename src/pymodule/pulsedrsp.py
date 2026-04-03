@@ -37,7 +37,7 @@ import sys
 
 from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
-from .cppsolver import ComplexResponse
+from .cppsolver import ComplexResponseSolver
 from .inputparser import parse_seq_range
 
 
@@ -241,7 +241,7 @@ class PulsedResponse:
             'a_components': self.pulse_settings['pol_dir'],
             'b_components': self.pulse_settings['pol_dir']
         })
-        self.rsp_driver = ComplexResponse(self.comm, self.ostream)
+        self.rsp_driver = ComplexResponseSolver(self.comm, self.ostream)
         self.rsp_driver.update_settings(cpp_settings, method_settings)
 
     def compute(self, molecule, ao_basis, scf_results):

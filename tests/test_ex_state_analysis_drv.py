@@ -151,6 +151,7 @@ class TestCTNumbers:
         lreig_drv.ostream.mute()
         lreig_drv.nstates = 2
         lreig_drv.initial_guess_multiplier = 1
+        lreig_drv.max_subspace_dim = 1000
         lreig_results = lreig_drv.compute(molecule, basis, scf_results)
 
         exc_drv = ExcitedStateAnalysisDriver()

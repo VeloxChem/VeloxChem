@@ -40,7 +40,7 @@ from .oneeints import compute_electric_dipole_integrals
 from .veloxchemlib import mpi_master, hartree_in_wavenumber
 from .profiler import Profiler
 from .outputstream import OutputStream
-from .cppsolver import ComplexResponse
+from .cppsolver import ComplexResponseSolver
 from .linearsolver import LinearSolver
 from .nonlinearsolver import NonlinearSolver
 from .distributedarray import DistributedArray
@@ -273,7 +273,7 @@ class ShgDriver(NonlinearSolver):
 
         # Computing the first-order response vectors (3 per frequency)
 
-        N_drv = ComplexResponse(self.comm, self.ostream)
+        N_drv = ComplexResponseSolver(self.comm, self.ostream)
 
         cpp_keywords = [
             'frequencies', 'damping', 'norm_thresh', 'lindep_thresh',
@@ -461,18 +461,18 @@ class ShgDriver(NonlinearSolver):
         for (wb, wc) in freqpairs:
 
             Na = {
-                'x': ComplexResponse.get_full_solution_vector(Nx[('x',
+                'x': ComplexResponseSolver.get_full_solution_vector(Nx[('x',
                                                                   (wb + wc))]),
-                'y': ComplexResponse.get_full_solution_vector(Nx[('y',
+                'y': ComplexResponseSolver.get_full_solution_vector(Nx[('y',
                                                                   (wb + wc))]),
-                'z': ComplexResponse.get_full_solution_vector(Nx[('z',
+                'z': ComplexResponseSolver.get_full_solution_vector(Nx[('z',
                                                                   (wb + wc))]),
             }
 
             Nb = {
-                'x': ComplexResponse.get_full_solution_vector(Nx[('x', wb)]),
-                'y': ComplexResponse.get_full_solution_vector(Nx[('y', wb)]),
-                'z': ComplexResponse.get_full_solution_vector(Nx[('z', wb)]),
+                'x': ComplexResponseSolver.get_full_solution_vector(Nx[('x', wb)]),
+                'y': ComplexResponseSolver.get_full_solution_vector(Nx[('y', wb)]),
+                'z': ComplexResponseSolver.get_full_solution_vector(Nx[('z', wb)]),
             }
 
             if self.rank == mpi_master():
@@ -562,9 +562,9 @@ class ShgDriver(NonlinearSolver):
 
         for (wb, wc) in freqpairs:
 
-            nx = ComplexResponse.get_full_solution_vector(Nx[('x', wb)])
-            ny = ComplexResponse.get_full_solution_vector(Nx[('y', wb)])
-            nz = ComplexResponse.get_full_solution_vector(Nx[('z', wb)])
+            nx = ComplexResponseSolver.get_full_solution_vector(Nx[('x', wb)])
+            ny = ComplexResponseSolver.get_full_solution_vector(Nx[('y', wb)])
+            nz = ComplexResponseSolver.get_full_solution_vector(Nx[('z', wb)])
 
             if self.rank == mpi_master():
 
@@ -817,9 +817,9 @@ class ShgDriver(NonlinearSolver):
 
             vec_pack = self._collect_vectors_in_columns(vec_pack)
 
-            nx = ComplexResponse.get_full_solution_vector(Nx[('x', wb)])
-            ny = ComplexResponse.get_full_solution_vector(Nx[('y', wb)])
-            nz = ComplexResponse.get_full_solution_vector(Nx[('z', wb)])
+            nx = ComplexResponseSolver.get_full_solution_vector(Nx[('x', wb)])
+            ny = ComplexResponseSolver.get_full_solution_vector(Nx[('y', wb)])
+            nz = ComplexResponseSolver.get_full_solution_vector(Nx[('z', wb)])
 
             if self.rank != mpi_master():
                 continue
