@@ -179,6 +179,39 @@ def test_solvate_rejects_unknown_solvent_name():
                         box=[10.0, 10.0, 10.0])
 
 
+def test_solvate_reports_partial_fill_after_repeated_insertion_failures():
+
+    solute = _make_methane_solute()
+    solvent = _make_water()
+    box = [10.0, 10.0, 10.0]
+    target_density = _target_density_for_count(solute, solvent, 5, box)
+    builder = SolvationBuilder(ostream=RecordingOutput())
+    builder.failures_factor = 0.4
+
+    call_counter = {'count': 0}
+
+    def fake_insert(molecule, tree):
+        call_counter['count'] += 1
+        if call_counter['count'] == 1:
+            shift = np.array([0.5, 0.5, 0.5])
+            coords = molecule.get_coordinates_in_angstrom() + shift
+            return [(len(builder.system), label, coord)
+                    for label, coord in zip(molecule.get_labels(), coords)]
+        return None
+
+    builder._insert_molecule = fake_insert
+
+    builder.solvate(solute,
+                    solvent='other',
+                    solvent_molecule=solvent,
+                    target_density=target_density,
+                    neutralize=False,
+                    box=box)
+
+    assert builder.added_solvent_counts == [1]
+    assert 'Failed to pack 4 out of 5 molecules after 2 attempts' in builder.ostream.infos
+
+
 def test_counterion_molecules_rejects_unknown_ion_name():
 
     builder = SolvationBuilder(ostream=RecordingOutput())
@@ -270,3 +303,59 @@ def test_custom_solvate_rejects_solvents_without_nonhydrogen_atoms():
                                solvents=[hydrogen],
                                proportion=[1],
                                box_size=[10.0, 10.0, 10.0])
+
+
+def test_custom_solvate_preserves_small_mixture_without_zeroing_components():
+
+    solute = _make_methane_solute()
+    solvents = [_make_water(), _make_molecule('CO')]
+    builder = SolvationBuilder(ostream=RecordingOutput())
+
+    insert_counter = {'count': 0}
+
+    def fake_insert(molecule, tree):
+        shift = np.array([0.5 + insert_counter['count'], 0.5, 0.5])
+        insert_counter['count'] += 1
+        coords = molecule.get_coordinates_in_angstrom() + shift
+        return [(len(builder.system), label, coord)
+                for label, coord in zip(molecule.get_labels(), coords)]
+
+    builder._insert_molecule = fake_insert
+
+    builder.custom_solvate(solute,
+                           solvents=solvents,
+                           proportion=[1, 2],
+                           box_size=[5.9, 5.9, 5.9])
+
+    assert builder.quantities == [1, 1]
+    assert builder.added_solvent_counts == [1, 1]
+
+
+def test_custom_solvate_stops_after_repeated_insertion_failures():
+
+    solute = _make_methane_solute()
+    builder = SolvationBuilder(ostream=RecordingOutput())
+    builder.failures_factor = 0.4
+
+    call_counter = {'count': 0}
+
+    def fake_insert(molecule, tree):
+        call_counter['count'] += 1
+        if call_counter['count'] == 1:
+            shift = np.array([0.5, 0.5, 0.5])
+            coords = molecule.get_coordinates_in_angstrom() + shift
+            return [(len(builder.system), label, coord)
+                    for label, coord in zip(molecule.get_labels(), coords)]
+        if call_counter['count'] > 3:
+            raise RuntimeError('custom_solvate kept inserting after repeated failures')
+        return None
+
+    builder._insert_molecule = fake_insert
+
+    builder.custom_solvate(solute,
+                           solvents=[_make_water()],
+                           proportion=[1],
+                           box_size=[6.0, 6.0, 6.0])
+
+    assert builder.added_solvent_counts == [1]
+    assert 'Failed to pack 4 out of 5 molecules after 2 attempts' in builder.ostream.infos

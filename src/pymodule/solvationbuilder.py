@@ -378,8 +378,7 @@ class SolvationBuilder:
                         failure_count += 1
 
                 if failure_count >= max_failures:
-                    self.ostream.print_info(f"Failed to pack {quantity - added_count} out of {quantity} molecules after {failure_count} attempts")
-                    self.ostream.flush()
+                    self._report_partial_fill(quantity, added_count, failure_count)
                     break  
 
                 if new_molecules:
@@ -389,9 +388,7 @@ class SolvationBuilder:
                     tree = cKDTree(existing_coords)
 
             self.added_solvent_counts.append(added_count)
-            msg = f"Solvated system with {added_count} solvent molecules out of {quantity} requested"
-            self.ostream.print_info(msg)
-            self.ostream.flush()
+            self._report_solvation_result(added_count, quantity)
 
         # Insert the counterions
         if self.counterion:
@@ -499,23 +496,24 @@ class SolvationBuilder:
             available_volume_nm3 > 0.0,
             'SolvationBuilder: The available solvent volume must be positive. '
             'Increase the box size or padding.')
-        max_nonh_count = box_volume_nm3 * 28 - solute_nonh_count
+        max_nonh_count = available_volume_nm3 * 28
         assert_msg_critical(
             max_nonh_count > 0.0,
             'SolvationBuilder: The custom solvation box is too small to fit any solvent molecules. '
             'Increase the box size.')
-        solvent_counts = [int(norm_prop * int(max_nonh_count / norm_nonh_count))
-                          for norm_prop in normalized_proportion]
+        total_solvent_count = int(max_nonh_count / norm_nonh_count)
         assert_msg_critical(
-            any(count > 0 for count in solvent_counts),
+            total_solvent_count > 0,
             'SolvationBuilder: The custom solvation box is too small to fit any solvent molecules. '
             'Increase the box size.')
-        solvent_min_idx = np.argmin(np.array(solvent_counts))
-        for solvent_idx in range(len(solvent_counts)):
-            solvent_counts[solvent_idx] = int(
-                solvent_counts[solvent_min_idx] * (
-                    normalized_proportion[solvent_idx] /
-                    normalized_proportion[solvent_min_idx]))
+        raw_solvent_counts = np.array(normalized_proportion) * total_solvent_count
+        solvent_counts = np.floor(raw_solvent_counts).astype(int)
+        remaining_count = total_solvent_count - int(solvent_counts.sum())
+        if remaining_count > 0:
+            fractional_parts = raw_solvent_counts - solvent_counts
+            order = np.argsort(-fractional_parts)
+            for solvent_idx in order[:remaining_count]:
+                solvent_counts[solvent_idx] += 1
         quantities = list(solvent_counts)
 
         # Load the solvent molecules
@@ -550,6 +548,8 @@ class SolvationBuilder:
         # Solvate the solute with the solvent molecules
         for i, (solvent, quantity) in enumerate(zip(self.solvents, self.quantities)):
             added_count = 0
+            failure_count = 0
+            max_failures = max(1, int(np.ceil(self.failures_factor * quantity)))
             while added_count < quantity:
                 result = self._insert_molecule(solvent, tree)
                 if result:
@@ -558,10 +558,14 @@ class SolvationBuilder:
                     # Update the KDTree with the new solvent
                     tree = cKDTree(existing_coords)
                     added_count += 1
+                    failure_count = 0
+                else:
+                    failure_count += 1
+                    if failure_count >= max_failures:
+                        self._report_partial_fill(quantity, added_count, failure_count)
+                        break
             self.added_solvent_counts.append(added_count)
-            msg = f"Solvated system with {added_count} solvent molecules out of {quantity} requested"
-            self.ostream.print_info(msg)
-            self.ostream.flush()
+            self._report_solvation_result(added_count, quantity)
 
         self.system_molecule = self._save_molecule()
 
@@ -933,6 +937,37 @@ class SolvationBuilder:
 
         if self.quantities:
             self.quantities[-1] = quantity
+
+    def _report_partial_fill(self, quantity, added_count, failure_count):
+        """
+        Reports a partial-fill outcome after repeated insertion failures.
+
+        :param quantity:
+            The requested number of molecules.
+        :param added_count:
+            The number of molecules that were added successfully.
+        :param failure_count:
+            The number of consecutive failed insertion attempts.
+        """
+
+        self.ostream.print_info(
+            f"Failed to pack {quantity - added_count} out of {quantity} molecules after "
+            f"{failure_count} attempts")
+        self.ostream.flush()
+
+    def _report_solvation_result(self, added_count, quantity):
+        """
+        Reports the final number of packed solvent molecules.
+
+        :param added_count:
+            The number of molecules that were added successfully.
+        :param quantity:
+            The requested number of molecules.
+        """
+
+        msg = f"Solvated system with {added_count} solvent molecules out of {quantity} requested"
+        self.ostream.print_info(msg)
+        self.ostream.flush()
 
     def _insert_molecule(self, new_molecule, tree):
         """
