@@ -43,7 +43,7 @@ from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .scfrestopendriver import ScfRestrictedOpenDriver
 from .lreigensolver import LinearResponseEigenSolver
-from .cppsolver import ComplexResponse
+from .cppsolver import ComplexResponseSolver
 from .veloxchemlib import mpi_master
 
 
@@ -332,305 +332,345 @@ class QMTrajectoryDriver:
 
         return out, lengths
 
-    # ── HDF5 output ──────────────────────────────────────────────────────────
+    # ── HDF5 incremental output ───────────────────────────────────────────────
+    #
+    # The file is opened before the loop and written frame-by-frame, so it is
+    # always valid on disk.  A crash loses at most the in-flight frame.
+    #
+    # Layout
+    # ──────
+    # Root-level resizable datasets hold per-frame molecular metadata
+    # (nuclear_charges, atom_coordinates, nuclear_repulsion, …) plus a
+    # boolean ``converged`` flag.  ``scf/`` and ``rsp/`` groups hold the
+    # corresponding quantum-chemical results; non-converged frames store
+    # NaN-filled placeholders so frame indices stay aligned.
 
-    def _write_stacked_h5(
+    def _h5_open_for_writing(
         self,
-        snapshots,
-        results,
-        h5_file: str | Path,
-        basis_source,
-        dft_func_label,
-        prop_driver=None,
+        h5_path: Path,
+        first_snap: dict,
+        fixed_basis,
+        dft_label: str,
+        total_frames: int,
     ):
         """
-        Write trajectory SCF/property results to a single stacked HDF5 file.
+        Create the trajectory HDF5 file and initialise all resizable datasets.
 
-        The layout mirrors the stacked HDF5 format so that
-        the same post-processing tools can be applied to both ensemble and
-        trajectory outputs.
+        Called once before the main loop.  All datasets are created with
+        ``maxshape=(None, ...)`` so they can be extended frame-by-frame via
+        :meth:`_h5_append_frame`.
 
-        :param snapshots:
-            List of snapshot dictionaries (or a single dict) as returned by
-            :class:`QMTrajectoryParser`.
-        :param results:
-            Results dictionary returned by :meth:`compute`.
-        :param h5_file:
-            Output HDF5 path.
-        :param basis_source:
-            Basis label string or :class:`MolecularBasis` object.
-        :param dft_func_label:
-            DFT functional label written at root level.
-        :param prop_driver:
-            Optional property driver used to reconstruct LR extras.
+        :param h5_path:
+            Destination path (created fresh; existing file is removed).
+        :param first_snap:
+            First snapshot dict, used to infer per-frame dataset shapes.
+        :param fixed_basis:
+            :class:`MolecularBasis` object (or basis-set label string).
+        :param dft_label:
+            DFT functional label string.
+        :param total_frames:
+            Total number of frames in the trajectory (written as metadata).
         """
         if self.rank != mpi_master():
             return
 
-        if isinstance(snapshots, dict):
-            snapshots = [snapshots]
-
-        h5_path = Path(h5_file)
         h5_path.parent.mkdir(parents=True, exist_ok=True)
         if h5_path.exists():
             h5_path.unlink()
 
-        frames = np.array(
-            [int(frame) for frame, _ in results.get("scf_all", [])],
-            dtype=np.int32,
+        _basis_label = (
+            fixed_basis if isinstance(fixed_basis, str)
+            else fixed_basis.get_label()
         )
-        nframes = frames.size
+        _dft_label_str = str(dft_label) if dft_label else "HF"
 
-        snapshot_by_frame = {int(s["frame"]): s for s in snapshots}
-        ordered_snapshots = [snapshot_by_frame[int(fid)] for fid in frames]
+        # Build a reference molecule to infer shapes.
+        _lbl0 = [str(x) for x in first_snap["qm_elements"]]
+        _crd0 = np.asarray(first_snap["qm_coords"], dtype=float)
+        _mol0 = Molecule(_lbl0, _crd0)
+        _mol0.set_charge(int(first_snap.get("qm_charge", 0)))
+        _mol0.set_multiplicity(int(first_snap.get("qm_multiplicity", 1)))
+        MolecularBasis.read(_mol0, _basis_label)  # assign atom basis labels
+        _abl_flat = []
+        for _a, _e in _mol0.get_atom_basis_labels():
+            _abl_flat += [_a, _e]
+        _abl_bytes = np.bytes_(_abl_flat)
 
-        frame_indices = np.asarray(
-            [
-                int(s.get("frame_id", s.get("frame", -1)))
-                for s in ordered_snapshots
-            ],
-            dtype=np.int32,
-        )
+        natoms = _mol0.number_of_atoms()
+        ncoords = natoms * 3
 
         with h5py.File(h5_path, "w") as hf:
-            hf.create_dataset("frame_id", data=frame_indices)
-            total_frames = int(
-                ordered_snapshots[0].get("total_frames", nframes)
-            )
+            # ── Scalar metadata written once ──────────────────────────────────
             hf.create_dataset(
                 "total_frames", data=np.array([total_frames], dtype=np.int32)
             )
-
-            traj_name = str(ordered_snapshots[0].get("trajectory_name", ""))
+            traj_name = str(first_snap.get("trajectory_name", ""))
             hf.create_dataset("trajectory_name", data=np.bytes_([traj_name]))
 
-            qm_idx_arrays = [
-                np.asarray(s.get("qm_atom_indices", []), dtype=np.int32)
-                for s in ordered_snapshots
-            ]
-            _stacked_idx, _lengths_idx = self._stack_result_arrays(qm_idx_arrays)
-            if _stacked_idx is not None:
-                hf.create_dataset("qm_atom_indices", data=_stacked_idx)
-                if _lengths_idx is not None:
-                    hf.create_dataset("qm_atom_indices_lengths", data=_lengths_idx)
-
-            # ── Root-level metadata (mirrors create_hdf5 per frame, stacked) ──
-            _basis_label = (
-                basis_source if isinstance(basis_source, str)
-                else basis_source.get_label()
+            qm_idx = np.asarray(
+                first_snap.get("qm_atom_indices", []), dtype=np.int32
             )
-            _dft_label_str = str(dft_func_label) if dft_func_label else "HF"
+            if qm_idx.size:
+                hf.create_dataset(
+                    "qm_atom_indices",
+                    data=qm_idx.reshape(1, -1),
+                    maxshape=(None, qm_idx.size),
+                )
 
-            # Read basis once (mol0) to assign atom basis labels to the molecule
-            # so molecule.get_atom_basis_labels() works correctly.
-            _labels0 = [str(x) for x in ordered_snapshots[0]["qm_elements"]]
-            _coords0 = np.asarray(ordered_snapshots[0]["qm_coords"], dtype=float)
-            _mol0 = Molecule(_labels0, _coords0)
-            _mol0.set_charge(int(ordered_snapshots[0].get("qm_charge", 0)))
-            _mol0.set_multiplicity(int(ordered_snapshots[0].get("qm_multiplicity", 1)))
-            MolecularBasis.read(_mol0, _basis_label)
-            _abl_flat = []
-            for _a, _e in _mol0.get_atom_basis_labels():
-                _abl_flat += [_a, _e]
-            _abl_bytes = np.bytes_(_abl_flat)
-
-            per_nuclear_repulsion = []
-            per_nuclear_charges = []
-            per_atom_coordinates = []
-            per_number_of_atoms = []
-            per_number_of_alpha_electrons = []
-            per_number_of_beta_electrons = []
-            per_molecular_charge = []
-            per_spin_multiplicity = []
-            per_basis_set = []
-            per_atom_basis_labels = []
-            per_dft_func_label_list = []
-            per_potfile_text = []
-
-            for snap in ordered_snapshots:
-                _lbl = [str(x) for x in snap["qm_elements"]]
-                _crd = np.asarray(snap["qm_coords"], dtype=float)
-                _mol = Molecule(_lbl, _crd)
-                _mol.set_charge(int(snap.get("qm_charge", 0)))
-                _mol.set_multiplicity(int(snap.get("qm_multiplicity", 1)))
-
-                per_nuclear_repulsion.append(
-                    np.array([_mol.nuclear_repulsion_energy(basis_source)])
-                )
-                per_nuclear_charges.append(
-                    np.asarray(_mol.get_element_ids())
-                )
-                per_atom_coordinates.append(
-                    np.asarray(_mol.get_coordinates_in_bohr())
-                )
-                per_number_of_atoms.append(
-                    np.array([_mol.number_of_atoms()])
-                )
-                per_number_of_alpha_electrons.append(
-                    np.array([_mol.number_of_alpha_electrons()])
-                )
-                per_number_of_beta_electrons.append(
-                    np.array([_mol.number_of_beta_electrons()])
-                )
-                per_molecular_charge.append(
-                    np.array([_mol.get_charge()])
-                )
-                per_spin_multiplicity.append(
-                    np.array([_mol.get_multiplicity()])
-                )
-                per_basis_set.append(np.bytes_([_basis_label]))
-                per_atom_basis_labels.append(_abl_bytes)
-                per_dft_func_label_list.append(np.bytes_([_dft_label_str]))
-                per_potfile_text.append(np.bytes_(['']))
-
-            for _key, _arrays in [
-                ("nuclear_repulsion", per_nuclear_repulsion),
-                ("nuclear_charges", per_nuclear_charges),
-                ("atom_coordinates", per_atom_coordinates),
-                ("number_of_atoms", per_number_of_atoms),
-                ("number_of_alpha_electrons", per_number_of_alpha_electrons),
-                ("number_of_beta_electrons", per_number_of_beta_electrons),
-                ("molecular_charge", per_molecular_charge),
-                ("spin_multiplicity", per_spin_multiplicity),
-                ("basis_set", per_basis_set),
-                ("atom_basis_labels_flattened", per_atom_basis_labels),
-                ("dft_func_label", per_dft_func_label_list),
-                ("potfile_text", per_potfile_text),
-            ]:
-                _stacked, _lengths = self._stack_result_arrays(_arrays)
-                if _stacked is not None:
-                    _dset = hf.create_dataset(_key, data=_stacked)
-                    if _key == "nuclear_charges":
-                        self._apply_atomic_metadata(_dset, None, _key)
-                    self._apply_temporal_metadata(_dset, None, _key)
-                    if _lengths is not None:
-                        hf.create_dataset(f"{_key}_lengths", data=_lengths)
-
-            # Stacked SCF and RSP group payloads.
-            scf_history_all = results.get("scf_history_all", [])
-            if not scf_history_all:
-                scf_history_all = [None] * len(results.get("scf_all", []))
-            group_payloads = []
-            if results.get("scf_all") is not None:
-                group_payloads.append((
-                    "scf",
-                    [
-                        self._get_scf_hdf5_payload_local(res, hist)
-                        for (_, res), hist in zip(
-                            results["scf_all"], scf_history_all
-                        )
-                        if res is not None
-                    ],
-                ))
-            if results.get("prop_all") is not None:
-                is_cpp = hasattr(prop_driver, "get_spectrum")
-                if is_cpp:
-                    rsp_payloads = [
-                        self._get_cpp_rsp_hdf5_payload_local(res, prop_driver)
-                        for _, res in results["prop_all"]
-                    ]
+            # ── Per-frame resizable root datasets ─────────────────────────────
+            def _res(name, shape, dtype, fill=np.nan, *, vlen=False):
+                """Helper: create a (0, *shape) resizable dataset."""
+                if vlen:
+                    dt = h5py.special_dtype(vlen=bytes)
+                    hf.create_dataset(
+                        name,
+                        shape=(0,),
+                        maxshape=(None,),
+                        dtype=dt,
+                    )
                 else:
-                    rsp_payloads = [
-                        self._get_lr_rsp_hdf5_payload_local(res)
-                        for _, res in results["prop_all"]
-                    ]
-                group_payloads.append(("rsp", rsp_payloads))
-
-            for group_name, frame_payloads in group_payloads:
-                if not frame_payloads:
-                    continue
-
-                common_keys = sorted(
-                    set.intersection(*(set(p.keys()) for p in frame_payloads))
-                )
-                grp = hf.require_group(group_name)
-
-                for key in common_keys:
-                    arrays = []
-                    supported = True
-                    for i, payload in enumerate(frame_payloads):
-                        arr = self._result_value_to_array(payload[key])
-                        if arr is None:
-                            supported = False
-                            break
-                        arrays.append(arr)
-
-                    if not supported:
-                        continue
-
-                    stacked, lengths = self._stack_result_arrays(arrays)
-                    if stacked is None:
-                        continue
-
-                    dset = grp.create_dataset(key, data=stacked)
-                    self._apply_atomic_metadata(dset, group_name, key)
-                    self._apply_temporal_metadata(dset, group_name, key)
-                    if lengths is not None:
-                        grp.create_dataset(f"{key}_lengths", data=lengths)
-
-            # Reconstruct LR-specific extras: state vectors (S1, S2, …) and
-            # NTO datasets that are not present in the standard rsp payload.
-            if (
-                prop_driver is not None
-                and results.get("prop_all") is not None
-                and not hasattr(prop_driver, "get_spectrum")
-                and hasattr(prop_driver, "get_full_solution_vector")
-            ):
-                rsp_grp = hf.require_group("rsp")
-                state_vectors = {}
-                nto_arrays = {}
-
-                for i, (_, rsp_res) in enumerate(results["prop_all"]):
-                    snap = ordered_snapshots[i]
-                    scf_res = results["scf_all"][i][1]
-
-                    labels = [str(x) for x in snap["qm_elements"]]
-                    coords = np.asarray(snap["qm_coords"], dtype=float)
-                    molecule = Molecule(labels, coords)
-                    molecule.set_charge(int(snap.get("qm_charge", 0)))
-                    molecule.set_multiplicity(
-                        int(snap.get("qm_multiplicity", 1))
+                    hf.create_dataset(
+                        name,
+                        shape=(0,) + tuple(shape),
+                        maxshape=(None,) + tuple(shape),
+                        dtype=dtype,
+                        fillvalue=fill,
                     )
 
-                    if isinstance(basis_source, str):
-                        basis_for_snap = MolecularBasis.read(
-                            molecule, basis_source
-                        )
-                    else:
-                        basis_for_snap = basis_source
+            _res("frame_id",               (),        np.int32,   fill=-1)
+            _res("converged",              (),        bool,       fill=False)
+            _res("nuclear_repulsion",      (),        np.float64)
+            _res("nuclear_charges",        (natoms,), np.int32,   fill=-1)
+            _res("atom_coordinates",       (natoms, 3), np.float64)
+            _res("number_of_atoms",        (),        np.int32,   fill=0)
+            _res("number_of_alpha_electrons", (),     np.int32,   fill=0)
+            _res("number_of_beta_electrons",  (),     np.int32,   fill=0)
+            _res("molecular_charge",       (),        np.float64)
+            _res("spin_multiplicity",      (),        np.int32,   fill=0)
+            _res("basis_set",              (),        "S64",      fill=b"")
+            _res("dft_func_label",         (),        "S64",      fill=b"")
+            _res("potfile_text",           (),        "S1",       fill=b"")
 
+            # atom_basis_labels_flattened has variable per-atom string size;
+            # store as a fixed-length byte dataset sized from the first frame.
+            hf.create_dataset(
+                "atom_basis_labels_flattened",
+                data=_abl_bytes.reshape(1, -1),
+                maxshape=(None, len(_abl_bytes)),
+                dtype=_abl_bytes.dtype,
+            )
+
+            # Apply metadata attributes.
+            dset_nc = hf["nuclear_charges"]
+            self._apply_atomic_metadata(dset_nc, None, "nuclear_charges")
+            self._apply_temporal_metadata(hf["nuclear_repulsion"], None, "nuclear_repulsion")
+
+    def _h5_append_frame(
+        self,
+        h5_path: Path,
+        frame: int,
+        snap: dict,
+        molecule,
+        fixed_basis,
+        dft_label: str,
+        scf_results,
+        scf_history,
+        rsp_results,
+        prop_driver,
+    ):
+        """
+        Append one frame's results to the trajectory HDF5 file.
+
+        Non-converged frames (``scf_results is None``) are written with a
+        ``converged=False`` flag and NaN placeholders in all numeric datasets,
+        so the frame index is preserved.
+
+        :param h5_path:
+            Path to the already-open trajectory file.
+        :param frame:
+            Integer frame number.
+        :param snap:
+            Snapshot dictionary for this frame.
+        :param molecule:
+            :class:`Molecule` object for this frame.
+        :param fixed_basis:
+            :class:`MolecularBasis` object.
+        :param dft_label:
+            DFT functional label string.
+        :param scf_results:
+            SCF results dict, or ``None`` if SCF did not converge.
+        :param scf_history:
+            SCF history list, or ``[]`` if not available.
+        :param rsp_results:
+            Property results dict, or ``None`` if not computed.
+        :param prop_driver:
+            The property driver instance (used for CPP spectrum / LR extras),
+            or ``None``.
+        """
+        if self.rank != mpi_master():
+            return
+
+        converged = scf_results is not None
+        _basis_label = (
+            fixed_basis if isinstance(fixed_basis, str)
+            else fixed_basis.get_label()
+        )
+        _dft_label_str = str(dft_label) if dft_label else "HF"
+
+        with h5py.File(h5_path, "a") as hf:
+
+            def _ext(name):
+                """Extend dataset along axis-0 by one and return new index."""
+                dset = hf[name]
+                n = dset.shape[0]
+                dset.resize(n + 1, axis=0)
+                return n
+
+            # ── Root-level per-frame metadata ─────────────────────────────────
+            i = _ext("frame_id")
+            hf["frame_id"][i] = int(snap.get("frame_id", frame))
+            _ext("converged");  hf["converged"][i] = converged
+
+            e_nuc = molecule.effective_nuclear_repulsion_energy(fixed_basis)
+            _ext("nuclear_repulsion"); hf["nuclear_repulsion"][i] = e_nuc
+
+            nc = np.asarray(molecule.get_element_ids(), dtype=np.int32)
+            _ext("nuclear_charges"); hf["nuclear_charges"][i] = nc
+
+            coords = np.asarray(molecule.get_coordinates_in_bohr())
+            _ext("atom_coordinates"); hf["atom_coordinates"][i] = coords
+
+            _ext("number_of_atoms");
+            hf["number_of_atoms"][i] = molecule.number_of_atoms()
+            _ext("number_of_alpha_electrons")
+            hf["number_of_alpha_electrons"][i] = molecule.number_of_alpha_electrons()
+            _ext("number_of_beta_electrons")
+            hf["number_of_beta_electrons"][i] = molecule.number_of_beta_electrons()
+            _ext("molecular_charge")
+            hf["molecular_charge"][i] = molecule.get_charge()
+            _ext("spin_multiplicity")
+            hf["spin_multiplicity"][i] = molecule.get_multiplicity()
+
+            bs_bytes = np.bytes_([_basis_label])
+            _ext("basis_set"); hf["basis_set"][i] = bs_bytes[0]
+            dft_bytes = np.bytes_([_dft_label_str])
+            _ext("dft_func_label"); hf["dft_func_label"][i] = dft_bytes[0]
+            _ext("potfile_text"); hf["potfile_text"][i] = b""
+
+            abl = hf["atom_basis_labels_flattened"]
+            n_abl = abl.shape[0]
+            abl.resize(n_abl + 1, axis=0)
+            # shape already fixed from init; values are same for all frames
+            # (fixed topology), so we just copy the first row or write zeros.
+            abl[n_abl] = abl[0] if n_abl > 0 else abl[0]
+
+            # qm_atom_indices (fixed across frames — only extend row count)
+            if "qm_atom_indices" in hf:
+                qi = hf["qm_atom_indices"]
+                qi.resize(qi.shape[0] + 1, axis=0)
+                qi[qi.shape[0] - 1] = qi[0]
+
+            # ── SCF group ─────────────────────────────────────────────────────
+            if converged:
+                payload = self._get_scf_hdf5_payload_local(
+                    scf_results, scf_history
+                )
+                scf_grp = hf.require_group("scf")
+                for key, value in payload.items():
+                    arr = self._result_value_to_array(value)
+                    if arr is None:
+                        continue
+                    if key not in scf_grp:
+                        scf_grp.create_dataset(
+                            key,
+                            data=arr.reshape((1,) + arr.shape),
+                            maxshape=(None,) + arr.shape,
+                        )
+                        self._apply_atomic_metadata(scf_grp[key], "scf", key)
+                        self._apply_temporal_metadata(scf_grp[key], "scf", key)
+                    else:
+                        dset = scf_grp[key]
+                        n = dset.shape[0]
+                        dset.resize(n + 1, axis=0)
+                        dset[n] = arr
+
+            # ── RSP group ─────────────────────────────────────────────────────
+            if converged and rsp_results is not None and prop_driver is not None:
+                is_cpp = hasattr(prop_driver, "get_spectrum")
+                if is_cpp:
+                    rsp_payload = self._get_cpp_rsp_hdf5_payload_local(
+                        rsp_results, prop_driver
+                    )
+                else:
+                    rsp_payload = self._get_lr_rsp_hdf5_payload_local(
+                        rsp_results
+                    )
+
+                rsp_grp = hf.require_group("rsp")
+                for key, value in rsp_payload.items():
+                    arr = self._result_value_to_array(value)
+                    if arr is None:
+                        continue
+                    if key not in rsp_grp:
+                        rsp_grp.create_dataset(
+                            key,
+                            data=arr.reshape((1,) + arr.shape),
+                            maxshape=(None,) + arr.shape,
+                        )
+                        self._apply_atomic_metadata(rsp_grp[key], "rsp", key)
+                        self._apply_temporal_metadata(rsp_grp[key], "rsp", key)
+                    else:
+                        dset = rsp_grp[key]
+                        n = dset.shape[0]
+                        dset.resize(n + 1, axis=0)
+                        dset[n] = arr
+
+                # LR-specific: state eigenvectors
+                if (
+                    not is_cpp
+                    and hasattr(prop_driver, "get_full_solution_vector")
+                ):
+                    basis_for_snap = fixed_basis
                     nocc = molecule.number_of_alpha_occupied_orbitals(
                         basis_for_snap
                     )
-
-                    eigvecs = rsp_res.get("eigenvectors_distributed", {})
+                    eigvecs = rsp_results.get("eigenvectors_distributed", {})
                     nstates = int(
-                        rsp_res.get("number_of_states", len(eigvecs))
+                        rsp_results.get("number_of_states", len(eigvecs))
                     )
-
                     for s in range(nstates):
                         if s not in eigvecs:
                             continue
-                        eigvec = prop_driver.get_full_solution_vector(
-                            eigvecs[s]
-                        )
+                        eigvec = prop_driver.get_full_solution_vector(eigvecs[s])
                         if eigvec is None:
                             continue
-
                         s_key = f"S{s + 1}"
-                        state_vectors.setdefault(s_key, []).append(
-                            np.asarray(eigvec)
-                        )
+                        ev_arr = np.asarray(eigvec)
+                        if s_key not in rsp_grp:
+                            rsp_grp.create_dataset(
+                                s_key,
+                                data=ev_arr.reshape(1, -1),
+                                maxshape=(None, ev_arr.size),
+                            )
+                        else:
+                            dset = rsp_grp[s_key]
+                            n = dset.shape[0]
+                            dset.resize(n + 1, axis=0)
+                            dset[n] = ev_arr
 
-                        if getattr(prop_driver, "nto", False) and hasattr(prop_driver, "get_nto"):
+                        if getattr(prop_driver, "nto", False) and hasattr(
+                            prop_driver, "get_nto"
+                        ):
                             if getattr(prop_driver, "core_excitation", False):
                                 occ_count = int(
                                     getattr(prop_driver, "num_core_orbitals", 0)
                                 )
-                                mo_occ = scf_res["C_alpha"][
+                                mo_occ = scf_results["C_alpha"][
                                     :, :occ_count
                                 ].copy()
-                                mo_vir = scf_res["C_alpha"][:, nocc:].copy()
+                                mo_vir = scf_results["C_alpha"][
+                                    :, nocc:
+                                ].copy()
                                 z_mat = eigvec[: eigvec.size // 2].reshape(
                                     occ_count, -1
                                 )
@@ -655,12 +695,14 @@ class QMTrajectoryDriver:
                                 )
                                 occ_count = num_core + num_val
                                 mo_occ = np.hstack((
-                                    scf_res["C_alpha"][:, :num_core].copy(),
-                                    scf_res["C_alpha"][
+                                    scf_results["C_alpha"][
+                                        :, :num_core
+                                    ].copy(),
+                                    scf_results["C_alpha"][
                                         :, nocc - num_val : nocc
                                     ].copy(),
                                 ))
-                                mo_vir = scf_res["C_alpha"][
+                                mo_vir = scf_results["C_alpha"][
                                     :, nocc : nocc + num_vir
                                 ].copy()
                                 z_mat = eigvec[: eigvec.size // 2].reshape(
@@ -670,8 +712,12 @@ class QMTrajectoryDriver:
                                     occ_count, -1
                                 )
                             else:
-                                mo_occ = scf_res["C_alpha"][:, :nocc].copy()
-                                mo_vir = scf_res["C_alpha"][:, nocc:].copy()
+                                mo_occ = scf_results["C_alpha"][
+                                    :, :nocc
+                                ].copy()
+                                mo_vir = scf_results["C_alpha"][
+                                    :, nocc:
+                                ].copy()
                                 z_mat = eigvec[: eigvec.size // 2].reshape(
                                     nocc, -1
                                 )
@@ -683,38 +729,33 @@ class QMTrajectoryDriver:
                                 z_mat - y_mat, mo_occ, mo_vir
                             )
                             nto_prefix = f"NTO_S{s + 1}_"
-                            nto_alpha_orb = np.asarray(
-                                nto_mo.alpha_to_numpy()
-                            )
-                            nto_arrays.setdefault(
-                                nto_prefix + "alpha_orbitals", []
-                            ).append(nto_alpha_orb)
-                            nto_arrays.setdefault(
-                                nto_prefix + "alpha_energies", []
-                            ).append(np.asarray(nto_mo.ea_to_numpy()))
-                            nto_arrays.setdefault(
-                                nto_prefix + "alpha_occupations", []
-                            ).append(np.asarray(nto_mo.occa_to_numpy()))
-
-                for key, arrays in state_vectors.items():
-                    if len(arrays) != nframes:
-                        continue
-                    stacked, lengths = self._stack_result_arrays(arrays)
-                    if stacked is None:
-                        continue
-                    rsp_grp.create_dataset(key, data=stacked)
-                    if lengths is not None:
-                        rsp_grp.create_dataset(f"{key}_lengths", data=lengths)
-
-                for key, arrays in nto_arrays.items():
-                    if len(arrays) != nframes:
-                        continue
-                    stacked, lengths = self._stack_result_arrays(arrays)
-                    if stacked is None:
-                        continue
-                    rsp_grp.create_dataset(key, data=stacked)
-                    if lengths is not None:
-                        rsp_grp.create_dataset(f"{key}_lengths", data=lengths)
+                            for nto_key, nto_arr in [
+                                (
+                                    nto_prefix + "alpha_orbitals",
+                                    np.asarray(nto_mo.alpha_to_numpy()),
+                                ),
+                                (
+                                    nto_prefix + "alpha_energies",
+                                    np.asarray(nto_mo.ea_to_numpy()),
+                                ),
+                                (
+                                    nto_prefix + "alpha_occupations",
+                                    np.asarray(nto_mo.occa_to_numpy()),
+                                ),
+                            ]:
+                                if nto_key not in rsp_grp:
+                                    rsp_grp.create_dataset(
+                                        nto_key,
+                                        data=nto_arr.reshape(
+                                            (1,) + nto_arr.shape
+                                        ),
+                                        maxshape=(None,) + nto_arr.shape,
+                                    )
+                                else:
+                                    dset = rsp_grp[nto_key]
+                                    n = dset.shape[0]
+                                    dset.resize(n + 1, axis=0)
+                                    dset[n] = nto_arr
 
     # ── Main compute loop ─────────────────────────────────────────────────────
 
@@ -804,9 +845,11 @@ class QMTrajectoryDriver:
         :return:
             Dictionary with keys:
 
-            - ``scf_all``: list of ``(frame, scf_results)`` tuples.
+            - ``scf_all``: list of ``(frame, scf_results)`` tuples, where
+              ``scf_results`` is ``None`` for frames that did not converge.
             - ``prop_all``: list of ``(frame, property_results)`` tuples
-              (only present when a property driver is used).
+              (only present when a property driver is used; ``property_results``
+              is ``None`` for frames that did not converge).
         :raises ValueError:
             If ``qm_multiplicity`` is not a positive integer, or if a
             snapshot's charge/multiplicity combination is incompatible.
@@ -846,10 +889,10 @@ class QMTrajectoryDriver:
                     self.comm, self.ostream
                 )
             elif "frequencies" in prop_opts:
-                prop_driver = ComplexResponse(self.comm, self.ostream)
+                prop_driver = ComplexResponseSolver(self.comm, self.ostream)
             if prop_driver is not None:
                 prop_driver.update_settings(prop_opts)
-                if isinstance(prop_driver, ComplexResponse) and "property" in prop_opts:
+                if isinstance(prop_driver, ComplexResponseSolver) and "property" in prop_opts:
                     prop_driver.set_cpp_property(prop_opts["property"])
 
         do_rsp = prop_driver is not None
@@ -883,6 +926,26 @@ class QMTrajectoryDriver:
         scf_all = []
         scf_history_all = []
         rsp_all = [] if do_rsp else None
+
+        # ── Determine DFT label once (needed before the loop for H5 init) ─────
+        _xcfun = getattr(scf_driver, "xcfun", None)
+        if hasattr(_xcfun, "get_func_label"):
+            h5_dft_func_label = _xcfun.get_func_label()
+        elif _xcfun:
+            h5_dft_func_label = str(_xcfun)
+        else:
+            h5_dft_func_label = "HF"
+
+        # ── Open H5 file before the loop so writes are incremental ────────────
+        h5_path = Path(stacked_h5_file) if stacked_h5_file else None
+        if h5_path is not None:
+            self._h5_open_for_writing(
+                h5_path,
+                snapshots[0],
+                fixed_basis,
+                h5_dft_func_label,
+                total_frames=len(snapshots),
+            )
 
         # ── Main trajectory loop ───────────────────────────────────────────────
         for snap in snapshots:
@@ -954,9 +1017,26 @@ class QMTrajectoryDriver:
                 if self.rank == mpi_master():
                     self.ostream.print_info(
                         f"Frame {frame}: SCF did not converge — "
-                        "skipping this frame in the stacked output."
+                        "recording as non-converged frame."
                     )
                     self.ostream.print_blank()
+                scf_all.append((frame, None))
+                scf_history_all.append([])
+                if do_rsp:
+                    rsp_all.append((frame, None))
+                if h5_path is not None:
+                    self._h5_append_frame(
+                        h5_path,
+                        frame,
+                        snap,
+                        molecule,
+                        fixed_basis,
+                        h5_dft_func_label,
+                        scf_results=None,
+                        scf_history=[],
+                        rsp_results=None,
+                        prop_driver=rsp_driver if do_rsp else None,
+                    )
                 continue
 
             scf_all.append((frame, scf_results))
@@ -964,32 +1044,30 @@ class QMTrajectoryDriver:
                 list(scf_driver._history) if scf_driver._history else []
             )
 
+            rsp_results = None
             if do_rsp:
                 rsp_results = rsp_driver.compute(
                     molecule, fixed_basis, scf_results
                 )
                 rsp_all.append((frame, rsp_results))
 
+            if h5_path is not None:
+                self._h5_append_frame(
+                    h5_path,
+                    frame,
+                    snap,
+                    molecule,
+                    fixed_basis,
+                    h5_dft_func_label,
+                    scf_results=scf_results,
+                    scf_history=scf_history_all[-1],
+                    rsp_results=rsp_results,
+                    prop_driver=rsp_driver if do_rsp else None,
+                )
+
         results = {"scf_all": scf_all, "scf_history_all": scf_history_all}
         if do_rsp:
             results["prop_all"] = rsp_all
-
-        if stacked_h5_file is not None:
-            _xcfun = getattr(scf_driver, "xcfun", None)
-            if hasattr(_xcfun, "get_func_label"):
-                h5_dft_func_label = _xcfun.get_func_label()
-            elif _xcfun:
-                h5_dft_func_label = str(_xcfun)
-            else:
-                h5_dft_func_label = "HF"
-            self._write_stacked_h5(
-                snapshots,
-                results,
-                stacked_h5_file,
-                fixed_basis,
-                h5_dft_func_label,
-                rsp_driver if do_rsp else None,
-            )
 
         return results
 
