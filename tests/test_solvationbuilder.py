@@ -217,3 +217,56 @@ def test_solvate_rejects_non_positive_target_density(target_density):
                         target_density=target_density,
                         neutralize=False,
                         box=[10.0, 10.0, 10.0])
+
+
+@pytest.mark.parametrize('proportion', ([0, 0], [1, 0], [1, -1]))
+def test_custom_solvate_rejects_non_positive_proportions(proportion):
+
+    solute = _make_methane_solute()
+    solvents = [_make_water(), _make_molecule('CO')]
+    builder = SolvationBuilder(ostream=RecordingOutput())
+
+    with pytest.raises(AssertionError, match='proportions must be positive'):
+        builder.custom_solvate(solute,
+                               solvents=solvents,
+                               proportion=proportion,
+                               box_size=[10.0, 10.0, 10.0])
+
+
+def test_custom_solvate_rejects_box_smaller_than_solute_volume():
+
+    solute = _make_methane_solute()
+    solvents = [_make_water(), _make_molecule('CO')]
+    builder = SolvationBuilder(ostream=RecordingOutput())
+
+    with pytest.raises(AssertionError, match='available solvent volume must be positive'):
+        builder.custom_solvate(solute,
+                               solvents=solvents,
+                               proportion=[1, 1],
+                               box_size=[1.0, 1.0, 1.0])
+
+
+def test_custom_solvate_rejects_box_without_solvent_capacity():
+
+    solute = _make_methane_solute()
+    solvents = [_make_water(), _make_molecule('CO')]
+    builder = SolvationBuilder(ostream=RecordingOutput())
+
+    with pytest.raises(AssertionError, match='too small to fit any solvent molecules'):
+        builder.custom_solvate(solute,
+                               solvents=solvents,
+                               proportion=[1, 1],
+                               box_size=[4.0, 4.0, 4.0])
+
+
+def test_custom_solvate_rejects_solvents_without_nonhydrogen_atoms():
+
+    solute = _make_methane_solute()
+    hydrogen = _make_molecule('[H][H]')
+    builder = SolvationBuilder(ostream=RecordingOutput())
+
+    with pytest.raises(AssertionError, match='at least one non-hydrogen atom'):
+        builder.custom_solvate(solute,
+                               solvents=[hydrogen],
+                               proportion=[1],
+                               box_size=[10.0, 10.0, 10.0])

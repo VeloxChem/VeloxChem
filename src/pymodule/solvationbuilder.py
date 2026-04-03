@@ -457,6 +457,7 @@ class SolvationBuilder:
 
         # Add the solute to the system
         self._load_solute_molecule(solute)
+        solute_volume = self._get_volume(solute) * 1e-3
 
         solute_nonh_count = 0
         for atom_label in solute.get_labels():
@@ -468,6 +469,15 @@ class SolvationBuilder:
 
         # Estimate quantities
         # normalize proportion
+        assert_msg_critical(
+            len(solvents) == len(proportion),
+            'SolvationBuilder: The number of solvents and proportions must match.')
+        assert_msg_critical(
+            len(proportion) > 0,
+            'SolvationBuilder: At least one solvent proportion must be provided.')
+        assert_msg_critical(
+            all(p > 0 for p in proportion),
+            'SolvationBuilder: All custom solvent proportions must be positive.')
         sum_proportion = sum(proportion)
         normalized_proportion = [p / sum_proportion for p in proportion]
         # Make rough estimation of quantities based on the empirical
@@ -479,10 +489,27 @@ class SolvationBuilder:
             for atom_label in solvent.get_labels():
                 if atom_label != 'H':
                     norm_nonh_count += norm_prop
+        assert_msg_critical(
+            norm_nonh_count > 0.0,
+            'SolvationBuilder: Custom solvents must contain at least one non-hydrogen atom '
+            'to estimate packing.')
         box_volume_nm3 = box_size[0] * box_size[1] * box_size[2] * 1e-3
+        available_volume_nm3 = box_volume_nm3 - solute_volume
+        assert_msg_critical(
+            available_volume_nm3 > 0.0,
+            'SolvationBuilder: The available solvent volume must be positive. '
+            'Increase the box size or padding.')
         max_nonh_count = box_volume_nm3 * 28 - solute_nonh_count
+        assert_msg_critical(
+            max_nonh_count > 0.0,
+            'SolvationBuilder: The custom solvation box is too small to fit any solvent molecules. '
+            'Increase the box size.')
         solvent_counts = [int(norm_prop * int(max_nonh_count / norm_nonh_count))
                           for norm_prop in normalized_proportion]
+        assert_msg_critical(
+            any(count > 0 for count in solvent_counts),
+            'SolvationBuilder: The custom solvation box is too small to fit any solvent molecules. '
+            'Increase the box size.')
         solvent_min_idx = np.argmin(np.array(solvent_counts))
         for solvent_idx in range(len(solvent_counts)):
             solvent_counts[solvent_idx] = int(
