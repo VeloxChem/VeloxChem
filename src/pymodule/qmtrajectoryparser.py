@@ -428,3 +428,29 @@ class QMTrajectoryParser:
             self.ostream.print_blank()
 
         return snapshots
+
+    def show_trajectory(self, frames, mode='animate', stride=1, width=600,
+                        height=400, interval=100, loop='forward'):
+        """
+        Display a list of parsed frames using py3Dmol.
+
+        :param frames:
+            List of frame dicts as returned by :meth:`structures`.
+        :param mode:
+            Visualisation mode: ``'animate'`` plays frames as a movie;
+            ``'superimpose'`` overlays all selected frames simultaneously.
+        :param stride:
+            Use every ``stride``-th frame (default: 1, i.e. all frames).
+        :param width:
+            Viewer width in pixels.
+        :param height:
+            Viewer height in pixels.
+        :param interval:
+            Playback delay between frames in milliseconds (``'animate'`` only).
+        :param loop:
+            Animation loop mode: ``'forward'`` or ``'backAndForth'``
+            (``'animate'`` only).
+        """
+        from .qmtrajectoryanalyzer import show_trajectory as _show_trajectory
+        _show_trajectory(frames, mode=mode, stride=stride, width=width,
+                         height=height, interval=interval, loop=loop)
