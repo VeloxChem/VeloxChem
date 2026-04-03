@@ -88,16 +88,16 @@ class SolvationBuilder:
         if comm is None:
             comm = MPI.COMM_WORLD
 
+        assert_msg_critical(
+            comm.Get_size() == 1,
+            'SolvationBuilder: Only single-rank interactive use is supported. '
+            'Run the solvation builder with one MPI rank.')
+
         if ostream is None:
             if comm.Get_rank() == mpi_master():
                 ostream = OutputStream(sys.stdout)
             else:
                 ostream = OutputStream(None)
-
-        # MPI information
-        self.comm = comm
-        self.rank = comm.Get_rank()
-        self.size = comm.Get_size()
 
         # Output stream
         self.ostream = ostream
@@ -183,6 +183,7 @@ class SolvationBuilder:
 
         # Save the solvent name
         self.solvent_name = solvent
+        self.equilibration_flag = False
 
         header_msg = "VeloxChem Solvation Builder"
         self.ostream.print_header(header_msg)
@@ -434,6 +435,7 @@ class SolvationBuilder:
 
         # Insert the counterions
         if self.counterion:
+            inserted_counterions = 0
             for _ in range(abs(charge)):
                 result = self._insert_molecule(self.counterion, tree)
                 if result:
@@ -442,6 +444,13 @@ class SolvationBuilder:
                         [atom[-1] for atom in self.system])
                     # Update the KDTree with the counterion
                     tree = cKDTree(existing_coords)
+                    inserted_counterions += 1
+            if inserted_counterions != self.added_counterions:
+                self._report_partial_fill(self.added_counterions,
+                                          inserted_counterions,
+                                          self.added_counterions -
+                                          inserted_counterions)
+                self.added_counterions = inserted_counterions
 
         end = time.time()
         self.ostream.print_info(
@@ -498,6 +507,7 @@ class SolvationBuilder:
 
         # Reset solvent name
         self.solvent_name = None
+        self.equilibration_flag = False
 
         # Add the solute to the system
         self._load_solute_molecule(solute)
@@ -802,7 +812,7 @@ class SolvationBuilder:
         # Write the system PDB file
         if self.equilibration_flag:
             # If the system was equilibrated, remove pdb to align with new resnames etc.
-            Path('equilibrated_system.pdb').unlink()
+            self._unlink_if_exists('equilibrated_system.pdb')
 
         self._write_system_pdb(filename=filename)
         # Print information
@@ -933,15 +943,15 @@ class SolvationBuilder:
 
         # Delete the produced gro and top files with Path
         if self.solvent_name == 'itself':
-            Path('liquid.gro').unlink()
-            Path('liquid.top').unlink()
-            Path('liquid.itp').unlink()
+            self._unlink_if_exists('liquid.gro')
+            self._unlink_if_exists('liquid.top')
+            self._unlink_if_exists('liquid.itp')
         else:
-            Path('system.gro').unlink()
-            Path('system.top').unlink()
-            Path('solute.itp').unlink()
+            self._unlink_if_exists('system.gro')
+            self._unlink_if_exists('system.top')
+            self._unlink_if_exists('solute.itp')
             for i in range(len(self.solvent_ffs)):
-                Path(f'solvent_{i+1}.itp').unlink()
+                self._unlink_if_exists(f'solvent_{i+1}.itp')
 
         # Update the system molecule
         self.system_molecule = Molecule.read_pdb_file('equilibrated_system.pdb')
@@ -970,6 +980,18 @@ class SolvationBuilder:
         box_size = np.max(extent) + 2 * padding * 10
 
         return box_size
+
+    def _unlink_if_exists(self, filename):
+        """
+        Remove a generated file if it exists.
+
+        :param filename:
+            The file to remove.
+        """
+
+        path = Path(filename)
+        if path.exists():
+            path.unlink()
 
     def _load_solute_molecule(self, solute):
         '''
