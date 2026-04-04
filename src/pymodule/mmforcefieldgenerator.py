@@ -1156,6 +1156,10 @@ class MMForceFieldGenerator:
         is_water = molecule.is_water_molecule()
         use_water_model = ((water_model is not None) and
                            (is_water or contains_water))
+        assert_msg_critical(
+            (not is_water) or (water_model is not None),
+            'MMForceFieldGenerator: explicit water_model is required for isolated water molecules.'
+        )
         skip_resp = (not resp) or ((water_model is not None) and is_water)
 
         if skip_resp:

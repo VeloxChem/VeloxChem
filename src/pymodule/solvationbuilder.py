@@ -931,9 +931,13 @@ class SolvationBuilder:
         self.ostream.print_info(f"{filename} file written")
         self.ostream.flush()
 
-    def perform_equilibration(self):
+    def perform_equilibration(self, water_model=None):
         """
         Performs an equilibration using OpenMM.
+
+        :param water_model:
+            Optional water model name to use when equilibrating a pure-water
+            `solvent='itself'` system.
         """
 
         try:
@@ -950,7 +954,15 @@ class SolvationBuilder:
         solute_ff.ostream.mute()
         solute_ff.partial_charges = self.solute.get_partial_charges(
             self.solute.get_charge())
-        solute_ff.create_topology(self.solute)
+
+        if self.solvent_name == 'itself' and self.solute.is_water_molecule():
+            assert_msg_critical(
+                water_model is not None,
+                'SolvationBuilder: water_model must be provided when equilibrating a pure-water solvent=\'itself\' system.'
+            )
+            solute_ff.create_topology(self.solute, water_model=water_model)
+        else:
+            solute_ff.create_topology(self.solute)
 
         use_water_model = (self.solvent_name in self.water_parameters)
 

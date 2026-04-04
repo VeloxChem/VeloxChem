@@ -9,6 +9,19 @@ from veloxchem.mmforcefieldgenerator import MMForceFieldGenerator
 
 class TestMMForceFieldGenerator:
 
+    def test_ffgen_rejects_isolated_water_without_explicit_water_model(self):
+
+        pytest.importorskip('rdkit')
+
+        water = Molecule.read_smiles('O')
+
+        ff_gen = MMForceFieldGenerator()
+        ff_gen.ostream.mute()
+
+        with pytest.raises(AssertionError,
+                           match='explicit water_model is required'):
+            ff_gen.create_topology(water)
+
     def test_ffgen_water(self):
 
         pytest.importorskip('rdkit')
