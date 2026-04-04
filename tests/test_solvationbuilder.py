@@ -55,6 +55,16 @@ def _make_carbon_dioxide():
     return _make_molecule("O=C=O")
 
 
+def _make_ibuprofenate_solute():
+
+    return _make_molecule("CC(C)CC1=CC=C(C=C1)C(C)C(=O)[O-]")
+
+
+def _make_propylene_glycol():
+
+    return _make_molecule("CC(CO)O")
+
+
 def _target_density_for_count(solute, solvent, desired_count, box):
 
     builder = SolvationBuilder(ostream=RecordingOutput())
@@ -229,7 +239,8 @@ class TestSolvationBuilder:
                         box=box)
 
         assert builder.added_solvent_counts == [1]
-        assert 'Failed to pack 4 out of 5 molecules after 2 attempts' in builder.ostream.infos
+        assert ('Solvated system with 1 solvent molecules out of 5 requested'
+                in builder.ostream.infos)
 
     def test_solvate_tracks_only_successfully_inserted_counterions(self):
 
@@ -266,7 +277,8 @@ class TestSolvationBuilder:
         assert builder.added_solvent_counts == [0]
         assert builder.added_counterions == 0
         assert 'Na' not in system_labels
-        assert 'Failed to pack 1 out of 1 molecules after 1 attempts' in builder.ostream.infos
+        assert ('Solvated system with 0 solvent molecules out of 1 requested'
+                in builder.ostream.infos)
 
     def test_solvate_resets_stale_equilibration_flag(self):
 
@@ -446,7 +458,28 @@ class TestSolvationBuilder:
                                box_size=[6.0, 6.0, 6.0])
 
         assert builder.added_solvent_counts == [1]
-        assert 'Failed to pack 4 out of 5 molecules after 2 attempts' in builder.ostream.infos
+        assert ('Solvated system with 1 solvent molecules out of 5 requested'
+                in builder.ostream.infos)
+
+    def test_custom_solvate_keeps_mixture_components_close_for_ibuprofenate(
+            self):
+
+        np.random.seed(0)
+        solute = _make_ibuprofenate_solute()
+        solvents = [_make_water(), _make_propylene_glycol()]
+        builder = SolvationBuilder(ostream=RecordingOutput())
+
+        builder.custom_solvate(solute,
+                               solvents=solvents,
+                               proportion=[50, 50],
+                               box_size=[25.0, 25.0, 25.0])
+
+        first_count, second_count = builder.added_solvent_counts
+
+        assert first_count >= 50
+        assert second_count >= 50
+        assert abs(first_count - second_count) <= int(
+            np.ceil(0.05 * max(first_count, second_count)))
 
     def test_write_gromacs_files_writes_system_topology_and_gro(self, tmp_path):
 

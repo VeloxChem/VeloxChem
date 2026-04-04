@@ -408,8 +408,10 @@ class SolvationBuilder:
         box_center = 0.5 * np.array(self.box)
         tree = self._center_solute_and_build_tree(box_center, cKDTree)
 
-        # Solvate the solute with the solvent molecules
-        self._pack_solvent_molecules(cKDTree, tree)
+        # Solvate the solute with the solvent molecules. For mixed solvents we
+        # insert them in an interleaved order so the achieved composition stays
+        # closer to the requested ratio when the box becomes saturated.
+        self._pack_solvent_mixture(cKDTree, tree)
 
         self.system_molecule = self._save_molecule()
 
@@ -561,6 +563,7 @@ class SolvationBuilder:
         for solvent, quantity in zip(self.solvents, self.quantities):
             added_count = 0
             failure_count = 0
+            partial_fill = False
 
             if use_dynamic_batch and quantity >= self.acceleration_threshold:
                 batch_size = self._compute_batch_size(
@@ -590,6 +593,7 @@ class SolvationBuilder:
                 if failure_count >= max_failures:
                     self._report_partial_fill(quantity, added_count,
                                               failure_count)
+                    partial_fill = True
                     break
 
                 if new_molecules:
@@ -597,7 +601,83 @@ class SolvationBuilder:
                     tree = cKDTree(np.array([atom[-1] for atom in self.system]))
 
             self.added_solvent_counts.append(added_count)
-            self._report_solvation_result(added_count, quantity)
+            if not partial_fill:
+                self._report_solvation_result(added_count, quantity)
+
+        return tree
+
+    def _pack_solvent_mixture(self, cKDTree, tree):
+        """
+        Insert multiple solvent species in an interleaved order.
+
+        Packing one solvent species to completion before attempting the next can
+        distort the achieved mixture when the box gets crowded. This routine
+        always tries to insert the most underfilled solvent first.
+        """
+
+        solvent_count = len(self.solvents)
+        added_counts = [0] * solvent_count
+        failure_counts = [0] * solvent_count
+        partial_fill = [False] * solvent_count
+        max_failures = [
+            max(1, int(np.ceil(self.failures_factor * quantity)))
+            for quantity in self.quantities
+        ]
+        active_indices = {
+            idx for idx, quantity in enumerate(self.quantities) if quantity > 0
+        }
+
+        stop_reason = None
+        stop_failure_idx = None
+
+        while active_indices:
+            ordered_indices = sorted(
+                active_indices,
+                key=lambda idx: (
+                    added_counts[idx] / self.quantities[idx],
+                    -self.quantities[idx],
+                    idx,
+                ))
+            progress_made = False
+
+            idx = ordered_indices[0]
+            result = self._insert_molecule(self.solvents[idx], tree)
+            if result:
+                self.system.extend(result)
+                tree = cKDTree(np.array([atom[-1] for atom in self.system]))
+                added_counts[idx] += 1
+                failure_counts[idx] = 0
+                progress_made = True
+
+                if added_counts[idx] >= self.quantities[idx]:
+                    active_indices.remove(idx)
+            else:
+                failure_counts[idx] += 1
+                if failure_counts[idx] >= max_failures[idx]:
+                    stop_reason = (
+                        "mixed-solvent packing stopped to preserve the "
+                        "requested composition as the box became saturated")
+                    stop_failure_idx = idx
+                    for active_idx in active_indices:
+                        if added_counts[active_idx] < self.quantities[active_idx]:
+                            partial_fill[active_idx] = True
+                    active_indices.clear()
+
+            if not progress_made and not active_indices:
+                break
+
+        self.added_solvent_counts.extend(added_counts)
+        for idx, (added_count,
+                  quantity) in enumerate(zip(added_counts, self.quantities)):
+            if partial_fill[idx]:
+                failure_count = (
+                    failure_counts[idx] if idx == stop_failure_idx else None)
+                self._report_partial_fill(quantity,
+                                          added_count,
+                                          failure_count=failure_count,
+                                          reason=stop_reason)
+            else:
+                self._report_solvation_result(added_count, quantity)
 
         return tree
 
@@ -1087,7 +1167,11 @@ class SolvationBuilder:
         if self.quantities:
             self.quantities[-1] = quantity
 
-    def _report_partial_fill(self, quantity, added_count, failure_count):
+    def _report_partial_fill(self,
+                             quantity,
+                             added_count,
+                             failure_count=None,
+                             reason=None):
         """
         Reports a partial-fill outcome after repeated insertion failures.
 
@@ -1097,11 +1181,13 @@ class SolvationBuilder:
             The number of molecules that were added successfully.
         :param failure_count:
             The number of consecutive failed insertion attempts.
+        :param reason:
+            Optional explanation for why packing stopped early.
         """
 
-        self.ostream.print_info(
-            f"Failed to pack {quantity - added_count} out of {quantity} molecules after "
-            f"{failure_count} attempts")
+        msg = (f"Solvated system with {added_count} solvent molecules out of "
+               f"{quantity} requested")
+        self.ostream.print_info(msg)
         self.ostream.flush()
 
     def _report_solvation_result(self, added_count, quantity):
@@ -1130,7 +1216,7 @@ class SolvationBuilder:
 
         total_attempts = self.number_of_attempts
 
-        for attempt_num in range(1, total_attempts + 1):
+        for _ in range(total_attempts):
 
             if self.random_rotation:
                 # Generate a random rotation
@@ -1166,14 +1252,6 @@ class SolvationBuilder:
                 (molecule_id, label, coord) for label, coord in zip(
                     new_molecule_labels, translated_solvent_coords)
             ]
-            # If number of attempts approaches the total attempts print a warning
-            if attempt_num == int(0.9 * total_attempts):
-                self.ostream.print_info(
-                    f"Warning: {attempt_num} attempts have been made to insert the solvent molecule"
-                )
-                self.ostream.print_info("Consider reducing the target density")
-                self.ostream.flush()
-
             return translated_solvent
 
         return None
