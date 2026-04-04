@@ -1,8 +1,10 @@
 from mpi4py import MPI
 import numpy as np
+from pathlib import Path
 import pytest
 
 from veloxchem.molecule import Molecule
+from veloxchem.mmforcefieldgenerator import MMForceFieldGenerator
 from veloxchem.solvationbuilder import SolvationBuilder
 
 pytest.importorskip("rdkit")
@@ -63,6 +65,19 @@ def _target_density_for_count(solute, solvent, desired_count, box):
 
     # Add a tiny margin so int(mols_per_nm3 * volume_nm3) stays at desired_count.
     return density * 1.0001
+
+
+def _make_forcefield(molecule, water_model=None):
+
+    ff_gen = MMForceFieldGenerator()
+    ff_gen.ostream.mute()
+
+    if water_model is None:
+        ff_gen.create_topology(molecule, resp=False)
+    else:
+        ff_gen.create_topology(molecule, water_model=water_model)
+
+    return ff_gen
 
 
 @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() != 1,
@@ -432,3 +447,137 @@ class TestSolvationBuilder:
 
         assert builder.added_solvent_counts == [1]
         assert 'Failed to pack 4 out of 5 molecules after 2 attempts' in builder.ostream.infos
+
+    def test_write_gromacs_files_writes_system_topology_and_gro(self, tmp_path):
+
+        np.random.seed(0)
+        solute = _make_fluoride_solute()
+        solvent = _make_water()
+        box = [10.0, 10.0, 10.0]
+        target_density = _target_density_for_count(solute, solvent, 3, box)
+        builder = SolvationBuilder(ostream=RecordingOutput())
+
+        builder.solvate(solute,
+                        solvent='other',
+                        solvent_molecule=solvent,
+                        target_density=target_density,
+                        neutralize=True,
+                        box=box)
+
+        solute_ff = _make_forcefield(solute)
+        solvent_ff = _make_forcefield(solvent, water_model='cspce')
+
+        builder.workdir = str(tmp_path)
+        builder.write_gromacs_files(solute_ff=solute_ff,
+                                    solvent_ffs=[solvent_ff])
+
+        system_top = (tmp_path / 'system.top').read_text()
+        solute_top = (tmp_path / 'solute.top').read_text()
+        solute_itp = (tmp_path / 'solute.itp').read_text()
+        system_gro = (tmp_path / 'system.gro').read_text()
+
+        assert (tmp_path / 'solute.gro').exists()
+        assert (tmp_path / 'solvent_1.itp').exists()
+        assert '#include "solute.itp"' in system_top
+        assert '#include "solvent_1.itp"' in system_top
+        assert f'#include "{builder.parent_forcefield}.ff/forcefield.itp"' in system_top
+        assert f'#include "{builder.parent_forcefield}.ff/ions.itp"' in system_top
+        assert 'MOL 1' in system_top
+        assert 'SOL1 2' in system_top
+        assert 'NA 1' in system_top
+        assert '[ atomtypes ]' in solute_top
+        assert '[ atomtypes ]' in system_top
+        assert '[ atomtypes ]' not in solute_itp
+        assert 'SOL1' in system_gro
+        assert 'NA' in system_gro
+
+    def test_write_gromacs_files_itself_updates_liquid_topology(self, tmp_path):
+
+        np.random.seed(0)
+        solute = _make_methane_solute()
+        box = [10.0, 10.0, 10.0]
+        target_density = _target_density_for_count(solute, solute, 2, box)
+        builder = SolvationBuilder(ostream=RecordingOutput())
+
+        builder.solvate(solute,
+                        solvent='itself',
+                        target_density=target_density,
+                        neutralize=False,
+                        box=box)
+
+        solute_ff = _make_forcefield(solute)
+
+        builder.workdir = tmp_path
+        builder.write_gromacs_files(solute_ff=solute_ff)
+
+        liquid_top = (tmp_path / 'liquid.top').read_text()
+        liquid_gro = (tmp_path / 'liquid.gro').read_text()
+
+        assert f'MOL               {builder.added_solvent_counts[0] + 1}' in liquid_top
+        assert liquid_gro.splitlines()[1] == str(
+            builder.system_molecule.number_of_atoms())
+        assert 'MOL' in liquid_gro
+
+    def test_write_openmm_files_writes_system_pdb_and_cleans_stale_file(
+            self, tmp_path):
+
+        np.random.seed(1)
+        solute = _make_methane_solute()
+        solvent = _make_water()
+        box = [10.0, 10.0, 10.0]
+        target_density = _target_density_for_count(solute, solvent, 1, box)
+        builder = SolvationBuilder(ostream=RecordingOutput())
+
+        builder.solvate(solute,
+                        solvent='other',
+                        solvent_molecule=solvent,
+                        target_density=target_density,
+                        neutralize=False,
+                        box=box)
+        builder.equilibration_flag = True
+
+        solute_ff = _make_forcefield(solute)
+        solvent_ff = _make_forcefield(solvent, water_model='cspce')
+
+        builder.workdir = tmp_path
+        stale_pdb = tmp_path / 'equilibrated_system.pdb'
+        stale_pdb.write_text('stale file')
+
+        builder.write_openmm_files(solute_ff=solute_ff, solvent_ffs=[solvent_ff])
+
+        system_pdb = (tmp_path / 'system.pdb').read_text()
+
+        assert not stale_pdb.exists()
+        assert (tmp_path / 'solute.xml').exists()
+        assert (tmp_path / 'solvent_1.xml').exists()
+        assert 'HEADER    Generated by VeloxChem' in system_pdb
+        assert 'HETATM' in system_pdb
+        assert 'CONECT' in system_pdb
+        assert 'S01' in system_pdb
+
+    def test_write_openmm_files_itself_honors_write_pdb_only(self, tmp_path):
+
+        np.random.seed(1)
+        solute = _make_methane_solute()
+        box = [10.0, 10.0, 10.0]
+        target_density = _target_density_for_count(solute, solute, 1, box)
+        builder = SolvationBuilder(ostream=RecordingOutput())
+
+        builder.solvate(solute,
+                        solvent='itself',
+                        target_density=target_density,
+                        neutralize=False,
+                        box=box)
+        builder.write_pdb_only = True
+
+        solute_ff = _make_forcefield(solute)
+
+        builder.workdir = str(tmp_path)
+        builder.write_openmm_files(solute_ff=solute_ff)
+
+        liquid_pdb = (tmp_path / 'liquid.pdb').read_text()
+
+        assert (tmp_path / 'liquid.pdb').exists()
+        assert not (tmp_path / 'liquid.xml').exists()
+        assert 'HEADER    Generated by VeloxChem' in liquid_pdb
+        assert 'CONECT' in liquid_pdb

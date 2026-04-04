@@ -101,6 +101,7 @@ class SolvationBuilder:
 
         # Output stream
         self.ostream = ostream
+        self.workdir = Path('.')
 
         # Packing configuration
         self.threshold = 1.8
@@ -144,6 +145,16 @@ class SolvationBuilder:
 
         # Standard forcefield
         self.parent_forcefield = 'amber03'
+
+    def _path(self, filename):
+        """
+        Resolve a generated filename relative to the builder work directory.
+
+        :param filename:
+            The generated filename.
+        """
+
+        return Path(self.workdir) / filename
 
     def solvate(self,
                 solute,
@@ -656,13 +667,15 @@ class SolvationBuilder:
 
         # Special case for 'itself' solvent
         if self.solvent_name == 'itself':
+            liquid_itp = self._path('liquid.itp')
+            liquid_top = self._path('liquid.top')
             # Write the itp and top files
-            self.solute_ff.write_itp('liquid.itp', 'MOL')
-            self.solute_ff.write_top('liquid.top', 'liquid.itp', 'MOL')
+            self.solute_ff.write_itp(str(liquid_itp), 'MOL')
+            self.solute_ff.write_top(str(liquid_top), str(liquid_itp), 'MOL')
             # Change the number of molecules in solute.top to the total number of molecules
-            with open('liquid.top', 'r') as f:
+            with open(liquid_top, 'r') as f:
                 lines = f.readlines()
-            with open('liquid.top', 'w') as f:
+            with open(liquid_top, 'w') as f:
                 for line in lines:
                     if line.startswith('; Compound '):
                         f.write(line)
@@ -682,10 +695,13 @@ class SolvationBuilder:
             self._write_system_gro(filename='liquid.gro')
 
         else:
+            solute_itp = self._path('solute.itp')
+            solute_top = self._path('solute.top')
+            solute_gro = self._path('solute.gro')
             # Write the itp files
-            self.solute_ff.write_itp('solute.itp', 'MOL')
-            self.solute_ff.write_top('solute.top', 'solute.itp', 'MOL')
-            self.solute_ff.write_gro('solute.gro', 'MOL')
+            self.solute_ff.write_itp(str(solute_itp), 'MOL')
+            self.solute_ff.write_top(str(solute_top), str(solute_itp), 'MOL')
+            self.solute_ff.write_gro(str(solute_gro), 'MOL')
 
             if not equilibration:
                 self.ostream.print_info("solute.itp file written")
@@ -693,7 +709,8 @@ class SolvationBuilder:
 
             if self.solvent_ffs:
                 for i, solvent_ff in enumerate(self.solvent_ffs):
-                    solvent_ff.write_itp(f'solvent_{i+1}.itp', f'SOL{i+1}')
+                    solvent_ff.write_itp(str(self._path(f'solvent_{i+1}.itp')),
+                                         f'SOL{i+1}')
                     if not equilibration:
                         self.ostream.print_info(
                             f"solvent_{i+1}.itp file written")
@@ -702,33 +719,35 @@ class SolvationBuilder:
             # Post-treatment of the files to ensure compatibility with GROMACS parsing.
             # Extract the atom types from the itp files
             atomtypes = []
-            atomtypes.extend(self._extract_atomtypes('solute.itp'))
+            atomtypes.extend(self._extract_atomtypes(str(solute_itp)))
             if self.solvent_ffs:
                 for i in range(len(self.solvent_ffs)):
                     atomtypes.extend(
-                        self._extract_atomtypes(f'solvent_{i+1}.itp'))
+                        self._extract_atomtypes(
+                            str(self._path(f'solvent_{i+1}.itp'))))
 
             # Remove duplicated atom types
             atomtypes = list(set(atomtypes))
 
             # Remove the atomtypes section from the itp files
             solute_atomtypes_lines = self._remove_atomtypes_section(
-                'solute.itp')
+                str(solute_itp))
             if self.solvent_ffs:
                 for i in range(len(self.solvent_ffs)):
-                    self._remove_atomtypes_section(f'solvent_{i+1}.itp')
+                    self._remove_atomtypes_section(
+                        str(self._path(f'solvent_{i+1}.itp')))
 
             # Add atomtypes section to solute top file
-            with open('solute.top', 'r') as f:
+            with open(solute_top, 'r') as f:
                 solute_lines = f.readlines()
-            with open('solute.top', 'w') as f:
+            with open(solute_top, 'w') as f:
                 for line in solute_lines:
                     if '"solute.itp"' in line:
                         f.write(''.join(solute_atomtypes_lines) + '\n')
                     f.write(line)
 
             # Write the top file based on the forcefields generated
-            with open('system.top', 'w') as f:
+            with open(self._path('system.top'), 'w') as f:
                 f.write('[ defaults ]\n')
                 f.write(
                     '; nbfunc        comb-rule       gen-pairs        fudgeLJ   fudgeQQ\n'
@@ -787,7 +806,8 @@ class SolvationBuilder:
         if self.solvent_name == 'itself':
             # Write the XML and PDB files for the solute
             if not self.write_pdb_only:
-                self.solute_ff.write_openmm_files('liquid', 'MOL')
+                self.solute_ff.write_openmm_files(str(self._path('liquid')),
+                                                  'MOL')
                 self.ostream.print_info("liquid.xml file written")
                 self.ostream.flush()
             # Write the system PDB file
@@ -796,13 +816,16 @@ class SolvationBuilder:
         else:
             # Solute
             if not self.write_pdb_only:
-                self.solute_ff.write_openmm_files('solute', 'MOL')
+                self.solute_ff.write_openmm_files(str(self._path('solute')),
+                                                  'MOL')
                 self.ostream.print_info(
                     "solute.pdb, and solute.xml files written")
                 self.ostream.flush()
 
             for i, solvent_ff in enumerate(self.solvent_ffs):
-                solvent_ff.generate_residue_xml(f'solvent_{i+1}.xml',
+                solvent_ff.generate_residue_xml(
+                                                str(self._path(
+                                                    f'solvent_{i+1}.xml')),
                                                 f'S{i+1:02d}')
                 self.ostream.print_info(f"solvent_{i+1}.xml file written")
                 self.ostream.flush()
@@ -812,7 +835,7 @@ class SolvationBuilder:
         # Write the system PDB file
         if self.equilibration_flag:
             # If the system was equilibrated, remove pdb to align with new resnames etc.
-            self._unlink_if_exists('equilibrated_system.pdb')
+            self._unlink_if_exists(self._path('equilibrated_system.pdb'))
 
         self._write_system_pdb(filename=filename)
         # Print information
@@ -868,17 +891,19 @@ class SolvationBuilder:
 
         # Load the system
         if self.solvent_name == 'itself':
-            gro = app.GromacsGroFile('liquid.gro')
+            gro = app.GromacsGroFile(str(self._path('liquid.gro')))
         else:
-            gro = app.GromacsGroFile('system.gro')
+            gro = app.GromacsGroFile(str(self._path('system.gro')))
 
         # # Create the force field
         if self.solvent_name == 'itself':
             forcefield = app.GromacsTopFile(
-                'liquid.top', periodicBoxVectors=gro.getPeriodicBoxVectors())
+                str(self._path('liquid.top')),
+                periodicBoxVectors=gro.getPeriodicBoxVectors())
         else:
             forcefield = app.GromacsTopFile(
-                'system.top', periodicBoxVectors=gro.getPeriodicBoxVectors())
+                str(self._path('system.top')),
+                periodicBoxVectors=gro.getPeriodicBoxVectors())
 
         topology = forcefield.topology
         positions = gro.positions
@@ -905,7 +930,7 @@ class SolvationBuilder:
 
         # Equilibrate
         simulation.reporters.append(
-            app.StateDataReporter('equilibration.log',
+            app.StateDataReporter(str(self._path('equilibration.log')),
                                   1000,
                                   step=True,
                                   potentialEnergy=True,
@@ -938,23 +963,24 @@ class SolvationBuilder:
         )
         self.ostream.flush()
         # Write the PDB file
-        with open('equilibrated_system.pdb', 'w') as f:
+        with open(self._path('equilibrated_system.pdb'), 'w') as f:
             app.PDBFile.writeFile(simulation.topology, positions, f)
 
         # Delete the produced gro and top files with Path
         if self.solvent_name == 'itself':
-            self._unlink_if_exists('liquid.gro')
-            self._unlink_if_exists('liquid.top')
-            self._unlink_if_exists('liquid.itp')
+            self._unlink_if_exists(self._path('liquid.gro'))
+            self._unlink_if_exists(self._path('liquid.top'))
+            self._unlink_if_exists(self._path('liquid.itp'))
         else:
-            self._unlink_if_exists('system.gro')
-            self._unlink_if_exists('system.top')
-            self._unlink_if_exists('solute.itp')
+            self._unlink_if_exists(self._path('system.gro'))
+            self._unlink_if_exists(self._path('system.top'))
+            self._unlink_if_exists(self._path('solute.itp'))
             for i in range(len(self.solvent_ffs)):
-                self._unlink_if_exists(f'solvent_{i+1}.itp')
+                self._unlink_if_exists(self._path(f'solvent_{i+1}.itp'))
 
         # Update the system molecule
-        self.system_molecule = Molecule.read_pdb_file('equilibrated_system.pdb')
+        self.system_molecule = Molecule.read_pdb_file(
+            str(self._path('equilibrated_system.pdb')))
 
     # Auxiliary functions
 
@@ -1460,6 +1486,7 @@ class SolvationBuilder:
         Write the system's molecule into a GRO file.
         """
 
+        filename = self._path(filename)
         coords_in_nm = self.system_molecule.get_coordinates_in_angstrom() * 0.1
 
         if self.solvent_name == 'itself':
@@ -1550,6 +1577,7 @@ class SolvationBuilder:
         Write the system's molecule into a PDB file.
         """
 
+        filename = self._path(filename)
         # Write the system PDB file
         with open(filename, 'w') as f:
             f.write("HEADER    Generated by VeloxChem\n")
