@@ -278,9 +278,10 @@ class SolvationBuilder:
             f"Time to solvate the system: {end - start:.2f} s")
         self.ostream.flush()
         # Print results
+        box_volume_nm3 = self.box[0] * self.box[1] * self.box[2] * 1e-3
         self.ostream.print_info(
-            'The density of the solvent after packing is: ' +
-            f'{self._check_density(solvent_molecule, self.added_solvent_counts[0], volume_nm3)} kg/m^3'
+            'The density of the system after packing is: ' +
+            f'{self._compute_density(box_volume_nm3)} kg/m^3'
         )
         self.ostream.print_blank()
         self.ostream.flush()
@@ -412,6 +413,12 @@ class SolvationBuilder:
         # insert them in an interleaved order so the achieved composition stays
         # closer to the requested ratio when the box becomes saturated.
         self._pack_solvent_mixture(cKDTree, tree)
+        self.ostream.print_info(
+            'The density of the system after packing is: ' +
+            f'{self._compute_density(box_volume_nm3)} kg/m^3'
+        )
+        self.ostream.print_blank()
+        self.ostream.flush()
 
         self.system_molecule = self._save_molecule()
 
@@ -1036,12 +1043,10 @@ class SolvationBuilder:
             f'The box size after equilibration is: {self.box[0] * 0.1:.2f} x {self.box[1] * 0.1:.2f} x {self.box[2] * 0.1:.2f} nm^3'
         )
         self.ostream.flush()
-        # Recalculate the available volume for the solvent
-        volume_nm3 = (self.box[0] * self.box[1] * self.box[2] -
-                      self._get_volume(self.solute)) * 1e-3
-        # Recalculate the density of the solvent
+        box_volume_nm3 = self.box[0] * self.box[1] * self.box[2] * 1e-3
+        # Recalculate the density of the system
         self.ostream.print_info(
-            f'The density of the solvent after equilibration is: {self._check_density(self.solvents[0], self.added_solvent_counts[0], volume_nm3)} kg/m^3'
+            f'The density of the system after equilibration is: {self._compute_density(box_volume_nm3)} kg/m^3'
         )
         self.ostream.flush()
         # Write the PDB file
@@ -1451,24 +1456,42 @@ class SolvationBuilder:
 
         return ion_mol
 
-    def _check_density(self, molecule, number_of_molecules, volume):
+    def _compute_density(self, volume):
         """
-        Given the moecule mass in gr/mol and the volume in cubic nm,
-        return the density in kg/m^3.
+        Return the density of the whole periodic system in kg/m^3.
 
-        :param molecule:
-            The VeloxChem molecule object.
-        :param number_of_molecules:
-            The number of molecules.
+        This includes the solute, all solvent species, and any inserted
+        counterions, divided by the full simulation box volume.
+
         :param volume:
             The volume in cubic nm.
         """
-        mass = sum(molecule.get_masses()) * 1e-3
-        volume = volume * 1e-27
-        moles = number_of_molecules / 6.022e23
-        density = mass * moles / volume
 
-        return int(density)
+        volume_m3 = volume * 1e-27
+        total_mass = 0.0
+
+        solute_count = 1
+        if self.solvent_name == 'itself' and self.added_solvent_counts:
+            solute_count += self.added_solvent_counts[0]
+            solvent_start = 1
+        else:
+            solvent_start = 0
+
+        if self.solute is not None:
+            solute_mass = sum(self.solute.get_masses()) * 1e-3
+            total_mass += solute_mass * solute_count / 6.022e23
+
+        for molecule, number_of_molecules in zip(self.solvents[solvent_start:],
+                                                 self.added_solvent_counts[solvent_start:]):
+            mass = sum(molecule.get_masses()) * 1e-3
+            moles = number_of_molecules / 6.022e23
+            total_mass += mass * moles
+
+        if self.counterion is not None and self.added_counterions > 0:
+            ion_mass = sum(self.counterion.get_masses()) * 1e-3
+            total_mass += ion_mass * self.added_counterions / 6.022e23
+
+        return int(total_mass / volume_m3)
 
     def _density_to_mols_per_nm3(self, molecule, density):
         """

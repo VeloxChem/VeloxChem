@@ -77,6 +77,18 @@ def _target_density_for_count(solute, solvent, desired_count, box):
     return density * 1.0001
 
 
+def _system_density(solute, solvents, counts, box):
+
+    total_mass = sum(solute.get_masses())
+    for solvent, count in zip(solvents, counts):
+        total_mass += count * sum(solvent.get_masses())
+
+    mass_kg = total_mass * 1.0e-3 / 6.02214076e23
+    volume_m3 = box[0] * box[1] * box[2] * 1.0e-30
+
+    return mass_kg / volume_m3
+
+
 def _make_forcefield(molecule, water_model=None):
 
     ff_gen = MMForceFieldGenerator()
@@ -475,11 +487,16 @@ class TestSolvationBuilder:
                                box_size=[25.0, 25.0, 25.0])
 
         first_count, second_count = builder.added_solvent_counts
+        reference_density = _system_density(solute, solvents,
+                                            [first_count, second_count],
+                                            [25.0, 25.0, 25.0])
+        actual_density = builder._compute_density(25.0 * 25.0 * 25.0 * 1.0e-3)
 
         assert first_count >= 50
         assert second_count >= 50
         assert abs(first_count - second_count) <= int(
             np.ceil(0.05 * max(first_count, second_count)))
+        assert actual_density == pytest.approx(reference_density, rel=0.01)
 
     def test_write_gromacs_files_writes_system_topology_and_gro(self, tmp_path):
 
