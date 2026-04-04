@@ -164,6 +164,7 @@ class SolvationBuilder:
                 target_density=None,
                 neutralize=True,
                 equilibrate=False,
+                equilibration_steps=None,
                 box=None):
         """
         Create a solvated system with the most typical solvent molecules.
@@ -188,6 +189,9 @@ class SolvationBuilder:
             If True, neutralizes the total charge of the molecule with a counterion.
         :param equilibrate:
             If True, perform an equilibration of the system.
+        :param equilibration_steps:
+            Optional number of MD steps to use for the equilibration run.
+            If None, the builder default stored in `self.steps` is used.
         """
 
         from scipy.spatial import cKDTree
@@ -289,14 +293,16 @@ class SolvationBuilder:
         self.system_molecule = self._save_molecule()
 
         if equilibrate:
+            run_steps = (self.steps if equilibration_steps is None else
+                         equilibration_steps)
             # TODO: run perform_equilibration using openmm files
             try:
                 start = time.time()
-                self.perform_equilibration()
+                self.perform_equilibration(steps=equilibration_steps)
                 end = time.time()
                 self.ostream.print_info("Equilibrating the system")
                 self.ostream.print_blank()
-                self.ostream.print_info(f"Duration: {self.steps/1000} ps")
+                self.ostream.print_info(f"Duration: {run_steps/1000} ps")
                 self.ostream.print_info(f"Temperature: {self.temperature} K")
                 self.ostream.print_info(f"Pressure: {self.pressure} bar")
                 self.ostream.print_blank()
@@ -931,13 +937,15 @@ class SolvationBuilder:
         self.ostream.print_info(f"{filename} file written")
         self.ostream.flush()
 
-    def perform_equilibration(self, water_model=None):
+    def perform_equilibration(self, water_model=None, steps=None):
         """
         Performs an equilibration using OpenMM.
 
         :param water_model:
             Optional water model name to use when equilibrating a pure-water
             `solvent='itself'` system.
+        :param steps:
+            Optional number of MD steps to run. If None, `self.steps` is used.
         """
 
         try:
@@ -947,6 +955,8 @@ class SolvationBuilder:
 
         except ImportError:
             raise ImportError("OpenMM is required for this functionality")
+
+        run_steps = self.steps if steps is None else steps
 
         # Generate the forcefields using semiempirical charges.
 
@@ -1037,7 +1047,7 @@ class SolvationBuilder:
                                   potentialEnergy=True,
                                   temperature=True,
                                   volume=True))
-        simulation.step(self.steps)
+        simulation.step(run_steps)
 
         # Get the final positions
         positions = simulation.context.getState(

@@ -37,7 +37,7 @@ def _make_molecule(xyz_string, charge=0):
 
 def _make_fluoride_solute(charge=-1):
 
-    return _make_molecule("F", charge=charge)
+    return _make_molecule("[F]", charge=charge)
 
 
 def _make_methane_solute(charge=0):
@@ -58,6 +58,11 @@ def _make_carbon_dioxide():
 def _make_ibuprofenate_solute():
 
     return _make_molecule("CC(C)CC1=CC=C(C=C1)C(C)C(=O)[O-]")
+
+
+def _make_ammonium_solute(charge=1):
+
+    return _make_molecule("[NH4+]", charge=charge)
 
 
 def _make_propylene_glycol():
@@ -111,7 +116,7 @@ class TestSolvationBuilder:
         np.random.seed(0)
         solute = _make_fluoride_solute()
         solvent = _make_water()
-        box = [10.0, 10.0, 10.0]
+        box = [25.0, 25.0, 25.0]
         target_density = _target_density_for_count(solute, solvent, 3, box)
         builder = SolvationBuilder(ostream=RecordingOutput())
 
@@ -297,7 +302,7 @@ class TestSolvationBuilder:
         np.random.seed(0)
         solute = _make_methane_solute()
         solvent = _make_water()
-        box = [10.0, 10.0, 10.0]
+        box = [25.0, 25.0, 25.0]
         target_density = _target_density_for_count(solute, solvent, 1, box)
         builder = SolvationBuilder(ostream=RecordingOutput())
         builder.equilibration_flag = True
@@ -310,6 +315,35 @@ class TestSolvationBuilder:
                         box=box)
 
         assert builder.equilibration_flag is False
+
+    def test_solvate_reports_skipped_equilibration_when_files_are_missing(
+            self, monkeypatch):
+
+        np.random.seed(0)
+        solute = _make_methane_solute()
+        solvent = _make_water()
+        box = [10.0, 10.0, 10.0]
+        target_density = _target_density_for_count(solute, solvent, 1, box)
+        builder = SolvationBuilder(ostream=RecordingOutput())
+
+        def fake_perform_equilibration(water_model=None, steps=None):
+            raise ValueError('missing forcefield include')
+
+        monkeypatch.setattr(builder, 'perform_equilibration',
+                            fake_perform_equilibration)
+
+        builder.solvate(solute,
+                        solvent='other',
+                        solvent_molecule=solvent,
+                        target_density=target_density,
+                        neutralize=False,
+                        equilibrate=True,
+                        equilibration_steps=1,
+                        box=box)
+
+        assert builder.equilibration_flag is False
+        assert 'Equilibration skipped due to missing files' in builder.ostream.infos
+        assert 'Equilibrating the system' not in builder.ostream.infos
 
     def test_unlink_if_exists_handles_present_and_missing_files(self, tmp_path):
 
@@ -331,6 +365,52 @@ class TestSolvationBuilder:
 
         with pytest.raises(AssertionError, match='Unsupported counterion'):
             builder._counterion_molecules()
+
+    def test_solvate_reports_neutral_solute_when_neutralization_is_requested(
+            self):
+
+        np.random.seed(0)
+        solute = _make_methane_solute()
+        solvent = _make_water()
+        box = [10.0, 10.0, 10.0]
+        target_density = _target_density_for_count(solute, solvent, 1, box)
+        builder = SolvationBuilder(ostream=RecordingOutput())
+
+        builder.solvate(solute,
+                        solvent='other',
+                        solvent_molecule=solvent,
+                        target_density=target_density,
+                        neutralize=True,
+                        box=box)
+
+        assert builder.added_counterions == 0
+        assert builder.counterion is None
+        assert 'The solute is neutral, no counterions will be added' in builder.ostream.infos
+
+    def test_solvate_positive_solute_uses_negative_counterions(self):
+
+        np.random.seed(0)
+        solute = _make_ammonium_solute()
+        solvent = _make_water()
+        box = [10.0, 10.0, 10.0]
+        target_density = _target_density_for_count(solute, solvent, 3, box)
+        builder = SolvationBuilder(ostream=RecordingOutput())
+
+        builder.solvate(solute,
+                        solvent='other',
+                        solvent_molecule=solvent,
+                        target_density=target_density,
+                        neutralize=True,
+                        box=box)
+
+        system_labels = [atom[1] for atom in builder.system]
+
+        assert builder.added_solvent_counts == [2]
+        assert builder.added_counterions == 1
+        assert builder.ion_name == builder.ncharge
+        assert system_labels.count('O') == 2
+        assert system_labels.count('Cl') == 1
+        assert 'The solute has a charge of 1, adding 1Cl counterions' in builder.ostream.infos
 
     def test_solvate_rejects_box_smaller_than_solute_volume(self):
 
@@ -359,6 +439,30 @@ class TestSolvationBuilder:
             builder.solvate(solute,
                             solvent='other',
                             solvent_molecule=solvent,
+                            target_density=target_density,
+                            neutralize=False,
+                            box=[10.0, 10.0, 10.0])
+
+    @pytest.mark.parametrize(
+        ('solvent', 'solvent_molecule', 'target_density', 'message'),
+        [
+            ('other', None, 1000,
+             "The solvent molecule must be provided if the solvent is 'other'"),
+            ('other', _make_water(), None,
+             "The target density must be provided if the solvent is 'other'"),
+            ('itself', None, None,
+             "The target density must be provided if the solvent is 'itself'"),
+        ])
+    def test_solvate_validates_required_typical_solvent_inputs(
+            self, solvent, solvent_molecule, target_density, message):
+
+        solute = _make_methane_solute()
+        builder = SolvationBuilder(ostream=RecordingOutput())
+
+        with pytest.raises(ValueError, match=message):
+            builder.solvate(solute,
+                            solvent=solvent,
+                            solvent_molecule=solvent_molecule,
                             target_density=target_density,
                             neutralize=False,
                             box=[10.0, 10.0, 10.0])
@@ -472,6 +576,45 @@ class TestSolvationBuilder:
         assert builder.added_solvent_counts == [1]
         assert ('Solvated system with 1 solvent molecules out of 5 requested'
                 in builder.ostream.infos)
+
+    def test_pack_solvent_molecules_uses_dynamic_batch_sizing(self):
+
+        builder = SolvationBuilder(ostream=RecordingOutput())
+        builder.solvents = [_make_water()]
+        builder.quantities = [builder.acceleration_threshold]
+
+        insert_counter = {'count': 0}
+        seen_trees = []
+
+        class FakeKDTree:
+
+            def __init__(self, coordinates):
+                self.coordinates = coordinates
+
+        def fake_insert(molecule, tree):
+            seen_trees.append(tree)
+            atom_idx = insert_counter['count']
+            insert_counter['count'] += 1
+            return [(atom_idx, molecule.get_labels()[0],
+                     np.array([float(atom_idx), 0.0, 0.0]))]
+
+        builder._insert_molecule = fake_insert
+
+        tree = builder._pack_solvent_molecules(FakeKDTree,
+                                               None,
+                                               use_dynamic_batch=True,
+                                               max_batch_size=20,
+                                               min_batch_size=10)
+
+        assert builder.added_solvent_counts == [builder.acceleration_threshold]
+        assert insert_counter['count'] == builder.acceleration_threshold
+        assert seen_trees[:20] == [None] * 20
+        assert isinstance(seen_trees[20], FakeKDTree)
+        assert isinstance(tree, FakeKDTree)
+        assert builder._compute_batch_size(added_count=500,
+                                           max_batch_size=20,
+                                           min_batch_size=10,
+                                           total_quantity=1000) == 10
 
     def test_custom_solvate_keeps_mixture_components_close_for_ibuprofenate(
             self):
@@ -631,6 +774,79 @@ class TestSolvationBuilder:
         assert not (tmp_path / 'liquid.xml').exists()
         assert 'HEADER    Generated by VeloxChem' in liquid_pdb
         assert 'CONECT' in liquid_pdb
+
+    def test_solvate_equilibrates_with_explicit_small_step_count(self,
+                                                                 tmp_path):
+
+        pytest.importorskip("openmm")
+
+        np.random.seed(0)
+        solute = _make_methane_solute()
+        solvent = _make_water()
+        box = [25.0, 25.0, 25.0]
+        target_density = _target_density_for_count(solute, solvent, 1, box)
+        builder = SolvationBuilder(ostream=RecordingOutput())
+        builder.workdir = tmp_path
+
+        builder.solvate(solute,
+                        solvent='other',
+                        solvent_molecule=solvent,
+                        target_density=target_density,
+                        neutralize=False,
+                        equilibrate=True,
+                        equilibration_steps=1,
+                        box=box)
+
+        assert builder.equilibration_flag is True
+        assert (tmp_path / 'equilibrated_system.pdb').exists()
+        assert 'Equilibrating the system' in builder.ostream.infos
+        assert 'Duration: 0.001 ps' in builder.ostream.infos
+
+    def test_perform_equilibration_supports_itself_for_non_water_system(
+            self, tmp_path):
+
+        pytest.importorskip("openmm")
+
+        np.random.seed(0)
+        solute = _make_methane_solute()
+        box = [25.0, 25.0, 25.0]
+        target_density = _target_density_for_count(solute, solute, 1, box)
+        builder = SolvationBuilder(ostream=RecordingOutput())
+        builder.workdir = tmp_path
+
+        builder.solvate(solute,
+                        solvent='itself',
+                        target_density=target_density,
+                        neutralize=False,
+                        box=box)
+        builder.perform_equilibration(steps=1)
+
+        assert (tmp_path / 'equilibrated_system.pdb').exists()
+        assert builder.system_molecule.number_of_atoms() > 0
+        assert not (tmp_path / 'liquid.gro').exists()
+        assert not (tmp_path / 'liquid.top').exists()
+
+    def test_perform_equilibration_supports_named_water_solvent(self,
+                                                                tmp_path):
+
+        pytest.importorskip("openmm")
+
+        np.random.seed(0)
+        solute = _make_methane_solute()
+        box = [20.5, 20.5, 20.5]
+        builder = SolvationBuilder(ostream=RecordingOutput())
+        builder.workdir = tmp_path
+
+        builder.solvate(solute,
+                        solvent='cspce',
+                        neutralize=False,
+                        box=box)
+        builder.perform_equilibration(steps=1)
+
+        assert (tmp_path / 'equilibrated_system.pdb').exists()
+        assert builder.system_molecule.number_of_atoms() > 0
+        assert not (tmp_path / 'system.gro').exists()
+        assert not (tmp_path / 'system.top').exists()
 
     def test_perform_equilibration_requires_water_model_for_pure_water_itself(
             self):
