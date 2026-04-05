@@ -1321,10 +1321,10 @@ class MMForceFieldGenerator:
                 if k in [i, j]:
                     continue
                 if self.connectivity_matrix[j, k] == 1:
-                    inds = (i, j, k) if i < k else (k, j, i)
+                    inds = self._canonicalize_zero_based_angle_key((i, j, k))
                     angle_indices.add(inds)
                 if self.connectivity_matrix[k, i] == 1:
-                    inds = (k, i, j) if k < j else (j, i, k)
+                    inds = self._canonicalize_zero_based_angle_key((k, i, j))
                     angle_indices.add(inds)
         angle_indices = sorted(list(angle_indices))
 
@@ -1337,10 +1337,12 @@ class MMForceFieldGenerator:
                 if l in [i, j, k]:
                     continue
                 if self.connectivity_matrix[k, l] == 1:
-                    inds = (i, j, k, l) if i < l else (l, k, j, i)
+                    inds = self._canonicalize_zero_based_dihedral_key(
+                        (i, j, k, l))
                     dihedral_indices.add(inds)
                 if self.connectivity_matrix[l, i] == 1:
-                    inds = (l, i, j, k) if l < k else (k, j, i, l)
+                    inds = self._canonicalize_zero_based_dihedral_key(
+                        (l, i, j, k))
                     dihedral_indices.add(inds)
         dihedral_indices = sorted(list(dihedral_indices))
 
@@ -2397,26 +2399,81 @@ class MMForceFieldGenerator:
         self.ostream.print_info(msg)
         self.ostream.flush()
 
-    def get_dihedral_params(self, atom_indices_for_dihedral):
-        """
-        Gets dihedral parameters.
-
-        :param atom_indices_for_dihedral:
-            One-based atom indices for the dihedral.
-
-        :return:
-            The dihedral parameters in a dictionary.
-        """
+    @staticmethod
+    def _to_zero_based_indices(atom_indices):
+        """Converts one-based atom indices to zero-based tuple indices."""
 
         assert_msg_critical(
-            len(atom_indices_for_dihedral) == 4,
-            'MMForceFieldGenerator.get_dihedral_params: ' +
-            'Expecting a tuple of four atom indices')
+            all(index > 0 for index in atom_indices),
+            'MMForceFieldGenerator: one-based atom indices must be greater than 0'
+        )
+        return tuple(index - 1 for index in atom_indices)
 
-        # convert 1-based indices to 0-based indices
-        key = tuple([x - 1 for x in atom_indices_for_dihedral])
+    @staticmethod
+    def _canonicalize_zero_based_bond_key(key):
+        """Canonicalizes a zero-based bond key."""
 
-        return dict(self.dihedrals[key])
+        key = tuple(key)
+        assert_msg_critical(
+            all(index >= 0 for index in key),
+            'MMForceFieldGenerator: zero-based atom indices must be non-negative'
+        )
+        assert_msg_critical(
+            len(set(key)) == len(key),
+            'MMForceFieldGenerator: atom indices in a bond must be unique')
+        return tuple(sorted(key))
+
+    @staticmethod
+    def _canonicalize_zero_based_angle_key(key):
+        """Canonicalizes a zero-based angle key."""
+
+        key = tuple(key)
+        assert_msg_critical(
+            all(index >= 0 for index in key),
+            'MMForceFieldGenerator: zero-based atom indices must be non-negative'
+        )
+        assert_msg_critical(
+            len(set(key)) == len(key),
+            'MMForceFieldGenerator: atom indices in an angle must be unique')
+        return key if key[0] < key[2] else key[::-1]
+
+    @staticmethod
+    def _canonicalize_zero_based_dihedral_key(key):
+        """Canonicalizes a zero-based dihedral key."""
+
+        key = tuple(key)
+        assert_msg_critical(
+            all(index >= 0 for index in key),
+            'MMForceFieldGenerator: zero-based atom indices must be non-negative'
+        )
+        assert_msg_critical(
+            len(set(key)) == len(key),
+            'MMForceFieldGenerator: atom indices in a dihedral must be unique')
+        return key if key[0] < key[3] else key[::-1]
+
+    @staticmethod
+    def _canonicalize_one_based_bond_key(atom_indices_for_bond):
+        """Canonicalizes one-based bond indices to the zero-based storage key."""
+
+        key = MMForceFieldGenerator._to_zero_based_indices(
+            atom_indices_for_bond)
+        return MMForceFieldGenerator._canonicalize_zero_based_bond_key(key)
+
+    @staticmethod
+    def _canonicalize_one_based_angle_key(atom_indices_for_angle):
+        """Canonicalizes one-based angle indices to the zero-based storage key."""
+
+        key = MMForceFieldGenerator._to_zero_based_indices(
+            atom_indices_for_angle)
+        return MMForceFieldGenerator._canonicalize_zero_based_angle_key(key)
+
+    @staticmethod
+    def _canonicalize_one_based_dihedral_key(atom_indices_for_dihedral):
+        """Canonicalizes one-based dihedral indices to the zero-based storage key."""
+
+        key = MMForceFieldGenerator._to_zero_based_indices(
+            atom_indices_for_dihedral)
+        return MMForceFieldGenerator._canonicalize_zero_based_dihedral_key(key)
 
     def set_bond_params(self, atom_indices_for_bond, bond_params):
         """
@@ -2438,8 +2495,7 @@ class MMForceFieldGenerator:
                        dict), 'MMForceFieldGenerator.set_bond_params: ' +
             'Expecting a dictionary of bond parameters')
 
-        # convert 1-based indices to 0-based indices
-        key = tuple([x - 1 for x in atom_indices_for_bond])
+        key = self._canonicalize_one_based_bond_key(atom_indices_for_bond)
 
         self.bonds[key] = dict(bond_params)
 
@@ -2458,8 +2514,7 @@ class MMForceFieldGenerator:
             'MMForceFieldGenerator.set_bond_params: ' +
             'Expecting a tuple of two atom indices')
 
-        # convert 1-based indices to 0-based indices
-        key = tuple([x - 1 for x in atom_indices_for_bond])
+        key = self._canonicalize_one_based_bond_key(atom_indices_for_bond)
 
         return deepcopy(self.bonds[key])
 
@@ -2483,8 +2538,7 @@ class MMForceFieldGenerator:
                        dict), 'MMForceFieldGenerator.set_angle_params: ' +
             'Expecting a dictionary of angle parameters')
 
-        # convert 1-based indices to 0-based indices
-        key = tuple([x - 1 for x in atom_indices_for_angle])
+        key = self._canonicalize_one_based_angle_key(atom_indices_for_angle)
 
         self.angles[key] = dict(angle_params)
 
@@ -2503,8 +2557,7 @@ class MMForceFieldGenerator:
             'MMForceFieldGenerator.set_angle_params: ' +
             'Expecting a tuple of three atom indices')
 
-        # convert 1-based indices to 0-based indices
-        key = tuple([x - 1 for x in atom_indices_for_angle])
+        key = self._canonicalize_one_based_angle_key(atom_indices_for_angle)
 
         return deepcopy(self.angles[key])
 
@@ -2528,8 +2581,8 @@ class MMForceFieldGenerator:
                        dict), 'MMForceFieldGenerator.set_dihedral_params: ' +
             'Expecting a dictionary of dihedral parameters')
 
-        # convert 1-based indices to 0-based indices
-        key = tuple([x - 1 for x in atom_indices_for_dihedral])
+        key = self._canonicalize_one_based_dihedral_key(
+            atom_indices_for_dihedral)
 
         self.dihedrals[key] = dict(dihedral_params)
 
@@ -2548,8 +2601,8 @@ class MMForceFieldGenerator:
             'MMForceFieldGenerator.set_dihedral_params: ' +
             'Expecting a tuple of four atom indices')
 
-        # convert 1-based indices to 0-based indices
-        key = tuple([x - 1 for x in atom_indices_for_dihedral])
+        key = self._canonicalize_one_based_dihedral_key(
+            atom_indices_for_dihedral)
 
         return deepcopy(self.dihedrals[key])
 
@@ -3641,20 +3694,8 @@ class MMForceFieldGenerator:
         Returns:
             MMForceFieldGenerator: The updated forcefield object with the loaded data.
         """
-        forcefield = MMForceFieldGenerator()
         ff_data = json.loads(json_string)
-
-        forcefield.atoms = MMForceFieldGenerator._str_to_tuple_key(
-            ff_data["atoms"])
-        forcefield.bonds = MMForceFieldGenerator._str_to_tuple_key(
-            ff_data["bonds"])
-        forcefield.angles = MMForceFieldGenerator._str_to_tuple_key(
-            ff_data["angles"])
-        forcefield.dihedrals = MMForceFieldGenerator._str_to_tuple_key(
-            ff_data["dihedrals"])
-        forcefield.impropers = MMForceFieldGenerator._str_to_tuple_key(
-            ff_data["impropers"])
-        return forcefield
+        return MMForceFieldGenerator._forcefield_from_json_data(ff_data)
 
     @staticmethod
     def load_forcefield_from_json_file(path: str):
@@ -3667,11 +3708,10 @@ class MMForceFieldGenerator:
         Returns:
             MMForceFieldGenerator: The updated forcefield object with the loaded data.
         """
-        with open(path, "r", encoding="utf-8") as file:
-            json_str = file.read()
-        forcefield = MMForceFieldGenerator.load_forcefield_from_json_string(
-            json_str)
-        return forcefield
+        json_path = Path(path)
+        json_string = json_path.read_text(encoding="utf-8")
+        return MMForceFieldGenerator.load_forcefield_from_json_string(
+            json_string)
 
     def print_bonds(self):
         s = "Bonds: \n"
@@ -3756,14 +3796,27 @@ class MMForceFieldGenerator:
         Returns:
             None
         """
-        json = MMForceFieldGenerator.get_forcefield_as_json(forcefield)
-        cwd = Path().cwd()
-        path = cwd / Path(filename)
-        folder = str(path.parent)
-        if not Path(folder).exists():
-            Path(folder).mkdir(parents=True, exist_ok=True)
-        with open(path, "w", encoding="utf-8") as file:
-            file.write(json)
+        json_payload = MMForceFieldGenerator.get_forcefield_as_json(forcefield)
+        json_path = Path(filename)
+        json_path.parent.mkdir(parents=True, exist_ok=True)
+        json_path.write_text(json_payload, encoding="utf-8")
+
+    @staticmethod
+    def _forcefield_from_json_data(ff_data: dict):
+        """Builds a force field generator instance from decoded JSON data."""
+
+        forcefield = MMForceFieldGenerator()
+        forcefield.atoms = MMForceFieldGenerator._str_to_tuple_key(
+            ff_data["atoms"])
+        forcefield.bonds = MMForceFieldGenerator._str_to_tuple_key(
+            ff_data["bonds"])
+        forcefield.angles = MMForceFieldGenerator._str_to_tuple_key(
+            ff_data["angles"])
+        forcefield.dihedrals = MMForceFieldGenerator._str_to_tuple_key(
+            ff_data["dihedrals"])
+        forcefield.impropers = MMForceFieldGenerator._str_to_tuple_key(
+            ff_data["impropers"])
+        return forcefield
 
     @staticmethod
     def _str_to_tuple_key(dictionary: dict) -> dict:
@@ -3776,19 +3829,15 @@ class MMForceFieldGenerator:
         Returns:
             dict: The dictionary with keys converted to tuple.
         """
-        str_keys = list(dictionary.keys())
-        tup_keys = []
-        for str_key in str_keys:
-            tuple = ()
-            for item in str_key.split(","):
-                item = item.replace("(", "")
-                item = item.replace(")", "")
-                item = item.replace(" ", "")
-                tuple += (int(item),)
-            if len(tuple) == 1:
-                tuple = tuple[0]
-            tup_keys.append(tuple)
-        return {key: value for key, value in zip(tup_keys, dictionary.values())}
+        converted = {}
+
+        for str_key, value in dictionary.items():
+            tuple_key = tuple(
+                int(item.strip().strip("()")) for item in str_key.split(","))
+            converted_key = tuple_key[0] if len(tuple_key) == 1 else tuple_key
+            converted[converted_key] = value
+
+        return converted
 
     @staticmethod
     def _tuple_to_str_key(dictionary: dict) -> dict:
