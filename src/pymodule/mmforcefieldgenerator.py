@@ -598,6 +598,8 @@ class MMForceFieldGenerator:
             self.scan_geometries = scan_results['scan_geometries']
             self.target_dihedrals = scan_results['target_dihedrals']
 
+        target_scan_index = self._get_target_scan_index(rotatable_bond)
+
         # Group dihedrals by their types
         dihedral_groups = defaultdict(list)
         for i, j, k, l in dihedral_indices:
@@ -643,7 +645,7 @@ class MMForceFieldGenerator:
         phases_array = np.array(phases, dtype=float)
         periodicities_array = np.array(periodicities, dtype=float)
         phases_array_rad = np.deg2rad(phases_array)
-        dihedral_angles_rad = np.deg2rad(self.scan_dih_angles[0])
+        dihedral_angles_rad = np.deg2rad(self.scan_dih_angles[target_scan_index])
 
         # Set the dihedral barriers to zero for the scan
         for i, j, k, l in dihedral_indices:
@@ -661,7 +663,8 @@ class MMForceFieldGenerator:
         self.ostream.print_blank()
         self.ostream.flush()
 
-        initial_data = self.validate_force_field(0, verbose=verbose)
+        initial_data = self.validate_force_field(target_scan_index,
+                                                 verbose=verbose)
 
         qm_energies = np.array(initial_data['qm_scan_kJpermol'])
         mm_baseline = np.array(initial_data['mm_scan_kJpermol'])
@@ -898,6 +901,29 @@ class MMForceFieldGenerator:
             'standard_deviation': self.fitting_summary['standard_deviation'],
         }
 
+    def _get_target_scan_index(self, rotatable_bond):
+        """Gets the scan index matching a requested rotatable bond.
+
+        :param rotatable_bond:
+            The rotatable bond as a pair of 1-based atom indices.
+        :return:
+            The index of the matching scan entry.
+        """
+
+        matching_indices = []
+
+        for idx, dihedral in enumerate(self.target_dihedrals):
+            central_bond = sorted([dihedral[1] + 1, dihedral[2] + 1])
+            if central_bond == sorted(rotatable_bond):
+                matching_indices.append(idx)
+
+        assert_msg_critical(
+            len(matching_indices) > 0,
+            'MMForceFieldGenerator.reparameterize_dihedrals: The rotatable '
+            'bond does not match the scan data')
+
+        return matching_indices[0]
+
     def read_qm_scan_xyz_files(self, scan_xyz_files, inp_dir=None):
         """
         Reads QM scan xyz files.
@@ -921,7 +947,8 @@ class MMForceFieldGenerator:
         self.ostream.print_info('Reading QM scan from file...')
 
         for xyz in scan_xyz_files:
-            xyz_fname = str(inp_dir / xyz)
+            xyz_path = inp_dir / xyz
+            xyz_fname = str(xyz_path)
 
             self.ostream.print_info(f'  {xyz_fname}')
 
@@ -933,7 +960,7 @@ class MMForceFieldGenerator:
 
             xyz_lines = None
             if self.rank == mpi_master():
-                with open(xyz_fname, 'r') as f_xyz:
+                with xyz_path.open('r') as f_xyz:
                     xyz_lines = f_xyz.readlines()
             xyz_lines = self.comm.bcast(xyz_lines, root=mpi_master())
 
@@ -973,6 +1000,11 @@ class MMForceFieldGenerator:
                 dih_inds is not None,
                 'MMForceFieldGenerator.read_qm_scan_xyz_files: QM scan file '
                 f'{xyz_fname} does not contain any Scan records')
+            assert_msg_critical(
+                len(geometries) == len(energies) == len(dih_angles),
+                'MMForceFieldGenerator.read_qm_scan_xyz_files: inconsistent '
+                'number of geometries, energies, and dihedral angles in QM '
+                f'scan file {xyz_fname}')
             self.scan_energies.append(energies)
             self.scan_dih_angles.append(dih_angles)
             self.target_dihedrals.append(dih_inds)

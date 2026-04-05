@@ -1,5 +1,6 @@
 from mpi4py import MPI
 from pathlib import Path
+import numpy as np
 import pytest
 
 from veloxchem.veloxchemlib import mpi_master
@@ -14,7 +15,7 @@ skip_multi_rank_raises = pytest.mark.skipif(
 class TestMMForceFieldGenerator:
 
     @staticmethod
-    def _ethanol_molecule():
+    def _ffgen_test_molecule():
 
         xyzstr = """10
             xyz
@@ -55,15 +56,17 @@ class TestMMForceFieldGenerator:
         ff_gen.ostream.mute()
         ff_gen.create_topology(water, water_model='cspce')
 
-        fname = '_vlx_test_water_'
-        ff_gen.write_openmm_files(fname)
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
 
-        here = Path(__file__).parent
-        xmlfile_ref = str(here / 'data' / 'mmffgen_water.xml')
+            fname = '_vlx_test_water_'
+            ff_gen.write_openmm_files(fname)
 
-        assert self.match_xml(f'{fname}.xml', xmlfile_ref, 1e-10)
+            here = Path(__file__).parent
+            xmlfile_ref = str(here / 'data' / 'mmffgen_water.xml')
 
-        self.clean_up_xml_and_pdb(fname)
+            assert self.match_xml(f'{fname}.xml', xmlfile_ref, 1e-10)
+
+            self.clean_up_xml_and_pdb(fname)
 
     def test_ffgen_transition_metal(self):
 
@@ -102,27 +105,27 @@ class TestMMForceFieldGenerator:
         ff_gen.ostream.mute()
         ff_gen.create_topology(tm_complex, resp=False)
 
-        fname = '_vlx_test_tm_complex_'
-        ff_gen.write_openmm_files(fname)
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
 
-        here = Path(__file__).parent
-        xmlfile_ref = str(here / 'data' / 'mmffgen_tm_noresp.xml')
+            fname = '_vlx_test_tm_complex_'
+            ff_gen.write_openmm_files(fname)
 
-        assert self.match_xml(f'{fname}.xml', xmlfile_ref, 1e-10)
+            here = Path(__file__).parent
+            xmlfile_ref = str(here / 'data' / 'mmffgen_tm_noresp.xml')
 
-        self.clean_up_xml_and_pdb(fname)
+            assert self.match_xml(f'{fname}.xml', xmlfile_ref, 1e-10)
+
+            self.clean_up_xml_and_pdb(fname)
 
     def clean_up_xml_and_pdb(self, fname):
 
-        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+        ffgen_xml_file = Path(f'{fname}.xml')
+        if ffgen_xml_file.is_file():
+            ffgen_xml_file.unlink()
 
-            ffgen_xml_file = Path(f'{fname}.xml')
-            if ffgen_xml_file.is_file():
-                ffgen_xml_file.unlink()
-
-            ffgen_pdb_file = Path(f'{fname}.pdb')
-            if ffgen_pdb_file.is_file():
-                ffgen_pdb_file.unlink()
+        ffgen_pdb_file = Path(f'{fname}.pdb')
+        if ffgen_pdb_file.is_file():
+            ffgen_pdb_file.unlink()
 
     def match_xml(self, fname_data, fname_ref, tolerance):
 
@@ -185,7 +188,7 @@ class TestMMForceFieldGenerator:
 
         pytest.importorskip('rdkit')
 
-        mol = self._ethanol_molecule()
+        mol = self._ffgen_test_molecule()
 
         ff_gen = MMForceFieldGenerator()
         ff_gen.ostream.mute()
@@ -230,7 +233,7 @@ class TestMMForceFieldGenerator:
 
         pytest.importorskip('rdkit')
 
-        mol = self._ethanol_molecule()
+        mol = self._ffgen_test_molecule()
 
         ff_gen = MMForceFieldGenerator()
         ff_gen.ostream.mute()
@@ -505,12 +508,141 @@ class TestMMForceFieldGenerator:
                            match='does not contain any Scan records'):
             ff_gen.read_qm_scan_xyz_files([xyz_file.name], inp_dir=tmp_path)
 
+    @skip_multi_rank_raises
+    def test_ffgen_read_qm_scan_xyz_files_rejects_inconsistent_scan_lengths(
+            self, tmp_path):
+
+        ff_gen = MMForceFieldGenerator()
+        ff_gen.ostream.mute()
+
+        xyz_file = tmp_path / '1-2-3-4.xyz'
+        xyz_file.write_text("2\n"
+                            "Scan Cycle 1/1 ; Dihedral 1-2-3-4 = 0.00 ; "
+                            "Iteration 1 Energy -1.0\n"
+                            "H 0.0 0.0 0.0\n"
+                            "H 0.0 0.0 0.7\n"
+                            "Scan Cycle 2/2 ; Dihedral 1-2-3-4 = 180.00 ; "
+                            "Iteration 1 Energy -0.5\n")
+
+        with pytest.raises(AssertionError,
+                           match='inconsistent number of geometries, energies, and dihedral angles'):
+            ff_gen.read_qm_scan_xyz_files([xyz_file.name], inp_dir=tmp_path)
+
+    @skip_multi_rank_raises
+    def test_ffgen_reparameterize_dihedrals_rejects_scan_results_for_other_bond(
+            self):
+
+        pytest.importorskip('scipy')
+
+        ff_gen = MMForceFieldGenerator()
+        ff_gen.ostream.mute()
+        ff_gen.dihedrals = {
+            (0, 1, 2, 3): {
+                'multiple': False,
+                'comment': 'c3-c3-c3-c3',
+                'barrier': 0.5,
+                'phase': 0.0,
+                'periodicity': 1,
+            },
+        }
+
+        scan_results = {
+            'scan_dih_angles': [[0.0, 180.0]],
+            'scan_energies': [[0.0, 1.0]],
+            'scan_geometries': [[self._ffgen_test_molecule(),
+                                 self._ffgen_test_molecule()]],
+            'target_dihedrals': [[0, 4, 5, 6]],
+        }
+
+        with pytest.raises(AssertionError,
+                           match='rotatable bond does not match the scan data'):
+            ff_gen.reparameterize_dihedrals((2, 3),
+                                            scan_results=scan_results,
+                                            initial_validation=False,
+                                            verbose=False)
+
+    def test_ffgen_reparameterize_dihedrals_uses_matching_scan_results_entry(
+            self):
+
+        mol = self._ffgen_test_molecule()
+        ff_gen = MMForceFieldGenerator()
+        ff_gen.ostream.mute()
+        ff_gen.create_topology(mol, resp=False)
+
+        rotatable_bond = (2, 3)
+        matching_dihedral = None
+        for dihedral in ff_gen.dihedrals:
+            if sorted([dihedral[1] + 1, dihedral[2] + 1]) == list(
+                    rotatable_bond):
+                matching_dihedral = list(dihedral)
+                break
+
+        assert matching_dihedral is not None
+
+        scan_results = {
+            'scan_dih_angles': [[10.0, 20.0], [30.0, 60.0]],
+            'scan_energies': [[0.1, 0.2], [0.3, 0.6]],
+            'scan_geometries': [[mol, mol], [mol, mol]],
+            'target_dihedrals': [[0, 4, 5, 6], matching_dihedral],
+        }
+
+        ff_gen.scan_dih_angles = scan_results['scan_dih_angles']
+        ff_gen.scan_energies = scan_results['scan_energies']
+        ff_gen.scan_geometries = scan_results['scan_geometries']
+        ff_gen.target_dihedrals = scan_results['target_dihedrals']
+
+        target_scan_index = ff_gen._get_target_scan_index(rotatable_bond)
+
+        assert target_scan_index == 1
+        assert ff_gen.scan_dih_angles[target_scan_index] == [30.0, 60.0]
+        assert ff_gen.scan_energies[target_scan_index] == [0.3, 0.6]
+        assert (ff_gen.scan_geometries[target_scan_index][0].get_xyz_string() ==
+                mol.get_xyz_string())
+
+    def test_ffgen_reparameterize_dihedrals_runs_with_matching_scan_results(
+            self):
+
+        pytest.importorskip('scipy')
+
+        mol = self._ffgen_test_molecule()
+        ff_gen = MMForceFieldGenerator()
+        ff_gen.ostream.mute()
+        ff_gen.partial_charges = mol.get_partial_charges(mol.get_charge())
+        ff_gen.create_topology(mol)
+
+        rotatable_bond = (2, 3)
+        matching_dihedral = None
+        for dihedral in ff_gen.dihedrals:
+            if sorted([dihedral[1] + 1, dihedral[2] + 1]) == list(
+                    rotatable_bond):
+                matching_dihedral = list(dihedral)
+                break
+
+        assert matching_dihedral is not None
+
+        # Keep the constrained targets reasonably close to the starting
+        # geometry. More aggressive jumps from this nearly planar structure can
+        # trigger geomeTRIC internal-coordinate rebuild divergence in MPI runs.
+        scan_results = {
+            'scan_dih_angles': [[10.0, 20.0], [150.0, 120.0]],
+            'scan_energies': [[0.1, 0.2], [0.3, 0.6]],
+            'scan_geometries': [[mol, mol], [mol, mol]],
+            'target_dihedrals': [[0, 4, 5, 6], matching_dihedral],
+        }
+
+        results = ff_gen.reparameterize_dihedrals(rotatable_bond,
+                                                  scan_results=scan_results,
+                                                  initial_validation=False,
+                                                  verbose=False)
+
+        assert results['dihedral_angles'].tolist() == [150.0, 120.0]
+
     def test_ffgen_file_writers_use_default_names_and_copy_file_creates_parent(
             self, tmp_path):
 
         ff_gen = MMForceFieldGenerator()
         ff_gen.molecule_name = str(tmp_path / 'ethanol_input.xyz')
-        ff_gen.molecule = self._ethanol_molecule()
+        ff_gen.molecule = self._ffgen_test_molecule()
         ff_gen.atoms = {
             0: {
                 'type': 'c3',
@@ -571,7 +703,7 @@ class TestMMForceFieldGenerator:
 
         ff_gen = MMForceFieldGenerator()
         ff_gen.ostream.mute()
-        ff_gen.create_topology(self._ethanol_molecule(), resp=False)
+        ff_gen.create_topology(self._ffgen_test_molecule(), resp=False)
 
         original_dihedral = ff_gen.get_dihedral_params((6, 1, 2, 7))
 
