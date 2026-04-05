@@ -351,19 +351,24 @@ class MMForceFieldGenerator:
                       scan_range=[0, 360],
                       n_points=7):
         """
-        Changes the dihedral constants for a specific rotatable bond in order to
-        fit the QM scan.
+        Runs a constrained QM scan for one rotatable bond.
 
         :param scf_driver:
-            The SCF driver. If None is provided it will use HF.
+            The SCF driver used to obtain the reference wavefunction.
         :param basis:
-            The AO basis set. If None is provided it will use 6-31G*.
+            The AO basis set.
         :param rotatable_bond:
-            The list of indices of the rotatable bond. (1-indexed)
+            The rotatable bond as a pair of 1-based atom indices.
+        :param scf_results:
+            Optional SCF results. If not provided, an SCF calculation is run.
         :param scan_range:
-            List with the range of dihedral angles. Default is [0, 360].
+            Two-element list with the start and end dihedral angles in degrees.
         :param n_points:
-            The number of points to be calculated. Default is 19.
+            The number of scan points.
+
+        :return:
+            A dictionary with scan angles, scan energies, scan geometries, and
+            the target dihedral indices.
         """
 
         assert_msg_critical(
@@ -476,17 +481,25 @@ class MMForceFieldGenerator:
                                  show_diff=False,
                                  verbose=True):
         """
-        Changes the dihedral constants for a specific rotatable bond in order to
-        fit the QM scan.
+        Fits dihedral parameters for one rotatable bond to QM scan data.
 
         :param rotatable_bond:
-            The list of indices of the rotatable bond. (1-indexed)
+            The rotatable bond as a pair of 1-based atom indices.
+        :param scan_results:
+            Precomputed scan data returned by :meth:`scan_dihedral`.
         :param scan_file:
-            The file with the QM scan. If None is provided it a QM scan will be performed.
+            Path to an XYZ scan file. Exactly one of ``scan_results`` and
+            ``scan_file`` must be provided.
         :param visualize:
-            Whether the dihedral scans should be visualized.
+            Whether to display the fitted and reference scans.
         :param fit_extrema:
-            Whether the dihedral parameters should be fitted to the QM scan extrema.
+            Whether to fit only extrema rather than the full scan.
+        :param initial_validation:
+            Whether to validate the original force field before fitting.
+        :param show_diff:
+            Whether to display the QM-MM difference when visualizing.
+        :param verbose:
+            Whether to print progress and validation details.
         """
 
         try:
@@ -1110,6 +1123,11 @@ class MMForceFieldGenerator:
         :param resp:
             If RESP charges should be computed.
             If False partial charges will be set to zero.
+        :param water_model:
+            The explicit water model to use for isolated water molecules.
+        :param use_xml:
+            Whether to read GAFF parameters from the XML dataset instead of the
+            legacy data file.
         """
 
         ff_data_dict = None
@@ -2334,10 +2352,6 @@ class MMForceFieldGenerator:
 
         :param bond:
             The bond to be added. As a list of 1-based atom indices.
-        :param force_constant:
-            The force constant of the bond. Default is 250000.00 kJ/mol/nm^2.
-        :param equilibrium:
-            The equilibrium distance of the bond. If none it will be calculated.
         """
 
         # Extract indices from the list
@@ -2364,15 +2378,15 @@ class MMForceFieldGenerator:
 
     def add_dihedral(self, dihedral, barrier=0.0, phase=0, periodicity=1):
         """
-        Adds a dihedral to the an existing dihedral in the topology
-        converting it in a multiple dihedral.
+        Adds a Fourier term to an existing proper dihedral.
 
         :param dihedral:
-            The dihedral to be added. As a list of 1-based atom indices.
+            The target dihedral as four 1-based atom indices. Reversed order is
+            also accepted.
         :param barrier:
-            The barrier of the dihedral. Default is 1.00 kJ/mol.
+            The barrier height in kJ/mol.
         :param phase:
-            The phase of the dihedral. Default is 0.00 degrees.
+            The phase angle in degrees.
         :param periodicity:
             The periodicity of the dihedral. Default is 1.
         """
@@ -2982,10 +2996,13 @@ class MMForceFieldGenerator:
 
     def write_itp(self, itp_file, mol_name=None):
         """
-        Writes an ITP file with the original parameters.
+        Writes a GROMACS ITP file for the current force field.
 
         :param itp_file:
             The ITP file path.
+        :param mol_name:
+            The residue and molecule name written to the file. Defaults to
+            ``MOL``.
         """
 
         itp_filename = str(itp_file)
@@ -3399,11 +3416,9 @@ class MMForceFieldGenerator:
         :param mol_name:
             The name of the molecule.
         :param amber_ff:
-            The name of the Amber force field.
-        :param water_model:
-            The name of the water model.
+            Optional Amber force-field include name for the topology file.
         :param gro_precision:
-            The number of decimal places in gro file.
+            The number of decimal places in the GRO file.
         """
 
         if mol_name is None:
@@ -3419,12 +3434,12 @@ class MMForceFieldGenerator:
 
     def write_openmm_files(self, filename, mol_name=None):
         """
-        Writes all the needed files for a MD simulation with OpenMM.
+        Writes the XML and PDB files needed for an OpenMM simulation.
 
         :param filename:
-            The name of the molecule.
+            Base filename used for the generated files.
         :param mol_name:
-            The name of the molecule.
+            Molecule or residue name written to the output files.
         """
 
         if mol_name is None:
@@ -3439,12 +3454,12 @@ class MMForceFieldGenerator:
     @staticmethod
     def copy_file(src, dest):
         """
-        Copies file (from src to dest).
+        Copies a text file if the destination differs from the source.
 
         :param src:
-            The source of copy.
+            Source path.
         :param dest:
-            The destination of copy.
+            Destination path.
         """
 
         if (not dest.is_file()) or (not src.samefile(dest)):
@@ -3454,13 +3469,16 @@ class MMForceFieldGenerator:
 
     def validate_force_field(self, i, verbose=True):
         """
-        Validates force field by RMSD of dihedral potentials.
+        Compares MM and QM dihedral scans for one target dihedral.
 
         :param i:
             The index of the target dihedral.
+        :param verbose:
+            Whether to print progress information.
 
         :return:
-            A dictionary containing the results of validation.
+            A dictionary with the dihedral indices, scan angles, and relative
+            MM and QM scan energies in kJ/mol.
         """
 
         dih = self.target_dihedrals[i]
@@ -3499,6 +3517,11 @@ class MMForceFieldGenerator:
             The scanned geometries for this dihedral.
         :param angles:
             The scanned angles for this dihedral.
+        :param verbose:
+            Whether to print progress information.
+
+        :return:
+            A list of MM energies in kJ/mol corresponding to ``angles``.
         """
 
         # select scan angles and geometries from QM data
@@ -3534,7 +3557,10 @@ class MMForceFieldGenerator:
         :param molecule:
             The molecule.
         :param constraints:
-            The constraints.
+            A list of geometry constraints passed to the optimizer.
+
+        :return:
+            The final MM energy in Hartree.
         """
 
         mm_drv = MMDriver(self.comm, self.ostream)
@@ -3556,8 +3582,10 @@ class MMForceFieldGenerator:
         """
         Prints validation summary.
 
-        :param validation_result:
+        :param fitted_dihedral_results:
             The dictionary containing the result of validation.
+        :param verbose:
+            Whether to print the pointwise MM/QM comparison before the summary.
         """
 
         if verbose:
@@ -3593,10 +3621,12 @@ class MMForceFieldGenerator:
 
     def visualize(self, validation_result, show_diff=False):
         """
-        Visualizes dihedral potential.
+        Plots QM and MM dihedral potentials.
 
         :param validation_result:
             The dictionary containing the result of validation.
+        :param show_diff:
+            Whether to plot the QM-MM difference curve.
         """
 
         try:
@@ -3666,10 +3696,13 @@ class MMForceFieldGenerator:
 
     def get_included_file(self, top_fname):
         """
-        Gets the name of the included itp file.
+        Gets the ITP file included by a topology file.
 
         :param top_fname:
             The topology file.
+
+        :return:
+            The included ITP file path.
         """
 
         itp_file = None
@@ -3741,6 +3774,8 @@ class MMForceFieldGenerator:
             json_string)
 
     def print_bonds(self):
+        """Prints the bond parameters in a tabular format."""
+
         s = "Bonds: \n"
         s += f"{'Bond':>9} {'fc (kJ/mol nm^2)':>18} {'eq (nm)':>10} {'comment'}\n"
         for bond, params in self.bonds.items():
@@ -3749,6 +3784,8 @@ class MMForceFieldGenerator:
         self.ostream.flush()
 
     def print_angles(self):
+        """Prints the angle parameters in a tabular format."""
+
         s = "Angles: \n"
         s += f"{'Angle':>15} {'fc (kJ/mol rad^2)':>18} {'eq (rad)':>10} {'comment'}\n"
         for angle, params in self.angles.items():
@@ -3757,12 +3794,16 @@ class MMForceFieldGenerator:
         self.ostream.flush()
 
     def print_dihedrals(self):
+        """Prints the proper dihedral parameters in a tabular format."""
+
         s = "Proper dihedrals: \n"
         s += self.get_torsion_print_string(self.dihedrals)
         self.ostream.print_info(s)
         self.ostream.flush()
 
     def print_impropers(self):
+        """Prints the improper dihedral parameters in a tabular format."""
+
         s = "Improper dihedrals: \n"
         s += self.get_torsion_print_string(self.impropers)
         self.ostream.print_info(s)
@@ -3770,6 +3811,8 @@ class MMForceFieldGenerator:
 
     @staticmethod
     def get_torsion_print_string(torsions):
+        """Formats torsion parameters for the print helpers."""
+
         s = ""
         s += f"{'Torsion':>21} {'barrier (kJ/mol rad^2)':>22} {'phase (rad)':>11} {'periodicity':>12} {'comment'}\n"
         for torsion, params in torsions.items():

@@ -13,6 +13,24 @@ skip_multi_rank_raises = pytest.mark.skipif(
 
 class TestMMForceFieldGenerator:
 
+    @staticmethod
+    def _ethanol_molecule():
+
+        xyzstr = """10
+            xyz
+            C        1.560000    -0.075662     2.503629
+            C        1.255506     0.490597     1.343469
+            O        1.434318    -0.214973     0.154595
+            C        1.118147     0.362263    -1.104238
+            H        1.422185     0.469784     3.428142
+            H        1.948080    -1.085628     2.537131
+            H        0.867900     1.502691     1.326870
+            H        1.336865    -0.370909    -1.907478
+            H        1.732304     1.272846    -1.269421
+            H        0.040051     0.626884    -1.140597
+        """
+        return Molecule.read_xyz_string(xyzstr)
+
     @skip_multi_rank_raises
     def test_ffgen_rejects_isolated_water_without_explicit_water_model(self):
 
@@ -167,20 +185,7 @@ class TestMMForceFieldGenerator:
 
         pytest.importorskip('rdkit')
 
-        xyzstr = """10
-            xyz
-            C        1.560000    -0.075662     2.503629
-            C        1.255506     0.490597     1.343469
-            O        1.434318    -0.214973     0.154595
-            C        1.118147     0.362263    -1.104238
-            H        1.422185     0.469784     3.428142
-            H        1.948080    -1.085628     2.537131
-            H        0.867900     1.502691     1.326870
-            H        1.336865    -0.370909    -1.907478
-            H        1.732304     1.272846    -1.269421
-            H        0.040051     0.626884    -1.140597
-        """
-        mol = Molecule.read_xyz_string(xyzstr)
+        mol = self._ethanol_molecule()
 
         ff_gen = MMForceFieldGenerator()
         ff_gen.ostream.mute()
@@ -225,20 +230,7 @@ class TestMMForceFieldGenerator:
 
         pytest.importorskip('rdkit')
 
-        xyzstr = """10
-            xyz
-            C        1.560000    -0.075662     2.503629
-            C        1.255506     0.490597     1.343469
-            O        1.434318    -0.214973     0.154595
-            C        1.118147     0.362263    -1.104238
-            H        1.422185     0.469784     3.428142
-            H        1.948080    -1.085628     2.537131
-            H        0.867900     1.502691     1.326870
-            H        1.336865    -0.370909    -1.907478
-            H        1.732304     1.272846    -1.269421
-            H        0.040051     0.626884    -1.140597
-        """
-        mol = Molecule.read_xyz_string(xyzstr)
+        mol = self._ethanol_molecule()
 
         ff_gen = MMForceFieldGenerator()
         ff_gen.ostream.mute()
@@ -415,6 +407,42 @@ class TestMMForceFieldGenerator:
                            match='one-based atom indices must be greater than 0'):
             ff_gen.set_angle_params((1, -2, 3), {})
 
+    def test_ffgen_update_settings_resolves_local_gaff_paths(self, tmp_path):
+
+        ff_gen = MMForceFieldGenerator()
+        ff_gen.molecule_name = str(tmp_path / 'inputs' / 'ligand.inp')
+
+        force_field_file = tmp_path / 'inputs' / 'gaff2.dat'
+        force_field_file.parent.mkdir(parents=True)
+        force_field_file.write_text('; mock GAFF data\n')
+
+        ff_gen.update_settings({
+            'molecule_name': ff_gen.molecule_name,
+            'force_field_data': 'gaff2.dat',
+        })
+
+        assert ff_gen.force_field_data == str(force_field_file)
+        assert ff_gen.force_field_data_extension == str(
+            force_field_file.with_name('gaff2_extension.dat'))
+        assert ff_gen.resp_dict == {}
+
+        ff_gen.update_settings({'filename': 'ligand_from_filename'})
+
+        assert ff_gen.molecule_name == 'ligand_from_filename'
+
+    @skip_multi_rank_raises
+    def test_ffgen_update_settings_rejects_non_gaff_force_field(self, tmp_path):
+
+        ff_gen = MMForceFieldGenerator()
+        ff_gen.molecule_name = str(tmp_path / 'inputs' / 'ligand.inp')
+
+        force_field_file = tmp_path / 'inputs' / 'amber99sb.dat'
+        force_field_file.parent.mkdir(parents=True)
+        force_field_file.write_text('; unsupported FF data\n')
+
+        with pytest.raises(AssertionError, match='Only GAFF is supported'):
+            ff_gen.update_settings({'force_field_data': 'amber99sb.dat'})
+
     @skip_multi_rank_raises
     def test_ffgen_rejects_malformed_scan_files(self, tmp_path):
 
@@ -439,10 +467,10 @@ class TestMMForceFieldGenerator:
 
         missing_scan_file = tmp_path / '1-2-3-4.xyz'
         missing_scan_file.write_text("""2
-comment
-H 0.0 0.0 0.0
-H 0.0 0.0 0.7
-""")
+        comment
+        H 0.0 0.0 0.0
+        H 0.0 0.0 0.7
+        """)
 
         with pytest.raises(AssertionError,
                            match='scan file does not contain any Scan records'):
@@ -468,11 +496,129 @@ H 0.0 0.0 0.7
 
         xyz_file = tmp_path / 'scan.xyz'
         xyz_file.write_text("""2
-comment
-H 0.0 0.0 0.0
-H 0.0 0.0 0.7
-""")
+        comment
+        H 0.0 0.0 0.0
+        H 0.0 0.0 0.7
+        """)
 
         with pytest.raises(AssertionError,
                            match='does not contain any Scan records'):
             ff_gen.read_qm_scan_xyz_files([xyz_file.name], inp_dir=tmp_path)
+
+    def test_ffgen_file_writers_use_default_names_and_copy_file_creates_parent(
+            self, tmp_path):
+
+        ff_gen = MMForceFieldGenerator()
+        ff_gen.molecule_name = str(tmp_path / 'ethanol_input.xyz')
+        ff_gen.molecule = self._ethanol_molecule()
+        ff_gen.atoms = {
+            0: {
+                'type': 'c3',
+                'name': 'C1',
+                'mass': 12.011,
+                'charge': -0.2,
+                'sigma': 0.34,
+                'epsilon': 0.11,
+                'equivalent_atom': 1,
+            },
+            1: {
+                'type': 'hc',
+                'name': 'H1',
+                'mass': 1.008,
+                'charge': 0.2,
+                'sigma': 0.25,
+                'epsilon': 0.03,
+                'equivalent_atom': 1,
+            },
+        }
+        ff_gen.unique_atom_types = ['c3', 'hc']
+        ff_gen.bonds = {
+            (0, 1): {
+                'type': 'harmonic',
+                'force_constant': 3.1e5,
+                'equilibrium': 0.109,
+                'comment': 'C-H',
+            },
+        }
+        ff_gen.angles = {}
+        ff_gen.dihedrals = {}
+        ff_gen.impropers = {}
+        ff_gen.pairs = []
+
+        itp_file = tmp_path / 'defaults.itp'
+        gro_file = tmp_path / 'defaults.gro'
+        pdb_file = tmp_path / 'defaults.pdb'
+
+        ff_gen.write_itp(itp_file)
+        ff_gen.write_gro(gro_file)
+        ff_gen.write_pdb(pdb_file)
+
+        assert 'MOL' in itp_file.read_text()
+        assert 'GRO file of MOL' in gro_file.read_text()
+        assert 'PDB file of ethanol_input' in pdb_file.read_text()
+
+        src = tmp_path / 'copied-source.txt'
+        src.write_text('copied content')
+        dest = tmp_path / 'nested' / 'dir' / 'copied-dest.txt'
+
+        MMForceFieldGenerator.copy_file(src, dest)
+
+        assert dest.read_text() == 'copied content'
+
+    def test_ffgen_add_dihedral_promotes_existing_term_to_multiple(self):
+
+        pytest.importorskip('rdkit')
+
+        ff_gen = MMForceFieldGenerator()
+        ff_gen.ostream.mute()
+        ff_gen.create_topology(self._ethanol_molecule(), resp=False)
+
+        original_dihedral = ff_gen.get_dihedral_params((6, 1, 2, 7))
+
+        assert original_dihedral['multiple'] is False
+
+        ff_gen.add_dihedral((7, 2, 1, 6), barrier=2.5, phase=180.0, periodicity=3)
+
+        updated_dihedral = ff_gen.get_dihedral_params((6, 1, 2, 7))
+
+        assert updated_dihedral['multiple'] is True
+        assert updated_dihedral['barrier'][0] == original_dihedral['barrier']
+        assert updated_dihedral['phase'][0] == original_dihedral['phase']
+        assert updated_dihedral['periodicity'][0] == original_dihedral[
+            'periodicity']
+        assert updated_dihedral['comment'][0] == original_dihedral['comment']
+        assert updated_dihedral['barrier'][-1] == 2.5
+        assert updated_dihedral['phase'][-1] == 180.0
+        assert updated_dihedral['periodicity'][-1] == -3
+        assert updated_dihedral['comment'][-1] == 'Added 6-1-2-7 dihedral'
+
+    def test_ffgen_get_atom_names_gets_unique_suffixes(self):
+
+        ff_gen = MMForceFieldGenerator()
+        ff_gen.molecule = Molecule.read_xyz_string("""5
+        labels
+        C 0.0 0.0 0.0
+        H 0.0 0.0 1.0
+        H 1.0 0.0 0.0
+        O 0.0 1.0 0.0
+        N 1.0 1.0 1.0
+        """)
+
+        assert ff_gen.get_atom_names() == ['C', 'H1', 'H2', 'O', 'N']
+
+    @skip_multi_rank_raises
+    def test_ffgen_get_included_file_requires_include_directive(self, tmp_path):
+
+        ff_gen = MMForceFieldGenerator()
+
+        top_file = tmp_path / 'molecule.top'
+        top_file.write_text('#include "molecule.itp"\n[ system ]\nTest\n')
+
+        assert ff_gen.get_included_file(str(top_file)) == str(tmp_path /
+                                                               'molecule.itp')
+
+        missing_include_top = tmp_path / 'missing.top'
+        missing_include_top.write_text('[ system ]\nTest\n')
+
+        with pytest.raises(AssertionError, match='could not find included file'):
+            ff_gen.get_included_file(str(missing_include_top))
