@@ -10,7 +10,7 @@ from veloxchem.mpitask import MpiTask
 
 class TestMp2Driver:
 
-    def run_mp2(self, task, scf_type, e_ref, mp2_type, tol):
+    def run_mp2(self, task, scf_type, e_ref, mp2_type, tol, n_frozen=0):
 
         if scf_type.lower() == 'restricted':
             scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
@@ -19,6 +19,7 @@ class TestMp2Driver:
         scf_results = scf_drv.compute(task.molecule, task.ao_basis)
 
         mp2_drv = Mp2Driver(task.mpi_comm, task.ostream)
+        mp2_drv.n_frozen = n_frozen
         if mp2_type.lower() == 'conventional':
             mp2_drv.conventional = True
         else:
@@ -51,6 +52,30 @@ class TestMp2Driver:
         e_ref = -0.28529088
 
         self.run_mp2(task, 'restricted', e_ref, 'fockdriven', 1.0e-8)
+
+    @pytest.mark.solvers
+    def test_mp2_conventional_frozen(self):
+
+        here = Path(__file__).parent
+        inpfile = str(here / 'data' / 'h2se.inp')
+
+        task = MpiTask([inpfile, None])
+
+        e_ref = -0.24787025
+
+        self.run_mp2(task, 'restricted', e_ref, 'conventional', 1.0e-8, None)
+
+    @pytest.mark.solvers
+    def test_mp2_fockdriven_frozen(self):
+
+        here = Path(__file__).parent
+        inpfile = str(here / 'data' / 'h2se.inp')
+
+        task = MpiTask([inpfile, None])
+
+        e_ref = -0.24787025
+
+        self.run_mp2(task, 'restricted', e_ref, 'fockdriven', 1.0e-8, None)
 
     @pytest.mark.solvers
     def test_ump2_conventional(self):

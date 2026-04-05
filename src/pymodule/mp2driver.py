@@ -34,6 +34,7 @@ from mpi4py import MPI
 import numpy as np
 import math
 import sys
+from collections import Counter
 
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import mpi_master, mat_t
@@ -99,6 +100,8 @@ class Mp2Driver:
         # size of subcommunicator
         self.comm_size = 1
 
+        self.n_frozen = None
+
         # output stream
         self.ostream = ostream
 
@@ -122,6 +125,7 @@ class Mp2Driver:
             'eri_thresh': 'float',
             'comm_size': 'int',
             'conventional': 'bool',
+            'n_frozen': 'int',
         }
 
         parse_input(self, mp2_keywords, mp2_dict)
@@ -234,6 +238,10 @@ class Mp2Driver:
             mol_orbs = MolecularOrbitals()
         mol_orbs = mol_orbs.broadcast(self.comm, root=mpi_master())
 
+        n_frozen = self.n_frozen
+        if n_frozen is None:
+            n_frozen = self.default_frozen(molecule, basis)
+
         # sanity check
 
         molecule_sanity_check(molecule)
@@ -246,6 +254,10 @@ class Mp2Driver:
         assert_msg_critical(
             mol_orbs.get_orbitals_type() != molorb.restopen,
             'Mp2Driver.compute: Restricted open-shell MP2 not implemented')
+
+        assert_msg_critical(
+             0 =< n_frozen <= molecule.number_of_beta_occupied_orbitals(basis),
+             'Mp2Driver.compute: Invalid number of frozen orbitals')
 
         # compute MP2 in memory
 
@@ -261,12 +273,12 @@ class Mp2Driver:
 
                 orb_ene = mol_orbs.ea_to_numpy()
                 nocc = molecule.number_of_alpha_occupied_orbitals(basis)
-                eocc = orb_ene[:nocc]
+                eocc = orb_ene[n_frozen:nocc]
                 evir = orb_ene[nocc:]
                 e_vv = evir.reshape(-1, 1) + evir
 
                 phys_oovv = moints_drv.compute_in_memory(
-                    molecule, basis, mol_orbs, 'phys_oovv')
+                    molecule, basis, mol_orbs, 'phys_oovv', n_frozen=n_frozen)
                 for i in range(phys_oovv.shape[0]):
                     for j in range(phys_oovv.shape[1]):
                         ab = phys_oovv[i, j, :, :]
@@ -287,10 +299,10 @@ class Mp2Driver:
                 nocc_a = molecule.number_of_alpha_occupied_orbitals(basis)
                 nocc_b = molecule.number_of_beta_occupied_orbitals(basis)
 
-                eocc_a = orb_ene_a[:nocc_a]
+                eocc_a = orb_ene_a[n_frozen:nocc_a]
                 evir_a = orb_ene_a[nocc_a:]
 
-                eocc_b = orb_ene_b[:nocc_b]
+                eocc_b = orb_ene_b[n_frozen:nocc_b]
                 evir_b = orb_ene_b[nocc_b:]
 
                 e_vv_aa = evir_a.reshape(-1, 1) + evir_a
@@ -298,11 +310,11 @@ class Mp2Driver:
                 e_vv_ab = evir_a.reshape(-1, 1) + evir_b
 
                 phys_oovv_aaaa = moints_drv.compute_in_memory(
-                    molecule, basis, mol_orbs, 'phys_oovv', 'aaaa')
+                    molecule, basis, mol_orbs, 'phys_oovv', 'aaaa', n_frozen=n_frozen)
                 phys_oovv_bbbb = moints_drv.compute_in_memory(
-                    molecule, basis, mol_orbs, 'phys_oovv', 'bbbb')
+                    molecule, basis, mol_orbs, 'phys_oovv', 'bbbb', n_frozen=n_frozen)
                 phys_oovv_abab = moints_drv.compute_in_memory(
-                    molecule, basis, mol_orbs, 'phys_oovv', 'abab')
+                    molecule, basis, mol_orbs, 'phys_oovv', 'abab', n_frozen=n_frozen)
 
                 for i in range(phys_oovv_aaaa.shape[0]):
                     for j in range(phys_oovv_aaaa.shape[1]):
@@ -348,6 +360,10 @@ class Mp2Driver:
             mol_orbs = MolecularOrbitals()
         mol_orbs = mol_orbs.broadcast(self.comm, mpi_master())
 
+        n_frozen = self.n_frozen
+        if n_frozen is None:
+            n_frozen = self.default_frozen(molecule, basis)
+
         # sanity check
 
         molecule_sanity_check(molecule)
@@ -360,6 +376,10 @@ class Mp2Driver:
         assert_msg_critical(
             mol_orbs.get_orbitals_type() != molorb.restopen,
             'Mp2Driver.compute: Restricted open-shell MP2 not implemented')
+
+        assert_msg_critical(
+             0 =< n_frozen <= molecule.number_of_beta_occupied_orbitals(basis),
+             'Mp2Driver.compute: Invalid number of frozen orbitals')
 
         # screening
 
@@ -406,14 +426,17 @@ class Mp2Driver:
             mo_a = mol_orbs.alpha_to_numpy()
             mo_b = mol_orbs.beta_to_numpy()
 
-            mo_occ_a = mo_a[:, :nocc_a].copy()
+            mo_occ_a = mo_a[:, n_frozen:nocc_a].copy()
             mo_vir_a = mo_a[:, nocc_a:].copy()
 
-            mo_occ_b = mo_b[:, :nocc_b].copy()
+            mo_occ_b = mo_b[:, n_frozen:nocc_b].copy()
             mo_vir_b = mo_b[:, nocc_b:].copy()
 
             orb_ene_a = mol_orbs.ea_to_numpy()
             orb_ene_b = mol_orbs.eb_to_numpy()
+
+            eocc_a = orb_ene_a[n_frozen:]
+            eocc_b = orb_ene_b[n_frozen:]
 
             evir_a = orb_ene_a[nocc_a:]
             evir_b = orb_ene_b[nocc_b:]
@@ -422,31 +445,34 @@ class Mp2Driver:
             evv_bb = evir_b.reshape(-1, 1) + evir_b
             evv_ab = evir_a.reshape(-1, 1) + evir_b
 
+            n_corr_a = nocc_a - n_frozen
+            n_corr_b = nocc_b - n_frozen
+
             # restricted
 
             if mol_orbs.get_orbitals_type() == molorb.rest:
 
                 mo_ints_ids = [((i, j), 'aa')
-                               for i in range(nocc_a)
-                               for j in range(i + 1, nocc_a)]
-                mo_ints_ids += [((i, i), 'aa') for i in range(nocc_a)]
+                               for i in range(n_corr_a)
+                               for j in range(i + 1, n_corr_a)]
+                mo_ints_ids += [((i, i), 'aa') for i in range(n_corr_a)]
 
             # unrestricted
 
             elif mol_orbs.get_orbitals_type() == molorb.unrest:
 
                 mo_ints_ids = [((i, j), 'aa')
-                               for i in range(nocc_a)
-                               for j in range(i + 1, nocc_a)]
-                mo_ints_ids += [((i, i), 'aa') for i in range(nocc_a)]
+                               for i in range(n_corr_a)
+                               for j in range(i + 1, n_corr_a)]
+                mo_ints_ids += [((i, i), 'aa') for i in range(n_corr_a)]
 
                 mo_ints_ids += [((i, j), 'bb')
-                                for i in range(nocc_b)
-                                for j in range(i + 1, nocc_b)]
-                mo_ints_ids += [((i, i), 'bb') for i in range(nocc_b)]
+                                for i in range(n_corr_b)
+                                for j in range(i + 1, n_corr_b)]
+                mo_ints_ids += [((i, i), 'bb') for i in range(n_corr_b)]
 
                 mo_ints_ids += [
-                    ((i, j), 'ab') for i in range(nocc_a) for j in range(nocc_b)
+                    ((i, j), 'ab') for i in range(n_corr_a) for j in range(n_corr_b)
                 ]
 
             self.print_header(len(mo_ints_ids), batch_size)
@@ -495,19 +521,19 @@ class Mp2Driver:
                 if local_master:
 
                     if spin == 'aa':
-                        mo_ij_aa = np.zeros((nocc_a, nocc_a))
+                        mo_ij_aa = np.zeros((n_corr_a, n_corr_a))
                         mo_ij_aa[i, j] = 1.0
                         ao_dens = np.linalg.multi_dot(
                             [mo_occ_a, mo_ij_aa, mo_occ_a.T])
 
                     elif spin == 'bb':
-                        mo_ij_bb = np.zeros((nocc_b, nocc_b))
+                        mo_ij_bb = np.zeros((n_corr_b, n_corr_b))
                         mo_ij_bb[i, j] = 1.0
                         ao_dens = np.linalg.multi_dot(
                             [mo_occ_b, mo_ij_bb, mo_occ_b.T])
 
                     elif spin == 'ab':
-                        mo_ij_ab = np.zeros((nocc_a, nocc_b))
+                        mo_ij_ab = np.zeros((n_corr_a, n_corr_b))
                         mo_ij_ab[i, j] = 1.0
                         ao_dens = np.linalg.multi_dot(
                             [mo_occ_a, mo_ij_ab, mo_occ_b.T])
@@ -550,7 +576,7 @@ class Mp2Driver:
                     for ind, ((i, j), spin) in enumerate(batch_ids):
                         f_aa = fock_arrays[ind]
                         vv = np.linalg.multi_dot([mo_vir_a.T, f_aa, mo_vir_a])
-                        de = orb_ene_a[i] + orb_ene_a[j] - evv_aa
+                        de = eocc_a[i] + eocc_a[j] - evv_aa
                         e_mp2 += np.sum(vv * (2.0 * vv - vv.T) / de)
                         if i != j:
                             e_mp2 += np.sum(vv.T * (2.0 * vv.T - vv) / de)
@@ -564,7 +590,7 @@ class Mp2Driver:
                             f_aa = fock_arrays[ind]
                             vv = np.linalg.multi_dot(
                                 [mo_vir_a.T, f_aa, mo_vir_a])
-                            de = orb_ene_a[i] + orb_ene_a[j] - evv_aa
+                            de = eocc_a[i] + eocc_a[j] - evv_aa
                             e_mp2 += 0.5 * np.sum(vv * (vv - vv.T) / de)
                             if i != j:
                                 e_mp2 += 0.5 * np.sum(vv.T * (vv.T - vv) / de)
@@ -573,7 +599,7 @@ class Mp2Driver:
                             f_bb = fock_arrays[ind]
                             vv = np.linalg.multi_dot(
                                 [mo_vir_b.T, f_bb, mo_vir_b])
-                            de = orb_ene_b[i] + orb_ene_b[j] - evv_bb
+                            de = eocc_b[i] + eocc_b[j] - evv_bb
                             e_mp2 += 0.5 * np.sum(vv * (vv - vv.T) / de)
                             if i != j:
                                 e_mp2 += 0.5 * np.sum(vv.T * (vv.T - vv) / de)
@@ -582,7 +608,7 @@ class Mp2Driver:
                             f_ab = fock_arrays[ind]
                             vv = np.linalg.multi_dot(
                                 [mo_vir_a.T, f_ab, mo_vir_b])
-                            de = orb_ene_a[i] + orb_ene_b[j] - evv_ab
+                            de = eocc_a[i] + eocc_b[j] - evv_ab
                             e_mp2 += np.sum(vv * vv / de)
 
         if local_master:
@@ -628,3 +654,38 @@ class Mp2Driver:
         self.ostream.print_header(cur_str.ljust(str_width))
         self.ostream.print_blank()
         self.ostream.flush()
+
+    def default_frozen(self, molecule, basis):
+        """
+        Select the default number of frozen orbitals
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        """
+        # Somewhat arbitrary, based on ORCA
+        CORE_RULES = [
+            (4,  0),   # H-Be: no core
+            (12, 1),   # B–Mg: 1s
+            (30, 5),   # Al-Zn: 1s2s2p
+            (38, 9),   # Ga-Sr: 1s2s2p3s3p
+            (48, 14),  # Y-Cd:  1s2s2p3s3p3d
+            (70, 18),  # In-Yb: 1s2s2p3s3p3d4s4p
+            (80, 23),  # Lu-Hg: 1s2s2p3s3p3d4s4p4d
+            (103, 34), # Tl-Lr: 1s2s2p3s3p3d4s4p4d4f5s5p
+            (112, 50),# Rf-Cn: 1s2s2p3s3p3d4s4p4d4f5s5p5d5f6s6p
+        ]
+
+        atoms_id = np.rint(molecule.get_element_ids()).astype(int)
+        mol_dict = Counter(atoms_id)
+
+        total = 0
+        for atom, count in mol_dict.items():
+            for (limit, cores) in CORE_RULES:
+                if atom <= limit:
+                    total += cores * count
+                    break
+            assert_msg_critical(atom <= CORE_RULES[-1][0], f'No default core number of element {atom}')
+
+        return total - sum(basis.get_number_of_ecp_core_electrons())//2
