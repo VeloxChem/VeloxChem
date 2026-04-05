@@ -414,3 +414,65 @@ class TestMMForceFieldGenerator:
         with pytest.raises(AssertionError,
                            match='one-based atom indices must be greater than 0'):
             ff_gen.set_angle_params((1, -2, 3), {})
+
+    @skip_multi_rank_raises
+    def test_ffgen_rejects_malformed_scan_files(self, tmp_path):
+
+        xyzstr = """10
+            xyz
+            C        1.560000    -0.075662     2.503629
+            C        1.255506     0.490597     1.343469
+            O        1.434318    -0.214973     0.154595
+            C        1.118147     0.362263    -1.104238
+            H        1.422185     0.469784     3.428142
+            H        1.948080    -1.085628     2.537131
+            H        0.867900     1.502691     1.326870
+            H        1.336865    -0.370909    -1.907478
+            H        1.732304     1.272846    -1.269421
+            H        0.040051     0.626884    -1.140597
+        """
+        mol = Molecule.read_xyz_string(xyzstr)
+
+        ff_gen = MMForceFieldGenerator()
+        ff_gen.ostream.mute()
+        ff_gen.create_topology(mol, resp=False)
+
+        missing_scan_file = tmp_path / '1-2-3-4.xyz'
+        missing_scan_file.write_text("""2
+comment
+H 0.0 0.0 0.0
+H 0.0 0.0 0.7
+""")
+
+        with pytest.raises(AssertionError,
+                           match='scan file does not contain any Scan records'):
+            ff_gen.reparameterize_dihedrals((1, 2),
+                                            scan_file=str(missing_scan_file))
+
+        wrong_name_file = tmp_path / 'wrong-name.xyz'
+        wrong_name_file.write_text(
+            'Scan Cycle 1/1 ; Dihedral 6-1-2-7 = 0.00 ; Iteration 1 Energy -1.0\n'
+        )
+
+        with pytest.raises(AssertionError,
+                           match='scan file name does not match dihedral indices'):
+            ff_gen.reparameterize_dihedrals((1, 2),
+                                            scan_file=str(wrong_name_file))
+
+    @skip_multi_rank_raises
+    def test_ffgen_read_qm_scan_xyz_files_rejects_missing_scan_records(
+            self, tmp_path):
+
+        ff_gen = MMForceFieldGenerator()
+        ff_gen.ostream.mute()
+
+        xyz_file = tmp_path / 'scan.xyz'
+        xyz_file.write_text("""2
+comment
+H 0.0 0.0 0.0
+H 0.0 0.0 0.7
+""")
+
+        with pytest.raises(AssertionError,
+                           match='does not contain any Scan records'):
+            ff_gen.read_qm_scan_xyz_files([xyz_file.name], inp_dir=tmp_path)

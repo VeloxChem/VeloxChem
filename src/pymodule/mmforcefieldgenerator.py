@@ -388,6 +388,11 @@ class MMForceFieldGenerator:
             [i + 1, j + 1, k + 1, l + 1] for i, j, k, l in dihedral_indices
         ]
 
+        assert_msg_critical(
+            len(dihedral_indices) > 0,
+            'MMForceFieldGenerator.scan_dihedral: rotatable_bond was not '
+            'found among dihedrals')
+
         # Print a header
         header = 'VeloxChem Dihedral Scan'
         self.ostream.print_header(header)
@@ -499,20 +504,31 @@ class MMForceFieldGenerator:
 
         # double check dihedral angle if scan file is provided
         if scan_file is not None:
-            with open(scan_file, 'r') as fh:
-                for line in fh:
-                    if line.startswith('Scan'):
-                        # Scan Cycle 1/19 ; Dihedral 3-4-6-7 = 0.00 ; Iteration 17 Energy -1089.05773546
-                        # Extract the dihedral indices
-                        scanned_dih = [
-                            int(i) for i in (
-                                line.split('Dihedral')[1].split()[0].split('-'))
-                        ]
-                        assert_msg_critical(
-                            sorted(scanned_dih[1:3]) == sorted(rotatable_bond),
-                            'MMForceFieldGenerator.reparameterize_dihedrals: ' +
-                            'The rotatable bond does not match the scan file')
-                        break
+            scan_lines = None
+            scan_path = Path(scan_file)
+            if self.rank == mpi_master():
+                with scan_path.open('r') as fh:
+                    scan_lines = fh.readlines()
+            scan_lines = self.comm.bcast(scan_lines, root=mpi_master())
+
+            scanned_dih = None
+            for line in scan_lines:
+                if line.startswith('Scan'):
+                    # Scan Cycle 1/19 ; Dihedral 3-4-6-7 = 0.00 ; Iteration 17 Energy -1089.05773546
+                    # Extract the dihedral indices
+                    scanned_dih = [
+                        int(i)
+                        for i in line.split('Dihedral')[1].split()[0].split('-')
+                    ]
+                    assert_msg_critical(
+                        sorted(scanned_dih[1:3]) == sorted(rotatable_bond),
+                        'MMForceFieldGenerator.reparameterize_dihedrals: ' +
+                        'The rotatable bond does not match the scan file')
+                    break
+            assert_msg_critical(
+                scanned_dih is not None,
+                'MMForceFieldGenerator.reparameterize_dihedrals: scan file '
+                'does not contain any Scan records')
 
         # Identify the dihedral indices for the rotatable bond
         dihedral_indices = []
@@ -530,6 +546,11 @@ class MMForceFieldGenerator:
         dihedral_indices_one_based = [
             [i + 1, j + 1, k + 1, l + 1] for i, j, k, l in dihedral_indices
         ]
+
+        assert_msg_critical(
+            len(dihedral_indices) > 0,
+            'MMForceFieldGenerator.reparameterize_dihedrals: rotatable_bond '
+            'was not found among dihedrals')
 
         # Print a header
         header = 'VeloxChem Dihedral Reparameterization'
@@ -551,9 +572,11 @@ class MMForceFieldGenerator:
                     f"{scanned_dih[0]}-{scanned_dih[1]}-{scanned_dih[2]}-{scanned_dih[3]}",
                     f"{scanned_dih[3]}-{scanned_dih[2]}-{scanned_dih[1]}-{scanned_dih[0]}"
             ]:
-                raise ValueError(
-                    'The scan file name does not match the dihedral indices. Format should be 1-2-3-4.xyz'
-                )
+                assert_msg_critical(
+                    False,
+                    'MMForceFieldGenerator.reparameterize_dihedrals: scan '
+                    'file name does not match dihedral indices. Format '
+                    'should be 1-2-3-4.xyz')
             self.read_qm_scan_xyz_files([scan_file])
         else:
             # process scan results
@@ -694,8 +717,7 @@ class MMForceFieldGenerator:
             residuals = (qm_energies_rel - mm_energies_fit_rel)
             residuals += barriers_to_fit[-1]
 
-            # Return the squared residuals for optimization
-            return residuals**2
+            return residuals
 
         # Print initial barriers
         self.ostream.print_info(
@@ -923,6 +945,7 @@ class MMForceFieldGenerator:
             # read energies and dihedral angles
 
             pattern = re.compile(r'\AScan')
+            dih_inds = None
 
             for line in xyz_lines:
                 if re.search(pattern, line):
@@ -933,6 +956,10 @@ class MMForceFieldGenerator:
                         for i in line.split('Dihedral')[1].split()[0].split('-')
                     ]
                     dih_inds = [i, j, k, l] if i < l else [l, k, j, i]
+            assert_msg_critical(
+                dih_inds is not None,
+                'MMForceFieldGenerator.read_qm_scan_xyz_files: QM scan file '
+                f'{xyz_fname} does not contain any Scan records')
             self.scan_energies.append(energies)
             self.scan_dih_angles.append(dih_angles)
             self.target_dihedrals.append(dih_inds)
