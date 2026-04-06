@@ -11,6 +11,7 @@ from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfgradientdriver import ScfGradientDriver
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.scfhessiandriver import ScfHessianDriver
+from veloxchem.dftutils import get_default_grid_level
 
 
 @pytest.mark.solvers
@@ -62,6 +63,17 @@ class TestScfHessianDriverMiscellaneous:
         return molecule, basis
 
     @staticmethod
+    def get_au2_molecule_and_basis():
+
+        molecule = Molecule.read_xyz_string("""2
+        au2
+        Au   0.000000    0.000000    0.000000
+        Au   0.000000    0.000000    2.800000
+        """)
+        basis = MolecularBasis.read(molecule, 'def2-svp', ostream=None)
+        return molecule, basis
+
+    @staticmethod
     def get_embedded_water_molecule_and_basis():
 
         molecule = Molecule.read_xyz_string("""3
@@ -88,8 +100,7 @@ class TestScfHessianDriverMiscellaneous:
         scf_drv = self.run_restricted_scf(molecule, basis)
 
         hess_drv = ScfHessianDriver(scf_drv)
-        hess_drv.update_settings({'xcfun': 'hf'},
-                                 hess_dict={'numerical': 'no'})
+        hess_drv.update_settings({'xcfun': 'hf'}, hess_dict={'numerical': 'no'})
 
         assert hess_drv.cphf_dict == {}
 
@@ -202,7 +213,7 @@ class TestScfHessianDriverMiscellaneous:
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='skip pytest.raises for multiple MPI processes')
-    def test_determine_xc_hessian_grid_level_rejects_unsupported_cases(self):
+    def test_determine_xc_hessian_grid_level_rejects_ecp_m06_case(self):
 
         scf_drv = ScfRestrictedDriver()
         scf_drv.ostream.mute()
@@ -210,14 +221,124 @@ class TestScfHessianDriverMiscellaneous:
 
         agcl_molecule, agcl_basis = self.get_agcl_molecule_and_basis()
         scf_drv.xcfun = parse_xc_func('M06')
-        with pytest.raises(AssertionError, match='is not supported'):
-            hess_drv._determine_xc_hessian_grid_level(agcl_molecule,
-                                                      agcl_basis,
+        with pytest.raises(AssertionError,
+                           match=r'Hessian calculation with M06 functional and '
+                           r'effective core potential is not supported'):
+            hess_drv._determine_xc_hessian_grid_level(agcl_molecule, agcl_basis,
                                                       6)
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    def test_determine_xc_hessian_grid_level_rejects_all_ecp_m06_case(self):
+
+        au2_molecule, au2_basis = self.get_au2_molecule_and_basis()
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_drv.xcfun = parse_xc_func('M06')
+
+        hess_drv = ScfHessianDriver(scf_drv)
+
+        with pytest.raises(AssertionError,
+                           match=r'Hessian calculation with M06 functional and '
+                           r'effective core potential is not supported'):
+            hess_drv._determine_xc_hessian_grid_level(au2_molecule, au2_basis,
+                                                      6)
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    def test_determine_xc_hessian_grid_level_rejects_scan_case(self):
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+        hess_drv = ScfHessianDriver(scf_drv)
 
         h2o_molecule, h2o_basis = self.get_h2o_molecule_and_basis()
         scf_drv.xcfun = parse_xc_func('SCAN')
-        with pytest.raises(AssertionError, match='is not supported'):
-            hess_drv._determine_xc_hessian_grid_level(h2o_molecule,
-                                                      h2o_basis,
+        with pytest.raises(AssertionError,
+                           match=r'Hessian calculation with SCAN functional '
+                           r'and max element id 8 is not supported'):
+            hess_drv._determine_xc_hessian_grid_level(h2o_molecule, h2o_basis,
                                                       7)
+
+    def test_determine_xc_hessian_grid_level_with_all_ecp_case(self):
+
+        au2_molecule, au2_basis = self.get_au2_molecule_and_basis()
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_drv.xcfun = parse_xc_func('PBE')
+        scf_drv.compute(au2_molecule, au2_basis)
+
+        hess_drv = ScfHessianDriver(scf_drv)
+        hess_drv.ostream.mute()
+        default_grid_level = get_default_grid_level(scf_drv.xcfun)
+
+        assert hess_drv._determine_xc_hessian_grid_level(
+            au2_molecule, au2_basis, default_grid_level) == 6
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    def test_determine_xc_hessian_grid_level_rejects_pbe_max_elem_id_37_case(
+            self):
+
+        class FakeMolecule:
+
+            @staticmethod
+            def get_identifiers():
+                return [37]
+
+        class FakeBasis:
+
+            @staticmethod
+            def get_number_of_ecp_core_electrons():
+                return [0]
+
+            @staticmethod
+            def has_ecp():
+                return False
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_drv.xcfun = parse_xc_func('PBE')
+        hess_drv = ScfHessianDriver(scf_drv)
+
+        with pytest.raises(
+                AssertionError,
+                match=r'Hessian calculation with PBE functional and max '
+                r'element id 37 is not supported'):
+            hess_drv._determine_xc_hessian_grid_level(FakeMolecule(),
+                                                      FakeBasis(), 4)
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    def test_determine_xc_hessian_grid_level_rejects_m06_max_elem_id_19_case(
+            self):
+
+        class FakeMolecule:
+
+            @staticmethod
+            def get_identifiers():
+                return [19]
+
+        class FakeBasis:
+
+            @staticmethod
+            def get_number_of_ecp_core_electrons():
+                return [0]
+
+            @staticmethod
+            def has_ecp():
+                return False
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_drv.xcfun = parse_xc_func('M06')
+        hess_drv = ScfHessianDriver(scf_drv)
+
+        with pytest.raises(
+                AssertionError,
+                match=r'Hessian calculation with M06 functional and max '
+                r'element id 19 is not supported'):
+            hess_drv._determine_xc_hessian_grid_level(FakeMolecule(),
+                                                      FakeBasis(), 5)
