@@ -1,3 +1,9 @@
+import matplotlib
+
+# Use a non-interactive backend so plot tests run reliably in headless environments.
+matplotlib.use('Agg')
+
+
 def pytest_configure(config):
     config.addinivalue_line(
         "markers",

@@ -305,8 +305,6 @@ class TestScfVibrationalAnalysisDriver:
     def test_vibrational_analysis_plot_and_print_info_helpers(
             self, monkeypatch, capsys):
 
-        import matplotlib
-        matplotlib.use('Agg')
         import matplotlib.pyplot as plt
 
         vib_drv = self._get_synthetic_vibanalysis()
