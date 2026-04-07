@@ -1,3 +1,5 @@
+from contextlib import redirect_stdout
+import io
 from pathlib import Path
 import sys
 import types
@@ -397,28 +399,31 @@ class TestScfVibrationalAnalysisDriver:
         assert fake_view.zoomed is True
         assert fake_view.shown is True
 
-        with pytest.raises(AssertionError, match='No IR intensities available'):
-            vib_drv.print_info(
-                {
-                    'molecule_xyz_string': molecule.get_xyz_string(),
-                    'normal_modes': vib_drv.normal_modes,
-                    'vib_frequencies': vib_drv.vib_frequencies,
-                    'ir_intensities': None,
-                    'raman_activities': vib_drv.raman_activities,
-                },
-                info_type='ir')
+        with redirect_stdout(io.StringIO()):
+            with pytest.raises(AssertionError,
+                               match='No IR intensities available'):
+                vib_drv.print_info(
+                    {
+                        'molecule_xyz_string': molecule.get_xyz_string(),
+                        'normal_modes': vib_drv.normal_modes,
+                        'vib_frequencies': vib_drv.vib_frequencies,
+                        'ir_intensities': None,
+                        'raman_activities': vib_drv.raman_activities,
+                    },
+                    info_type='ir')
 
-        with pytest.raises(AssertionError,
-                           match='No Raman activities available'):
-            vib_drv.print_info(
-                {
-                    'molecule_xyz_string': molecule.get_xyz_string(),
-                    'normal_modes': vib_drv.normal_modes,
-                    'vib_frequencies': vib_drv.vib_frequencies,
-                    'ir_intensities': vib_drv.ir_intensities,
-                    'raman_activities': None,
-                },
-                info_type='raman')
+        with redirect_stdout(io.StringIO()):
+            with pytest.raises(AssertionError,
+                               match='No Raman activities available'):
+                vib_drv.print_info(
+                    {
+                        'molecule_xyz_string': molecule.get_xyz_string(),
+                        'normal_modes': vib_drv.normal_modes,
+                        'vib_frequencies': vib_drv.vib_frequencies,
+                        'ir_intensities': vib_drv.ir_intensities,
+                        'raman_activities': None,
+                    },
+                    info_type='raman')
 
         with pytest.raises(AssertionError, match='Invalid plot type'):
             vib_drv.plot(
@@ -430,16 +435,17 @@ class TestScfVibrationalAnalysisDriver:
                 },
                 plot_type='unsupported')
 
-        with pytest.raises(AssertionError, match='Invalid plot type'):
-            vib_drv.print_info(
-                {
-                    'molecule_xyz_string': molecule.get_xyz_string(),
-                    'normal_modes': vib_drv.normal_modes,
-                    'vib_frequencies': vib_drv.vib_frequencies,
-                    'ir_intensities': vib_drv.ir_intensities,
-                    'raman_activities': vib_drv.raman_activities,
-                },
-                info_type='unsupported')
+        with redirect_stdout(io.StringIO()):
+            with pytest.raises(AssertionError, match='Invalid plot type'):
+                vib_drv.print_info(
+                    {
+                        'molecule_xyz_string': molecule.get_xyz_string(),
+                        'normal_modes': vib_drv.normal_modes,
+                        'vib_frequencies': vib_drv.vib_frequencies,
+                        'ir_intensities': vib_drv.ir_intensities,
+                        'raman_activities': vib_drv.raman_activities,
+                    },
+                    info_type='unsupported')
 
         with pytest.raises(AssertionError,
                            match='molecule only has 1 normal modes'):
