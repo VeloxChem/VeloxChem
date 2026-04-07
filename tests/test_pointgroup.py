@@ -1,8 +1,11 @@
 from pathlib import Path
 import numpy as np
+import pytest
+from mpi4py import MPI
 
 from veloxchem.molecule import Molecule
 from veloxchem.symmetryanalyzer import SymmetryAnalyzer
+from veloxchem.symmetryoperations import ImproperRotation, Rotation
 
 
 class TestPointGroup:
@@ -198,6 +201,28 @@ class TestPointGroup:
         xyzfile = here / 'data' / 'c60_ih.xyz'
         return Molecule.read_xyz_file(xyzfile)
 
+    def gen_mol_C1(self):
+
+        molxyz = """
+        5
+
+        C              0.000000         0.000000         0.000000
+        H              0.629000         0.629000         0.629000
+        F             -0.691000        -0.691000         0.691000
+        Cl             0.890000        -0.890000        -0.890000
+        Br            -1.050000         1.050000        -1.050000
+        """
+        return Molecule.read_xyz_string(molxyz)
+
+    def gen_mol_atom(self):
+
+        molxyz = """
+        1
+
+        He             0.000000         0.000000         0.000000
+        """
+        return Molecule.read_xyz_string(molxyz)
+
     def test_pointgroup(self):
 
         sym_analyzer = SymmetryAnalyzer()
@@ -235,6 +260,43 @@ class TestPointGroup:
             sym_res = sym_analyzer.identify_pointgroup(mol)
             assert sym_res['point_group'] == pg
 
+    def test_symmetrize_pointgroup(self):
+
+        pg_mol = {
+            'Cinfv': self.gen_mol_Cinfv(),
+            'Dinfh': self.gen_mol_Dinfh(),
+            'Cs': self.gen_mol_Cs(),
+            'C2h': self.gen_mol_C2h(),
+            'C2v': self.gen_mol_C2v(),
+            'C3v': self.gen_mol_C3v(),
+            'D2h': self.gen_mol_D2h(),
+            'D2d': self.gen_mol_D2d(),
+            'D3d': self.gen_mol_D3d(),
+            'D6h': self.gen_mol_D6h(),
+            'Td': self.gen_mol_Td(),
+            'Oh': self.gen_mol_Oh(),
+        }
+
+        for pg, mol in pg_mol.items():
+            for rot_mat in [None, self.rotation_matrix(), self.rotation_matrix_2()]:
+                if rot_mat is not None:
+                    mol = self.rotate_molecule(mol, rot_mat)
+
+                sym_analyzer = SymmetryAnalyzer()
+                sym_res = sym_analyzer.identify_pointgroup(mol)
+                assert sym_res['point_group'] == pg
+
+                sym_mol = sym_analyzer.symmetrize_pointgroup(sym_res)
+
+                assert sym_mol.number_of_atoms() == mol.number_of_atoms()
+                assert sym_mol.get_labels() == mol.get_labels()
+                np.testing.assert_allclose(sym_mol.center_of_mass_in_bohr(),
+                                           np.zeros(3),
+                                           atol=1.0e-12)
+
+                sym_res_after = SymmetryAnalyzer().identify_pointgroup(sym_mol)
+                assert sym_res_after['point_group'] == pg
+
     def test_c7h_expected_symmetry_elements(self):
 
         sym_analyzer = SymmetryAnalyzer()
@@ -245,3 +307,155 @@ class TestPointGroup:
             '6S7',
             'sigma_h',
         ]
+
+    def test_isolated_atom_analysis_and_printing(self, capsys):
+
+        sym_analyzer = SymmetryAnalyzer()
+        results = sym_analyzer.identify_pointgroup(self.gen_mol_atom(),
+                                                   tolerance='VERY TIGHT')
+
+        assert results == {
+            'degeneracy': 'Input structure is an isolated atom.',
+            'point_group': 'O(3)',
+        }
+        assert sym_analyzer._molecule_type == 'isolated_atom'
+
+        sym_analyzer.print_symmetry_results(results)
+        sym_analyzer.print_tolerance_keywords()
+
+        out = capsys.readouterr().out
+        assert 'Input structure is an isolated atom.' in out
+        assert 'Point group: O(3)' in out
+        assert 'very tight' in out
+
+        symmetrized_mol = sym_analyzer.symmetrize_pointgroup(results)
+        np.testing.assert_allclose(symmetrized_mol.center_of_mass_in_bohr(),
+                                   np.zeros(3))
+        np.testing.assert_allclose(symmetrized_mol.get_coordinates_in_bohr(),
+                                   np.zeros((1, 3)))
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    def test_invalid_tolerance_and_identity_operation_raise(self):
+
+        sym_analyzer = SymmetryAnalyzer()
+
+        with pytest.raises(AssertionError,
+                           match='Invalid tolerance keyword'):
+            sym_analyzer.identify_pointgroup(self.gen_mol_C2v(),
+                                             tolerance='invalid')
+
+        sym_analyzer.identify_pointgroup(self.gen_mol_C2v())
+        with pytest.raises(AssertionError,
+                           match='Identity matrix should not be checked'):
+            sym_analyzer._check_symmetry_operation(Rotation([1.0, 0.0, 0.0]),
+                                                  'C1')
+
+    def test_c1_symmetrization_and_operation_mapping(self):
+
+        sym_analyzer = SymmetryAnalyzer()
+        results = sym_analyzer.identify_pointgroup(self.gen_mol_C1())
+
+        assert results['point_group'] == 'C1'
+        assert results['expected_symmetry_elements'] == ['E']
+        assert results['degeneracy'] == (
+            'Principal moments of inertia: Nondegenerate')
+
+        symmetrized_mol = sym_analyzer.symmetrize_pointgroup(results)
+        np.testing.assert_allclose(symmetrized_mol.center_of_mass_in_bohr(),
+                                   np.zeros(3),
+                                   atol=1.0e-10)
+        assert symmetrized_mol.number_of_atoms() == 5
+
+        assert sym_analyzer._check_symmetry_operation(Rotation([1.0, 0.0, 0.0],
+                                                               order=2),
+                                                      'C2',
+                                                      mapping=True) is False
+        assert sym_analyzer._mapping == set()
+
+    def test_helper_methods_for_symmetry_elements_and_axes(self):
+
+        sym_analyzer = SymmetryAnalyzer()
+
+        assert sym_analyzer._get_sym_op_name('4S10') == 'S10'
+        assert sym_analyzer._is_rotation('C8') is True
+        assert sym_analyzer._is_rotation('sigma_h') is False
+        assert sym_analyzer._is_improper_rotation('S6') is True
+        assert sym_analyzer._is_improper_rotation('C6') is False
+
+        reordered = sym_analyzer._reorder_symmetry_elements(
+            ['E', 'sigma_h', 'C2', '3C2', '2S4', '2C4'])
+        assert reordered == ['2S4', '2C4', 'C2', '3C2', 'E', 'sigma_h']
+
+        symmetry_operations = [
+            Rotation([1.0, 0.0, 0.0], order=2),
+            Rotation([0.0, 1.0, 0.0], order=4),
+            Rotation([0.0, 0.0, 1.0], order=4, power=2),
+            ImproperRotation([1.0, 1.0, 0.0], order=4),
+        ]
+        highest_axes = sym_analyzer._get_highest_order_rotation_axes(
+            symmetry_operations)
+        assert len(highest_axes) == 1
+        np.testing.assert_allclose(highest_axes[0], np.array([0.0, 1.0, 0.0]))
+
+        t_axes = sym_analyzer._get_idealized_rotation_axes_T(
+            [np.array([1.0, 0.0, 0.0]),
+             np.array([0.0, 1.0, 0.0])])
+        assert len(t_axes) == 10
+
+        o_axes = sym_analyzer._get_idealized_rotation_axes_O(
+            [np.array([1.0, 0.0, 0.0]),
+             np.array([0.0, 1.0, 0.0]),
+             np.array([0.0, 0.0, 1.0])])
+        assert len(o_axes) == 15
+
+        i_axes = sym_analyzer._get_idealized_rotation_axes_I(
+            [
+                np.array([0.0, 0.0, 1.0]),
+                np.array([0.5257311121, 0.0, 0.8506508083]),
+            ])
+        assert len(i_axes) == 66
+
+        for axis in t_axes + o_axes + i_axes:
+            np.testing.assert_allclose(np.linalg.norm(axis), 1.0)
+
+    def test_helper_methods_for_orientation_grid_and_orders(self):
+
+        sym_analyzer = SymmetryAnalyzer()
+        sym_analyzer.identify_pointgroup(self.gen_mol_D6h())
+
+        assert sym_analyzer._get_degeneracy(np.array([1.0, 2.0, 3.0]),
+                                            1.0e-3) == 1
+        assert sym_analyzer._get_degeneracy(np.array([1.0, 1.0001, 3.0]),
+                                            1.0e-3) == 2
+        assert sym_analyzer._get_degeneracy(np.array([1.0, 1.0001, 1.0002]),
+                                            1.0e-3) == 3
+
+        assert sym_analyzer._get_nondegenerate(np.array([1.0, 1.0001, 3.0]),
+                                               1.0e-3) == 2
+        assert sym_analyzer._get_nondegenerate(np.array([1.0, 3.0, 3.0001]),
+                                               1.0e-3) == 0
+
+        grid_points = sym_analyzer._get_mol_grid_points()
+        spherical_grid_points = sym_analyzer._get_mol_grid_points('spherical')
+        assert len(grid_points) >= 9
+        assert len(grid_points) == len(spherical_grid_points)
+        for axis in grid_points + spherical_grid_points:
+            np.testing.assert_allclose(np.linalg.norm(axis), 1.0)
+
+        custom_analyzer = SymmetryAnalyzer()
+        custom_analyzer._tolerance_ang = 0.2
+        custom_analyzer._tolerance_eig = 1.0e-3
+        custom_analyzer._natoms = 2
+        custom_analyzer._symbols = ['H', 'H']
+        custom_analyzer._centered_coords = np.array([[-1.0, 0.0, 0.0],
+                                                     [1.0, 0.0, 0.0]])
+
+        assert custom_analyzer._get_axis_rot_order(np.array([0.0, 1.0, 0.0]),
+                                                   8) == 2
+
+        custom_analyzer._set_orientation(np.array([0.0, 1.0, 0.0]),
+                                         np.array([0.0, 0.0, 1.0]))
+        np.testing.assert_allclose(custom_analyzer._centered_coords,
+                                   np.array([[0.0, 0.0, -1.0],
+                                             [0.0, 0.0, 1.0]]))

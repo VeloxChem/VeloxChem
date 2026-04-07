@@ -903,6 +903,14 @@ class SymmetryAnalyzer:
         for i in range(self._natoms):
             centered_mol.set_atom_coordinates(i, rot_coords[i])
 
+        # Recenter after idealization/reorientation to remove residual
+        # mass-center drift from symmetry-orbit reconstruction.
+        center_of_mass = centered_mol.center_of_mass_in_bohr()
+        recentered_coords = centered_mol.get_coordinates_in_bohr() - center_of_mass
+
+        for i in range(self._natoms):
+            centered_mol.set_atom_coordinates(i, recentered_coords[i])
+
         return centered_mol
 
     def _handle_linear(self):
