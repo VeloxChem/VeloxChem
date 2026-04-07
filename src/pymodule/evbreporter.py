@@ -87,7 +87,7 @@ class EvbReporter():
 
         self.simulations = {}
         for name, system in systems.items():
-            sim = mmapp.Simulation(topology, system, mm.VerletIntegrator(1))
+            sim = mmapp.Simulation(topology, system, mm.LangevinIntegrator(1,1,1))
             self.simulations.update({name: sim})
 
         if not append:
