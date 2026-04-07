@@ -2678,6 +2678,12 @@ class MMForceFieldGenerator:
                     dih['barrier'] = k_phf
                     dih['comment'] += ' from Hessian (PHF)'
 
+            # Patch impropers
+            for key, k_phf in phf_results['impropers'].items():
+                if key in self.impropers:
+                    self.impropers[key]['barrier'] = k_phf
+                    self.impropers[key]['comment'] += ' from Hessian (PHF)'
+
             return
         elif method == 'seminario':
 

@@ -1,4 +1,6 @@
+from mpi4py import MPI
 import copy
+import sys
 
 import numpy as np
 
@@ -7,7 +9,9 @@ try:
     import openmm.unit as unit
 except ImportError:
     pass
-
+from .veloxchemlib import mpi_master
+from .outputstream import OutputStream
+from .veloxchemlib import bohr_in_angstrom, hartree_in_kjpermol
 
 class MMHessianDriver:
     """
@@ -39,14 +43,32 @@ class MMHessianDriver:
     _DISPLACEMENT = 1e-4  # nm — step size for finite differences
 
     # Conversion factor: kJ/mol/nm^2 -> Hartree/Bohr^2
-    # Computed lazily to avoid importing veloxchemlib at module level.
     @staticmethod
     def _to_hartree_bohr2() -> float:
-        from .veloxchemlib import bohr_in_angstrom, hartree_in_kjpermol
         bohr_to_nm = bohr_in_angstrom() * 0.1
         return bohr_to_nm**2 / hartree_in_kjpermol()
 
-    def __init__(self):
+    def __init__(self, comm=None, ostream=None):
+        """
+        Initializes force field generator.
+        """
+
+        if comm is None:
+            comm = MPI.COMM_WORLD
+
+        if ostream is None:
+            if comm.Get_rank() == mpi_master():
+                ostream = OutputStream(sys.stdout)
+            else:
+                ostream = OutputStream(None)
+
+        # mpi information
+        self.comm = comm
+        self.rank = self.comm.Get_rank()
+        self.nodes = self.comm.Get_size()
+
+        # output stream
+        self.ostream = ostream
         self._system = None
         self._positions_nm = None  # np.ndarray shape (N, 3), nanometres
 
@@ -87,6 +109,33 @@ class MMHessianDriver:
     def update_improper_constants(self, improper_constants: dict):
         """Called by PHFParameterizer after Stage 3 (improper fitting)."""
         self._improper_constants = dict(improper_constants)
+
+    def get_represented_dihedrals(self) -> set:
+        """
+        Return the set of all proper dihedral atom tuples that exist in the
+        OpenMM PeriodicTorsionForce, indexed by both forward and reverse
+        orderings.
+
+        Used by PHFParameterizer to filter self._dihedrals down to only
+        those with a force field representation before any fitting begins.
+        Dihedrals absent from this set have no OpenMM entry (e.g. because
+        the GAFF barrier is zero and was never written to the XML), so
+        h_unit would be all-zero and PHF cannot fit them.
+
+        Returns
+        -------
+        set of tuples (a1, a2, a3, a4)
+            Both (a1,a2,a3,a4) and (a4,a3,a2,a1) are included for each
+            stored torsion so that canonical-ordering lookups always match.
+        """
+        represented = set()
+        for force in self._system.getForces():
+            if isinstance(force, mm.PeriodicTorsionForce):
+                for idx in range(force.getNumTorsions()):
+                    a1, a2, a3, a4, _, _, _ = force.getTorsionParameters(idx)
+                    represented.add((a1, a2, a3, a4))
+                    represented.add((a4, a3, a2, a1))
+        return represented
 
     # ------------------------------------------------------------------
     # Public interface
@@ -204,6 +253,36 @@ class MMHessianDriver:
         pair = self._terminal_pair(coord_type, atom_indices)
         return self._numerical_partial_hessian(system, pair)
 
+    def compute_h0_zeroing(
+        self,
+        zero_targets: list,
+        terminal_pair: tuple,
+    ) -> np.ndarray:
+        """
+        Like compute_h0 but zeros all listed coordinates simultaneously.
+
+        Used for coupled ring systems where multiple force constants must be
+        absent from H'_0 at once, rather than just a single target.
+
+        Parameters
+        ----------
+        zero_targets : list of (coord_type, atom_indices) tuples
+            Each entry specifies a coordinate whose force constant is set
+            to zero in the system copy before computing H'_0.
+        terminal_pair : tuple
+            (atom_i, atom_j) — the partial Hessian block to extract.
+
+        Returns
+        -------
+        np.ndarray, shape (3, 3), units Hartree/Bohr^2
+        """
+        system = copy.deepcopy(self._system)
+        self._apply_current_best_estimates(system)
+        for coord_type, atom_indices in zero_targets:
+            self._set_target_force_constant(system, coord_type, atom_indices,
+                                            k=0.0)
+        return self._numerical_partial_hessian(system, terminal_pair)
+
     # ------------------------------------------------------------------
     # Private helpers — parameter manipulation
     # ------------------------------------------------------------------
@@ -294,13 +373,7 @@ class MMHessianDriver:
                         idx)
                     if (a1, a2, a3, a4) in [(i, j, kk, l), (l, kk, j, i)]:
                         force.setTorsionParameters(
-                            idx,
-                            a1,
-                            a2,
-                            a3,
-                            a4,
-                            per,
-                            phase,
+                            idx, a1, a2, a3, a4, per, phase,
                             k * unit.kilojoules_per_mole,
                         )
 
@@ -323,15 +396,21 @@ class MMHessianDriver:
 
     @staticmethod
     def _set_improper_k(system: 'mm.System', indices: tuple, k: float):
-        """Set force constant of improper torsion (out-of-plane dihedral)."""
-        i, j, kk, l = indices
+        """
+        Set force constant of an improper torsion (out-of-plane dihedral).
+
+        In OpenMM the central atom of an improper is typically stored as
+        atom 3 (0-based index 2), so the same four atoms can appear in many
+        orderings depending on the force field XML. We match by atom set
+        rather than by ordered tuple to cover all conventions.
+        """
+        atoms = set(indices)
         for force in system.getForces():
             if isinstance(force, mm.PeriodicTorsionForce):
                 for idx in range(force.getNumTorsions()):
                     a1, a2, a3, a4, per, phase, _ = force.getTorsionParameters(
                         idx)
-                    # Improper dihedrals can be stored in different orderings
-                    if (a1, a2, a3, a4) in [(i, j, kk, l), (l, kk, j, i)]:
+                    if {a1, a2, a3, a4} == atoms:
                         force.setTorsionParameters(
                             idx,
                             a1,
