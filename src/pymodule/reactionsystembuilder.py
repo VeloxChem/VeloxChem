@@ -352,6 +352,7 @@ class ReactionSystemBuilder():
         if self.no_reactant:
             return system, topology, system_mol, reaction_atoms
 
+        total_mapping = {}
         for res_dict in self.pdb_active_res:
             # all atoms already exist in the topology, pdb: top, matching chain id with removed_chain
             # the pdb residue should be checked against the reactant, and an index mapping should be found out #todo
@@ -362,7 +363,16 @@ class ReactionSystemBuilder():
                 r for r in chain.residues() if int(r.id) == res_dict['residue']
             ][0]
 
-            mapping = self._get_mapped_atom_ids_from_residue(residue)
+            iterator = self._get_mapped_atom_ids_from_residue(residue)
+
+            mapping = next(iterator)
+            # Check if any of the keys in mapping are already present in total mapping. If so, do not accept the mapping
+            while len(set(mapping.keys()).intersection(set(total_mapping.keys())))>0:
+                self.ostream.print_info(f"Encountered occupied residue mapping: {mapping}. Continuing search")
+                mapping=next(iterator)
+            self.ostream.print_info(f"Found unoccupied residue mapping: {mapping}. Adding to total mapping")
+            total_mapping.update(mapping)
+
             res_atoms = [atom for atom in residue.atoms()]
 
             for id in mapping.keys():
@@ -440,8 +450,7 @@ class ReactionSystemBuilder():
             raise ValueError(
                 f"Could not find subgraph isomorphism between the residue {residue.name} {residue.index} and the reactant molecule"
             )
-        mapping = next(GM.subgraph_isomorphisms_iter())
-        return mapping
+        return GM.subgraph_isomorphisms_iter()
 
     def _delete_pdb_forces(self, system, del_indices):
         # set the right force groups, give descriptive names to the pdb forces, and delete all contributions that solely have the given indices
