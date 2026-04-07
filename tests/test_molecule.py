@@ -466,6 +466,27 @@ class TestMolecule:
                             rel_tol=tol,
                             abs_tol=tol)
 
+    def test_nuclear_repulsion_energy_backward_compatibility(self):
+
+        tol = 1.0e-12
+
+        mol = Molecule.read_str(self.h2o_xyzstr(), 'au')
+        basis = MolecularBasis.read(mol, 'sto-3g', ostream=None)
+        ecp_basis = FakeBasis([2, 0, 0])
+
+        assert math.isclose(mol.nuclear_repulsion_energy(),
+                            9.34363815797054450919,
+                            rel_tol=tol,
+                            abs_tol=tol)
+        assert math.isclose(mol.nuclear_repulsion_energy(basis),
+                            mol.effective_nuclear_repulsion_energy(basis),
+                            rel_tol=tol,
+                            abs_tol=tol)
+        assert math.isclose(mol.nuclear_repulsion_energy(ecp_basis),
+                            mol.effective_nuclear_repulsion_energy(ecp_basis),
+                            rel_tol=tol,
+                            abs_tol=tol)
+
     def test_effective_nuclear_repulsion_energy_with_ecp_basis(self):
 
         tol = 1.0e-12
