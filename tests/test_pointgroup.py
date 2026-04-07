@@ -234,3 +234,14 @@ class TestPointGroup:
             mol = self.rotate_molecule(mol, rot_mat_2)
             sym_res = sym_analyzer.identify_pointgroup(mol)
             assert sym_res['point_group'] == pg
+
+    def test_c7h_expected_symmetry_elements(self):
+
+        sym_analyzer = SymmetryAnalyzer()
+
+        assert sym_analyzer._all_symmetry_elements['C7h'] == [
+            'E',
+            '6C7',
+            '6S7',
+            'sigma_h',
+        ]

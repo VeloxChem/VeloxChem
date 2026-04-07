@@ -139,7 +139,7 @@ class SymmetryAnalyzer:
             "C4h": ["E", "2C4", "C2", "i", "2S4", "sigma_h"],
             "C5h": ["E", "4C5", "4S5", "sigma_h"],
             "C6h": ["E", "2C6", "2C3", "C2", "i", "2S3", "2S6", "sigma_h"],
-            "C7h": ["E", "6C5", "6S7", "sigma_h"],
+            "C7h": ["E", "6C7", "6S7", "sigma_h"],
             "C8h": ["E", "4C8", "2C4", "C2", "i", "2S4", "4S8", "sigma_h"],
             "D2h": ["E", "3C2", "i", "sigma_h", "sigma_v", "sigma_d"],
             "D3h": ["E", "2C3", "3C2", "2S3", "sigma_h", "3sigma_v"],
