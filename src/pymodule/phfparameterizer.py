@@ -51,6 +51,15 @@ class PHFParameterizer:
     ``'dihedrals'``
         ``{(i, j, k, l): k_d}``  —  kJ/mol
 
+    ``'impropers'``
+        ``{(i, j, k, l): k_imp}``  —  kJ/mol
+
+    ``'bond_equilibria'``
+        ``{(i, j): r_eq}``  —  nanometres
+
+    ``'angle_equilibria'``
+        ``{(i, j, k): theta_eq}``  —  degrees
+
     All indices are zero-based, matching the convention used throughout
     MMForceFieldGenerator.
     """
@@ -116,14 +125,15 @@ class PHFParameterizer:
 
     def _extract_topology(self, ff_gen):
         """
-        Pull bond, angle, and dihedral lists from MMForceFieldGenerator.
+        Pull bond, angle, dihedral, and improper lists from MMForceFieldGenerator.
 
-        ff_gen.bonds, ff_gen.angles, ff_gen.dihedrals are dicts keyed by
-        atom-index tuples (zero-based) populated by create_topology().
+        ff_gen.bonds, ff_gen.angles, ff_gen.dihedrals, ff_gen.impropers are
+        dicts keyed by atom-index tuples (zero-based) populated by create_topology().
         """
         self._bonds = list(ff_gen.bonds.keys())
         self._angles = list(ff_gen.angles.keys())
         self._dihedrals = list(ff_gen.dihedrals.keys())
+        self._impropers = list(ff_gen.impropers.keys())
 
     def _check_for_rings(self):
         """

@@ -84,6 +84,22 @@ class ForceConstantSolver:
         """
         return self._solve(h_qm, h0, h_unit)
 
+    def solve_improper(
+        self,
+        h_qm: np.ndarray,
+        h0: np.ndarray,
+        h_unit: np.ndarray,
+    ) -> float:
+        """
+        Solve for improper-dihedral force constant k_imp.
+
+        Terminal atom pair is (i, l) for improper i-j-k-l.
+        h0 includes angle and dihedral contributions involving both i and l,
+        using k_a and k_d values already determined in Stages 1 and 2.
+        No nonbonded contribution: impropers don't have 1-4 interactions.
+        """
+        return self._solve(h_qm, h0, h_unit)
+
     def solve_bond(
         self,
         h_qm: np.ndarray,

@@ -54,6 +54,7 @@ class MMHessianDriver:
         # after each fitting stage so that H'_0 always uses up-to-date values.
         self._dihedral_constants = {}  # {(i,j,k,l): k_d}  kJ/mol
         self._angle_constants = {}  # {(i,j,k):   k_a}  kJ/mol/rad^2
+        self._improper_constants = {}  # {(i,j,k,l): k_imp}  kJ/mol
         # Bond constants are not needed as bonds are the final stage.
 
     # ------------------------------------------------------------------
@@ -82,6 +83,10 @@ class MMHessianDriver:
     def update_angle_constants(self, angle_constants: dict):
         """Called by PHFParameterizer after Stage 2 (angle fitting)."""
         self._angle_constants = dict(angle_constants)
+
+    def update_improper_constants(self, improper_constants: dict):
+        """Called by PHFParameterizer after Stage 3 (improper fitting)."""
+        self._improper_constants = dict(improper_constants)
 
     # ------------------------------------------------------------------
     # Public interface
@@ -208,6 +213,8 @@ class MMHessianDriver:
         """Return the (a, b) terminal atom pair used for block extraction."""
         if coord_type == 'dihedral':
             return (atom_indices[0], atom_indices[3])
+        elif coord_type == 'improper':
+            return (atom_indices[0], atom_indices[3])
         elif coord_type == 'angle':
             return (atom_indices[0], atom_indices[2])
         elif coord_type == 'bond':
@@ -270,6 +277,8 @@ class MMHessianDriver:
         """Set the force constant of the target internal coordinate to k."""
         if coord_type == 'dihedral':
             self._set_dihedral_k(system, atom_indices, k)
+        elif coord_type == 'improper':
+            self._set_improper_k(system, atom_indices, k)
         elif coord_type == 'angle':
             self._set_angle_k(system, atom_indices, k)
         elif coord_type == 'bond':
@@ -313,6 +322,28 @@ class MMHessianDriver:
                         )
 
     @staticmethod
+    def _set_improper_k(system: 'mm.System', indices: tuple, k: float):
+        """Set force constant of improper torsion (out-of-plane dihedral)."""
+        i, j, kk, l = indices
+        for force in system.getForces():
+            if isinstance(force, mm.PeriodicTorsionForce):
+                for idx in range(force.getNumTorsions()):
+                    a1, a2, a3, a4, per, phase, _ = force.getTorsionParameters(
+                        idx)
+                    # Improper dihedrals can be stored in different orderings
+                    if (a1, a2, a3, a4) in [(i, j, kk, l), (l, kk, j, i)]:
+                        force.setTorsionParameters(
+                            idx,
+                            a1,
+                            a2,
+                            a3,
+                            a4,
+                            per,
+                            phase,
+                            k * unit.kilojoules_per_mole,
+                        )
+
+    @staticmethod
     def _set_bond_k(system: 'mm.System', indices: tuple, k: float):
         i, j = indices
         for force in system.getForces():
@@ -337,6 +368,8 @@ class MMHessianDriver:
             self._set_dihedral_k(system, (i, j, kk, l), k_val)
         for (i, j, kk), k_val in self._angle_constants.items():
             self._set_angle_k(system, (i, j, kk), k_val)
+        for (i, j, kk, l), k_val in self._improper_constants.items():
+            self._set_improper_k(system, (i, j, kk, l), k_val)
 
     # ------------------------------------------------------------------
     # Private helpers — numerical Hessian
