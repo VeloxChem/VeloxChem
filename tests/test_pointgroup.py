@@ -26,8 +26,22 @@ class TestPointGroup:
 
         labels = mol.get_labels()
         coords = mol.get_coordinates_in_bohr()
-        new_coords = np.matmul(coords, rot_mat.T)
+        u_mat, _, vh_mat = np.linalg.svd(rot_mat)
+        regularized_rot_mat = np.matmul(u_mat, vh_mat)
+        if np.linalg.det(regularized_rot_mat) < 0.0:
+            u_mat[:, -1] *= -1.0
+            regularized_rot_mat = np.matmul(u_mat, vh_mat)
+        new_coords = np.matmul(coords, regularized_rot_mat.T)
         return Molecule(labels, new_coords, 'au')
+
+    def distort_molecule(self, mol, scale=1.0e-4):
+
+        coords = mol.get_coordinates_in_bohr().copy()
+        mol_seed = int(sum(mol.get_identifiers()) * coords.shape[0])
+        rng = np.random.default_rng(seed=mol_seed)
+        for idx in range(coords.shape[0]):
+            coords[idx] += scale * rng.uniform(-0.6, 0.6, 3)
+        return Molecule(mol.get_labels(), coords, 'au')
 
     def gen_mol_Cinfv(self):
 
@@ -240,7 +254,6 @@ class TestPointGroup:
             'D6h': self.gen_mol_D6h(),
             'Td': self.gen_mol_Td(),
             'Oh': self.gen_mol_Oh(),
-            'Ih': self.gen_mol_Ih(),
         }
 
         for pg, mol in pg_mol.items():
@@ -278,9 +291,15 @@ class TestPointGroup:
         }
 
         for pg, mol in pg_mol.items():
-            for rot_mat in [None, self.rotation_matrix(), self.rotation_matrix_2()]:
+            for rot_mat in [
+                    None,
+                    self.rotation_matrix(),
+                    self.rotation_matrix_2()
+            ]:
                 if rot_mat is not None:
                     mol = self.rotate_molecule(mol, rot_mat)
+
+                mol = self.distort_molecule(mol)
 
                 sym_analyzer = SymmetryAnalyzer()
                 sym_res = sym_analyzer.identify_pointgroup(mol)
@@ -294,8 +313,56 @@ class TestPointGroup:
                                            np.zeros(3),
                                            atol=1.0e-12)
 
-                sym_res_after = SymmetryAnalyzer().identify_pointgroup(sym_mol)
+                sym_res_after = SymmetryAnalyzer().identify_pointgroup(
+                    sym_mol, tolerance='very tight')
                 assert sym_res_after['point_group'] == pg
+
+    @pytest.mark.timeconsuming
+    def test_symmetrize_pointgroup_ih_from_distorted_geometry(self):
+
+        mol = self.gen_mol_Ih()
+        distorted_mol = self.distort_molecule(mol, 5.0e-5)
+
+        sym_analyzer = SymmetryAnalyzer()
+        sym_res = sym_analyzer.identify_pointgroup(distorted_mol)
+        assert sym_res['point_group'] == 'Ih'
+
+        sym_mol = sym_analyzer.symmetrize_pointgroup(sym_res)
+
+        assert sym_mol.number_of_atoms() == distorted_mol.number_of_atoms()
+        assert sym_mol.get_labels() == distorted_mol.get_labels()
+        np.testing.assert_allclose(sym_mol.center_of_mass_in_bohr(),
+                                   np.zeros(3),
+                                   atol=1.0e-12)
+
+        sym_res_after = SymmetryAnalyzer().identify_pointgroup(
+            sym_mol, tolerance='very tight')
+        assert sym_res_after['point_group'] == 'Ih'
+
+    def test_symmetrize_pointgroup_d6h_from_loose_geometry(self):
+
+        mol = self.gen_mol_D6h()
+        distorted_mol = self.distort_molecule(mol, scale=1.0e-3)
+
+        distorted_res = SymmetryAnalyzer().identify_pointgroup(distorted_mol)
+        assert distorted_res['point_group'] != 'D6h'
+
+        sym_analyzer = SymmetryAnalyzer()
+        sym_res = sym_analyzer.identify_pointgroup(distorted_mol,
+                                                   tolerance='loose')
+        assert sym_res['point_group'] == 'D6h'
+
+        sym_mol = sym_analyzer.symmetrize_pointgroup(sym_res)
+
+        assert sym_mol.number_of_atoms() == distorted_mol.number_of_atoms()
+        assert sym_mol.get_labels() == distorted_mol.get_labels()
+        np.testing.assert_allclose(sym_mol.center_of_mass_in_bohr(),
+                                   np.zeros(3),
+                                   atol=1.0e-12)
+
+        sym_res_after = SymmetryAnalyzer().identify_pointgroup(
+            sym_mol, tolerance='very tight')
+        assert sym_res_after['point_group'] == 'D6h'
 
     def test_c7h_expected_symmetry_elements(self):
 
@@ -340,8 +407,7 @@ class TestPointGroup:
 
         sym_analyzer = SymmetryAnalyzer()
 
-        with pytest.raises(AssertionError,
-                           match='Invalid tolerance keyword'):
+        with pytest.raises(AssertionError, match='Invalid tolerance keyword'):
             sym_analyzer.identify_pointgroup(self.gen_mol_C2v(),
                                              tolerance='invalid')
 
@@ -349,7 +415,7 @@ class TestPointGroup:
         with pytest.raises(AssertionError,
                            match='Identity matrix should not be checked'):
             sym_analyzer._check_symmetry_operation(Rotation([1.0, 0.0, 0.0]),
-                                                  'C1')
+                                                   'C1')
 
     def test_c1_symmetrization_and_operation_mapping(self):
 
@@ -403,17 +469,17 @@ class TestPointGroup:
              np.array([0.0, 1.0, 0.0])])
         assert len(t_axes) == 10
 
-        o_axes = sym_analyzer._get_idealized_rotation_axes_O(
-            [np.array([1.0, 0.0, 0.0]),
-             np.array([0.0, 1.0, 0.0]),
-             np.array([0.0, 0.0, 1.0])])
+        o_axes = sym_analyzer._get_idealized_rotation_axes_O([
+            np.array([1.0, 0.0, 0.0]),
+            np.array([0.0, 1.0, 0.0]),
+            np.array([0.0, 0.0, 1.0])
+        ])
         assert len(o_axes) == 15
 
-        i_axes = sym_analyzer._get_idealized_rotation_axes_I(
-            [
-                np.array([0.0, 0.0, 1.0]),
-                np.array([0.5257311121, 0.0, 0.8506508083]),
-            ])
+        i_axes = sym_analyzer._get_idealized_rotation_axes_I([
+            np.array([0.0, 0.0, 1.0]),
+            np.array([0.5257311121, 0.0, 0.8506508083]),
+        ])
         assert len(i_axes) == 66
 
         for axis in t_axes + o_axes + i_axes:
@@ -456,6 +522,6 @@ class TestPointGroup:
 
         custom_analyzer._set_orientation(np.array([0.0, 1.0, 0.0]),
                                          np.array([0.0, 0.0, 1.0]))
-        np.testing.assert_allclose(custom_analyzer._centered_coords,
-                                   np.array([[0.0, 0.0, -1.0],
-                                             [0.0, 0.0, 1.0]]))
+        np.testing.assert_allclose(
+            custom_analyzer._centered_coords,
+            np.array([[0.0, 0.0, -1.0], [0.0, 0.0, 1.0]]))

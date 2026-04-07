@@ -822,7 +822,7 @@ class SymmetryAnalyzer:
                 if not is_idealized[sym_idx]:
                     continue
 
-                if isinstance(sym_op, (Rotation, ImproperRotation)):
+                if isinstance(sym_op, Rotation):
                     axis = np.array(sym_op._axis)
 
                     dot = np.dot(u_vec_a, axis)
@@ -833,7 +833,7 @@ class SymmetryAnalyzer:
                         atoms[a] = np.array(factor * axis * vec_a_norm)
                         break
 
-                elif isinstance(sym_op, (Reflection, ImproperRotation)):
+                elif isinstance(sym_op, Reflection):
                     axis = np.array(sym_op._axis)
 
                     dot = np.dot(u_vec_a, axis)
@@ -844,6 +844,11 @@ class SymmetryAnalyzer:
                         y_axis /= np.linalg.norm(y_axis)
                         atoms[a] = np.array(np.cross(y_axis, axis) * vec_a_norm)
                         break
+
+                elif isinstance(sym_op, ImproperRotation):
+                    # General-position atoms in Sn groups should usually not be
+                    # snapped to the axis or perpendicular plane here.
+                    continue
 
         # generate molecule from unique atoms
 
