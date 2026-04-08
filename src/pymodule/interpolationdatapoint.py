@@ -117,6 +117,7 @@ class InterpolationDatapoint:
         self.confidence_radius = None
         self.use_inverse_bond_length = True
         self.use_eq_bond_length = False
+        self.eq_bond_symmetry_mode = "masked_exact"  # "masked_exact" | "symmetrized"
         self.use_cosine_dihedral = False
         self.use_vectorized_b_matrix = True
         self.validate_vectorized_b_matrix = False
@@ -135,6 +136,16 @@ class InterpolationDatapoint:
         self.internal_coordinates = None
         self.imp_int_coordinates = []
         self.mapping_masks = None
+
+        # rotor set up
+        self.family_label = None
+        self.bank_role = "core"
+        self.cluster_id = None
+        self.cluster_type = None
+        self.cluster_rotor_ids = None
+        self.cluster_state_id = 0
+        self.dihedrals_to_rotate = None
+        self.phase_signature = None
 
         # internal_coordinates_values is a numpy array with the values of the
         # geomeTRIC internal coordinates. It is used in InterpolationDriver to
@@ -160,6 +171,8 @@ class InterpolationDatapoint:
                 'use_eq_bond_length':
                     ('bool',
                      'use the log bond lengths'),
+                'eq_bond_symmetry_mode':
+                    ('str', 'eq-bond symmetry mode: masked_exact or symmetrized'),
                 'use_cosine_dihedral':
                     ('bool', 'use the cosine of dihedrals'
                      ),
@@ -405,7 +418,7 @@ class InterpolationDatapoint:
             elif self.use_eq_bond_length:
                 eq_values = self._get_eq_bond_lengths_array(bond_rows.size)
                 _, dq_dr, _ = self._switched_bond_transform(
-                    bond_values, eq_values, eps_inner=0.01, eps_outer=0.15)
+                    bond_values, eq_values, eps_inner=0.005, eps_outer=0.01)
                 row_scale[bond_rows] = dq_dr
                 # print(dq_dr)
 
@@ -558,7 +571,7 @@ class InterpolationDatapoint:
                 elif self.use_eq_bond_length:
                     r = q.value(coords)
                     _, r_deriv_2, r_deriv_3 = self._switched_bond_transform(
-                        r, eq_bond_values[bond_counter], eps_inner=0.01, eps_outer=0.15)
+                        r, eq_bond_values[bond_counter], eps_inner=0.005, eps_outer=0.01)
                     self.b2_matrix[i] = r_deriv_2 * second_derivative
                     for m in range(n_atoms):
                         for n in range(n_atoms):
@@ -948,14 +961,15 @@ class InterpolationDatapoint:
             if self.use_inverse_bond_length:
                 int_coords[bond_rows] = 1.0 / base_values[bond_rows]
             elif self.use_eq_bond_length:
+               
                 eq_values = self._get_eq_bond_lengths_array(bond_rows.size)
                 q_values, _, _ = self._switched_bond_transform(
                     base_values[bond_rows],
                     eq_values,
-                    eps_inner=0.01,
-                    eps_outer=0.15)
+                    eps_inner=0.005,
+                    eps_outer=0.01)
                 int_coords[bond_rows] = q_values
-
+                # print(int_coords, base_values)
 
         if self.use_cosine_dihedral:
             dihedral_rows = row_cache['dihedral_rows']
@@ -999,9 +1013,17 @@ class InterpolationDatapoint:
         dL = np.ones_like(r_arr)
         d2L = np.zeros_like(r_arr)
 
+        # L = np.square(r_eq_arr) * (1.0 / r_arr - 1.0 / r_eq_arr)
+        # dL = -np.square(r_eq_arr) / np.square(r_arr)
+        # d2L = np.square(r_eq_arr) * 2.0 / np.power(r_arr, 3)
+
         R = - np.square(r_eq_arr) * (1.0 / r_arr - 1.0 / r_eq_arr)
         dR = np.square(r_eq_arr) / np.square(r_arr)
         d2R = -np.square(r_eq_arr) * 2.0 / np.power(r_arr, 3)
+
+        # R = (1.0 / r_arr)
+        # dR = -1.0 / np.square(r_arr)
+        # d2R = 2.0 / np.power(r_arr, 3)
 
         x = np.log(r_arr / r_eq_arr)
         y = np.square(x)
@@ -1038,6 +1060,7 @@ class InterpolationDatapoint:
         d2s[mask_outer] = 0.0
 
         q = s * L + (1.0 - s) * R
+        # print(q)
         dq_dr = ds * (L - R) + s * dL + (1.0 - s) * dR
         d2q_dr2 = d2s * (L - R) + 2.0 * ds * (dL - dR) + s * d2L + (1.0 - s) * d2R
 
@@ -1054,6 +1077,233 @@ class InterpolationDatapoint:
             return float(q[0]), float(dq_dr[0]), float(d2q_dr2[0])
 
         return q, dq_dr, d2q_dr2
+    
+    def get_bond_permutation_from_mask(self, mask):
+        """
+        Convert a full internal-coordinate mask (size n_ic) into a bond-only
+        permutation (size n_bonds) for eq_bond_lengths.
+        """
+        assert_msg_critical(self.z_matrix is not None,
+                            'InterpolationDatapoint: No Z-matrix defined.')
+        mask_arr = np.asarray(mask, dtype=np.int64).reshape(-1)
+        n_ic = len(self.z_matrix)
+        assert_msg_critical(
+            mask_arr.size == n_ic,
+            f'InterpolationDatapoint: mask size mismatch (expected {n_ic}, got {mask_arr.size}).'
+        )
+
+        bond_rows = np.asarray(self._get_b_matrix_row_cache()['bond_rows'], dtype=np.int64)
+        row_to_bond = {int(row): i for i, row in enumerate(bond_rows.tolist())}
+
+        perm = np.empty((bond_rows.size,), dtype=np.int64)
+        for tgt_bond_idx, tgt_row in enumerate(bond_rows):
+            src_row = int(mask_arr[int(tgt_row)])
+            assert_msg_critical(
+                src_row in row_to_bond,
+                f'InterpolationDatapoint: mask maps bond row {int(tgt_row)} to non-bond row {src_row}.'
+            )
+            perm[tgt_bond_idx] = row_to_bond[src_row]
+
+        return perm
+
+
+    def get_masked_eq_bond_lengths(self, reference_eq_bond_lengths, mask):
+        """
+        Apply full-row symmetry mask to a bond-only eq_bond_lengths vector.
+        """
+        bond_rows = np.asarray(self._get_b_matrix_row_cache()['bond_rows'], dtype=np.int64)
+        eq_ref = np.asarray(reference_eq_bond_lengths, dtype=np.float64).reshape(-1)
+
+        assert_msg_critical(
+            eq_ref.size == bond_rows.size,
+            'InterpolationDatapoint: eq_bond_lengths size mismatch in masked mapping '
+            f'(expected {bond_rows.size}, got {eq_ref.size}).'
+        )
+
+        perm = self.get_bond_permutation_from_mask(mask)
+        return eq_ref[perm]
+
+    def symmetrize_eq_bond_lengths_from_masks(self, masks):
+        """
+        Average eq_bond_lengths over permutation orbits induced by masks.
+        """
+        if (not self.use_eq_bond_length) or (self.eq_bond_lengths is None):
+            return self.eq_bond_lengths
+
+        masks_arr = np.asarray(masks, dtype=np.int64)
+        if masks_arr.ndim == 1:
+            masks_arr = masks_arr.reshape(1, -1)
+        if masks_arr.shape[0] == 0:
+            return self.eq_bond_lengths
+
+        bond_rows = np.asarray(self._get_b_matrix_row_cache()['bond_rows'], dtype=np.int64)
+        n_bonds = int(bond_rows.size)
+        eq = np.asarray(self.eq_bond_lengths, dtype=np.float64).reshape(-1).copy()
+        assert_msg_critical(
+            eq.size == n_bonds,
+            f'InterpolationDatapoint: eq_bond_lengths size mismatch (expected {n_bonds}, got {eq.size}).'
+        )
+
+        parent = np.arange(n_bonds, dtype=np.int64)
+
+        def find(i):
+            while parent[i] != i:
+                parent[i] = parent[parent[i]]
+                i = parent[i]
+            return i
+
+        def union(i, j):
+            ri = find(i)
+            rj = find(j)
+            if ri != rj:
+                parent[rj] = ri
+
+        for mask in masks_arr:
+            perm = self.get_bond_permutation_from_mask(mask)
+            for i in range(n_bonds):
+                union(i, int(perm[i]))
+
+        groups = {}
+        for i in range(n_bonds):
+            root = find(i)
+            groups.setdefault(root, []).append(i)
+
+        for ids in groups.values():
+            avg = float(np.mean(eq[ids]))
+            eq[ids] = avg
+
+        self.eq_bond_lengths = eq
+        return self.eq_bond_lengths
+    
+    def prepare_eq_candidate_base_cache(self):
+        """
+        Precompute geometry-only pieces once per MD step for fast masked_exact updates.
+        """
+        assert_msg_critical(self.use_eq_bond_length,
+                            'InterpolationDatapoint: prepare_eq_candidate_base_cache requires use_eq_bond_length=True.')
+        assert_msg_critical(self.cartesian_coordinates is not None,
+                            'InterpolationDatapoint: No Cartesian coordinates defined.')
+        assert_msg_critical(self.internal_coordinates is not None,
+                            'InterpolationDatapoint: Internal coordinates not defined.')
+        assert_msg_critical(self.b_matrix is not None,
+                            'InterpolationDatapoint: B matrix not available.')
+        assert_msg_critical(self.original_b_matrix is not None,
+                            'InterpolationDatapoint: original_b_matrix not available.')
+        assert_msg_critical(self.internal_coordinates_values is not None,
+                            'InterpolationDatapoint: internal_coordinates_values not available.')
+
+        bond_rows = np.asarray(self._get_b_matrix_row_cache()['bond_rows'], dtype=np.int64)
+        n_atoms = self.cartesian_coordinates.shape[0]
+        coords = self.cartesian_coordinates.reshape((n_atoms * 3))
+        raw_bond_values = np.array(
+            [self.internal_coordinates[idx].value(coords) for idx in bond_rows],
+            dtype=np.float64
+        )
+
+        return {
+            "bond_rows": bond_rows,
+            "base_internal": np.asarray(self.internal_coordinates_values, dtype=np.float64).copy(),
+            "base_b_matrix": np.asarray(self.b_matrix, dtype=np.float64).copy(),
+            "base_original_b_matrix": np.asarray(self.original_b_matrix, dtype=np.float64).copy(),
+            "inv_sqrt_masses": None if self.inv_sqrt_masses is None else np.asarray(self.inv_sqrt_masses, dtype=np.float64).copy(),
+            "raw_bond_values": raw_bond_values,
+        }
+
+
+    def build_current_chart_with_eq_fast(self, eq_bond_lengths_candidate, base_cache):
+        """
+        Exact current chart for one candidate eq-vector, but bond-only update (fast).
+        """
+        bond_rows = np.asarray(base_cache["bond_rows"], dtype=np.int64)
+        eq_candidate = np.asarray(eq_bond_lengths_candidate, dtype=np.float64).reshape(-1)
+        assert_msg_critical(
+            eq_candidate.size == bond_rows.size,
+            f'InterpolationDatapoint: candidate eq size mismatch (expected {bond_rows.size}, got {eq_candidate.size}).'
+        )
+
+        q_bond, dq_dr, _ = self._switched_bond_transform(
+            base_cache["raw_bond_values"],
+            eq_candidate,
+            eps_inner=0.005,
+            eps_outer=0.01,
+        )
+
+        org_i = base_cache["base_internal"].copy()
+        org_i[bond_rows] = q_bond
+
+        b_i = base_cache["base_b_matrix"].copy()
+
+        bond_block = base_cache["base_original_b_matrix"][bond_rows, :] * dq_dr[:, None]
+        if base_cache["inv_sqrt_masses"] is not None:
+            bond_block = bond_block * base_cache["inv_sqrt_masses"][None, :]
+
+        b_i[bond_rows, :] = bond_block
+        return org_i, b_i
+
+
+    def build_masked_current_chart_from_reference_eq_fast(self, reference_eq_bond_lengths, mask, base_cache):
+        eq_masked = self.get_masked_eq_bond_lengths(reference_eq_bond_lengths, mask)
+        return self.build_current_chart_with_eq_fast(eq_masked, base_cache)
+
+    def build_current_chart_with_eq(self, eq_bond_lengths_candidate):
+        """
+        Rebuild current-point internal coordinates + B-matrix for one candidate
+        eq_bond_lengths vector. Returns copies and restores original object state.
+        """
+        assert_msg_critical(
+            self.use_eq_bond_length,
+            'InterpolationDatapoint: build_current_chart_with_eq called but use_eq_bond_length is False.'
+        )
+        assert_msg_critical(
+            self.cartesian_coordinates is not None,
+            'InterpolationDatapoint: No Cartesian coordinates are defined.'
+        )
+        assert_msg_critical(
+            self.internal_coordinates is not None,
+            'InterpolationDatapoint: Internal coordinates are not defined.'
+        )
+        assert_msg_critical(
+            self.eq_bond_lengths is not None,
+            'InterpolationDatapoint: No baseline eq_bond_lengths are defined.'
+        )
+
+        bond_rows = np.asarray(self._get_b_matrix_row_cache()['bond_rows'], dtype=np.int64)
+        eq_candidate = np.asarray(eq_bond_lengths_candidate, dtype=np.float64).reshape(-1)
+        assert_msg_critical(
+            eq_candidate.size == bond_rows.size,
+            'InterpolationDatapoint: candidate eq_bond_lengths size mismatch '
+            f'(expected {bond_rows.size}, got {eq_candidate.size}).'
+        )
+
+        old_eq = np.asarray(self.eq_bond_lengths, dtype=np.float64).copy()
+        old_b = None if self.b_matrix is None else self.b_matrix.copy()
+        old_ob = None if self.original_b_matrix is None else self.original_b_matrix.copy()
+        old_int = None if self.internal_coordinates_values is None else self.internal_coordinates_values.copy()
+        old_gm = None if self.g_minus is None else self.g_minus.copy()
+        old_b2 = None if self.b2_matrix is None else self.b2_matrix.copy()
+
+        try:
+            self.eq_bond_lengths = eq_candidate.copy()
+            self.calculate_b_matrix()
+            self.compute_internal_coordinates_values()
+            return self.internal_coordinates_values.copy(), self.b_matrix.copy()
+        finally:
+            self.eq_bond_lengths = old_eq
+            self.b_matrix = old_b
+            self.original_b_matrix = old_ob
+            self.internal_coordinates_values = old_int
+            self.g_minus = old_gm
+            self.b2_matrix = old_b2
+
+
+    def build_masked_current_chart_from_reference_eq(self, reference_eq_bond_lengths, mask):
+        """
+        Convenience: derive masked eq lengths from reference point + mask and
+        rebuild current chart for that candidate.
+        """
+        eq_masked = self.get_masked_eq_bond_lengths(reference_eq_bond_lengths, mask)
+        return self.build_current_chart_with_eq(eq_masked)
+
 
     def compare_internal_coordinate_value_implementations(self, atol=1.0e-12, rtol=1.0e-10):
         """
@@ -1097,7 +1347,7 @@ class InterpolationDatapoint:
         check = self.compare_internal_coordinate_value_implementations(
             atol=self.vectorized_internal_coordinates_values_check_atol,
             rtol=self.vectorized_internal_coordinates_values_check_rtol)
-        print(check)
+        # print(check)
         if not check['all_close']:
             raise ValueError(
                 'InterpolationDatapoint: Vectorized internal-coordinate value '
@@ -1151,6 +1401,22 @@ class InterpolationDatapoint:
         translated_coordinates = self.cartesian_coordinates - center
 
         return translated_coordinates
+    
+    def _write_string_dataset(self, h5f, name, value):
+        if value is None:
+            return
+        dt = h5py.string_dtype(encoding="utf-8")
+        h5f.create_dataset(name, data=np.array(value, dtype=object), dtype=dt)
+
+
+    def _write_optional_array(self, h5f, name, value):
+        if value is None:
+            return
+        array_value = np.asarray(value)
+        if array_value.ndim == 0:
+            h5f.create_dataset(name, data=array_value)
+        else:
+            h5f.create_dataset(name, data=array_value, compression="gzip")
         
 
     def write_hdf5(self, fname, label):
@@ -1306,6 +1572,15 @@ class InterpolationDatapoint:
                                compression='gzip')
             
 
+            self._write_string_dataset(h5f, label + "_family_label", self.family_label)
+            self._write_string_dataset(h5f, label + "_bank_role", self.bank_role)
+            self._write_string_dataset(h5f, label + "_cluster_type", self.cluster_type)
+            self._write_optional_array(h5f, label + "_cluster_id", self.cluster_id)
+            self._write_optional_array(h5f, label + "_cluster_rotor_ids", self.cluster_rotor_ids)
+            self._write_optional_array(h5f, label + "_cluster_state_id", [self.cluster_state_id])
+            self._write_optional_array(h5f, label + "_dihedrals_to_rotate", self.dihedrals_to_rotate)
+            self._write_optional_array(h5f, label + "_phase_signature", self.phase_signature)
+
             h5f.close()
 
 
@@ -1320,6 +1595,15 @@ class InterpolationDatapoint:
         :param label:
             The label of the selected coordinates.
         """
+
+        def _read_scalar_string(ds):
+            if ds is None:
+                return None
+            val = ds[()]
+            if isinstance(val, bytes):
+                return val.decode("utf-8")
+            return str(val)
+
         valid_checkpoint = (fname and isinstance(fname, str))
 
         if valid_checkpoint:
@@ -1397,6 +1681,30 @@ class InterpolationDatapoint:
                     if ds is not None:
                         self.imp_int_coordinates[key] = [tuple(x.tolist()) for x in ds]
 
+            
+            self.family_label = _read_scalar_string(h5f.get(label + "_family_label"))
+            self.bank_role = _read_scalar_string(h5f.get(label + "_bank_role"))
+            self.cluster_type = _read_scalar_string(h5f.get(label + "_cluster_type"))
+
+            cluster_id_ds = h5f.get(label + "_cluster_id")
+            self.cluster_id = None if cluster_id_ds is None else int(np.array(cluster_id_ds).reshape(-1)[0])
+
+            cluster_state_ds = h5f.get(label + "_cluster_state_id")
+            self.cluster_state_id = None if cluster_state_ds is None else int(np.array(cluster_state_ds).reshape(-1)[0])
+
+            rotor_ids_ds = h5f.get(label + "_cluster_rotor_ids")
+            self.cluster_rotor_ids = None if rotor_ids_ds is None else tuple(int(x) for x in np.array(rotor_ids_ds).reshape(-1))
+
+            rotate_ds = h5f.get(label + "_dihedrals_to_rotate")
+            if rotate_ds is None:
+                self.dihedrals_to_rotate = None
+            else:
+                rotate_arr = np.array(rotate_ds).reshape(-1, 4)
+                self.dihedrals_to_rotate = tuple(tuple(int(x) for x in row) for row in rotate_arr)
+
+            phase_sig_ds = h5f.get(label + "_phase_signature")
+            self.phase_signature = None if phase_sig_ds is None else np.array(phase_sig_ds, dtype=np.float64)
+                        
             h5f.close()
 
     def cartesian_distance_vector(self, data_point):

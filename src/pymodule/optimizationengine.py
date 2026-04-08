@@ -123,6 +123,8 @@ class OptimizationEngine(geometric.engine.Engine):
             new_mol = Molecule()
         new_mol = self.comm.bcast(new_mol, root=mpi_master())
 
+        print(new_mol.get_xyz_string())
+        
         self.grad_drv.ostream.print_info('Computing energy and gradient...')
         self.grad_drv.ostream.flush()
 

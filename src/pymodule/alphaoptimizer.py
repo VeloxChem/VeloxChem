@@ -65,7 +65,7 @@ from concurrent.futures import ProcessPoolExecutor
 # ---- global worker state (created once per process) ----
 _W = {}
 
-def _init_worker(z_matrix, impes_dict, sym_dict, sym_datapoints, dps, idx, exponent_p_q, beta, e_x, structures, qm_e, qm_g_flat):
+def _init_worker(z_matrix, impes_dict, sym_dict, sym_datapoints, cluster_banks, dps, idx, exponent_p_q, beta, e_x, structures, qm_e, qm_g_flat):
     """Runs once per process. Build a private driver & static constants."""
     # Avoid oversubscription when each process calls BLAS:
     os.environ["OMP_NUM_THREADS"] = "1"
@@ -77,6 +77,12 @@ def _init_worker(z_matrix, impes_dict, sym_dict, sym_datapoints, dps, idx, expon
     driver.update_settings(impes_dict)
     driver.symmetry_information = sym_dict
     driver.qm_symmetry_data_points = sym_datapoints
+    driver.qm_rotor_cluster_banks = cluster_banks or {}
+    if driver.qm_rotor_cluster_banks:
+        first_family = next(iter(driver.qm_rotor_cluster_banks.values()))
+        driver.rotor_cluster_information = first_family.get("cluster_info")
+    else:
+        driver.rotor_cluster_information = None
     driver.impes_coordinate.inv_sqrt_masses = dps[0].inv_sqrt_masses
     driver.impes_coordinate.eq_bond_lengths = dps[0].eq_bond_lengths
     driver.distance_thrsh = 1000
@@ -179,7 +185,7 @@ def _eval_structure(payload):
 
 
 class AlphaOptimizer:
-    def __init__(self, z_matrix, impes_dict, sym_dict, sym_datapoints, dps, structure_list, qm_e, qm_g, exponent_p_q, e_x, beta=0.8, n_workers=None, verbose=False):
+    def __init__(self, z_matrix, impes_dict, sym_dict, sym_datapoints, dps, structure_list, qm_e, qm_g, exponent_p_q, e_x, beta=0.8, n_workers=None, verbose=False, cluster_banks=None):
         self.z_matrix       = z_matrix
         self.impes_dict     = impes_dict
         self.sym_dict       = sym_dict
@@ -194,6 +200,10 @@ class AlphaOptimizer:
         self.S              = len(structure_list)
         self.idx            = np.asarray([o*3 + i for o in sym_dict[3] for i in range(3)], dtype=int)
         self.verbose        = bool(verbose)
+        if isinstance(cluster_banks, dict) and len(cluster_banks) > 0:
+            self.cluster_banks = copy.deepcopy(cluster_banks)
+        else:
+            self.cluster_banks = {}
         
         os.environ["OMP_NUM_THREADS"] = "1"
         os.environ["MKL_NUM_THREADS"] = "1"
@@ -203,7 +213,7 @@ class AlphaOptimizer:
         self._pool = ProcessPoolExecutor(
             max_workers=(n_workers or os.cpu_count() or 2),
             initializer=_init_worker,
-            initargs=(z_matrix, impes_dict, sym_dict, sym_datapoints, dps, self.idx, exponent_p_q, self.beta, self.e_x, self.structures, self.qm_e, self.qm_g_flat),
+            initargs=(z_matrix, impes_dict, sym_dict, sym_datapoints, self.cluster_banks, dps, self.idx, exponent_p_q, self.beta, self.e_x, self.structures, self.qm_e, self.qm_g_flat),
         )
         self._cache_key = None
         self._cache_grad = None

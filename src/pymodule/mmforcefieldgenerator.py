@@ -2454,14 +2454,14 @@ class MMForceFieldGenerator:
                 non_rotatable_bonds.add((atom1, atom2))
                 non_rotatable_bonds.add((atom2, atom1))
         for atom1 in ['c ']:
-            for atom2 in ['n ', 'ns']:
+            for atom2 in ['n ', 'ns', 'os', 'cd']:
                 non_rotatable_bonds.add((atom1, atom2))
                 non_rotatable_bonds.add((atom2, atom1))
         non_rotatable_bonds = list(non_rotatable_bonds)
 
         excited_states_rotatable_bond = set()
-        for atom1 in ['c2', 'cc', 'ce']:  # sp2 carbons involved in double bonds
-            for atom2 in ['c2', 'cd', 'cf']:  # their corresponding partners
+        for atom1 in ['c2', 'cc', 'ce', 'c ']:  # sp2 carbons involved in double bonds
+            for atom2 in ['c2', 'cd', 'cf', 'os']:  # their corresponding partners
                 excited_states_rotatable_bond.add((atom1, atom2))
                 excited_states_rotatable_bond.add((atom2, atom1))
 
