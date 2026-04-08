@@ -160,7 +160,18 @@ def select_rsp_property(task, mol_orbs, rsp_dict, method_dict):
             'uv-vis',
             'ecd',
     ]:
-        rsp_prop = Absorption(rsp_dict, method_dict)
+        assert_msg_critical(
+            not ('frequencies' in rsp_dict and 'nstates' in rsp_dict),
+            'Response: frequencies and nstates cannot both be specified')
+
+        if 'frequencies' not in rsp_dict:
+            rsp_prop = Absorption(rsp_dict, method_dict)
+        elif 'frequencies' in rsp_dict and prop_type in [
+                'absorption', 'uv-vis'
+        ]:
+            rsp_prop = LinearAbsorptionCrossSection(rsp_dict, method_dict)
+        elif 'frequencies' in rsp_dict and prop_type == 'ecd':
+            rsp_prop = CircularDichroismSpectrum(rsp_dict, method_dict)
 
     elif prop_type in [
             'linear absorption cross-section (cpp)',
