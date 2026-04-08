@@ -37,7 +37,7 @@ from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
 from .cppsolver import ComplexResponseSolver
 from .cppsolverunrest import ComplexResponseUnrestrictedSolver
-from .tdacppsolver import ComplexResponseTDA
+from .tdacppsolver import ComplexResponseTdaSolver
 from .lrsolver import LinearResponseSolver
 from .lrsolverunrest import LinearResponseUnrestrictedSolver
 from .lreigensolver import LinearResponseEigenSolver
@@ -175,7 +175,7 @@ class ResponseProperty:
 
             if self.tamm_dancoff:
                 if method_type == 'restricted':
-                    self._rsp_driver = ComplexResponseTDA(
+                    self._rsp_driver = ComplexResponseTdaSolver(
                         self.comm, self.ostream)
                 elif method_type == 'unrestricted':
                     assert_msg_critical(

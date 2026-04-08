@@ -10,7 +10,7 @@ from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
 from veloxchem.lrsolver import LinearResponseSolver
 from veloxchem.cppsolver import ComplexResponseSolver
-from veloxchem.tdacppsolver import ComplexResponseTDA
+from veloxchem.tdacppsolver import ComplexResponseTdaSolver
 from veloxchem.c6driver import C6Driver
 from veloxchem.lreigensolver import LinearResponseEigenSolver
 from veloxchem.tdaeigensolver import TdaEigenSolver
@@ -194,7 +194,7 @@ def _bcast_path_string(comm, path_string):
     [
         (LinearResponseSolver, _configure_lr, _compare_rsp_results),
         (ComplexResponseSolver, _configure_cpp, _compare_rsp_results),
-        (ComplexResponseTDA, _configure_tdacpp, _compare_rsp_results),
+        (ComplexResponseTdaSolver, _configure_tdacpp, _compare_rsp_results),
         (C6Driver, _configure_c6, _compare_c6_results),
         (LinearResponseEigenSolver, _configure_rpa, _compare_eigen_results),
         (TdaEigenSolver, _configure_tda, _compare_eigen_results),

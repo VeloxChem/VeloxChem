@@ -59,7 +59,7 @@ except ImportError:
     pass
 
 
-class ComplexResponseTDA(LinearSolver):
+class ComplexResponseTdaSolver(LinearSolver):
     """
     Implements the complex linear response solver using the Tamm-Dancoff approximation.
 
