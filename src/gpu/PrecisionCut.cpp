@@ -88,3 +88,48 @@ std::vector<uint32_t> build_cut_ij_tile(
     }
     return cut;
 }
+
+std::vector<uint32_t> build_cut_ij_tile_dd(
+    const std::vector<double>& Q_ij_local,
+    const std::vector<double>& Q_kl,
+    const std::vector<double>& D_kl,
+    uint32_t ij_count_local,
+    uint32_t kl_count,
+    int ij_tile_dim,
+    int kl_tile_dim,
+    double tau)
+{
+    const uint32_t nij_tiles = (ij_count_local + ij_tile_dim - 1) / ij_tile_dim;
+
+    std::vector<double> QD_kl(kl_count);
+    for (uint32_t kl = 0; kl < kl_count; ++kl) {
+        QD_kl[kl] = std::abs(Q_kl[kl]) * std::abs(D_kl[kl]);
+    }
+
+    const uint32_t nkl_tiles = (kl_count + kl_tile_dim - 1) / kl_tile_dim;
+    std::vector<double> QD_tile_max(nkl_tiles);
+
+    for (uint32_t t = 0; t < nkl_tiles; ++t)
+    {
+        QD_tile_max[t] = QD_kl[t * kl_tile_dim];
+    }
+
+    std::vector<uint32_t> cut(nij_tiles, 0);
+    for (uint32_t t = 0; t < nij_tiles; ++t) {
+        const double qmax = Q_ij_local[t * ij_tile_dim];
+        if (qmax <= 0.0) {
+            cut[t] = 0;
+            continue;
+        }
+
+        const double thr = tau / qmax;
+        auto it = std::lower_bound(
+            QD_tile_max.begin(),
+            QD_tile_max.end(),
+            thr,
+            std::greater<double>()
+        );
+        cut[t] = static_cast<uint32_t>(it - QD_tile_max.begin());
+    }
+    return cut;
+}

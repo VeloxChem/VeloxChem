@@ -25,4 +25,15 @@ build_cut_ij_tile(
     int tile,
     double tau);
 
+std::vector<uint32_t>
+build_cut_ij_tile_dd(
+    const std::vector<double>& Q_ij_local,
+    const std::vector<double>& Q_kl,
+    const std::vector<double>& D_kl,
+    uint32_t ij_count_local,
+    uint32_t kl_count,
+    int ij_tile_dim,
+    int kl_tile_dim,
+    double tau);
+
 #endif
