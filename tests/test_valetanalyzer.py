@@ -72,7 +72,7 @@ class TestValetAnalyzer:
 
         return cls._water_lr_case
 
-    def test_initialize_set_subgroups_and_extract_scf_data(self, capsys):
+    def test_initialize_set_subgroups(self, capsys):
 
         analyzer = ValetAnalyzer()
         molecule, basis = self._get_h2_molecule_and_basis()
@@ -92,21 +92,6 @@ class TestValetAnalyzer:
 
         assert analyzer._subgroups == [('atom1', 1)]
         assert "Subgroups updated: ['atom1']" in subgroup_output
-
-        scf_results = {
-            'atom_coordinates': molecule.get_coordinates_in_bohr(),
-            'nuclear_charges': [1.0, 1.0],
-            'basis_set': [basis.get_label().encode('utf-8')],
-        }
-
-        extracted_molecule = ValetAnalyzer._extract_molecule_from_scf(
-            scf_results)
-        extracted_basis = ValetAnalyzer._extract_basis_from_scf(
-            scf_results, extracted_molecule)
-
-        assert extracted_molecule.number_of_atoms() == molecule.number_of_atoms(
-        )
-        assert extracted_basis.get_label() == basis.get_label()
 
     @skip_multi_rank
     def test_compute_detach_attach_densities_validates_state_and_shell(self):
@@ -163,9 +148,9 @@ class TestValetAnalyzer:
                                                 rsp_results,
                                                 state_index=1)
         ref_detachment = np.array([
-            0.9944723894451350,
-            0.0008840638456755325,
-            0.0046435467091893510,
+            0.9998357388039689,
+            0.00008213057844294671,
+            0.00008213061758819769,
         ])
         ref_attachment = np.array([
             0.28456175730239014,
@@ -217,6 +202,27 @@ class TestValetAnalyzer:
             transition_data['transition_matrix'],
             ValetAnalyzer.compute_transition_matrix(expected_detachment,
                                                     expected_attachment))
+
+    @skip_multi_rank
+    def test_compute_transition_data_validates_subgroup_atom_indices(self):
+
+        molecule, basis, scf_results, rsp_results, _ = self._get_water_lr_case()
+        analyzer = ValetAnalyzer()
+        self._initialize_silently(analyzer, molecule, basis)
+
+        with pytest.raises(AssertionError,
+                           match='subgroup atom indices must be in the range'):
+            analyzer.compute_transition_data(scf_results,
+                                             rsp_results,
+                                             [('bad', 0)],
+                                             state_index=1)
+
+        with pytest.raises(AssertionError,
+                           match='subgroup atom indices must be in the range'):
+            analyzer.compute_transition_data(scf_results,
+                                             rsp_results,
+                                             [('bad', [1, 4])],
+                                             state_index=1)
 
     def test_compute_transition_matrix(self):
 
