@@ -1,4 +1,4 @@
-name: vlxenv_impes_release_v_1
+name: vlxenv_impes_master_merge
 channels:
   - conda-forge
 dependencies:
@@ -24,7 +24,7 @@ dependencies:
   - setuptools
   - wheel
   - pybind11-global
-  - python>=3.10
+  - python=3.13
   - psutil
   - pytest
   - mdanalysis
