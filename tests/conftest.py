@@ -1,7 +1,10 @@
-import matplotlib
-
-# Use a non-interactive backend so plot tests run reliably in headless environments.
-matplotlib.use('Agg')
+try:
+    import matplotlib
+except ImportError:
+    matplotlib = None
+else:
+    # Use a non-interactive backend so plot tests run reliably in headless environments.
+    matplotlib.use('Agg')
 
 
 def pytest_configure(config):

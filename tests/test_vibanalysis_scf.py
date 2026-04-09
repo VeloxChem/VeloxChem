@@ -307,7 +307,7 @@ class TestScfVibrationalAnalysisDriver:
     def test_vibrational_analysis_plot_and_print_info_helpers(
             self, monkeypatch, capsys):
 
-        import matplotlib.pyplot as plt
+        plt = pytest.importorskip('matplotlib.pyplot')
 
         vib_drv = self._get_synthetic_vibanalysis()
         molecule = self._get_water_molecule()
