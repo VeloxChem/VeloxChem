@@ -2560,19 +2560,21 @@ class MMForceFieldGenerator:
             J. Comput. Chem. 2016, 37, 2349–2359).  Derives bond, angle,
             and dihedral force constants analytically by least-squares
             fitting of partial MM Hessian blocks to the corresponding QM
-            blocks.  The ``reparameterize_all`` and ``reparameterize_keys``
-            arguments are ignored when ``method='phf'`` because PHF always
-            reparameterizes all internal coordinates.
+            blocks.  By default, only bonds and angles whose comment contains
+            'guessed' are reparameterized; all dihedrals and impropers are
+            always fitted.  Use ``reparameterize_all`` or
+            ``reparameterize_keys`` to override this behaviour.
 
         :param hessian:
             The Hessian matrix (np.ndarray, shape 3N x 3N, Hartree/Bohr^2)
             or the string ``'xtb'`` to trigger an on-the-fly XTB Hessian.
         :param reparameterize_all:
-            (Seminario only) If True, reparameterize all bonds and angles.
-            If False, only reparameterize entries whose comment is 'Guessed'.
+            If True, reparameterize all bonds, angles, dihedrals, and
+            impropers regardless of their comment field.
         :param reparameterize_keys:
-            (Seminario only) Explicit list of bond/angle keys to
-            reparameterize.
+            Explicit list of bond/angle/dihedral/improper keys (tuples) to
+            reparameterize.  Keys are matched against the four coordinate
+            dicts by set membership.
         :param method:
             Parameterization method: ``'seminario'`` (default) or ``'phf'``.
         """
@@ -2634,21 +2636,53 @@ class MMForceFieldGenerator:
         # ------------------------------------------------------------------
 
         if 'phf' in method.lower():
+            if method.lower() == 'phf(k)':
+                katachi = True
+            else:
+                katachi = False
 
             phf = PHFParameterizer()
-            self.ostream.print_info(
-                'Force-field reparameterization based on the PHF method')
+            if katachi:
+
+                self.ostream.print_info(
+                    'Force-field reparameterization based on the PHF method with Katachi equilibrium parameterization'
+                )
+            else:
+                self.ostream.print_info(
+                    'Force-field reparameterization based on the PHF method')
             self.ostream.print_blank()
             self.ostream.print_reference('Reference:')
             self.ostream.print_reference(phf.get_reference())
             self.ostream.print_blank()
             self.ostream.flush()
-            if method.lower() == 'phf(k)':
-                katachi = True
+            if reparameterize_all:
+                fit_bonds     = list(self.bonds.keys())
+                fit_angles    = list(self.angles.keys())
+                fit_dihedrals = list(self.dihedrals.keys())
+                fit_impropers = list(self.impropers.keys())
+            elif reparameterize_keys is not None:
+                bonds_set     = set(self.bonds.keys())
+                angles_set    = set(self.angles.keys())
+                dihedrals_set = set(self.dihedrals.keys())
+                impropers_set = set(self.impropers.keys())
+                fit_bonds     = [k for k in reparameterize_keys if k in bonds_set]
+                fit_angles    = [k for k in reparameterize_keys if k in angles_set]
+                fit_dihedrals = [k for k in reparameterize_keys if k in dihedrals_set]
+                fit_impropers = [k for k in reparameterize_keys if k in impropers_set]
             else:
-                katachi = False
+                fit_bonds  = [k for k, v in self.bonds.items()
+                              if 'guessed' in v['comment'].lower()]
+                fit_angles = [k for k, v in self.angles.items()
+                              if 'guessed' in v['comment'].lower()]
+                fit_dihedrals = list(self.dihedrals.keys())
+                fit_impropers = list(self.impropers.keys())
+
             phf_results = phf.compute(self, hessian, self.equivalent_atoms,
-                                      katachi)
+                                      katachi,
+                                      fit_bonds=fit_bonds,
+                                      fit_angles=fit_angles,
+                                      fit_dihedrals=fit_dihedrals,
+                                      fit_impropers=fit_impropers)
 
             # Patch bonds
             for key, k in phf_results['bonds'].items():

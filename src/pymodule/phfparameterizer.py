@@ -121,7 +121,11 @@ class PHFParameterizer:
                 ff_gen,
                 hessian: np.ndarray,
                 equivalent_atoms: list,
-                katachi=True) -> dict:
+                katachi=True,
+                fit_bonds=None,
+                fit_angles=None,
+                fit_dihedrals=None,
+                fit_impropers=None) -> dict:
         """
         Run the full PHF fitting procedure.
 
@@ -134,12 +138,40 @@ class PHFParameterizer:
             to the fitting stages without unit conversion, since the MM
             partial Hessian blocks from ArtificialMMHessianEngine are also
             returned in Hartree/Bohr^2.
+        fit_bonds : list of (i, j) tuples, optional
+            Keys of bonds to reparameterize. None means fit all bonds.
+        fit_angles : list of (i, j, k) tuples, optional
+            Keys of angles to reparameterize. None means fit all angles.
+        fit_dihedrals : list of (i, j, k, l) tuples, optional
+            Keys of dihedrals to reparameterize. None means fit all dihedrals.
+        fit_impropers : list of (i, j, k, l) tuples, optional
+            Keys of impropers to reparameterize. None means fit all impropers.
 
         Returns
         -------
         dict with keys 'bonds', 'angles', 'dihedrals', 'impropers'.
         """
         self._extract_topology(ff_gen)
+
+        if fit_bonds is not None:
+            _s = {self._canonical_bond(b) for b in fit_bonds}
+            self._bonds = [b for b in self._bonds
+                           if self._canonical_bond(b) in _s]
+
+        if fit_angles is not None:
+            _s = {self._canonical_angle(a) for a in fit_angles}
+            self._angles = [a for a in self._angles
+                            if self._canonical_angle(a) in _s]
+
+        if fit_dihedrals is not None:
+            _s = {self._canonical_dihedral(d) for d in fit_dihedrals}
+            self._dihedrals = [d for d in self._dihedrals
+                               if self._canonical_dihedral(d) in _s]
+
+        if fit_impropers is not None:
+            _s = {self._canonical_dihedral(i) for i in fit_impropers}
+            self._impropers = [i for i in self._impropers
+                               if self._canonical_dihedral(i) in _s]
 
         openmm_system, positions_nm = self._build_openmm_system(ff_gen)
         self._engine.set_system(openmm_system, positions_nm)
@@ -446,6 +478,29 @@ class PHFParameterizer:
             k_b = self.solve_bond(h_qm, h0, h_unit)
             self._bond_constants[bond] = k_b
 
+    # ------------------------------------------------------------------
+    # Canonical-key helpers — order-independent tuple identity
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _canonical_bond(bond: tuple) -> tuple:
+        """(i, j) → (min, max) — order-independent bond key."""
+        i, j = bond
+        return (i, j) if i < j else (j, i)
+
+    @staticmethod
+    def _canonical_angle(angle: tuple) -> tuple:
+        """(i, j, k) → (min_endpoint, center, max_endpoint)."""
+        i, j, k = angle
+        return (i, j, k) if i <= k else (k, j, i)
+
+    @staticmethod
+    def _canonical_dihedral(dihedral: tuple) -> tuple:
+        """Lexicographically smaller of forward and reverse.
+        Used for both proper dihedrals and impropers."""
+        rev = dihedral[::-1]
+        return dihedral if dihedral <= rev else rev
+
     def _average_equivalent_angle_constants(self, equivalent_atoms: list):
         """
         Average angle force constants across symmetry-equivalent angles.
@@ -466,9 +521,9 @@ class PHFParameterizer:
         groups: dict = {}
         for angle in self._angle_constants:
             i, j, k = angle
-            li, lj, lk = equivalent_atoms[i], equivalent_atoms[
-                j], equivalent_atoms[k]
-            key = (min(li, lk), lj, max(li, lk))
+            key = self._canonical_angle((equivalent_atoms[i],
+                                         equivalent_atoms[j],
+                                         equivalent_atoms[k]))
             groups.setdefault(key, []).append(angle)
 
         for group in groups.values():
@@ -480,8 +535,8 @@ class PHFParameterizer:
         """
         Average bond force constants across symmetry-equivalent bonds.
 
-        Two bonds (i, j) and (i', j') are equivalent when
-        {equivalent_atoms[i], equivalent_atoms[j]} is the same frozenset.
+        Two bonds (i, j) and (i', j') are equivalent when their endpoint
+        labels form the same canonical pair (uses _canonical_bond on labels).
 
         Modifies self._bond_constants in place.
 
@@ -493,7 +548,7 @@ class PHFParameterizer:
         groups: dict = {}
         for bond in self._bond_constants:
             i, j = bond
-            key = frozenset({equivalent_atoms[i], equivalent_atoms[j]})
+            key = self._canonical_bond((equivalent_atoms[i], equivalent_atoms[j]))
             groups.setdefault(key, []).append(bond)
 
         for group in groups.values():
@@ -506,8 +561,8 @@ class PHFParameterizer:
         """
         Average bond equilibrium lengths across symmetry-equivalent bonds.
 
-        Uses the same grouping key as _average_equivalent_bond_constants:
-        frozenset of endpoint labels. Modifies bond_eq in place.
+        Uses the same grouping key as _average_equivalent_bond_constants
+        (_canonical_bond on labels). Modifies bond_eq in place.
 
         Parameters
         ----------
@@ -517,7 +572,7 @@ class PHFParameterizer:
         groups: dict = {}
         for bond in bond_eq:
             i, j = bond
-            key = frozenset({equivalent_atoms[i], equivalent_atoms[j]})
+            key = self._canonical_bond((equivalent_atoms[i], equivalent_atoms[j]))
             groups.setdefault(key, []).append(bond)
 
         for group in groups.values():
@@ -542,9 +597,9 @@ class PHFParameterizer:
         groups: dict = {}
         for angle in angle_eq:
             i, j, k = angle
-            li, lj, lk = equivalent_atoms[i], equivalent_atoms[
-                j], equivalent_atoms[k]
-            key = (min(li, lk), lj, max(li, lk))
+            key = self._canonical_angle((equivalent_atoms[i],
+                                         equivalent_atoms[j],
+                                         equivalent_atoms[k]))
             groups.setdefault(key, []).append(angle)
 
         for group in groups.values():
