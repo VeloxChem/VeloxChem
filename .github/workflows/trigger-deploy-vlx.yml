@@ -1,4 +1,4 @@
-name: Trigger deploy-vlx
+name: Trigger deploy-vlx workflow
 
 on:
   push:
