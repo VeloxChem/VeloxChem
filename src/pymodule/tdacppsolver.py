@@ -360,6 +360,10 @@ class ComplexResponseTdaSolver(LinearSolver):
         norb = orb_ene.shape[0]
         nocc = molecule.number_of_alpha_electrons()
 
+        self._check_mpi_oversubscription(
+            self._get_excitation_space_dimension_restricted(nocc, norb),
+            'response space')
+
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
 
@@ -1207,7 +1211,10 @@ class ComplexResponseTdaSolver(LinearSolver):
             dist_new_b.data -= dist_new_proj.data
 
         if renormalize:
-            if dist_new_b.data.ndim > 0 and dist_new_b.shape(0) > 0:
+            has_global_rows = self.comm.allreduce(
+                int(dist_new_b.data.ndim > 0 and dist_new_b.shape(0) > 0),
+                op=MPI.SUM) > 0
+            if has_global_rows:
                 dist_new_b = self.remove_linear_dependence(
                     dist_new_b, self.lindep_thresh)
 

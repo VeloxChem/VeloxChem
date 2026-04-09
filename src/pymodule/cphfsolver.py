@@ -1398,7 +1398,10 @@ class CphfSolver(LinearSolver):
 
         # remove linear dependencies and orthonormalize trial vectors
         if renormalize:
-            if dist_trials.data.ndim > 0 and dist_trials.shape(0) > 0:
+            has_global_rows = self.comm.allreduce(
+                int(dist_trials.data.ndim > 0 and dist_trials.shape(0) > 0),
+                op=MPI.SUM) > 0
+            if has_global_rows:
                 dist_trials = self._remove_linear_dependence_half_size(
                     dist_trials, self.lindep_thresh)
                 dist_trials = (

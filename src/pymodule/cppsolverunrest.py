@@ -218,6 +218,10 @@ class ComplexResponseUnrestrictedSolver(ComplexResponseSolverBase):
         nocc_a = molecule.number_of_alpha_occupied_orbitals(basis)
         nocc_b = molecule.number_of_beta_occupied_orbitals(basis)
 
+        self._check_mpi_oversubscription(
+            self._get_excitation_space_dimension_unrestricted(
+                nocc_a, nocc_b, norb), 'response space')
+
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
         # DFT information

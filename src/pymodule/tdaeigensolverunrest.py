@@ -181,8 +181,16 @@ class TdaUnrestrictedEigenSolver(TdaEigenSolverBase):
         else:
             orb_ene_a = None
             orb_ene_b = None
+            norb = None
             nocc_a = None
             nocc_b = None
+
+        norb, nocc_a, nocc_b = self.comm.bcast((norb, nocc_a, nocc_b),
+                                               root=mpi_master())
+
+        self._check_mpi_oversubscription(
+            self._get_excitation_space_dimension_unrestricted(
+                nocc_a, nocc_b, norb), 'excitation space')
 
         # ERI information
         eri_dict = self._init_eri(molecule, basis)

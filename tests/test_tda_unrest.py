@@ -341,6 +341,8 @@ class TestUnrestrictedTDA:
                 np.abs(restarted_results['eigenvalues'] -
                        reference_results['eigenvalues'])) < 1.0e-8
 
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 4,
+                        reason='limit MPI size for this test case')
     def test_core_excitation_water_cation_sto3g(self):
 
         mol, bas = self.get_water_cation_system('sto-3g')

@@ -30,6 +30,7 @@
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+from mpi4py import MPI
 from pathlib import Path
 from datetime import datetime
 import numpy as np
@@ -822,6 +823,70 @@ class LinearSolver:
             return (
                 self.guess_scaling_threshold * self.initial_guess_multiplier +
                 (nstates - self.guess_scaling_threshold))
+
+    def _get_excitation_space_dimension_restricted(self, nocc, norb):
+        """
+        Gets the excitation-space dimension for restricted methods.
+
+        :param nocc:
+            Number of occupied orbitals.
+        :param norb:
+            Number of orbitals.
+
+        :return:
+            The excitation-space dimension.
+        """
+
+        if getattr(self, 'core_excitation', False):
+            return self.num_core_orbitals * (norb - nocc)
+
+        if getattr(self, 'restricted_subspace', False):
+            return ((self.num_core_orbitals + self.num_valence_orbitals) *
+                    self.num_virtual_orbitals)
+
+        return nocc * (norb - nocc)
+
+    def _get_excitation_space_dimension_unrestricted(self, nocc_a, nocc_b,
+                                                     norb):
+        """
+        Gets the excitation-space dimension for unrestricted methods.
+
+        :param nocc_a:
+            Number of alpha occupied orbitals.
+        :param nocc_b:
+            Number of beta occupied orbitals.
+        :param norb:
+            Number of orbitals.
+
+        :return:
+            The excitation-space dimension.
+        """
+
+        if getattr(self, 'core_excitation', False):
+            return (self.num_core_orbitals * (norb - nocc_a) +
+                    self.num_core_orbitals * (norb - nocc_b))
+
+        return (nocc_a * (norb - nocc_a) + nocc_b * (norb - nocc_b))
+
+    def _check_mpi_oversubscription(self, dimension, label):
+        """
+        Fails fast if the distributed space would assign zero rows to one or
+        more MPI ranks.
+
+        :param dimension:
+            The number of distributed rows.
+        :param label:
+            A short label for the distributed space.
+        """
+
+        assert_msg_critical(
+            dimension > 0,
+            f'{type(self).__name__}: invalid {label} dimension')
+        assert_msg_critical(
+            self.nodes <= dimension,
+            f'{type(self).__name__}: {self.nodes} MPI ranks exceed the '
+            f'{label} dimension ({dimension}). Please use at most {dimension} '
+            + 'MPI ranks for this calculation.')
 
     def _add_nstates_to_checkpoint(self):
         """
@@ -3036,14 +3101,20 @@ class LinearSolver:
             dist_new_ung.data -= dist_new_ung_proj.data
 
         if renormalize:
-            if dist_new_ger.data.ndim > 0 and dist_new_ger.shape(0) > 0:
+            has_global_ger_rows = self.comm.allreduce(
+                int(dist_new_ger.data.ndim > 0 and dist_new_ger.shape(0) > 0),
+                op=MPI.SUM) > 0
+            if has_global_ger_rows:
                 dist_new_ger = self._remove_linear_dependence_half_size(
                     dist_new_ger, self.lindep_thresh)
                 dist_new_ger = self._orthogonalize_gram_schmidt_half_size(
                     dist_new_ger)
                 dist_new_ger = self._normalize_half_size(dist_new_ger)
 
-            if dist_new_ung.data.ndim > 0 and dist_new_ung.shape(0) > 0:
+            has_global_ung_rows = self.comm.allreduce(
+                int(dist_new_ung.data.ndim > 0 and dist_new_ung.shape(0) > 0),
+                op=MPI.SUM) > 0
+            if has_global_ung_rows:
                 dist_new_ung = self._remove_linear_dependence_half_size(
                     dist_new_ung, self.lindep_thresh)
                 dist_new_ung = self._orthogonalize_gram_schmidt_half_size(

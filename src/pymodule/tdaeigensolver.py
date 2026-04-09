@@ -185,7 +185,14 @@ class TdaEigenSolver(TdaEigenSolverBase):
 
         else:
             orb_ene = None
+            norb = None
             nocc = None
+
+        norb, nocc = self.comm.bcast((norb, nocc), root=mpi_master())
+
+        self._check_mpi_oversubscription(
+            self._get_excitation_space_dimension_restricted(nocc, norb),
+            'excitation space')
 
         # ERI information
         eri_dict = self._init_eri(molecule, basis)

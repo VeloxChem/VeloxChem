@@ -176,6 +176,10 @@ class ComplexResponseSolver(ComplexResponseSolverBase):
         norb = orb_ene.shape[0]
         nocc = molecule.number_of_alpha_occupied_orbitals(basis)
 
+        self._check_mpi_oversubscription(
+            self._get_excitation_space_dimension_restricted(nocc, norb),
+            'response space')
+
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
         # DFT information

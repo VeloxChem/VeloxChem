@@ -196,6 +196,10 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
                     (self.num_virtual_orbitals)),
                 f'{type(self).__name__}: too many excited states')
 
+        self._check_mpi_oversubscription(
+            self._get_excitation_space_dimension_restricted(nocc, norb),
+            'excitation space')
+
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
 

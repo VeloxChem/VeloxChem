@@ -127,6 +127,8 @@ class TestUnrestrictedRPA:
 
         self.run_rpa_with_ecp(ref_exc_enes, ref_osc_str, 1.0e-6)
 
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 4,
+                        reason='limit MPI size for this test case')
     def test_core_excitation_water_cation_sto3g(self):
 
         xyz_string = """3
