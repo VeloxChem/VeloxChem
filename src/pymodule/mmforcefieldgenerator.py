@@ -2578,21 +2578,16 @@ class MMForceFieldGenerator:
         """
 
         assert_msg_critical(
-            method in ('seminario', 'phf'),
+            method.lower() in ('seminario', 'phf', 'phf(k)'),
             "MMForceFieldGenerator.reparameterize: method must be "
-            "'seminario' or 'phf'")
+            "'Seminario', 'PHF' or 'PHF(K)'")
 
-        # ------------------------------------------------------------------
-        # Resolve / validate the Hessian (shared by both methods)
-        # ------------------------------------------------------------------
+        assert_msg_critical(
+            hessian is not None,
+            'MMForceFieldGenerator.reparameterize: Hessian is required for ' +
+            'reparameterization')
 
-        assert method == 'seminario' or method == 'phf', "Method should be 'seminario' or 'phf'"
-        if hessian is None:
-            assert_msg_critical(
-                False,
-                'MMForceFieldGenerator.reparameterize: expecting Hessian')
-
-        elif isinstance(hessian, str):
+        if isinstance(hessian, str):
             assert_msg_critical(
                 hessian.lower() == 'xtb',
                 'ForceFieldGenerator.reparameterize: invalid Hessian option')
@@ -2638,50 +2633,60 @@ class MMForceFieldGenerator:
         # PHF branch
         # ------------------------------------------------------------------
 
-        if method == 'phf':
+        if 'phf' in method.lower():
 
+            phf = PHFParameterizer()
             self.ostream.print_info(
                 'Force-field reparameterization based on the PHF method')
             self.ostream.print_blank()
             self.ostream.print_reference('Reference:')
-            self.ostream.print_reference(
-                'R. Wang, M. Ozhgibesov, H. Hirao, '
-                'J. Comput. Chem. 2016, 37, 2349-2359. '
-                'DOI: 10.1002/jcc.24457')
+            self.ostream.print_reference(phf.get_reference())
             self.ostream.print_blank()
             self.ostream.flush()
-
-            phf = PHFParameterizer()
-            phf_results = phf.compute(self, hessian)
+            if method.lower() == 'phf(k)':
+                katachi = True
+            else:
+                katachi = False
+            phf_results = phf.compute(self, hessian, self.equivalent_atoms,
+                                      katachi)
 
             # Patch bonds
-            for key, k_phf in phf_results['bonds'].items():
-                self.bonds[key]['force_constant'] = k_phf
+            for key, k in phf_results['bonds'].items():
+                self.bonds[key]['force_constant'] = k
                 self.bonds[key]['comment'] += ' from Hessian (PHF)'
 
             # Patch angles
-            for key, k_phf in phf_results['angles'].items():
-                self.angles[key]['force_constant'] = k_phf
+            for key, k in phf_results['angles'].items():
+                self.angles[key]['force_constant'] = k
                 self.angles[key]['comment'] += ' from Hessian (PHF)'
 
+            if katachi:
+                for key, r in phf_results['bonds_equilibria'].items():
+                    self.bonds[key]['equilibrium'] = r
+                    self.bonds[key]['comment'] += ' from Hessian (PHF)'
+
+                for key, a in phf_results['angles_equilibria'].items():
+                    self.angles[key]['equilibrium'] = a
+                    self.angles[key]['comment'] += ' from Hessian (PHF)'
+
             # Patch dihedrals
-            for key, k_phf in phf_results['dihedrals'].items():
+            for key, k in phf_results['dihedrals'].items():
                 dih = self.dihedrals[key]
                 if dih['multiple']:
                     # PHF yields one scalar per dihedral tuple; distribute
                     # it equally across all terms of a multi-term dihedral.
-                    dih['barrier'] = [k_phf] * len(dih['barrier'])
+                    dih['barrier'] = [k] * len(dih['barrier'])
                     dih['comment'] = [
                         c + ' from Hessian (PHF)' for c in dih['comment']
                     ]
                 else:
-                    dih['barrier'] = k_phf
+                    dih['barrier'] = k
                     dih['comment'] += ' from Hessian (PHF)'
 
             # Patch impropers
-            for key, k_phf in phf_results['impropers'].items():
+            for key, k in phf_results['impropers'].items():
                 if key in self.impropers:
-                    self.impropers[key]['barrier'] = k_phf
+                    self.impropers[key]['barrier'] = k
                     self.impropers[key]['comment'] += ' from Hessian (PHF)'
 
             return

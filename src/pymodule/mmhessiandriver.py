@@ -9,9 +9,10 @@ try:
     import openmm.unit as unit
 except ImportError:
     pass
+
 from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
-from .veloxchemlib import bohr_in_angstrom, hartree_in_kjpermol
+
 
 class MMHessianDriver:
     """
@@ -45,6 +46,7 @@ class MMHessianDriver:
     # Conversion factor: kJ/mol/nm^2 -> Hartree/Bohr^2
     @staticmethod
     def _to_hartree_bohr2() -> float:
+        from .veloxchemlib import bohr_in_angstrom, hartree_in_kjpermol
         bohr_to_nm = bohr_in_angstrom() * 0.1
         return bohr_to_nm**2 / hartree_in_kjpermol()
 
@@ -77,6 +79,7 @@ class MMHessianDriver:
         self._dihedral_constants = {}  # {(i,j,k,l): k_d}  kJ/mol
         self._angle_constants = {}  # {(i,j,k):   k_a}  kJ/mol/rad^2
         self._improper_constants = {}  # {(i,j,k,l): k_imp}  kJ/mol
+        self._bond_constants = {}  # {(i,j): k_b}  kJ/mol/nm^2
         # Bond constants are not needed as bonds are the final stage.
 
     # ------------------------------------------------------------------
@@ -110,32 +113,9 @@ class MMHessianDriver:
         """Called by PHFParameterizer after Stage 3 (improper fitting)."""
         self._improper_constants = dict(improper_constants)
 
-    def get_represented_dihedrals(self) -> set:
-        """
-        Return the set of all proper dihedral atom tuples that exist in the
-        OpenMM PeriodicTorsionForce, indexed by both forward and reverse
-        orderings.
-
-        Used by PHFParameterizer to filter self._dihedrals down to only
-        those with a force field representation before any fitting begins.
-        Dihedrals absent from this set have no OpenMM entry (e.g. because
-        the GAFF barrier is zero and was never written to the XML), so
-        h_unit would be all-zero and PHF cannot fit them.
-
-        Returns
-        -------
-        set of tuples (a1, a2, a3, a4)
-            Both (a1,a2,a3,a4) and (a4,a3,a2,a1) are included for each
-            stored torsion so that canonical-ordering lookups always match.
-        """
-        represented = set()
-        for force in self._system.getForces():
-            if isinstance(force, mm.PeriodicTorsionForce):
-                for idx in range(force.getNumTorsions()):
-                    a1, a2, a3, a4, _, _, _ = force.getTorsionParameters(idx)
-                    represented.add((a1, a2, a3, a4))
-                    represented.add((a4, a3, a2, a1))
-        return represented
+    def update_bond_constants(self, bond_constants: dict):
+        """Called by PHFParameterizer after Stage 4 (bond fitting)."""
+        self._bond_constants = dict(bond_constants)
 
     # ------------------------------------------------------------------
     # Public interface
@@ -279,7 +259,9 @@ class MMHessianDriver:
         system = copy.deepcopy(self._system)
         self._apply_current_best_estimates(system)
         for coord_type, atom_indices in zero_targets:
-            self._set_target_force_constant(system, coord_type, atom_indices,
+            self._set_target_force_constant(system,
+                                            coord_type,
+                                            atom_indices,
                                             k=0.0)
         return self._numerical_partial_hessian(system, terminal_pair)
 
@@ -373,9 +355,16 @@ class MMHessianDriver:
                         idx)
                     if (a1, a2, a3, a4) in [(i, j, kk, l), (l, kk, j, i)]:
                         force.setTorsionParameters(
-                            idx, a1, a2, a3, a4, per, phase,
+                            idx,
+                            a1,
+                            a2,
+                            a3,
+                            a4,
+                            per,
+                            phase,
                             k * unit.kilojoules_per_mole,
                         )
+        pass
 
     @staticmethod
     def _set_angle_k(system: 'mm.System', indices: tuple, k: float):
@@ -396,31 +385,18 @@ class MMHessianDriver:
 
     @staticmethod
     def _set_improper_k(system: 'mm.System', indices: tuple, k: float):
-        """
-        Set force constant of an improper torsion (out-of-plane dihedral).
-
-        In OpenMM the central atom of an improper is typically stored as
-        atom 3 (0-based index 2), so the same four atoms can appear in many
-        orderings depending on the force field XML. We match by atom set
-        rather than by ordered tuple to cover all conventions.
-        """
-        atoms = set(indices)
+        central = indices[0]  # VeloxChem: central atom is first
+        peripheral = set(indices[1:])  # the other three atoms
         for force in system.getForces():
             if isinstance(force, mm.PeriodicTorsionForce):
                 for idx in range(force.getNumTorsions()):
                     a1, a2, a3, a4, per, phase, _ = force.getTorsionParameters(
                         idx)
-                    if {a1, a2, a3, a4} == atoms:
-                        force.setTorsionParameters(
-                            idx,
-                            a1,
-                            a2,
-                            a3,
-                            a4,
-                            per,
-                            phase,
-                            k * unit.kilojoules_per_mole,
-                        )
+                    # Require central atom at OpenMM's position 2 (a3)
+                    if a3 == central and {a1, a2, a4} == peripheral:
+                        force.setTorsionParameters(idx, a1, a2, a3, a4, per,
+                                                   phase,
+                                                   k * unit.kilojoules_per_mole)
 
     @staticmethod
     def _set_bond_k(system: 'mm.System', indices: tuple, k: float):
@@ -438,6 +414,86 @@ class MMHessianDriver:
                             k * unit.kilojoules_per_mole / unit.nanometer**2,
                         )
 
+    @staticmethod
+    def _compute_dihedral_angle(positions: np.ndarray, a: int, b: int, c: int,
+                                d: int) -> float:
+        """Return the signed torsion angle in radians for atoms a-b-c-d."""
+        r_ab = positions[b] - positions[a]
+        r_bc = positions[c] - positions[b]
+        r_cd = positions[d] - positions[c]
+        n1 = np.cross(r_ab, r_bc)
+        n2 = np.cross(r_bc, r_cd)
+        u_bc = r_bc / np.linalg.norm(r_bc)
+        return float(np.arctan2(np.dot(np.cross(n1, n2), u_bc), np.dot(n1, n2)))
+
+    @staticmethod
+    def _set_dihedral_phase(system: 'mm.System', indices: tuple, phi_qm: float):
+        """Set phase δ = n × φ_QM for every matching PeriodicTorsionForce entry."""
+        i, j, kk, l = indices
+        for force in system.getForces():
+            if isinstance(force, mm.PeriodicTorsionForce):
+                for idx in range(force.getNumTorsions()):
+                    a1, a2, a3, a4, per, _, k_val = force.getTorsionParameters(
+                        idx)
+                    if (a1, a2, a3, a4) in [(i, j, kk, l), (l, kk, j, i)]:
+                        force.setTorsionParameters(idx, a1, a2, a3, a4, per,
+                                                   per * phi_qm * unit.radian,
+                                                   k_val)
+
+    @staticmethod
+    def _set_improper_phase(system: 'mm.System', indices: tuple,
+                            omega_qm: float):
+        """Set phase δ = n × ω_QM for every matching improper torsion entry."""
+        central = indices[0]
+        peripheral = set(indices[1:])
+        for force in system.getForces():
+            if isinstance(force, mm.PeriodicTorsionForce):
+                for idx in range(force.getNumTorsions()):
+                    a1, a2, a3, a4, per, _, k_val = force.getTorsionParameters(
+                        idx)
+                    if a3 == central and {a1, a2, a4} == peripheral:
+                        force.setTorsionParameters(idx, a1, a2, a3, a4, per,
+                                                   per * omega_qm * unit.radian,
+                                                   k_val)
+
+    @staticmethod
+    def _find_improper_atom_order(system: 'mm.System', indices: tuple) -> tuple:
+        """Return the (a1, a2, a3=central, a4) ordering from PeriodicTorsionForce."""
+        central = indices[0]
+        peripheral = set(indices[1:])
+        for force in system.getForces():
+            if isinstance(force, mm.PeriodicTorsionForce):
+                for idx in range(force.getNumTorsions()):
+                    a1, a2, a3, a4, *_ = force.getTorsionParameters(idx)
+                    if a3 == central and {a1, a2, a4} == peripheral:
+                        return (a1, a2, a3, a4)
+        return indices  # fallback: no matching entry found
+
+    @staticmethod
+    def _set_bond_eq(system: 'mm.System', indices: tuple, r0_nm: float):
+        """Update the equilibrium bond length (in nm) for the given bond."""
+        i, j = indices
+        for force in system.getForces():
+            if isinstance(force, mm.HarmonicBondForce):
+                for idx in range(force.getNumBonds()):
+                    a1, a2, _, k_val = force.getBondParameters(idx)
+                    if {a1, a2} == {i, j}:
+                        force.setBondParameters(idx, a1, a2,
+                                                r0_nm * unit.nanometer, k_val)
+
+    @staticmethod
+    def _set_angle_eq(system: 'mm.System', indices: tuple, theta0_rad: float):
+        """Update the equilibrium angle (in radians) for the given angle."""
+        i, j, kk = indices
+        for force in system.getForces():
+            if isinstance(force, mm.HarmonicAngleForce):
+                for idx in range(force.getNumAngles()):
+                    a1, a2, a3, _, k_val = force.getAngleParameters(idx)
+                    if (a1, a2, a3) in [(i, j, kk), (kk, j, i)]:
+                        force.setAngleParameters(idx, a1, a2, a3,
+                                                 theta0_rad * unit.radian,
+                                                 k_val)
+
     def _apply_current_best_estimates(self, system: 'mm.System'):
         """
         Write the best-estimate force constants determined so far into the
@@ -445,10 +501,12 @@ class MMHessianDriver:
         """
         for (i, j, kk, l), k_val in self._dihedral_constants.items():
             self._set_dihedral_k(system, (i, j, kk, l), k_val)
-        for (i, j, kk), k_val in self._angle_constants.items():
-            self._set_angle_k(system, (i, j, kk), k_val)
         for (i, j, kk, l), k_val in self._improper_constants.items():
             self._set_improper_k(system, (i, j, kk, l), k_val)
+        for (i, j, kk), k_val in self._angle_constants.items():
+            self._set_angle_k(system, (i, j, kk), k_val)
+        for (i, j), k_val in self._bond_constants.items():
+            self._set_bond_k(system, (i, j), k_val)
 
     # ------------------------------------------------------------------
     # Private helpers — numerical Hessian

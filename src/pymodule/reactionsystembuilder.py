@@ -99,7 +99,7 @@ class ReactionSystemBuilder():
 
         self.posres_residue_radius: float = -1  # A, cutoff measured from the com of the ligand for which residues to add to the position restraints, -1 includes the whole molecule
         self.posres_k = 1000  # kj/mol nm^2, default in gromacs
-        self.carbon_k = 100 # kj/mol nm, centroid for bringing the system and CNT or graphene close
+        self.carbon_k = 100  # kj/mol nm, centroid for bringing the system and CNT or graphene close
 
         self.coul14_scale: float = 0.833
         self.lj14_scale: float = 0.5
@@ -275,10 +275,10 @@ class ReactionSystemBuilder():
             box = self._add_CNT_graphene(system, nb_force, topology, vlx_mol)
             # system.
             box = self._configure_pbc(system, topology, nb_force, box)  # A
-            self.positions, vlx_mol = self._equilibrate_carbon(system,nb_force,topology,self.positions)
+            self.positions, vlx_mol = self._equilibrate_carbon(
+                system, nb_force, topology, self.positions)
         else:
             box = self._configure_pbc(system, topology, nb_force, box)  # A
-            
 
         # assert False, "Rethink CNT/graphene input"
 
@@ -497,9 +497,9 @@ class ReactionSystemBuilder():
             2 * self.padding + 0.1 *
             (max(self.positions[:, 2]) - min(self.positions[:, 2]))
         ]
-        
+
         dims = ['x', 'y', 'z']
-        
+
         for i in range(3):
             if box[i] == -1:
                 box[i] = max(minim)
@@ -539,7 +539,8 @@ class ReactionSystemBuilder():
         self.ostream.flush()
         return box
 
-    def _equilibrate_carbon(self,system,nb_force,topology,initial_positions):
+    def _equilibrate_carbon(self, system, nb_force, topology,
+                            initial_positions):
         initial_positions = np.array(initial_positions)
         # a graphene sheet is at z =0
         # a CNT lies along the X-axis
@@ -547,79 +548,86 @@ class ReactionSystemBuilder():
         # rotate the molecule with the next face down
         # move the molecule as close/far away as necessary
         # check minimal z after rotation
-        
-        I = np.array([[1,0,0],[0,1,0],[0,0,1]])
-        Rx = np.array([[1,0,0],[0,0,-1],[0,1,0]])
-        Ry = np.array([[0,0,1],[0,1,0],[-1,0,0]])
-        Rz=np.array([[0,-1,0],[1,0,0],[0,0,1]])
+
+        I = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
+        Rx = np.array([[1, 0, 0], [0, 0, -1], [0, 1, 0]])
+        Ry = np.array([[0, 0, 1], [0, 1, 0], [-1, 0, 0]])
+        Rz = np.array([[0, -1, 0], [1, 0, 0], [0, 0, 1]])
         # Generate 6 rotations so that every 'face' of the molecule once faces down to the graphene sheet
-        rotations = [[I],[Rx],[Rx,Rx],[Rx,Rx,Rx],[Ry],[Ry,Ry,Ry]]
+        rotations = [[I], [Rx], [Rx, Rx], [Rx, Rx, Rx], [Ry], [Ry, Ry, Ry]]
         # In case of a CNT, you'd technically get 12 unique orientations, all of the above ones, and with Rz applied to them
-        
+
         # Shift the reactant to the center
         rea_indices = [atom.index for atom in self.reaction_atoms.values()]
         rea_positions = np.array([initial_positions[i] for i in rea_indices])
-        avg_x = np.mean(rea_positions[:,0])
-        avg_y = np.mean(rea_positions[:,1])
-        avg_z = np.mean(rea_positions[:,2])
-        center = np.array([avg_x,avg_y,avg_z])
+        avg_x = np.mean(rea_positions[:, 0])
+        avg_y = np.mean(rea_positions[:, 1])
+        avg_z = np.mean(rea_positions[:, 2])
+        center = np.array([avg_x, avg_y, avg_z])
         self.ostream.print_info(f"Shifting reactant with {center}")
         for i in rea_indices:
-            initial_positions[i]-=center
-        
+            initial_positions[i] -= center
+
         systems = self._interpolate_system(
             system,
-            [0,1],
+            [0, 1],
             nb_force,
             E_field_force=None,
         )
         rea_system = systems[0]
-        
+
         if self.CNT:
             carbon_ext_force = mm.CustomExternalForce("carbon_k*abs(z+y)")
         else:
             carbon_ext_force = mm.CustomExternalForce("carbon_k*abs(z)")
         carbon_ext_force.setName("Carbon external equilibration force")
-        carbon_ext_force.addGlobalParameter("carbon_k",self.carbon_k)
-        
-        reaction_particles_indices = [atom.index for atom in self.reaction_atoms.values()]
+        carbon_ext_force.addGlobalParameter("carbon_k", self.carbon_k)
+
+        reaction_particles_indices = [
+            atom.index for atom in self.reaction_atoms.values()
+        ]
         for i in reaction_particles_indices:
             carbon_ext_force.addParticle(i)
-        
+
         # with open("added_carbon", mode="w", encoding="utf-8") as output:
         #     output.write(mm.XmlSerializer.serialize(system))
-        all_conformers = {'energies':[],'geometries':[],'molecules':[],}
+        all_conformers = {
+            'energies': [],
+            'geometries': [],
+            'molecules': [],
+        }
         for i in range(6):
             positions = copy.copy(initial_positions)
 
             pdb_name = f'added_carbon.pdb'
             self.ostream.print_info(f"Rotating around {rotations[i]}")
-            minz=100
+            minz = 100
             for j in rea_indices:
                 new_point = []
                 for rot in rotations[i]:
                     old_point = positions[j]
-                    new_point = rot@old_point
-                    
+                    new_point = rot @ old_point
+
                     positions[j] = new_point
                 if new_point[2] < minz:
-                    minz= new_point[2]
-                    
+                    minz = new_point[2]
+
             if self.CNT:
-                shift = np.array([0,0,minz-self.CNT_radius_nm*10-5])
+                shift = np.array([0, 0, minz - self.CNT_radius_nm * 10 - 5])
             else:
-                shift = np.array([0,0,minz-5])
-            self.ostream.print_info(f"Shifting reactant with {shift} for rotation {i}")
+                shift = np.array([0, 0, minz - 5])
+            self.ostream.print_info(
+                f"Shifting reactant with {shift} for rotation {i}")
             self.ostream.flush()
             for j in rea_indices:
-                positions[j]-=shift
-            
+                positions[j] -= shift
+
             pdb = mmapp.PDBFile.writeFile(
                 topology,
                 positions * mmunit.angstrom,
                 pdb_name,
             )
-            opm_dyn = OpenMMDynamics(ostream = self.ostream)
+            opm_dyn = OpenMMDynamics(ostream=self.ostream)
             opm_dyn.pdb = mmapp.PDBFile(pdb_name)
             opm_dyn.system = rea_system
 
@@ -629,9 +637,9 @@ class ReactionSystemBuilder():
                 # snapshots=10
                 # nsteps=self.mm_steps * snapshots,
             )
-            all_conformers['energies']+=conformers_dict['energies']
-            all_conformers['geometries']+=conformers_dict['geometries']
-            all_conformers['molecules']+=conformers_dict['molecules']
+            all_conformers['energies'] += conformers_dict['energies']
+            all_conformers['geometries'] += conformers_dict['geometries']
+            all_conformers['molecules'] += conformers_dict['molecules']
             self.ostream.print_info(f"Saving pdbs")
             # for e,mol in zip(conformers_dict['energies'],conformers_dict['molecules']):
             #     mmapp.PDBFile.writeFile(
@@ -641,11 +649,10 @@ class ReactionSystemBuilder():
             # )
         if os.path.exists("added_carbon.pdb"):
             os.remove("added_carbon.pdb")
-        min_conf_i=np.argmin(all_conformers['energies'])
+        min_conf_i = np.argmin(all_conformers['energies'])
         min_mol = all_conformers['molecules'][min_conf_i]
         positions = min_mol.get_coordinates_in_angstrom()
         return positions, min_mol
-        
 
     def _add_reactant(self, system, topology, nb_force):
         reaction_chain = topology.addChain()
@@ -842,7 +849,7 @@ class ReactionSystemBuilder():
         # middle_y = (max(mol_positions[:, 1]) + min(mol_positions[:, 1])) / 2
         # min_z = min(mol_positions[:, 2])
         # min_y = min(mol_positions[:, 1])
-        
+
         # if self.graphene:
         #     x_offset = middle_x - X / 2
         #     y_offset = middle_y - Y / 2
@@ -851,7 +858,6 @@ class ReactionSystemBuilder():
         #     x_offset = middle_x - X / 2
         #     y_offset = min_y - 0.7 * (R + 1)
         #     z_offset = min_z - 0.7 * (R + 1)
-            
 
         for m in range(0, M):
             for n in range(0, N):
@@ -866,7 +872,7 @@ class ReactionSystemBuilder():
                         coord = np.array(
                             [coord[0], R * math.sin(phi), R * math.cos(phi)]
                         )  # A, X/2 factor is to center the CNT in the middle of the box. The X length is used to get the proper box size
-                    
+
                     # coord += np.array([x_offset, y_offset, z_offset])
 
                     mm_element = mmapp.Element.getByAtomicNumber(atomic_number)
@@ -1676,8 +1682,9 @@ class ReactionSystemBuilder():
 
         assert_msg_critical('openmm' in sys.modules,
                             'openmm is required for EvbSystemBuilder.')
-        assert len(E_field) == 3, f"Electric field {E_field} should have 3 components"
-        
+        assert len(
+            E_field) == 3, f"Electric field {E_field} should have 3 components"
+
         E_field_force = mm.CustomExternalForce("-k*q*(Ex*x+Ey*y+Ez*z)")
         E_field_force.addGlobalParameter("Ex", E_field[0])
         E_field_force.addGlobalParameter("Ey", E_field[1])
@@ -2457,7 +2464,11 @@ class ReactionSystemBuilder():
         # Calculate the angle using the dot product
         dot_product = np.dot(vector_u, vector_v)
         angle = np.arccos(dot_product)
-        angle = angle * 180 / np.pi  # Convert to degrees
+        if angle_unit.lower() == 'degree':
+            angle = angle * 180 / np.pi  # Convert to degrees
+        elif angle_unit.lower() != 'radian':
+            raise ValueError(
+                f"Invalid angle unit {angle_unit}. Use 'degree' or 'radian'.")
 
         return angle
 
