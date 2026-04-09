@@ -232,6 +232,8 @@ class TestValetAnalyzer:
 
     def test_plot_transition_diagram_renders_bars_connectors_and_title(self):
 
+        pytest.importorskip('matplotlib.pyplot')
+
         analyzer = ValetAnalyzer()
         transition_data = {
             'subgroup_names': ['Unassigned', 'Donor', 'Acceptor'],
