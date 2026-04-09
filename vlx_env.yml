@@ -33,7 +33,7 @@ dependencies:
   - rdkit
   - dftd4-python
   - geometric
-  - libxc
+  - libxc>=7.0.0
   - clang-format
   - yapf
   - toml

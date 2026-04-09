@@ -39,8 +39,8 @@ import sys
 
 from .veloxchemlib import KineticEnergyDriver, XCIntegrator
 from .veloxchemlib import T4CScreener
-from .veloxchemlib import (hartree_in_ev, bohr_in_angstrom,
-                           rotatory_strength_in_cgs)
+from .veloxchemlib import (hartree_in_ev, hartree_in_wavenumber,
+                           bohr_in_angstrom, rotatory_strength_in_cgs)
 from .veloxchemlib import get_dimer_ao_indices, parse_xc_func, make_matrix
 from .veloxchemlib import mpi_master, mat_t
 from .matrix import Matrix
@@ -58,6 +58,12 @@ from .errorhandler import assert_msg_critical
 from .inputparser import parse_input, print_keywords
 from .dftutils import get_default_grid_level
 from .checkpoint import read_rsp_hdf5, write_rsp_hdf5
+from .spectrumplot import plot_uv_vis_spectrum, plot_ecd_spectrum
+
+try:
+    import matplotlib.pyplot as plt
+except ImportError:
+    pass
 
 
 class ExcitonModelDriver:
@@ -858,6 +864,26 @@ class ExcitonModelDriver:
 
             self.ostream.flush()
 
+            return {
+                'hamiltonian': self.H.copy(),
+                'num_states': total_num_states,
+                'adiabatic_eigenvalues': eigvals.copy(),
+                'adiabatic_eigenvectors': eigvecs.copy(),
+                'adiabatic_electric_transition_dipoles':
+                    adia_elec_trans_dipoles.copy(),
+                'adiabatic_velocity_transition_dipoles':
+                    adia_velo_trans_dipoles.copy(),
+                'adiabatic_magnetic_transition_dipoles':
+                    adia_magn_trans_dipoles.copy(),
+                'excitation_energies_in_ev': eigvals * hartree_in_ev(),
+                'oscillator_strengths': np.array(osc_str, dtype=float),
+                'rotatory_strengths': np.array(rot_str, dtype=float),
+            }
+
+        else:
+            # non-master rank
+            return {}
+
     def get_excitation_ids(self, dimer_pairs):
         """
         Gets excitation indices.
@@ -887,6 +913,134 @@ class ExcitonModelDriver:
             excitation_ids[ind_B, ind_A] = ct_id + ct_states
 
         return excitation_ids
+
+    def _get_spectrum_plot_dict(self, exciton_results):
+        """
+        Converts exciton-model results to the response-style spectrum format.
+
+        :param exciton_results:
+            The dictionary returned by compute.
+
+        :return:
+            A dictionary readable by spectrumplot.py plotting routines.
+        """
+
+        required_keys = (
+            'adiabatic_eigenvalues',
+            'oscillator_strengths',
+            'rotatory_strengths',
+        )
+
+        for key in required_keys:
+            assert_msg_critical(
+                key in exciton_results,
+                f'{type(self).__name__}: Missing key "{key}" in exciton results'
+            )
+
+        return {
+            'eigenvalues': exciton_results['adiabatic_eigenvalues'],
+            'oscillator_strengths': exciton_results['oscillator_strengths'],
+            'rotatory_strengths': exciton_results['rotatory_strengths'],
+        }
+
+    def plot_uv_vis(self,
+                    exciton_results,
+                    broadening_type="lorentzian",
+                    broadening_value=(1000.0 / hartree_in_wavenumber() *
+                                      hartree_in_ev()),
+                    ax=None):
+        """
+        Plot the UV-Vis absorption spectrum from exciton-model results.
+
+        :param exciton_results:
+            The dictionary returned by compute.
+        :param broadening_type:
+            The type of broadening to use. Either 'lorentzian' or 'gaussian'.
+        :param broadening_value:
+            The broadening value in eV.
+        :param ax:
+            The matplotlib axis to plot on.
+        """
+
+        plot_dict = self._get_spectrum_plot_dict(exciton_results)
+
+        plot_uv_vis_spectrum(plot_dict,
+                             broadening_type=broadening_type,
+                             broadening_value=broadening_value,
+                             ax=ax)
+
+    def plot_ecd(self,
+                 exciton_results,
+                 broadening_type="lorentzian",
+                 broadening_value=(1000.0 / hartree_in_wavenumber() *
+                                   hartree_in_ev()),
+                 ax=None):
+        """
+        Plot the ECD spectrum from exciton-model results.
+
+        :param exciton_results:
+            The dictionary returned by compute.
+        :param broadening_type:
+            The type of broadening to use. Either 'lorentzian' or 'gaussian'.
+        :param broadening_value:
+            The broadening value in eV.
+        :param ax:
+            The matplotlib axis to plot on.
+        """
+
+        plot_dict = self._get_spectrum_plot_dict(exciton_results)
+
+        plot_ecd_spectrum(plot_dict,
+                          broadening_type=broadening_type,
+                          broadening_value=broadening_value,
+                          ax=ax)
+
+    def plot(self,
+             exciton_results,
+             broadening_type="lorentzian",
+             broadening_value=(1000.0 / hartree_in_wavenumber() *
+                               hartree_in_ev()),
+             plot_type="electronic"):
+        """
+        Plot the UV-Vis absorption or ECD spectrum from exciton-model results.
+
+        :param exciton_results:
+            The dictionary returned by compute.
+        :param broadening_type:
+            The type of broadening to use. 'lorentzian' or 'gaussian'.
+        :param broadening_value:
+            The broadening value in eV.
+        :param plot_type:
+            The type of plot to generate. 'uv', 'ecd', or 'electronic'.
+        """
+
+        assert_msg_critical('matplotlib' in sys.modules,
+                            'matplotlib is required.')
+
+        if plot_type.lower() in ["uv", "uv-vis", "uv_vis"]:
+            self.plot_uv_vis(exciton_results,
+                             broadening_type=broadening_type,
+                             broadening_value=broadening_value)
+        elif plot_type.lower() == "ecd":
+            self.plot_ecd(exciton_results,
+                          broadening_type=broadening_type,
+                          broadening_value=broadening_value)
+        elif plot_type.lower() == "electronic":
+            fig, axs = plt.subplots(2, 1, figsize=(8, 10))
+            fig.subplots_adjust(hspace=0.3)
+
+            self.plot_uv_vis(exciton_results,
+                             broadening_type=broadening_type,
+                             broadening_value=broadening_value,
+                             ax=axs[0])
+            self.plot_ecd(exciton_results,
+                          broadening_type=broadening_type,
+                          broadening_value=broadening_value,
+                          ax=axs[1])
+        else:
+            assert_msg_critical(False, 'Invalid plot type')
+
+        plt.show()
 
     def get_one_elec_integrals(self, molecule, basis):
         """
@@ -1279,7 +1433,7 @@ class ExcitonModelDriver:
             # compute dimer energy
             hcore = kin_mat + npot_mat
             fock = hcore + fock_mat_np
-            dimer_energy = dimer.nuclear_repulsion_energy()
+            dimer_energy = dimer.effective_nuclear_repulsion_energy(basis)
             dimer_energy += np.sum(dens * (hcore + fock))
             if self._dft:
                 dimer_energy += xc_ene

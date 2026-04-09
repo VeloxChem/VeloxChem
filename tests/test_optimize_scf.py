@@ -32,8 +32,7 @@ class TestOptimizeSCF:
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
         scf_drv.update_settings(task.input_dict['scf'],
                                 task.input_dict['method_settings'])
-        scf_results = scf_drv.compute(task.molecule, task.ao_basis,
-                                      task.min_basis)
+        scf_results = scf_drv.compute(task.molecule, task.ao_basis)
 
         grad_drv = ScfGradientDriver(scf_drv)
         opt_drv = OptimizationDriver(grad_drv)
@@ -41,7 +40,7 @@ class TestOptimizeSCF:
             'coordsys': 'tric',
             'filename': task.input_dict['filename'],
         })
-        opt_results = opt_drv.compute(task.molecule, task.ao_basis, scf_results)
+        opt_results = opt_drv.compute(task.molecule, task.ao_basis)
 
         if task.mpi_rank == mpi_master():
             opt_mol = Molecule.read_xyz_string(opt_results['final_geometry'])

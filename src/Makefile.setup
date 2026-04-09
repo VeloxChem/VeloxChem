@@ -6,8 +6,8 @@ CXX := clang++
 
 # Compiler flags for clang++ compiler 
 
-CXX_REL_FLG := -std=c++20 -O3 -Xpreprocessor -fopenmp -march=native -Wall -Rpass=loop-vectorize
-CXX_DEB_FLG := -std=c++20 -O3 -Xpreprocessor -fopenmp -march=native -Wall -Rpass=loop-vectorize -g 
+CXX_REL_FLG := -std=c++20 -O3 -Xpreprocessor -fopenmp -march=native -Wall
+CXX_DEB_FLG := -std=c++20 -O3 -Xpreprocessor -fopenmp -march=native -Wall -g 
 
 # Generic preprocessor flags
 
@@ -43,6 +43,14 @@ LIBXC_LD  := -L /opt/libxc/lib -lxc
 
 CXX_REL_FLG += $(LIBXC_INC)
 CXX_DEB_FLG += $(LIBXC_INC)
+
+# Boost interface
+
+LIBBST_INC := -I /opt/homebrew/Cellar/boost/1.90.0_1/include
+LIBBST_LD  := -L /opt/homebrew/Cellar/boost/1.90.0_1/lib -lboost_math_c99
+
+CXX_REL_FLG += $(LIBBST_INC)
+CXX_DEB_FLG += $(LIBBST_INC)
 
 # Eigen interface
 

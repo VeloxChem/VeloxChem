@@ -33,7 +33,7 @@ class TestOrbitalResponse:
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
         scf_drv.update_settings(task.input_dict['scf'],
                                 task.input_dict['method_settings'])
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        scf_drv.compute(task.molecule, task.ao_basis)
 
         # Our references: lambda and omega in AO basis
 

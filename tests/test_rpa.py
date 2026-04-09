@@ -1,4 +1,5 @@
 import numpy as np
+from mpi4py import MPI
 import pytest
 
 from veloxchem.veloxchemlib import mpi_master
@@ -11,7 +12,13 @@ from veloxchem.lreigensolver import LinearResponseEigenSolver
 @pytest.mark.solvers
 class TestRPA:
 
-    def run_rpa(self, xcfun_label, basis_label, ref_exc_enes, ref_osc_str, tol):
+    def run_rpa(self,
+                xcfun_label,
+                basis_label,
+                ref_exc_enes,
+                ref_osc_str,
+                tol,
+                max_subspace_dim=None):
 
         xyz_string = """3
         xyz
@@ -31,6 +38,7 @@ class TestRPA:
         lr_drv = LinearResponseEigenSolver()
         lr_drv.ostream.mute()
         lr_drv.nstates = 5
+        lr_drv.max_subspace_dim = max_subspace_dim
         lr_results = lr_drv.compute(mol, bas, scf_results)
 
         if lr_drv.rank == mpi_master():
@@ -39,6 +47,32 @@ class TestRPA:
             assert np.max(
                 np.abs(ref_osc_str -
                        lr_results['oscillator_strengths'])) < 1.0e-4
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    def test_compute_rejects_openshell_molecule(self):
+
+        xyz_string = """3
+        xyz
+        O   -0.1858140  -1.1749469   0.7662596
+        H   -0.1285513  -0.8984365   1.6808606
+        H   -0.0582782  -0.3702550   0.2638279
+        """
+        mol = Molecule.read_xyz_string(xyz_string)
+        mol.set_multiplicity(3)
+
+        bas = MolecularBasis.read(mol, 'def2-svp', ostream=None)
+
+        # empty scf results just for testing
+        scf_results = {}
+
+        lr_drv = LinearResponseEigenSolver()
+        lr_drv.ostream.mute()
+
+        with pytest.raises(
+                AssertionError,
+                match="Molecule: Invalid multiplicity for restricted"):
+            lr_results_not_used = lr_drv.compute(mol, bas, scf_results)
 
     def test_hf_svp(self):
 
@@ -50,7 +84,12 @@ class TestRPA:
         ref_osc_str = np.array(
             [0.023665, 0.000000, 0.097765, 0.086454, 0.291919])
 
-        self.run_rpa('hf', 'def2-svp', ref_exc_enes, ref_osc_str, 1.0e-6)
+        self.run_rpa('hf',
+                     'def2-svp',
+                     ref_exc_enes,
+                     ref_osc_str,
+                     1.0e-6,
+                     max_subspace_dim=50)
 
     def test_slda_svp(self):
 

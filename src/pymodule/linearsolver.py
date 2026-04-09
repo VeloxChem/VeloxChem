@@ -527,12 +527,14 @@ class LinearSolver:
             'potfile_text': potfile_text,
         }
 
-    def _init_cpcm(self, molecule):
+    def _init_cpcm(self, molecule, basis):
         """
         Initializes C-PCM.
 
         :param molecule:
             The molecule.
+        :param basis:
+            The AO basis set.
         """
 
         # C-PCM setup
@@ -549,7 +551,7 @@ class LinearSolver:
 
             cpcm_grid_t0 = tm.time()
 
-            self.cpcm_drv.init(molecule, do_nuclear=False)
+            self.cpcm_drv.init(molecule, basis, do_nuclear=False)
 
             if self.print_level > 1:
                 self.ostream.print_info(
@@ -657,6 +659,19 @@ class LinearSolver:
         else:
             self._dist_fock_ung.append(fock_ung, axis=1)
 
+    def _clear_subspace_data(self):
+        """
+        Clears stored reduced-space trial, sigma, and nonlinear Fock data.
+        """
+
+        self._dist_bger = None
+        self._dist_bung = None
+        self._dist_e2bger = None
+        self._dist_e2bung = None
+
+        self._dist_fock_ger = None
+        self._dist_fock_ung = None
+
     def _get_initial_guess_size_for_excitations(self, nstates):
         """
         Gets the initial guess size for initial excitations.
@@ -723,6 +738,53 @@ class LinearSolver:
         nstates = self.comm.bcast(nstates, root=mpi_master())
 
         return nstates
+
+    def _add_frequencies_to_checkpoint(self):
+        """
+        Add frequencies to checkpoint file.
+        """
+
+        # For LR/CPP
+
+        if self.checkpoint_file is None:
+            return
+
+        if self.rank == mpi_master():
+            hf = h5py.File(self.checkpoint_file, 'a')
+            key = 'frequencies'
+            if key in hf:
+                del hf[key]
+            hf.create_dataset(key, data=np.array(self.frequencies))
+            hf.close()
+
+        self.comm.barrier()
+
+    def _read_frequencies_from_checkpoint(self):
+        """
+        Read frequencies from checkpoint file.
+
+        :return:
+            The frequencies.
+        """
+
+        # For LR/CPP
+
+        if self.checkpoint_file is None:
+            return None
+
+        frequencies = None
+
+        if self.rank == mpi_master():
+            hf = h5py.File(self.checkpoint_file, 'r')
+            key = 'frequencies'
+            if key in hf:
+                frequencies = np.array(hf.get(key))
+                frequencies = [float(x) for x in frequencies]
+            hf.close()
+
+        frequencies = self.comm.bcast(frequencies, root=mpi_master())
+
+        return frequencies
 
     def compute(self, molecule, basis, scf_results, v_grad=None):
         """
@@ -1941,6 +2003,9 @@ class LinearSolver:
                 den_mat_for_ri_j.set_values(0.5 * (dens_Jab + dens_Jab.T))
 
                 fock_mat = self._ri_drv.compute(den_mat_for_ri_j, 'j')
+
+                fock_mat_a_np = fock_mat.to_numpy()
+                fock_mat_b_np = fock_mat.to_numpy()
             else:
                 # for now we calculate Ka, Kb and Jab separately for open-shell
                 den_mat_for_Ka = make_matrix(basis, mat_t.general)

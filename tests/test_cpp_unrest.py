@@ -5,7 +5,7 @@ from veloxchem.veloxchemlib import mpi_master
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
-from veloxchem.cppsolverunrest import ComplexResponseUnrestricted
+from veloxchem.cppsolverunrest import ComplexResponseUnrestrictedSolver
 
 
 @pytest.mark.solvers
@@ -17,7 +17,8 @@ class TestCppUnrestricted:
                 ref_x_data,
                 ref_y_data,
                 tol,
-                use_subcomms=False):
+                use_subcomms=False,
+                max_subspace_dim=None):
 
         xyz_string = """6
         xyz
@@ -41,11 +42,12 @@ class TestCppUnrestricted:
         scf_drv.acc_type = 'l2_c2diis'
         scf_results = scf_drv.compute(mol, bas)
 
-        lr_drv = ComplexResponseUnrestricted()
+        lr_drv = ComplexResponseUnrestrictedSolver()
         lr_drv.ostream.mute()
         lr_drv.property = cpp_property
         lr_drv.frequencies = list(ref_x_data)
         lr_drv.use_subcomms = use_subcomms
+        lr_drv.max_subspace_dim = max_subspace_dim
         lr_results = lr_drv.compute(mol, bas, scf_results)
 
         if lr_drv.rank == mpi_master():
@@ -63,7 +65,12 @@ class TestCppUnrestricted:
         ref_x_data = [0.33, 0.34, 0.35]
         ref_y_data = [0.05067935, 0.19924613, 0.39344688]
 
-        self.run_cpp(xcfun_label, cpp_property, ref_x_data, ref_y_data, 1.0e-6)
+        self.run_cpp(xcfun_label,
+                     cpp_property,
+                     ref_x_data,
+                     ref_y_data,
+                     1.0e-6,
+                     max_subspace_dim=120)
 
     def test_hf_ecd(self):
 
@@ -74,4 +81,51 @@ class TestCppUnrestricted:
         ref_x_data = [0.33, 0.34, 0.35]
         ref_y_data = [-0.12250733, -0.62669734, -1.23612738]
 
-        self.run_cpp(xcfun_label, cpp_property, ref_x_data, ref_y_data, 1.0e-6)
+        self.run_cpp(xcfun_label,
+                     cpp_property,
+                     ref_x_data,
+                     ref_y_data,
+                     1.0e-6,
+                     max_subspace_dim=1000)
+
+    def run_cpp_with_ecp(self, xcfun_label, cpp_property, ref_x_data,
+                         ref_y_data, tol):
+
+        xyz_string = """3
+        xyz
+        Au 0 0 0
+        H  0 0 1.55
+        H  0 1.53 0
+        """
+        mol = Molecule.read_xyz_string(xyz_string)
+        mol.set_multiplicity(2)
+
+        basis_label = 'def2-svp'
+        bas = MolecularBasis.read(mol, basis_label, ostream=None)
+
+        scf_drv = ScfUnrestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_drv.xcfun = xcfun_label
+        scf_results = scf_drv.compute(mol, bas)
+
+        lr_drv = ComplexResponseUnrestrictedSolver()
+        lr_drv.ostream.mute()
+        lr_drv.property = cpp_property
+        lr_drv.frequencies = list(ref_x_data)
+        lr_results = lr_drv.compute(mol, bas, scf_results)
+
+        if lr_drv.rank == mpi_master():
+            lr_spec = lr_drv.get_spectrum(lr_results, 'au')
+            assert np.max(
+                np.abs(np.array(lr_spec['y_data']) -
+                       np.array(ref_y_data))) < tol
+
+    def test_hf_absorption_with_ecp(self):
+
+        xcfun_label = 'hf'
+        cpp_property = 'absorption'
+        ref_x_data = [0.10, 0.11, 0.12]
+        ref_y_data = [0.00666692, 0.00907027, 0.01351851]
+
+        self.run_cpp_with_ecp(xcfun_label, cpp_property, ref_x_data, ref_y_data,
+                              1.0e-6)
