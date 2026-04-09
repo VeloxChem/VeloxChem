@@ -231,15 +231,6 @@ void print_cut_status(const std::string& tag,
     }
 }
 
-void print_cut_status_dd(const std::string& tag,
-                         const std::vector<uint32_t>& prec_cut_ij_tile_h,
-                         const std::vector<uint32_t>& screen_cut_ij_tile_h,
-                         uint32_t cd_prim_pair_count,
-                         uint32_t kl_tile_dim)
-{
-    print_cut_status(tag, prec_cut_ij_tile_h, screen_cut_ij_tile_h, cd_prim_pair_count, kl_tile_dim);
-}
-
 } // namespace 结束
 
 namespace gpu {  // gpu namespace
@@ -9847,7 +9838,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuFree(d_d_prim_info_f));
 
             check_J_against_ref("DDSS Two Separate Kernels (J2_2kernels vs ref)", h_mat_J2_2kernels, h_mat_J2_ref, (uint32_t)dd_prim_pair_count_local);       
-            print_cut_status_dd("DDSS", prec_cut_ij_tile_h, screen_cut_ij_tile_h, (uint32_t)ss_prim_pair_count, TILE_DIM_LARGE);
+            print_cut_status("DDSS", prec_cut_ij_tile_h, screen_cut_ij_tile_h, (uint32_t)ss_prim_pair_count, TILE_DIM_LARGE);
         }
 
 
@@ -10000,7 +9991,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuFree(d_d_prim_info_f));
 
             check_J_against_ref("DDSP Two Separate Kernels (J2_2kernels vs ref)", h_mat_J2_2kernels, h_mat_J2_ref, (uint32_t)dd_prim_pair_count_local);       
-            print_cut_status_dd("DDSP", prec_cut_ij_tile_h, screen_cut_ij_tile_h, (uint32_t)sp_prim_pair_count, TILE_DIM_LARGE);
+            print_cut_status("DDSP", prec_cut_ij_tile_h, screen_cut_ij_tile_h, (uint32_t)sp_prim_pair_count, TILE_DIM_LARGE);
         }
 
 
@@ -10144,7 +10135,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuFree(d_d_prim_info_f));
 
             check_J_against_ref("DDSD Two Separate Kernels (J2_2kernels vs ref)", h_mat_J2_2kernels, h_mat_J2_ref, (uint32_t)dd_prim_pair_count_local);       
-            print_cut_status_dd("DDSD", prec_cut_ij_tile_h, screen_cut_ij_tile_h, (uint32_t)sd_prim_pair_count, TILE_DIM_LARGE);
+            print_cut_status("DDSD", prec_cut_ij_tile_h, screen_cut_ij_tile_h, (uint32_t)sd_prim_pair_count, TILE_DIM_LARGE);
         }
 
 
@@ -10288,7 +10279,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuFree(d_d_prim_info_f));
 
             check_J_against_ref("DDPP Two Separate Kernels (J2_2kernels vs ref)", h_mat_J2_2kernels, h_mat_J2_ref, (uint32_t)dd_prim_pair_count_local);       
-            print_cut_status_dd("DDPP", prec_cut_ij_tile_h, screen_cut_ij_tile_h, (uint32_t)pp_prim_pair_count, TILE_DIM_LARGE);
+            print_cut_status("DDPP", prec_cut_ij_tile_h, screen_cut_ij_tile_h, (uint32_t)pp_prim_pair_count, TILE_DIM_LARGE);
         }
 
 
@@ -10765,7 +10756,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuFree(d_d_prim_info_f));
 
             check_J_against_ref("DDPD Two Separate Kernels (J2_2kernels vs ref)", h_mat_J2_2kernels, h_mat_J2_ref, (uint32_t)dd_prim_pair_count_local);       
-            print_cut_status_dd("DDPD", prec_cut_ij_tile_h, screen_cut_ij_tile_h, (uint32_t)pd_prim_pair_count, TILE_DIM_LARGE);
+            print_cut_status("DDPD", prec_cut_ij_tile_h, screen_cut_ij_tile_h, (uint32_t)pd_prim_pair_count, TILE_DIM_LARGE);
         }
 
 
@@ -11915,7 +11906,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuFree(d_d_prim_info_f));
 
             check_J_against_ref("DDDD Two Separate Kernels (J2_2kernels vs ref)", h_mat_J2_2kernels, h_mat_J2_ref, (uint32_t)dd_prim_pair_count_local);       
-            print_cut_status_dd("DDDD", prec_cut_ij_tile_h, screen_cut_ij_tile_h, (uint32_t)dd_prim_pair_count, TILE_DIM_LARGE);
+            print_cut_status("DDDD", prec_cut_ij_tile_h, screen_cut_ij_tile_h, (uint32_t)dd_prim_pair_count, TILE_DIM_LARGE);
         }
 
 
