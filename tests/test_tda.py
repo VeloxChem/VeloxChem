@@ -490,7 +490,7 @@ class TestTDA:
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='skip pytest.raises for multiple MPI processes')
-    def test_plot_rejects_invalid_modes(self):
+    def test_plot_rejects_restricted_subspace(self):
 
         lr_drv = TdaEigenSolver()
         lr_drv.restricted_subspace = True
@@ -501,7 +501,13 @@ class TestTDA:
         ):
             lr_drv.plot_uv_vis({})
 
-        lr_drv.restricted_subspace = False
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    def test_plot_rejects_invalid_modes(self):
+
+        pytest.importorskip('matplotlib.pyplot')
+
+        lr_drv = TdaEigenSolver()
 
         with pytest.raises(AssertionError, match='Invalid plot type'):
             lr_drv.plot({}, plot_type='invalid')

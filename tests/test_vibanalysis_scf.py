@@ -425,16 +425,6 @@ class TestScfVibrationalAnalysisDriver:
                     },
                     info_type='raman')
 
-        with pytest.raises(AssertionError, match='Invalid plot type'):
-            vib_drv.plot(
-                {
-                    'molecule_xyz_string': molecule.get_xyz_string(),
-                    'normal_modes': vib_drv.normal_modes,
-                    'vib_frequencies': vib_drv.vib_frequencies,
-                    'ir_intensities': vib_drv.ir_intensities,
-                },
-                plot_type='unsupported')
-
         with redirect_stdout(io.StringIO()):
             with pytest.raises(AssertionError, match='Invalid plot type'):
                 vib_drv.print_info(
@@ -450,6 +440,25 @@ class TestScfVibrationalAnalysisDriver:
         with pytest.raises(AssertionError,
                            match='molecule only has 1 normal modes'):
             vib_drv.animate(vib_results, mode=2)
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    def test_vibrational_analysis_plot_rejects_invalid_type(self):
+
+        pytest.importorskip('matplotlib.pyplot')
+
+        vib_drv = self._get_synthetic_vibanalysis()
+        molecule = self._get_water_molecule()
+
+        with pytest.raises(AssertionError, match='Invalid plot type'):
+            vib_drv.plot(
+                {
+                    'molecule_xyz_string': molecule.get_xyz_string(),
+                    'normal_modes': vib_drv.normal_modes,
+                    'vib_frequencies': vib_drv.vib_frequencies,
+                    'ir_intensities': vib_drv.ir_intensities,
+                },
+                plot_type='unsupported')
 
     @pytest.mark.solvers
     def test_scf_vibrational_analysis_ir(self):
