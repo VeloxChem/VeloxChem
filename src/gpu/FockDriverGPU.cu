@@ -7155,6 +7155,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             dim3 dd_num_blocks ((dd_prim_pair_count_local + dd_threads_per_block.x - 1) / dd_threads_per_block.x, 1);
 
+            /*
             gpu::computeCoulombFockDDSS<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_s_prim_info,
@@ -7175,116 +7176,28 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
+            */
 
-            gpuSafe(gpuStreamSynchronize(stream));
-        }
-
-// ======= HOST DISPATCHER FOR DDSS =======
-        if (ss_prim_pair_count > 0) {
-            const dim3 zero_threads_per_block(TILE_DIM * TILE_DIM);
-            const dim3 zero_num_blocks((dd_prim_pair_count_local + zero_threads_per_block.x - 1) / zero_threads_per_block.x);
-            const dim3 dd_dispatch_threads_per_block(TILE_DIM_SMALL, TILE_DIM_LARGE);
-            const dim3 dd_dispatch_num_blocks((dd_prim_pair_count_local + dd_dispatch_threads_per_block.x - 1) / dd_dispatch_threads_per_block.x, 1);
-            double *d_mat_J2_2kernels, *d_mat_J2_ref;
-            gpuSafe(gpuMalloc(&d_mat_J2_2kernels, sizeof(double) * dd_prim_pair_count_local));
-            gpuSafe(gpuMalloc(&d_mat_J2_ref, sizeof(double) * dd_prim_pair_count_local));
-            double *d_mat_D2;
-            gpuSafe(gpuMalloc(&d_mat_D2, sizeof(double) * ss_prim_pair_count));
-            gpuSafe(gpuMemcpyAsync(d_mat_D2, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
-            gpu::zeroData<<<zero_num_blocks, zero_threads_per_block, 0, stream>>>(d_mat_J2_2kernels, static_cast<uint32_t>(dd_prim_pair_count_local));
-            gpu::zeroData<<<zero_num_blocks, zero_threads_per_block, 0, stream>>>(d_mat_J2_ref, static_cast<uint32_t>(dd_prim_pair_count_local));
-
-            const double tau_precision = 1e-6;
-            uint32_t* d_prec_cut_ij_tile = nullptr;
             auto prec_cut_ij_tile_h = build_cut_ij_tile_dd(dd_mat_Q_local, ss_mat_Q, ss_mat_D, (uint32_t)dd_prim_pair_count_local, (uint32_t)ss_prim_pair_count, TILE_DIM_SMALL, TILE_DIM_LARGE, tau_precision);
             const uint32_t nij_tiles = (dd_prim_pair_count_local + TILE_DIM_SMALL - 1) / TILE_DIM_SMALL;
-            gpuSafe(gpuMalloc((void**)&d_prec_cut_ij_tile, nij_tiles * sizeof(uint32_t)));
             gpuSafe(gpuMemcpyAsync(d_prec_cut_ij_tile, prec_cut_ij_tile_h.data(), nij_tiles * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-            uint32_t* d_screen_cut_ij_tile = nullptr;
             auto screen_cut_ij_tile_h = build_cut_ij_tile_dd(dd_mat_Q_local, ss_mat_Q, ss_mat_D, (uint32_t)dd_prim_pair_count_local, (uint32_t)ss_prim_pair_count, TILE_DIM_SMALL, TILE_DIM_LARGE, eri_threshold);
-            gpuSafe(gpuMalloc((void**)&d_screen_cut_ij_tile, nij_tiles * sizeof(uint32_t)));
             gpuSafe(gpuMemcpyAsync(d_screen_cut_ij_tile, screen_cut_ij_tile_h.data(), nij_tiles * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-            // Float versions mapping
-            std::vector<float> dd_mat_Q_local_f    = to_float_vec(dd_mat_Q_local);
-            std::vector<float> ss_mat_Q_f          = to_float_vec(ss_mat_Q);
-            std::vector<float> ss_mat_D_f          = to_float_vec(ss_mat_D);
-            std::vector<float> dd_pair_data_local_f= to_float_vec(dd_pair_data_local);
-            std::vector<float> ss_pair_data_f      = to_float_vec(ss_pair_data);
-
-            float *d_ss_mat_D_f = nullptr, *d_ss_mat_Q_f = nullptr, *d_dd_mat_Q_local_f = nullptr, *d_ss_pair_data_f = nullptr, *d_dd_pair_data_local_f = nullptr;
-            gpuSafe(gpuMalloc(&d_ss_mat_D_f, sizeof(float) * ss_mat_D_f.size()));
-            gpuSafe(gpuMalloc(&d_ss_mat_Q_f, sizeof(float) * ss_mat_Q_f.size()));
-            gpuSafe(gpuMalloc(&d_dd_mat_Q_local_f, sizeof(float) * dd_mat_Q_local_f.size()));
-            gpuSafe(gpuMalloc(&d_ss_pair_data_f, sizeof(float) * ss_pair_data_f.size()));
-            gpuSafe(gpuMalloc(&d_dd_pair_data_local_f, sizeof(float) * dd_pair_data_local_f.size()));
-
-            gpuSafe(gpuMemcpyAsync(d_ss_mat_D_f, ss_mat_D_f.data(), ss_mat_D_f.size() * sizeof(float), gpuMemcpyHostToDevice, stream));
-            gpuSafe(gpuMemcpyAsync(d_ss_mat_Q_f, ss_mat_Q_f.data(), ss_mat_Q_f.size() * sizeof(float), gpuMemcpyHostToDevice, stream));
-            gpuSafe(gpuMemcpyAsync(d_dd_mat_Q_local_f, dd_mat_Q_local_f.data(), dd_mat_Q_local_f.size() * sizeof(float), gpuMemcpyHostToDevice, stream));
-            gpuSafe(gpuMemcpyAsync(d_ss_pair_data_f, ss_pair_data_f.data(), ss_pair_data_f.size() * sizeof(float), gpuMemcpyHostToDevice, stream));
-            gpuSafe(gpuMemcpyAsync(d_dd_pair_data_local_f, dd_pair_data_local_f.data(), dd_pair_data_local_f.size() * sizeof(float), gpuMemcpyHostToDevice, stream));
-    
-
-            std::vector<float> s_prim_info_f = to_float_vec(s_prim_info);
-            float* d_s_prim_info_f = nullptr;
-            gpuSafe(gpuMalloc(&d_s_prim_info_f, sizeof(float) * s_prim_info_f.size()));
-            gpuSafe(gpuMemcpyAsync(d_s_prim_info_f, s_prim_info_f.data(), s_prim_info_f.size() * sizeof(float), gpuMemcpyHostToDevice, stream));
-        
-
-            std::vector<float> d_prim_info_f = to_float_vec(d_prim_info);
-            float* d_d_prim_info_f = nullptr;
-            gpuSafe(gpuMalloc(&d_d_prim_info_f, sizeof(float) * d_prim_info_f.size()));
-            gpuSafe(gpuMemcpyAsync(d_d_prim_info_f, d_prim_info_f.data(), d_prim_info_f.size() * sizeof(float), gpuMemcpyHostToDevice, stream));
-        
-
-            // 1. Original (Baseline Reference)
-            gpu::computeCoulombFockDDSS<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_ref, d_s_prim_info, static_cast<uint32_t>(s_prim_count), d_d_prim_info, static_cast<uint32_t>(d_prim_count),
-                               d_mat_D2, d_dd_mat_Q_local, d_ss_mat_Q,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_ss_first_inds, d_ss_second_inds, d_ss_pair_data, static_cast<uint32_t>(ss_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, eri_threshold);
-
-            // 2. FP64 Part (Two Kernels)
-            gpu::computeCoulombFockDDSS_FP64<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_s_prim_info, static_cast<uint32_t>(s_prim_count), d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D2,
+            gpu::computeCoulombFockDDSS_FP64<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                               d_mat_J, d_s_prim_info, static_cast<uint32_t>(s_prim_count), d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D,
                                d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
                                d_ss_first_inds, d_ss_second_inds, d_ss_pair_data, static_cast<uint32_t>(ss_prim_pair_count),
                                d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
-            
-            // 3. FP32 Part (Two Kernels)
-            gpu::computeCoulombFockDDSS_FP32<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_s_prim_info_f, static_cast<uint32_t>(s_prim_count), d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_ss_mat_D_f,
+
+            gpu::computeCoulombFockDDSS_FP32<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                               d_mat_J, d_s_prim_info_f, static_cast<uint32_t>(s_prim_count), d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_ss_mat_D_f,
                                d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local),
                                d_ss_first_inds, d_ss_second_inds, d_ss_pair_data_f, static_cast<uint32_t>(ss_prim_pair_count),
                                d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
 
-            std::vector<double> h_mat_J2_2kernels(dd_prim_pair_count_local, 0.0);
-            std::vector<double> h_mat_J2_ref(dd_prim_pair_count_local, 0.0);
-
-            gpuSafe(gpuMemcpyAsync(h_mat_J2_2kernels.data(), d_mat_J2_2kernels, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
-            gpuSafe(gpuMemcpyAsync(h_mat_J2_ref.data(), d_mat_J2_ref, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
-
             gpuSafe(gpuStreamSynchronize(stream));
-
-            gpuSafe(gpuFree(d_mat_J2_2kernels));
-            gpuSafe(gpuFree(d_mat_J2_ref));
-            gpuSafe(gpuFree(d_prec_cut_ij_tile));
-            gpuSafe(gpuFree(d_screen_cut_ij_tile));
-            gpuSafe(gpuFree(d_mat_D2));
-            gpuSafe(gpuFree(d_ss_mat_D_f));
-            gpuSafe(gpuFree(d_ss_mat_Q_f));
-            gpuSafe(gpuFree(d_dd_mat_Q_local_f));
-            gpuSafe(gpuFree(d_ss_pair_data_f));
-            gpuSafe(gpuFree(d_dd_pair_data_local_f));
-    
-            gpuSafe(gpuFree(d_s_prim_info_f));
-            gpuSafe(gpuFree(d_d_prim_info_f));
-
-            check_J_against_ref("DDSS Two Separate Kernels (J2_2kernels vs ref)", h_mat_J2_2kernels, h_mat_J2_ref, (uint32_t)dd_prim_pair_count_local);       
-            print_cut_status("DDSS", prec_cut_ij_tile_h, screen_cut_ij_tile_h, (uint32_t)ss_prim_pair_count, TILE_DIM_LARGE);
         }
 
 
@@ -7299,6 +7212,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             dim3 dd_num_blocks ((dd_prim_pair_count_local + dd_threads_per_block.x - 1) / dd_threads_per_block.x, 1);
 
+            /*
             gpu::computeCoulombFockDDSP<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_s_prim_info,
@@ -7321,123 +7235,28 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
+            */
 
-            gpuSafe(gpuStreamSynchronize(stream));
-        }
-
-// ======= HOST DISPATCHER FOR DDSP =======
-        if (sp_prim_pair_count > 0) {
-            const dim3 zero_threads_per_block(TILE_DIM * TILE_DIM);
-            const dim3 zero_num_blocks((dd_prim_pair_count_local + zero_threads_per_block.x - 1) / zero_threads_per_block.x);
-            const dim3 dd_dispatch_threads_per_block(TILE_DIM_SMALL, TILE_DIM_LARGE);
-            const dim3 dd_dispatch_num_blocks((dd_prim_pair_count_local + dd_dispatch_threads_per_block.x - 1) / dd_dispatch_threads_per_block.x, 1);
-            double *d_mat_J2_2kernels, *d_mat_J2_ref;
-            gpuSafe(gpuMalloc(&d_mat_J2_2kernels, sizeof(double) * dd_prim_pair_count_local));
-            gpuSafe(gpuMalloc(&d_mat_J2_ref, sizeof(double) * dd_prim_pair_count_local));
-            double *d_mat_D2;
-            gpuSafe(gpuMalloc(&d_mat_D2, sizeof(double) * sp_prim_pair_count));
-            gpuSafe(gpuMemcpyAsync(d_mat_D2, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
-            gpu::zeroData<<<zero_num_blocks, zero_threads_per_block, 0, stream>>>(d_mat_J2_2kernels, static_cast<uint32_t>(dd_prim_pair_count_local));
-            gpu::zeroData<<<zero_num_blocks, zero_threads_per_block, 0, stream>>>(d_mat_J2_ref, static_cast<uint32_t>(dd_prim_pair_count_local));
-
-            const double tau_precision = 1e-6;
-            uint32_t* d_prec_cut_ij_tile = nullptr;
             auto prec_cut_ij_tile_h = build_cut_ij_tile_dd(dd_mat_Q_local, sp_mat_Q, sp_mat_D, (uint32_t)dd_prim_pair_count_local, (uint32_t)sp_prim_pair_count, TILE_DIM_SMALL, TILE_DIM_LARGE, tau_precision);
             const uint32_t nij_tiles = (dd_prim_pair_count_local + TILE_DIM_SMALL - 1) / TILE_DIM_SMALL;
-            gpuSafe(gpuMalloc((void**)&d_prec_cut_ij_tile, nij_tiles * sizeof(uint32_t)));
             gpuSafe(gpuMemcpyAsync(d_prec_cut_ij_tile, prec_cut_ij_tile_h.data(), nij_tiles * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-            uint32_t* d_screen_cut_ij_tile = nullptr;
             auto screen_cut_ij_tile_h = build_cut_ij_tile_dd(dd_mat_Q_local, sp_mat_Q, sp_mat_D, (uint32_t)dd_prim_pair_count_local, (uint32_t)sp_prim_pair_count, TILE_DIM_SMALL, TILE_DIM_LARGE, eri_threshold);
-            gpuSafe(gpuMalloc((void**)&d_screen_cut_ij_tile, nij_tiles * sizeof(uint32_t)));
             gpuSafe(gpuMemcpyAsync(d_screen_cut_ij_tile, screen_cut_ij_tile_h.data(), nij_tiles * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-            // Float versions mapping
-            std::vector<float> dd_mat_Q_local_f    = to_float_vec(dd_mat_Q_local);
-            std::vector<float> sp_mat_Q_f          = to_float_vec(sp_mat_Q);
-            std::vector<float> sp_mat_D_f          = to_float_vec(sp_mat_D);
-            std::vector<float> dd_pair_data_local_f= to_float_vec(dd_pair_data_local);
-            std::vector<float> sp_pair_data_f      = to_float_vec(sp_pair_data);
-
-            float *d_sp_mat_D_f = nullptr, *d_sp_mat_Q_f = nullptr, *d_dd_mat_Q_local_f = nullptr, *d_sp_pair_data_f = nullptr, *d_dd_pair_data_local_f = nullptr;
-            gpuSafe(gpuMalloc(&d_sp_mat_D_f, sizeof(float) * sp_mat_D_f.size()));
-            gpuSafe(gpuMalloc(&d_sp_mat_Q_f, sizeof(float) * sp_mat_Q_f.size()));
-            gpuSafe(gpuMalloc(&d_dd_mat_Q_local_f, sizeof(float) * dd_mat_Q_local_f.size()));
-            gpuSafe(gpuMalloc(&d_sp_pair_data_f, sizeof(float) * sp_pair_data_f.size()));
-            gpuSafe(gpuMalloc(&d_dd_pair_data_local_f, sizeof(float) * dd_pair_data_local_f.size()));
-
-            gpuSafe(gpuMemcpyAsync(d_sp_mat_D_f, sp_mat_D_f.data(), sp_mat_D_f.size() * sizeof(float), gpuMemcpyHostToDevice, stream));
-            gpuSafe(gpuMemcpyAsync(d_sp_mat_Q_f, sp_mat_Q_f.data(), sp_mat_Q_f.size() * sizeof(float), gpuMemcpyHostToDevice, stream));
-            gpuSafe(gpuMemcpyAsync(d_dd_mat_Q_local_f, dd_mat_Q_local_f.data(), dd_mat_Q_local_f.size() * sizeof(float), gpuMemcpyHostToDevice, stream));
-            gpuSafe(gpuMemcpyAsync(d_sp_pair_data_f, sp_pair_data_f.data(), sp_pair_data_f.size() * sizeof(float), gpuMemcpyHostToDevice, stream));
-            gpuSafe(gpuMemcpyAsync(d_dd_pair_data_local_f, dd_pair_data_local_f.data(), dd_pair_data_local_f.size() * sizeof(float), gpuMemcpyHostToDevice, stream));
-    
-
-            std::vector<float> s_prim_info_f = to_float_vec(s_prim_info);
-            float* d_s_prim_info_f = nullptr;
-            gpuSafe(gpuMalloc(&d_s_prim_info_f, sizeof(float) * s_prim_info_f.size()));
-            gpuSafe(gpuMemcpyAsync(d_s_prim_info_f, s_prim_info_f.data(), s_prim_info_f.size() * sizeof(float), gpuMemcpyHostToDevice, stream));
-        
-
-            std::vector<float> p_prim_info_f = to_float_vec(p_prim_info);
-            float* d_p_prim_info_f = nullptr;
-            gpuSafe(gpuMalloc(&d_p_prim_info_f, sizeof(float) * p_prim_info_f.size()));
-            gpuSafe(gpuMemcpyAsync(d_p_prim_info_f, p_prim_info_f.data(), p_prim_info_f.size() * sizeof(float), gpuMemcpyHostToDevice, stream));
-        
-
-            std::vector<float> d_prim_info_f = to_float_vec(d_prim_info);
-            float* d_d_prim_info_f = nullptr;
-            gpuSafe(gpuMalloc(&d_d_prim_info_f, sizeof(float) * d_prim_info_f.size()));
-            gpuSafe(gpuMemcpyAsync(d_d_prim_info_f, d_prim_info_f.data(), d_prim_info_f.size() * sizeof(float), gpuMemcpyHostToDevice, stream));
-        
-
-            // 1. Original (Baseline Reference)
-            gpu::computeCoulombFockDDSP<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_ref, d_s_prim_info, static_cast<uint32_t>(s_prim_count), d_p_prim_info, static_cast<uint32_t>(p_prim_count), d_d_prim_info, static_cast<uint32_t>(d_prim_count),
-                               d_mat_D2, d_dd_mat_Q_local, d_sp_mat_Q,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_sp_first_inds, d_sp_second_inds, d_sp_pair_data, static_cast<uint32_t>(sp_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, eri_threshold);
-
-            // 2. FP64 Part (Two Kernels)
-            gpu::computeCoulombFockDDSP_FP64<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_s_prim_info, static_cast<uint32_t>(s_prim_count), d_p_prim_info, static_cast<uint32_t>(p_prim_count), d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D2,
+            gpu::computeCoulombFockDDSP_FP64<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                               d_mat_J, d_s_prim_info, static_cast<uint32_t>(s_prim_count), d_p_prim_info, static_cast<uint32_t>(p_prim_count), d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D,
                                d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
                                d_sp_first_inds, d_sp_second_inds, d_sp_pair_data, static_cast<uint32_t>(sp_prim_pair_count),
                                d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
-            
-            // 3. FP32 Part (Two Kernels)
-            gpu::computeCoulombFockDDSP_FP32<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_s_prim_info_f, static_cast<uint32_t>(s_prim_count), d_p_prim_info_f, static_cast<uint32_t>(p_prim_count), d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_sp_mat_D_f,
+
+            gpu::computeCoulombFockDDSP_FP32<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                               d_mat_J, d_s_prim_info_f, static_cast<uint32_t>(s_prim_count), d_p_prim_info_f, static_cast<uint32_t>(p_prim_count), d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_sp_mat_D_f,
                                d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local),
                                d_sp_first_inds, d_sp_second_inds, d_sp_pair_data_f, static_cast<uint32_t>(sp_prim_pair_count),
                                d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
 
-            std::vector<double> h_mat_J2_2kernels(dd_prim_pair_count_local, 0.0);
-            std::vector<double> h_mat_J2_ref(dd_prim_pair_count_local, 0.0);
-
-            gpuSafe(gpuMemcpyAsync(h_mat_J2_2kernels.data(), d_mat_J2_2kernels, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
-            gpuSafe(gpuMemcpyAsync(h_mat_J2_ref.data(), d_mat_J2_ref, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
-
             gpuSafe(gpuStreamSynchronize(stream));
-
-            gpuSafe(gpuFree(d_mat_J2_2kernels));
-            gpuSafe(gpuFree(d_mat_J2_ref));
-            gpuSafe(gpuFree(d_prec_cut_ij_tile));
-            gpuSafe(gpuFree(d_screen_cut_ij_tile));
-            gpuSafe(gpuFree(d_mat_D2));
-            gpuSafe(gpuFree(d_sp_mat_D_f));
-            gpuSafe(gpuFree(d_sp_mat_Q_f));
-            gpuSafe(gpuFree(d_dd_mat_Q_local_f));
-            gpuSafe(gpuFree(d_sp_pair_data_f));
-            gpuSafe(gpuFree(d_dd_pair_data_local_f));
-    
-            gpuSafe(gpuFree(d_s_prim_info_f));
-            gpuSafe(gpuFree(d_p_prim_info_f));
-            gpuSafe(gpuFree(d_d_prim_info_f));
-
-            check_J_against_ref("DDSP Two Separate Kernels (J2_2kernels vs ref)", h_mat_J2_2kernels, h_mat_J2_ref, (uint32_t)dd_prim_pair_count_local);       
-            print_cut_status("DDSP", prec_cut_ij_tile_h, screen_cut_ij_tile_h, (uint32_t)sp_prim_pair_count, TILE_DIM_LARGE);
         }
 
 
@@ -7452,6 +7271,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             dim3 dd_num_blocks ((dd_prim_pair_count_local + dd_threads_per_block.x - 1) / dd_threads_per_block.x, 1);
 
+            /*
             gpu::computeCoulombFockDDSD<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_s_prim_info,
@@ -7472,116 +7292,28 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
+            */
 
-            gpuSafe(gpuStreamSynchronize(stream));
-        }
-
-// ======= HOST DISPATCHER FOR DDSD =======
-        if (sd_prim_pair_count > 0) {
-            const dim3 zero_threads_per_block(TILE_DIM * TILE_DIM);
-            const dim3 zero_num_blocks((dd_prim_pair_count_local + zero_threads_per_block.x - 1) / zero_threads_per_block.x);
-            const dim3 dd_dispatch_threads_per_block(TILE_DIM_SMALL, TILE_DIM_LARGE);
-            const dim3 dd_dispatch_num_blocks((dd_prim_pair_count_local + dd_dispatch_threads_per_block.x - 1) / dd_dispatch_threads_per_block.x, 1);
-            double *d_mat_J2_2kernels, *d_mat_J2_ref;
-            gpuSafe(gpuMalloc(&d_mat_J2_2kernels, sizeof(double) * dd_prim_pair_count_local));
-            gpuSafe(gpuMalloc(&d_mat_J2_ref, sizeof(double) * dd_prim_pair_count_local));
-            double *d_mat_D2;
-            gpuSafe(gpuMalloc(&d_mat_D2, sizeof(double) * sd_prim_pair_count));
-            gpuSafe(gpuMemcpyAsync(d_mat_D2, sd_mat_D.data(), sd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
-            gpu::zeroData<<<zero_num_blocks, zero_threads_per_block, 0, stream>>>(d_mat_J2_2kernels, static_cast<uint32_t>(dd_prim_pair_count_local));
-            gpu::zeroData<<<zero_num_blocks, zero_threads_per_block, 0, stream>>>(d_mat_J2_ref, static_cast<uint32_t>(dd_prim_pair_count_local));
-
-            const double tau_precision = 1e-6;
-            uint32_t* d_prec_cut_ij_tile = nullptr;
             auto prec_cut_ij_tile_h = build_cut_ij_tile_dd(dd_mat_Q_local, sd_mat_Q, sd_mat_D, (uint32_t)dd_prim_pair_count_local, (uint32_t)sd_prim_pair_count, TILE_DIM_SMALL, TILE_DIM_LARGE, tau_precision);
             const uint32_t nij_tiles = (dd_prim_pair_count_local + TILE_DIM_SMALL - 1) / TILE_DIM_SMALL;
-            gpuSafe(gpuMalloc((void**)&d_prec_cut_ij_tile, nij_tiles * sizeof(uint32_t)));
             gpuSafe(gpuMemcpyAsync(d_prec_cut_ij_tile, prec_cut_ij_tile_h.data(), nij_tiles * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-            uint32_t* d_screen_cut_ij_tile = nullptr;
             auto screen_cut_ij_tile_h = build_cut_ij_tile_dd(dd_mat_Q_local, sd_mat_Q, sd_mat_D, (uint32_t)dd_prim_pair_count_local, (uint32_t)sd_prim_pair_count, TILE_DIM_SMALL, TILE_DIM_LARGE, eri_threshold);
-            gpuSafe(gpuMalloc((void**)&d_screen_cut_ij_tile, nij_tiles * sizeof(uint32_t)));
             gpuSafe(gpuMemcpyAsync(d_screen_cut_ij_tile, screen_cut_ij_tile_h.data(), nij_tiles * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-            // Float versions mapping
-            std::vector<float> dd_mat_Q_local_f    = to_float_vec(dd_mat_Q_local);
-            std::vector<float> sd_mat_Q_f          = to_float_vec(sd_mat_Q);
-            std::vector<float> sd_mat_D_f          = to_float_vec(sd_mat_D);
-            std::vector<float> dd_pair_data_local_f= to_float_vec(dd_pair_data_local);
-            std::vector<float> sd_pair_data_f      = to_float_vec(sd_pair_data);
-
-            float *d_sd_mat_D_f = nullptr, *d_sd_mat_Q_f = nullptr, *d_dd_mat_Q_local_f = nullptr, *d_sd_pair_data_f = nullptr, *d_dd_pair_data_local_f = nullptr;
-            gpuSafe(gpuMalloc(&d_sd_mat_D_f, sizeof(float) * sd_mat_D_f.size()));
-            gpuSafe(gpuMalloc(&d_sd_mat_Q_f, sizeof(float) * sd_mat_Q_f.size()));
-            gpuSafe(gpuMalloc(&d_dd_mat_Q_local_f, sizeof(float) * dd_mat_Q_local_f.size()));
-            gpuSafe(gpuMalloc(&d_sd_pair_data_f, sizeof(float) * sd_pair_data_f.size()));
-            gpuSafe(gpuMalloc(&d_dd_pair_data_local_f, sizeof(float) * dd_pair_data_local_f.size()));
-
-            gpuSafe(gpuMemcpyAsync(d_sd_mat_D_f, sd_mat_D_f.data(), sd_mat_D_f.size() * sizeof(float), gpuMemcpyHostToDevice, stream));
-            gpuSafe(gpuMemcpyAsync(d_sd_mat_Q_f, sd_mat_Q_f.data(), sd_mat_Q_f.size() * sizeof(float), gpuMemcpyHostToDevice, stream));
-            gpuSafe(gpuMemcpyAsync(d_dd_mat_Q_local_f, dd_mat_Q_local_f.data(), dd_mat_Q_local_f.size() * sizeof(float), gpuMemcpyHostToDevice, stream));
-            gpuSafe(gpuMemcpyAsync(d_sd_pair_data_f, sd_pair_data_f.data(), sd_pair_data_f.size() * sizeof(float), gpuMemcpyHostToDevice, stream));
-            gpuSafe(gpuMemcpyAsync(d_dd_pair_data_local_f, dd_pair_data_local_f.data(), dd_pair_data_local_f.size() * sizeof(float), gpuMemcpyHostToDevice, stream));
-    
-
-            std::vector<float> s_prim_info_f = to_float_vec(s_prim_info);
-            float* d_s_prim_info_f = nullptr;
-            gpuSafe(gpuMalloc(&d_s_prim_info_f, sizeof(float) * s_prim_info_f.size()));
-            gpuSafe(gpuMemcpyAsync(d_s_prim_info_f, s_prim_info_f.data(), s_prim_info_f.size() * sizeof(float), gpuMemcpyHostToDevice, stream));
-        
-
-            std::vector<float> d_prim_info_f = to_float_vec(d_prim_info);
-            float* d_d_prim_info_f = nullptr;
-            gpuSafe(gpuMalloc(&d_d_prim_info_f, sizeof(float) * d_prim_info_f.size()));
-            gpuSafe(gpuMemcpyAsync(d_d_prim_info_f, d_prim_info_f.data(), d_prim_info_f.size() * sizeof(float), gpuMemcpyHostToDevice, stream));
-        
-
-            // 1. Original (Baseline Reference)
-            gpu::computeCoulombFockDDSD<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_ref, d_s_prim_info, static_cast<uint32_t>(s_prim_count), d_d_prim_info, static_cast<uint32_t>(d_prim_count),
-                               d_mat_D2, d_dd_mat_Q_local, d_sd_mat_Q,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_sd_first_inds, d_sd_second_inds, d_sd_pair_data, static_cast<uint32_t>(sd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, eri_threshold);
-
-            // 2. FP64 Part (Two Kernels)
-            gpu::computeCoulombFockDDSD_FP64<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_s_prim_info, static_cast<uint32_t>(s_prim_count), d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D2,
+            gpu::computeCoulombFockDDSD_FP64<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                               d_mat_J, d_s_prim_info, static_cast<uint32_t>(s_prim_count), d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D,
                                d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
                                d_sd_first_inds, d_sd_second_inds, d_sd_pair_data, static_cast<uint32_t>(sd_prim_pair_count),
                                d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
-            
-            // 3. FP32 Part (Two Kernels)
-            gpu::computeCoulombFockDDSD_FP32<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_s_prim_info_f, static_cast<uint32_t>(s_prim_count), d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_sd_mat_D_f,
+
+            gpu::computeCoulombFockDDSD_FP32<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                               d_mat_J, d_s_prim_info_f, static_cast<uint32_t>(s_prim_count), d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_sd_mat_D_f,
                                d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local),
                                d_sd_first_inds, d_sd_second_inds, d_sd_pair_data_f, static_cast<uint32_t>(sd_prim_pair_count),
                                d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
 
-            std::vector<double> h_mat_J2_2kernels(dd_prim_pair_count_local, 0.0);
-            std::vector<double> h_mat_J2_ref(dd_prim_pair_count_local, 0.0);
-
-            gpuSafe(gpuMemcpyAsync(h_mat_J2_2kernels.data(), d_mat_J2_2kernels, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
-            gpuSafe(gpuMemcpyAsync(h_mat_J2_ref.data(), d_mat_J2_ref, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
-
             gpuSafe(gpuStreamSynchronize(stream));
-
-            gpuSafe(gpuFree(d_mat_J2_2kernels));
-            gpuSafe(gpuFree(d_mat_J2_ref));
-            gpuSafe(gpuFree(d_prec_cut_ij_tile));
-            gpuSafe(gpuFree(d_screen_cut_ij_tile));
-            gpuSafe(gpuFree(d_mat_D2));
-            gpuSafe(gpuFree(d_sd_mat_D_f));
-            gpuSafe(gpuFree(d_sd_mat_Q_f));
-            gpuSafe(gpuFree(d_dd_mat_Q_local_f));
-            gpuSafe(gpuFree(d_sd_pair_data_f));
-            gpuSafe(gpuFree(d_dd_pair_data_local_f));
-    
-            gpuSafe(gpuFree(d_s_prim_info_f));
-            gpuSafe(gpuFree(d_d_prim_info_f));
-
-            check_J_against_ref("DDSD Two Separate Kernels (J2_2kernels vs ref)", h_mat_J2_2kernels, h_mat_J2_ref, (uint32_t)dd_prim_pair_count_local);       
-            print_cut_status("DDSD", prec_cut_ij_tile_h, screen_cut_ij_tile_h, (uint32_t)sd_prim_pair_count, TILE_DIM_LARGE);
         }
 
 
@@ -7596,6 +7328,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             dim3 dd_num_blocks ((dd_prim_pair_count_local + dd_threads_per_block.x - 1) / dd_threads_per_block.x, 1);
 
+            /*
             gpu::computeCoulombFockDDPP<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_p_prim_info,
@@ -7616,116 +7349,28 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
+            */
 
-            gpuSafe(gpuStreamSynchronize(stream));
-        }
-
-// ======= HOST DISPATCHER FOR DDPP =======
-        if (pp_prim_pair_count > 0) {
-            const dim3 zero_threads_per_block(TILE_DIM * TILE_DIM);
-            const dim3 zero_num_blocks((dd_prim_pair_count_local + zero_threads_per_block.x - 1) / zero_threads_per_block.x);
-            const dim3 dd_dispatch_threads_per_block(TILE_DIM_SMALL, TILE_DIM_LARGE);
-            const dim3 dd_dispatch_num_blocks((dd_prim_pair_count_local + dd_dispatch_threads_per_block.x - 1) / dd_dispatch_threads_per_block.x, 1);
-            double *d_mat_J2_2kernels, *d_mat_J2_ref;
-            gpuSafe(gpuMalloc(&d_mat_J2_2kernels, sizeof(double) * dd_prim_pair_count_local));
-            gpuSafe(gpuMalloc(&d_mat_J2_ref, sizeof(double) * dd_prim_pair_count_local));
-            double *d_mat_D2;
-            gpuSafe(gpuMalloc(&d_mat_D2, sizeof(double) * pp_prim_pair_count));
-            gpuSafe(gpuMemcpyAsync(d_mat_D2, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
-            gpu::zeroData<<<zero_num_blocks, zero_threads_per_block, 0, stream>>>(d_mat_J2_2kernels, static_cast<uint32_t>(dd_prim_pair_count_local));
-            gpu::zeroData<<<zero_num_blocks, zero_threads_per_block, 0, stream>>>(d_mat_J2_ref, static_cast<uint32_t>(dd_prim_pair_count_local));
-
-            const double tau_precision = 1e-6;
-            uint32_t* d_prec_cut_ij_tile = nullptr;
             auto prec_cut_ij_tile_h = build_cut_ij_tile_dd(dd_mat_Q_local, pp_mat_Q, pp_mat_D, (uint32_t)dd_prim_pair_count_local, (uint32_t)pp_prim_pair_count, TILE_DIM_SMALL, TILE_DIM_LARGE, tau_precision);
             const uint32_t nij_tiles = (dd_prim_pair_count_local + TILE_DIM_SMALL - 1) / TILE_DIM_SMALL;
-            gpuSafe(gpuMalloc((void**)&d_prec_cut_ij_tile, nij_tiles * sizeof(uint32_t)));
             gpuSafe(gpuMemcpyAsync(d_prec_cut_ij_tile, prec_cut_ij_tile_h.data(), nij_tiles * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-            uint32_t* d_screen_cut_ij_tile = nullptr;
             auto screen_cut_ij_tile_h = build_cut_ij_tile_dd(dd_mat_Q_local, pp_mat_Q, pp_mat_D, (uint32_t)dd_prim_pair_count_local, (uint32_t)pp_prim_pair_count, TILE_DIM_SMALL, TILE_DIM_LARGE, eri_threshold);
-            gpuSafe(gpuMalloc((void**)&d_screen_cut_ij_tile, nij_tiles * sizeof(uint32_t)));
             gpuSafe(gpuMemcpyAsync(d_screen_cut_ij_tile, screen_cut_ij_tile_h.data(), nij_tiles * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-            // Float versions mapping
-            std::vector<float> dd_mat_Q_local_f    = to_float_vec(dd_mat_Q_local);
-            std::vector<float> pp_mat_Q_f          = to_float_vec(pp_mat_Q);
-            std::vector<float> pp_mat_D_f          = to_float_vec(pp_mat_D);
-            std::vector<float> dd_pair_data_local_f= to_float_vec(dd_pair_data_local);
-            std::vector<float> pp_pair_data_f      = to_float_vec(pp_pair_data);
-
-            float *d_pp_mat_D_f = nullptr, *d_pp_mat_Q_f = nullptr, *d_dd_mat_Q_local_f = nullptr, *d_pp_pair_data_f = nullptr, *d_dd_pair_data_local_f = nullptr;
-            gpuSafe(gpuMalloc(&d_pp_mat_D_f, sizeof(float) * pp_mat_D_f.size()));
-            gpuSafe(gpuMalloc(&d_pp_mat_Q_f, sizeof(float) * pp_mat_Q_f.size()));
-            gpuSafe(gpuMalloc(&d_dd_mat_Q_local_f, sizeof(float) * dd_mat_Q_local_f.size()));
-            gpuSafe(gpuMalloc(&d_pp_pair_data_f, sizeof(float) * pp_pair_data_f.size()));
-            gpuSafe(gpuMalloc(&d_dd_pair_data_local_f, sizeof(float) * dd_pair_data_local_f.size()));
-
-            gpuSafe(gpuMemcpyAsync(d_pp_mat_D_f, pp_mat_D_f.data(), pp_mat_D_f.size() * sizeof(float), gpuMemcpyHostToDevice, stream));
-            gpuSafe(gpuMemcpyAsync(d_pp_mat_Q_f, pp_mat_Q_f.data(), pp_mat_Q_f.size() * sizeof(float), gpuMemcpyHostToDevice, stream));
-            gpuSafe(gpuMemcpyAsync(d_dd_mat_Q_local_f, dd_mat_Q_local_f.data(), dd_mat_Q_local_f.size() * sizeof(float), gpuMemcpyHostToDevice, stream));
-            gpuSafe(gpuMemcpyAsync(d_pp_pair_data_f, pp_pair_data_f.data(), pp_pair_data_f.size() * sizeof(float), gpuMemcpyHostToDevice, stream));
-            gpuSafe(gpuMemcpyAsync(d_dd_pair_data_local_f, dd_pair_data_local_f.data(), dd_pair_data_local_f.size() * sizeof(float), gpuMemcpyHostToDevice, stream));
-    
-
-            std::vector<float> p_prim_info_f = to_float_vec(p_prim_info);
-            float* d_p_prim_info_f = nullptr;
-            gpuSafe(gpuMalloc(&d_p_prim_info_f, sizeof(float) * p_prim_info_f.size()));
-            gpuSafe(gpuMemcpyAsync(d_p_prim_info_f, p_prim_info_f.data(), p_prim_info_f.size() * sizeof(float), gpuMemcpyHostToDevice, stream));
-        
-
-            std::vector<float> d_prim_info_f = to_float_vec(d_prim_info);
-            float* d_d_prim_info_f = nullptr;
-            gpuSafe(gpuMalloc(&d_d_prim_info_f, sizeof(float) * d_prim_info_f.size()));
-            gpuSafe(gpuMemcpyAsync(d_d_prim_info_f, d_prim_info_f.data(), d_prim_info_f.size() * sizeof(float), gpuMemcpyHostToDevice, stream));
-        
-
-            // 1. Original (Baseline Reference)
-            gpu::computeCoulombFockDDPP<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_ref, d_p_prim_info, static_cast<uint32_t>(p_prim_count), d_d_prim_info, static_cast<uint32_t>(d_prim_count),
-                               d_mat_D2, d_dd_mat_Q_local, d_pp_mat_Q,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_pp_first_inds, d_pp_second_inds, d_pp_pair_data, static_cast<uint32_t>(pp_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, eri_threshold);
-
-            // 2. FP64 Part (Two Kernels)
-            gpu::computeCoulombFockDDPP_FP64<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_p_prim_info, static_cast<uint32_t>(p_prim_count), d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D2,
+            gpu::computeCoulombFockDDPP_FP64<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                               d_mat_J, d_p_prim_info, static_cast<uint32_t>(p_prim_count), d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D,
                                d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
                                d_pp_first_inds, d_pp_second_inds, d_pp_pair_data, static_cast<uint32_t>(pp_prim_pair_count),
                                d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
-            
-            // 3. FP32 Part (Two Kernels)
-            gpu::computeCoulombFockDDPP_FP32<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_p_prim_info_f, static_cast<uint32_t>(p_prim_count), d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_pp_mat_D_f,
+
+            gpu::computeCoulombFockDDPP_FP32<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                               d_mat_J, d_p_prim_info_f, static_cast<uint32_t>(p_prim_count), d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_pp_mat_D_f,
                                d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local),
                                d_pp_first_inds, d_pp_second_inds, d_pp_pair_data_f, static_cast<uint32_t>(pp_prim_pair_count),
                                d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
 
-            std::vector<double> h_mat_J2_2kernels(dd_prim_pair_count_local, 0.0);
-            std::vector<double> h_mat_J2_ref(dd_prim_pair_count_local, 0.0);
-
-            gpuSafe(gpuMemcpyAsync(h_mat_J2_2kernels.data(), d_mat_J2_2kernels, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
-            gpuSafe(gpuMemcpyAsync(h_mat_J2_ref.data(), d_mat_J2_ref, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
-
             gpuSafe(gpuStreamSynchronize(stream));
-
-            gpuSafe(gpuFree(d_mat_J2_2kernels));
-            gpuSafe(gpuFree(d_mat_J2_ref));
-            gpuSafe(gpuFree(d_prec_cut_ij_tile));
-            gpuSafe(gpuFree(d_screen_cut_ij_tile));
-            gpuSafe(gpuFree(d_mat_D2));
-            gpuSafe(gpuFree(d_pp_mat_D_f));
-            gpuSafe(gpuFree(d_pp_mat_Q_f));
-            gpuSafe(gpuFree(d_dd_mat_Q_local_f));
-            gpuSafe(gpuFree(d_pp_pair_data_f));
-            gpuSafe(gpuFree(d_dd_pair_data_local_f));
-    
-            gpuSafe(gpuFree(d_p_prim_info_f));
-            gpuSafe(gpuFree(d_d_prim_info_f));
-
-            check_J_against_ref("DDPP Two Separate Kernels (J2_2kernels vs ref)", h_mat_J2_2kernels, h_mat_J2_ref, (uint32_t)dd_prim_pair_count_local);       
-            print_cut_status("DDPP", prec_cut_ij_tile_h, screen_cut_ij_tile_h, (uint32_t)pp_prim_pair_count, TILE_DIM_LARGE);
         }
 
 
@@ -7740,6 +7385,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             dim3 dd_num_blocks ((dd_prim_pair_count_local + dd_threads_per_block.x - 1) / dd_threads_per_block.x, 1);
 
+            /*
             gpu::computeCoulombFockDDPD0<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_p_prim_info,
@@ -7949,260 +7595,118 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
+            */
 
-            gpuSafe(gpuStreamSynchronize(stream));
-        }
-
-// ======= HOST DISPATCHER FOR DDPD =======
-        if (pd_prim_pair_count > 0) {
-            const dim3 zero_threads_per_block(TILE_DIM * TILE_DIM);
-            const dim3 zero_num_blocks((dd_prim_pair_count_local + zero_threads_per_block.x - 1) / zero_threads_per_block.x);
-            const dim3 dd_dispatch_threads_per_block(TILE_DIM_SMALL, TILE_DIM_LARGE);
-            const dim3 dd_dispatch_num_blocks((dd_prim_pair_count_local + dd_dispatch_threads_per_block.x - 1) / dd_dispatch_threads_per_block.x, 1);
-            double *d_mat_J2_2kernels, *d_mat_J2_ref;
-            gpuSafe(gpuMalloc(&d_mat_J2_2kernels, sizeof(double) * dd_prim_pair_count_local));
-            gpuSafe(gpuMalloc(&d_mat_J2_ref, sizeof(double) * dd_prim_pair_count_local));
-            double *d_mat_D2;
-            gpuSafe(gpuMalloc(&d_mat_D2, sizeof(double) * pd_prim_pair_count));
-            gpuSafe(gpuMemcpyAsync(d_mat_D2, pd_mat_D.data(), pd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
-            gpu::zeroData<<<zero_num_blocks, zero_threads_per_block, 0, stream>>>(d_mat_J2_2kernels, static_cast<uint32_t>(dd_prim_pair_count_local));
-            gpu::zeroData<<<zero_num_blocks, zero_threads_per_block, 0, stream>>>(d_mat_J2_ref, static_cast<uint32_t>(dd_prim_pair_count_local));
-
-            const double tau_precision = 1e-6;
-            uint32_t* d_prec_cut_ij_tile = nullptr;
             auto prec_cut_ij_tile_h = build_cut_ij_tile_dd(dd_mat_Q_local, pd_mat_Q, pd_mat_D, (uint32_t)dd_prim_pair_count_local, (uint32_t)pd_prim_pair_count, TILE_DIM_SMALL, TILE_DIM_LARGE, tau_precision);
             const uint32_t nij_tiles = (dd_prim_pair_count_local + TILE_DIM_SMALL - 1) / TILE_DIM_SMALL;
-            gpuSafe(gpuMalloc((void**)&d_prec_cut_ij_tile, nij_tiles * sizeof(uint32_t)));
             gpuSafe(gpuMemcpyAsync(d_prec_cut_ij_tile, prec_cut_ij_tile_h.data(), nij_tiles * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-            uint32_t* d_screen_cut_ij_tile = nullptr;
             auto screen_cut_ij_tile_h = build_cut_ij_tile_dd(dd_mat_Q_local, pd_mat_Q, pd_mat_D, (uint32_t)dd_prim_pair_count_local, (uint32_t)pd_prim_pair_count, TILE_DIM_SMALL, TILE_DIM_LARGE, eri_threshold);
-            gpuSafe(gpuMalloc((void**)&d_screen_cut_ij_tile, nij_tiles * sizeof(uint32_t)));
             gpuSafe(gpuMemcpyAsync(d_screen_cut_ij_tile, screen_cut_ij_tile_h.data(), nij_tiles * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-            // Float versions mapping
-            std::vector<float> dd_mat_Q_local_f    = to_float_vec(dd_mat_Q_local);
-            std::vector<float> pd_mat_Q_f          = to_float_vec(pd_mat_Q);
-            std::vector<float> pd_mat_D_f          = to_float_vec(pd_mat_D);
-            std::vector<float> dd_pair_data_local_f= to_float_vec(dd_pair_data_local);
-            std::vector<float> pd_pair_data_f      = to_float_vec(pd_pair_data);
+            gpu::computeCoulombFockDDPD0_FP64<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                               d_mat_J, d_p_prim_info, static_cast<uint32_t>(p_prim_count), d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D,
+                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
+                               d_pd_first_inds, d_pd_second_inds, d_pd_pair_data, static_cast<uint32_t>(pd_prim_pair_count),
+                               d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
+            gpu::computeCoulombFockDDPD1_FP64<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                               d_mat_J, d_p_prim_info, static_cast<uint32_t>(p_prim_count), d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D,
+                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
+                               d_pd_first_inds, d_pd_second_inds, d_pd_pair_data, static_cast<uint32_t>(pd_prim_pair_count),
+                               d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
+            gpu::computeCoulombFockDDPD2_FP64<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                               d_mat_J, d_p_prim_info, static_cast<uint32_t>(p_prim_count), d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D,
+                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
+                               d_pd_first_inds, d_pd_second_inds, d_pd_pair_data, static_cast<uint32_t>(pd_prim_pair_count),
+                               d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
+            gpu::computeCoulombFockDDPD3_FP64<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                               d_mat_J, d_p_prim_info, static_cast<uint32_t>(p_prim_count), d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D,
+                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
+                               d_pd_first_inds, d_pd_second_inds, d_pd_pair_data, static_cast<uint32_t>(pd_prim_pair_count),
+                               d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
+            gpu::computeCoulombFockDDPD4_FP64<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                               d_mat_J, d_p_prim_info, static_cast<uint32_t>(p_prim_count), d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D,
+                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
+                               d_pd_first_inds, d_pd_second_inds, d_pd_pair_data, static_cast<uint32_t>(pd_prim_pair_count),
+                               d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
+            gpu::computeCoulombFockDDPD5_FP64<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                               d_mat_J, d_p_prim_info, static_cast<uint32_t>(p_prim_count), d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D,
+                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
+                               d_pd_first_inds, d_pd_second_inds, d_pd_pair_data, static_cast<uint32_t>(pd_prim_pair_count),
+                               d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
+            gpu::computeCoulombFockDDPD6_FP64<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                               d_mat_J, d_p_prim_info, static_cast<uint32_t>(p_prim_count), d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D,
+                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
+                               d_pd_first_inds, d_pd_second_inds, d_pd_pair_data, static_cast<uint32_t>(pd_prim_pair_count),
+                               d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
+            gpu::computeCoulombFockDDPD7_FP64<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                               d_mat_J, d_p_prim_info, static_cast<uint32_t>(p_prim_count), d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D,
+                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
+                               d_pd_first_inds, d_pd_second_inds, d_pd_pair_data, static_cast<uint32_t>(pd_prim_pair_count),
+                               d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
+            gpu::computeCoulombFockDDPD8_FP64<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                               d_mat_J, d_p_prim_info, static_cast<uint32_t>(p_prim_count), d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D,
+                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
+                               d_pd_first_inds, d_pd_second_inds, d_pd_pair_data, static_cast<uint32_t>(pd_prim_pair_count),
+                               d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
+            gpu::computeCoulombFockDDPD9_FP64<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                               d_mat_J, d_p_prim_info, static_cast<uint32_t>(p_prim_count), d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D,
+                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
+                               d_pd_first_inds, d_pd_second_inds, d_pd_pair_data, static_cast<uint32_t>(pd_prim_pair_count),
+                               d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
 
-            float *d_pd_mat_D_f = nullptr, *d_pd_mat_Q_f = nullptr, *d_dd_mat_Q_local_f = nullptr, *d_pd_pair_data_f = nullptr, *d_dd_pair_data_local_f = nullptr;
-            gpuSafe(gpuMalloc(&d_pd_mat_D_f, sizeof(float) * pd_mat_D_f.size()));
-            gpuSafe(gpuMalloc(&d_pd_mat_Q_f, sizeof(float) * pd_mat_Q_f.size()));
-            gpuSafe(gpuMalloc(&d_dd_mat_Q_local_f, sizeof(float) * dd_mat_Q_local_f.size()));
-            gpuSafe(gpuMalloc(&d_pd_pair_data_f, sizeof(float) * pd_pair_data_f.size()));
-            gpuSafe(gpuMalloc(&d_dd_pair_data_local_f, sizeof(float) * dd_pair_data_local_f.size()));
-
-            gpuSafe(gpuMemcpyAsync(d_pd_mat_D_f, pd_mat_D_f.data(), pd_mat_D_f.size() * sizeof(float), gpuMemcpyHostToDevice, stream));
-            gpuSafe(gpuMemcpyAsync(d_pd_mat_Q_f, pd_mat_Q_f.data(), pd_mat_Q_f.size() * sizeof(float), gpuMemcpyHostToDevice, stream));
-            gpuSafe(gpuMemcpyAsync(d_dd_mat_Q_local_f, dd_mat_Q_local_f.data(), dd_mat_Q_local_f.size() * sizeof(float), gpuMemcpyHostToDevice, stream));
-            gpuSafe(gpuMemcpyAsync(d_pd_pair_data_f, pd_pair_data_f.data(), pd_pair_data_f.size() * sizeof(float), gpuMemcpyHostToDevice, stream));
-            gpuSafe(gpuMemcpyAsync(d_dd_pair_data_local_f, dd_pair_data_local_f.data(), dd_pair_data_local_f.size() * sizeof(float), gpuMemcpyHostToDevice, stream));
-    
-
-            std::vector<float> p_prim_info_f = to_float_vec(p_prim_info);
-            float* d_p_prim_info_f = nullptr;
-            gpuSafe(gpuMalloc(&d_p_prim_info_f, sizeof(float) * p_prim_info_f.size()));
-            gpuSafe(gpuMemcpyAsync(d_p_prim_info_f, p_prim_info_f.data(), p_prim_info_f.size() * sizeof(float), gpuMemcpyHostToDevice, stream));
-        
-
-            std::vector<float> d_prim_info_f = to_float_vec(d_prim_info);
-            float* d_d_prim_info_f = nullptr;
-            gpuSafe(gpuMalloc(&d_d_prim_info_f, sizeof(float) * d_prim_info_f.size()));
-            gpuSafe(gpuMemcpyAsync(d_d_prim_info_f, d_prim_info_f.data(), d_prim_info_f.size() * sizeof(float), gpuMemcpyHostToDevice, stream));
-        
-
-            // 1. Original (Baseline Reference)
-            gpu::computeCoulombFockDDPD0<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_ref, d_p_prim_info, static_cast<uint32_t>(p_prim_count), d_d_prim_info, static_cast<uint32_t>(d_prim_count),
-                               d_mat_D2, d_dd_mat_Q_local, d_pd_mat_Q,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_pd_first_inds, d_pd_second_inds, d_pd_pair_data, static_cast<uint32_t>(pd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, eri_threshold);
-            gpu::computeCoulombFockDDPD1<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_ref, d_p_prim_info, static_cast<uint32_t>(p_prim_count), d_d_prim_info, static_cast<uint32_t>(d_prim_count),
-                               d_mat_D2, d_dd_mat_Q_local, d_pd_mat_Q,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_pd_first_inds, d_pd_second_inds, d_pd_pair_data, static_cast<uint32_t>(pd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, eri_threshold);
-            gpu::computeCoulombFockDDPD2<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_ref, d_p_prim_info, static_cast<uint32_t>(p_prim_count), d_d_prim_info, static_cast<uint32_t>(d_prim_count),
-                               d_mat_D2, d_dd_mat_Q_local, d_pd_mat_Q,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_pd_first_inds, d_pd_second_inds, d_pd_pair_data, static_cast<uint32_t>(pd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, eri_threshold);
-            gpu::computeCoulombFockDDPD3<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_ref, d_p_prim_info, static_cast<uint32_t>(p_prim_count), d_d_prim_info, static_cast<uint32_t>(d_prim_count),
-                               d_mat_D2, d_dd_mat_Q_local, d_pd_mat_Q,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_pd_first_inds, d_pd_second_inds, d_pd_pair_data, static_cast<uint32_t>(pd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, eri_threshold);
-            gpu::computeCoulombFockDDPD4<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_ref, d_p_prim_info, static_cast<uint32_t>(p_prim_count), d_d_prim_info, static_cast<uint32_t>(d_prim_count),
-                               d_mat_D2, d_dd_mat_Q_local, d_pd_mat_Q,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_pd_first_inds, d_pd_second_inds, d_pd_pair_data, static_cast<uint32_t>(pd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, eri_threshold);
-            gpu::computeCoulombFockDDPD5<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_ref, d_p_prim_info, static_cast<uint32_t>(p_prim_count), d_d_prim_info, static_cast<uint32_t>(d_prim_count),
-                               d_mat_D2, d_dd_mat_Q_local, d_pd_mat_Q,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_pd_first_inds, d_pd_second_inds, d_pd_pair_data, static_cast<uint32_t>(pd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, eri_threshold);
-            gpu::computeCoulombFockDDPD6<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_ref, d_p_prim_info, static_cast<uint32_t>(p_prim_count), d_d_prim_info, static_cast<uint32_t>(d_prim_count),
-                               d_mat_D2, d_dd_mat_Q_local, d_pd_mat_Q,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_pd_first_inds, d_pd_second_inds, d_pd_pair_data, static_cast<uint32_t>(pd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, eri_threshold);
-            gpu::computeCoulombFockDDPD7<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_ref, d_p_prim_info, static_cast<uint32_t>(p_prim_count), d_d_prim_info, static_cast<uint32_t>(d_prim_count),
-                               d_mat_D2, d_dd_mat_Q_local, d_pd_mat_Q,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_pd_first_inds, d_pd_second_inds, d_pd_pair_data, static_cast<uint32_t>(pd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, eri_threshold);
-            gpu::computeCoulombFockDDPD8<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_ref, d_p_prim_info, static_cast<uint32_t>(p_prim_count), d_d_prim_info, static_cast<uint32_t>(d_prim_count),
-                               d_mat_D2, d_dd_mat_Q_local, d_pd_mat_Q,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_pd_first_inds, d_pd_second_inds, d_pd_pair_data, static_cast<uint32_t>(pd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, eri_threshold);
-            gpu::computeCoulombFockDDPD9<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_ref, d_p_prim_info, static_cast<uint32_t>(p_prim_count), d_d_prim_info, static_cast<uint32_t>(d_prim_count),
-                               d_mat_D2, d_dd_mat_Q_local, d_pd_mat_Q,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_pd_first_inds, d_pd_second_inds, d_pd_pair_data, static_cast<uint32_t>(pd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, eri_threshold);
-
-            // 2. FP64 Part (Two Kernels)
-            gpu::computeCoulombFockDDPD0_FP64<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_p_prim_info, static_cast<uint32_t>(p_prim_count), d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D2,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_pd_first_inds, d_pd_second_inds, d_pd_pair_data, static_cast<uint32_t>(pd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
-            gpu::computeCoulombFockDDPD1_FP64<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_p_prim_info, static_cast<uint32_t>(p_prim_count), d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D2,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_pd_first_inds, d_pd_second_inds, d_pd_pair_data, static_cast<uint32_t>(pd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
-            gpu::computeCoulombFockDDPD2_FP64<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_p_prim_info, static_cast<uint32_t>(p_prim_count), d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D2,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_pd_first_inds, d_pd_second_inds, d_pd_pair_data, static_cast<uint32_t>(pd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
-            gpu::computeCoulombFockDDPD3_FP64<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_p_prim_info, static_cast<uint32_t>(p_prim_count), d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D2,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_pd_first_inds, d_pd_second_inds, d_pd_pair_data, static_cast<uint32_t>(pd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
-            gpu::computeCoulombFockDDPD4_FP64<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_p_prim_info, static_cast<uint32_t>(p_prim_count), d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D2,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_pd_first_inds, d_pd_second_inds, d_pd_pair_data, static_cast<uint32_t>(pd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
-            gpu::computeCoulombFockDDPD5_FP64<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_p_prim_info, static_cast<uint32_t>(p_prim_count), d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D2,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_pd_first_inds, d_pd_second_inds, d_pd_pair_data, static_cast<uint32_t>(pd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
-            gpu::computeCoulombFockDDPD6_FP64<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_p_prim_info, static_cast<uint32_t>(p_prim_count), d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D2,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_pd_first_inds, d_pd_second_inds, d_pd_pair_data, static_cast<uint32_t>(pd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
-            gpu::computeCoulombFockDDPD7_FP64<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_p_prim_info, static_cast<uint32_t>(p_prim_count), d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D2,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_pd_first_inds, d_pd_second_inds, d_pd_pair_data, static_cast<uint32_t>(pd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
-            gpu::computeCoulombFockDDPD8_FP64<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_p_prim_info, static_cast<uint32_t>(p_prim_count), d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D2,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_pd_first_inds, d_pd_second_inds, d_pd_pair_data, static_cast<uint32_t>(pd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
-            gpu::computeCoulombFockDDPD9_FP64<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_p_prim_info, static_cast<uint32_t>(p_prim_count), d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D2,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_pd_first_inds, d_pd_second_inds, d_pd_pair_data, static_cast<uint32_t>(pd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
-            
-            // 3. FP32 Part (Two Kernels)
-            gpu::computeCoulombFockDDPD0_FP32<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_p_prim_info_f, static_cast<uint32_t>(p_prim_count), d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_pd_mat_D_f,
+            gpu::computeCoulombFockDDPD0_FP32<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                               d_mat_J, d_p_prim_info_f, static_cast<uint32_t>(p_prim_count), d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_pd_mat_D_f,
                                d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local),
                                d_pd_first_inds, d_pd_second_inds, d_pd_pair_data_f, static_cast<uint32_t>(pd_prim_pair_count),
                                d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
-            gpu::computeCoulombFockDDPD1_FP32<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_p_prim_info_f, static_cast<uint32_t>(p_prim_count), d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_pd_mat_D_f,
+            gpu::computeCoulombFockDDPD1_FP32<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                               d_mat_J, d_p_prim_info_f, static_cast<uint32_t>(p_prim_count), d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_pd_mat_D_f,
                                d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local),
                                d_pd_first_inds, d_pd_second_inds, d_pd_pair_data_f, static_cast<uint32_t>(pd_prim_pair_count),
                                d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
-            gpu::computeCoulombFockDDPD2_FP32<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_p_prim_info_f, static_cast<uint32_t>(p_prim_count), d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_pd_mat_D_f,
+            gpu::computeCoulombFockDDPD2_FP32<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                               d_mat_J, d_p_prim_info_f, static_cast<uint32_t>(p_prim_count), d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_pd_mat_D_f,
                                d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local),
                                d_pd_first_inds, d_pd_second_inds, d_pd_pair_data_f, static_cast<uint32_t>(pd_prim_pair_count),
                                d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
-            gpu::computeCoulombFockDDPD3_FP32<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_p_prim_info_f, static_cast<uint32_t>(p_prim_count), d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_pd_mat_D_f,
+            gpu::computeCoulombFockDDPD3_FP32<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                               d_mat_J, d_p_prim_info_f, static_cast<uint32_t>(p_prim_count), d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_pd_mat_D_f,
                                d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local),
                                d_pd_first_inds, d_pd_second_inds, d_pd_pair_data_f, static_cast<uint32_t>(pd_prim_pair_count),
                                d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
-            gpu::computeCoulombFockDDPD4_FP32<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_p_prim_info_f, static_cast<uint32_t>(p_prim_count), d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_pd_mat_D_f,
+            gpu::computeCoulombFockDDPD4_FP32<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                               d_mat_J, d_p_prim_info_f, static_cast<uint32_t>(p_prim_count), d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_pd_mat_D_f,
                                d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local),
                                d_pd_first_inds, d_pd_second_inds, d_pd_pair_data_f, static_cast<uint32_t>(pd_prim_pair_count),
                                d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
-            gpu::computeCoulombFockDDPD5_FP32<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_p_prim_info_f, static_cast<uint32_t>(p_prim_count), d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_pd_mat_D_f,
+            gpu::computeCoulombFockDDPD5_FP32<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                               d_mat_J, d_p_prim_info_f, static_cast<uint32_t>(p_prim_count), d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_pd_mat_D_f,
                                d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local),
                                d_pd_first_inds, d_pd_second_inds, d_pd_pair_data_f, static_cast<uint32_t>(pd_prim_pair_count),
                                d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
-            gpu::computeCoulombFockDDPD6_FP32<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_p_prim_info_f, static_cast<uint32_t>(p_prim_count), d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_pd_mat_D_f,
+            gpu::computeCoulombFockDDPD6_FP32<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                               d_mat_J, d_p_prim_info_f, static_cast<uint32_t>(p_prim_count), d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_pd_mat_D_f,
                                d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local),
                                d_pd_first_inds, d_pd_second_inds, d_pd_pair_data_f, static_cast<uint32_t>(pd_prim_pair_count),
                                d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
-            gpu::computeCoulombFockDDPD7_FP32<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_p_prim_info_f, static_cast<uint32_t>(p_prim_count), d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_pd_mat_D_f,
+            gpu::computeCoulombFockDDPD7_FP32<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                               d_mat_J, d_p_prim_info_f, static_cast<uint32_t>(p_prim_count), d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_pd_mat_D_f,
                                d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local),
                                d_pd_first_inds, d_pd_second_inds, d_pd_pair_data_f, static_cast<uint32_t>(pd_prim_pair_count),
                                d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
-            gpu::computeCoulombFockDDPD8_FP32<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_p_prim_info_f, static_cast<uint32_t>(p_prim_count), d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_pd_mat_D_f,
+            gpu::computeCoulombFockDDPD8_FP32<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                               d_mat_J, d_p_prim_info_f, static_cast<uint32_t>(p_prim_count), d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_pd_mat_D_f,
                                d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local),
                                d_pd_first_inds, d_pd_second_inds, d_pd_pair_data_f, static_cast<uint32_t>(pd_prim_pair_count),
                                d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
-            gpu::computeCoulombFockDDPD9_FP32<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_p_prim_info_f, static_cast<uint32_t>(p_prim_count), d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_pd_mat_D_f,
+            gpu::computeCoulombFockDDPD9_FP32<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
+                               d_mat_J, d_p_prim_info_f, static_cast<uint32_t>(p_prim_count), d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_pd_mat_D_f,
                                d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local),
                                d_pd_first_inds, d_pd_second_inds, d_pd_pair_data_f, static_cast<uint32_t>(pd_prim_pair_count),
                                d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
-
-            std::vector<double> h_mat_J2_2kernels(dd_prim_pair_count_local, 0.0);
-            std::vector<double> h_mat_J2_ref(dd_prim_pair_count_local, 0.0);
-
-            gpuSafe(gpuMemcpyAsync(h_mat_J2_2kernels.data(), d_mat_J2_2kernels, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
-            gpuSafe(gpuMemcpyAsync(h_mat_J2_ref.data(), d_mat_J2_ref, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
             gpuSafe(gpuStreamSynchronize(stream));
-
-            gpuSafe(gpuFree(d_mat_J2_2kernels));
-            gpuSafe(gpuFree(d_mat_J2_ref));
-            gpuSafe(gpuFree(d_prec_cut_ij_tile));
-            gpuSafe(gpuFree(d_screen_cut_ij_tile));
-            gpuSafe(gpuFree(d_mat_D2));
-            gpuSafe(gpuFree(d_pd_mat_D_f));
-            gpuSafe(gpuFree(d_pd_mat_Q_f));
-            gpuSafe(gpuFree(d_dd_mat_Q_local_f));
-            gpuSafe(gpuFree(d_pd_pair_data_f));
-            gpuSafe(gpuFree(d_dd_pair_data_local_f));
-    
-            gpuSafe(gpuFree(d_p_prim_info_f));
-            gpuSafe(gpuFree(d_d_prim_info_f));
-
-            check_J_against_ref("DDPD Two Separate Kernels (J2_2kernels vs ref)", h_mat_J2_2kernels, h_mat_J2_ref, (uint32_t)dd_prim_pair_count_local);       
-            print_cut_status("DDPD", prec_cut_ij_tile_h, screen_cut_ij_tile_h, (uint32_t)pd_prim_pair_count, TILE_DIM_LARGE);
         }
 
 
@@ -8217,6 +7721,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             dim3 dd_num_blocks ((dd_prim_pair_count_local + dd_threads_per_block.x - 1) / dd_threads_per_block.x, 1);
 
+            /*
             gpu::computeCoulombFockDDDD0<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_mat_J,
                                d_d_prim_info,
@@ -8786,573 +8291,78 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
+            */
 
-            gpuSafe(gpuStreamSynchronize(stream));
-        }
-
-// ======= HOST DISPATCHER FOR DDDD =======
-        if (dd_prim_pair_count > 0) {
-            const dim3 zero_threads_per_block(TILE_DIM * TILE_DIM);
-            const dim3 zero_num_blocks((dd_prim_pair_count_local + zero_threads_per_block.x - 1) / zero_threads_per_block.x);
-            const dim3 dd_dispatch_threads_per_block(TILE_DIM_SMALL, TILE_DIM_LARGE);
-            const dim3 dd_dispatch_num_blocks((dd_prim_pair_count_local + dd_dispatch_threads_per_block.x - 1) / dd_dispatch_threads_per_block.x, 1);
-            double *d_mat_J2_2kernels, *d_mat_J2_ref;
-            gpuSafe(gpuMalloc(&d_mat_J2_2kernels, sizeof(double) * dd_prim_pair_count_local));
-            gpuSafe(gpuMalloc(&d_mat_J2_ref, sizeof(double) * dd_prim_pair_count_local));
-            double *d_mat_D2;
-            gpuSafe(gpuMalloc(&d_mat_D2, sizeof(double) * dd_prim_pair_count));
-            gpuSafe(gpuMemcpyAsync(d_mat_D2, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
-            gpu::zeroData<<<zero_num_blocks, zero_threads_per_block, 0, stream>>>(d_mat_J2_2kernels, static_cast<uint32_t>(dd_prim_pair_count_local));
-            gpu::zeroData<<<zero_num_blocks, zero_threads_per_block, 0, stream>>>(d_mat_J2_ref, static_cast<uint32_t>(dd_prim_pair_count_local));
-
-            const double tau_precision = 1e-6;
-            uint32_t* d_prec_cut_ij_tile = nullptr;
             auto prec_cut_ij_tile_h = build_cut_ij_tile_dd(dd_mat_Q_local, dd_mat_Q, dd_mat_D, (uint32_t)dd_prim_pair_count_local, (uint32_t)dd_prim_pair_count, TILE_DIM_SMALL, TILE_DIM_LARGE, tau_precision);
             const uint32_t nij_tiles = (dd_prim_pair_count_local + TILE_DIM_SMALL - 1) / TILE_DIM_SMALL;
-            gpuSafe(gpuMalloc((void**)&d_prec_cut_ij_tile, nij_tiles * sizeof(uint32_t)));
             gpuSafe(gpuMemcpyAsync(d_prec_cut_ij_tile, prec_cut_ij_tile_h.data(), nij_tiles * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-            uint32_t* d_screen_cut_ij_tile = nullptr;
             auto screen_cut_ij_tile_h = build_cut_ij_tile_dd(dd_mat_Q_local, dd_mat_Q, dd_mat_D, (uint32_t)dd_prim_pair_count_local, (uint32_t)dd_prim_pair_count, TILE_DIM_SMALL, TILE_DIM_LARGE, eri_threshold);
-            gpuSafe(gpuMalloc((void**)&d_screen_cut_ij_tile, nij_tiles * sizeof(uint32_t)));
             gpuSafe(gpuMemcpyAsync(d_screen_cut_ij_tile, screen_cut_ij_tile_h.data(), nij_tiles * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-            // Float versions mapping
-            std::vector<float> dd_mat_Q_local_f    = to_float_vec(dd_mat_Q_local);
-            std::vector<float> dd_mat_Q_f          = to_float_vec(dd_mat_Q);
-            std::vector<float> dd_mat_D_f          = to_float_vec(dd_mat_D);
-            std::vector<float> dd_pair_data_local_f= to_float_vec(dd_pair_data_local);
-            std::vector<float> dd_pair_data_f      = to_float_vec(dd_pair_data);
+            gpu::computeCoulombFockDDDD0_FP64<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
+            gpu::computeCoulombFockDDDD1_FP64<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
+            gpu::computeCoulombFockDDDD2_FP64<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
+            gpu::computeCoulombFockDDDD3_FP64<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
+            gpu::computeCoulombFockDDDD4_FP64<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
+            gpu::computeCoulombFockDDDD5_FP64<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
+            gpu::computeCoulombFockDDDD6_FP64<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
+            gpu::computeCoulombFockDDDD7_FP64<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
+            gpu::computeCoulombFockDDDD8_FP64<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
+            gpu::computeCoulombFockDDDD9_FP64<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
+            gpu::computeCoulombFockDDDD10_FP64<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
+            gpu::computeCoulombFockDDDD11_FP64<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
+            gpu::computeCoulombFockDDDD12_FP64<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
+            gpu::computeCoulombFockDDDD13_FP64<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
+            gpu::computeCoulombFockDDDD14_FP64<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
+            gpu::computeCoulombFockDDDD15_FP64<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
+            gpu::computeCoulombFockDDDD16_FP64<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
+            gpu::computeCoulombFockDDDD17_FP64<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
+            gpu::computeCoulombFockDDDD18_FP64<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
+            gpu::computeCoulombFockDDDD19_FP64<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
+            gpu::computeCoulombFockDDDD20_FP64<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
+            gpu::computeCoulombFockDDDD21_FP64<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
+            gpu::computeCoulombFockDDDD22_FP64<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
+            gpu::computeCoulombFockDDDD23_FP64<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
+            gpu::computeCoulombFockDDDD24_FP64<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
+            gpu::computeCoulombFockDDDD25_FP64<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
+            gpu::computeCoulombFockDDDD26_FP64<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
+            gpu::computeCoulombFockDDDD27_FP64<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
+            gpu::computeCoulombFockDDDD28_FP64<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
+            gpu::computeCoulombFockDDDD29_FP64<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
 
-            float *d_dd_mat_D_f = nullptr, *d_dd_mat_Q_f = nullptr, *d_dd_mat_Q_local_f = nullptr, *d_dd_pair_data_f = nullptr, *d_dd_pair_data_local_f = nullptr;
-            gpuSafe(gpuMalloc(&d_dd_mat_D_f, sizeof(float) * dd_mat_D_f.size()));
-            gpuSafe(gpuMalloc(&d_dd_mat_Q_f, sizeof(float) * dd_mat_Q_f.size()));
-            gpuSafe(gpuMalloc(&d_dd_mat_Q_local_f, sizeof(float) * dd_mat_Q_local_f.size()));
-            gpuSafe(gpuMalloc(&d_dd_pair_data_f, sizeof(float) * dd_pair_data_f.size()));
-            gpuSafe(gpuMalloc(&d_dd_pair_data_local_f, sizeof(float) * dd_pair_data_local_f.size()));
-
-            gpuSafe(gpuMemcpyAsync(d_dd_mat_D_f, dd_mat_D_f.data(), dd_mat_D_f.size() * sizeof(float), gpuMemcpyHostToDevice, stream));
-            gpuSafe(gpuMemcpyAsync(d_dd_mat_Q_f, dd_mat_Q_f.data(), dd_mat_Q_f.size() * sizeof(float), gpuMemcpyHostToDevice, stream));
-            gpuSafe(gpuMemcpyAsync(d_dd_mat_Q_local_f, dd_mat_Q_local_f.data(), dd_mat_Q_local_f.size() * sizeof(float), gpuMemcpyHostToDevice, stream));
-            gpuSafe(gpuMemcpyAsync(d_dd_pair_data_f, dd_pair_data_f.data(), dd_pair_data_f.size() * sizeof(float), gpuMemcpyHostToDevice, stream));
-            gpuSafe(gpuMemcpyAsync(d_dd_pair_data_local_f, dd_pair_data_local_f.data(), dd_pair_data_local_f.size() * sizeof(float), gpuMemcpyHostToDevice, stream));
-    
-
-            std::vector<float> d_prim_info_f = to_float_vec(d_prim_info);
-            float* d_d_prim_info_f = nullptr;
-            gpuSafe(gpuMalloc(&d_d_prim_info_f, sizeof(float) * d_prim_info_f.size()));
-            gpuSafe(gpuMemcpyAsync(d_d_prim_info_f, d_prim_info_f.data(), d_prim_info_f.size() * sizeof(float), gpuMemcpyHostToDevice, stream));
-        
-
-            // 1. Original (Baseline Reference)
-            gpu::computeCoulombFockDDDD0<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_ref, d_d_prim_info, static_cast<uint32_t>(d_prim_count),
-                               d_mat_D2, d_dd_mat_Q_local, d_dd_mat_Q,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, eri_threshold);
-            gpu::computeCoulombFockDDDD1<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_ref, d_d_prim_info, static_cast<uint32_t>(d_prim_count),
-                               d_mat_D2, d_dd_mat_Q_local, d_dd_mat_Q,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, eri_threshold);
-            gpu::computeCoulombFockDDDD2<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_ref, d_d_prim_info, static_cast<uint32_t>(d_prim_count),
-                               d_mat_D2, d_dd_mat_Q_local, d_dd_mat_Q,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, eri_threshold);
-            gpu::computeCoulombFockDDDD3<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_ref, d_d_prim_info, static_cast<uint32_t>(d_prim_count),
-                               d_mat_D2, d_dd_mat_Q_local, d_dd_mat_Q,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, eri_threshold);
-            gpu::computeCoulombFockDDDD4<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_ref, d_d_prim_info, static_cast<uint32_t>(d_prim_count),
-                               d_mat_D2, d_dd_mat_Q_local, d_dd_mat_Q,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, eri_threshold);
-            gpu::computeCoulombFockDDDD5<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_ref, d_d_prim_info, static_cast<uint32_t>(d_prim_count),
-                               d_mat_D2, d_dd_mat_Q_local, d_dd_mat_Q,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, eri_threshold);
-            gpu::computeCoulombFockDDDD6<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_ref, d_d_prim_info, static_cast<uint32_t>(d_prim_count),
-                               d_mat_D2, d_dd_mat_Q_local, d_dd_mat_Q,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, eri_threshold);
-            gpu::computeCoulombFockDDDD7<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_ref, d_d_prim_info, static_cast<uint32_t>(d_prim_count),
-                               d_mat_D2, d_dd_mat_Q_local, d_dd_mat_Q,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, eri_threshold);
-            gpu::computeCoulombFockDDDD8<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_ref, d_d_prim_info, static_cast<uint32_t>(d_prim_count),
-                               d_mat_D2, d_dd_mat_Q_local, d_dd_mat_Q,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, eri_threshold);
-            gpu::computeCoulombFockDDDD9<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_ref, d_d_prim_info, static_cast<uint32_t>(d_prim_count),
-                               d_mat_D2, d_dd_mat_Q_local, d_dd_mat_Q,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, eri_threshold);
-            gpu::computeCoulombFockDDDD10<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_ref, d_d_prim_info, static_cast<uint32_t>(d_prim_count),
-                               d_mat_D2, d_dd_mat_Q_local, d_dd_mat_Q,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, eri_threshold);
-            gpu::computeCoulombFockDDDD11<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_ref, d_d_prim_info, static_cast<uint32_t>(d_prim_count),
-                               d_mat_D2, d_dd_mat_Q_local, d_dd_mat_Q,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, eri_threshold);
-            gpu::computeCoulombFockDDDD12<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_ref, d_d_prim_info, static_cast<uint32_t>(d_prim_count),
-                               d_mat_D2, d_dd_mat_Q_local, d_dd_mat_Q,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, eri_threshold);
-            gpu::computeCoulombFockDDDD13<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_ref, d_d_prim_info, static_cast<uint32_t>(d_prim_count),
-                               d_mat_D2, d_dd_mat_Q_local, d_dd_mat_Q,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, eri_threshold);
-            gpu::computeCoulombFockDDDD14<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_ref, d_d_prim_info, static_cast<uint32_t>(d_prim_count),
-                               d_mat_D2, d_dd_mat_Q_local, d_dd_mat_Q,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, eri_threshold);
-            gpu::computeCoulombFockDDDD15<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_ref, d_d_prim_info, static_cast<uint32_t>(d_prim_count),
-                               d_mat_D2, d_dd_mat_Q_local, d_dd_mat_Q,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, eri_threshold);
-            gpu::computeCoulombFockDDDD16<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_ref, d_d_prim_info, static_cast<uint32_t>(d_prim_count),
-                               d_mat_D2, d_dd_mat_Q_local, d_dd_mat_Q,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, eri_threshold);
-            gpu::computeCoulombFockDDDD17<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_ref, d_d_prim_info, static_cast<uint32_t>(d_prim_count),
-                               d_mat_D2, d_dd_mat_Q_local, d_dd_mat_Q,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, eri_threshold);
-            gpu::computeCoulombFockDDDD18<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_ref, d_d_prim_info, static_cast<uint32_t>(d_prim_count),
-                               d_mat_D2, d_dd_mat_Q_local, d_dd_mat_Q,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, eri_threshold);
-            gpu::computeCoulombFockDDDD19<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_ref, d_d_prim_info, static_cast<uint32_t>(d_prim_count),
-                               d_mat_D2, d_dd_mat_Q_local, d_dd_mat_Q,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, eri_threshold);
-            gpu::computeCoulombFockDDDD20<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_ref, d_d_prim_info, static_cast<uint32_t>(d_prim_count),
-                               d_mat_D2, d_dd_mat_Q_local, d_dd_mat_Q,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, eri_threshold);
-            gpu::computeCoulombFockDDDD21<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_ref, d_d_prim_info, static_cast<uint32_t>(d_prim_count),
-                               d_mat_D2, d_dd_mat_Q_local, d_dd_mat_Q,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, eri_threshold);
-            gpu::computeCoulombFockDDDD22<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_ref, d_d_prim_info, static_cast<uint32_t>(d_prim_count),
-                               d_mat_D2, d_dd_mat_Q_local, d_dd_mat_Q,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, eri_threshold);
-            gpu::computeCoulombFockDDDD23<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_ref, d_d_prim_info, static_cast<uint32_t>(d_prim_count),
-                               d_mat_D2, d_dd_mat_Q_local, d_dd_mat_Q,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, eri_threshold);
-            gpu::computeCoulombFockDDDD24<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_ref, d_d_prim_info, static_cast<uint32_t>(d_prim_count),
-                               d_mat_D2, d_dd_mat_Q_local, d_dd_mat_Q,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, eri_threshold);
-            gpu::computeCoulombFockDDDD25<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_ref, d_d_prim_info, static_cast<uint32_t>(d_prim_count),
-                               d_mat_D2, d_dd_mat_Q_local, d_dd_mat_Q,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, eri_threshold);
-            gpu::computeCoulombFockDDDD26<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_ref, d_d_prim_info, static_cast<uint32_t>(d_prim_count),
-                               d_mat_D2, d_dd_mat_Q_local, d_dd_mat_Q,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, eri_threshold);
-            gpu::computeCoulombFockDDDD27<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_ref, d_d_prim_info, static_cast<uint32_t>(d_prim_count),
-                               d_mat_D2, d_dd_mat_Q_local, d_dd_mat_Q,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, eri_threshold);
-            gpu::computeCoulombFockDDDD28<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_ref, d_d_prim_info, static_cast<uint32_t>(d_prim_count),
-                               d_mat_D2, d_dd_mat_Q_local, d_dd_mat_Q,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, eri_threshold);
-            gpu::computeCoulombFockDDDD29<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_ref, d_d_prim_info, static_cast<uint32_t>(d_prim_count),
-                               d_mat_D2, d_dd_mat_Q_local, d_dd_mat_Q,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, eri_threshold);
-
-            // 2. FP64 Part (Two Kernels)
-            gpu::computeCoulombFockDDDD0_FP64<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D2,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
-            gpu::computeCoulombFockDDDD1_FP64<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D2,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
-            gpu::computeCoulombFockDDDD2_FP64<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D2,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
-            gpu::computeCoulombFockDDDD3_FP64<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D2,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
-            gpu::computeCoulombFockDDDD4_FP64<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D2,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
-            gpu::computeCoulombFockDDDD5_FP64<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D2,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
-            gpu::computeCoulombFockDDDD6_FP64<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D2,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
-            gpu::computeCoulombFockDDDD7_FP64<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D2,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
-            gpu::computeCoulombFockDDDD8_FP64<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D2,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
-            gpu::computeCoulombFockDDDD9_FP64<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D2,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
-            gpu::computeCoulombFockDDDD10_FP64<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D2,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
-            gpu::computeCoulombFockDDDD11_FP64<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D2,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
-            gpu::computeCoulombFockDDDD12_FP64<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D2,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
-            gpu::computeCoulombFockDDDD13_FP64<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D2,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
-            gpu::computeCoulombFockDDDD14_FP64<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D2,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
-            gpu::computeCoulombFockDDDD15_FP64<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D2,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
-            gpu::computeCoulombFockDDDD16_FP64<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D2,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
-            gpu::computeCoulombFockDDDD17_FP64<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D2,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
-            gpu::computeCoulombFockDDDD18_FP64<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D2,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
-            gpu::computeCoulombFockDDDD19_FP64<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D2,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
-            gpu::computeCoulombFockDDDD20_FP64<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D2,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
-            gpu::computeCoulombFockDDDD21_FP64<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D2,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
-            gpu::computeCoulombFockDDDD22_FP64<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D2,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
-            gpu::computeCoulombFockDDDD23_FP64<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D2,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
-            gpu::computeCoulombFockDDDD24_FP64<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D2,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
-            gpu::computeCoulombFockDDDD25_FP64<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D2,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
-            gpu::computeCoulombFockDDDD26_FP64<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D2,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
-            gpu::computeCoulombFockDDDD27_FP64<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D2,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
-            gpu::computeCoulombFockDDDD28_FP64<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D2,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
-            gpu::computeCoulombFockDDDD29_FP64<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D2,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
-            
-            // 3. FP32 Part (Two Kernels)
-            gpu::computeCoulombFockDDDD0_FP32<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
-            gpu::computeCoulombFockDDDD1_FP32<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
-            gpu::computeCoulombFockDDDD2_FP32<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
-            gpu::computeCoulombFockDDDD3_FP32<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
-            gpu::computeCoulombFockDDDD4_FP32<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
-            gpu::computeCoulombFockDDDD5_FP32<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
-            gpu::computeCoulombFockDDDD6_FP32<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
-            gpu::computeCoulombFockDDDD7_FP32<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
-            gpu::computeCoulombFockDDDD8_FP32<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
-            gpu::computeCoulombFockDDDD9_FP32<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
-            gpu::computeCoulombFockDDDD10_FP32<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
-            gpu::computeCoulombFockDDDD11_FP32<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
-            gpu::computeCoulombFockDDDD12_FP32<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
-            gpu::computeCoulombFockDDDD13_FP32<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
-            gpu::computeCoulombFockDDDD14_FP32<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
-            gpu::computeCoulombFockDDDD15_FP32<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
-            gpu::computeCoulombFockDDDD16_FP32<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
-            gpu::computeCoulombFockDDDD17_FP32<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
-            gpu::computeCoulombFockDDDD18_FP32<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
-            gpu::computeCoulombFockDDDD19_FP32<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
-            gpu::computeCoulombFockDDDD20_FP32<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
-            gpu::computeCoulombFockDDDD21_FP32<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
-            gpu::computeCoulombFockDDDD22_FP32<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
-            gpu::computeCoulombFockDDDD23_FP32<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
-            gpu::computeCoulombFockDDDD24_FP32<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
-            gpu::computeCoulombFockDDDD25_FP32<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
-            gpu::computeCoulombFockDDDD26_FP32<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
-            gpu::computeCoulombFockDDDD27_FP32<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
-            gpu::computeCoulombFockDDDD28_FP32<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
-            gpu::computeCoulombFockDDDD29_FP32<<<dd_dispatch_num_blocks, dd_dispatch_threads_per_block, 0, stream>>>(
-                               d_mat_J2_2kernels, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count),
-                               d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
-
-            std::vector<double> h_mat_J2_2kernels(dd_prim_pair_count_local, 0.0);
-            std::vector<double> h_mat_J2_ref(dd_prim_pair_count_local, 0.0);
-
-            gpuSafe(gpuMemcpyAsync(h_mat_J2_2kernels.data(), d_mat_J2_2kernels, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
-            gpuSafe(gpuMemcpyAsync(h_mat_J2_ref.data(), d_mat_J2_ref, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+            gpu::computeCoulombFockDDDD0_FP32<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
+            gpu::computeCoulombFockDDDD1_FP32<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
+            gpu::computeCoulombFockDDDD2_FP32<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
+            gpu::computeCoulombFockDDDD3_FP32<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
+            gpu::computeCoulombFockDDDD4_FP32<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
+            gpu::computeCoulombFockDDDD5_FP32<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
+            gpu::computeCoulombFockDDDD6_FP32<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
+            gpu::computeCoulombFockDDDD7_FP32<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
+            gpu::computeCoulombFockDDDD8_FP32<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
+            gpu::computeCoulombFockDDDD9_FP32<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
+            gpu::computeCoulombFockDDDD10_FP32<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
+            gpu::computeCoulombFockDDDD11_FP32<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
+            gpu::computeCoulombFockDDDD12_FP32<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
+            gpu::computeCoulombFockDDDD13_FP32<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
+            gpu::computeCoulombFockDDDD14_FP32<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
+            gpu::computeCoulombFockDDDD15_FP32<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
+            gpu::computeCoulombFockDDDD16_FP32<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
+            gpu::computeCoulombFockDDDD17_FP32<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
+            gpu::computeCoulombFockDDDD18_FP32<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
+            gpu::computeCoulombFockDDDD19_FP32<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
+            gpu::computeCoulombFockDDDD20_FP32<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
+            gpu::computeCoulombFockDDDD21_FP32<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
+            gpu::computeCoulombFockDDDD22_FP32<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
+            gpu::computeCoulombFockDDDD23_FP32<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
+            gpu::computeCoulombFockDDDD24_FP32<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
+            gpu::computeCoulombFockDDDD25_FP32<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
+            gpu::computeCoulombFockDDDD26_FP32<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
+            gpu::computeCoulombFockDDDD27_FP32<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
+            gpu::computeCoulombFockDDDD28_FP32<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
+            gpu::computeCoulombFockDDDD29_FP32<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_dd_mat_D_f, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data_f, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
 
             gpuSafe(gpuStreamSynchronize(stream));
-
-            gpuSafe(gpuFree(d_mat_J2_2kernels));
-            gpuSafe(gpuFree(d_mat_J2_ref));
-            gpuSafe(gpuFree(d_prec_cut_ij_tile));
-            gpuSafe(gpuFree(d_screen_cut_ij_tile));
-            gpuSafe(gpuFree(d_mat_D2));
-            gpuSafe(gpuFree(d_dd_mat_D_f));
-            gpuSafe(gpuFree(d_dd_mat_Q_f));
-            gpuSafe(gpuFree(d_dd_mat_Q_local_f));
-            gpuSafe(gpuFree(d_dd_pair_data_f));
-            gpuSafe(gpuFree(d_dd_pair_data_local_f));
-    
-            gpuSafe(gpuFree(d_d_prim_info_f));
-
-            check_J_against_ref("DDDD Two Separate Kernels (J2_2kernels vs ref)", h_mat_J2_2kernels, h_mat_J2_ref, (uint32_t)dd_prim_pair_count_local);       
-            print_cut_status("DDDD", prec_cut_ij_tile_h, screen_cut_ij_tile_h, (uint32_t)dd_prim_pair_count, TILE_DIM_LARGE);
         }
 
 
