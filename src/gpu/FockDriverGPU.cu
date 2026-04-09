@@ -4760,23 +4760,23 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             const uint32_t max_nij_tiles = (max_prim_pair_count_local + TILE_DIM - 1) / TILE_DIM;
 
-            gpuSafe(gpuMalloc(&d_s_prim_info_f, sizeof(float) * s_prim_info_f.size()));
-            gpuSafe(gpuMalloc(&d_p_prim_info_f, sizeof(float) * p_prim_info_f.size()));
+            gpuSafe(gpuMallocAsync(&d_s_prim_info_f, sizeof(float) * s_prim_info_f.size(), stream));
+            gpuSafe(gpuMallocAsync(&d_p_prim_info_f, sizeof(float) * p_prim_info_f.size(), stream));
 
-            gpuSafe(gpuMalloc((void**)&d_prec_cut_ij_tile, max_nij_tiles * sizeof(uint32_t)));
-            gpuSafe(gpuMalloc((void**)&d_screen_cut_ij_tile, max_nij_tiles * sizeof(uint32_t)));
+            gpuSafe(gpuMallocAsync((void**)&d_prec_cut_ij_tile, max_nij_tiles * sizeof(uint32_t), stream));
+            gpuSafe(gpuMallocAsync((void**)&d_screen_cut_ij_tile, max_nij_tiles * sizeof(uint32_t), stream));
 
-            gpuSafe(gpuMalloc(&d_ss_mat_D_f, sizeof(float) * ss_mat_D_f.size()));
-            gpuSafe(gpuMalloc(&d_sp_mat_D_f, sizeof(float) * sp_mat_D_f.size()));
-            gpuSafe(gpuMalloc(&d_pp_mat_D_f, sizeof(float) * pp_mat_D_f.size()));
+            gpuSafe(gpuMallocAsync(&d_ss_mat_D_f, sizeof(float) * ss_mat_D_f.size(), stream));
+            gpuSafe(gpuMallocAsync(&d_sp_mat_D_f, sizeof(float) * sp_mat_D_f.size(), stream));
+            gpuSafe(gpuMallocAsync(&d_pp_mat_D_f, sizeof(float) * pp_mat_D_f.size(), stream));
 
-            gpuSafe(gpuMalloc(&d_ss_pair_data_local_f, sizeof(float) * ss_pair_data_local_f.size()));
-            gpuSafe(gpuMalloc(&d_sp_pair_data_local_f, sizeof(float) * sp_pair_data_local_f.size()));
-            gpuSafe(gpuMalloc(&d_pp_pair_data_local_f, sizeof(float) * pp_pair_data_local_f.size()));
+            gpuSafe(gpuMallocAsync(&d_ss_pair_data_local_f, sizeof(float) * ss_pair_data_local_f.size(), stream));
+            gpuSafe(gpuMallocAsync(&d_sp_pair_data_local_f, sizeof(float) * sp_pair_data_local_f.size(), stream));
+            gpuSafe(gpuMallocAsync(&d_pp_pair_data_local_f, sizeof(float) * pp_pair_data_local_f.size(), stream));
 
-            gpuSafe(gpuMalloc(&d_ss_pair_data_f, sizeof(float) * ss_pair_data_f.size()));
-            gpuSafe(gpuMalloc(&d_sp_pair_data_f, sizeof(float) * sp_pair_data_f.size()));
-            gpuSafe(gpuMalloc(&d_pp_pair_data_f, sizeof(float) * pp_pair_data_f.size()));
+            gpuSafe(gpuMallocAsync(&d_ss_pair_data_f, sizeof(float) * ss_pair_data_f.size(), stream));
+            gpuSafe(gpuMallocAsync(&d_sp_pair_data_f, sizeof(float) * sp_pair_data_f.size(), stream));
+            gpuSafe(gpuMallocAsync(&d_pp_pair_data_f, sizeof(float) * pp_pair_data_f.size(), stream));
 
             gpuSafe(gpuMemcpyAsync(d_s_prim_info_f, s_prim_info_f.data(), s_prim_info_f.size() * sizeof(float), gpuMemcpyHostToDevice, stream));
             gpuSafe(gpuMemcpyAsync(d_p_prim_info_f, p_prim_info_f.data(), p_prim_info_f.size() * sizeof(float), gpuMemcpyHostToDevice, stream));
@@ -7515,23 +7515,23 @@ computeFockOnGPU(const              CMolecule& molecule,
 #pragma omp barrier
 
 
-            gpuSafe(gpuFree(d_prec_cut_ij_tile));
-            gpuSafe(gpuFree(d_screen_cut_ij_tile));
+            gpuSafe(gpuFreeAsync(d_prec_cut_ij_tile, stream));
+            gpuSafe(gpuFreeAsync(d_screen_cut_ij_tile, stream));
 
-            gpuSafe(gpuFree(d_s_prim_info_f));
-            gpuSafe(gpuFree(d_p_prim_info_f));
+            gpuSafe(gpuFreeAsync(d_s_prim_info_f, stream));
+            gpuSafe(gpuFreeAsync(d_p_prim_info_f, stream));
 
-            gpuSafe(gpuFree(d_ss_mat_D_f));
-            gpuSafe(gpuFree(d_sp_mat_D_f));
-            gpuSafe(gpuFree(d_pp_mat_D_f));
+            gpuSafe(gpuFreeAsync(d_ss_mat_D_f, stream));
+            gpuSafe(gpuFreeAsync(d_sp_mat_D_f, stream));
+            gpuSafe(gpuFreeAsync(d_pp_mat_D_f, stream));
 
-            gpuSafe(gpuFree(d_ss_pair_data_local_f));
-            gpuSafe(gpuFree(d_sp_pair_data_local_f));
-            gpuSafe(gpuFree(d_pp_pair_data_local_f));
+            gpuSafe(gpuFreeAsync(d_ss_pair_data_local_f, stream));
+            gpuSafe(gpuFreeAsync(d_sp_pair_data_local_f, stream));
+            gpuSafe(gpuFreeAsync(d_pp_pair_data_local_f, stream));
 
-            gpuSafe(gpuFree(d_ss_pair_data_f));
-            gpuSafe(gpuFree(d_sp_pair_data_f));
-            gpuSafe(gpuFree(d_pp_pair_data_f));
+            gpuSafe(gpuFreeAsync(d_ss_pair_data_f, stream));
+            gpuSafe(gpuFreeAsync(d_sp_pair_data_f, stream));
+            gpuSafe(gpuFreeAsync(d_pp_pair_data_f, stream));
 
 
 
