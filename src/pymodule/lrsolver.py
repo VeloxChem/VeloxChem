@@ -102,7 +102,7 @@ class LinearResponseSolver(LinearResponseSolverBase):
             self.set_lr_property(self.property)
 
         # check molecule
-        molecule_sanity_check(molecule, 'restricted')
+        molecule_sanity_check(molecule, 'restricted', type(self).__name__)
 
         # check SCF results
         scf_results_sanity_check(self, scf_results)

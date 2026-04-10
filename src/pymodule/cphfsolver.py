@@ -140,7 +140,7 @@ class CphfSolver(LinearSolver):
 
         # check molecule
         # this special method is only implemented for restricted case
-        molecule_sanity_check(molecule, 'restricted')
+        molecule_sanity_check(molecule, 'restricted', type(self).__name__)
 
         # check SCF results
         scf_results_sanity_check(self, scf_results)

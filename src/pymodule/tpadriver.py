@@ -128,7 +128,7 @@ class TpaDriver(NonlinearSolver):
             self.lindep_thresh = self.conv_thresh * 1.0e-6
 
         # check molecule
-        molecule_sanity_check(molecule)
+        molecule_sanity_check(molecule, 'restricted', type(self).__name__)
 
         # check SCF results
         scf_results_sanity_check(self, scf_results)
@@ -158,13 +158,6 @@ class TpaDriver(NonlinearSolver):
         eri_dict = self._init_eri(molecule, ao_basis)
 
         dft_dict = self._init_dft(molecule, scf_results)
-
-        # sanity check
-        nalpha = molecule.number_of_alpha_electrons()
-        nbeta = molecule.number_of_beta_electrons()
-        assert_msg_critical(
-            nalpha == nbeta,
-            'TPA Driver: not implemented for unrestricted case')
 
         if self.rank == mpi_master():
             S = scf_results['S']

@@ -155,7 +155,7 @@ class ShgDriver(NonlinearSolver):
             self.lindep_thresh = self.conv_thresh * 1.0e-6
 
         # check molecule
-        molecule_sanity_check(molecule)
+        molecule_sanity_check(molecule, 'restricted', type(self).__name__)
 
         # check SCF results
         scf_results_sanity_check(self, scf_results)
@@ -185,13 +185,6 @@ class ShgDriver(NonlinearSolver):
             self._print_header(title)
 
         start_time = time.time()
-
-        # sanity check
-        nalpha = molecule.number_of_alpha_electrons()
-        nbeta = molecule.number_of_beta_electrons()
-        assert_msg_critical(
-            nalpha == nbeta,
-            'SHG Driver: not implemented for unrestricted case')
 
         if self.rank == mpi_master():
             S = scf_results['S']

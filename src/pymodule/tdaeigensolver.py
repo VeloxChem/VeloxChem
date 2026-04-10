@@ -121,7 +121,7 @@ class TdaEigenSolver(TdaEigenSolverBase):
             self.lindep_thresh = self.conv_thresh * 1.0e-2
 
         # check molecule
-        molecule_sanity_check(molecule, 'restricted')
+        molecule_sanity_check(molecule, 'restricted', type(self).__name__)
 
         # check SCF results
         scf_results_sanity_check(self, scf_results)

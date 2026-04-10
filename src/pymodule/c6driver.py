@@ -250,7 +250,7 @@ class C6Driver(LinearSolver):
         self._dist_e2bung = None
 
         # check molecule
-        molecule_sanity_check(molecule, 'restricted')
+        molecule_sanity_check(molecule, 'restricted', type(self).__name__)
 
         # check SCF results
         scf_results_sanity_check(self, scf_results)

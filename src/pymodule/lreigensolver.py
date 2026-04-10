@@ -132,7 +132,7 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
         self._dist_fock_ung = None
 
         # check molecule
-        molecule_sanity_check(molecule, 'restricted')
+        molecule_sanity_check(molecule, 'restricted', type(self).__name__)
 
         # check SCF results
         scf_results_sanity_check(self, scf_results)
@@ -1094,12 +1094,7 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
         self._dist_e2bger = None
         self._dist_e2bung = None
 
-        # sanity check
-        nalpha = molecule.number_of_alpha_electrons()
-        nbeta = molecule.number_of_beta_electrons()
-        assert_msg_critical(
-            nalpha == nbeta,
-            f'{type(self).__name__}: not implemented for unrestricted case')
+        molecule_sanity_check(molecule, 'restricted', type(self).__name__)
 
         if self.rank == mpi_master():
             orb_ene = scf_results['E_alpha']
