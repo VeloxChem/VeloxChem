@@ -115,12 +115,10 @@ getExchangeCorrelationFunctional(const std::string &xcLabel)
         if (format::upper_case(xcLabel) == "RCAM-B3LYP") return CXCFunctional("RCAM-B3LYP", {"HYB_GGA_XC_RCAM_B3LYP"}, {1.0});
 
         // range-separated functional with custom parameters
-        // note that the fourth argument "0.19 + 0.81" will not affect the actual calculation with range-separated functional
-        // but we set it anyways using a value that is consistent with libxc convention
         if (format::upper_case(xcLabel) == "CAM-B3LYP-100") return CXCFunctional("CAM-B3LYP-100",
                                                                                  {"HYB_GGA_XC_CAM_B3LYP"},
                                                                                  {1.0},
-                                                                                 0.19 + 0.81,
+                                                                                 0.0,
                                                                                  {0.19, 0.81, 0.33});
 
         // meta-GGA

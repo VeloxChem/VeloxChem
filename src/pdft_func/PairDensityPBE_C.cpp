@@ -214,14 +214,6 @@ compute_exc_vxc(const int np, const double* rho, const double* sigma, double* ex
 
       double depw92_drho = depw92_dfzeta*dfzeta_drho + depw92_dzeta4*dzeta4_drho + dg1_drho*(-fpol*zeta4*(fzeta - 2) + 1) + dg2_drho*fpol*zeta4*(fzeta - 2) + dg3_drho*(fpol*zeta4*(fzeta - 2)/fz20 - fpol*(fzeta - 2)/fz20);
 
-      double ec_lda = epw92;
-
-      double dec_lda_depw92 = 1;
-
-      double dec_lda_dpi = dec_lda_depw92*depw92_dpi;
-
-      double dec_lda_drho = dec_lda_depw92*depw92_drho;
-
       double fzeta_2 = 0;
 
       double dfzeta_2_drho = 0;

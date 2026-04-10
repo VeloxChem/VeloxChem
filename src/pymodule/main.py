@@ -318,7 +318,7 @@ def main():
 
         traj_drv = TrajectoryDriver(task.mpi_comm, task.ostream)
         traj_drv.update_settings(traj_dict, spect_dict, rsp_dict, method_dict)
-        traj_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        traj_drv.compute(task.molecule, task.ao_basis)
 
     # Diatomic vibronic spectrum using Numerov
 
@@ -331,7 +331,7 @@ def main():
 
         numerov_drv = NumerovDriver(task.mpi_comm, task.ostream)
         numerov_drv.update_settings(numerov_dict, scf_dict, method_dict)
-        numerov_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        numerov_drv.compute(task.molecule, task.ao_basis)
 
     # Self-consistent field
     run_scf = task_type in [
@@ -369,19 +369,39 @@ def main():
         else:
             scf_drv = select_scf_driver(task, scf_type)
             scf_drv.update_settings(scf_dict, method_dict)
-            scf_results = scf_drv.compute(task.molecule, task.ao_basis,
-                                          task.min_basis)
 
-            mol_orbs = scf_drv.molecular_orbitals
-            density = scf_drv.density
+            # For SCF geometry optimization, a common use case is to continue
+            # from a checkpoint. Here we check if this is the case, and if so,
+            # SCF for the input geometry will be skipped and will be taken care
+            # of by the optimization driver.
+            use_checkpoint_geometry = False
 
-            if not scf_drv.is_converged:
-                return
+            if task_type == 'optimize':
+                opt_dict = (dict(task.input_dict['optimize'])
+                            if 'optimize' in task.input_dict else {})
+                # not an excited state geometry optimization
+                if 'response' not in task.input_dict:
+                    # restart is default or True for optimization driver
+                    if ('restart' not in opt_dict) or opt_dict['restart']:
+                        # check validity of checkpoint
+                        use_checkpoint_geometry = scf_drv.validate_checkpoint(
+                            task.molecule.get_element_ids(),
+                            task.ao_basis.get_label(), scf_drv.scf_type)
 
-            if (scf_drv.electric_field is not None and
-                    task.molecule.get_charge() != 0):
-                task.finish()
-                return
+            if not use_checkpoint_geometry:
+                scf_results = scf_drv.compute(task.molecule, task.ao_basis,
+                                              task.min_basis)
+
+                mol_orbs = scf_drv.molecular_orbitals
+                density = scf_drv.density
+
+                if not scf_drv.is_converged:
+                    return
+
+                if (scf_drv.electric_field is not None and
+                        task.molecule.get_charge() != 0):
+                    task.finish()
+                    return
 
     # Gradient
 
@@ -494,8 +514,7 @@ def main():
                 opt_drv = OptimizationDriver(grad_drv)
                 opt_drv.keep_files = True
                 opt_drv.update_settings(opt_dict)
-                opt_results = opt_drv.compute(task.molecule, task.ao_basis,
-                                              scf_results)
+                opt_results = opt_drv.compute(task.molecule, task.ao_basis)
 
         elif run_excited_state_gradient:
 

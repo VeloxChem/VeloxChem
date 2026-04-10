@@ -119,7 +119,7 @@ COldElectricDipoleIntegralsDriver::compute(const CMolecule& molecule, const CMol
         const auto nrows = mat.number_of_rows();
         const auto ncols = mat.number_of_columns();
 
-        CDenseMatrix new_mat(nrows, ncols);
+        CDenseMatrix new_mat(static_cast<int>(nrows), static_cast<int>(ncols));
 
         std::memcpy(new_mat.values(), mat.data(), nrows * ncols * sizeof(double));
 

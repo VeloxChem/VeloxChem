@@ -38,7 +38,7 @@ class TestProjectedSECPGeom110Driver:
         npyfile = str(here / 'data' / 'auh2.def2svp.au.ecp.only.ul.geom.110.au1.au1.npy')
         ref_mat = np.load(npyfile)
         
-        print(ref_mat.shape)
+        #print(ref_mat.shape)
         
         # dimension of molecular basis
         basdims = [0, 10, 25, 35, 42]
@@ -63,8 +63,8 @@ class TestProjectedSECPGeom110Driver:
                     rmat.set_values(
                         np.ascontiguousarray(ref_mat[k, sbra:ebra, sket:eket]))
                     # compare submatrices
-                    print(cmat.to_numpy())
-                    print(rmat.to_numpy())
+                    #print(cmat.to_numpy())
+                    #print(rmat.to_numpy())
                     #assert cmat == rmat
             smat = fmat.full_matrix()
             fref = SubMatrix([0, 0, 42, 42])

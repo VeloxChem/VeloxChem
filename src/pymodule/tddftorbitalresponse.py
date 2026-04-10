@@ -200,7 +200,7 @@ class TddftOrbitalResponse(CphfSolver):
         pe_dict = self._init_pe(molecule, basis, silent=True)
 
         # CPCM_information
-        self._init_cpcm(molecule)
+        self._init_cpcm(molecule, basis)
 
         profiler = Profiler({
             'timing': self.timing,
@@ -510,7 +510,7 @@ class TddftOrbitalResponse(CphfSolver):
         pe_dict = self._init_pe(molecule, basis, silent=True)
 
         # CPCM_information
-        self._init_cpcm(molecule)
+        self._init_cpcm(molecule, basis)
 
         profiler.stop_timer('Prep')
 

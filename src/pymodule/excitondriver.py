@@ -1433,7 +1433,7 @@ class ExcitonModelDriver:
             # compute dimer energy
             hcore = kin_mat + npot_mat
             fock = hcore + fock_mat_np
-            dimer_energy = dimer.nuclear_repulsion_energy()
+            dimer_energy = dimer.effective_nuclear_repulsion_energy(basis)
             dimer_energy += np.sum(dens * (hcore + fock))
             if self._dft:
                 dimer_energy += xc_ene

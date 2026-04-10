@@ -296,7 +296,7 @@ class VibrationalAnalysis:
         self.rsp_dict = dict(rsp_dict)
         self.polgrad_dict = dict(polgrad_dict)
 
-    def compute(self, molecule, ao_basis=None, min_basis=None):
+    def compute(self, molecule, ao_basis=None):
         """
         Drives the computation of the vibrational analysis and
         associated properties.
@@ -305,8 +305,6 @@ class VibrationalAnalysis:
             The molecule.
         :param ao_basis:
             The AO basis set.
-        :param min_basis:
-            The minimal AO basis set.
 
         :returns:
             The dictionary with vibrational analysis results.
@@ -1216,8 +1214,7 @@ class VibrationalAnalysis:
         nmodes = len(self.vib_frequencies)
         nfreqs = len(self.frequencies)
 
-        # TODO: take care of ECP core electrons
-        nuc_rep = molecule.nuclear_repulsion_energy(basis)
+        nuc_rep = molecule.effective_nuclear_repulsion_energy(basis)
         hf.create_dataset(vib_group + 'nuclear_repulsion', data=nuc_rep)
 
         hf.create_dataset(vib_group + "number_of_modes", data=np.array([nmodes]))
