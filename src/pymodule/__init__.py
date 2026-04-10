@@ -233,7 +233,7 @@ from .oneeints import compute_nuclear_potential_integrals
 from .oneeints import compute_electric_dipole_integrals
 from .oneeints import compute_linear_momentum_integrals
 from .oneeints import compute_angular_momentum_integrals
-from .checkpoint import read_molecule_and_basis, read_results
+from .resultsio import read_molecule_and_basis, read_results
 
 # Environment variable: basis set path, number of OpenMP threads, MKL linking
 from .environment import (set_vlxbasispath, get_basis_path, set_vlxdatapath,

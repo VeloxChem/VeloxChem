@@ -74,8 +74,8 @@ from .sanitychecks import (molecule_sanity_check, dft_sanity_check,
                            solvation_model_sanity_check)
 from .errorhandler import assert_msg_critical
 from .mathutils import screened_eigh
-from .checkpoint import (create_hdf5, write_scf_results_to_hdf5,
-                         write_cpcm_charges, read_cpcm_charges)
+from .checkpoint import write_cpcm_charges, read_cpcm_charges
+from .resultsio import create_hdf5, write_scf_results_to_hdf5
 
 
 class ScfDriver:

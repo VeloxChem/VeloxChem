@@ -62,8 +62,8 @@ from .mmgradientdriver import MMGradientDriver
 from .inputparser import (parse_input, print_keywords,
                           get_random_string_parallel, unparse_input,
                           read_unparsed_input_from_hdf5)
-from .checkpoint import read_molecule_and_basis
 from .errorhandler import assert_msg_critical
+from .resultsio import read_molecule_and_basis
 
 with redirect_stderr(StringIO()) as fg_err:
     import geometric
