@@ -3,7 +3,7 @@ name: Trigger deploy-vlx workflow
 on:
   push:
     branches:
-      - merge-test
+      - master
 
 jobs:
   trigger:
