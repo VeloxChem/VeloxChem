@@ -3112,6 +3112,96 @@ class MMForceFieldGenerator:
 
         return dict(self.dihedrals[key])
 
+    def set_bond_params(self, atom_indices_for_bond, bond_params):
+        """
+        Sets bond parameters.
+
+        :param atom_indices_for_bond:
+            One-based atom indices for the bond.
+        :param bond_params:
+            The bond parameters in a dictionary.
+        """
+
+        assert_msg_critical(
+            len(atom_indices_for_bond) == 2,
+            'MMForceFieldGenerator.set_bond_params: ' +
+            'Expecting a tuple of two atom indices')
+
+        assert_msg_critical(
+            isinstance(bond_params,
+                       dict), 'MMForceFieldGenerator.set_bond_params: ' +
+            'Expecting a dictionary of bond parameters')
+
+        # convert 1-based indices to 0-based indices
+        key = tuple([x - 1 for x in atom_indices_for_bond])
+
+        self.bonds[key] = dict(bond_params)
+
+    def get_bond_params(self, atom_indices_for_bond):
+        """
+        Gets bond parameters.
+
+        :param atom_indices_for_bond:
+            One-based atom indices for the bond.
+        :return:
+            The bond parameters in a dictionary.
+        """
+
+        assert_msg_critical(
+            len(atom_indices_for_bond) == 2,
+            'MMForceFieldGenerator.set_bond_params: ' +
+            'Expecting a tuple of two atom indices')
+
+        # convert 1-based indices to 0-based indices
+        key = tuple([x - 1 for x in atom_indices_for_bond])
+
+        return deepcopy(self.bonds[key])
+
+    def set_angle_params(self, atom_indices_for_angle, angle_params):
+        """
+        Sets angle parameters.
+
+        :param atom_indices_for_angle:
+            One-based atom indices for the angle.
+        :param angle_params:
+            The angle parameters in a dictionary.
+        """
+
+        assert_msg_critical(
+            len(atom_indices_for_angle) == 3,
+            'MMForceFieldGenerator.set_angle_params: ' +
+            'Expecting a tuple of three atom indices')
+
+        assert_msg_critical(
+            isinstance(angle_params,
+                       dict), 'MMForceFieldGenerator.set_angle_params: ' +
+            'Expecting a dictionary of angle parameters')
+
+        # convert 1-based indices to 0-based indices
+        key = tuple([x - 1 for x in atom_indices_for_angle])
+
+        self.angles[key] = dict(angle_params)
+
+    def get_angle_params(self, atom_indices_for_angle):
+        """
+        Gets angle parameters.
+
+        :param atom_indices_for_angle:
+            One-based atom indices for the angle.
+        :return:
+            The angle parameters in a dictionary.
+        """
+
+        assert_msg_critical(
+            len(atom_indices_for_angle) == 3,
+            'MMForceFieldGenerator.set_angle_params: ' +
+            'Expecting a tuple of three atom indices')
+
+        # convert 1-based indices to 0-based indices
+        key = tuple([x - 1 for x in atom_indices_for_angle])
+
+        return deepcopy(self.angles[key])
+
     def set_dihedral_params(self, atom_indices_for_dihedral, dihedral_params):
         """
         Sets dihedral parameters.
@@ -3136,6 +3226,26 @@ class MMForceFieldGenerator:
         key = tuple([x - 1 for x in atom_indices_for_dihedral])
 
         self.dihedrals[key] = dict(dihedral_params)
+
+    def get_dihedral_params(self, atom_indices_for_dihedral):
+        """
+        Gets dihedral parameters.
+
+        :param atom_indices_for_dihedral:
+            One-based atom indices for the dihedral.
+        :return:
+            The dihedral parameters in a dictionary.
+        """
+
+        assert_msg_critical(
+            len(atom_indices_for_dihedral) == 4,
+            'MMForceFieldGenerator.set_dihedral_params: ' +
+            'Expecting a tuple of four atom indices')
+
+        # convert 1-based indices to 0-based indices
+        key = tuple([x - 1 for x in atom_indices_for_dihedral])
+
+        return deepcopy(self.dihedrals[key])
 
     def check_rotatable_bonds(self, rotatable_bonds_types):
         """

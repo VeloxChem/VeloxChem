@@ -385,13 +385,7 @@ class LinearResponseEigenSolverBase(LinearSolver):
         for key, val in vars(self).items():
             if isinstance(val, (MPI.Intracomm, OutputStream)):
                 continue
-
-            if isinstance(val, XCFunctional):
-                new_rsp_drv.key = XCFunctional(val)
-            elif isinstance(val, MolecularGrid):
-                new_rsp_drv.key = MolecularGrid(val)
-            else:
-                new_rsp_drv.key = deepcopy(val)
+            setattr(new_rsp_drv, key, deepcopy(val))
 
         return new_rsp_drv
 

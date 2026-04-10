@@ -15,6 +15,7 @@ from veloxchem.veloxchemlib import get_vdw_radii_data_in_bohr
 from veloxchem.veloxchemlib import chemical_element_identifier
 from veloxchem.mpitask import MpiTask
 from veloxchem.molecule import Molecule
+from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.dispersionmodel import DispersionModel
 from veloxchem.optimizationdriver import OptimizationDriver
 from veloxchem.inputparser import get_random_string_serial
@@ -460,17 +461,18 @@ class TestMolecule:
         assert mol.atom_indices('N') == [0]
         assert mol.atom_indices('H') == [1, 2, 3]
 
-    def test_nuclear_repulsion_energy(self):
+    def test_effective_nuclear_repulsion_energy(self):
 
         tol = 1.0e-12
 
         mol = Molecule.read_str(self.h2o_xyzstr(), 'au')
-        assert math.isclose(mol.nuclear_repulsion_energy(),
+        basis = MolecularBasis.read(mol, 'sto-3g', ostream=None)
+        assert math.isclose(mol.effective_nuclear_repulsion_energy(basis),
                             9.34363815797054450919,
                             rel_tol=tol,
                             abs_tol=tol)
 
-    def test_nuclear_repulsion_energy_with_ecp_basis(self):
+    def test_effective_nuclear_repulsion_energy_with_ecp_basis(self):
 
         tol = 1.0e-12
 
@@ -486,31 +488,31 @@ class TestMolecule:
                 distance = np.linalg.norm(coords[j] - coords[i])
                 ref_energy += charges[i] * charges[j] / distance
 
-        assert math.isclose(mol.nuclear_repulsion_energy(basis),
+        assert math.isclose(mol.effective_nuclear_repulsion_energy(basis),
                             ref_energy,
                             rel_tol=tol,
                             abs_tol=tol)
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='skip pytest.raises for multiple MPI processes')
-    def test_nuclear_repulsion_energy_rejects_ecp_length_mismatch(self):
+    def test_effective_nuclear_repulsion_energy_rejects_ecp_length_mismatch(self):
 
         mol = Molecule.read_str(self.h2o_xyzstr(), 'au')
 
         with pytest.raises(
                 AssertionError,
                 match='ECP core electron list must match number of atoms'):
-            mol.nuclear_repulsion_energy(FakeBasis([2, 0]))
+            mol.effective_nuclear_repulsion_energy(FakeBasis([2, 0]))
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='skip pytest.raises for multiple MPI processes')
-    def test_nuclear_repulsion_energy_rejects_negative_ecp_electrons(self):
+    def test_effective_nuclear_repulsion_energy_rejects_negative_ecp_electrons(self):
 
         mol = Molecule.read_str(self.h2o_xyzstr(), 'au')
 
         with pytest.raises(AssertionError,
                            match='ECP core electrons must be non-negative'):
-            mol.nuclear_repulsion_energy(FakeBasis([2, -1, 0]))
+            mol.effective_nuclear_repulsion_energy(FakeBasis([2, -1, 0]))
 
     def test_check_proximity(self):
 
@@ -925,13 +927,13 @@ class TestMolecule:
         assert np.array_equal(mol.get_connectivity_matrix(H2_factor=1.3),
                               np.array([[0, 0], [0, 0]]))
 
-    def test_find_connected_atoms(self):
+    def testfind_connected_atoms(self):
 
         mol = Molecule.read_str(self.nh3_h2o_xyzstr(), 'au')
         connectivity = mol.get_connectivity_matrix()
 
-        assert mol._find_connected_atoms(0, connectivity) == {0, 1, 2, 3}
-        assert mol._find_connected_atoms(4, connectivity) == {4, 5, 6}
+        assert mol.find_connected_atoms(0, connectivity) == {0, 1, 2, 3}
+        assert mol.find_connected_atoms(4, connectivity) == {4, 5, 6}
 
     def test_coordinates_in_bohr(self):
 
@@ -1394,6 +1396,31 @@ class TestMolecule:
         assert isinstance(xyz_without_hydrogen, str)
         assert int(xyz_with_hydrogen.splitlines()[0]) == 3
         assert int(xyz_without_hydrogen.splitlines()[0]) == 1
+
+    @pytest.mark.skipif("rdkit" not in sys.modules,
+                        reason="rdkit not available")
+    def test_read_smiles_with_multi_components(self):
+
+        mol = Molecule.read_smiles('CCO.C1CCCC1.c1ccccc1')
+        assert mol.number_of_atoms() == 36
+
+    @pytest.mark.skipif("rdkit" not in sys.modules,
+                        reason="rdkit not available")
+    def test_read_smiles_with_reorder_hydrogens(self):
+
+        # with reorder_hydrogens, the first atom will be C and
+        # the second atom will be H
+        mol = Molecule.read_smiles('CCO', reorder_hydrogens=True)
+        labels = mol.get_labels()
+        assert labels[0] != 'H'
+        assert labels[1] == 'H'
+        assert labels[2] == 'H'
+
+        # H2 molecule
+        mol = Molecule.read_smiles('[H][H]', reorder_hydrogens=True)
+        labels = mol.get_labels()
+        assert labels[0] == 'H'
+        assert labels[1] == 'H'
 
     @pytest.mark.skipif("rdkit" not in sys.modules,
                         reason="rdkit not available")

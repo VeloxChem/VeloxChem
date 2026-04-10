@@ -132,11 +132,6 @@ class ComplexResponseUnrestrictedSolver(ComplexResponseSolverBase):
         for convergence.
         """
 
-        # TODO: enable ECP
-        assert_msg_critical(
-            not basis.has_ecp(),
-            f'{type(self).__name__}.compute: ECP is not yet supported')
-
         # take care of quadrupole components
         if self.is_quadrupole(self.a_operator):
             if isinstance(self.a_components, str):
@@ -220,8 +215,8 @@ class ComplexResponseUnrestrictedSolver(ComplexResponseSolverBase):
 
         norb = orb_ene_a.shape[0]
 
-        nocc_a = molecule.number_of_alpha_electrons()
-        nocc_b = molecule.number_of_beta_electrons()
+        nocc_a = molecule.number_of_alpha_occupied_orbitals(basis)
+        nocc_b = molecule.number_of_beta_occupied_orbitals(basis)
 
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
@@ -230,7 +225,7 @@ class ComplexResponseUnrestrictedSolver(ComplexResponseSolverBase):
         # PE information
         pe_dict = self._init_pe(molecule, basis)
         # CPCM information
-        self._init_cpcm(molecule)
+        self._init_cpcm(molecule, basis)
 
         # TODO: enable PE
         assert_msg_critical(
@@ -358,12 +353,121 @@ class ComplexResponseUnrestrictedSolver(ComplexResponseSolverBase):
                                               basis, dft_dict, pe_dict)
             self.restart = self.comm.bcast(self.restart, root=mpi_master())
 
+        # read initial guess from restart file
         if self.restart:
-            # read initial guess from restart file
             self._read_checkpoint(rsp_vector_labels)
-            # TODO: handle restarting with different frequencies
+
+            checkpoint_frequencies = self._read_frequencies_from_checkpoint()
+
+            # Note that we only handle the restart with additional frequencies when
+            # `self.nonlinear` is inactive
+
+            # print warning if frequencies is not present in the restart file
+            if checkpoint_frequencies is None and not self.nonlinear:
+                self.ostream.print_warning(
+                    'Could not find the frequencies key in the checkpoint file.'
+                )
+                self.ostream.print_blank()
+                self.ostream.print_info(
+                    'Assuming that frequencies is not changed before and after '
+                    + 'the restart.')
+                self.ostream.print_blank()
+                self.ostream.flush()
+
+            # generate necessary initial guesses if more frequencies are requested
+            # in a restart calculation
+            elif not self.nonlinear:
+                extra_freqs = []
+                for w in self.frequencies:
+                    if w not in checkpoint_frequencies:
+                        extra_freqs.append(w)
+
+                if extra_freqs:
+                    self.ostream.print_info(
+                        f'Generating initial guesses for {len(extra_freqs)} ' +
+                        'more frequencies...')
+                    self.ostream.print_blank()
+
+                    if self.rank == mpi_master():
+                        extra_v_grad = {
+                            (op, w): (va, vb) for op, va, vb in zip(
+                                self.b_components, b_grad_alpha, b_grad_beta)
+                            for w in extra_freqs
+                        }
+                        extra_op_freq_keys = list(extra_v_grad.keys())
+                    else:
+                        extra_op_freq_keys = None
+                    extra_op_freq_keys = self.comm.bcast(extra_op_freq_keys,
+                                                         root=mpi_master())
+
+                    extra_precond = {
+                        w: self._get_precond((orb_ene_a, orb_ene_b),
+                                             (nocc_a, nocc_b), norb, w,
+                                             d) for w in extra_freqs
+                    }
+
+                    extra_dist_rhs = {}
+                    for key in extra_op_freq_keys:
+                        if self.rank == mpi_master():
+                            gradger_a, gradung_a = self._decomp_grad(
+                                extra_v_grad[key][0])
+                            gradger_b, gradung_b = self._decomp_grad(
+                                extra_v_grad[key][1])
+
+                            grad_mat_a = np.hstack((
+                                gradger_a.real.reshape(-1, 1),
+                                gradung_a.real.reshape(-1, 1),
+                                gradung_a.imag.reshape(-1, 1),
+                                gradger_a.imag.reshape(-1, 1),
+                            ))
+                            rhs_mat_a = np.hstack((
+                                gradger_a.real.reshape(-1, 1),
+                                gradung_a.real.reshape(-1, 1),
+                                -gradung_a.imag.reshape(-1, 1),
+                                -gradger_a.imag.reshape(-1, 1),
+                            ))
+
+                            grad_mat_b = np.hstack((
+                                gradger_b.real.reshape(-1, 1),
+                                gradung_b.real.reshape(-1, 1),
+                                gradung_b.imag.reshape(-1, 1),
+                                gradger_b.imag.reshape(-1, 1),
+                            ))
+                            rhs_mat_b = np.hstack((
+                                gradger_b.real.reshape(-1, 1),
+                                gradung_b.real.reshape(-1, 1),
+                                -gradung_b.imag.reshape(-1, 1),
+                                -gradger_b.imag.reshape(-1, 1),
+                            ))
+
+                            # put alpha and beta together
+                            grad_mat = np.vstack((grad_mat_a, grad_mat_b))
+                            rhs_mat = np.vstack((rhs_mat_a, rhs_mat_b))
+                        else:
+                            grad_mat = None
+                            rhs_mat = None
+                        dist_grad[key] = DistributedArray(grad_mat, self.comm)
+                        extra_dist_rhs[key] = DistributedArray(
+                            rhs_mat, self.comm)
+
+                    bger, bung = self._setup_trials(extra_dist_rhs,
+                                                    extra_precond)
+
+                    profiler.set_timing_key('Preparation')
+
+                    self._e2n_half_size(bger,
+                                        bung,
+                                        molecule,
+                                        basis,
+                                        scf_results,
+                                        eri_dict,
+                                        dft_dict,
+                                        pe_dict,
+                                        profiler,
+                                        method_type='unrestricted')
+
+        # generate initial guess from scratch
         else:
-            # generate initial guess from scratch
             bger, bung = self._setup_trials(dist_rhs, precond)
 
             profiler.set_timing_key('Preparation')
@@ -520,6 +624,7 @@ class ComplexResponseUnrestrictedSolver(ComplexResponseSolverBase):
             if self.force_checkpoint:
                 self._write_checkpoint(molecule, basis, dft_dict, pe_dict,
                                        rsp_vector_labels)
+                self._add_frequencies_to_checkpoint()
 
             # creating new sigma and rho linear transformations
             self._e2n_half_size(new_trials_ger,
@@ -541,6 +646,7 @@ class ComplexResponseUnrestrictedSolver(ComplexResponseSolverBase):
 
         self._write_checkpoint(molecule, basis, dft_dict, pe_dict,
                                rsp_vector_labels)
+        self._add_frequencies_to_checkpoint()
 
         # converged?
         if self.rank == mpi_master():
@@ -914,8 +1020,8 @@ class ComplexResponseUnrestrictedSolver(ComplexResponseSolverBase):
         a_grad_beta /= sqrt_2
 
         if self.rank == mpi_master():
-            nocc_a = molecule.number_of_alpha_electrons()
-            nocc_b = molecule.number_of_beta_electrons()
+            nocc_a = molecule.number_of_alpha_occupied_orbitals(basis)
+            nocc_b = molecule.number_of_beta_occupied_orbitals(basis)
             norb = scf_results['E_alpha'].shape[0]
 
             nvir_a = norb - nocc_a

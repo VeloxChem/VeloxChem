@@ -716,8 +716,7 @@ class UnrestrictedHessianOrbitalResponse(CphfSolver):
         npot_grad_100_drv = NuclearPotentialGeom100Driver()
         npot_grad_010_drv = NuclearPotentialGeom010Driver()
 
-        mol_charges = molecule.get_element_ids()
-        mol_charges -= basis.get_number_of_ecp_core_electrons()
+        mol_charges = molecule.get_effective_nuclear_charges(basis)
         mol_coords = molecule.get_coordinates_in_bohr()
 
         gmats_npot_100 = npot_grad_100_drv.compute(molecule, basis, i,

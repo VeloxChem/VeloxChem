@@ -287,8 +287,6 @@ CVisualizationDriver::computeAtomicOrbitalForGrid(CCubicGrid& grid, const CMolec
 {
     // atomic orbital information
 
-    auto idelem = aoinfo[0];
-
     auto angl = aoinfo[1];
 
     auto isph = aoinfo[2];

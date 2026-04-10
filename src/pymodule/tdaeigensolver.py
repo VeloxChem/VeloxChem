@@ -197,7 +197,7 @@ class TdaEigenSolver(TdaEigenSolverBase):
         pe_dict = self._init_pe(molecule, basis)
 
         # CPCM_information
-        self._init_cpcm(molecule)
+        self._init_cpcm(molecule, basis)
 
         # set up trial excitation vectors on master node
 

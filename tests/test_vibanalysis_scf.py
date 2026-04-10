@@ -22,7 +22,7 @@ class TestScfVibrationalAnalysisDriver:
 
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
         scf_drv.acc_type = 'l2_c2diis'
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        scf_drv.compute(task.molecule, task.ao_basis)
 
         vib_settings = {
             'do_ir': 'yes',
@@ -72,7 +72,7 @@ class TestScfVibrationalAnalysisDriver:
         task = MpiTask([inpfile, None])
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
 
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        scf_drv.compute(task.molecule, task.ao_basis)
 
         vib_settings = {
             'do_ir': 'no',
@@ -114,7 +114,7 @@ class TestScfVibrationalAnalysisDriver:
         task = MpiTask([inpfile, None])
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
 
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        scf_drv.compute(task.molecule, task.ao_basis)
 
         vib_settings = {
             'do_ir': 'yes',
@@ -158,7 +158,7 @@ class TestScfVibrationalAnalysisDriver:
         task = MpiTask([inpfile, None])
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
 
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        scf_drv.compute(task.molecule, task.ao_basis)
 
         vib_settings = {
             'do_ir': 'yes',
@@ -207,7 +207,7 @@ class TestScfVibrationalAnalysisDriver:
         task = MpiTask([inpfile, None])
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
 
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        scf_drv.compute(task.molecule, task.ao_basis)
 
         vib_settings = {
             'do_ir': 'no',
