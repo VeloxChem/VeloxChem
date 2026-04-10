@@ -389,7 +389,7 @@ class ExcitedStateMomentDriver(NonlinearSolver):
         F0 = self.comm.bcast(F0, root=mpi_master())
         norb = self.comm.bcast(norb, root=mpi_master())
 
-        nocc = molecule.number_of_alpha_electrons()
+        nocc = molecule.number_of_alpha_occupied_orbitals(ao_basis)
 
         eri_dict = self._init_eri(molecule, ao_basis)
 

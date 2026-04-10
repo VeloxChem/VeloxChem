@@ -358,7 +358,7 @@ class ComplexResponseTdaSolver(LinearSolver):
             orb_ene = None
         orb_ene = self.comm.bcast(orb_ene, root=mpi_master())
         norb = orb_ene.shape[0]
-        nocc = molecule.number_of_alpha_electrons()
+        nocc = molecule.number_of_alpha_occupied_orbitals(basis)
 
         self._check_mpi_oversubscription(
             self._get_excitation_space_dimension_restricted(nocc, norb),
@@ -464,13 +464,14 @@ class ComplexResponseTdaSolver(LinearSolver):
 
             bger_loc = bger.get_full_matrix(root=mpi_master())
 
-            tdens = self._get_trans_densities(bger_loc, scf_results, molecule)
+            tdens = self._get_trans_densities(bger_loc, scf_results, molecule,
+                                              basis)
 
             fock = self._comp_lr_fock(tdens, molecule, basis, eri_dict,
                                       dft_dict, pe_dict)
 
             if self.rank == mpi_master():
-                sig_mat = self._get_sigmas(fock, scf_results, molecule,
+                sig_mat = self._get_sigmas(fock, scf_results, molecule, basis,
                                            bger_loc)
             else:
                 sig_mat = None
@@ -691,13 +692,13 @@ class ComplexResponseTdaSolver(LinearSolver):
                 root=mpi_master())
 
             tdens = self._get_trans_densities(new_trials_ger_loc, scf_results,
-                                              molecule)
+                                              molecule, basis)
 
             fock = self._comp_lr_fock(tdens, molecule, basis, eri_dict,
                                       dft_dict, pe_dict)
 
             if self.rank == mpi_master():
-                sig_mat = self._get_sigmas(fock, scf_results, molecule,
+                sig_mat = self._get_sigmas(fock, scf_results, molecule, basis,
                                            new_trials_ger_loc)
             else:
                 sig_mat = None
@@ -822,7 +823,7 @@ class ComplexResponseTdaSolver(LinearSolver):
         else:
             return None
 
-    def _get_trans_densities(self, trial_mat, tensors, molecule):
+    def _get_trans_densities(self, trial_mat, tensors, molecule, basis):
         """
         Computes the transition densities.
 
@@ -840,7 +841,7 @@ class ComplexResponseTdaSolver(LinearSolver):
         # form transition densities
 
         if self.rank == mpi_master():
-            nocc = molecule.number_of_alpha_electrons()
+            nocc = molecule.number_of_alpha_occupied_orbitals(basis)
             norb = tensors['C_alpha'].shape[1]
             nvir = norb - nocc
 
@@ -857,7 +858,7 @@ class ComplexResponseTdaSolver(LinearSolver):
 
         return tdens
 
-    def _get_sigmas(self, fock, tensors, molecule, trial_mat):
+    def _get_sigmas(self, fock, tensors, molecule, basis, trial_mat):
         """
         Computes the sigma vectors.
 
@@ -874,7 +875,7 @@ class ComplexResponseTdaSolver(LinearSolver):
             The sigma vectors as 2D Numpy array.
         """
 
-        nocc = molecule.number_of_alpha_electrons()
+        nocc = molecule.number_of_alpha_occupied_orbitals(basis)
         norb = tensors['C_alpha'].shape[1]
         nvir = norb - nocc
 
@@ -1659,7 +1660,7 @@ class ComplexResponseTdaSolver(LinearSolver):
                                                  basis, scf_results)
 
         if self.rank == mpi_master():
-            nocc = molecule.number_of_alpha_electrons()
+            nocc = molecule.number_of_alpha_occupied_orbitals(basis)
             norb = scf_results['E_alpha'].shape[0]
             nvir = norb - nocc
 

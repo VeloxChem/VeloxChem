@@ -338,7 +338,7 @@ class ThgRedDriver(NonlinearSolver):
         F0 = self.comm.bcast(F0, root=mpi_master())
         norb = self.comm.bcast(norb, root=mpi_master())
 
-        nocc = molecule.number_of_alpha_electrons()
+        nocc = molecule.number_of_alpha_occupied_orbitals(ao_basis)
 
         # computing all compounded first-order densities
         density_list1, density_list2, density_list3 = self.get_densities(w, Nx, mo, nocc, norb)

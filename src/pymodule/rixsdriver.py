@@ -297,7 +297,7 @@ class RixsDriver(LinearSolver):
 
             cvs_rsp_results = cvs_rsp_drv.compute(molecule, basis, scf_results)
 
-        nocc = molecule.number_of_alpha_electrons()
+        nocc = molecule.number_of_alpha_occupied_orbitals(basis)
 
         self.twoshot = (not self.restricted_subspace)
         init_photon_set = True
@@ -471,7 +471,7 @@ class RixsDriver(LinearSolver):
                                                3, 3), dtype=complex)
 
         if self.rank == mpi_master():
-            self._print_header(molecule)
+            self._print_header(molecule, basis)
 
         ave, rem = divmod(num_final_states, self.nodes)
         counts = [ave + 1 if p < rem else ave for p in range(self.nodes)]
@@ -937,7 +937,7 @@ class RixsDriver(LinearSolver):
                     del hf[name]
                 hf.create_dataset(name, data=data)
 
-    def _print_header(self, molecule):
+    def _print_header(self, molecule, basis):
         """
         Prints RIXS calculation setup details to output stream.
         """
@@ -998,7 +998,7 @@ class RixsDriver(LinearSolver):
             return labels
 
         str_width   = 60
-        nocc        = molecule.number_of_alpha_electrons()
+        nocc        = molecule.number_of_alpha_occupied_orbitals(basis)
 
         self.ostream.print_blank()
         title = 'Resonant Inelastic X-ray Scattering (RIXS) Setup'

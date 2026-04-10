@@ -300,7 +300,7 @@ class PolarizabilityGradient:
 
         if self.rank == mpi_master():
             # MO coefficients
-            nocc = molecule.number_of_alpha_electrons()
+            nocc = molecule.number_of_alpha_occupied_orbitals(basis)
             mo = scf_tensors['C_alpha']  # only alpha part
             mo_occ = mo[:, :nocc].copy()
             mo_vir = mo[:, nocc:].copy()
@@ -336,7 +336,8 @@ class PolarizabilityGradient:
             if 'dist_cphf_ov' in orbrsp_results.keys():
                 # get lambda multipliers from distributed arrays
                 cphf_ov = self.get_lambda_response_vector(
-                    molecule, scf_tensors, orbrsp_results['dist_cphf_ov'], f)
+                    molecule, basis, scf_tensors, orbrsp_results['dist_cphf_ov'],
+                    f)
 
             else:
                 if self.rank == mpi_master():
@@ -423,8 +424,9 @@ class PolarizabilityGradient:
                 lambda_ao += lambda_ao.transpose(0, 1, 3, 2)
 
                 # calculate symmetrized unrelaxed density matrix
-                unrel_dm_ao = self.calculate_unrel_dm(molecule, scf_tensors,
-                                                      x_plus_y_mo, x_minus_y_mo)
+                unrel_dm_ao = self.calculate_unrel_dm(molecule, basis,
+                                                      scf_tensors, x_plus_y_mo,
+                                                      x_minus_y_mo)
 
                 # calculate relaxed density matrix
                 rel_dm_ao = unrel_dm_ao + lambda_ao
@@ -1330,7 +1332,8 @@ class PolarizabilityGradient:
         else:
             return None
 
-    def get_lambda_response_vector(self, molecule, scf_tensors, lambda_list, fdx):
+    def get_lambda_response_vector(self, molecule, basis, scf_tensors,
+                                   lambda_list, fdx):
         """
         Gets the full lambda multipliers vector from distributed array.
 
@@ -1346,7 +1349,7 @@ class PolarizabilityGradient:
         if self.rank == mpi_master():
             # MO coefficients
             mo = scf_tensors['C_alpha']  # only alpha part
-            nocc = molecule.number_of_alpha_electrons()
+            nocc = molecule.number_of_alpha_occupied_orbitals(basis)
             mo_vir = mo[:, nocc:].copy()
             nvir = mo_vir.shape[1]
             del mo, mo_vir
@@ -1908,7 +1911,8 @@ class PolarizabilityGradient:
 
         return fock_type, exchange_scaling_factor
 
-    def calculate_unrel_dm(self, molecule, scf_tensors, x_plus_y_mo, x_minus_y_mo):
+    def calculate_unrel_dm(self, molecule, basis, scf_tensors, x_plus_y_mo,
+                           x_minus_y_mo):
         """
         Calculates the symmetrized unrelaxed one-particle density matrix
         in AO basis.
@@ -1931,7 +1935,7 @@ class PolarizabilityGradient:
 
         # MO coefficients
         mo = scf_tensors['C_alpha']  # only alpha part
-        nocc = molecule.number_of_alpha_electrons()
+        nocc = molecule.number_of_alpha_occupied_orbitals(basis)
         mo_occ = mo[:, :nocc].copy()
         mo_vir = mo[:, nocc:].copy()
         nvir = mo_vir.shape[1]
