@@ -10,7 +10,6 @@ from veloxchem.thgreddriver import ThgRedDriver
 from veloxchem.outputstream import OutputStream
 
 
-@pytest.mark.timeconsuming
 class Testhgreduced:
 
     def run_thg_red(self, xcfun_label):
@@ -56,14 +55,17 @@ class Testhgreduced:
             calc_val = thgred_results["THG"][(0.05,0.05,0.05)]
             assert abs(abs(calc_val / ref_val) - 1.0) < tol
 
+    @pytest.mark.timeconsuming
     def test_thg_red_lda(self):
 
         self.run_thg_red('slda')
 
+    @pytest.mark.solvers
     def test_thg_red_gga(self):
 
         self.run_thg_red('pbe0')
 
+    @pytest.mark.timeconsuming
     def test_thg_red_mgga(self):
 
         self.run_thg_red('tpssh')

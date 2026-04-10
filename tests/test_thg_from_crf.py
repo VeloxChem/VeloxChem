@@ -10,7 +10,6 @@ from veloxchem.thgdriver import ThgDriver
 from veloxchem.outputstream import OutputStream
 
 
-@pytest.mark.timeconsuming
 class TestthgFromCrf:
 
     def run_thg_from_crf(self, xcfun_label):
@@ -120,14 +119,17 @@ class TestthgFromCrf:
                 calc_val = thg_results['THG'][(w1, w2, w3)]
                 assert abs(abs(calc_val.real / ref_val.real) - 1.0) < tol
 
+    @pytest.mark.timeconsuming
     def test_thg_from_crf_lda(self):
 
         self.run_thg_from_crf('slda')
 
+    @pytest.mark.solvers
     def test_thg_from_crf_gga(self):
 
         self.run_thg_from_crf('pbe0')
 
+    @pytest.mark.timeconsuming
     def test_thg_from_crf_mgga(self):
 
         self.run_thg_from_crf('tpssh')
