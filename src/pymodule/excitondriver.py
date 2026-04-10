@@ -37,7 +37,7 @@ import time as tm
 import math
 import sys
 
-from .veloxchemlib import KineticEnergyDriver, XCIntegrator, ECPDriver
+from .veloxchemlib import KineticEnergyDriver, XCIntegrator, EcpDriver
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import (hartree_in_ev, hartree_in_wavenumber,
                            bohr_in_angstrom, rotatory_strength_in_cgs)
@@ -1348,7 +1348,7 @@ class ExcitonModelDriver:
         npot_mat = self.comm.bcast(npot_mat, root=mpi_master())
 
         if basis.has_ecp():
-            ecp_drv = ECPDriver()
+            ecp_drv = EcpDriver()
             core_electrons = basis.get_number_of_ecp_core_electrons()
             ecp_atom_inds = [
                 idx for idx, nelec in enumerate(core_electrons) if nelec > 0
