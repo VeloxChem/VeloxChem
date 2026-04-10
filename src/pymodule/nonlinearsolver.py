@@ -305,11 +305,6 @@ class NonlinearSolver:
             The dictionary of ERI information.
         """
 
-        # TODO: enable ECP
-        assert_msg_critical(
-            not basis.has_ecp(),
-            f'{type(self).__name__}.compute: ECP is not yet supported')
-
         # TODO: enable RI-JK
         assert_msg_critical(
             not self.ri_jk,
