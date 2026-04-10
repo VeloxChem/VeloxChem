@@ -232,7 +232,7 @@ class TestCPP:
 
         with pytest.raises(
                 AssertionError,
-                match="Molecule: Invalid multiplicity for restricted"):
+                match="ComplexResponseSolver: not implemented for unrestricted case"):
             lr_results_not_used = lr_drv.compute(mol, bas, scf_results)
 
     def run_cpp_with_ecp(self, xcfun_label, cpp_property, ref_x_data,
