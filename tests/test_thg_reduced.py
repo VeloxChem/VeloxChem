@@ -6,7 +6,7 @@ from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.thgdriver import ThgDriver
-from veloxchem.thgreddriver import ThgRedDriver
+from veloxchem.thgreddriver import ThgReducedDriver
 from veloxchem.outputstream import OutputStream
 
 
@@ -43,7 +43,7 @@ class Testhgreduced:
         thg_results = thg.compute(molecule, basis, scf_results)
 
 
-        thgred = ThgRedDriver(MPI.COMM_WORLD,OutputStream())
+        thgred = ThgReducedDriver(MPI.COMM_WORLD,OutputStream())
         thgred.ostream.mute()
         thgred.update_settings(rsp_settings, method_settings)
         thgred_results = thgred.compute(molecule, basis, scf_results)

@@ -179,10 +179,9 @@ from .rspc6 import C6
 from .rspshg import SHG
 from .rsptpa import TPA
 from .rspthg import THG
-from .rspthgred import THGRed
+from .rspthgred import ThgReduced
 from .rixsdriver import RixsDriver
 from .localizationdriver import LocalizationDriver
-#from .rspcustomproperty import CustomProperty
 from .mpitask import MpiTask
 from .subcommunicators import SubCommunicators
 from .peforcefieldgenerator import PEForceFieldGenerator

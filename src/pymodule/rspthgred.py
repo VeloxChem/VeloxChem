@@ -33,7 +33,7 @@
 from .rspproperty import ResponseProperty
 
 
-class THGRed(ResponseProperty):
+class ThgReduced(ResponseProperty):
     """
     Implements the two-photon absorption property.
 

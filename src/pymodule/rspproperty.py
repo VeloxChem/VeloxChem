@@ -48,7 +48,7 @@ from .tdaeigensolverunrest import TdaUnrestrictedEigenSolver
 from .rixsdriver import RixsDriver
 from .shgdriver import ShgDriver
 from .thgdriver import ThgDriver
-from .thgreddriver import ThgRedDriver
+from .thgreddriver import ThgReducedDriver
 from .tpatransitiondriver import TpaTransitionDriver
 from .excitedstatemomentdriver import ExcitedStateMomentDriver
 from .threepatransitiondriver import ThreePATransitionDriver
@@ -343,7 +343,7 @@ class ResponseProperty:
               self._rsp_dict['residue'] == 'none' and
               self._rsp_dict['is_complex'] == 'yes'):    
              
-             self._rsp_driver = ThgRedDriver(self.comm, self.ostream)
+             self._rsp_driver = ThgReducedDriver(self.comm, self.ostream)
 
         # TPA (cubic response) driver
         elif (self._rsp_dict['order'] == 'cubic' and

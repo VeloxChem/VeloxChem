@@ -52,7 +52,7 @@ from .checkpoint import read_distributed_focks
 from .checkpoint import write_distributed_focks
 
 
-class ThgRedDriver(NonlinearSolver):
+class ThgReducedDriver(NonlinearSolver):
     """
     Implements the isotropic cubic response driver for Third-harmonic gerneration
     (thg)
