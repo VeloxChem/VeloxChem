@@ -226,10 +226,10 @@ class RixsDriver(LinearSolver):
             and the scattering amplitude tensor.
         """
 
-        # TODO: enable ECP
         assert_msg_critical(
             not basis.has_ecp(),
-            f'{type(self).__name__}.compute: ECP is not yet supported')
+            f'{type(self).__name__}.compute: ECPs are not supported for ' +
+            'RIXS calculations. Explicit core orbitals are required.')
 
         if rsp_results is None:
 
