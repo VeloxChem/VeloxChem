@@ -37,7 +37,7 @@ import time as tm
 import math
 import sys
 
-from .veloxchemlib import KineticEnergyDriver, XCIntegrator
+from .veloxchemlib import KineticEnergyDriver, XCIntegrator, ECPDriver
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import (hartree_in_ev, hartree_in_wavenumber,
                            bohr_in_angstrom, rotatory_strength_in_cgs)
@@ -323,11 +323,6 @@ class ExcitonModelDriver:
         :param basis:
             The AO basis set.
         """
-
-        # TODO: enable ECP
-        assert_msg_critical(
-            not basis.has_ecp(),
-            f'{type(self).__name__}.compute: ECP is not yet supported')
 
         if self.checkpoint_file is None and self.filename is not None:
             self.checkpoint_file = f'{self.filename}_exciton.h5'
@@ -1346,8 +1341,29 @@ class ExcitonModelDriver:
 
         npot_mat = None
         if self.rank == mpi_master():
-            npot_mat = compute_nuclear_potential_integrals(dimer, basis)
+            charges = dimer.get_effective_nuclear_charges(basis)
+            coords = dimer.get_coordinates_in_bohr()
+            npot_mat = compute_nuclear_potential_integrals(
+                dimer, basis, charges, coords)
         npot_mat = self.comm.bcast(npot_mat, root=mpi_master())
+
+        if basis.has_ecp():
+            ecp_drv = ECPDriver()
+            core_electrons = basis.get_number_of_ecp_core_electrons()
+            ecp_atom_inds = [
+                idx for idx, nelec in enumerate(core_electrons) if nelec > 0
+            ]
+
+            ave, res = divmod(len(ecp_atom_inds), self.nodes)
+            counts = [ave + 1 if p < res else ave for p in range(self.nodes)]
+            start = sum(counts[:self.rank])
+            end = sum(counts[:self.rank + 1])
+            local_ecp_atom_inds = ecp_atom_inds[start:end]
+
+            ecp_mat = ecp_drv.compute(dimer, basis, local_ecp_atom_inds)
+            ecp_mat = self.comm.reduce(ecp_mat.to_numpy(), root=mpi_master())
+        else:
+            ecp_mat = None
 
         # dft grid
         if self._dft:
@@ -1430,6 +1446,8 @@ class ExcitonModelDriver:
         if self.rank == mpi_master():
             # compute dimer energy
             hcore = kin_mat + npot_mat
+            if ecp_mat is not None:
+                hcore += ecp_mat
             fock = hcore + fock_mat_np
             dimer_energy = dimer.effective_nuclear_repulsion_energy(basis)
             dimer_energy += np.sum(dens * (hcore + fock))
