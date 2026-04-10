@@ -163,7 +163,7 @@ class ExcitonModelDriver:
         self.tda_max_iter = 100
 
         # dimer cutoff radius
-        self.dimer_cutoff_radius = None
+        self.dimer_cutoff_radius = 8.0
 
         # mpi information
         self.comm = comm
