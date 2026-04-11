@@ -38,7 +38,7 @@ target_include_directories(vlxobjs
 target_link_libraries(vlxobjs
   PUBLIC
     OpenMP::OpenMP_CXX
-    Math::LA
+    Eigen3::eigen
     Libxc::xc
     Boost::headers
   )
