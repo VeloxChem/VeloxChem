@@ -388,7 +388,7 @@ class VibrationalAnalysis:
             self.print_vibrational_analysis(molecule)
 
             # create binary file and save vibrational analysis results
-            self._write_final_hdf5(molecule, ao_basis)
+            self._write_final_hdf5(vib_results)
 
             return vib_results
         else:
@@ -1189,68 +1189,31 @@ class VibrationalAnalysis:
             index for index, element in enumerate(lst) if element in targets
         ]
 
-    def _write_final_hdf5(self, molecule, basis=None):
+    def _write_final_hdf5(self, vib_results):
         """
         Writes final HDF5 file that contains results
         from vibrational analysis
 
-        :param molecule:
-            The molecule.
-        :param basis:
-            Optional AO basis set object (for taking care of ECP core electrons).
+        :param vib_results:
+            The vibrational analysis results dictionary.
         """
 
         if self.filename is not None:
             results_h5_file = f"{self.filename}.h5"
-            self.write_vib_results_to_hdf5(molecule, results_h5_file, basis)
+            self.write_vib_results_to_hdf5(results_h5_file, vib_results)
 
-    def write_vib_results_to_hdf5(self, molecule, fname, basis=None):
+    def write_vib_results_to_hdf5(self, fname, vib_results):
         """
         Writes vibrational analysis results to HDF5 file.
 
-        :param molecule:
-            The molecule.
         :param fname:
             Name of the HDF5 file.
-        :param basis:
-            Optional AO basis set object (for taking care of ECP core electrons).
+        :param vib_results:
+            The vibrational analysis results dictionary.
         """
 
         if not (fname and isinstance(fname, str) and Path(fname).is_file()):
             return
-
-        natm = molecule.number_of_atoms()
-        nmodes = len(self.vib_frequencies)
-
-        vib_results = {
-            'molecule_xyz_string': molecule.get_xyz_string(),
-            'gibbs_free_energy': self.gibbs_free_energy,
-            'free_energy_summary': self.free_energy_summary,
-            'hessian': self.hessian,
-            'vib_frequencies': self.vib_frequencies,
-            'number_of_modes': nmodes,
-            # TODO: Stop reshaping here once vib HDF5 is fully aligned with the
-            # in-memory results model and downstream readers are updated.
-            'normal_modes': np.array(self.normal_modes.reshape(nmodes, natm, 3)),
-            'reduced_masses': self.reduced_masses,
-            'force_constants': self.force_constants,
-        }
-
-        if self.do_ir:
-            vib_results['dipole_gradient'] = self.dipole_gradient
-            vib_results['ir_intensities'] = self.ir_intensities
-
-        if self.do_raman or self.do_resonance_raman:
-            vib_results['number_of_external_frequencies'] = len(
-                self.frequencies)
-            vib_results['external_frequencies'] = self.frequencies
-            vib_results['raman_activities'] = self.raman_activities
-            vib_results['polarizability_gradient'] = (
-                self.polarizability_gradient)
-            vib_results['raman_type'] = (
-                'resonance' if self.do_resonance_raman else 'normal')
-            if self.depol_ratio is not None:
-                vib_results['depolarization_ratios'] = self.depol_ratio
 
         write_results_to_hdf5(fname,
                               'vib',

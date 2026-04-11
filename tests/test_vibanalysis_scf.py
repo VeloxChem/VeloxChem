@@ -274,14 +274,35 @@ class TestScfVibrationalAnalysisDriver:
             'dominant normal modes' in info for info in vib_drv.ostream.infos)
 
         if vib_drv.rank == mpi_master():
+            vib_results = {
+                'molecule_xyz_string': molecule.get_xyz_string(),
+                'gibbs_free_energy': vib_drv.gibbs_free_energy,
+                'free_energy_summary': vib_drv.free_energy_summary,
+                'hessian': vib_drv.hessian,
+                'vib_frequencies': vib_drv.vib_frequencies,
+                'number_of_modes': len(vib_drv.vib_frequencies),
+                'normal_modes': vib_drv.normal_modes.reshape(6, 3, 3),
+                'reduced_masses': vib_drv.reduced_masses,
+                'force_constants': vib_drv.force_constants,
+                'dipole_gradient': vib_drv.dipole_gradient,
+                'ir_intensities': vib_drv.ir_intensities,
+                'number_of_external_frequencies': len(vib_drv.frequencies),
+                'external_frequencies': vib_drv.frequencies,
+                'raman_activities': vib_drv.raman_activities,
+                'polarizability_gradient': vib_drv.polarizability_gradient,
+                'raman_type': 'normal',
+                'depolarization_ratios': vib_drv.depol_ratio,
+            }
+
             direct_h5_file = Path(direct_h5_name)
-            direct_h5_file.touch()
-            vib_drv.write_vib_results_to_hdf5(molecule, str(direct_h5_file),
-                                              basis)
+            with h5py.File(direct_h5_file, 'w'):
+                pass
+            vib_drv.write_vib_results_to_hdf5(str(direct_h5_file), vib_results)
 
             wrapped_h5_file = Path(wrapped_h5_name)
-            wrapped_h5_file.touch()
-            vib_drv._write_final_hdf5(molecule, basis)
+            with h5py.File(wrapped_h5_file, 'w'):
+                pass
+            vib_drv._write_final_hdf5(vib_results)
 
             with h5py.File(direct_h5_file, 'r') as hf:
                 assert hf['vib'].attrs['value_type'] == 'dict'
