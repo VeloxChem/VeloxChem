@@ -12,6 +12,7 @@ from veloxchem.veloxchemlib import mpi_master
 from veloxchem.mpitask import MpiTask
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
+from veloxchem.resultsio import read_results
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.vibrationalanalysis import VibrationalAnalysis
 
@@ -283,15 +284,32 @@ class TestScfVibrationalAnalysisDriver:
             vib_drv._write_final_hdf5(molecule, basis)
 
             with h5py.File(direct_h5_file, 'r') as hf:
-                assert hf['vib/number_of_modes'][0] == len(
-                    vib_drv.vib_frequencies)
-                assert hf['vib/hessian'].shape == vib_drv.hessian.shape
+                assert hf['vib'].attrs['value_type'] == 'dict'
                 assert hf['vib/normal_modes'].shape == (6, 3, 3)
-                assert hf['vib/external_frequencies'].shape == (2,)
-                assert hf[
-                    'vib/raman_activities'].shape == vib_drv.raman_activities.shape
-                assert hf['vib/polarizability_gradient'].shape == (2, 3, 3, 9)
-                assert hf['vib/raman_type'][0] == b'normal'
+                assert hf['vib/number_of_modes'].attrs['value_type'] == 'int'
+                assert hf['vib/external_frequencies'].attrs['value_type'] == (
+                    'tuple')
+                assert hf['vib/raman_type'].attrs['value_type'] == 'str'
+
+                polgrad_group = hf['vib/polarizability_gradient']
+                assert polgrad_group.attrs['value_type'] == 'dict'
+                assert polgrad_group.attrs['dict_storage'] == 'entries'
+
+            recovered = read_results(str(direct_h5_file), 'vib')
+            assert recovered['number_of_modes'] == len(vib_drv.vib_frequencies)
+            assert recovered['raman_type'] == 'normal'
+            np.testing.assert_allclose(recovered['hessian'], vib_drv.hessian)
+            np.testing.assert_allclose(recovered['normal_modes'],
+                                       vib_drv.normal_modes.reshape(6, 3, 3))
+            assert recovered['external_frequencies'] == vib_drv.frequencies
+            np.testing.assert_allclose(recovered['raman_activities'],
+                                       vib_drv.raman_activities)
+            assert recovered['polarizability_gradient'].keys() == (
+                vib_drv.polarizability_gradient.keys())
+            for key in recovered['polarizability_gradient']:
+                np.testing.assert_allclose(
+                    recovered['polarizability_gradient'][key],
+                    vib_drv.polarizability_gradient[key])
 
             assert wrapped_h5_file.is_file()
 

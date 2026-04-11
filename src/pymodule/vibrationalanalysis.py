@@ -53,6 +53,7 @@ from .veloxchemlib import (mpi_master, bohr_in_angstrom, avogadro_constant,
                            amu_in_kg, speed_of_light_in_vacuum_in_SI)
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input, get_random_string_serial
+from .resultsio import write_results_to_hdf5
 from .sanitychecks import raman_sanity_check
 
 with redirect_stderr(StringIO()) as fg_err:
@@ -337,9 +338,13 @@ class VibrationalAnalysis:
             self.frequency_analysis(molecule)
             vib_results['gibbs_free_energy'] = self.gibbs_free_energy
             vib_results['free_energy_summary'] = self.free_energy_summary
+            vib_results['hessian'] = self.hessian
             vib_results['vib_frequencies'] = self.vib_frequencies
-            # normalized
-            vib_results['normal_modes'] = self.normal_modes
+            vib_results['number_of_modes'] = len(self.vib_frequencies)
+            # Keep the in-memory representation aligned with current HDF5
+            # storage until downstream consumers are updated together.
+            vib_results['normal_modes'] = self.normal_modes.reshape(
+                len(self.vib_frequencies), molecule.number_of_atoms(), 3)
 
             # calculate force constants
             (self.reduced_masses,
@@ -349,6 +354,7 @@ class VibrationalAnalysis:
 
             # calculate the gradient of the dipole moment for IR intensities
             if self.do_ir:
+                vib_results['dipole_gradient'] = self.dipole_gradient
                 self.ir_intensities = self.calculate_ir_intensity(
                     self.raw_normal_modes)
                 vib_results['ir_intensities'] = self.ir_intensities
@@ -358,8 +364,15 @@ class VibrationalAnalysis:
                 (self.raman_activities, self.int_pol, self.int_depol,
                  self.depol_ratio) = self.calculate_raman_activity(
                      self.raw_normal_modes)
+                vib_results['number_of_external_frequencies'] = len(
+                    self.frequencies)
                 vib_results['external_frequencies'] = self.frequencies
                 vib_results['raman_activities'] = self.raman_activities
+                vib_results['polarizability_gradient'] = (
+                    self.polarizability_gradient)
+                vib_results['raman_type'] = (
+                    'resonance'
+                    if self.do_resonance_raman else 'normal')
                 if self.depol_ratio is not None:
                     vib_results['depolarization_ratios'] = self.depol_ratio
             elif (self.do_raman or self.do_resonance_raman) and self.is_xtb:
@@ -1206,59 +1219,49 @@ class VibrationalAnalysis:
         if not (fname and isinstance(fname, str) and Path(fname).is_file()):
             return
 
-        hf = h5py.File(fname, 'a')
-
-        vib_group = 'vib/'
-
         natm = molecule.number_of_atoms()
         nmodes = len(self.vib_frequencies)
-        nfreqs = len(self.frequencies)
 
-        nuc_rep = molecule.effective_nuclear_repulsion_energy(basis)
-        hf.create_dataset(vib_group + 'nuclear_repulsion', data=nuc_rep)
+        vib_results = {
+            'molecule_xyz_string': molecule.get_xyz_string(),
+            'gibbs_free_energy': self.gibbs_free_energy,
+            'free_energy_summary': self.free_energy_summary,
+            'hessian': self.hessian,
+            'vib_frequencies': self.vib_frequencies,
+            'number_of_modes': nmodes,
+            # TODO: Stop reshaping here once vib HDF5 is fully aligned with the
+            # in-memory results model and downstream readers are updated.
+            'normal_modes': np.array(self.normal_modes.reshape(nmodes, natm, 3)),
+            'reduced_masses': self.reduced_masses,
+            'force_constants': self.force_constants,
+        }
 
-        hf.create_dataset(vib_group + "number_of_modes", data=np.array([nmodes]))
-
-        hf.create_dataset(vib_group + 'normal_modes',
-                          data=np.array(self.normal_modes.reshape(
-                              nmodes, natm, 3)))
-
-        hf.create_dataset(vib_group + 'hessian', data=self.hessian)
-        hf.create_dataset(vib_group + 'vib_frequencies',
-                          data=np.array(self.vib_frequencies))
-        hf.create_dataset(vib_group + 'force_constants',
-                          data=np.array(self.force_constants))
-        hf.create_dataset(vib_group + 'reduced_masses',
-                          data=np.array(self.reduced_masses))
         if self.do_ir:
-            hf.create_dataset(vib_group + 'dipole_gradient',
-                             data=self.dipole_gradient)
-            hf.create_dataset(vib_group + 'ir_intensities',
-                              data=np.array(self.ir_intensities))
+            vib_results['dipole_gradient'] = self.dipole_gradient
+            vib_results['ir_intensities'] = self.ir_intensities
 
         if self.do_raman or self.do_resonance_raman:
-            hf.create_dataset(vib_group + "number_of_external_frequencies",
-                              data=np.array([nfreqs]))
-            hf.create_dataset(vib_group + 'external_frequencies',
-                              data=np.array(self.frequencies))
-            ra = [s for s in self.raman_activities]
-            hf.create_dataset(vib_group + 'raman_activities', data=np.array(ra))
-            polgrad = [self.polarizability_gradient[a] for a in self.polarizability_gradient.keys()]
-            hf.create_dataset(vib_group + 'polarizability_gradient',
-                            data=np.array(polgrad))
+            vib_results['number_of_external_frequencies'] = len(
+                self.frequencies)
+            vib_results['external_frequencies'] = self.frequencies
+            vib_results['raman_activities'] = self.raman_activities
+            vib_results['polarizability_gradient'] = (
+                self.polarizability_gradient)
+            vib_results['raman_type'] = (
+                'resonance' if self.do_resonance_raman else 'normal')
+            if self.depol_ratio is not None:
+                vib_results['depolarization_ratios'] = self.depol_ratio
 
-            raman_type = 'normal'
-            if self.do_resonance_raman:
-                raman_type = 'resonance'
-            hf.create_dataset(vib_group + 'raman_type', data=np.bytes_([raman_type]))
+        write_results_to_hdf5(fname,
+                              'vib',
+                              vib_results,
+                              value_label='vibrational result')
 
         valstr = 'Vibrational analysis results written to file: '
         valstr += fname
         self.ostream.print_info(valstr)
         self.ostream.print_blank()
         self.ostream.flush()
-
-        hf.close()
 
     def print_header(self):
         """

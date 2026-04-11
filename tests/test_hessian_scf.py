@@ -100,6 +100,56 @@ class TestScfHessianDriver:
 
         task.finish()
 
+    @pytest.mark.timeconsuming
+    def test_numerical_vib_results_include_legacy_vib_domain_fields(
+            self, tmp_path):
+
+        here = Path(__file__).parent
+        inpfile = str(here / 'data' / 'water_hessian_scf.inp')
+
+        task = MpiTask([inpfile, None])
+
+        filename = str(tmp_path / 'water_vib_payload')
+        filename = task.mpi_comm.bcast(filename, root=mpi_master())
+
+        scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
+        scf_drv.acc_type = 'l2_c2diis'
+        scf_drv.filename = filename
+        scf_drv.compute(task.molecule, task.ao_basis)
+
+        vibanalysis_drv = VibrationalAnalysis(scf_drv)
+        vibanalysis_drv.update_settings({}, {
+            'do_ir': 'yes',
+            'do_raman': 'yes',
+            'numerical_hessian': 'yes',
+            'numerical_raman': 'yes',
+            'filename': filename,
+        })
+        vibanalysis_drv.ostream.mute()
+        vib_results = vibanalysis_drv.compute(task.molecule, task.ao_basis)
+
+        if task.mpi_rank == mpi_master():
+            assert 'hessian' in vib_results
+            assert 'dipole_gradient' in vib_results
+            assert 'polarizability_gradient' in vib_results
+            assert 'number_of_modes' in vib_results
+            assert 'number_of_external_frequencies' in vib_results
+            assert 'raman_type' in vib_results
+
+            np.testing.assert_allclose(vib_results['hessian'],
+                                       vibanalysis_drv.hessian)
+            np.testing.assert_allclose(vib_results['dipole_gradient'],
+                                       vibanalysis_drv.dipole_gradient)
+            assert vib_results['polarizability_gradient'] == (
+                vibanalysis_drv.polarizability_gradient)
+            assert vib_results['number_of_modes'] == len(
+                vib_results['vib_frequencies'])
+            assert vib_results['number_of_external_frequencies'] == len(
+                vib_results['external_frequencies'])
+            assert vib_results['raman_type'] == 'normal'
+
+        task.finish()
+
     @pytest.mark.solvers
     def test_analytical_scf_hessian(self):
 

@@ -9,6 +9,7 @@ from veloxchem import (Molecule, MolecularBasis, OptimizationDriver, MpiTask,
                        mpi_master)
 from veloxchem.resultsio import (read_results, write_results_to_hdf5,
                                  write_scf_results_to_hdf5)
+from veloxchem.vibrationalanalysis import VibrationalAnalysis
 
 
 def _get_water_and_basis():
@@ -28,29 +29,33 @@ def _get_water_and_basis():
 
 def _assert_roundtrip_equal(expected, actual):
 
-    assert expected.keys() == actual.keys()
-
-    for key, expected_value in expected.items():
-        actual_value = actual[key]
-
+    def assert_value_equal(expected_value, actual_value):
         if expected_value is None:
             assert actual_value is None
         elif isinstance(expected_value, np.ndarray):
             np.testing.assert_allclose(actual_value, expected_value)
+        elif isinstance(expected_value, dict):
+            assert isinstance(actual_value, dict)
+            assert actual_value.keys() == expected_value.keys()
+            for key in expected_value:
+                assert_value_equal(expected_value[key], actual_value[key])
         elif isinstance(expected_value, list):
             assert isinstance(actual_value, list)
             assert len(actual_value) == len(expected_value)
-            for actual_item, expected_item in zip(actual_value, expected_value):
-                assert actual_item.keys() == expected_item.keys()
-                for subkey, subvalue in expected_item.items():
-                    assert actual_item[subkey] == subvalue
+            for expected_item, actual_item in zip(expected_value, actual_value):
+                assert_value_equal(expected_item, actual_item)
         elif isinstance(expected_value, tuple):
             assert isinstance(actual_value, tuple)
             assert len(actual_value) == len(expected_value)
-            for actual_item, expected_item in zip(actual_value, expected_value):
-                np.testing.assert_allclose(actual_item, expected_item)
+            for expected_item, actual_item in zip(expected_value, actual_value):
+                assert_value_equal(expected_item, actual_item)
         else:
             assert actual_value == expected_value
+
+    assert expected.keys() == actual.keys()
+
+    for key, expected_value in expected.items():
+        assert_value_equal(expected_value, actual[key])
 
 
 def _assert_opt_results_roundtrip_equal(expected, actual):
@@ -169,6 +174,42 @@ def test_write_results_to_hdf5_stores_requested_group(tmp_path):
                                vib_results['frequencies'])
     assert recovered['intensities'] == vib_results['intensities']
     assert recovered['projected'] is vib_results['projected']
+
+
+def test_write_results_to_hdf5_roundtrips_dict_with_non_string_keys(tmp_path):
+
+    if MPI.COMM_WORLD.Get_rank() != mpi_master():
+        return
+
+    h5file = Path(tmp_path) / 'dict_entries_results.h5'
+    with h5py.File(h5file, 'w'):
+        pass
+
+    results = {
+        'polarizability_gradient': {
+            0.0: np.arange(18.0).reshape(2, 3, 3),
+            0.2: np.arange(18.0, 36.0).reshape(2, 3, 3),
+        }
+    }
+
+    write_results_to_hdf5(str(h5file),
+                          'vib',
+                          results,
+                          value_label='vibrational result')
+
+    with h5py.File(h5file, 'r') as h5f:
+        polgrad_group = h5f['vib/polarizability_gradient']
+        assert polgrad_group.attrs['value_type'] == 'dict'
+        assert polgrad_group.attrs['dict_storage'] == 'entries'
+        assert polgrad_group.attrs['length'] == 2
+
+    recovered = read_results(str(h5file), 'vib')
+    assert recovered.keys() == results.keys()
+    assert recovered['polarizability_gradient'].keys() == (
+        results['polarizability_gradient'].keys())
+    for key in results['polarizability_gradient']:
+        np.testing.assert_allclose(recovered['polarizability_gradient'][key],
+                                   results['polarizability_gradient'][key])
 
 
 def test_read_results_roundtrips_only_requested_group(tmp_path):
@@ -320,3 +361,35 @@ def test_opt_results_hdf5_roundtrip_with_real_scan(tmp_path):
         fpath = Path('scan-final.xyz')
         if fpath.is_file():
             fpath.unlink()
+
+
+def test_vib_results_hdf5_roundtrip_with_water_calculation(tmp_path):
+
+    here = Path(__file__).parent
+    inpfile = str(here / 'data' / 'water_hessian_scf.inp')
+
+    task = MpiTask([inpfile, None])
+    filename = str(tmp_path / 'water_vib_results')
+    filename = task.mpi_comm.bcast(filename, root=mpi_master())
+
+    scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
+    scf_drv.acc_type = 'l2_c2diis'
+    scf_drv.filename = filename
+    _ = scf_drv.compute(task.molecule, task.ao_basis)
+
+    vib_drv = VibrationalAnalysis(scf_drv)
+    vib_drv.update_settings({}, {
+        'do_ir': 'yes',
+        'do_raman': 'yes',
+        'numerical_hessian': 'no',
+        'numerical_raman': 'no',
+        'filename': filename,
+    })
+    vib_drv.ostream.mute()
+    vib_results = vib_drv.compute(task.molecule, task.ao_basis)
+
+    if task.mpi_rank == mpi_master():
+        recovered = read_results(f'{filename}.h5', 'vib')
+        _assert_roundtrip_equal(vib_results, recovered)
+        assert 'basis_set' not in recovered
+        assert 'nuclear_charges' not in recovered

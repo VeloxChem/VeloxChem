@@ -80,8 +80,22 @@ def _write_value_to_hdf5(parent, key, value, value_label='HDF5 value'):
     if isinstance(value, dict):
         group = parent.create_group(key)
         group.attrs['value_type'] = 'dict'
-        for child_key, child_value in value.items():
-            _write_value_to_hdf5(group, child_key, child_value, value_label)
+        if all(isinstance(child_key, str) for child_key in value):
+            group.attrs['dict_storage'] = 'named'
+            for child_key, child_value in value.items():
+                _write_value_to_hdf5(group, child_key, child_value, value_label)
+        else:
+            # Fall back to indexed dict entries when keys are not valid HDF5
+            # object names, e.g. floats used for response frequencies.
+            group.attrs['dict_storage'] = 'entries'
+            group.attrs['length'] = len(value)
+            for idx, (child_key, child_value) in enumerate(value.items()):
+                entry_group = group.create_group(str(idx))
+                entry_group.attrs['value_type'] = 'dict_entry'
+                _write_value_to_hdf5(entry_group, '__key__', child_key,
+                                     value_label)
+                _write_value_to_hdf5(entry_group, '__value__', child_value,
+                                     value_label)
         return
 
     if isinstance(value, (list, tuple)):
@@ -151,10 +165,28 @@ def _read_value_from_hdf5(h5obj, value_label='HDF5 value'):
 
     if isinstance(h5obj, h5py.Group):
         if value_type == 'dict':
-            return {
-                key: _read_value_from_hdf5(h5obj[key], value_label)
-                for key in h5obj
-            }
+            dict_storage = h5obj.attrs.get('dict_storage', 'named')
+            if dict_storage == 'named':
+                return {
+                    key: _read_value_from_hdf5(h5obj[key], value_label)
+                    for key in h5obj
+                }
+
+            if dict_storage == 'entries':
+                length = int(h5obj.attrs['length'])
+                values = {}
+                for i in range(length):
+                    entry_group = h5obj[str(i)]
+                    key = _read_value_from_hdf5(entry_group['__key__'],
+                                                value_label)
+                    value = _read_value_from_hdf5(entry_group['__value__'],
+                                                  value_label)
+                    values[key] = value
+                return values
+
+            errmsg = (f'Unsupported {value_label} dict storage '
+                      f'{dict_storage!r}.')
+            assert_msg_critical(False, errmsg)
 
         if value_type in ('list', 'tuple'):
             length = int(h5obj.attrs['length'])
