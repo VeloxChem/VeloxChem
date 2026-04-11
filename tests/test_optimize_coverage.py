@@ -12,6 +12,7 @@ from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.optimizationdriver import OptimizationDriver
 from veloxchem.optimizationengine import OptimizationEngine
 from veloxchem.outputstream import OutputStream
+from veloxchem.resultsio import read_results
 from veloxchem.scfgradientdriver import ScfGradientDriver
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 
@@ -107,12 +108,15 @@ class TestOptimizationDriverCoverage:
             pass
 
         xyz = molecule.get_xyz_string()
+        coords_au = molecule.get_coordinates_in_bohr()
         opt_drv._write_final_hdf5(
             str(opt_h5),
             molecule,
             {
                 "opt_energies": [-1.0, -1.1],
                 "opt_geometries": [xyz, xyz],
+                "opt_coordinates_au": np.array([coords_au, coords_au]),
+                "nuclear_repulsion_energies": np.array([0.7, 0.7]),
             },
             basis=basis,
         )
@@ -127,6 +131,8 @@ class TestOptimizationDriverCoverage:
             {
                 "scan_energies": [-1.0, -0.9],
                 "scan_geometries": [xyz, xyz],
+                "scan_coordinates_au": np.array([coords_au, coords_au]),
+                "nuclear_repulsion_energies": np.array([0.7, 0.7]),
             },
             basis=basis,
         )
@@ -135,11 +141,30 @@ class TestOptimizationDriverCoverage:
             assert "opt/opt_energies" in h5f
             assert "opt/opt_coordinates_au" in h5f
             assert "opt/nuclear_repulsion_energies" in h5f
+            assert h5f["opt"].attrs["value_type"] == "dict"
 
         with h5py.File(scan_h5) as h5f:
             assert "opt/scan_energies" in h5f
             assert "opt/scan_coordinates_au" in h5f
             assert "opt/nuclear_repulsion_energies" in h5f
+            assert h5f["opt"].attrs["value_type"] == "dict"
+
+        opt_readback = read_results(str(opt_h5), "opt")
+        scan_readback = read_results(str(scan_h5), "opt")
+
+        assert opt_readback["opt_energies"] == [-1.0, -1.1]
+        assert opt_readback["opt_geometries"] == [xyz, xyz]
+        np.testing.assert_allclose(opt_readback["opt_coordinates_au"],
+                                   np.array([coords_au, coords_au]))
+        np.testing.assert_allclose(opt_readback["nuclear_repulsion_energies"],
+                                   np.array([0.7, 0.7]))
+
+        assert scan_readback["scan_energies"] == [-1.0, -0.9]
+        assert scan_readback["scan_geometries"] == [xyz, xyz]
+        np.testing.assert_allclose(scan_readback["scan_coordinates_au"],
+                                   np.array([coords_au, coords_au]))
+        np.testing.assert_allclose(scan_readback["nuclear_repulsion_energies"],
+                                   np.array([0.7, 0.7]))
 
     def test_optimizationdriver_restart_uses_checkpoint_geometry(
             self, tmp_path):

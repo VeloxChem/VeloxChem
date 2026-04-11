@@ -4,7 +4,9 @@ from mpi4py import MPI
 import h5py
 import numpy as np
 
-from veloxchem import Molecule, MolecularBasis, ScfRestrictedDriver, mpi_master
+from veloxchem import (Molecule, MolecularBasis, OptimizationDriver, MpiTask,
+                       OutputStream, ScfGradientDriver, ScfRestrictedDriver,
+                       mpi_master)
 from veloxchem.resultsio import read_results, write_scf_results_to_hdf5
 
 
@@ -46,6 +48,29 @@ def _assert_roundtrip_equal(expected, actual):
             assert len(actual_value) == len(expected_value)
             for actual_item, expected_item in zip(actual_value, expected_value):
                 np.testing.assert_allclose(actual_item, expected_item)
+        else:
+            assert actual_value == expected_value
+
+
+def _assert_opt_results_roundtrip_equal(expected, actual):
+
+    expected_keys = set(expected.keys()) - {'final_molecule'}
+    assert actual.keys() == expected_keys
+
+    for key in expected_keys:
+        expected_value = expected[key]
+        actual_value = actual[key]
+
+        if isinstance(expected_value, np.ndarray):
+            np.testing.assert_allclose(actual_value, expected_value)
+        elif isinstance(expected_value, list):
+            assert isinstance(actual_value, list)
+            assert len(actual_value) == len(expected_value)
+            if expected_value and isinstance(expected_value[0], str):
+                assert actual_value == expected_value
+            else:
+                np.testing.assert_allclose(np.array(actual_value),
+                                           np.array(expected_value))
         else:
             assert actual_value == expected_value
 
@@ -175,15 +200,90 @@ def test_scf_results_hdf5_roundtrip_with_water_calculation(tmp_path):
     scf_drv.filename = filename
     scf_results = scf_drv.compute(molecule, basis)
 
-    if MPI.COMM_WORLD.Get_rank() != mpi_master():
-        return
+    if scf_drv.rank == mpi_master():
+        h5file = Path(f'{filename}.h5')
 
-    h5file = Path(f'{filename}.h5')
+        recovered = read_results(str(h5file), 'scf')
 
-    recovered = read_results(str(h5file), 'scf')
+        _assert_roundtrip_equal(scf_results, recovered)
 
-    _assert_roundtrip_equal(scf_results, recovered)
+        assert 'basis_set' not in recovered
+        assert 'nuclear_charges' not in recovered
+        assert recovered['scf_history'] == scf_drv.history
 
-    assert 'basis_set' not in recovered
-    assert 'nuclear_charges' not in recovered
-    assert recovered['scf_history'] == scf_drv.history
+
+def test_opt_results_hdf5_roundtrip_with_nh3_optimization(tmp_path):
+
+    here = Path(__file__).parent
+    inpfile = str(here / 'data' / 'nh3.inp')
+
+    task = MpiTask([inpfile, None])
+    task.input_dict['scf']['checkpoint_file'] = None
+    task.input_dict['method_settings']['basis'] = 'STO-3G'
+
+    filename = str(tmp_path / 'nh3_opt_results')
+    filename = task.mpi_comm.bcast(filename, root=mpi_master())
+    task.input_dict['filename'] = filename
+
+    if task.mpi_rank == mpi_master():
+        task.ao_basis = MolecularBasis.read(task.molecule, 'STO-3G',
+                                            ostream=None)
+    else:
+        task.ao_basis = None
+    task.ao_basis = task.mpi_comm.bcast(task.ao_basis, root=mpi_master())
+
+    scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
+    scf_drv.update_settings(task.input_dict['scf'],
+                            task.input_dict['method_settings'])
+    _ = scf_drv.compute(task.molecule, task.ao_basis)
+
+    grad_drv = ScfGradientDriver(scf_drv)
+    opt_drv = OptimizationDriver(grad_drv)
+    opt_drv.update_settings({
+        'coordsys': 'tric',
+        'filename': filename,
+    })
+    opt_results = opt_drv.compute(task.molecule, task.ao_basis)
+
+    if opt_drv.rank == mpi_master():
+        recovered = read_results(f'{filename}.h5', 'opt')
+
+        _assert_opt_results_roundtrip_equal(opt_results, recovered)
+        assert 'xyz' not in recovered
+        assert 'final_molecule' not in recovered
+
+
+def test_opt_results_hdf5_roundtrip_with_real_scan(tmp_path):
+
+    molecule = Molecule.read_xyz_string("""2
+    H2
+    H 0.0 0.0 0.0
+    H 0.0 0.0 0.8
+    """)
+    filename = str(tmp_path / 'opt_scan_real')
+    filename = MPI.COMM_WORLD.bcast(filename, root=mpi_master())
+
+    ostream = OutputStream(None)
+    scf_drv = ScfRestrictedDriver(MPI.COMM_WORLD, ostream)
+    scf_drv.filename = filename
+    grad_drv = ScfGradientDriver(scf_drv)
+    opt_drv = OptimizationDriver(grad_drv)
+    basis = MolecularBasis.read(molecule, 'STO-3G', ostream=None)
+
+    opt_drv.ostream.mute()
+    opt_drv.filename = filename
+    opt_drv.constraints = ['scan distance 1 2 0.6 1.0 3']
+    opt_drv.conv_maxiter = True
+
+    opt_results = opt_drv.compute(molecule, basis)
+
+    if opt_drv.rank == mpi_master():
+        recovered = read_results(f'{filename}.h5', 'opt')
+
+        _assert_opt_results_roundtrip_equal(opt_results, recovered)
+        assert 'xyz' not in recovered
+        assert 'final_molecule' not in recovered
+
+        fpath = Path('scan-final.xyz')
+        if fpath.is_file():
+            fpath.unlink()

@@ -296,6 +296,35 @@ def write_scf_results_to_hdf5(fname, scf_results):
                                      value_label='SCF result')
 
 
+def write_opt_results_to_hdf5(fname, opt_results):
+    """
+    Writes optimization results to HDF5 file.
+
+    :param fname:
+        Name of the HDF5 file.
+    :param opt_results:
+        The dictionary containing optimization results.
+    """
+
+    valid_checkpoint = (fname and isinstance(fname, str) and
+                        Path(fname).is_file())
+
+    if valid_checkpoint:
+
+        with h5py.File(fname, 'a') as hf:
+            if 'opt' in hf:
+                del hf['opt']
+
+            opt_group = hf.create_group('opt')
+            opt_group.attrs['value_type'] = 'dict'
+
+            for key, value in opt_results.items():
+                _write_value_to_hdf5(opt_group,
+                                     key,
+                                     value,
+                                     value_label='optimization result')
+
+
 def write_lr_rsp_results_to_hdf5(fname, rsp_results, group_label='rsp'):
     """
     Writes the results of a linear response calculation to HDF5 file.
