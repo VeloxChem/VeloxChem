@@ -40,60 +40,6 @@ from .distributedarray import DistributedArray
 from .resultsio import create_hdf5
 
 
-def write_rsp_solution(fname, key, vec, group_label='rsp'):
-    """
-    Writes a response solution vector to HDF5 file.
-
-    :param fname:
-        The name of the checkpoint file.
-    :param key:
-        The key for the solution vector.
-    :param vec:
-        The solution vector.
-    :param group_label:
-        The checkpoint file group label.
-    """
-
-    if fname and isinstance(fname, str):
-        hf = h5py.File(fname, 'a')
-        label = group_label + '/' + key
-        if label in hf:
-            del hf[label]
-        hf.create_dataset(label, data=vec)
-        hf.close()
-
-
-def write_rsp_solution_with_multiple_keys(fname, keys, vec, group_label='rsp'):
-    """
-    Writes a response solution vector with multiple keys to HDF5 file.
-
-    :param fname:
-        The name of the checkpoint file.
-    :param keys:
-        The list of keys for the solution vector.
-    :param vec:
-        The solution vector.
-    :param group_label:
-        The checkpoint file group label.
-    """
-
-    if fname and isinstance(fname, str):
-        hf = h5py.File(fname, 'a')
-
-        label = group_label + '/' + keys[0]
-        if label in hf:
-            del hf[label]
-        dset = hf.create_dataset(label, data=vec)
-
-        for key in keys[1:]:
-            label = group_label + '/' + key
-            if label in hf:
-                del hf[label]
-            hf[label] = dset
-
-        hf.close()
-
-
 def write_rsp_hdf5(fname, arrays, labels, molecule, basis, dft_dict, pe_dict,
                    ostream):
     """

@@ -374,6 +374,59 @@ def write_opt_results_to_hdf5(fname, opt_results):
                           value_label='optimization result')
 
 
+def write_rsp_solution(fname, key, vec, group_label='rsp'):
+    """
+    Writes a response solution vector to HDF5 file.
+
+    :param fname:
+        The name of the HDF5 file.
+    :param key:
+        The key for the solution vector.
+    :param vec:
+        The solution vector.
+    :param group_label:
+        The HDF5 group label.
+    """
+
+    if fname and isinstance(fname, str):
+        with h5py.File(fname, 'a') as hf:
+            label = group_label + '/' + key
+            if label in hf:
+                del hf[label]
+            hf.create_dataset(label, data=vec)
+
+
+def write_rsp_solution_with_multiple_keys(fname,
+                                          keys,
+                                          vec,
+                                          group_label='rsp'):
+    """
+    Writes one response solution vector under multiple HDF5 keys.
+
+    :param fname:
+        The name of the HDF5 file.
+    :param keys:
+        The list of keys for the solution vector.
+    :param vec:
+        The solution vector.
+    :param group_label:
+        The HDF5 group label.
+    """
+
+    if fname and isinstance(fname, str):
+        with h5py.File(fname, 'a') as hf:
+            label = group_label + '/' + keys[0]
+            if label in hf:
+                del hf[label]
+            dset = hf.create_dataset(label, data=vec)
+
+            for key in keys[1:]:
+                label = group_label + '/' + key
+                if label in hf:
+                    del hf[label]
+                hf[label] = dset
+
+
 def write_lr_rsp_results_to_hdf5(fname, rsp_results):
     """
     Writes the results of a linear response calculation to HDF5 file.
