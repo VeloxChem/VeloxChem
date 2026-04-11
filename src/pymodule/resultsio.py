@@ -299,7 +299,11 @@ def create_hdf5(fname, molecule, basis, dft_func_label, potfile_text):
         hf.close()
 
 
-def write_results_to_hdf5(fname, label, results, value_label='result'):
+def write_results_to_hdf5(fname,
+                          label,
+                          results,
+                          value_label='result',
+                          replace_group=True):
     """
     Writes a group-local results dictionary to an HDF5 file.
 
@@ -311,6 +315,9 @@ def write_results_to_hdf5(fname, label, results, value_label='result'):
         The dictionary containing result data.
     :param value_label:
         A label used in serialization error messages.
+    :param replace_group:
+        If ``True``, replace the whole target group before writing. If
+        ``False``, keep existing group members that are not overwritten.
     """
 
     valid_checkpoint = (fname and isinstance(fname, str) and
@@ -319,13 +326,16 @@ def write_results_to_hdf5(fname, label, results, value_label='result'):
     if valid_checkpoint:
 
         with h5py.File(fname, 'a') as hf:
-            if label in hf:
+            if replace_group and label in hf:
                 del hf[label]
 
-            result_group = hf.create_group(label)
+            result_group = hf.require_group(label)
             result_group.attrs['value_type'] = 'dict'
+            result_group.attrs['dict_storage'] = 'named'
 
             for key, value in results.items():
+                if key in result_group:
+                    del result_group[key]
                 _write_value_to_hdf5(result_group,
                                      key,
                                      value,
@@ -364,7 +374,7 @@ def write_opt_results_to_hdf5(fname, opt_results):
                           value_label='optimization result')
 
 
-def write_lr_rsp_results_to_hdf5(fname, rsp_results, group_label='rsp'):
+def write_lr_rsp_results_to_hdf5(fname, rsp_results):
     """
     Writes the results of a linear response calculation to HDF5 file.
 
@@ -372,27 +382,13 @@ def write_lr_rsp_results_to_hdf5(fname, rsp_results, group_label='rsp'):
         Name of the HDF5 file.
     :param rsp_results:
         The dictionary containing the linear response results.
-    :param group_label:
-        The checkpoint file group label.
     """
 
-    if fname and isinstance(fname, str):
-
-        hf = h5py.File(fname, 'a')
-
-        for key in rsp_results:
-            if "vector" in key or "cube" in key or "file" in key or "details" in key:
-                continue
-
-            if key == "esa_results":
-                continue
-
-            label = group_label + '/' + key
-            if label in hf:
-                del hf[label]
-            hf.create_dataset(label, data=rsp_results[key])
-
-        hf.close()
+    write_results_to_hdf5(fname,
+                          'rsp',
+                          rsp_results,
+                          value_label='response result',
+                          replace_group=False)
 
 
 def write_detach_attach_to_hdf5(fname,

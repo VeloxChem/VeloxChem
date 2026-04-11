@@ -594,7 +594,15 @@ class TdaUnrestrictedEigenSolver(TdaEigenSolverBase):
 
             if (self.save_solutions and final_h5_fname is not None):
                 # Write response results to final checkpoint file.
-                write_lr_rsp_results_to_hdf5(final_h5_fname, ret_dict)
+                # Keep the legacy rsp HDF5 layout for compatibility.
+                # Eigenvectors are written separately as S1/S2/... datasets, so
+                # they do not belong in this HDF5-facing payload.
+                h5_ret_dict = {
+                    key: value
+                    for key, value in ret_dict.items()
+                    if key != 'eigenvectors'
+                }
+                write_lr_rsp_results_to_hdf5(final_h5_fname, h5_ret_dict)
 
             self._print_results(ret_dict)
 
