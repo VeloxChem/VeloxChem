@@ -40,7 +40,7 @@ import time as tm
 import tempfile
 import math
 
-from .veloxchemlib import mpi_master, hartree_in_kjpermol
+from .veloxchemlib import mpi_master, hartree_in_kjpermol, bohr_in_angstrom
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 from .outputstream import OutputStream
@@ -523,44 +523,26 @@ class OptimizationDriver:
                     opt_results['scan_energies'] = [
                         opt_energies[-1] for opt_energies in all_energies
                     ]
-                    opt_results['nuclear_repulsion_energies'] = np.array([
-                        Molecule(labels, opt_coords_au[-1], 'au',
-                                 atom_basis_labels)
-                        .nuclear_repulsion_energy(basis)
-                        for opt_coords_au in all_coords_au
-                    ])
                     opt_results['scan_coordinates_au'] = np.array(
                         [opt_coords_au[-1] for opt_coords_au in all_coords_au])
 
-                    opt_results['scan_geometries'] = []
-                    labels = molecule.get_labels()
-                    for opt_coords_au in all_coords_au:
-                        mol = Molecule(labels, opt_coords_au[-1], 'au',
-                                       atom_basis_labels)
-                        opt_results['scan_geometries'].append(
-                            mol.get_xyz_string())
+                    opt_results['scan_geometries'] = [
+                        self._get_xyz_string(labels, opt_coords_au[-1])
+                        for opt_coords_au in all_coords_au
+                    ]
 
                 else:
                     self.print_opt_result(m)
 
                     opt_results['opt_energies'] = list(m.qm_energies)
-                    nuclear_repulsion_energies = []
 
-                    opt_results['opt_geometries'] = []
-                    opt_coordinates_au = []
-                    labels = molecule.get_labels()
-                    for xyz in m.xyzs:
-                        coords_au = xyz / geometric.nifty.bohr2ang
-                        mol = Molecule(labels, coords_au, 'au',
-                                       atom_basis_labels)
-                        opt_results['opt_geometries'].append(
-                            mol.get_xyz_string())
-                        opt_coordinates_au.append(coords_au)
-                        nuclear_repulsion_energies.append(
-                            mol.nuclear_repulsion_energy(basis))
-
-                    opt_results['nuclear_repulsion_energies'] = np.array(
-                        nuclear_repulsion_energies)
+                    opt_coordinates_au = [
+                        xyz / geometric.nifty.bohr2ang for xyz in m.xyzs
+                    ]
+                    opt_results['opt_geometries'] = [
+                        self._get_xyz_string(labels, coords_au)
+                        for coords_au in opt_coordinates_au
+                    ]
                     opt_results['opt_coordinates_au'] = np.array(
                         opt_coordinates_au)
 
@@ -660,6 +642,33 @@ class OptimizationDriver:
                 extfile.unlink()
             except PermissionError:
                 pass
+
+    @staticmethod
+    def _get_xyz_string(labels, coords_au, precision=12):
+        """
+        Formats an xyz string from labels and Bohr coordinates.
+
+        :param labels:
+            The atomic labels.
+        :param coords_au:
+            Atomic coordinates in Bohr.
+        :param precision:
+            Decimal precision for coordinates in Angstrom.
+
+        :return:
+            The xyz string.
+        """
+
+        coords_angstrom = coords_au * bohr_in_angstrom()
+        xyz = f'{len(labels)}\n\n'
+
+        for label, (xa, ya, za) in zip(labels, coords_angstrom):
+            xyz += f'{label:<6s}'
+            xyz += f' {xa:{precision + 10}.{precision}f}'
+            xyz += f' {ya:{precision + 10}.{precision}f}'
+            xyz += f' {za:{precision + 10}.{precision}f}\n'
+
+        return xyz
 
     @staticmethod
     def get_ic_rmsd(opt_mol, ref_mol):

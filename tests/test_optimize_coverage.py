@@ -5,6 +5,7 @@ import h5py
 import numpy as np
 from mpi4py import MPI
 
+from veloxchem.veloxchemlib import bohr_in_angstrom
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.inputparser import read_unparsed_input_from_hdf5
 from veloxchem.molecule import Molecule
@@ -90,6 +91,21 @@ class TestOptimizationDriverCoverage:
         opt_drv.clean_up_file(removable)
         assert not removable.exists()
 
+        coords_au = np.array([
+            [0.0, 0.0, 0.0],
+            [1.0, -2.0, 3.0],
+        ])
+        xyz = opt_drv._get_xyz_string(["H", "O"], coords_au, precision=4)
+        lines = xyz.splitlines()
+        scale = bohr_in_angstrom()
+
+        assert lines[:2] == ["2", ""]
+        assert lines[2] == f"H      {0.0:14.4f} {0.0:14.4f} {0.0:14.4f}"
+        assert lines[3] == (
+            f"O      {1.0 * scale:14.4f} {-2.0 * scale:14.4f} "
+            f"{3.0 * scale:14.4f}"
+        )
+
         opt_copy = deepcopy(opt_drv)
         assert opt_copy is not opt_drv
         assert opt_copy.grad_drv is not opt_drv.grad_drv
@@ -101,7 +117,7 @@ class TestOptimizationDriverCoverage:
             H 0.0 0.0 0.0
             H 0.0 0.0 0.7
         """)
-        opt_drv, basis = self.make_scf_opt_driver(molecule)
+        opt_drv, _ = self.make_scf_opt_driver(molecule)
 
         opt_h5 = tmp_path / "opt_results.h5"
         with h5py.File(opt_h5, "w"):
@@ -116,9 +132,7 @@ class TestOptimizationDriverCoverage:
                 "opt_energies": [-1.0, -1.1],
                 "opt_geometries": [xyz, xyz],
                 "opt_coordinates_au": np.array([coords_au, coords_au]),
-                "nuclear_repulsion_energies": np.array([0.7, 0.7]),
             },
-            basis=basis,
         )
 
         scan_h5 = tmp_path / "scan_results.h5"
@@ -132,21 +146,17 @@ class TestOptimizationDriverCoverage:
                 "scan_energies": [-1.0, -0.9],
                 "scan_geometries": [xyz, xyz],
                 "scan_coordinates_au": np.array([coords_au, coords_au]),
-                "nuclear_repulsion_energies": np.array([0.7, 0.7]),
             },
-            basis=basis,
         )
 
         with h5py.File(opt_h5) as h5f:
             assert "opt/opt_energies" in h5f
             assert "opt/opt_coordinates_au" in h5f
-            assert "opt/nuclear_repulsion_energies" in h5f
             assert h5f["opt"].attrs["value_type"] == "dict"
 
         with h5py.File(scan_h5) as h5f:
             assert "opt/scan_energies" in h5f
             assert "opt/scan_coordinates_au" in h5f
-            assert "opt/nuclear_repulsion_energies" in h5f
             assert h5f["opt"].attrs["value_type"] == "dict"
 
         opt_readback = read_results(str(opt_h5), "opt")
@@ -156,15 +166,11 @@ class TestOptimizationDriverCoverage:
         assert opt_readback["opt_geometries"] == [xyz, xyz]
         np.testing.assert_allclose(opt_readback["opt_coordinates_au"],
                                    np.array([coords_au, coords_au]))
-        np.testing.assert_allclose(opt_readback["nuclear_repulsion_energies"],
-                                   np.array([0.7, 0.7]))
 
         assert scan_readback["scan_energies"] == [-1.0, -0.9]
         assert scan_readback["scan_geometries"] == [xyz, xyz]
         np.testing.assert_allclose(scan_readback["scan_coordinates_au"],
                                    np.array([coords_au, coords_au]))
-        np.testing.assert_allclose(scan_readback["nuclear_repulsion_energies"],
-                                   np.array([0.7, 0.7]))
 
     def test_optimizationdriver_restart_uses_checkpoint_geometry(
             self, tmp_path):
