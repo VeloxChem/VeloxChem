@@ -1971,6 +1971,7 @@ class ScfDriver:
                     'scf_energy': self.scf_energy,
                     'restart': self.restart,
                     'filename': self.filename,
+                    'scf_history': self.history,
                     # scf tensors
                     'S': S,
                     'C_alpha': C_alpha,
@@ -3538,8 +3539,7 @@ class ScfDriver:
             potfile_text = ''
 
         create_hdf5(final_h5_fname, molecule, ao_basis, xc_label, potfile_text)
-        write_scf_results_to_hdf5(final_h5_fname, self.scf_results,
-                                  self.history)
+        write_scf_results_to_hdf5(final_h5_fname, self.scf_results)
 
         self.ostream.print_blank()
         self.ostream.print_info('SCF results written to file: ' +

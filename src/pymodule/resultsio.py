@@ -134,6 +134,78 @@ def _write_value_to_hdf5(parent, key, value, value_label='HDF5 value'):
     assert_msg_critical(False, errmsg)
 
 
+def _read_value_from_hdf5(h5obj, value_label='HDF5 value'):
+    """
+    Reads a Python value from an HDF5 dataset/group using stored metadata.
+
+    :param h5obj:
+        The HDF5 dataset or group.
+    :param value_label:
+        A label used in error messages for the serialized value domain.
+
+    :return:
+        The reconstructed Python value.
+    """
+
+    value_type = h5obj.attrs.get('value_type', None)
+
+    if isinstance(h5obj, h5py.Group):
+        if value_type == 'dict':
+            return {
+                key: _read_value_from_hdf5(h5obj[key], value_label)
+                for key in h5obj
+            }
+
+        if value_type in ('list', 'tuple'):
+            length = int(h5obj.attrs['length'])
+            values = [
+                _read_value_from_hdf5(h5obj[str(i)], value_label)
+                for i in range(length)
+            ]
+            return values if value_type == 'list' else tuple(values)
+
+        errmsg = (f'Unsupported {value_label} group value_type '
+                  f'{value_type!r}.')
+        assert_msg_critical(False, errmsg)
+
+    if value_type == 'none':
+        return None
+
+    if value_type == 'str':
+        data = h5obj[()]
+        if isinstance(data, bytes):
+            return data.decode('utf-8')
+        return data.astype(str) if isinstance(data, np.ndarray) else str(data)
+
+    if value_type == 'bool':
+        return bool(h5obj[()])
+
+    if value_type == 'int':
+        return int(h5obj[()])
+
+    if value_type == 'float':
+        return float(h5obj[()])
+
+    if value_type == 'complex':
+        return complex(h5obj[()])
+
+    if value_type == 'ndarray':
+        data = np.array(h5obj)
+        if h5obj.attrs.get('array_data_type', None) == 'str':
+            return data.astype(str)
+        return data
+
+    if value_type is None:
+        data = np.array(h5obj)
+        if len(data.shape) == 1 and data.shape[0] == 1:
+            return data[0]
+        return data
+
+    errmsg = (f'Unsupported {value_label} dataset value_type '
+              f'{value_type!r}.')
+    assert_msg_critical(False, errmsg)
+
+
 def create_hdf5(fname, molecule, basis, dft_func_label, potfile_text):
     """
     Creates HDF5 file for a calculation.
@@ -195,7 +267,7 @@ def create_hdf5(fname, molecule, basis, dft_func_label, potfile_text):
         hf.close()
 
 
-def write_scf_results_to_hdf5(fname, scf_results, scf_history):
+def write_scf_results_to_hdf5(fname, scf_results):
     """
     Writes SCF results to HDF5 file.
 
@@ -203,8 +275,6 @@ def write_scf_results_to_hdf5(fname, scf_results, scf_history):
         Name of the HDF5 file.
     :param scf_results:
         The dictionary containing SCF results.
-    :param scf_history:
-        The list containing SCF history.
     """
 
     valid_checkpoint = (fname and isinstance(fname, str) and
@@ -224,17 +294,6 @@ def write_scf_results_to_hdf5(fname, scf_results, scf_history):
                                      key,
                                      value,
                                      value_label='SCF result')
-
-            if scf_history:
-                history_group = scf_group.create_group('scf_history')
-                history_group.attrs['value_type'] = 'dict'
-
-                keys = list(scf_history[0].keys())
-                for key in keys:
-                    data = np.array([step[key] for step in scf_history])
-                    dset = history_group.create_dataset(key, data=data)
-                    dset.attrs['value_type'] = 'ndarray'
-                    dset.attrs['array_data_type'] = str(data.dtype)
 
 
 def write_lr_rsp_results_to_hdf5(fname, rsp_results, group_label='rsp'):
@@ -326,7 +385,7 @@ def write_detach_attach_to_hdf5(fname,
         hf.close()
 
 
-def read_results(fname, label):
+def read_results_old(fname, label):
     """ Read the results dictionary from an HDF5 results file.
 
         :param fname:
@@ -407,6 +466,36 @@ def read_results(fname, label):
     h5f.close()
 
     return res_dict
+
+
+def read_results(fname, label):
+    """ Read a results dictionary from a specific HDF5 group.
+
+        This reader only reconstructs the content stored under ``label`` and
+        does not merge unrelated top-level file metadata into the returned
+        dictionary.
+
+        :param fname:
+            Name of the HDF5 file.
+        :param label:
+            The results dictionary label (scf, rsp, vib, opt, etc.).
+
+        :return:
+            the dictionary of results stored under the requested label.
+    """
+
+    valid_filename = (fname and isinstance(fname, str))
+    assert_msg_critical(valid_filename, f"{fname!r} is not a valid filename.")
+
+    file_exists = Path(fname).is_file()
+    assert_msg_critical(file_exists, f"{fname!r} does not exist.")
+
+    with h5py.File(fname, "r") as h5f:
+        label_found = (label in h5f)
+        assert_msg_critical(label_found,
+                            label + " section not found in the checkpoint file.")
+
+        return _read_value_from_hdf5(h5f[label], value_label='results')
 
 
 def read_molecule_and_basis(fname):
