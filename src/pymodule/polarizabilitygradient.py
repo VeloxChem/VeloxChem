@@ -2106,6 +2106,11 @@ class PolarizabilityGradient:
             for f, w in enumerate(self.frequencies):
                 polgrad_results[w] = num_polgradient[f]
 
+        # Restore SCF tensors and any filename-based HDF5 output to the
+        # original geometry after the displaced numerical evaluations.
+        scf_drv.compute(molecule, ao_basis)
+
+        if self.rank == mpi_master():
             valstr = '** Time spent on constructing the numerical gradient for '
             valstr += f'{n_freqs:d} frequencies: {(tm.time() - loop_start_time):.2f} sec **'
             self.ostream.print_info(valstr)

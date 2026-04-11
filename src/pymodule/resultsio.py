@@ -267,6 +267,39 @@ def create_hdf5(fname, molecule, basis, dft_func_label, potfile_text):
         hf.close()
 
 
+def write_results_to_hdf5(fname, label, results, value_label='result'):
+    """
+    Writes a group-local results dictionary to an HDF5 file.
+
+    :param fname:
+        Name of the HDF5 file.
+    :param label:
+        The HDF5 group label.
+    :param results:
+        The dictionary containing result data.
+    :param value_label:
+        A label used in serialization error messages.
+    """
+
+    valid_checkpoint = (fname and isinstance(fname, str) and
+                        Path(fname).is_file())
+
+    if valid_checkpoint:
+
+        with h5py.File(fname, 'a') as hf:
+            if label in hf:
+                del hf[label]
+
+            result_group = hf.create_group(label)
+            result_group.attrs['value_type'] = 'dict'
+
+            for key, value in results.items():
+                _write_value_to_hdf5(result_group,
+                                     key,
+                                     value,
+                                     value_label=value_label)
+
+
 def write_scf_results_to_hdf5(fname, scf_results):
     """
     Writes SCF results to HDF5 file.
@@ -277,23 +310,10 @@ def write_scf_results_to_hdf5(fname, scf_results):
         The dictionary containing SCF results.
     """
 
-    valid_checkpoint = (fname and isinstance(fname, str) and
-                        Path(fname).is_file())
-
-    if valid_checkpoint:
-
-        with h5py.File(fname, 'a') as hf:
-            if 'scf' in hf:
-                del hf['scf']
-
-            scf_group = hf.create_group('scf')
-            scf_group.attrs['value_type'] = 'dict'
-
-            for key, value in scf_results.items():
-                _write_value_to_hdf5(scf_group,
-                                     key,
-                                     value,
-                                     value_label='SCF result')
+    write_results_to_hdf5(fname,
+                          'scf',
+                          scf_results,
+                          value_label='SCF result')
 
 
 def write_opt_results_to_hdf5(fname, opt_results):
@@ -306,23 +326,10 @@ def write_opt_results_to_hdf5(fname, opt_results):
         The dictionary containing optimization results.
     """
 
-    valid_checkpoint = (fname and isinstance(fname, str) and
-                        Path(fname).is_file())
-
-    if valid_checkpoint:
-
-        with h5py.File(fname, 'a') as hf:
-            if 'opt' in hf:
-                del hf['opt']
-
-            opt_group = hf.create_group('opt')
-            opt_group.attrs['value_type'] = 'dict'
-
-            for key, value in opt_results.items():
-                _write_value_to_hdf5(opt_group,
-                                     key,
-                                     value,
-                                     value_label='optimization result')
+    write_results_to_hdf5(fname,
+                          'opt',
+                          opt_results,
+                          value_label='optimization result')
 
 
 def write_lr_rsp_results_to_hdf5(fname, rsp_results, group_label='rsp'):

@@ -63,6 +63,43 @@ class TestScfHessianDriver:
 
         task.finish()
 
+    @pytest.mark.timeconsuming
+    def test_numerical_vib_resets_final_h5_geometry(self, tmp_path):
+
+        here = Path(__file__).parent
+        inpfile = str(here / 'data' / 'water_hessian_scf.inp')
+
+        task = MpiTask([inpfile, None])
+
+        filename = str(tmp_path / 'water_vib_reset')
+        filename = task.mpi_comm.bcast(filename, root=mpi_master())
+
+        scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
+        scf_drv.acc_type = 'l2_c2diis'
+        scf_drv.filename = filename
+        scf_drv.compute(task.molecule, task.ao_basis)
+
+        vib_settings = {
+            'do_ir': 'yes',
+            'do_raman': 'yes',
+            'numerical_hessian': 'yes',
+            'numerical_raman': 'yes',
+            'filename': filename,
+        }
+        vibanalysis_drv = VibrationalAnalysis(scf_drv)
+        vibanalysis_drv.update_settings({}, vib_settings)
+        vibanalysis_drv.ostream.mute()
+        vibanalysis_drv.compute(task.molecule, task.ao_basis)
+
+        if task.mpi_rank == mpi_master():
+            with h5py.File(f'{filename}.h5', 'r') as h5f:
+                stored_coords = np.array(h5f.get('atom_coordinates'))
+
+            np.testing.assert_allclose(stored_coords,
+                                       task.molecule.get_coordinates_in_bohr())
+
+        task.finish()
+
     @pytest.mark.solvers
     def test_analytical_scf_hessian(self):
 

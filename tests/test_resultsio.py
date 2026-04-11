@@ -7,7 +7,8 @@ import numpy as np
 from veloxchem import (Molecule, MolecularBasis, OptimizationDriver, MpiTask,
                        OutputStream, ScfGradientDriver, ScfRestrictedDriver,
                        mpi_master)
-from veloxchem.resultsio import read_results, write_scf_results_to_hdf5
+from veloxchem.resultsio import (read_results, write_results_to_hdf5,
+                                 write_scf_results_to_hdf5)
 
 
 def _get_water_and_basis():
@@ -136,6 +137,38 @@ def test_write_scf_results_to_hdf5_stores_all_entries_with_metadata(tmp_path):
         assert history_group['0'].attrs['value_type'] == 'dict'
         assert history_group['0']['energy'].attrs['value_type'] == 'float'
         assert history_group['0']['gradient_norm'].attrs['value_type'] == 'float'
+
+
+def test_write_results_to_hdf5_stores_requested_group(tmp_path):
+
+    if MPI.COMM_WORLD.Get_rank() != mpi_master():
+        return
+
+    h5file = Path(tmp_path) / 'generic_results.h5'
+    with h5py.File(h5file, 'w') as h5f:
+        h5f.create_dataset('basis_set', data=np.bytes_(['def2-svp']))
+
+    vib_results = {
+        'frequencies': np.array([100.0, 200.0]),
+        'intensities': [0.1, 0.2],
+        'projected': True,
+    }
+
+    write_results_to_hdf5(str(h5file),
+                          'vib',
+                          vib_results,
+                          value_label='vibrational result')
+
+    with h5py.File(h5file, 'r') as h5f:
+        assert 'vib' in h5f
+        assert h5f['vib'].attrs['value_type'] == 'dict'
+        assert 'basis_set' in h5f
+
+    recovered = read_results(str(h5file), 'vib')
+    np.testing.assert_allclose(recovered['frequencies'],
+                               vib_results['frequencies'])
+    assert recovered['intensities'] == vib_results['intensities']
+    assert recovered['projected'] is vib_results['projected']
 
 
 def test_read_results_roundtrips_only_requested_group(tmp_path):
