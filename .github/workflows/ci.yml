@@ -16,6 +16,7 @@ on:
       - feature-test
       - merge-test
       - restart-test
+      - chore-simplify-eigen-boost-finding
 
 jobs:
   vlx_ci:
@@ -59,20 +60,30 @@ jobs:
           source venv/bin/activate
           which python
           python -V
+          echo "=== Eigen and Boost ==="
+          git clone --depth 1 -b 3.4.0 https://gitlab.com/libeigen/eigen.git
+          cmake -Seigen -Bbuild -DCMAKE_INSTALL_PREFIX="$HOME/Software" &> /dev/null
+          cmake --build build --target install --parallel &> /dev/null
+          rm -rf eigen build
+          git clone https://github.com/boostorg/boost.git -b boost-1.90.0 boost_src --depth 1
+          cd boost_src
+          git submodule update --depth 1 -q --init tools/boostdep
+          git submodule update --depth 1 -q --init libs/math
+          python tools/boostdep/depinst/depinst.py -X test -g "--depth 1" math
+          cmake -S. -Bbuild -DBUILD_SHARED_LIBS=ON -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$HOME/Software" &> /dev/null
+          cmake --build build --target install --parallel &> /dev/null
+          cd ..
+          rm -rf boost_src
           echo "=== Python dependencies ==="
           python -m pip install --upgrade pip setuptools wheel
           CC=gcc MPICC=mpicc python -m pip install mpi4py --no-binary=mpi4py
           CC=gcc CXX=g++ python -m pip install MDAnalysis
           git config --global --add safe.directory $PWD
-          git clone -b 3.4.0 https://gitlab.com/libeigen/eigen.git
-          git clone -b boost-1.90.0 https://github.com/boostorg/math.git boost-math
-          export EIGEN_INCLUDE_DIR=$(pwd)/eigen
-          export BOOST_INCLUDE_DIR=$(pwd)/boost-math/include
-          CXX=g++ python -m pip install git+https://github.com/VeloxChem/PyFraME.git
+          EIGEN_INCLUDE_DIR=$HOME/Software/include/eigen3 CXX=g++ python -m pip install git+https://github.com/VeloxChem/PyFraME.git
           python -m pip install dftd4 xtb
           python -m pip install openmm rdkit pymbar
           echo "=== VeloxChem build ==="
-          export CMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH:/usr/local
+          export CMAKE_PREFIX_PATH=$HOME/Software:/usr/local:$CMAKE_PREFIX_PATH
           SKBUILD_CONFIGURE_OPTIONS="-DCMAKE_CXX_COMPILER=g++" \
             python -m pip install -v .[test,qmmm]
           echo "=== VeloxChem test ==="
