@@ -31,12 +31,107 @@
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from pathlib import Path
+import numbers
 import numpy as np
 import h5py
 
 from .errorhandler import assert_msg_critical
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
+
+
+def _write_value_to_hdf5(parent, key, value, value_label='HDF5 value'):
+    """
+    Writes a Python value to HDF5 with metadata for future round-tripping.
+
+    Supported values are ``None``, strings, booleans, numbers, NumPy arrays,
+    dictionaries, and list/tuple containers composed of supported values.
+
+    :param parent:
+        The parent HDF5 group.
+    :param key:
+        The dataset/group name.
+    :param value:
+        The value to write.
+    :param value_label:
+        A label used in error messages for the serialized value domain.
+    """
+
+    string_type = h5py.string_dtype(encoding='utf-8')
+
+    if value is None:
+        dset = parent.create_dataset(key, shape=(0,), dtype=string_type)
+        dset.attrs['value_type'] = 'none'
+        return
+
+    if isinstance(value, str):
+        dset = parent.create_dataset(key, data=value, dtype=string_type)
+        dset.attrs['value_type'] = 'str'
+        return
+
+    if isinstance(value, (bytes, np.bytes_)):
+        dset = parent.create_dataset(key,
+                                     data=np.bytes_(value.decode('utf-8')
+                                                    if isinstance(value, bytes)
+                                                    else value.decode('utf-8')))
+        dset.attrs['value_type'] = 'str'
+        return
+
+    if isinstance(value, dict):
+        group = parent.create_group(key)
+        group.attrs['value_type'] = 'dict'
+        for child_key, child_value in value.items():
+            _write_value_to_hdf5(group, child_key, child_value, value_label)
+        return
+
+    if isinstance(value, (list, tuple)):
+        group = parent.create_group(key)
+        group.attrs['value_type'] = ('list'
+                                     if isinstance(value, list) else 'tuple')
+        group.attrs['length'] = len(value)
+        for idx, item in enumerate(value):
+            _write_value_to_hdf5(group, str(idx), item, value_label)
+        return
+
+    if isinstance(value, np.ndarray):
+        if value.dtype.kind in ('U', 'S', 'O'):
+            assert_msg_critical(
+                value.dtype.kind != 'O' or all(isinstance(x, str)
+                                               for x in value.flat),
+                f'Unsupported object array for {value_label} key {key!r}.')
+            dset = parent.create_dataset(key, data=value.astype(str),
+                                         dtype=string_type)
+            dset.attrs['value_type'] = 'ndarray'
+            dset.attrs['array_data_type'] = 'str'
+        else:
+            dset = parent.create_dataset(key, data=value)
+            dset.attrs['value_type'] = 'ndarray'
+            dset.attrs['array_data_type'] = str(value.dtype)
+        return
+
+    if isinstance(value, (np.bool_, bool)):
+        dset = parent.create_dataset(key, data=bool(value))
+        dset.attrs['value_type'] = 'bool'
+        return
+
+    if isinstance(value, numbers.Integral):
+        dset = parent.create_dataset(key, data=int(value))
+        dset.attrs['value_type'] = 'int'
+        return
+
+    if isinstance(value, numbers.Real):
+        dset = parent.create_dataset(key, data=float(value))
+        dset.attrs['value_type'] = 'float'
+        return
+
+    if isinstance(value, numbers.Complex):
+        dset = parent.create_dataset(key, data=complex(value))
+        dset.attrs['value_type'] = 'complex'
+        return
+
+    errmsg = (f'Unsupported {value_label} type for key {key!r}: '
+              f'{type(value)!r}')
+    assert_msg_critical(False, errmsg)
 
 
 def create_hdf5(fname, molecule, basis, dft_func_label, potfile_text):
@@ -117,32 +212,29 @@ def write_scf_results_to_hdf5(fname, scf_results, scf_history):
 
     if valid_checkpoint:
 
-        hf = h5py.File(fname, 'a')
+        with h5py.File(fname, 'a') as hf:
+            if 'scf' in hf:
+                del hf['scf']
 
-        scf_group = hf.create_group('scf')
+            scf_group = hf.create_group('scf')
+            scf_group.attrs['value_type'] = 'dict'
 
-        keys = ['S'] + [
-            f'{x}_{y}' for x in ['C', 'E', 'occ', 'D', 'F']
-            for y in ['alpha', 'beta']
-        ]
-        for key in keys:
-            if key in scf_results:
-                scf_group.create_dataset(key, data=scf_results[key])
+            for key, value in scf_results.items():
+                _write_value_to_hdf5(scf_group,
+                                     key,
+                                     value,
+                                     value_label='SCF result')
 
-        scf_group.create_dataset('dipole_moment',
-                                 data=scf_results['dipole_moment'])
+            if scf_history:
+                history_group = scf_group.create_group('scf_history')
+                history_group.attrs['value_type'] = 'dict'
 
-        scf_group.create_dataset('scf_type',
-                                 data=np.bytes_([scf_results['scf_type']]))
-        scf_group.create_dataset('scf_energy',
-                                 data=np.array([scf_results['scf_energy']]))
-
-        keys = list(scf_history[0].keys())
-        for key in keys:
-            data = np.array([step[key] for step in scf_history])
-            scf_group.create_dataset(f'scf_history_{key}', data=data)
-
-        hf.close()
+                keys = list(scf_history[0].keys())
+                for key in keys:
+                    data = np.array([step[key] for step in scf_history])
+                    dset = history_group.create_dataset(key, data=data)
+                    dset.attrs['value_type'] = 'ndarray'
+                    dset.attrs['array_data_type'] = str(data.dtype)
 
 
 def write_lr_rsp_results_to_hdf5(fname, rsp_results, group_label='rsp'):
