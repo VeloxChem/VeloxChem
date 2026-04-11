@@ -44,6 +44,7 @@ from .outputstream import OutputStream
 from .distributedarray import DistributedArray
 from .linearsolver import LinearSolver
 from .errorhandler import assert_msg_critical
+from .resultsio import write_results_to_hdf5
 
 try:
     import matplotlib.pyplot as plt
@@ -711,29 +712,24 @@ class ComplexResponseSolverBase(LinearSolver):
         Writes the results of a linear response calculation to HDF5 file.
         """
 
-        if fname and isinstance(fname, str):
-            hf = h5py.File(fname, 'a')
+        h5_rsp_results = dict(rsp_results)
 
-            xlabel = self.group_label + '/frequencies'
-            if xlabel in hf:
-                del hf[xlabel]
-            hf.create_dataset(xlabel, data=rsp_results['frequencies'])
+        spectrum = self.get_spectrum(rsp_results, 'au')
 
-            spectrum = self.get_spectrum(rsp_results, 'au')
+        if spectrum is not None:
+            y_data = np.array(spectrum['y_data'])
 
-            if spectrum is not None:
-                y_data = np.array(spectrum['y_data'])
+            if self.property == 'absorption':
+                assert_msg_critical(
+                    '[a.u.]' in spectrum['y_label'],
+                    f'{type(self).__name__}.write_cpp_rsp_results_to_hdf5: '
+                    + 'In valid unit in y_label')
+                h5_rsp_results['sigma'] = y_data
+            elif self.property == 'ecd':
+                h5_rsp_results['delta-epsilon'] = y_data
 
-                if self.property == 'absorption':
-                    assert_msg_critical(
-                        '[a.u.]' in spectrum['y_label'],
-                        f'{type(self).__name__}.write_cpp_rsp_results_to_hdf5: '
-                        + 'In valid unit in y_label')
-                    ylabel = self.group_label + '/sigma'
-                elif self.property == 'ecd':
-                    ylabel = self.group_label + '/delta-epsilon'
-                if ylabel in hf:
-                    del hf[ylabel]
-                hf.create_dataset(ylabel, data=y_data)
-
-            hf.close()
+        write_results_to_hdf5(fname,
+                              self.group_label,
+                              h5_rsp_results,
+                              value_label='response result',
+                              replace_group=False)

@@ -7,6 +7,7 @@ import numpy as np
 from veloxchem import (Molecule, MolecularBasis, OptimizationDriver, MpiTask,
                        OutputStream, ScfGradientDriver, ScfRestrictedDriver,
                        mpi_master)
+from veloxchem.cppsolver import ComplexResponseSolver
 from veloxchem.lreigensolver import LinearResponseEigenSolver
 from veloxchem.resultsio import (read_results, write_results_to_hdf5,
                                  write_scf_results_to_hdf5)
@@ -47,6 +48,45 @@ def _run_water_rsp_roundtrip(tmp_path, solver_cls):
     rsp_drv.max_subspace_dim = 10
     if solver_cls is LinearResponseEigenSolver:
         rsp_drv.esa = True
+    rsp_results = rsp_drv.compute(molecule, basis, scf_results)
+
+    return rsp_drv, rsp_results, base + '.h5'
+
+
+def _run_cpp_rsp_roundtrip(tmp_path):
+
+    xyz_string = """6
+    xyz
+    O -3.42904  1.55532  0.01546
+    C -1.99249  1.74379  0.02665
+    H -1.74709  2.74160  0.44749
+    H -1.59636  1.67836 -1.00861
+    H -1.51398  0.95881  0.64937
+    H -3.84726  2.33620 -0.34927
+    """
+
+    molecule = Molecule.read_xyz_string(xyz_string)
+    basis = MolecularBasis.read(molecule, 'def2-svp', ostream=None)
+    base = str(Path(tmp_path) / 'cppsolver')
+
+    scf_drv = ScfRestrictedDriver()
+    scf_drv.ostream.mute()
+    base = scf_drv.comm.bcast(base, root=mpi_master())
+    scf_drv.filename = base
+    scf_drv.xcfun = 'hf'
+    scf_drv.acc_type = 'l2_c2diis'
+    scf_results = scf_drv.compute(molecule, basis)
+
+    rsp_drv = ComplexResponseSolver()
+    rsp_drv.ostream.mute()
+    rsp_drv.filename = base
+    rsp_drv.property = 'absorption'
+    rsp_drv.frequencies = [0.39]
+    rsp_drv.damping = 0.02
+    rsp_drv.non_equilibrium_solv = False
+    rsp_drv.ri_auxiliary_basis = 'def2-universal-jfit'
+    rsp_drv.conv_thresh = 1.0e-5
+    rsp_drv.max_iter = 120
     rsp_results = rsp_drv.compute(molecule, basis, scf_results)
 
     return rsp_drv, rsp_results, base + '.h5'
@@ -345,6 +385,43 @@ def test_read_results_roundtrips_rpa_rsp_and_preserves_legacy_solution_vectors(
             recovered['S2'],
             rsp_drv.get_full_solution_vector(
                 rsp_results['eigenvectors_distributed'][1]))
+
+
+def test_read_results_roundtrips_cpp_rsp_and_preserves_legacy_solution_vectors(
+        tmp_path):
+
+    rsp_drv, rsp_results, h5file = _run_cpp_rsp_roundtrip(tmp_path)
+
+    if MPI.COMM_WORLD.Get_rank() == mpi_master():
+        recovered = read_results(h5file, 'rsp')
+
+        assert 'solutions' not in recovered
+
+        expected_rsp = {key: value for key, value in rsp_results.items()
+                        if key != 'solutions'}
+        spectrum = rsp_drv.get_spectrum(rsp_results, 'au')
+        expected_rsp['sigma'] = np.array(spectrum['y_data'])
+
+        recovered_solution_keys = {
+            key
+            for key in recovered
+            if key not in expected_rsp
+        }
+        expected_solution_keys = {
+            f'{aop}_{bop}_{w:.8f}'
+            for (aop, bop, w) in rsp_results['response_functions']
+        }
+
+        assert recovered_solution_keys == expected_solution_keys
+        _assert_roundtrip_equal(expected_rsp,
+                                {key: value for key, value in recovered.items()
+                                 if key in expected_rsp})
+
+        for key in rsp_results['solutions']:
+            full_vec = rsp_drv.get_full_solution_vector(
+                rsp_results['solutions'][key])
+            flat_key = f'{key[0]}_{key[0]}_{key[1]:.8f}'
+            np.testing.assert_allclose(recovered[flat_key], full_vec)
 
 
 def test_scf_results_hdf5_roundtrip_with_water_calculation(tmp_path):

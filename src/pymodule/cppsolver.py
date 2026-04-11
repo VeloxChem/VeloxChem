@@ -601,8 +601,13 @@ class ComplexResponseSolver(ComplexResponseSolverBase):
 
                     # write spectrum to h5 file
                     if final_h5_fname is not None:
+                        h5_ret_dict = {
+                            key: value
+                            for key, value in ret_dict.items()
+                            if key != 'solutions'
+                        }
                         self.write_cpp_rsp_results_to_hdf5(
-                            final_h5_fname, ret_dict)
+                            final_h5_fname, h5_ret_dict)
 
                     return ret_dict
                 else:
