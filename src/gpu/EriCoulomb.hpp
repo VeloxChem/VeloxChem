@@ -2253,6 +2253,42 @@ computeCoulombFockDDDD4_FP32(double*         mat_J,
                        const uint32_t* screen_cut_ij_tile);
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
+computeCoulombFockDDDD34_FP32(double*         mat_J,
+                       const float*    d_prim_info_f,
+                       const uint32_t  d_prim_count,
+                       const float*    dd_mat_D_f,
+                       const uint32_t* dd_first_inds_local,
+                       const uint32_t* dd_second_inds_local,
+                       const float*    dd_pair_data_local_f,
+                       const uint32_t  dd_prim_pair_count_local,
+                       const uint32_t* dd_first_inds,
+                       const uint32_t* dd_second_inds,
+                       const float*    dd_pair_data_f,
+                       const uint32_t  dd_prim_pair_count,
+                       const float*    boys_func_table_f,
+                       const float*    boys_func_ft_f,
+                       const uint32_t* prec_cut_ij_tile,
+                       const uint32_t* screen_cut_ij_tile);
+
+__global__ void __launch_bounds__(TILE_SIZE_J)
+computeCoulombFockDDDD34_FP32_scalarized(double*         mat_J,
+                       const float*    d_prim_info_f,
+                       const uint32_t  d_prim_count,
+                       const float*    dd_mat_D_f,
+                       const uint32_t* dd_first_inds_local,
+                       const uint32_t* dd_second_inds_local,
+                       const float*    dd_pair_data_local_f,
+                       const uint32_t  dd_prim_pair_count_local,
+                       const uint32_t* dd_first_inds,
+                       const uint32_t* dd_second_inds,
+                       const float*    dd_pair_data_f,
+                       const uint32_t  dd_prim_pair_count,
+                       const float*    boys_func_table_f,
+                       const float*    boys_func_ft_f,
+                       const uint32_t* prec_cut_ij_tile,
+                       const uint32_t* screen_cut_ij_tile);
+
+__global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD5(double*         mat_J,
                        const double*   d_prim_info,
                        const uint32_t  d_prim_count,
@@ -3154,6 +3190,42 @@ computeCoulombFockDDDD21_FP64(double*         mat_J,
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD21_FP32(double*         mat_J,
+                       const float*    d_prim_info_f,
+                       const uint32_t  d_prim_count,
+                       const float*    dd_mat_D_f,
+                       const uint32_t* dd_first_inds_local,
+                       const uint32_t* dd_second_inds_local,
+                       const float*    dd_pair_data_local_f,
+                       const uint32_t  dd_prim_pair_count_local,
+                       const uint32_t* dd_first_inds,
+                       const uint32_t* dd_second_inds,
+                       const float*    dd_pair_data_f,
+                       const uint32_t  dd_prim_pair_count,
+                       const float*    boys_func_table_f,
+                       const float*    boys_func_ft_f,
+                       const uint32_t* prec_cut_ij_tile,
+                       const uint32_t* screen_cut_ij_tile);
+
+__global__ void __launch_bounds__(TILE_SIZE_J)
+computeCoulombFockDDDD21_FP32_scalarized(double*         mat_J,
+                       const float*    d_prim_info_f,
+                       const uint32_t  d_prim_count,
+                       const float*    dd_mat_D_f,
+                       const uint32_t* dd_first_inds_local,
+                       const uint32_t* dd_second_inds_local,
+                       const float*    dd_pair_data_local_f,
+                       const uint32_t  dd_prim_pair_count_local,
+                       const uint32_t* dd_first_inds,
+                       const uint32_t* dd_second_inds,
+                       const float*    dd_pair_data_f,
+                       const uint32_t  dd_prim_pair_count,
+                       const float*    boys_func_table_f,
+                       const float*    boys_func_ft_f,
+                       const uint32_t* prec_cut_ij_tile,
+                       const uint32_t* screen_cut_ij_tile);
+
+__global__ void __launch_bounds__(TILE_SIZE_J)
+computeCoulombFockDDDD21_FP32_shared_staged(double*         mat_J,
                        const float*    d_prim_info_f,
                        const uint32_t  d_prim_count,
                        const float*    dd_mat_D_f,
