@@ -73,7 +73,6 @@ def _init_worker(z_matrix, impes_dict, sym_dict, sym_datapoints, cluster_banks, 
     os.environ["OPENBLAS_NUM_THREADS"] = "1"
     
     driver = InterpolationDriver(z_matrix)
-    driver.use_symmetry = bool(sym_datapoints)
     driver.update_settings(impes_dict)
     driver.symmetry_information = sym_dict
     driver.qm_symmetry_data_points = sym_datapoints
@@ -85,7 +84,7 @@ def _init_worker(z_matrix, impes_dict, sym_dict, sym_datapoints, cluster_banks, 
         driver.rotor_cluster_information = None
     driver.impes_coordinate.inv_sqrt_masses = dps[0].inv_sqrt_masses
     driver.impes_coordinate.eq_bond_lengths = dps[0].eq_bond_lengths
-    driver.distance_thrsh = 1000
+
     driver.exponent_p = exponent_p_q[0]
     driver.exponent_q = exponent_p_q[1]
     driver.print = False
@@ -213,8 +212,13 @@ class AlphaOptimizer:
         self._pool = ProcessPoolExecutor(
             max_workers=(n_workers or os.cpu_count() or 2),
             initializer=_init_worker,
-            initargs=(z_matrix, impes_dict, sym_dict, sym_datapoints, self.cluster_banks, dps, self.idx, exponent_p_q, self.beta, self.e_x, self.structures, self.qm_e, self.qm_g_flat),
+            initargs=(
+                z_matrix, impes_dict, sym_dict, sym_datapoints, self.cluster_banks,
+                dps, self.idx, exponent_p_q, self.beta, self.e_x,
+                self.structures, self.qm_e, self.qm_g_flat,
+            )
         )
+
         self._cache_key = None
         self._cache_grad = None
         self._cache_metrics = None
@@ -230,11 +234,9 @@ class AlphaOptimizer:
         # Build per-structure payloads with only structure index + alpha vector.
         payloads = [(i, alphas_arr) for i in range(self.S)]
 
-        # Choose a decent chunksize to lower IPC overhead:
-        chunksize = max(1, math.ceil(self.S / (4 * (self._pool._max_workers or 1))))
-
-        # Map in parallel; compute BOTH loss and grad and cache the summed grad
+        chunksize = max(1, math.ceil(self.S / (4 * self._pool._max_workers)))
         futs = self._pool.map(_eval_structure, payloads, chunksize=chunksize)
+
         sum_loss = 0.0
         sum_grad = np.zeros(self.M, dtype=np.float64)
         sum_energy = 0.0

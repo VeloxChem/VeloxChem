@@ -26,15 +26,8 @@ from contextlib import redirect_stderr
 from io import StringIO
 import numpy as np
 import h5py
-import sys
-import scipy
 from time import time
-from .profiler import Profiler
-import multiprocessing as mp
-from mpi4py import MPI
 
-
-from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
 from .inputparser import (parse_input, print_keywords, print_attributes)
 
@@ -76,7 +69,7 @@ class InterpolationDatapoint:
           cosine of radians (dihedral angles).
     """
 
-    def __init__(self, z_matrix=None, atom_labels=None, comm=None, ostream=None):
+    def __init__(self, z_matrix=None, atom_labels=None):
         """
         Initializes the InterpolationDatapoint object.
 
@@ -107,7 +100,6 @@ class InterpolationDatapoint:
         self.inv_sqrt_masses = None
 
         self.b_matrix = None
-        self.switching_value = []
 
         # copy of Willson B matrix in r and phi
         # (needed for converting the b2_matrix in 1/r and/or cos(phi)).
@@ -120,31 +112,33 @@ class InterpolationDatapoint:
         self.eq_bond_symmetry_mode = "masked_exact"  # "masked_exact" | "symmetrized"
         self.use_cosine_dihedral = False
         self.use_vectorized_b_matrix = True
-        self.validate_vectorized_b_matrix = False
-        self.vectorized_b_matrix_check_atol = 1.0e-12
-        self.vectorized_b_matrix_check_rtol = 1.0e-10
         self.use_vectorized_internal_coordinates_values = True
-        self.validate_vectorized_internal_coordinates_values = False
-        self.vectorized_internal_coordinates_values_check_atol = 1.0e-12
-        self.vectorized_internal_coordinates_values_check_rtol = 1.0e-10
         self.identify_imp_int_coord = True
-        self.NAC = False
         self.eq_bond_lengths = None
         
         # internal_coordinates is a list of geomeTRIC objects which represent
         # different types of internal coordinates (distances, angles, dihedrals)
         self.internal_coordinates = None
         self.imp_int_coordinates = []
+        # symmetry permutation masks used to evaluate equivalent coordinate orderings
         self.mapping_masks = None
 
         # rotor set up
+        # shared family key linking the core datapoint with all derived symmetry/cluster states
         self.family_label = None
+        # role of this datapoint in its family bank: core, symmetry, or cluster
         self.bank_role = "core"
+        # cluster identifier if this datapoint belongs to a rotor-cluster state bank
         self.cluster_id = None
+        # cluster category used by clustered interpolation logic
         self.cluster_type = None
+        # rotor IDs participating in the assigned cluster state
         self.cluster_rotor_ids = None
+        # state index inside the cluster angle library for this datapoint
         self.cluster_state_id = 0
+        # concrete dihedral definitions rotated to construct this geometry
         self.dihedrals_to_rotate = None
+        # optional precomputed phase signature for cluster-state matching
         self.phase_signature = None
 
         # internal_coordinates_values is a numpy array with the values of the
@@ -154,14 +148,6 @@ class InterpolationDatapoint:
         self.internal_coordinates_values = None
         self.cartesian_coordinates = None
         self._b_matrix_row_cache = None
-
-        # baysian block
-        self.prec_matrix = None
-        self.low_trig_chol_prec_matrix = None
-        self.rhs = None
-        self.post_mean = None
-        self.sigma2 = None
-        self.lambda_inv = None
 
         self._input_keywords = {
             'im_settings': {
@@ -304,79 +290,6 @@ class InterpolationDatapoint:
         )
         return eq_values
 
-    def calculate_b_matrix_legacy(self):
-        """
-        Legacy Wilson B-matrix construction used for validation/reference.
-        """
-        assert_msg_critical(self.internal_coordinates is not None, 'InterpolationDatapoint: No internal coordinates are defined.')
-        assert_msg_critical(self.cartesian_coordinates is not None, 'InterpolationDatapoint: No cartesian coordinates are defined.')
-
-        n_atoms = self.cartesian_coordinates.shape[0]
-        coords = self.cartesian_coordinates.reshape((n_atoms * 3))
-
-        self.b_matrix = np.zeros((len(self.z_matrix), n_atoms * 3))
-        # self.b_matrix = np.zeros((len(self.internal_coordinates), n_atoms * 3))
-        if self.use_inverse_bond_length or self.use_cosine_dihedral or self.use_eq_bond_length:
-            self.original_b_matrix = np.zeros((len(self.z_matrix), n_atoms * 3))
-            # self.original_b_matrix = np.zeros((len(self.internal_coordinates), n_atoms * 3))
-        else:
-            self.original_b_matrix = None
-
-        prev_dihedral = None
-        for i, z in enumerate(self.z_matrix):
-            q = self.internal_coordinates[i]
-            derivative = q.derivative(coords).reshape(-1)
-
-            if len(z) == 2 and self.use_inverse_bond_length:
-                r = q.value(coords)
-                r_inv_2 = 1.0 / (r * r)
-                self.b_matrix[i, :derivative.shape[0]] = -r_inv_2 * derivative
-
-                self.original_b_matrix[i, :derivative.shape[0]] = derivative
-
-            elif len(z) == 2 and self.use_eq_bond_length:
-                r = q.value(coords)
-                r_e = self.eq_bond_lengths[i]
-                # r_deriv_2 = 4.0 * r_e / (r + r_e)**2
-                # f = np.tanh((r - r_e)/0.4)
-                r_deriv_2 = np.exp(-0.4 * (r - r_e))
-
-                self.b_matrix[i, :derivative.shape[0]] = r_deriv_2 * derivative
-
-                self.original_b_matrix[i, :derivative.shape[0]] = derivative
-
-            elif len(z) == 4 and self.use_cosine_dihedral:
-                if prev_dihedral != z:
-                    prev_dihedral = z
-                    phi = q.value(coords)
-                    phi_dev_1 = -1.0 * np.sin(phi)
-
-                    self.b_matrix[i, :derivative.shape[0]] = phi_dev_1 * derivative
-
-                    self.original_b_matrix[i, :derivative.shape[0]] = derivative
-
-                else:
-                    phi = q.value(coords)
-                    phi_dev_1 = np.cos(phi)
-
-                    self.b_matrix[i, :derivative.shape[0]] = phi_dev_1 * derivative
-
-                    self.original_b_matrix[i, :derivative.shape[0]] = derivative
-
-            else:
-                self.b_matrix[i, :derivative.shape[0]] = derivative
-                if self.use_inverse_bond_length or self.use_eq_bond_length:
-                    self.original_b_matrix[i] = derivative
-
-        if self.inv_sqrt_masses is not None:
-            self.b_matrix = self.b_matrix * self.inv_sqrt_masses
-            if self.use_inverse_bond_length or self.use_eq_bond_length:
-                self.original_b_matrix = self.original_b_matrix
-
-            # self.b_matrix[i] = derivative
-        # self.b_matrix = self.b_matrix * self.inv_sqrt_masses[np.newaxis, :]
-        # self.original_b_matrix = self.original_b_matrix * self.inv_sqrt_masses[np.newaxis, :]
-
     def _calculate_b_matrix_vectorized(self):
         """
         Vectorized Wilson B-matrix construction.
@@ -420,7 +333,6 @@ class InterpolationDatapoint:
                 _, dq_dr, _ = self._switched_bond_transform(
                     bond_values, eq_values, eps_inner=0.005, eps_outer=0.01)
                 row_scale[bond_rows] = dq_dr
-                # print(dq_dr)
 
         if self.use_cosine_dihedral:
             dihedral_rows = row_cache['dihedral_rows']
@@ -440,94 +352,11 @@ class InterpolationDatapoint:
             if self.use_inverse_bond_length or self.use_eq_bond_length:
                 self.original_b_matrix = self.original_b_matrix
 
-    def _validate_vectorized_b_matrix_against_legacy(self):
-        """
-        Verifies vectorized B-matrix against legacy implementation.
-        """
-        check = self.compare_b_matrix_implementations(
-            atol=self.vectorized_b_matrix_check_atol,
-            rtol=self.vectorized_b_matrix_check_rtol)
-
-        if not check['all_close']:
-            raise ValueError(
-                'InterpolationDatapoint: Vectorized B-matrix validation failed '
-                f"(b_max_abs_diff={check['b_matrix_max_abs_diff']:.3e}, "
-                f"original_b_max_abs_diff={check['original_b_matrix_max_abs_diff']:.3e}).")
-
-    def compare_b_matrix_implementations(self, atol=1.0e-12, rtol=1.0e-10):
-        """
-        Compares vectorized and legacy B-matrix implementations.
-
-        :return:
-            Dictionary containing pass/fail flags and maximum absolute diffs.
-        """
-
-        previous_use_vectorized = self.use_vectorized_b_matrix
-        previous_validate_vectorized = self.validate_vectorized_b_matrix
-
-        self.use_vectorized_b_matrix = True
-        self.validate_vectorized_b_matrix = False
-        self._calculate_b_matrix_vectorized()
-        vectorized_b_matrix = self.b_matrix.copy()
-        vectorized_original_b = (
-            None if self.original_b_matrix is None else self.original_b_matrix.copy()
-        )
-
-        self.calculate_b_matrix_legacy()
-        legacy_b_matrix = self.b_matrix.copy()
-        legacy_original_b = (
-            None if self.original_b_matrix is None else self.original_b_matrix.copy()
-        )
-
-        b_close = bool(np.allclose(vectorized_b_matrix, legacy_b_matrix, atol=atol, rtol=rtol))
-        b_max_abs_diff = float(np.max(np.abs(vectorized_b_matrix - legacy_b_matrix)))
-
-        if vectorized_original_b is None and legacy_original_b is None:
-            original_available = True
-            original_close = True
-            original_max_abs_diff = 0.0
-        elif vectorized_original_b is None or legacy_original_b is None:
-            original_available = False
-            original_close = False
-            original_max_abs_diff = float('inf')
-        else:
-            original_available = True
-            original_close = bool(
-                np.allclose(vectorized_original_b, legacy_original_b, atol=atol, rtol=rtol))
-            original_max_abs_diff = float(
-                np.max(np.abs(vectorized_original_b - legacy_original_b)))
-
-        self.use_vectorized_b_matrix = previous_use_vectorized
-        self.validate_vectorized_b_matrix = previous_validate_vectorized
-        if previous_use_vectorized:
-            self.b_matrix = vectorized_b_matrix
-            self.original_b_matrix = vectorized_original_b
-        else:
-            self.b_matrix = legacy_b_matrix
-            self.original_b_matrix = legacy_original_b
-
-        return {
-            'b_matrix_close': b_close,
-            'b_matrix_max_abs_diff': b_max_abs_diff,
-            'original_b_matrix_available': original_available,
-            'original_b_matrix_close': original_close,
-            'original_b_matrix_max_abs_diff': original_max_abs_diff,
-            'all_close': bool(b_close and original_close),
-        }
-
     def calculate_b_matrix(self):
         """
         Calculates the Wilson B-matrix.
         """
-
-        if not self.use_vectorized_b_matrix:
-            self.calculate_b_matrix_legacy()
-            return
-
         self._calculate_b_matrix_vectorized()
-
-        if self.validate_vectorized_b_matrix:
-            self._validate_vectorized_b_matrix_against_legacy()
 
 
     def calculate_b2_matrix(self):
@@ -615,7 +444,6 @@ class InterpolationDatapoint:
                 self.inv_sqrt_masses.reshape(1, -1, 1) *
                 self.inv_sqrt_masses.reshape(1,  1, -1))
 
-            # self.b2_matrix[i] = second_derivative
                
     def transform_gradient_to_internal_coordinates(self, tol=1e-6):
         """
@@ -883,53 +711,6 @@ class InterpolationDatapoint:
         self.internal_gradient = None
         self.internal_hessian = None
 
-    def compute_internal_coordinates_values_legacy(self):
-        """
-        Legacy internal-coordinate value evaluation.
-        """
-
-        assert_msg_critical(
-            self.internal_coordinates is not None,
-            'InterpolationDatapoint: No internal coordinates are defined.')
-
-        assert_msg_critical(
-            self.cartesian_coordinates is not None,
-            'InterpolationDatapoint: No cartesian coordinates are defined.')
-
-        n_atoms = self.cartesian_coordinates.shape[0]
-        coords = self.cartesian_coordinates.reshape((n_atoms * 3))
-
-        int_coords = []
-        prev_dihedral = None
-  
-        for idx, q in enumerate(self.internal_coordinates):
-            
-            if (isinstance(q, geometric.internal.Distance) and
-                    self.use_inverse_bond_length):
-                int_coords.append(1.0 / q.value(coords))
-    
-            elif (isinstance(q, geometric.internal.Distance) and
-                    self.use_eq_bond_length):
-                
-                # int_coords.append((2.0 * (q.value(coords) - self.eq_bond_lengths[idx]) / (q.value(coords) + self.eq_bond_lengths[idx])))
-                int_coords.append((1.0 - np.exp(-0.4 * (q.value(coords) - self.eq_bond_lengths[idx]))) / 0.4)
-                
-            elif (isinstance(q, geometric.internal.Dihedral) and
-                  self.use_cosine_dihedral):
-                
-                if prev_dihedral != q:
-                    prev_dihedral = q 
-                    int_coords.append(np.cos(q.value(coords)))
-                else:
-                       
-                    int_coords.append(np.sin(q.value(coords)))
-            else:
-                int_coords.append((q.value(coords)))
-
-        # internal_coordinates_values contains the values of the
-        # internal_coordinates geomeTRIC objects
-        self.internal_coordinates_values = np.array(int_coords)
-
     def _compute_internal_coordinates_values_vectorized(self):
         """
         Vectorized internal-coordinate value evaluation.
@@ -1013,17 +794,10 @@ class InterpolationDatapoint:
         dL = np.ones_like(r_arr)
         d2L = np.zeros_like(r_arr)
 
-        # L = np.square(r_eq_arr) * (1.0 / r_arr - 1.0 / r_eq_arr)
-        # dL = -np.square(r_eq_arr) / np.square(r_arr)
-        # d2L = np.square(r_eq_arr) * 2.0 / np.power(r_arr, 3)
 
         R = - np.square(r_eq_arr) * (1.0 / r_arr - 1.0 / r_eq_arr)
         dR = np.square(r_eq_arr) / np.square(r_arr)
         d2R = -np.square(r_eq_arr) * 2.0 / np.power(r_arr, 3)
-
-        # R = (1.0 / r_arr)
-        # dR = -1.0 / np.square(r_arr)
-        # d2R = 2.0 / np.power(r_arr, 3)
 
         x = np.log(r_arr / r_eq_arr)
         y = np.square(x)
@@ -1060,19 +834,10 @@ class InterpolationDatapoint:
         d2s[mask_outer] = 0.0
 
         q = s * L + (1.0 - s) * R
-        # print(q)
+
         dq_dr = ds * (L - R) + s * dL + (1.0 - s) * dR
         d2q_dr2 = d2s * (L - R) + 2.0 * ds * (dL - dR) + s * d2L + (1.0 - s) * d2R
 
-        # print("r =", r)
-        # print("x =", x)
-        # print("y =", y)
-        # print("s =", s)
-        # print("ds_dr =", ds)
-        # print("L =", L)
-        # print("R =", R)
-        # print("L-R =", L-R)
-        # print("dq_dr =", dq_dr)
         if scalar_input:
             return float(q[0]), float(dq_dr[0]), float(d2q_dr2[0])
 
@@ -1305,70 +1070,15 @@ class InterpolationDatapoint:
         return self.build_current_chart_with_eq(eq_masked)
 
 
-    def compare_internal_coordinate_value_implementations(self, atol=1.0e-12, rtol=1.0e-10):
-        """
-        Compares vectorized and legacy internal-coordinate value evaluation.
-
-        :return:
-            Dictionary containing pass/fail flags and maximum absolute diff.
-        """
-
-        previous_use_vectorized = self.use_vectorized_internal_coordinates_values
-        previous_validate_vectorized = self.validate_vectorized_internal_coordinates_values
-
-        self.use_vectorized_internal_coordinates_values = True
-        self.validate_vectorized_internal_coordinates_values = False
-        self._compute_internal_coordinates_values_vectorized()
-        vectorized_values = self.internal_coordinates_values.copy()
-
-        self.compute_internal_coordinates_values_legacy()
-        legacy_values = self.internal_coordinates_values.copy()
-
-        close = bool(np.allclose(vectorized_values, legacy_values, atol=atol, rtol=rtol))
-        max_abs_diff = float(np.max(np.abs(vectorized_values - legacy_values)))
-        
-        self.use_vectorized_internal_coordinates_values = previous_use_vectorized
-        self.validate_vectorized_internal_coordinates_values = previous_validate_vectorized
-        self.internal_coordinates_values = (
-            vectorized_values if previous_use_vectorized else legacy_values
-        )
-
-        return {
-            'internal_coordinates_close': close,
-            'internal_coordinates_max_abs_diff': max_abs_diff,
-            'all_close': close,
-        }
-
-    def _validate_vectorized_internal_coordinate_values_against_legacy(self):
-        """
-        Verifies vectorized internal-coordinate values against legacy implementation.
-        """
-
-        check = self.compare_internal_coordinate_value_implementations(
-            atol=self.vectorized_internal_coordinates_values_check_atol,
-            rtol=self.vectorized_internal_coordinates_values_check_rtol)
-        # print(check)
-        if not check['all_close']:
-            raise ValueError(
-                'InterpolationDatapoint: Vectorized internal-coordinate value '
-                'validation failed '
-                f"(max abs diff={check['internal_coordinates_max_abs_diff']:.3e}).")
 
     def compute_internal_coordinates_values(self):
         """
         Creates an array with the values of the internal coordinates
         and saves it in self.
         """
-
-        if not self.use_vectorized_internal_coordinates_values:
-            self.compute_internal_coordinates_values_legacy()
-            return
-
         self._compute_internal_coordinates_values_vectorized()
 
-        if self.validate_vectorized_internal_coordinates_values:
-            self._validate_vectorized_internal_coordinate_values_against_legacy()
-
+    
     def get_z_matrix_as_np_arrays(self):
 
         zmat = self.z_matrix_dict
@@ -1731,74 +1441,6 @@ class InterpolationDatapoint:
         distance_vector = (reference_coordinates - rotated_coordinates)
 
         return distance_vector
-    
-    def determine_trust_radius(self, molecule, interpolation_settings, dynamics_settings, label, key, allowed_deviation, symmetry_groups=[]):
-        from .imdatabasepointcollecter import IMDatabasePointCollecter
-        from scipy.stats import pearsonr
-        forcefield_generator = MMForceFieldGenerator()
-        dynamics_settings['trajectory_file'] = f'trajectory_single_point.pdb'
-        
-        forcefield_generator.create_topology(molecule)
-            
-        im_database_driver = IMDatabasePointCollecter()
-        im_database_driver.distance_thrsh = 0.1
-        im_database_driver.platform = 'CUDA'
-        im_database_driver.optimize = False
-        im_database_driver.system_from_molecule(molecule, self.z_matrix, forcefield_generator, solvent=dynamics_settings['solvent'], qm_atoms='all', trust_radius=True)  
-        desiered_point_density = 100
-
-        im_database_driver.density_around_data_point = [desiered_point_density, key]
-
-        im_database_driver.allowed_molecule_deviation = allowed_deviation
-       
-        im_database_driver.update_settings(dynamics_settings, interpolation_settings)
-        im_database_driver.expansion = False
-        im_database_driver.qm_data_points = [self]
-        im_database_driver.im_labels = [label]
-        im_database_driver.non_core_symmetry_groups = symmetry_groups
-        im_database_driver.run_qmmm()
-
-        # individual impes run objects
-        
-        self.molecules = im_database_driver.molecules
-
-        expansion_molecules = im_database_driver.expansion_molecules
-        
-        sorted_expansion_list = sorted(expansion_molecules, key=lambda x: x[1], reverse=True)
-        # Printing neatly
-        # Renaming molecules to "Molecule 1", "Molecule 2", etc.
-        sorted_data_with_labels = [(f"Molecule {i+1}", v1, v2, v3) for i, (mol, v1, v2, v3) in enumerate(sorted_expansion_list)]
-
-        # Printing neatly
-        print(f"{'Molecule':<15} {'delta E':<10} {'RMSD (distance)':<10} {'|r|':<10}")
-        print("="*50)
-        for molecule, value1, value2, value3 in sorted_data_with_labels:
-            print(f"{molecule:<15} {value1:<10.6f} {value2:<10.6f} {value3:<10.6f}")
-
-        # Extract the delta E (energy difference) and norm (|r|) values from the data
-        deltaE = [value1 for _, value1, _, _ in sorted_data_with_labels]
-        norm_distance = [value3 for _, _, _, value3 in sorted_data_with_labels]
-        if len(deltaE) > 1:
-            # Calculate Pearson correlation using scipy
-            corr_coef_scipy, p_value = pearsonr(deltaE, norm_distance)
-            print("Pearson correlation coefficient (scipy):", corr_coef_scipy)
-            print("p-value:", p_value)
-            
-            trust_radius = 0.5
-            if corr_coef_scipy <= 0:
-                trust_radius = 0.01
-            # Define boundaries:
-            else:
-                min_trust = 0.01  # trust radius when r=0
-                max_trust = 0.5   # trust radius when r=1
-                # Linear interpolation:
-                trust_radius = min_trust + corr_coef_scipy * (max_trust - min_trust)
-        else:
-            trust_radius = 0.5
-
-        print('Trust Radius', trust_radius)
-                
-        return trust_radius
 
     def remove_point_from_hdf5(self, fname, label, use_inverse_bond_length=False, use_cosine_dihedral=False, use_eq_bond_length=False):
         """

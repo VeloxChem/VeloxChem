@@ -39,30 +39,19 @@ from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
 
 try:
-    from xtb.interface import Calculator as XtbCalculator
-    from xtb.utils import get_method as xtb_get_method
+    from tblite.interface import Calculator as TBLiteCalculator
+    _TBLITE_AVAILABLE = True
 except ImportError:
-    pass
+    TBLiteCalculator = None
+    _TBLITE_AVAILABLE = False
 
 
 class XtbDriver:
     """
-    Implements XTB driver.
-
-    :param comm:
-        The MPI communicator.
-    :param ostream:
-        The output stream.
-
-    Instance variables
-        - flag: The driver flag.
+    Implements xTB driver using tblite backend.
     """
 
     def __init__(self, comm=None, ostream=None):
-        """
-        Initializes XTB driver.
-        """
-
         if comm is None:
             comm = MPI.COMM_WORLD
 
@@ -78,6 +67,9 @@ class XtbDriver:
 
         self.ostream = ostream
         self.roots = 0
+
+        # keep the old user-facing style for compatibility
+        # accepted examples: 'gfn1', 'gfn2', 'ipea1'
         self.xtb_method = 'gfn2'
 
         self._xtb_calc = None
@@ -86,106 +78,101 @@ class XtbDriver:
     @staticmethod
     def is_available():
         """
-        Returns if XTB driver is available.
+        Returns if tblite backend is available.
         """
+        return _TBLITE_AVAILABLE
 
-        return ('xtb' in sys.modules)
+    def _tblite_method_string(self):
+        """
+        Map legacy veloxchem method labels to tblite method names.
+        """
+        method = self.xtb_method.strip().lower()
+
+        mapping = {
+            'gfn1': 'GFN1-xTB',
+            'gfn2': 'GFN2-xTB',
+            'ipea1': 'IPEA1-xTB',
+            'gfn1-xtb': 'GFN1-xTB',
+            'gfn2-xtb': 'GFN2-xTB',
+            'ipea1-xtb': 'IPEA1-xTB',
+        }
+
+        errmsg = f'XtbDriver: Unsupported xTB method "{self.xtb_method}".'
+        assert_msg_critical(method in mapping, errmsg)
+
+        return mapping[method]
 
     def set_method(self, xtb_method):
-        """
-        Sets XTB method.
-        """
-
         if self.rank == mpi_master():
             self.xtb_method = xtb_method
 
     def get_method(self):
-        """
-        Gets XTB method.
-        """
-
         if self.rank == mpi_master():
             return self.xtb_method
-        else:
-            return None
+        return None
 
     def get_energy(self):
-        """
-        Gets XTB energy.
-        """
-
         if self.rank == mpi_master() and self._xtb_res is not None:
-            return self._xtb_res.get_energy()
-        else:
-            return None
+            return self._xtb_res.get("energy")
+        return None
 
     def get_gradient(self):
-        """
-        Gets XTB gradient.
-        """
-
         if self.rank == mpi_master() and self._xtb_res is not None:
-            return self._xtb_res.get_gradient()
-        else:
-            return None
+            return self._xtb_res.get("gradient")
+        return None
 
     def get_dipole(self):
-        """
-        Gets XTB dipole.
-        """
-
         if self.rank == mpi_master() and self._xtb_res is not None:
-            return self._xtb_res.get_dipole()
-        else:
-            return None
+            return self._xtb_res.get("dipole")
+        return None
 
     def compute(self, molecule):
         """
-        Performs XTB calculation.
-
-        :param molecule:
-            The molecule.
-
-        :return:
-            The results from XTB calculation.
+        Performs xTB calculation via tblite backend.
         """
 
-        # sanity check
-        errmsg = 'XtbDriver: xtb-python is not available. '
-        errmsg += 'Please install xtb-python.'
+        errmsg = 'XtbDriver: tblite-python is not available. Please install tblite-python.'
         assert_msg_critical(self.is_available(), errmsg)
 
-        identifiers = np.array(molecule.get_identifiers())
-        coords_in_au = molecule.get_coordinates_in_bohr()
-
-        self._xtb_calc = XtbCalculator(
-            xtb_get_method(self.xtb_method.upper() + '-xTB'), identifiers,
-            coords_in_au)
+        identifiers = np.array(molecule.get_identifiers(), dtype=np.int32)
+        coords_in_au = np.array(molecule.get_coordinates_in_bohr(), dtype=np.float64)
 
         if self.rank == mpi_master():
-
-            # set verbosity
-
-            if self.ostream.is_muted:
-                self._xtb_calc.set_verbosity('muted')
-            else:
-                self._xtb_calc.set_verbosity('full')
-
-            # run XTB calculation
-
             self.print_title()
+
+            charge = molecule.get_charge()
+            multiplicity = molecule.get_multiplicity()
+            uhf = max(multiplicity - 1, 0)
+
+            self._xtb_calc = TBLiteCalculator(
+                self._tblite_method_string(),
+                identifiers,
+                coords_in_au,
+                charge=charge,
+                uhf=uhf
+            )
+
+            # tblite verbosity is numeric in the Python API
+            # 0 = quiet/minimal, 1 = default printout
+            if self.ostream.is_muted:
+                self._xtb_calc.set("verbosity", 0)
+            else:
+                self._xtb_calc.set("verbosity", 1)
 
             self._xtb_res = self._xtb_calc.singlepoint()
 
-            # process results
+            # required quantities
+            energy = self._xtb_res.get("energy")
+            gradient = self._xtb_res.get("gradient")
 
-            energy = self._xtb_res.get_energy()
-            gradient = self._xtb_res.get_gradient()
-            dipole = self._xtb_res.get_dipole()
-            partial_charges = self._xtb_res.get_charges()
-            bond_orders = self._xtb_res.get_bond_orders()
-            orbital_energies = self._xtb_res.get_orbital_eigenvalues()
-            orbital_occupations = self._xtb_res.get_orbital_occupations()
+            # optional quantities: retrieve only if available in backend/result
+            result_dict = self._xtb_res.dict()
+
+            dipole = result_dict.get("dipole")
+            partial_charges = result_dict.get("charges")
+            bond_orders = result_dict.get("bond-orders")
+            orbital_energies = result_dict.get("orbital-energies")
+            orbital_occupations = result_dict.get("orbital-occupations")
 
             grad2 = np.sum(gradient**2, axis=1)
             rms_grad = np.sqrt(np.mean(grad2))
@@ -205,14 +192,9 @@ class XtbDriver:
 
             return xtb_results
 
-        else:
-            return None
+        return None
 
     def print_title(self):
-        """
-        Prints title for XTB calculation.
-        """
-
         self.ostream.print_blank()
         self.ostream.print_header('XTB Driver')
         self.ostream.print_header(12 * '=')
@@ -223,12 +205,7 @@ class XtbDriver:
         self.ostream.flush()
 
     def get_reference(self):
-        """
-        Gets reference string for XTB.
-        """
-
         ref_str = 'C. Bannwarth, E. Caldeweyher, S. Ehlert, '
         ref_str += 'A. Hansen, P. Pracht, J. Seibert, S. Spicher, S. Grimme, '
         ref_str += 'WIREs Comput. Mol. Sci., 2020, 11, e01493'
-
         return ref_str

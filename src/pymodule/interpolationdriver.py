@@ -24,32 +24,23 @@
 
 from tkinter import E
 from mpi4py import MPI
-import multiprocessing as mp
-from collections import Counter
-import os
-from concurrent.futures import ThreadPoolExecutor
 import numpy as np
-import math
-import random
 from time import time
-import torch
-import gpytorch
 from typing import List, Tuple, Dict, Any, Optional
 from scipy.optimize import linear_sum_assignment
-from scipy.linalg import cho_factor, cho_solve
 import sys
 from .profiler import Profiler
 import h5py
 from contextlib import redirect_stderr
 from io import StringIO
 from .interpolationdatapoint import InterpolationDatapoint
-from .atommapper import AtomMapper
+
 from .molecule import Molecule
 from .outputstream import OutputStream
 from .veloxchemlib import mpi_master
-from. veloxchemlib import hartree_in_kcalpermol, bohr_in_angstrom
+
 from .errorhandler import assert_msg_critical
-from .inputparser import (parse_input, print_keywords, print_attributes)
+from .inputparser import (parse_input)
 
 from .rotorclass import build_runtime_cluster_set
 
@@ -127,7 +118,6 @@ class InterpolationDriver():
         self.confidence_radius = 0.5
         self.alpha = 1.0
         
-        self.distance_thrsh = 2.0
         self.z_matrix = z_matrix
         self.impes_dict = None
         self.sum_of_weights = None
@@ -135,32 +125,31 @@ class InterpolationDriver():
         self.print = False
         self.store_weights = False
         self.perform_mapping = True
+        # symmetry metadata tuple produced during database-point generation
         self.symmetry_information = None
+        # global switch controlling symmetry-expanded candidate evaluation
         self.use_symmetry = True
         self.weights = {}
         self.int_coord_weights = {}
         self.potentials = []
         self.gradients = []
-        self.distance_molecule = None
-
-        self.external_weights = None
-
-        self.calc_hess = True        
-        
-        self.skip_first_check = 0
-        rng = np.random.default_rng(1)
-        self.A = rng.uniform(-1, 1, size=(3*4, 3*4))
 
         # kpoint file with QM data
         self.imforcefield_file = None
         self.qm_data_points = None
+        # per-label torsion descriptors used by symmetry-aware distance metrics
         self.symmetry_dihedral_lists = {}
+        # grouped datapoints: core label -> [core point, symmetry-expanded points...]
         self.qm_symmetry_data_points = {}
+        # legacy containers kept for backward-compatible symmetry workflows
         self.qm_symmetry_data_points_1 = None
         self.qm_symmetry_data_points_2 = None
 
+        # active rotor-cluster metadata for the current datapoint family
         self.rotor_cluster_information = None
+        # cached runtime masks/projectors derived from rotor_cluster_information
         self.rotor_cluster_runtime = None
+        # family_label -> {core point, cluster registry, expected states}
         self.qm_rotor_cluster_banks = {}
 
         # Confidence radii optimization information
@@ -189,8 +178,11 @@ class InterpolationDriver():
         self.runtime_profile_calls = 0
 
         # Optional runtime cache for symmetry-expanded task evaluation.
+        # enables reuse of flattened symmetry tasks across compute() calls
         self.runtime_data_cache_enabled = True
+        # invalidation flag for rebuilt symmetry task cache payload
         self._runtime_data_cache_dirty = True
+        # core-label keyed cache of (datapoint, mask0, mask) symmetry tasks
         self._symmetry_task_cache = {}
 
         self.mpi_preload_enabled = True
@@ -439,7 +431,7 @@ class InterpolationDriver():
 
     def _use_symmetry_for_label(self, dp_label):
         sym_list = (self.qm_symmetry_data_points or {}).get(dp_label, [])
-        return bool(self.use_symmetry and len(sym_list) > 1)
+        return bool(len(sym_list) > 1)
     
     def _get_datapoint_by_label(self, dp_label):
         for dp in (self.qm_data_points or []):
@@ -472,7 +464,6 @@ class InterpolationDriver():
                 'dihedral_end': int(dihedral_end),
             }
 
-        # Fallback for legacy datasets that rely on symmetry metadata.
         if self.symmetry_information is not None:
             dihedral_start = int(self.symmetry_information[-1][0])
             dihedral_end = int(self.symmetry_information[-1][1])
@@ -691,25 +682,6 @@ class InterpolationDriver():
                 best_d2, best_grad = d2, gd2
         return best_d2, best_grad
 
-    
-    # def _cluster_state_signature_metric(self, cluster_id, datapoint, org_int_coords):
-    #     masks = getattr(datapoint, "mapping_masks", None)
-
-    #     if masks is None or len(masks) == 0:
-    #         cur = self._build_cluster_signature(cluster_id, np.asarray(org_int_coords, dtype=np.float64))
-    #         ref = self._build_cluster_signature(cluster_id, np.asarray(datapoint.internal_coordinates_values, dtype=np.float64))
-    #         return self._cluster_signature_distance_and_gradient(cluster_id, cur, ref)
-
-    #     best_d2 = None
-    #     best_grad = None
-    #     for mask in np.asarray(masks, dtype=np.int64):
-    #         d2, gd2 = self._cluster_mask_signature_distance_and_gradient(
-    #             cluster_id=cluster_id, datapoint=datapoint, mask=mask, org_int_coords=org_int_coords
-    #         )
-    #         if best_d2 is None or d2 < best_d2:
-    #             best_d2, best_grad = d2, gd2
-    #     return best_d2, best_grad
-    
     def _cluster_signature_distance_and_gradient(self, cluster_id, current_signature, reference_signature, b_matrix=None):
         rows_by_rotor = self._get_cluster_signature_rows(cluster_id)
         if b_matrix is None:
@@ -738,32 +710,6 @@ class InterpolationDriver():
             grad_total /= n_groups
 
         return d2_total, grad_total
-
-
-    # def _cluster_signature_distance_and_gradient(self, cluster_id, current_signature, reference_signature):
-    #     rows_by_rotor = self._get_cluster_signature_rows(cluster_id)
-    #     ncart = self.impes_coordinate.b_matrix.shape[1]
-    #     d2_total = 0.0
-    #     grad_total = np.zeros(ncart, dtype=np.float64)
-    #     n_groups = len(rows_by_rotor)
-
-    #     for ridx, rows in enumerate(rows_by_rotor):
-    #         rows_arr = np.asarray(rows, dtype=np.int64)
-    #         brows = self.impes_coordinate.b_matrix[rows_arr, :]
-    #         sig_c = np.asarray(current_signature[ridx], dtype=np.float64)
-    #         sig_r = np.asarray(reference_signature[ridx], dtype=np.float64)
-    #         delta = sig_c - sig_r
-    #         terms = 2.0 * (1.0 - np.cos(delta))
-    #         d2_r = float(np.mean(terms))
-    #         grad_r = np.mean(2.0 * np.sin(delta)[:, None] * brows, axis=0)
-    #         d2_total += d2_r
-    #         grad_total += grad_r
-
-    #     if n_groups > 0:
-    #         d2_total /= n_groups
-    #         grad_total /= n_groups
-
-    #     return d2_total, grad_total
     
     def _evaluate_masked_cluster_state(self, cluster_id, datapoint, projector, org_int_coords, base_cache=None):
         masks = datapoint.mapping_masks
@@ -818,46 +764,6 @@ class InterpolationDriver():
             + np.tensordot(np.asarray(masked_E, dtype=np.float64), grad_weights, axes=1)
         )
         return state_E, state_G
-
-
-    # def _evaluate_masked_cluster_state(self, cluster_id, datapoint, projector, org_int_coords):
-    #     masks = datapoint.mapping_masks
-    #     if masks is None or len(masks) == 0:
-    #         masks = [np.arange(len(datapoint.internal_coordinates_values), dtype=np.int64)]
-
-    #     masked_E = []
-    #     masked_G = []
-    #     raw = []
-    #     raw_grad = []
-
-    #     for mask in masks:
-    #         E_m, G_m = self._restricted_taylor_eval_for_mask(
-    #             datapoint=datapoint,
-    #             mask=np.asarray(mask, dtype=np.int64),
-    #             projector=projector,
-    #             org_int_coords=org_int_coords,
-    #         )
-
-    #         d2_m, grad_d2_m = self._cluster_mask_signature_distance_and_gradient(
-    #             cluster_id=cluster_id,
-    #             datapoint=datapoint,
-    #             mask=np.asarray(mask, dtype=np.int64),
-    #             org_int_coords=org_int_coords,
-    #         )
-
-    #         w_m, grad_w_m = self._normalize_symmetry_candidate_weight(d2_m, grad_d2_m)
-    #         masked_E.append(E_m)
-    #         masked_G.append(G_m)
-    #         raw.append(w_m)
-    #         raw_grad.append(grad_w_m)
-
-    #     weights, grad_weights = self._normalize_mask_weight_pool(raw, raw_grad)
-    #     state_E = np.dot(weights, np.asarray(masked_E, dtype=np.float64))
-    #     state_G = (
-    #         np.tensordot(weights, np.asarray(masked_G, dtype=np.float64), axes=1)
-    #         + np.tensordot(np.asarray(masked_E, dtype=np.float64), grad_weights, axes=1)
-    #     )
-    #     return state_E, state_G
     
     def _cluster_mask_signature_distance_and_gradient(
         self,
@@ -890,26 +796,6 @@ class InterpolationDriver():
         return self._cluster_signature_distance_and_gradient(
             cluster_id, cur_sig, ref_sig, b_matrix=b_eval
         )
-
-    
-    # def _cluster_mask_signature_distance_and_gradient(
-    #     self,
-    #     *,
-    #     cluster_id,
-    #     datapoint,
-    #     mask,
-    #     org_int_coords,
-    # ):
-    #     """
-    #     Signature distance between current structure and one mask-specific
-    #     candidate view of a stored cluster state.
-    #     """
-    #     mask = np.asarray(mask, dtype=np.int64)
-    #     cur_sig = self._build_cluster_signature(cluster_id, np.asarray(org_int_coords, dtype=np.float64))
-    #     ref_masked = np.asarray(datapoint.internal_coordinates_values, dtype=np.float64)[mask]
-    #     ref_sig = self._build_cluster_signature(cluster_id, ref_masked)
-    #     return self._cluster_signature_distance_and_gradient(cluster_id, cur_sig, ref_sig)
-
 
     def _normalize_symmetry_candidate_weight(
         self,
@@ -1008,60 +894,6 @@ class InterpolationDriver():
             dihedral_start=dstart,
             dihedral_end=dend,
         )
-
-
-    # def _restricted_taylor_eval_for_mask(
-    #     self,
-    #     *,
-    #     datapoint,
-    #     mask,
-    #     projector,
-    #     org_int_coords,
-    # ):
-    #     """
-    #     Evaluate one symmetry-masked candidate of a stored datapoint in a
-    #     projector-restricted subspace (core + cluster).
-    #     """
-    #     mask = np.asarray(mask, dtype=np.int64)
-    #     n_ic = len(datapoint.internal_coordinates_values)
-    #     mask0 = np.arange(n_ic, dtype=np.int64)
-
-    #     grad_eff = np.asarray(datapoint.internal_gradient, dtype=np.float64).copy()
-    #     hess_eff = np.asarray(datapoint.internal_hessian, dtype=np.float64).copy()
-    #     ref_masked = np.asarray(datapoint.internal_coordinates_values, dtype=np.float64)[mask]
-
-    #     # Same remapping logic as legacy symmetry Taylor evaluation.
-    #     grad_eff[mask0] = grad_eff[mask]
-    #     hess_eff[np.ix_(mask0, mask0)] = hess_eff[np.ix_(mask, mask)]
-
-    #     bounds = self._get_internal_coordinate_partitions()
-    #     dstart = int(bounds["dihedral_start"])
-    #     dend = int(bounds["dihedral_end"])
-
-    #     org_eval = np.asarray(org_int_coords, dtype=np.float64)
-    #     b_eval = np.asarray(self.impes_coordinate.b_matrix, dtype=np.float64)
-
-    #     if self.impes_coordinate.use_eq_bond_length:
-    #         org_eval, b_eval = self._candidate_current_chart(
-    #             symmetry_data_point=datapoint,
-    #             mask=mask,
-    #             org_int_coords=org_eval,
-    #             b_matrix=b_eval,
-    #         )
-
-    #     return self._restricted_taylor_eval(
-    #         energy=float(datapoint.energy),
-    #         grad=grad_eff,
-    #         hess=hess_eff,
-    #         ref_coords=ref_masked,
-    #         org_int_coords=org_eval,
-    #         b_matrix=b_eval,
-    #         projector=np.asarray(projector, dtype=np.float64),
-    #         dihedral_start=dstart,
-    #         dihedral_end=dend,
-    #     )
-
-
 
     def _restricted_taylor_eval(
         self,
@@ -1203,65 +1035,6 @@ class InterpolationDriver():
         weights = raw / S
         grad_weights = (raw_grad * S - raw[:, None, None] * sum_grad) / (S**2)
         return weights, grad_weights, populated
-
-
-    # def _compute_cluster_weights(self, cluster_id, cluster_bank, org_int_coords):
-    #     current_signature = self._build_cluster_signature(cluster_id, org_int_coords)
-    #     populated = [
-    #     (sid, dp) for sid, dp in sorted(cluster_bank["expected_states"].items())
-    #     if dp is not None
-    #     ]
-
-    #     natm = self.impes_coordinate.cartesian_coordinates.shape[0]
-    #     if len(populated) == 0:
-    #         return (
-    #             np.zeros((0,), dtype=np.float64),
-    #             np.zeros((0, natm, 3), dtype=np.float64),
-    #             [],
-    #         )
-
-    #     raw = []
-    #     raw_grad = []
-
-    #     # for dp in populated:
-    #         # reference_signature = self._build_cluster_signature(
-    #         #     cluster_id,
-    #         #     dp.internal_coordinates_values,
-    #         # )
-    #         # d2_i, grad_d2_i = self._cluster_signature_distance_and_gradient(
-    #         #     cluster_id,
-    #         #     current_signature,
-    #         #     reference_signature,
-    #         # )
-
-    #     for sid, dp in populated:
-
-    #         d2_i, grad_d2_i = self._cluster_state_signature_metric(cluster_id, dp, org_int_coords)
-
-    #         rho2 = 1.0
-    #         x = d2_i / rho2 + 1.0e-12
-    #         w_i = 1.0 / (2.0 * x**2)
-    #         dw_dd2 = -(2.0 / (2.0 * rho2)) * x**(-3)
-    #         grad_w_i = dw_dd2 * grad_d2_i
-
-    #         raw.append(w_i)
-    #         raw_grad.append(grad_w_i.reshape(natm, 3))
-
-    #     raw = np.asarray(raw, dtype=np.float64)
-    #     raw_grad = np.asarray(raw_grad, dtype=np.float64)
-
-    #     S = raw.sum()
-    #     if S < 1.0e-14:
-    #         idx = int(np.argmax(raw))
-    #         weights = np.zeros_like(raw)
-    #         weights[idx] = 1.0
-    #         grad_weights = np.zeros_like(raw_grad)
-    #         return weights, grad_weights, populated
-
-    #     sum_grad = raw_grad.sum(axis=0)
-    #     weights = raw / S
-    #     grad_weights = (raw_grad * S - raw[:, None, None] * sum_grad) / (S**2)
-    #     return weights, grad_weights, populated
     
     def _compute_potential_clustered(self, data_point, org_int_coords):
         family_label = data_point.family_label or data_point.point_label
@@ -1348,113 +1121,6 @@ class InterpolationDriver():
                     f"(shepard={shep:.6f}s, {100.0 * shep / total:.1f}% )"
                 )
 
-    def simple_interpolation(self):
-        """Performs a simple interpolation.
-
-        :param qm_data_points:
-            A list of InterpolationDatapoint corresponding to configurations
-            to be used for interpolation (which have been calculated
-            quantum mechanically).
-        """
-
-        natms = self.impes_coordinate.cartesian_coordinates.shape[0]
-
-        sum_weights = 0.0
-        potentials = []
-        gradients = []
-        weights = []
-        weight_gradients = []
-        sum_weight_gradients = np.zeros((natms, 3))
-
-        distances_and_gradients = []
-        min_distance = float('inf')
-        self.time_step_reducer = False
-        
-        org_internal_coordinates = self.impes_coordinate.internal_coordinates_values.copy()
-        org_b_matrix = self.impes_coordinate.b_matrix.copy()
-        org_mask = np.arange(len(self.impes_coordinate.z_matrix))
-
-        z_matrix_dict = { tuple(sorted(element)): i 
-                  for i, element in enumerate(self.impes_coordinate.z_matrix) }
-
-        # Determine weights, weight gradients,
-        # energy values, and energy gradients for interpolation
-        for i, data_point in enumerate(self.qm_data_points[:2]):
-            
-            distance, weight_gradient, _, swapped = self.cartesian_distance(data_point)
-
-            if abs(distance) < min_distance:
-                min_distance = abs(distance)
-
-            distances_and_gradients.append((distance, i, weight_gradient, swapped))
-
-        # min_distance, distances_and_gradients = self.process_in_parallel()
-
-        used_labels = []
-        close_distances = [
-            (self.qm_data_points[index], distance, wg, index, swapped_tuple) 
-            for distance, index, wg, swapped_tuple in distances_and_gradients 
-            if abs(distance) <= min_distance + self.distance_thrsh]
-        for qm_data_point, distance, weight_grad, label_idx, swapped_tuple_obj in close_distances:
-            new_coordintes = False
-            reordered_int_coord_values = org_internal_coordinates.copy()
-            mask = []
-            org_b_matrix_cp = org_b_matrix.copy()
-            if swapped_tuple_obj is not None:
-                for i, element in enumerate(self.impes_coordinate.z_matrix):
-                    # Otherwise, reorder the element
-                    reordered_element = [swapped_tuple_obj[3].get(x, x) for x in element]
-                    key = tuple(sorted(reordered_element))
-                    z_mat_index = z_matrix_dict.get(key)
-                    mask.append(z_mat_index)
-                    # print(z_mat_index, key, element)
-                    reordered_int_coord_values[i] = (float(org_internal_coordinates[z_mat_index]))
-                
-                org_b_matrix_cp[org_mask] = org_b_matrix[mask]
-                org_b_matrix_cp = org_b_matrix_cp.reshape(len(self.impes_coordinate.z_matrix), len(self.molecule.get_labels()), 3)
-                org_b_matrix_cp = org_b_matrix_cp[:, swapped_tuple_obj[1], :]
-                org_b_matrix_cp = org_b_matrix_cp.reshape(len(self.impes_coordinate.z_matrix), len(self.molecule.get_labels()) * 3)
-                # print('reordered internal coordinates', reordered_int_coord_values)
-                new_coordintes = True
-            weight = 1.0 / (distance**(2 * self.exponent_p))
-            used_labels.append(label_idx)
-            sum_weights += weight
-            sum_weight_gradients += weight_grad
-
-            potential = self.compute_potential(qm_data_point, reordered_int_coord_values)
-            gradient = self.compute_gradient(qm_data_point, swapped_tuple_obj, reordered_int_coord_values, org_b_matrix_cp)
-            gradients.append(gradient)
-            potentials.append(potential)
-            weights.append(weight)
-            self.potentials.append(potential)
-            weight_gradients.append(weight_grad)
-            if new_coordintes:
-                # print('B-matrix', self.impes_coordinate.internal_coordinates_values, '\n org B-Matrix \n', org_internal_coordinates)
-                # print('\n difference B-matrix', np.linalg.norm(self.impes_coordinate.b_matrix[:, :] - org_b_matrix_cp[:, :]))
-                # print('\n ', np.linalg.norm(np.array(reordered_int_coord_values) - np.array(self.impes_coordinate.internal_coordinates_values)))
-                self.impes_coordinate.internal_coordinates_values = org_internal_coordinates
-                self.impes_coordinate.b_matrix = org_b_matrix
-
-        # Perform the interpolation and save the result in
-        # self.impes_coordinate.energy and self.impes_coordinate.gradient
-        self.impes_coordinate.energy = 0
-        self.impes_coordinate.gradient = np.zeros((natms, 3))
-        weights = np.array(weights, dtype=np.float64) / sum_weights
-        potentials = np.array(potentials, dtype=np.float64)
-        gradients = np.array(gradients, dtype=np.float64)
-        weight_gradients = np.array(weight_gradients, dtype=np.float64)
-
-        for i, weight_i in enumerate(weights):
-            self.int_coord_weight[self.labels[used_labels[i]]] = weight_i
-
-        self.impes_coordinate.energy = np.dot(weights, potentials)
-        self.impes_coordinate.gradient = (
-            np.tensordot(weights, gradients, axes=1) +
-            np.tensordot(potentials, weight_gradients, axes=1) / sum_weights -
-            self.impes_coordinate.energy * sum_weight_gradients / sum_weights)
-
-
-
     def shepard_interpolation(self):
         """Performs a simple interpolation.
 
@@ -1464,54 +1130,9 @@ class InterpolationDriver():
             quantum mechanically).
         """
         shepard_t0 = time()
-
-        def numerical_gradient(f, X, dp, eps=1e-6):
-            """
-            Compute numerical gradient of scalar function f(X) w.r.t. coordinates X.
-            
-            Parameters
-            ----------
-            f : callable
-                Function taking X (Nc,3) and returning scalar float.
-            X : ndarray
-                Coordinate array of shape (Nc,3).
-            eps : float
-                Finite difference step.
-            
-            Returns
-            -------
-            grad : ndarray
-                Numerical gradient with same shape as X.
-            """
-            grad = np.zeros_like(X, dtype=float)
-            grad_da_dw = np.zeros_like(X, dtype=float)
-
-            Nc = X.shape[0]
-            for a in range(Nc):
-                for mu in range(3):
-                    dX = np.zeros_like(X)
-                    dX[a, mu] = eps
-                    current_geometry_plus = X + dX
-                    self.define_impes_coordinate(current_geometry_plus)
-                    _, _, denominator_p, _, _, _, dw_da_p, _ = f(dp)
-                    f_plus = 1.0 / denominator_p
-
-                    # f_plus, _, _  = f(dp, self.impes_coordinate.internal_coordinates_values)
-                    current_geometry_minus = X - dX
-                    self.define_impes_coordinate(current_geometry_minus)
-                    # f_minus, _, _  = f(dp, self.impes_coordinate.internal_coordinates_values)
-                    _, _, denominator_m, _, _, _, dw_da_m, _ = f(dp)
-                    f_minus = 1.0 / denominator_m
-                    grad[a, mu] = (f_plus - f_minus) / (2 * eps)
-                    if self.calc_optim_trust_radius:
-                        grad_da_dw[a, mu] = (dw_da_p - dw_da_m) / (2 * eps)
-            
-            return grad, grad_da_dw
-        
-
+    
         natms = self.impes_coordinate.cartesian_coordinates.shape[0]
 
-        sum_weights_cart = 0.0
         potentials = []
         gradients = []
         hessian_error = []
@@ -1529,8 +1150,6 @@ class InterpolationDriver():
         masses_cart = np.repeat(masses, 3)
         sqrt_masses = np.sqrt(masses_cart)
 
-        sum_weight_gradients_cart = np.zeros((natms, 3))
-
         distances_and_gradients = []
         min_distance = float('inf')
         self.time_step_reducer = False
@@ -1541,18 +1160,8 @@ class InterpolationDriver():
 
         if self.weightfunction_type == 'cartesian':
             for i, data_point in enumerate(self.qm_data_points[:]):
-                # if i == 0:
-                #     continue
-                # data_point.confidence_radius = alphas[i]
-                if self.external_weights is not None:
-                    data_point.confidence_radius = self.external_weights[i]
-                distance, dihedral_dist, denominator, weight_gradient, distance_vec, _, _, dw_da_dx = self.cartesian_distance(data_point)
-                # if i < 2:
-                #     num_grad, num_grad_dw_da = numerical_gradient(self.cartesian_distance, self.molecule.get_coordinates_in_bohr(), data_point)
 
-                #     print('Grad_diff: ', i, '\n', num_grad, weight_gradient, num_grad - weight_gradient)
-                    
-                #     print('dw da grad', num_grad_dw_da, dw_da_dx, num_grad_dw_da - dw_da_dx)
+                distance, dihedral_dist, denominator, weight_gradient, distance_vec, _, _, dw_da_dx = self.cartesian_distance(data_point)
                 
                 
                 if abs(distance) < min_distance:
@@ -1561,40 +1170,12 @@ class InterpolationDriver():
 
         elif self.weightfunction_type == 'internal':
             for i, data_point in enumerate(self.qm_data_points[:]):
-                if self.external_weights is not None:
-                    data_point.confidence_radius = self.external_weights[i]
                 distance, dihedral_dist, denominator, weight_gradient, distance_vec, _, _, dw_da_dx = self.internal_distance(data_point)
 
                 if abs(distance) < min_distance:
                     min_distance = abs(distance)
                 distances_and_gradients.append((distance, dihedral_dist, i, denominator, weight_gradient, distance_vec))
 
-        elif self.weightfunction_type == 'cartesian-hessian':
-            for i, data_point in enumerate(self.qm_data_points[:]):
-                
-                distance, dihedral_dist, denominator, weight_gradient, distance_vec, _, _, dw_da_dx = self.cartesian_hessian_distance(data_point)
-
-                
-                # if i == 1:
-                    
-                    # num_grad, num_grad_dw_da = numerical_gradient(self.cartesian_hessian_distance, self.molecule.get_coordinates_in_bohr(), data_point)
-
-                    # print('Grad_diff: ', i, '\n', num_grad, weight_gradient, num_grad - weight_gradient)
-                    
-                    # print('dw da grad', num_grad_dw_da, dw_da_dx, num_grad_dw_da - dw_da_dx)
-                if abs(distance) < min_distance:
-                    min_distance = abs(distance)
-                distances_and_gradients.append((distance, dihedral_dist, i, denominator, weight_gradient, distance_vec))
-        
-        elif self.weightfunction_type == 'cartesian-hessian-combined':
-            for i, data_point in enumerate(self.qm_data_points[:]):
-                # if data_point.point_label != "point_3_rinv_dihedral":
-                #     continue
-                distance, dihedral_dist, denominator, weight_gradient, distance_vec, _, _, dw_da_dx = self.cartesian_hessian_combined_distance(data_point)
-
-                if abs(distance) < min_distance:
-                    min_distance = abs(distance)
-                distances_and_gradients.append((distance, dihedral_dist, i, denominator, weight_gradient, distance_vec))
         else:
             errtxt = "Unrecognized weight function type: "
             errtxt += self.weightfunction_type
@@ -1611,7 +1192,7 @@ class InterpolationDriver():
 
         eval_loop_t0 = time()
         compute_potential_acc = 0.0
-        for qm_data_point, distance, dihedral_dist, denominator_cart, weight_grad_cart, distance_vector, label_idx in close_distances:
+        for qm_data_point, distance, dihedral_dist, denominator_cart, weight_grad_cart, _, label_idx in close_distances:
             
             weight_cart = 1.0 / (denominator_cart)
 
@@ -1676,261 +1257,10 @@ class InterpolationDriver():
         # --- 4.  book-keeping (optional) ---------------------------------------------
         for lbl, Wi in zip(used_labels, W_i):
             self.weights[lbl] = Wi
-        # print('weights', self.weights)
-        # self.sum_of_weights      = W_i.sum()          # if you really need it later
+
         self.averaged_int_dist   = np.tensordot(W_i, averaged_int_dists, axes=1)
         self._add_runtime_timing('shepard.assembly', time() - assembly_t0)
         self._add_runtime_timing('shepard.total', time() - shepard_t0)
-
-    def shepard_interpolation_paral(self, max_workers=None):
-        """Performs Shepard interpolation with parallelized datapoint-distance evaluation.
-
-        This is intended as a comparison path against ``shepard_interpolation``.
-        """
-
-        natms = self.impes_coordinate.cartesian_coordinates.shape[0]
-
-        sum_weights_cart = 0.0
-        potentials = []
-        gradients = []
-        hessian_error = []
-        self.weights = {}
-        weights_cart = []
-        averaged_int_dists = []
-        weight_gradients_cart = []
-        used_labels = []
-        self.potentials = []
-        self.gradients = []
-        self.dw_dalpha_list = []
-        self.dw_dX_dalpha_list = []
-
-        masses = self.molecule.get_masses().copy()
-        masses_cart = np.repeat(masses, 3)
-        sqrt_masses = np.sqrt(masses_cart)
-
-        sum_weight_gradients_cart = np.zeros((natms, 3))
-        self.time_step_reducer = False
-        self.calc_optim_trust_radius = True
-
-        if self.external_weights is not None:
-            for i, data_point in enumerate(self.qm_data_points[:]):
-                data_point.confidence_radius = self.external_weights[i]
-
-        def evaluate_datapoint(index_data_point):
-            i, data_point = index_data_point
-            if self.weightfunction_type == 'cartesian':
-                distance, dihedral_dist, denominator, weight_gradient, distance_vec, _, dw_dalpha_i, dw_dX_dalpha_i = self.cartesian_distance(
-                    data_point, store_alpha_gradients=False)
-            elif self.weightfunction_type == 'internal':
-                distance, dihedral_dist, denominator, weight_gradient, distance_vec, _, dw_dalpha_i, dw_dX_dalpha_i = self.internal_distance(
-                    data_point, store_alpha_gradients=False)
-            elif self.weightfunction_type == 'cartesian-hessian':
-                distance, dihedral_dist, denominator, weight_gradient, distance_vec, _, dw_dalpha_i, dw_dX_dalpha_i = self.cartesian_hessian_distance(
-                    data_point, store_alpha_gradients=False)
-            else:
-                errtxt = "Unrecognized weight function type: "
-                errtxt += self.weightfunction_type
-                raise ValueError(errtxt)
-
-            return (i, distance, dihedral_dist, denominator, weight_gradient,
-                    distance_vec, dw_dalpha_i, dw_dX_dalpha_i)
-
-        def collect_distances_and_gradients():
-            min_distance = float('inf')
-            distances_and_gradients = []
-
-            datapoints = list(enumerate(self.qm_data_points[:]))
-            n_points = len(datapoints)
-
-            workers = max_workers
-            if workers is None:
-                workers = os.cpu_count() or 1
-            workers = max(1, min(workers, n_points))
-
-            if workers == 1 or n_points < 2:
-                results = [evaluate_datapoint(item) for item in datapoints]
-            else:
-                with ThreadPoolExecutor(max_workers=workers) as executor:
-                    results = list(executor.map(evaluate_datapoint, datapoints))
-
-            for i, distance, dihedral_dist, denominator, weight_gradient, distance_vec, dw_dalpha_i, dw_dX_dalpha_i in results:
-                if abs(distance) < min_distance:
-                    min_distance = abs(distance)
-                distances_and_gradients.append((distance, dihedral_dist, i, denominator, weight_gradient, distance_vec))
-
-                if self.calc_optim_trust_radius:
-                    self.dw_dalpha_list.append(dw_dalpha_i)
-                    if self.weightfunction_type in ('cartesian', 'internal'):
-                        dw_dX_dalpha_i_full = np.zeros((natms, 3))
-                        dw_dX_dalpha_i_full[self.symmetry_information[3]] = dw_dX_dalpha_i
-                        self.dw_dX_dalpha_list.append(dw_dX_dalpha_i_full)
-                    else:
-                        self.dw_dX_dalpha_list.append(dw_dX_dalpha_i)
-
-            return min_distance, distances_and_gradients
-
-        min_distance, distances_and_gradients = collect_distances_and_gradients()
-
-        close_distances = [
-            (self.qm_data_points[index], distance, dihedral_dist, denom, wg, distance_vec, index)
-            for distance, dihedral_dist, index, denom, wg, distance_vec in distances_and_gradients
-            if abs(distance) <= min_distance]
-
-        for qm_data_point, distance, dihedral_dist, denominator_cart, weight_grad_cart, distance_vector, label_idx in close_distances:
-            weight_cart = 1.0 / (denominator_cart)
-
-            sum_weights_cart += weight_cart
-            sum_weight_gradients_cart += weight_grad_cart
-
-            potential, gradient_mw, r_i = self.compute_potential_paral(
-                qm_data_point,
-                self.impes_coordinate.internal_coordinates_values,
-                max_workers=max_workers)
-            gradient = sqrt_masses * gradient_mw.reshape(-1)
-            gradient = gradient.reshape(gradient_mw.shape)
-            gradients.append(gradient)
-            averaged_int_dists.append(qm_data_point.internal_coordinates_values)
-
-            hessian_error.append(r_i)
-            potentials.append(potential)
-            used_labels.append(label_idx)
-            weights_cart.append(weight_cart)
-            self.potentials.append(potential)
-            self.gradients.append(gradient)
-            weight_gradients_cart.append(weight_grad_cart)
-
-        self.impes_coordinate.energy = 0.0
-        self.impes_coordinate.gradient = np.zeros((natms, 3))
-        self.impes_coordinate.NAC = np.zeros((natms, 3))
-
-        w_i = np.array(weights_cart, dtype=np.float64)
-        grad_w_i = np.array(weight_gradients_cart, dtype=np.float64)
-
-        S = w_i.sum()
-        sum_grad_w = grad_w_i.sum(axis=0)
-        self.sum_of_weights = S
-        self.sum_of_weights_grad = sum_grad_w
-
-        W_i = w_i / S
-        grad_W_i = (grad_w_i * S - w_i[:, None, None] * sum_grad_w) / S**2
-
-        potentials = np.array(potentials, dtype=np.float64)
-        gradients = np.array(gradients, dtype=np.float64)
-
-        self.impes_coordinate.energy = np.dot(W_i, potentials)
-        self.impes_coordinate.gradient = (
-            np.tensordot(W_i, gradients, axes=1) +
-            np.tensordot(potentials, grad_W_i, axes=1))
-
-        for lbl, Wi in zip(used_labels, W_i):
-            self.weights[lbl] = Wi
-        self.averaged_int_dist = np.tensordot(W_i, averaged_int_dists, axes=1)
-
-    def validate_shepard_parallel(
-        self,
-        molecule=None,
-        max_workers=None,
-        atol=1.0e-10,
-        rtol=1.0e-8,
-        restore_serial=True,
-    ):
-        """Validate serial vs parallel Shepard interpolation outputs.
-
-        Returns a dictionary with per-quantity differences and pass/fail flags.
-        """
-
-        def _copy_if_array(value):
-            return value.copy() if isinstance(value, np.ndarray) else value
-
-        def _copy_list_maybe_arrays(values):
-            return [_copy_if_array(v) for v in values]
-
-        if molecule is not None:
-            self.molecule = molecule
-            self.distance_molecule = Molecule.from_xyz_string(molecule.get_xyz_string())
-            self.define_impes_coordinate(molecule.get_coordinates_in_bohr())
-
-        if self.qm_data_points is None:
-            self.qm_data_points = self.read_qm_data_points()
-
-        if self.interpolation_type != 'shepard':
-            raise ValueError("validate_shepard_parallel requires interpolation_type='shepard'.")
-
-        self.shepard_interpolation()
-
-        serial_energy = float(self.impes_coordinate.energy)
-        serial_gradient = self.impes_coordinate.gradient.copy()
-        serial_nac = self.impes_coordinate.NAC.copy() if self.impes_coordinate.NAC is not None else None
-        serial_weights = dict(self.weights)
-        serial_sum_weights = float(self.sum_of_weights)
-        serial_sum_weights_grad = self.sum_of_weights_grad.copy()
-        serial_averaged_int_dist = self.averaged_int_dist.copy()
-        serial_potentials = _copy_list_maybe_arrays(self.potentials)
-        serial_gradients = _copy_list_maybe_arrays(self.gradients)
-        serial_dw_dalpha_list = _copy_list_maybe_arrays(self.dw_dalpha_list)
-        serial_dw_dX_dalpha_list = _copy_list_maybe_arrays(self.dw_dX_dalpha_list)
-
-        self.shepard_interpolation_paral(max_workers=max_workers)
-
-        parallel_energy = float(self.impes_coordinate.energy)
-        parallel_gradient = self.impes_coordinate.gradient.copy()
-        parallel_weights = dict(self.weights)
-        parallel_sum_weights = float(self.sum_of_weights)
-        parallel_sum_weights_grad = self.sum_of_weights_grad.copy()
-        parallel_averaged_int_dist = self.averaged_int_dist.copy()
-
-        all_weight_keys = sorted(set(serial_weights.keys()) | set(parallel_weights.keys()))
-        serial_weight_values = np.array([serial_weights.get(k, 0.0) for k in all_weight_keys], dtype=np.float64)
-        parallel_weight_values = np.array([parallel_weights.get(k, 0.0) for k in all_weight_keys], dtype=np.float64)
-
-        energy_abs_diff = abs(serial_energy - parallel_energy)
-        gradient_max_abs_diff = np.max(np.abs(serial_gradient - parallel_gradient))
-        sum_weights_abs_diff = abs(serial_sum_weights - parallel_sum_weights)
-        sum_weights_grad_max_abs_diff = np.max(np.abs(serial_sum_weights_grad - parallel_sum_weights_grad))
-        averaged_int_dist_max_abs_diff = np.max(np.abs(serial_averaged_int_dist - parallel_averaged_int_dist))
-        weights_max_abs_diff = (
-            np.max(np.abs(serial_weight_values - parallel_weight_values))
-            if serial_weight_values.size > 0 else 0.0
-        )
-
-        validation = {
-            'energy_close': bool(np.isclose(serial_energy, parallel_energy, atol=atol, rtol=rtol)),
-            'gradient_close': bool(np.allclose(serial_gradient, parallel_gradient, atol=atol, rtol=rtol)),
-            'sum_weights_close': bool(np.isclose(serial_sum_weights, parallel_sum_weights, atol=atol, rtol=rtol)),
-            'sum_weights_grad_close': bool(np.allclose(serial_sum_weights_grad, parallel_sum_weights_grad, atol=atol, rtol=rtol)),
-            'averaged_int_dist_close': bool(np.allclose(serial_averaged_int_dist, parallel_averaged_int_dist, atol=atol, rtol=rtol)),
-            'weights_close': bool(np.allclose(serial_weight_values, parallel_weight_values, atol=atol, rtol=rtol)),
-            'energy_abs_diff': float(energy_abs_diff),
-            'gradient_max_abs_diff': float(gradient_max_abs_diff),
-            'sum_weights_abs_diff': float(sum_weights_abs_diff),
-            'sum_weights_grad_max_abs_diff': float(sum_weights_grad_max_abs_diff),
-            'averaged_int_dist_max_abs_diff': float(averaged_int_dist_max_abs_diff),
-            'weights_max_abs_diff': float(weights_max_abs_diff),
-            'n_weight_entries': int(serial_weight_values.size),
-        }
-        validation['all_close'] = bool(
-            validation['energy_close'] and
-            validation['gradient_close'] and
-            validation['sum_weights_close'] and
-            validation['sum_weights_grad_close'] and
-            validation['averaged_int_dist_close'] and
-            validation['weights_close']
-        )
-
-        if restore_serial:
-            self.impes_coordinate.energy = serial_energy
-            self.impes_coordinate.gradient = serial_gradient
-            self.impes_coordinate.NAC = serial_nac
-            self.weights = serial_weights
-            self.sum_of_weights = serial_sum_weights
-            self.sum_of_weights_grad = serial_sum_weights_grad
-            self.averaged_int_dist = serial_averaged_int_dist
-            self.potentials = serial_potentials
-            self.gradients = serial_gradients
-            self.dw_dalpha_list = serial_dw_dalpha_list
-            self.dw_dX_dalpha_list = serial_dw_dX_dalpha_list
-
-        return validation
 
 
     def read_qm_data_points(self):
@@ -2326,8 +1656,6 @@ class InterpolationDriver():
             mask=mask,
         )
 
-        
-
     def compute_potential(self, data_point, org_int_coords):
         """Calculates the potential energy surface at self.impes_coordinate
            based on the energy, gradient and Hessian of data_point.
@@ -2350,7 +1678,7 @@ class InterpolationDriver():
         dp_label = data_point.point_label 
         
         symmetry_data_points = (self.qm_symmetry_data_points or {}).get(dp_label, [])
-        use_symmetry_branch = (len(symmetry_data_points) > 1 and self.use_symmetry)
+        use_symmetry_branch = (len(symmetry_data_points) > 1)
         bounds = self._get_internal_coordinate_partitions()
         bond_end = int(bounds['bond_end'])
         angle_end = int(bounds['angle_end'])
@@ -2368,11 +1696,6 @@ class InterpolationDriver():
             pot_gradients = []
             hessian_error = []
 
-            symmetry_weights_local = []
-            symmetry_weight_gradients_local = []
-            candidate_phase_vectors = []
-
-            r_cut = 1.5
             torsion_meta = self._get_symmetry_torsion_meta()
             b_matrix = self.impes_coordinate.b_matrix
 
@@ -2382,12 +1705,6 @@ class InterpolationDriver():
                 eq_mode = self._get_eq_symmetry_mode()
                 if eq_mode == 'masked_exact':
                     candidate_base_cache = self.impes_coordinate.prepare_eq_candidate_base_cache()
-
-            # # Current full methyl-rotor phases
-            # current_full_phases = self._compute_collective_methyl_phases_sym3(
-            #     org_int_coords.copy(),
-            #     torsion_meta
-            # )
 
             current_grouped = self._build_grouped_symmetry_signatures(org_int_coords.copy(), torsion_meta)
             grouped_brows = self._build_grouped_symmetry_brows(torsion_meta)
@@ -2401,25 +1718,9 @@ class InterpolationDriver():
             self.angle_rmsd = []
             self.dihedral_rmsd = []
 
-            # ----------------------------------------
-            # Full loop over all (datapoint, mask) candidates
-            # ----------------------------------------
-            # counter = 0
             for symmetry_data_point, mask0, mask in symmetry_task_entries:
                 energy = symmetry_data_point.energy
 
-                # dp_mol = Molecule(self.molecule.get_labels(), symmetry_data_point.cartesian_coordinates, 'bohr')
-
-
-                # if (mask == mask0).all():
-                #     counter = 0
-                # else:
-                #     counter += 1
-                # # mask-specific full phase vector for this candidate
-                # candidate_full_phases = self._compute_collective_methyl_phases_sym3(
-                #     symmetry_data_point.internal_coordinates_values[mask],
-                #     torsion_meta, counter
-                # )
                 candidate_full_grouped = self._build_grouped_symmetry_signatures(
                     symmetry_data_point.internal_coordinates_values[mask],
                     torsion_meta
@@ -2427,7 +1728,7 @@ class InterpolationDriver():
 
                 cand_grouped_signitures.append(candidate_full_grouped)
                 candidate_labels.append((symmetry_data_point.point_label, tuple(mask)))
-                # candidate_phase_vectors.append(candidate_full_phases)
+
                 org_eval_i, b_eval_i = self._candidate_current_chart(
                     symmetry_data_point=symmetry_data_point,
                     mask=mask,
@@ -2460,51 +1761,8 @@ class InterpolationDriver():
                     np.sqrt(np.mean(np.sum(dist_correlation[dihedral_start:dihedral_end]**2)))
                 )
 
-                # current local support factor from your symmetry dihedral terms
-                combined_weights = []
-                combined_weights_derivative = []
-
-                # for idx, entry in enumerate(sum_sym_3_dihedral_cos):
-                #     if entry >= r_cut**2:
-                #         combined_weights.append(0.0)
-                #         combined_weights_derivative.append(np.zeros((natm, 3)))
-                #     else:
-                #         decay_term = 1.0 - (entry / r_cut**2)
-                #         combined_weights.append(decay_term**3)
-
-                #         grad_factor = (-3.0 / r_cut**2) * (decay_term**2)
-                #         grad_matrix = grad_factor * sum_sym_3_dihedral_prime_cos[idx].reshape(natm, 3)
-                #         combined_weights_derivative.append(grad_matrix)
-
-                # W_local = np.prod(combined_weights) if combined_weights else 1.0
-
-                # grad_W_local = np.zeros((natm, 3))
-                # for I in range(len(combined_weights)):
-                #     prod_other_w = np.prod([
-                #         combined_weights[J]
-                #         for J in range(len(combined_weights))
-                #         if J != I
-                #     ])
-                #     grad_W_local += combined_weights_derivative[I] * prod_other_w
-
-                # symmetry_weights_local.append(W_local)
-                # symmetry_weight_gradients_local.append(grad_W_local)
-
                 potentials.append(pes_i)
                 pot_gradients.append(pes_prime_i)
-
-            # ----------------------------------------
-            # Phase weights for ALL candidates
-            # ----------------------------------------
-            # candidate_phase_vectors = np.asarray(candidate_phase_vectors, dtype=np.float64)
-
-            # d2_phase = np.array([
-            #     self._compute_two_rotor_phase_distance(current_full_phases, cand_phases)
-            #     for cand_phases in candidate_phase_vectors
-            # ], dtype=np.float64)
-
-            # w_phase = np.exp(-80.0 * d2_phase)
-            # w_phase_inv = 1.0/((d2_phase/0.5)**4 + (d2_phase/0.5)**4)
 
             raw_w = []
             raw_grad_w = []
@@ -2527,57 +1785,14 @@ class InterpolationDriver():
                 raw_w.append(w_i)
                 raw_grad_w.append(grad_w_i.reshape(natm, 3))
 
-            # Diagnostics
-            # print("current_full_phases =", current_full_phases)
-            # print("candidate_phase_vectors =", candidate_phase_vectors)
-            # print("d2_phase =", d2_phase)
-            # print("w_phase =", w_phase)
-            # print("w_phase_inv =", w_phase_inv)
-
-            # ----------------------------------------
-            # Final combined weights
-            # ----------------------------------------
             w_i_sig = np.asarray(raw_w, dtype=np.float64)
             grad_w_i_sig = np.asarray(raw_grad_w, dtype=np.float64)
 
-            # w_i_local = np.asarray(symmetry_weights_local, dtype=np.float64)
-            # grad_w_i_local = np.asarray(symmetry_weight_gradients_local, dtype=np.float64)
-
-            # Combined candidate weight
-  
-            # w_i_inv = w_phase_inv
-
-            # S = w_i_local.sum()
-            # S_inv = w_i_inv.sum()
             S_sig = w_i_sig.sum()
-            # if S < 1e-14:
-            #     # fallback to nearest phase candidate
-            #     idx_best = int(np.argmin(d2_phase))
-            #     w_i_local = np.zeros_like(w_i_local)
-            #     w_i_local[idx_best] = 1.0
-            #     S = 1.0
-
-            # NOTE:
-            # Here we only include gradient of local support, not gradient of w_phase.
-            # Good enough for testing selection logic; not fully exact yet.
-            # grad_w_i = w_phase[:, None, None]
-
-            # sum_grad_w = grad_w_i_local.sum(axis=0)
             sum_grad_w_sig = grad_w_i_sig.sum(axis=0)
 
-
-            # W_i = w_i_local / S
-            # W_i_inv = w_i_inv / S_inv
             W_i_sig = w_i_sig / S_sig
-            # grad_W_i = (grad_w_i_local * S - w_i_local[:, None, None] * sum_grad_w) / (S**2)
             grad_W_i_sig = (grad_w_i_sig * S_sig - w_i_sig[:, None, None] * sum_grad_w_sig) / (S_sig**2)
-
-
-            # print("w_local =", W_i)
-            # print("combined raw weights =", w_i)
-            # print("normalized weights =", W_i)
-            # print("normalized weights invers =", W_i_inv)
-
 
             U_i = np.asarray(potentials, dtype=np.float64)
             grad_U_i = np.asarray(pot_gradients, dtype=np.float64)
@@ -2589,19 +1804,8 @@ class InterpolationDriver():
                 + np.tensordot(U_i, grad_W_i_sig, axes=1)
             )
 
-            # Vectorized: apply the normalized weights elementwise to the RMSD diagnostics.
-            # This avoids the explicit Python loop and leverages NumPy broadcasting.
-   
-            # self.bond_rmsd = np.asarray(self.bond_rmsd, dtype=np.float64) * W_i_sig
-            # self.angle_rmsd = np.asarray(self.angle_rmsd, dtype=np.float64) * W_i_sig
-            # self.dihedral_rmsd = np.asarray(self.dihedral_rmsd, dtype=np.float64) * W_i_sig
-
             gradient = grad_pes
 
-            # print(W_i_sig)
-
-            # print(pes, gradient)
-            # exit()
             return pes, gradient, hessian_error
 
         else:
@@ -2614,9 +1818,6 @@ class InterpolationDriver():
 
             if not self.use_cosine_dihedral:
                 dist_check[dihedral_start:dihedral_end] = np.sin(dist_org[dihedral_start:dihedral_end])
-            
-    
-            # print(data_point.point_label, dist_check[dihedral_start:], np.max(hessian[dihedral_start:, dihedral_start:]))
 
             self.bond_rmsd.append(np.sqrt(np.mean(np.sum((dist_org[:bond_end])**2))))
             self.angle_rmsd.append(np.sqrt(np.mean(np.sum(dist_org[bond_end:angle_end]**2))))
@@ -2638,173 +1839,6 @@ class InterpolationDriver():
             pes_prime = np.matmul(self.impes_coordinate.b_matrix.T, (grad + dist_hessian_eff)).reshape(natm, 3)
 
             return pes, pes_prime, (grad + dist_hessian_eff)
-
-    def compute_potential_paral(self, data_point, org_int_coords, max_workers=None):
-        """Parallelized potential evaluation for symmetry-expanded datapoints.
-
-        Falls back to ``compute_potential`` when symmetry expansion is not active.
-        """
-
-        pes = 0.0
-        gradient = None
-        natm = data_point.cartesian_coordinates.shape[0]
-        dp_label = data_point.point_label
-
-        symmetry_data_points = (self.qm_symmetry_data_points or {}).get(dp_label, [])
-        use_symmetry_branch = (len(symmetry_data_points) > 1 and self.use_symmetry)
-        symmetry_task_entries = ()
-        if use_symmetry_branch:
-            symmetry_task_entries = self._get_symmetry_task_entries(dp_label)
-            use_symmetry_branch = len(symmetry_task_entries) > 0
-
-        if use_symmetry_branch:
-
-            symmetry_weights = []
-            potentials = []
-            pot_gradients = []
-            symmetry_weight_gradients = []
-            hessian_error = []
-
-            symmetry_weights_cos = []
-            symmetry_weight_gradients_cos = []
-            r_cut = 1.5
-
-            torsion_meta = self._get_symmetry_torsion_meta()
-            dihedral_start = torsion_meta['dihedral_start']
-            bond_end = self.symmetry_information[-1][0]
-            angle_end = self.symmetry_information[-1][1]
-            b_matrix = self.impes_coordinate.b_matrix
-
-            def evaluate_symmetry_mask_task(task):
-                symmetry_data_point, mask0, mask = task
-
-                energy = symmetry_data_point.energy
-
-                grad = symmetry_data_point.internal_gradient.copy()
-                grad[mask0] = grad[mask]
-
-                hessian = symmetry_data_point.internal_hessian.copy()
-                hessian[np.ix_(mask0, mask0)] = hessian[np.ix_(mask, mask)]
-
-                dist_org = (org_int_coords.copy() -
-                            symmetry_data_point.internal_coordinates_values[mask])
-                dist_check = (org_int_coords.copy() -
-                              symmetry_data_point.internal_coordinates_values[mask])
-                dist_correlation = (org_int_coords.copy() -
-                                    symmetry_data_point.internal_coordinates_values[mask])
-
-                dist_check[dihedral_start:] = np.sin(dist_org[dihedral_start:])
-                dist_correlation[dihedral_start:] = dist_check[dihedral_start:]
-
-                (sum_sym_dihedral,
-                 sum_sym_dihedral_prime,
-                 sum_sym_3_dihedral_cos,
-                 sum_sym_3_dihedral_prime_cos) = self._vectorized_symmetry_dihedral_terms(
-                     dist_org,
-                     dist_correlation,
-                     b_matrix,
-                     torsion_meta)
-
-                bond_rmsd = np.sqrt(np.mean(np.sum((dist_org[:bond_end])**2)))
-                angle_rmsd = np.sqrt(np.mean(np.sum(dist_org[bond_end:angle_end]**2)))
-                dihedral_rmsd = np.sqrt(np.mean(np.sum(dist_correlation[dihedral_start:]**2)))
-
-                combined_weights = []
-                combined_weights_derivative = []
-                for idx, entry in enumerate(sum_sym_3_dihedral_cos):
-                    if entry >= r_cut**2:
-                        combined_weights.append(0.0)
-                        combined_weights_derivative.append(np.zeros((natm, 3)))
-                    else:
-                        decay_term = 1.0 - (entry / r_cut**2)
-                        combined_weights.append(decay_term**3)
-                        grad_factor = (-3.0 / r_cut**2) * (decay_term**2)
-                        grad_matrix = grad_factor * sum_sym_3_dihedral_prime_cos[idx].reshape(natm, 3)
-                        combined_weights_derivative.append(grad_matrix)
-
-                W_total = np.prod(combined_weights) if combined_weights else 1.0
-                grad_W_total = np.zeros((natm, 3))
-                for I in range(len(combined_weights)):
-                    prod_other_w = np.prod(
-                        [combined_weights[J] for J in range(len(combined_weights))
-                         if J != I])
-                    grad_W_total += combined_weights_derivative[I] * prod_other_w
-
-                symmetry_weight = sum_sym_dihedral**4
-                symmetry_weight_gradient = (
-                    4 * sum_sym_dihedral**3 * sum_sym_dihedral_prime.reshape(natm, 3))
-
-                pes_local = (energy + np.matmul(dist_check.T, grad) +
-                             0.5 * np.linalg.multi_dot([dist_check.T, hessian, dist_check]))
-
-                dist_hessian = np.matmul(dist_check.T, hessian)
-                cos_dist = np.cos(dist_org[dihedral_start:])
-                grad[dihedral_start:] *= cos_dist
-                dist_hessian[dihedral_start:] *= cos_dist
-
-                pes_prime = (
-                    np.matmul(b_matrix.T, (grad + dist_hessian))).reshape(natm, 3)
-
-                return (W_total, grad_W_total, pes_local, pes_prime,
-                        bond_rmsd, angle_rmsd, dihedral_rmsd,
-                        symmetry_weight, symmetry_weight_gradient)
-
-            def evaluate_all_symmetry_tasks():
-                tasks = symmetry_task_entries
-
-                n_tasks = len(tasks)
-                if n_tasks == 0:
-                    return []
-                workers = max_workers
-                if workers is None:
-                    workers = os.cpu_count() or 1
-                workers = max(1, min(workers, n_tasks))
-
-                if workers == 1 or n_tasks < 2:
-                    return [evaluate_symmetry_mask_task(task) for task in tasks]
-
-                with ThreadPoolExecutor(max_workers=workers) as executor:
-                    return list(executor.map(evaluate_symmetry_mask_task, tasks))
-
-            task_results = evaluate_all_symmetry_tasks()
-
-            for (W_total, grad_W_total, pes_local, pes_prime, bond_rmsd, angle_rmsd,
-                 dihedral_rmsd, symmetry_weight, symmetry_weight_gradient) in task_results:
-                symmetry_weights_cos.append(W_total)
-                symmetry_weight_gradients_cos.append(grad_W_total)
-                symmetry_weights.append(symmetry_weight)
-                symmetry_weight_gradients.append(symmetry_weight_gradient)
-                potentials.append(pes_local)
-                pot_gradients.append(pes_prime)
-                self.bond_rmsd.append(bond_rmsd)
-                self.angle_rmsd.append(angle_rmsd)
-                self.dihedral_rmsd.append(dihedral_rmsd)
-
-            w_i = np.asarray(symmetry_weights_cos, dtype=np.float64)
-            grad_w_i = np.asarray(symmetry_weight_gradients_cos, dtype=np.float64)
-
-            S = w_i.sum()
-            sum_grad_w = grad_w_i.sum(axis=0)
-
-            W_i = w_i / S
-            grad_W_i = (grad_w_i * S - w_i[:, None, None] * sum_grad_w) / S**2
-
-            U_i = np.asarray(potentials, dtype=np.float64)
-            grad_U_i = np.asarray(pot_gradients, dtype=np.float64)
-
-            pes = np.dot(W_i, U_i)
-            grad_pes = (np.tensordot(W_i, grad_U_i, axes=1) +
-                        np.tensordot(U_i, grad_W_i, axes=1))
-
-            for j, Wi in enumerate(W_i):
-                self.bond_rmsd[j] *= Wi
-                self.angle_rmsd[j] *= Wi
-                self.dihedral_rmsd[j] *= Wi
-
-            gradient = grad_pes
-            return pes, gradient, hessian_error
-
-        return self.compute_potential(data_point, org_int_coords)
             
 
     def simple_weight_gradient(self, distance_vector, distance):
@@ -2822,113 +1856,6 @@ class InterpolationDriver():
                            (distance**(2 * self.exponent_p + 2)))
 
         return weight_gradient
-
-    
-    # def trust_radius_weight_gradient(self, confidence_radius, distance):
-        
-
-    #     denominator = (
-    #             (distance / confidence_radius)**(2 * self.exponent_p) +
-    #             (distance / confidence_radius)**(2 * self.exponent_q))
-    #     trust_radius_weight_gradient = -1.0 * ((( -2.0 * self.exponent_p * ((distance / confidence_radius)**(2 * self.exponent_p)) / confidence_radius) - 
-    #                                          (2.0 * self.exponent_q * ((distance / confidence_radius)**(2 * self.exponent_q) / confidence_radius))) / denominator**2)
-    #     return trust_radius_weight_gradient
-
-    
-    # def trust_radius_weight_gradient_gradient(self, confidence_radius, distance, distance_vector):
-        
-    #     # confidence_radius = datapoint.confidence_radius
-    #     # distance, _, _, _, distance_vector, _ = self.cartesian_distance(datapoint)
-    #     denominator = (
-    #             (distance / confidence_radius)**(2 * self.exponent_p) +
-    #             (distance / confidence_radius)**(2 * self.exponent_q))
-        
-        
-    #     trust_radius_weight_gradient_gradient_1_nominator = (((-4.0 * self.exponent_p**2 * distance_vector * distance**(2.0 * self.exponent_p - 2.0)) 
-    #                                             /(confidence_radius**(2.0 * self.exponent_p) * confidence_radius))
-    #                                             - (4.0 * self.exponent_q**2.0 * distance_vector * distance**(2.0 * self.exponent_q - 2.0)) 
-    #                                             /(confidence_radius**(2.0 * self.exponent_q) * confidence_radius)) 
-
-    #     trust_radius_weight_gradient_gradient_2_nominator = ( 2.0 * (((2.0 * self.exponent_p * distance_vector * distance**(2.0 * self.exponent_p - 2.0)) /(confidence_radius**(2.0 * self.exponent_p)))
-    #                                             + (2.0 * self.exponent_q * distance_vector * distance**(2.0 * self.exponent_q - 2.0)) / (confidence_radius**(2.0 * self.exponent_q))) 
-    #                                             * (((-2.0 * (distance/confidence_radius)**(2.0 * self.exponent_p) * self.exponent_p) / confidence_radius) 
-    #                                             - ((2.0 * (distance/confidence_radius)**(2.0 * self.exponent_q) * self.exponent_q) / confidence_radius))) 
-
-        
-    #     trust_radius_weight_gradient_gradient = -1.0 * trust_radius_weight_gradient_gradient_1_nominator / denominator**2 + trust_radius_weight_gradient_gradient_2_nominator / denominator**3
-
-
-    #     return trust_radius_weight_gradient_gradient
-    
-
-    # def shepard_weight_gradient(self, distance_vector, distance, confidence_radius):
-    #     """ Returns the derivative of an unormalized Shepard interpolation
-    #         weight with respect to the Cartesian coordinates in
-    #         self.impes_coordinate
-
-    #         :param distance_vector:
-    #             The Cartesian distance vector between
-    #             the current data_point and self.impes_coordinate.
-    #         :param distance:
-    #             The norm of the distance vector * sqrt(N), N number of atoms.
-    #     """
-        
-
-    #     denominator = (
-    #         (distance / confidence_radius)**(2 * self.exponent_p) +
-    #         (distance / confidence_radius)**(2 * self.exponent_q))
-    #     derivative_p = (self.exponent_p * distance_vector *
-    #                     distance**(2 * self.exponent_p - 2) /
-    #                     confidence_radius**(2 * self.exponent_p))
-    #     derivative_q = (self.exponent_q * distance_vector *
-    #                     distance**(2 * self.exponent_q - 2) /
-    #                     confidence_radius**(2 * self.exponent_q))
-        
-    #     weight_gradient = (-1.0 * (2.0 * (derivative_p + derivative_q)) *
-    #                    (1.0 / (denominator**2)))
-        
-        
-   
-    #     return  denominator, weight_gradient
-    
-
-    # def trust_radius_tc_weight_gradient(self, confidence_radius, distance, imp_int_coords_distance):
-        
-    #     combined_distance_sq = (distance**2 + imp_int_coords_distance)
-
-    #     denominator = (
-    #             (combined_distance_sq / confidence_radius**2)**(self.exponent_p) +
-    #             (combined_distance_sq / confidence_radius**2)**(self.exponent_q))
-        
-    #     trust_radius_weight_gradient = -1.0 * (((-2.0 * self.exponent_p * ((combined_distance_sq / confidence_radius**2)**(self.exponent_p)) / confidence_radius) - 
-    #                                          (2.0 * self.exponent_q * ((combined_distance_sq / confidence_radius**2)**(self.exponent_q) / confidence_radius))) / denominator**2)
-    #     return trust_radius_weight_gradient
-
-    
-    # def trust_radius_tc_weight_gradient_gradient(self, confidence_radius, distance, distance_vector, imp_int_coords_distance, imp_int_coords_dist_derivative):
-        
-    #     combined_distance_sq = (distance**2 + imp_int_coords_distance)
-        
-    #     denominator = (
-    #             (combined_distance_sq / confidence_radius**2)**(self.exponent_p) +
-    #             (combined_distance_sq / confidence_radius**2)**(self.exponent_q))
-        
-    #     print('confidence', confidence_radius, (confidence_radius**(2.0 * self.exponent_p)))
-    #     trust_radius_weight_gradient_gradient_1_nominator = (((-2.0 * self.exponent_p**2 * (imp_int_coords_dist_derivative + 2.0 * distance_vector.reshape(-1)) * combined_distance_sq**(self.exponent_p - 1.0)) 
-    #                                             /(confidence_radius**(2.0 * self.exponent_p) * confidence_radius))
-    #                                             - (2.0 * self.exponent_q**2.0 * (imp_int_coords_dist_derivative + 2.0 * distance_vector.reshape(-1)) * combined_distance_sq**(self.exponent_q - 1.0)) 
-    #                                             /(confidence_radius**(2.0 * self.exponent_q) * confidence_radius)).reshape(distance_vector.shape[0], 3)
-
-    #     trust_radius_weight_gradient_gradient_2_nominator = 2.0 * ((((self.exponent_p * (imp_int_coords_dist_derivative + 2.0 * distance_vector.reshape(-1)) * combined_distance_sq**(self.exponent_p - 1.0)) /(confidence_radius**(2.0 * self.exponent_p)))
-    #                                             + (self.exponent_q * (imp_int_coords_dist_derivative + 2.0 * distance_vector.reshape(-1)) * combined_distance_sq**(self.exponent_q - 1.0)) / (confidence_radius**(2.0 * self.exponent_q))) 
-    #                                             * (((-2.0 * (combined_distance_sq/confidence_radius**2)**(self.exponent_p) * self.exponent_p) / confidence_radius) 
-    #                                             - ((2.0 * (combined_distance_sq/confidence_radius**2)**(self.exponent_q) * self.exponent_q) / confidence_radius))).reshape(distance_vector.shape[0], 3)
-
-        
-    #     trust_radius_weight_gradient_gradient = -1.0 * trust_radius_weight_gradient_gradient_1_nominator / denominator**2 + trust_radius_weight_gradient_gradient_2_nominator / denominator**3
-
-        
-    #     return trust_radius_weight_gradient_gradient
 
     def trust_radius_weight_gradient(self, confidence_radius, distance):
         
@@ -3070,135 +1997,6 @@ class InterpolationDriver():
 
             return trust_radius_weight_gradient_gradient.reshape(distance_vector.shape[0], 3)
 
-
-    # def YM_target_customized_shepard_weight_gradient(self, distance_vector, distance, confidence_radius, imp_int_coords_distance, imp_int_coordinate_derivative):
-    #     """ Returns the derivative of an unormalized Shepard interpolation
-    #         weight with respect to the Cartesian coordinates in
-    #         self.impes_coordinate
-
-    #         :param distance_vector:
-    #             The Cartesian distance vector between
-    #             the current data_point and self.impes_coordinate.
-    #         :param distance:
-    #             The norm of the distance vector * sqrt(N), N number of atoms.
-    #     """
-
-    #     combined_distance = np.sqrt(imp_int_coords_distance)
-    #     combined_distance_sq = (distance**2 + imp_int_coords_distance)
-        
-    #     denominator = (
-    #         ((combined_distance_sq) / confidence_radius**2)**(self.exponent_p) +
-    #         ((combined_distance_sq) / confidence_radius**2)**(self.exponent_q))
-    #     derivative_p = ((self.exponent_p * ((2.0 * distance_vector.reshape(-1) + imp_int_coordinate_derivative) ) *
-    #                     combined_distance_sq**(self.exponent_p - 1) /
-    #                     confidence_radius**(2 * self.exponent_p)))
-    #     derivative_q = ((self.exponent_q * ((2.0 * distance_vector.reshape(-1) + imp_int_coordinate_derivative)) *
-    #                     combined_distance_sq**(self.exponent_q - 1) /
-    #                     confidence_radius**(2 * self.exponent_q)))
-        
-
-        
-    #     weight_gradient = (-1.0 * ((derivative_p + derivative_q)) *
-    #                    (1.0 / (denominator**2)))
-        
-   
-    #     return  denominator, weight_gradient.reshape(distance_vector.shape[0], 3)
-    
-    # def VL_target_customized_shepard_weight_gradient(self, distance_vector, distance, confidence_radius, dq, dq_dx):
-    #     """ Returns the derivative of an unormalized Shepard interpolation
-    #         weight with respect to the Cartesian coordinates in
-    #         self.impes_coordinate
-
-    #         :param distance_vector:
-    #             The Cartesian distance vector between
-    #             the current data_point and self.impes_coordinate.
-    #         :param distance:
-    #             The norm of the distance vector * sqrt(N), N number of atoms.
-    #     """
-
-    #     denominator = (
-    #         (distance / confidence_radius)**(2 * self.exponent_p) +
-    #         (distance / confidence_radius)**(2 * self.exponent_q))
-    #     derivative_p = (self.exponent_p * distance_vector *
-    #                     distance**(2 * self.exponent_p - 2) /
-    #                     confidence_radius**(2 * self.exponent_p))
-    #     derivative_q = (self.exponent_q * distance_vector *
-    #                     distance**(2 * self.exponent_q - 2) /
-    #                     confidence_radius**(2 * self.exponent_q))
-        
-    #     weight_gradient = (-1.0 * (2.0 * (derivative_p + derivative_q)) *
-    #                    (1.0 / (denominator**2)))
-        
-    #     final_denominator = denominator * np.exp(self.alpha * dq) 
-
-    #     final_weight_gradient = (weight_gradient.reshape(-1) * np.exp(-self.alpha * dq) - 1.0/denominator * self.alpha * np.exp(-self.alpha * dq) * dq_dx).reshape(-1, 3)
-
-    #     return  final_denominator, final_weight_gradient
-    
-    # def trust_radius_weight_gradient_hessian(self, confidence_radius, distance, imp_int_coords_distance):
-
-    #     combined_distance_sq = (distance + imp_int_coords_distance)
-
-    #     denominator = (
-    #             (combined_distance_sq / confidence_radius**2)**(self.exponent_p) +
-    #             (combined_distance_sq / confidence_radius**2)**(self.exponent_q))
-    #     trust_radius_weight_gradient = -1.0 * ((( -2.0 * self.exponent_p * ((combined_distance_sq)**(self.exponent_p)) / (confidence_radius * confidence_radius**(2 * self.exponent_p))) - 
-    #                                          (2.0 * self.exponent_q * ((combined_distance_sq)**(self.exponent_q)) / (confidence_radius * confidence_radius**(2 * self.exponent_q)))) / denominator**2)
-
-    #     return trust_radius_weight_gradient
-    
-    # def trust_radius_weight_gradient_gradient_hessian(self, confidence_radius, distance, grad_s, imp_int_coords_distance, imp_int_coords_distance_derivative):
-        
-    #     combined_distance_sq = (distance + imp_int_coords_distance)
-    #     denominator = (
-    #             (combined_distance_sq / confidence_radius**2)**(self.exponent_p) +
-    #             (combined_distance_sq / confidence_radius**2)**(self.exponent_q))
-
-    #     trust_radius_weight_gradient_gradient_nominator_1_1 = ((self.exponent_p * (combined_distance_sq)**(self.exponent_p - 1) / (confidence_radius**(2 * self.exponent_p))) + (self.exponent_q * (combined_distance_sq)**(self.exponent_q - 1) / (confidence_radius**(2 * self.exponent_q))))
-    #     trust_radius_weight_gradient_gradient_nominator_1_2 = 2.0 * ((-2.0 * self.exponent_p * (combined_distance_sq)**(self.exponent_p) / (confidence_radius * confidence_radius**(2 * self.exponent_p))) - ( 2.0 * self.exponent_q * (combined_distance_sq)**(self.exponent_q) / (confidence_radius * confidence_radius**(2 * self.exponent_q))))
-
-    #     trust_radius_weight_gradient_gradient_nominator_2 = ((-2.0 * self.exponent_p**2 * (combined_distance_sq)**(self.exponent_p - 1) / (confidence_radius * confidence_radius**(2 * self.exponent_p))) - (2.0 * self.exponent_q**2 * (combined_distance_sq)**(self.exponent_q - 1) / (confidence_radius * confidence_radius**(2 * self.exponent_q))))
-        
-    #     trust_radius_weight_gradient_gradient = (((trust_radius_weight_gradient_gradient_nominator_1_1 * trust_radius_weight_gradient_gradient_nominator_1_2 ) / denominator**3) - trust_radius_weight_gradient_gradient_nominator_2 / denominator**2) * (grad_s + imp_int_coords_distance_derivative.reshape(-1, 3))
-
-
-    #     return trust_radius_weight_gradient_gradient
-    
-    # def shepard_weight_gradient_hessian(self, quad_distance, confidence_radius, grad_s, imp_int_coords_distance=0, imp_int_coords_distance_derivative=0):
-    #     """ Returns the derivative of an unormalized Shepard interpolation
-    #         weight with respect to the Cartesian coordinates in
-    #         self.impes_coordinate
-
-    #         :param distance_vector:
-    #             The Cartesian distance vector between
-    #             the current data_point and self.impes_coordinate.
-    #         :param distance:
-    #             The norm of the distance vector * sqrt(N), N number of atoms.
-    #     """
-
-    #     combined_distance_sq = (quad_distance + imp_int_coords_distance)
-
-    #     denominator = (
-    #         ((combined_distance_sq) / confidence_radius**2)**(self.exponent_p) +
-    #         ((combined_distance_sq) / confidence_radius**2)**(self.exponent_q))
-        
-    #     derivative_p = ((self.exponent_p * 
-    #                     combined_distance_sq**(self.exponent_p - 1) /
-    #                     confidence_radius**(2 * self.exponent_p)))
-    #     derivative_q = ((self.exponent_q *
-    #                     combined_distance_sq**(self.exponent_q - 1) /
-    #                     confidence_radius**(2 * self.exponent_q)))
-        
-
-        
-    #     weight_gradient = (-1.0 * (1.0 * (derivative_p + derivative_q) *
-    #                    (1.0 / (denominator**2)))) * (grad_s + imp_int_coords_distance_derivative.reshape(-1, 3))
-        
-    #     print(denominator, weight_gradient)
-    #     exit()
-
-    #     return  denominator, weight_gradient
-
     def YM_target_customized_shepard_weight_gradient(self, distance_vector, distance, confidence_radius, imp_int_coords_distance, imp_int_coordinate_derivative):
         
         R = confidence_radius
@@ -3253,90 +2051,6 @@ class InterpolationDriver():
 
         return final_denominator, final_weight_gradient
     
-
-    def trust_radius_weight_gradient_hessian(self, confidence_radius, distance, imp_int_coords_distance):
-
-        R = confidence_radius
-        # Note: Your original code for this specific function does not square `distance` here. 
-        # I am preserving your exact mathematical intent.
-        D = distance + imp_int_coords_distance
-        
-        p = float(self.exponent_p)
-        q = float(self.exponent_q)
-        
-        u = D / (R**2)
-        
-        # Early Exit (returning 0.0 scalar if gradients flatten out)
-        if np.isscalar(u) and u > 1e6:
-            return 0.0
-            
-        denom_base = u**p + u**q
-        denom_base = np.clip(denom_base, a_min=1e-300, a_max=None)
-        
-        numerator = p * u**p + q * u**q
-        
-        trust_radius_weight_gradient = (2.0 / R) * (numerator / denom_base**2)
-
-        return trust_radius_weight_gradient
-    
-
-    def trust_radius_weight_gradient_gradient_hessian(self, confidence_radius, distance, grad_s, imp_int_coords_distance, imp_int_coords_distance_derivative):
-        
-        R = confidence_radius
-        # Again, preserving the un-squared distance from your original logic
-        D = distance + imp_int_coords_distance
-        v = grad_s + imp_int_coords_distance_derivative.reshape(-1, 3)
-        
-        p = float(self.exponent_p)
-        q = float(self.exponent_q)
-        
-        u = D / (R**2)
-        
-        # Early Exit
-        if np.isscalar(u) and u > 1e6:
-            return np.zeros_like(v, dtype=np.float64)
-            
-        denom_base = u**p + u**q
-        denom_base = np.clip(denom_base, a_min=1e-300, a_max=None)
-        
-        # Factored numerator terms
-        term1 = (p**2 * u**(p - 1.0) + q**2 * u**(q - 1.0)) / (denom_base**2)
-        term2 = 2.0 * ((p * u**(p - 1.0) + q * u**(q - 1.0)) * (p * u**p + q * u**q)) / (denom_base**3)
-        
-        trust_radius_weight_gradient_gradient = (2.0 / R**3) * (term1 - term2) * v
-
-        return trust_radius_weight_gradient_gradient
-    
-    def shepard_weight_gradient_hessian(self, quad_distance, confidence_radius, grad_s, imp_int_coords_distance=0, imp_int_coords_distance_derivative=0):
-        
-        # 1. Define base variables
-        R = confidence_radius
-        D = quad_distance + imp_int_coords_distance
-        
-        p = float(self.exponent_p)
-        q = float(self.exponent_q)
-        
-        # Evaluate the gradient multiplier early
-        grad_combined = grad_s + imp_int_coords_distance_derivative.reshape(-1, 3)
-        
-        # 2. Compute dimensionless ratio
-        u = D / (R**2)
-        
-        # 3. Early Exit: Protect against float64 overflow for massive relative distances
-        if np.isscalar(u) and u > 1e6:
-            return u**p + u**q, np.zeros_like(grad_combined, dtype=np.float64)
-        
-        # 4. Base denominator
-        denom_base = u**p + u**q
-        denom_base = np.clip(denom_base, a_min=1e-300, a_max=None)
-        
-        # 5. Algebraically factored numerator
-        numerator = p * u**(p - 1.0) + q * u**(q - 1.0)
-        
-        # 6. Assemble the final weight gradient
-        weight_gradient = -1.0 * (numerator / (R**2 * denom_base**2)) * grad_combined
-        
-        return denom_base, weight_gradient
     
     def calculate_translation_coordinates(self, given_coordinates, weights=None):
         """Center the molecule by translating its geometric center to (0, 0, 0)."""
@@ -3521,45 +2235,6 @@ class InterpolationDriver():
                 InterpolationDatapoint object
         """
 
-        def numerical_gradient(f, X, dp, eps=1e-6):
-            """
-            Compute numerical gradient of scalar function f(X) w.r.t. coordinates X.
-            
-            Parameters
-            ----------
-            f : callable
-                Function taking X (Nc,3) and returning scalar float.
-            X : ndarray
-                Coordinate array of shape (Nc,3).
-            eps : float
-                Finite difference step.
-            
-            Returns
-            -------
-            grad : ndarray
-                Numerical gradient with same shape as X.
-            """
-            grad = np.zeros_like(X, dtype=float)
-            Nc = X.shape[0]
-            for a in range(Nc):
-                for mu in range(3):
-                    dX = np.zeros_like(X)
-                    dX[a, mu] = eps
-                    current_geometry_plus = X + dX
-                    self.define_impes_coordinate(current_geometry_plus)
-
-                    f_plus = self.impes_coordinate.internal_coordinates_values[0]
-                    # f_plus, _, _  = f(dp, self.impes_coordinate.internal_coordinates_values)
-                    current_geometry_minus = X - dX
-                    self.define_impes_coordinate(current_geometry_minus)
-                    # f_minus, _, _  = f(dp, self.impes_coordinate.internal_coordinates_values)
-                   
-                    f_minus = self.impes_coordinate.internal_coordinates_values[0]
-
-                    grad[a, mu] = (f_plus - f_minus) / (2 * eps) 
-            
-            return grad.reshape(-1)
-
         # First, translate the cartesian coordinates to zero
         target_coordinates = data_point.cartesian_coordinates.copy()
         reference_coordinates = self.impes_coordinate.cartesian_coordinates.copy()
@@ -3585,31 +2260,12 @@ class InterpolationDriver():
         distance_vector_sub =  Xc - rotated_current
         distance = np.linalg.norm(distance_vector_sub)
 
-        # distance_vector_sub = np.zeros_like(reference_coordinates)   # (natms,3)
-        
-        # distance_vector_sub[self.symmetry_information[3]] = distance_vector_sub
-
-
-        # grad_s = distance_vector_sub @ R_x
-        # grad_s -= grad_s.mean(axis=0, keepdims=True)
-
-        # distance_vector_sub = grad_s
         
         dihedral_dist = 0.0
         if distance < 1e-8:
             distance = 1e-8
             distance_vector_sub[:] = 0
 
-        H_eff = data_point.internal_hessian
-        eigval, V = np.linalg.eigh(H_eff)
-
-        participation = V**2  # shape (n_coord, n_modes)
-
-        # For each internal coordinate, find dominant eigenmode
-        dominant_mode_per_coord = np.argmax(participation, axis=1)
-        coord_curvature = np.sum(eigval * (V**2), axis=1)
-        # print(self.z_matrix)
-        # print('True decomposition', coord_curvature)
             
         # sum of the derivative necessary 
         imp_int_coord_derivative_contribution = np.zeros_like(distance_vector_sub).reshape(-1)
@@ -3647,21 +2303,12 @@ class InterpolationDriver():
         dw_dX_dalpha_i = 0
 
         if self.interpolation_type == 'shepard':
-            # denominator, weight_gradient_sub = self.shepard_weight_gradient(
-            #     distance_vector_sub, distance, data_point.confidence_radius)
-            denominator_imp_coord, weight_gradient_sub_imp_coord = self.YM_target_customized_shepard_weight_gradient(
-                distance_vector_sub, distance, data_point.confidence_radius, imp_int_coord_distance, imp_int_coord_derivative_contribution)
             
-            if 1 == 1:
-                denominator_imp_coord, weight_gradient_sub_imp_coord = self.VL_target_customized_shepard_weight_gradient(
-                    distance_vector_sub, distance, data_point.confidence_radius, Dimp_sq, dq_dx)
+            denominator_imp_coord, weight_gradient_sub_imp_coord = self.VL_target_customized_shepard_weight_gradient(
+                distance_vector_sub, distance, data_point.confidence_radius, Dimp_sq, dq_dx)
             
             if self.calc_optim_trust_radius:
-                # dw_dalhpa_i = self.trust_radius_weight_gradient(data_point.confidence_radius, distance)
-                # dw_dX_dalpha_i = self.trust_radius_weight_gradient_gradient(data_point.confidence_radius, distance, distance_vector)
 
-                # Keep alpha-derivatives consistent with the VL denominator path
-                # used above (Dimp_sq + dq_dx), not the legacy unweighted variant.
                 dw_dalhpa_i = self.trust_radius_tc_weight_gradient(
                     data_point.confidence_radius, distance, Dimp_sq)
                 dw_dX_dalpha_i = self.trust_radius_tc_weight_gradient_gradient(
@@ -3677,9 +2324,6 @@ class InterpolationDriver():
                     dw_dX_dalpha_i_full[self.symmetry_information[3]] = dw_dX_dalpha_i
                     self.dw_dX_dalpha_list.append(dw_dX_dalpha_i_full)
                     
-        elif self.interpolation_type == 'simple':
-            weight_gradient = self.simple_weight_gradient(
-                distance_vector_sub, distance)
         else:
             errtxt = "Unrecognized interpolation type: "
             errtxt += self.interpolation_type
@@ -3692,574 +2336,12 @@ class InterpolationDriver():
         return distance, dihedral_dist, denominator_imp_coord, weight_gradient, distance_vector_sub, grad_s, dw_dalhpa_i, dw_dX_dalpha_i
 
 
-    def cartesian_hessian_combined_distance(self, data_point, store_alpha_gradients=True):
-        
-
-        def rigid_body_projector(X, masses, tol=1e-12):
-            """
-            Projector P (3N,3N) that removes translations + rotations in MASS-WEIGHTED coordinates.
-
-            X:      (N,3) coordinates (use datapoint geometry, already centered is fine)
-            masses: (N,)  atomic masses for these N atoms
-            """
-            X = np.asarray(X, float)
-            m = np.asarray(masses, float)
-            N = X.shape[0]
-            n = 3*N
-
-            # Use COM as origin (if you already centered by centroid, that's still OK:
-            # changing origin only mixes rotation vectors with translations, which remain in the same rigid subspace)
-            com = (m[:, None] * X).sum(axis=0) / m.sum()
-            R = X - com
-
-            # Build rigid basis B in mass-weighted coordinate space
-            B = np.zeros((n, 6), float)
-            mw = np.sqrt(np.repeat(m, 3))
-
-            # translations
-            for a in range(3):
-                v = np.zeros((N, 3), float)
-                v[:, a] = 1.0
-                B[:, a] = (v.reshape(-1) * mw)
-
-            # rotations: omega x r_i
-            for k, omega in enumerate(np.eye(3)):
-                v = np.cross(omega, R).reshape(-1)
-                B[:, 3+k] = v * mw
-
-            # Orthonormalize and detect rank (linear geometries -> rank 5)
-            U, s, _ = np.linalg.svd(B, full_matrices=False)
-            r = int(np.sum(s > tol * s[0])) if s[0] > 0 else 0
-            Q = U[:, :r]
-
-            P = np.eye(n) - Q @ Q.T
-            return 0.5*(P + P.T), Q, s, r
-
-
-        def apply_Jc(A):   # A: (Nc,3)
-            return A - A.mean(axis=0, keepdims=True)
-
-
-        def make_psd_stiffness_metric_from_massweighted_hessian(K, P, r_rigid,
-                                                       floor_rel=1e-6, floor_abs=None,
-                                                       cap_rel=None):
-            """
-            K:       (3N,3N) mass-weighted Hessian block (symmetric)
-            P:       rigid-body projector in mass-weighted space
-            r_rigid: number of rigid DOFs removed (typically 6, sometimes 5)
-            Returns: K_metric (3N,3N) PSD stiffness metric in mass-weighted space
-            """
-            K = 0.5*(K + K.T)
-
-            # Project out rigid DOFs (keeps a nullspace of dimension r_rigid)
-            Kp = P @ K @ P
-            Kp = 0.5*(Kp + Kp.T)
-
-            w, U = np.linalg.eigh(Kp)
-
-            # Enforce the rigid nullspace explicitly: zero the smallest r_rigid eigenvalues by magnitude
-            idx = np.argsort(np.abs(w))
-            rigid_idx = idx[:r_rigid]
-            vib_idx   = idx[r_rigid:]
-
-            lam = np.zeros_like(w)
-
-            # rigid handled separately
-            pos = np.setdiff1d(np.where(w > 0)[0], rigid_idx)
-            neg = np.setdiff1d(np.where(w < 0)[0], rigid_idx)
-
-            lam[pos] = w[pos]
-            lam[neg] = 0.5 * np.abs(w[neg])   # e.g. neg_scale = 0.25 or 0.5
-
-            # Floor only the vibrational subspace if desired
-            if vib_idx.size > 0:
-                if floor_abs is None:
-                    # robust scale from vibrational magnitudes
-                    base = np.median(lam[vib_idx])
-                    floor_abs = max(floor_rel * base, 0.0)
-
-                lam[vib_idx] = np.maximum(lam[vib_idx], floor_abs)
-
-                if cap_rel is not None:
-                    cap = cap_rel * np.percentile(lam[vib_idx], 95)
-                    lam[vib_idx] = np.minimum(lam[vib_idx], cap)
-
-            K_metric = (U * lam) @ U.T
-            return 0.5*(K_metric + K_metric.T)
-
-        
-        # First, translate the cartesian coordinates to zero
-        target_coordinates = data_point.cartesian_coordinates.copy()
-        reference_coordinates = self.impes_coordinate.cartesian_coordinates.copy()
-
-        active_atoms = np.delete(np.arange(reference_coordinates.shape[0]), self.symmetry_information[4])
-        active_dofs = np.array([3*a + i for a in active_atoms for i in range(3)])
-
-        target_coordinates_core = target_coordinates[active_atoms]
-        reference_coordinates_core = reference_coordinates[active_atoms]
-
-        center_target_coordinates_core = self.calculate_translation_coordinates(target_coordinates_core)
-        center_reference_coordinates_core = self.calculate_translation_coordinates(reference_coordinates_core)
-
-        distance = 0
-        distance_vector = 0
-        grad_s = 1.0
-
-    
-        Xc = center_reference_coordinates_core     # variable (current geometry)
-        Yc = center_target_coordinates_core        # fixed (datapoint)
-        R_x  = geometric.rotate.get_rot(Xc, Yc)
-        dU_x = geometric.rotate.get_rot_der(Xc, Yc)   
-        
-        rotated_current = (R_x @ Xc.T).T
-        distance_vector =  rotated_current - Yc
-        org_distance = np.linalg.norm(distance_vector) 
-        grad_s = distance_vector @ R_x
-        grad_s -= grad_s.mean(axis=0, keepdims=True)
-
-        H_eff = data_point.hessian
-
-        all_masses = np.asarray(self.molecule.get_masses(), dtype=float)
-        active_masses = all_masses[active_atoms]
-    
-        idx3 = np.concatenate([3*active_atoms[:,None] + np.array([0,1,2])], axis=1).ravel()
-        H_SS = H_eff[np.ix_(idx3, idx3)] # (Nc,)
-        Msqrt = np.sqrt(np.repeat(active_masses, 3))               # (3Nc,)
-
-
-        # Build rigid-body projector in MASS-WEIGHTED space (removes translations + rotations)
-        Pmw, Q, s, r_rigid = rigid_body_projector(Yc, active_masses)
-
-        
-        H_spd = make_psd_stiffness_metric_from_massweighted_hessian(
-            H_SS, Pmw, r_rigid=r_rigid,
-            floor_rel=1e-6, floor_abs=None,
-            cap_rel=None
-        )
-        
-        # H_spd = make_spd_hessian(Hc_ul, floor_abs=1e-6)
-        H_spd_nmw = (Msqrt[:,None] * H_spd) * Msqrt[None,:]
-        w, U   = np.linalg.eigh(H_spd)
-        w_nmw, U   = np.linalg.eigh(H_spd_nmw)
-
-        e_ref = 1.0 / (2.0 * 0.00159360)       # Your scaling factor for the Hessian importance
-        d_vec = distance_vector.reshape(-1)
-
-
-        G_iso = (1.0 / (distance_vector.shape[0] * 0.1**2)) * np.eye(d_vec.size)
-        q_iso = d_vec @ (G_iso @ d_vec)
-
-        Metric = e_ref * (H_spd_nmw)# + (beta * np.eye(dim))
-
-        G_tot = G_iso + 0.5 * Metric
-
-        distance     =  (d_vec @ ((G_tot) @ d_vec))
-
-        # distance = np.sqrt(distance_2)
-
-        if distance < 1e-8:
-            distance = 1e-8
-            d_vec[:] = 0
-            distance_vector[:] = 0
-
-        y = (G_tot @ d_vec).reshape(-1, 3)      # (Nc,3)
-
-        rigid = y @ R_x                           # (Nc,3)
-        S = y.T @ Xc                                    # (3,3)
-
-        resp = np.einsum('baij,ij->ba', dU_x, S, optimize=True)   # (Nc,3)
-
-        z_mat = rigid + resp                            # (Nc,3)
-        z_mat = apply_Jc(z_mat)                        # (Nc,3)
-
-        grad_s = (2.0) * z_mat                # (Nc,3) 
-        
-        # print('org cart distance', org_distance, 'q_iso', q_iso, 'hessian metric', distance)
-
-        # distance = org_distance + 0.5 * distance 
-
-        # sum of the derivative necessary 
-        imp_int_coord_derivative_contribution = np.zeros_like(distance_vector).reshape(-1)
-        imp_int_coord_distance = 0
-        dihedral_dist = 0
-        
-        H_eff = data_point.internal_hessian
-        eigval, V = np.linalg.eigh(H_eff)
-
-        participation = V**2  # shape (n_coord, n_modes)
-
-        # For each internal coordinate, find dominant eigenmode
-
-        coord_curvature = np.sum(eigval * (V**2), axis=1)
-        
-        dq = []
-        dq_dx = np.zeros_like(distance_vector).reshape(-1)
-        # if data_point.point_label == "point_3_rinv_dihedral":
-        #     data_point.imp_int_coordinates = [(1,0,2,3)]
-        
-        if self.use_tc_weights:
-            for key, entries in data_point.imp_int_coordinates.items():
-                for element in entries:
-                    idx = self.impes_coordinate.z_matrix.index(element)
-                
-                    org_imp_int_coord_distance = (self.impes_coordinate.internal_coordinates_values[idx] - data_point.internal_coordinates_values[idx])
-                    unmw_b_matrix = self.impes_coordinate.b_matrix[idx, active_dofs] / self.impes_coordinate.inv_sqrt_masses[active_dofs]
-                    
-                    if len(element) == 4:
-                        dq_dx +=  coord_curvature[idx] * 2.0 * unmw_b_matrix * np.cos(org_imp_int_coord_distance) * np.sin(org_imp_int_coord_distance)
-                        dq.append(coord_curvature[idx] * np.sin(org_imp_int_coord_distance))
-                    else:
-                        dq_dx += coord_curvature[idx]**2 * 2.0 * unmw_b_matrix * org_imp_int_coord_distance
-                        dq.append(coord_curvature[idx] * org_imp_int_coord_distance)
-
-            
-
-        Dimp_sq = float(np.dot(np.array(dq), np.array(dq)))
-
-        if Dimp_sq < 1e-8:
-            imp_int_coord_distance = 1e-8
-            imp_int_coord_derivative_contribution[:] = 0
-            Dimp_sq = 1e-8
-            dq_dx[:] = 0
-
-        dw_dalpha_i = 0
-        dw_dX_dalpha_i = 0
-        if self.interpolation_type == 'shepard':
-            denominator, weight_gradient = self.shepard_weight_gradient_hessian(distance, data_point.confidence_radius, grad_s, imp_int_coord_distance, imp_int_coord_derivative_contribution)  
-            
-            
-            
-            weight_gradient = (weight_gradient.reshape(-1) * np.exp(-self.alpha * Dimp_sq) - 1.0 / denominator * self.alpha * np.exp(-self.alpha * Dimp_sq) * dq_dx).reshape(-1,3)
-            denominator = denominator * np.exp(self.alpha * Dimp_sq)
-            
-
-            if self.calc_optim_trust_radius:
-                dw_dalpha_i = self.trust_radius_weight_gradient_hessian(data_point.confidence_radius, distance, imp_int_coord_distance)
-                dw_dX_dalpha_i = self.trust_radius_weight_gradient_gradient_hessian(data_point.confidence_radius, distance, grad_s, imp_int_coord_distance, imp_int_coord_derivative_contribution)
-
-                if store_alpha_gradients:
-                    self.dw_dalpha_list.append(dw_dalpha_i)
-                    self.dw_dX_dalpha_list.append(dw_dX_dalpha_i)
-
-
-            
-        elif self.interpolation_type == 'simple':
-            weight_gradient = self.simple_weight_gradient(distance_vector, distance)
-        else:
-            errtxt = "Unrecognized interpolation type: "
-            errtxt += self.interpolation_type
-            raise ValueError(errtxt)
-        
-        weight_gradient_full = np.zeros_like(reference_coordinates)   # (natms,3)
-        weight_gradient_full[self.symmetry_information[3]] = weight_gradient
-        
-
-        return distance, dihedral_dist, denominator, weight_gradient_full, distance_vector, grad_s, dw_dalpha_i, dw_dX_dalpha_i
-
-
-    def cartesian_hessian_distance(self, data_point, store_alpha_gradients=True):
-        """Calculates and returns the cartesian distance between
-           self.coordinates and data_point coordinates.
-           Besides the distance, it also returns the weight gradient,
-           which requires the distance vector to be computed.
-
-           :param data_point:
-                InterpolationDatapoint object
-        """
-
-        def denominator_func(a, distance):
-            denominator = (
-                (distance / a**2)**(self.exponent_p) +
-                (distance / a**2)**(self.exponent_q))
-            return 1.0 / denominator
-
-        def numerical_gradient(f, distance, dp, eps=1e-6):
-            """
-            Compute numerical gradient of scalar function f(X) w.r.t. coordinates X.
-            
-            Parameters
-            ----------
-            f : callable
-                Function taking X (Nc,3) and returning scalar float.
-            X : ndarray
-                Coordinate array of shape (Nc,3).
-            eps : float
-                Finite difference step.
-            
-            Returns
-            -------
-            grad : ndarray
-                Numerical gradient with same shape as X.
-            """
-            w_da = 0
-
-            a = dp.confidence_radius
-            da = eps
-            a_p = a + da
-
-            w_da_p = f(a_p, distance)
-            # f_plus, _, _  = f(dp, self.impes_coordinate.internal_coordinates_values)
-            a_m = a - da
- 
-            # f_minus, _, _  = f(dp, self.impes_coordinate.internal_coordinates_values)
-            w_da_m = f(a_m, distance)
-
-            w_da += (w_da_p - w_da_m) / (2 * eps)
-            
-            return w_da
-
-        def rigid_body_projector(X, masses, tol=1e-12):
-            """
-            Projector P (3N,3N) that removes translations + rotations in MASS-WEIGHTED coordinates.
-
-            X:      (N,3) coordinates (use datapoint geometry, already centered is fine)
-            masses: (N,)  atomic masses for these N atoms
-            """
-            X = np.asarray(X, float)
-            m = np.asarray(masses, float)
-            N = X.shape[0]
-            n = 3*N
-
-            # Use COM as origin (if you already centered by centroid, that's still OK:
-            # changing origin only mixes rotation vectors with translations, which remain in the same rigid subspace)
-            com = (m[:, None] * X).sum(axis=0) / m.sum()
-            R = X - com
-
-            # Build rigid basis B in mass-weighted coordinate space
-            B = np.zeros((n, 6), float)
-            mw = np.sqrt(np.repeat(m, 3))
-
-            # translations
-            for a in range(3):
-                v = np.zeros((N, 3), float)
-                v[:, a] = 1.0
-                B[:, a] = (v.reshape(-1) * mw)
-
-            # rotations: omega x r_i
-            for k, omega in enumerate(np.eye(3)):
-                v = np.cross(omega, R).reshape(-1)
-                B[:, 3+k] = v * mw
-
-            # Orthonormalize and detect rank (linear geometries -> rank 5)
-            U, s, _ = np.linalg.svd(B, full_matrices=False)
-            r = int(np.sum(s > tol * s[0])) if s[0] > 0 else 0
-            Q = U[:, :r]
-
-            P = np.eye(n) - Q @ Q.T
-            return 0.5*(P + P.T), Q, s, r
-
-
-        def apply_Jc(A):   # A: (Nc,3)
-            return A - A.mean(axis=0, keepdims=True)
-
-
-        def make_psd_stiffness_metric_from_massweighted_hessian(K, P, r_rigid,
-                                                       floor_rel=1e-6, floor_abs=None,
-                                                       cap_rel=None):
-            """
-            K:       (3N,3N) mass-weighted Hessian block (symmetric)
-            P:       rigid-body projector in mass-weighted space
-            r_rigid: number of rigid DOFs removed (typically 6, sometimes 5)
-            Returns: K_metric (3N,3N) PSD stiffness metric in mass-weighted space
-            """
-            K = 0.5*(K + K.T)
-
-            # Project out rigid DOFs (keeps a nullspace of dimension r_rigid)
-            Kp = P @ K @ P
-            Kp = 0.5*(Kp + Kp.T)
-
-            w, U = np.linalg.eigh(Kp)
-
-            # Enforce the rigid nullspace explicitly: zero the smallest r_rigid eigenvalues by magnitude
-            idx = np.argsort(np.abs(w))
-            rigid_idx = idx[:r_rigid]
-            vib_idx   = idx[r_rigid:]
-
-            lam = np.abs(w)                 # stiffness magnitude
-            lam[rigid_idx] = 0.0            # keep rigid at exactly zero
-
-            # Floor only the vibrational subspace if desired
-            if vib_idx.size > 0:
-                if floor_abs is None:
-                    # robust scale from vibrational magnitudes
-                    base = np.median(lam[vib_idx])
-                    floor_abs = max(floor_rel * base, 0.0)
-
-                lam[vib_idx] = np.maximum(lam[vib_idx], floor_abs)
-
-                if cap_rel is not None:
-                    cap = cap_rel * np.percentile(lam[vib_idx], 95)
-                    lam[vib_idx] = np.minimum(lam[vib_idx], cap)
-
-            K_metric = (U * lam) @ U.T
-            return 0.5*(K_metric + K_metric.T)
-
-        
-        # First, translate the cartesian coordinates to zero
-        target_coordinates = data_point.cartesian_coordinates.copy()
-        reference_coordinates = self.impes_coordinate.cartesian_coordinates.copy()
-
-        active_atoms = np.delete(np.arange(reference_coordinates.shape[0]), self.symmetry_information[4])
-        active_dofs = np.array([3*a + i for a in active_atoms for i in range(3)])
-
-        target_coordinates_core = target_coordinates[active_atoms]
-        reference_coordinates_core = reference_coordinates[active_atoms]
-
-        center_target_coordinates_core = self.calculate_translation_coordinates(target_coordinates_core)
-        center_reference_coordinates_core = self.calculate_translation_coordinates(reference_coordinates_core)
-
-        distance = 0
-        distance_vector = 0
-        grad_s = 1.0
-
-    
-        Xc = center_reference_coordinates_core     # variable (current geometry)
-        Yc = center_target_coordinates_core        # fixed (datapoint)
-        R_x  = geometric.rotate.get_rot(Xc, Yc)
-        dU_x = geometric.rotate.get_rot_der(Xc, Yc)   
-        
-        rotated_current = (R_x @ Xc.T).T
-        distance_vector =  rotated_current - Yc
-        org_distance = np.linalg.norm(distance_vector) 
-        grad_s = distance_vector @ R_x
-        grad_s -= grad_s.mean(axis=0, keepdims=True)
-
-        H_eff = data_point.hessian
-
-        all_masses = np.asarray(self.molecule.get_masses(), dtype=float)
-        active_masses = all_masses[active_atoms]
-    
-        idx3 = np.concatenate([3*active_atoms[:,None] + np.array([0,1,2])], axis=1).ravel()
-        H_SS = H_eff[np.ix_(idx3, idx3)] # (Nc,)
-        Msqrt = np.sqrt(np.repeat(active_masses, 3))               # (3Nc,)
-
-
-        # Build rigid-body projector in MASS-WEIGHTED space (removes translations + rotations)
-        Pmw, Q, s, r_rigid = rigid_body_projector(Yc, active_masses)
-
-        
-        H_spd = make_psd_stiffness_metric_from_massweighted_hessian(
-            H_SS, Pmw, r_rigid=r_rigid,
-            floor_rel=1e-6, floor_abs=None,
-            cap_rel=None
-        )
-        
-        # H_spd = make_spd_hessian(Hc_ul, floor_abs=1e-6)
-        H_spd_nmw = (Msqrt[:,None] * H_spd) * Msqrt[None,:]
-        w, U   = np.linalg.eigh(H_spd)
-        w_nmw, U   = np.linalg.eigh(H_spd_nmw)
-
-        e_ref = 1.0 / (2.0 * 0.00159360)       # Your scaling factor for the Hessian importance
-        beta  = 1e-6      # Regularization: ensures non-zero distance for rigid modes/flat regions
-        d_vec = distance_vector.reshape(-1)
-        dim = d_vec.size
-        Metric = (H_spd_nmw)# + (beta * np.eye(dim))
-        distance     =  e_ref * (d_vec @ ((Metric) @ d_vec))
-        # distance = np.sqrt(distance_2)
-
-        if distance < 1e-8:
-            distance = 1e-8
-            d_vec[:] = 0
-        y = e_ref * (Metric @ d_vec).reshape(-1, 3)      # (Nc,3)
-
-        rigid = y @ R_x                           # (Nc,3)
-        S = y.T @ Xc                                    # (3,3)
-
-        resp = np.einsum('baij,ij->ba', dU_x, S, optimize=True)   # (Nc,3)
-
-        z_mat = rigid + resp                            # (Nc,3)
-        z_mat = apply_Jc(z_mat)                        # (Nc,3)
-
-        grad_s = (2.0) * z_mat                           # (Nc,3) 
-        lambda_hess = 0.5
-
-        # print('org cart distance', org_distance, 'hessian metric', distance)
-
-        # sum of the derivative necessary 
-        imp_int_coord_derivative_contribution = np.zeros_like(distance_vector).reshape(-1)
-        imp_int_coord_distance = 0
-        dihedral_dist = 0
-        
-        H_eff = data_point.internal_hessian
-        eigval, V = np.linalg.eigh(H_eff)
-
-        participation = V**2  # shape (n_coord, n_modes)
-
-        # For each internal coordinate, find dominant eigenmode
-        coord_curvature = np.sum(eigval * (V**2), axis=1)
-        
-        dq = []
-        dq_dx = np.zeros_like(distance_vector).reshape(-1)
-        # if data_point.point_label == "point_3_rinv_dihedral":
-        #     data_point.imp_int_coordinates = [(1,0,2,3)]
-        
-        if self.use_tc_weights:
-            for key, entries in data_point.imp_int_coordinates.items():
-                for element in entries:
-                    idx = self.impes_coordinate.z_matrix.index(element)
-                
-                    org_imp_int_coord_distance = (self.impes_coordinate.internal_coordinates_values[idx] - data_point.internal_coordinates_values[idx])
-                    unmw_b_matrix = self.impes_coordinate.b_matrix[idx, active_dofs] / self.impes_coordinate.inv_sqrt_masses[active_dofs]
-                    
-                    if len(element) == 4:
-                        dq_dx +=  coord_curvature[idx] * 2.0 * unmw_b_matrix * np.cos(org_imp_int_coord_distance) * np.sin(org_imp_int_coord_distance)
-                        dq.append(coord_curvature[idx] * np.sin(org_imp_int_coord_distance))
-                    else:
-                        dq_dx += coord_curvature[idx]**2 * 2.0 * unmw_b_matrix * org_imp_int_coord_distance
-                        dq.append(coord_curvature[idx] * org_imp_int_coord_distance)
-
-            
-
-        Dimp_sq = float(np.dot(np.array(dq), np.array(dq)))
-
-        if Dimp_sq < 1e-8:
-            imp_int_coord_distance = 1e-8
-            imp_int_coord_derivative_contribution[:] = 0
-            Dimp_sq = 1e-8
-            dq_dx[:] = 0
-
-        dw_dalpha_i = 0
-        dw_dX_dalpha_i = 0
-        if self.interpolation_type == 'shepard':
-            denominator, weight_gradient = self.shepard_weight_gradient_hessian(distance, data_point.confidence_radius, grad_s, imp_int_coord_distance, imp_int_coord_derivative_contribution)  
-            
-            
-            
-            weight_gradient = (weight_gradient.reshape(-1) * np.exp(-self.alpha * Dimp_sq) - 1.0 / denominator * self.alpha * np.exp(-self.alpha * Dimp_sq) * dq_dx).reshape(-1,3)
-            denominator = denominator * np.exp(self.alpha * Dimp_sq)
-            
-
-            if self.calc_optim_trust_radius:
-                dw_dalpha_i = self.trust_radius_weight_gradient_hessian(data_point.confidence_radius, distance, imp_int_coord_distance)
-                dw_dX_dalpha_i = self.trust_radius_weight_gradient_gradient_hessian(data_point.confidence_radius, distance, grad_s, imp_int_coord_distance, imp_int_coord_derivative_contribution)
-
-                if store_alpha_gradients:
-                    self.dw_dalpha_list.append(dw_dalpha_i)
-                    self.dw_dX_dalpha_list.append(dw_dX_dalpha_i)
-
-            
-        elif self.interpolation_type == 'simple':
-            weight_gradient = self.simple_weight_gradient(distance_vector, distance)
-        else:
-            errtxt = "Unrecognized interpolation type: "
-            errtxt += self.interpolation_type
-            raise ValueError(errtxt)
-        
-        weight_gradient_full = np.zeros_like(reference_coordinates)   # (natms,3)
-        weight_gradient_full[self.symmetry_information[3]] = weight_gradient
-        
-
-        return distance, dihedral_dist, denominator, weight_gradient_full, distance_vector, grad_s, dw_dalpha_i, dw_dX_dalpha_i
-
-
     def determine_important_internal_coordinates(
         self,
-        qm_energy,
         qm_gradient,
         molecule,
         z_matrix,
         datapoints,
-        dihedral_diff_const: bool = True,  # kept only for API compatibility
     ):
         """
         Error-source-focused selection scheme.

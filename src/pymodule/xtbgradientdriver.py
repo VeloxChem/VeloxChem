@@ -37,19 +37,9 @@ from .gradientdriver import GradientDriver
 class XtbGradientDriver(GradientDriver):
     """
     Implements XTB gradient driver.
-
-    :param xtb_drv:
-        The XTB driver.
-
-    Instance variables
-        - flag: The driver flag.
     """
 
     def __init__(self, xtb_drv):
-        """
-        Initializes XTB gradient driver.
-        """
-
         super().__init__(xtb_drv.comm, xtb_drv.ostream)
 
         self.xtb_driver = xtb_drv
@@ -70,6 +60,7 @@ class XtbGradientDriver(GradientDriver):
         self.ostream.mute()
         self.xtb_driver.compute(molecule)
         self.ostream.unmute()
+
         self.gradient = self.xtb_driver.get_gradient()
         self.gradient = self.comm.bcast(self.gradient, root=mpi_master())
 
@@ -91,4 +82,7 @@ class XtbGradientDriver(GradientDriver):
         self.xtb_driver.compute(molecule)
         self.ostream.unmute()
 
-        return self.xtb_driver.get_energy()
+        energy = self.xtb_driver.get_energy()
+        energy = self.comm.bcast(energy, root=mpi_master())
+
+        return energy

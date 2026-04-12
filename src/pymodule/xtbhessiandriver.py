@@ -81,15 +81,6 @@ class XtbHessianDriver(HessianDriver):
             cphf_dict = {}
 
     def compute(self, molecule, *args):
-        """
-        Computes the numerical nuclear Hessian.
-
-        :param molecule:
-            The molecule.
-        :param args:
-            Redundant args from call in vibrationalanalysis
-        """
-
         self.print_header()
 
         start_time = tm.time()
@@ -99,10 +90,10 @@ class XtbHessianDriver(HessianDriver):
         self.ostream.unmute()
 
         self.elec_energy = self.xtb_driver.get_energy()
+        self.elec_energy = self.comm.bcast(self.elec_energy, root=mpi_master())
 
         self.compute_numerical(molecule)
 
-        # print Hessian
         if self.do_print_hessian:
             self.print_geometry(molecule)
             self.ostream.print_blank()
