@@ -340,10 +340,6 @@ class IMForceFieldGenerator:
                             constraint = f"freeze dihedral {reference_dih[0] + 1} {reference_dih[1] + 1} {reference_dih[2] + 1} {reference_dih[3] + 1}"
                             opt_drv.constraints = [constraint]
                         opt_results = opt_drv.compute(mol, opt_basis, scf_results)
-                        # TODO: ask and remove commented out
-                        # optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
-                        # mol = optimized_molecule
-                        # print(optimized_molecule.get_xyz_string())
                         mol = opt_results["final_molecule"]
                     
                     current_basis = MolecularBasis.read(mol, basis.get_main_basis_label())
@@ -849,9 +845,6 @@ class IMForceFieldGenerator:
 
                             opt_drv.constraints = constraints
                         opt_results = opt_drv.compute(mol, current_basis, scf_results)
-                        # TODO: ask and remove commented out
-                        # optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
-                        # mol = optimized_molecule
                         mol = opt_results["final_molecule"]
                     
                     labels = []
@@ -859,7 +852,6 @@ class IMForceFieldGenerator:
                     current_basis = MolecularBasis.read(mol, basis.get_main_basis_label())
                     self.add_point(mol, current_basis, imforcefieldfile)
                     database_expanded = True
-                    # FIXME: shouldn't printouts be handled by self.ostream?
                     print('The interpolation quality was too low! Structre as been added to the database')
 
             if not database_expanded:

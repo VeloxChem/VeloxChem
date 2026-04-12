@@ -1881,9 +1881,6 @@ class IMDatabasePointCollecter:
                     constraint = f"freeze dihedral {reference_dih[0] + 1} {reference_dih[1] + 1} {reference_dih[2] + 1} {reference_dih[3] + 1}"
                     opt_drv.constraints = [constraint]
                 opt_results = opt_drv.compute(molecule, current_basis, scf_tensors)
-                # TODO: ask and remove commented out
-                # optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
-                # molecule = optimized_molecule
                 molecule = opt_results["final_molecule"]
 
             self.add_point(molecule, label, self.qm_datafile, current_basis)
