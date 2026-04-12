@@ -185,7 +185,14 @@ class TdaEigenSolver(TdaEigenSolverBase):
 
         else:
             orb_ene = None
+            norb = None
             nocc = None
+
+        norb, nocc = self.comm.bcast((norb, nocc), root=mpi_master())
+
+        self._check_mpi_oversubscription(
+            self._get_excitation_space_dimension_restricted(nocc, norb),
+            'excitation space')
 
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
@@ -218,6 +225,8 @@ class TdaEigenSolver(TdaEigenSolverBase):
                     molecule, basis, dft_dict, pe_dict, self.ostream)
                 self.restart = (rst_trial_mat is not None and
                                 rst_sig_mat is not None)
+                if self.restart:
+                    self.restart = self.match_settings(self.checkpoint_file)
             self.restart = self.comm.bcast(self.restart, root=mpi_master())
 
         if self.restart:
@@ -329,6 +338,7 @@ class TdaEigenSolver(TdaEigenSolverBase):
                 write_rsp_hdf5(self.checkpoint_file, [trials, sigmas],
                                ['TDA_trials', 'TDA_sigmas'], molecule, basis,
                                dft_dict, pe_dict, self.ostream)
+            self._write_settings_to_checkpoint()
             self._add_nstates_to_checkpoint()
 
             # finish TDA after convergence

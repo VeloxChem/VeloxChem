@@ -297,12 +297,12 @@ class TestLR:
         lr_drv.restart = True
         lr_drv.frequencies = [0.05, 0.06]
         restarted_results = lr_drv.compute(mol, bas, scf_results)
-        assert lr_drv.restart
+        assert lr_drv.restart is True
 
         lr_drv.restart = False
         lr_drv.frequencies = [0.05, 0.06]
         fresh_results = lr_drv.compute(mol, bas, scf_results)
-        assert not lr_drv.restart
+        assert lr_drv.restart is False
 
         if lr_drv.rank == mpi_master():
             for key, value in restarted_results['response_functions'].items():

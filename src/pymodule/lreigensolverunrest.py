@@ -187,6 +187,10 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
                 False,
                 f'{type(self).__name__}: restricted_subspace not implemented')
 
+        self._check_mpi_oversubscription(
+            self._get_excitation_space_dimension_unrestricted(
+                nocc_a, nocc_b, norb), 'excitation space')
+
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
 
@@ -226,6 +230,8 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
                 self.restart = check_rsp_hdf5(self.checkpoint_file,
                                               rsp_vector_labels, molecule,
                                               basis, dft_dict, pe_dict)
+                if self.restart:
+                    self.restart = self.match_settings(self.checkpoint_file)
             self.restart = self.comm.bcast(self.restart, root=mpi_master())
 
         # read initial guess from restart file

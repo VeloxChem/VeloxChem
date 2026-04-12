@@ -154,6 +154,10 @@ class LinearResponseSolver(LinearResponseSolverBase):
         norb = orb_ene.shape[0]
         nocc = molecule.number_of_alpha_occupied_orbitals(basis)
 
+        self._check_mpi_oversubscription(
+            self._get_excitation_space_dimension_restricted(nocc, norb),
+            'response space')
+
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
 
@@ -226,6 +230,8 @@ class LinearResponseSolver(LinearResponseSolverBase):
                 self.restart = check_rsp_hdf5(self.checkpoint_file,
                                               rsp_vector_labels, molecule,
                                               basis, dft_dict, pe_dict)
+                if self.restart:
+                    self.restart = self.match_settings(self.checkpoint_file)
             self.restart = self.comm.bcast(self.restart, root=mpi_master())
 
         # read initial guess from restart file
