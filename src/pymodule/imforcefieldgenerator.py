@@ -63,7 +63,7 @@ from .imdatabasepointcollecter import IMDatabasePointCollecter
 from .mmforcefieldgenerator import MMForceFieldGenerator
 from .conformergenerator import ConformerGenerator
 from .optimizationdriver import OptimizationDriver
-from .atommapper import AtomMapper
+# from .atommapper import AtomMapper
 from .tsguesser import TransitionStateGuesser
 
 import openmm as mm
@@ -689,7 +689,46 @@ class IMForceFieldGenerator:
         :param sampling_structures: devides the searchspace around given rotatbale dihedrals
             
         """
-        
+
+        def _determine_cX_symmetry_groups(molecule):
+            """
+            Build symmetry groups for methyl rotors only.
+
+            Returns the same tuple shape used from AtomMapper:
+                (atom_map, symmetry_groups, rc_groups)
+            where:
+                atom_map: all atom indices
+                symmetry_groups: list of equivalent H triplets in CH3 groups
+                rc_groups: empty (not used in this CH3-only path)
+            """
+            labels = [str(x).strip().capitalize() for x in molecule.get_labels()]
+            conn = molecule.get_connectivity_matrix()
+            n_atoms = len(labels)
+
+            atom_map = list(range(n_atoms))
+            rc_groups = []
+
+            ch3_groups = []
+            seen = set()
+
+            allowed_neighbours = ["H", "F", "Cl", "Br"]
+
+            for c_idx, symbol in enumerate(labels):
+                if symbol != "C":
+                    continue
+
+                neighbors = [j for j, bonded in enumerate(conn[c_idx]) if bonded]
+                h_neighbors = [j for j in neighbors if labels[j] in allowed_neighbours]
+                heavy_neighbors = [j for j in neighbors if labels[j] not in allowed_neighbours]
+
+                # Rotor-relevant methyl carbon: C(H)3-X
+                if len(neighbors) == 4 and len(h_neighbors) == 3 and len(heavy_neighbors) == 1:
+                    group = tuple(sorted(h_neighbors))
+                    if group not in seen:
+                        seen.add(group)
+                        ch3_groups.append(list(group))
+
+            return atom_map, ch3_groups, rc_groups       
         
         def determine_dimer_fragments(molecule):
             
@@ -913,8 +952,11 @@ class IMForceFieldGenerator:
             self.qm_data_points = None
             self.molecule = molecule
 
-            atom_mapper = AtomMapper(molecule, molecule)
-            symmetry_groups = atom_mapper.determine_symmetry_group()
+            # atom_mapper = AtomMapper(molecule, molecule)
+            # symmetry_groups = atom_mapper.determine_symmetry_group()
+
+            symmetry_groups = _determine_cX_symmetry_groups(molecule)
+
 
             if not self.use_symmetry:
                 symmetry_groups = (symmetry_groups[0], [], symmetry_groups[2])

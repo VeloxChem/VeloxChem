@@ -36,7 +36,7 @@ import h5py
 from contextlib import redirect_stderr
 from io import StringIO
 from .interpolationdatapoint import InterpolationDatapoint
-from .atommapper import AtomMapper
+# from .atommapper import AtomMapper
 from .molecule import Molecule
 from .outputstream import OutputStream
 from .veloxchemlib import mpi_master

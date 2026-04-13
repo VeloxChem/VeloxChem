@@ -52,7 +52,7 @@ from .optimizationdriver import OptimizationDriver
 from .interpolationdatapoint import InterpolationDatapoint
 from .scfrestdriver import ScfRestrictedDriver
 from .interpolationdriver import InterpolationDriver
-from .atommapper import AtomMapper
+# from .atommapper import AtomMapper
 from .errorhandler import assert_msg_critical
 from .mofutils import svd_superimpose
 from contextlib import redirect_stderr
@@ -2976,8 +2976,8 @@ class OpenMMIMDynamics:
         self.qm_data_points = None
         self.molecule = molecule
 
-        atom_mapper = AtomMapper(molecule, molecule)
-        symmetry_groups = atom_mapper.determine_symmetry_group()
+        # atom_mapper = AtomMapper(molecule, molecule)
+        # symmetry_groups = atom_mapper.determine_symmetry_group()
 
         if not self.use_symmetry:
             symmetry_groups = (symmetry_groups[0], [], symmetry_groups[2])
