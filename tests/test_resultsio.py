@@ -3,6 +3,7 @@ from pathlib import Path
 from mpi4py import MPI
 import h5py
 import numpy as np
+import pytest
 
 from veloxchem import (Molecule, MolecularBasis, OptimizationDriver, MpiTask,
                        OutputStream, ScfGradientDriver, ScfRestrictedDriver,
@@ -354,74 +355,76 @@ def test_read_results_roundtrips_tda_rsp_and_preserves_legacy_solution_vectors(
                                    rsp_results['eigenvectors'][:, 1])
 
 
+@pytest.mark.skipif(MPI.COMM_WORLD.Get_size() != 1,
+                    reason='runs only on a single MPI rank')
 def test_read_results_roundtrips_rpa_rsp_and_preserves_legacy_solution_vectors(
         tmp_path):
 
     rsp_drv, rsp_results, h5file = _run_water_rsp_roundtrip(
         tmp_path, LinearResponseEigenSolver)
 
-    if MPI.COMM_WORLD.Get_rank() == mpi_master():
-        recovered = read_results(h5file, 'rsp')
+    recovered = read_results(h5file, 'rsp')
 
-        assert 'eigenvectors_distributed' not in recovered
+    assert 'eigenvectors_distributed' not in recovered
 
-        expected_rsp = {
-            key: value
-            for key, value in rsp_results.items()
-            if key != 'eigenvectors_distributed'
-        }
-        recovered_rsp = {
-            key: value
-            for key, value in recovered.items() if key not in {'S1', 'S2'}
-        }
+    expected_rsp = {
+        key: value
+        for key, value in rsp_results.items()
+        if key != 'eigenvectors_distributed'
+    }
+    recovered_rsp = {
+        key: value
+        for key, value in recovered.items() if key not in {'S1', 'S2'}
+    }
 
-        _assert_roundtrip_equal(expected_rsp, recovered_rsp)
+    _assert_roundtrip_equal(expected_rsp, recovered_rsp)
 
-        np.testing.assert_allclose(
-            recovered['S1'],
-            rsp_drv.get_full_solution_vector(
-                rsp_results['eigenvectors_distributed'][0]))
-        np.testing.assert_allclose(
-            recovered['S2'],
-            rsp_drv.get_full_solution_vector(
-                rsp_results['eigenvectors_distributed'][1]))
+    np.testing.assert_allclose(
+        recovered['S1'],
+        rsp_drv.get_full_solution_vector(
+            rsp_results['eigenvectors_distributed'][0]))
+    np.testing.assert_allclose(
+        recovered['S2'],
+        rsp_drv.get_full_solution_vector(
+            rsp_results['eigenvectors_distributed'][1]))
 
 
+@pytest.mark.skipif(MPI.COMM_WORLD.Get_size() != 1,
+                    reason='runs only on a single MPI rank')
 def test_read_results_roundtrips_cpp_rsp_and_preserves_legacy_solution_vectors(
         tmp_path):
 
     rsp_drv, rsp_results, h5file = _run_cpp_rsp_roundtrip(tmp_path)
 
-    if MPI.COMM_WORLD.Get_rank() == mpi_master():
-        recovered = read_results(h5file, 'rsp')
+    recovered = read_results(h5file, 'rsp')
 
-        assert 'solutions' not in recovered
+    assert 'solutions' not in recovered
 
-        expected_rsp = {key: value for key, value in rsp_results.items()
-                        if key != 'solutions'}
-        spectrum = rsp_drv.get_spectrum(rsp_results, 'au')
-        expected_rsp['sigma'] = np.array(spectrum['y_data'])
+    expected_rsp = {key: value for key, value in rsp_results.items()
+                    if key != 'solutions'}
+    spectrum = rsp_drv.get_spectrum(rsp_results, 'au')
+    expected_rsp['sigma'] = np.array(spectrum['y_data'])
 
-        recovered_solution_keys = {
-            key
-            for key in recovered
-            if key not in expected_rsp
-        }
-        expected_solution_keys = {
-            f'{aop}_{bop}_{w:.8f}'
-            for (aop, bop, w) in rsp_results['response_functions']
-        }
+    recovered_solution_keys = {
+        key
+        for key in recovered
+        if key not in expected_rsp
+    }
+    expected_solution_keys = {
+        f'{aop}_{bop}_{w:.8f}'
+        for (aop, bop, w) in rsp_results['response_functions']
+    }
 
-        assert recovered_solution_keys == expected_solution_keys
-        _assert_roundtrip_equal(expected_rsp,
-                                {key: value for key, value in recovered.items()
-                                 if key in expected_rsp})
+    assert recovered_solution_keys == expected_solution_keys
+    _assert_roundtrip_equal(expected_rsp,
+                            {key: value for key, value in recovered.items()
+                             if key in expected_rsp})
 
-        for key in rsp_results['solutions']:
-            full_vec = rsp_drv.get_full_solution_vector(
-                rsp_results['solutions'][key])
-            flat_key = f'{key[0]}_{key[0]}_{key[1]:.8f}'
-            np.testing.assert_allclose(recovered[flat_key], full_vec)
+    for key in rsp_results['solutions']:
+        full_vec = rsp_drv.get_full_solution_vector(
+            rsp_results['solutions'][key])
+        flat_key = f'{key[0]}_{key[0]}_{key[1]:.8f}'
+        np.testing.assert_allclose(recovered[flat_key], full_vec)
 
 
 def test_scf_results_hdf5_roundtrip_with_water_calculation(tmp_path):
@@ -446,6 +449,37 @@ def test_scf_results_hdf5_roundtrip_with_water_calculation(tmp_path):
         assert 'basis_set' not in recovered
         assert 'nuclear_charges' not in recovered
         assert recovered['scf_history'] == scf_drv.history
+
+
+@pytest.mark.skipif(MPI.COMM_WORLD.Get_size() != 1,
+                    reason='runs only on a single MPI rank')
+def test_read_results_ignores_legacy_untyped_rsp_nto_group(tmp_path):
+
+    h5file = tmp_path / 'legacy_rsp_nto.h5'
+
+    with h5py.File(h5file, 'w') as h5f:
+        rsp_group = h5f.create_group('rsp')
+        rsp_group.attrs['value_type'] = 'dict'
+        rsp_group.attrs['dict_storage'] = 'named'
+
+        eigenvalues = rsp_group.create_dataset('eigenvalues',
+                                               data=np.array([1.2, 1.5]))
+        eigenvalues.attrs['value_type'] = 'ndarray'
+        eigenvalues.attrs['array_data_type'] = 'float64'
+
+        rsp_group.create_dataset('S1', data=np.array([0.3, 0.4, 0.5]))
+
+        nto_group = rsp_group.create_group('nto')
+        nto_group.create_dataset('NTO_S1_alpha_energies',
+                                 data=np.array([0.1, 0.2, 0.3]))
+        nto_group.create_dataset('NTO_S1_scf_type',
+                                 data=np.array([b'restricted']))
+
+    recovered = read_results(str(h5file), 'rsp')
+
+    assert set(recovered) == {'S1', 'eigenvalues'}
+    np.testing.assert_allclose(recovered['S1'], np.array([0.3, 0.4, 0.5]))
+    np.testing.assert_allclose(recovered['eigenvalues'], np.array([1.2, 1.5]))
 
 
 def test_opt_results_hdf5_roundtrip_with_nh3_optimization(tmp_path):

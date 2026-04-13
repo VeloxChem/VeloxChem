@@ -170,6 +170,11 @@ def _read_value_from_hdf5(h5obj, value_label='HDF5 value'):
                 return {
                     key: _read_value_from_hdf5(h5obj[key], value_label)
                     for key in h5obj
+                    # TODO: Drop this temporary skip once legacy raw nested
+                    # groups such as rsp/nto are serialized with value_type
+                    # metadata or stored outside the serialized results group.
+                    if (not isinstance(h5obj[key], h5py.Group) or
+                        h5obj[key].attrs.get('value_type', None) is not None)
                 }
 
             if dict_storage == 'entries':
