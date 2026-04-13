@@ -30,9 +30,11 @@
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+from mpi4py import MPI
 from contextlib import redirect_stdout, redirect_stderr
 from pathlib import Path
 from io import StringIO
+from copy import deepcopy
 import numpy as np
 import time as tm
 import tempfile
@@ -42,12 +44,14 @@ import h5py
 from .veloxchemlib import mpi_master, hartree_in_kjpermol
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
+from .outputstream import OutputStream
 from .optimizationengine import OptimizationEngine
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .scfrestopendriver import ScfRestrictedOpenDriver
 from .scfgradientdriver import ScfGradientDriver
 from .scfhessiandriver import ScfHessianDriver
+from .vibrationalanalysis import VibrationalAnalysis
 from .tddftgradientdriver import TddftGradientDriver
 from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
@@ -55,7 +59,10 @@ from .openmmdriver import OpenMMDriver
 from .openmmgradientdriver import OpenMMGradientDriver
 from .mmdriver import MMDriver
 from .mmgradientdriver import MMGradientDriver
-from .inputparser import parse_input, print_keywords, get_random_string_parallel
+from .inputparser import (parse_input, print_keywords,
+                          get_random_string_parallel, unparse_input,
+                          read_unparsed_input_from_hdf5)
+from .checkpoint import read_molecule_and_basis
 from .errorhandler import assert_msg_critical
 
 with redirect_stderr(StringIO()) as fg_err:
@@ -119,6 +126,8 @@ class OptimizationDriver:
 
         self.filename = None
 
+        self.restart = True
+
         self._debug = False
 
         # input keywords
@@ -136,6 +145,7 @@ class OptimizationDriver:
                 'hessian': ('str_lower', 'hessian flag'),
                 'ref_xyz': ('str', 'reference geometry'),
                 'keep_files': ('bool', 'flag to keep output files'),
+                'restart': ('bool', 'flag to restart from checkpoint'),
                 'conv_maxiter':
                     ('bool', 'consider converged if max_iter is reached'),
                 'conv_energy': ('float', ''),
@@ -157,9 +167,7 @@ class OptimizationDriver:
         """
 
         if hasattr(self.grad_drv, 'scf_driver'):
-            return isinstance(self.grad_drv.scf_driver,
-                              (ScfRestrictedDriver, ScfUnrestrictedDriver,
-                               ScfRestrictedOpenDriver))
+            return isinstance(self.grad_drv, ScfGradientDriver)
         else:
             return False
 
@@ -190,6 +198,27 @@ class OptimizationDriver:
         # update hessian option for transition state search
         if ('hessian' not in opt_dict) and (self.transition or self.irc):
             self.hessian = 'first'
+
+    def read_settings(self, checkpoint_file):
+        """
+        Reads opt settings from checkpoint file.
+
+        :param checkpoint_file:
+            The checkpoint file to read settings from.
+        """
+
+        if self.rank == mpi_master():
+            checkpoint_opt_input = read_unparsed_input_from_hdf5(
+                checkpoint_file, group_name='opt_settings')
+        else:
+            checkpoint_opt_input = None
+
+        checkpoint_opt_input = self.comm.bcast(checkpoint_opt_input,
+                                               root=mpi_master())
+
+        self.update_settings(checkpoint_opt_input)
+
+        self.grad_drv.read_settings(checkpoint_file)
 
     def _pick_driver(self, drv):
         """
@@ -236,7 +265,7 @@ class OptimizationDriver:
             The same arguments as the "compute" function of the gradient driver.
 
         :return:
-            The tuple with final geometry, and energy of molecule.
+            A dictionary containing the results of the geometry optimization.
         """
 
         # update hessian option for transition state search
@@ -261,7 +290,29 @@ class OptimizationDriver:
 
         start_time = tm.time()
 
+        if self.is_scf:
+            basis = args[0]
+            if self.restart:
+                valid_chkpnt = self.grad_drv.scf_driver.validate_checkpoint(
+                    molecule.get_element_ids(), basis.get_label(),
+                    self.grad_drv.scf_driver.scf_type)
+                if valid_chkpnt:
+                    if self.rank == mpi_master():
+                        molecule, basis = read_molecule_and_basis(
+                            self.grad_drv.scf_driver.get_checkpoint_file())
+                    molecule = self.comm.bcast(molecule, root=mpi_master())
+                    self.ostream.print_info(
+                        'Reading molecular geometry from checkpoint file...')
+                    self.ostream.print_blank()
+                    self.ostream.flush()
+
         opt_engine = OptimizationEngine(self.grad_drv, molecule, *args)
+
+        # save unparsed opt_dict in opt_engine for later writing to checkpoint
+        opt_keywords = {
+            key: val[0] for key, val in self.input_keywords['optimize'].items()
+        }
+        opt_engine.opt_unparsed_input = unparse_input(self, opt_keywords)
 
         if self._debug:
             opt_engine._debug = True
@@ -336,15 +387,37 @@ class OptimizationDriver:
                         for line in constr_dict[key]:
                             print(line, file=fh)
             constr_filename = constr_file.as_posix()
+
+            # self.ostream.print_info('The following constraints are passed to geomeTRIC:')
+            # self.ostream.print_blank()
+            # with constr_file.open('r') as fh:
+            #     for line in fh:
+            #         self.ostream.print_header(line.rstrip().ljust(104))
+            # self.ostream.print_blank()
+            # self.ostream.flush()
+
         else:
             constr_filename = None
 
         optinp_filename = Path(filename + '.optinp').as_posix()
 
+        # prepare for post-opt Hessian
+
+        need_scf_postopt_hessian = False
+        if self.is_scf and self.hessian == 'last':
+            need_scf_postopt_hessian = True
+            self.hessian = 'never'
+        elif self.is_scf and self.hessian == 'first+last':
+            need_scf_postopt_hessian = True
+            self.hessian = 'first'
+
         # pre-compute Hessian
 
         if self.is_scf and self.hessian == 'first':
             hessian_drv = ScfHessianDriver(self.grad_drv.scf_driver)
+            # conservative choice of disabling restart
+            # since geometry is likely changed during an opt calculation
+            hessian_drv.cphf_dict = {'restart': False}
             hessian_drv.compute(molecule, args[0])
             if self.rank == mpi_master():
                 hess_data = hessian_drv.hessian.copy()
@@ -418,6 +491,7 @@ class OptimizationDriver:
             final_mol = self.comm.bcast(final_mol, root=mpi_master())
 
             opt_results = {'final_geometry': final_mol.get_xyz_string()}
+            opt_results['final_molecule'] = final_mol
 
             if self.rank == mpi_master():
                 self.grad_drv.ostream.print_info(
@@ -489,9 +563,34 @@ class OptimizationDriver:
                 # Note: use base_fname so that the final h5 file is kept even
                 # when keep_files is False
                 final_h5_fname = base_fname + ".h5"
-                self._write_final_hdf5(final_h5_fname, final_mol, opt_results)
+                # pass in the basis set object if it is in args
+                if len(args) >= 1 and isinstance(args[0], MolecularBasis):
+                    self._write_final_hdf5(final_h5_fname,
+                                           final_mol,
+                                           opt_results,
+                                           basis=args[0])
+                else:
+                    self._write_final_hdf5(final_h5_fname, final_mol,
+                                           opt_results)
 
             opt_results = self.comm.bcast(opt_results, root=mpi_master())
+
+        # post-opt Hessian
+
+        if self.is_scf and need_scf_postopt_hessian:
+            vib_drv = VibrationalAnalysis(self.grad_drv.scf_driver)
+            vib_drv.filename = self.grad_drv.scf_driver.filename
+            # conservative choice of disabling restart
+            # since geometry is likely changed during an opt calculation
+            vib_drv.cphf_dict = {'restart': False}
+            vib_results_not_used = vib_drv.compute(molecule, args[0])
+            # restore Hessian option
+            if self.hessian == 'never':
+                need_scf_postopt_hessian = False
+                self.hessian == 'last'
+            elif self.hessian == 'first':
+                need_scf_postopt_hessian = False
+                self.hessian == 'first+last'
 
         try:
             temp_dir.cleanup()
@@ -932,7 +1031,7 @@ class OptimizationDriver:
         mol = Molecule.read_xyz_string(xyz_data_i)
         mol.show(atom_indices=atom_indices, width=640, height=360)
 
-    def _write_final_hdf5(self, fname, molecule, opt_results):
+    def _write_final_hdf5(self, fname, molecule, opt_results, basis=None):
         """
         Creats a HDF5 file and saves the optimization results.
 
@@ -942,6 +1041,8 @@ class OptimizationDriver:
             The molecule.
         :param opt_results:
             The dictionary of optimzation results.
+        :param basis:
+            Optional AO basis set object (for taking care of ECP core electrons).
         """
 
         if (fname and isinstance(fname, str) and Path(fname).is_file()):
@@ -960,7 +1061,7 @@ class OptimizationDriver:
                 for xyzstr in opt_results['scan_geometries']:
                     mol = Molecule.read_xyz_string(xyzstr)
                     nuclear_repulsion_energies.append(
-                        mol.nuclear_repulsion_energy())
+                        mol.effective_nuclear_repulsion_energy(basis))
                     scan_coordinates_au.append(mol.get_coordinates_in_bohr())
 
                 hf.create_dataset(opt_group + 'scan_coordinates_au',
@@ -975,7 +1076,7 @@ class OptimizationDriver:
                 for xyzstr in opt_results['opt_geometries']:
                     mol = Molecule.read_xyz_string(xyzstr)
                     nuclear_repulsion_energies.append(
-                        mol.nuclear_repulsion_energy())
+                        mol.effective_nuclear_repulsion_energy(basis))
                     opt_coordinates_au.append(mol.get_coordinates_in_bohr())
 
                 hf.create_dataset(opt_group + 'opt_coordinates_au',
@@ -992,3 +1093,23 @@ class OptimizationDriver:
             self.ostream.flush()
 
             hf.close()
+
+    def __deepcopy__(self, memo):
+        """
+        Implements deepcopy.
+
+        :param memo:
+            The memo dictionary for deepcopy.
+
+        :return:
+            A deepcopy of self.
+        """
+
+        new_opt_drv = OptimizationDriver(deepcopy(self.grad_drv))
+
+        for key, val in vars(self).items():
+            if isinstance(val, (MPI.Intracomm, OutputStream)):
+                continue
+            setattr(new_opt_drv, key, deepcopy(val))
+
+        return new_opt_drv

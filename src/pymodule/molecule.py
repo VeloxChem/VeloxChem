@@ -38,7 +38,8 @@ from .veloxchemlib import Molecule
 from .veloxchemlib import bohr_in_angstrom, mpi_master
 from .outputstream import OutputStream
 from .inputparser import print_keywords
-from .errorhandler import assert_msg_critical, safe_arccos
+from .errorhandler import assert_msg_critical
+from .mathutils import safe_arccos
 from .pubchemfetcher import (get_data_from_name, get_all_conformer_IDs,
                              get_conformer_data, get_pubchem_sketcher_reference)
 
@@ -68,7 +69,10 @@ def _Molecule_smiles_formal_charge(smiles_str):
 
 
 @staticmethod
-def _Molecule_smiles_to_xyz(smiles_str, optimize=True, hydrogen=True):
+def _Molecule_smiles_to_xyz(smiles_str,
+                            optimize=True,
+                            hydrogen=True,
+                            reorder_hydrogens=False):
     """
     Converts SMILES string to xyz string.
 
@@ -77,7 +81,10 @@ def _Molecule_smiles_to_xyz(smiles_str, optimize=True, hydrogen=True):
     :param optimize:
         Boolean indicating whether to perform geometry optimization.
     :param hydrogen:
-        Boolean indicating whether to remove hydrogens.
+        Boolean indicating whether to include hydrogens.
+    :param reorder_hydrogens:
+        Boolean indicating whether to reorder hydrogen atoms such that they are
+        close to their bonded neighbor.
 
     :return:
         An xyz string (including number of atoms).
@@ -97,28 +104,85 @@ def _Molecule_smiles_to_xyz(smiles_str, optimize=True, hydrogen=True):
             AllChem.UFFOptimizeMolecule(mol_full)
 
         if hydrogen:
+            if reorder_hydrogens:
+                reordering = []
+                for atom in mol_full.GetAtoms():
+                    # add non-hydrogen atom
+                    if (atom.GetAtomicNum() != 1 and
+                            atom.GetIdx() not in reordering):
+                        reordering.append(atom.GetIdx())
+                        for nbr in atom.GetNeighbors():
+                            # add neighboring hydrogen atoms
+                            if (nbr.GetAtomicNum() == 1 and
+                                    nbr.GetIdx() not in reordering):
+                                reordering.append(nbr.GetIdx())
+                for atom in mol_full.GetAtoms():
+                    # For completeness, add remaining atoms
+                    # This is necessary for e.g. H2 molecule
+                    if atom.GetIdx() not in reordering:
+                        reordering.append(atom.GetIdx())
+                assert_msg_critical(
+                    len(reordering) == mol_full.GetNumAtoms(),
+                    'Molecule.smiles_to_xyz: Invalid list of indices for reordering'
+                )
+                mol_full_reordered = Chem.RenumberAtoms(mol_full, reordering)
+                mol_full = mol_full_reordered
             return Chem.MolToXYZBlock(mol_full)
         else:
-            return Chem.RemoveHs(mol_full)
+            return Chem.MolToXYZBlock(Chem.RemoveHs(mol_full))
 
     except ImportError:
         raise ImportError('Unable to import rdkit.')
 
 
 @staticmethod
-def _Molecule_read_smiles(smiles_str):
+def _Molecule_read_smiles(smiles_str, reorder_hydrogens=False):
     """
     Reads molecule from SMILES string.
 
     :param smiles_str:
         The SMILES string.
+    :param reorder_hydrogens:
+        Boolean indicating whether to reorder hydrogen atoms such that they are
+        close to their bonded neighbor.
 
     :return:
         The molecule.
     """
 
-    xyz = Molecule.smiles_to_xyz(smiles_str, optimize=True)
-    mol = Molecule.read_xyz_string(xyz)
+    if '.' in smiles_str:
+        # multi-components
+        sub_xyzs = [
+            Molecule.smiles_to_xyz(sub_smiles_str,
+                                   optimize=True,
+                                   reorder_hydrogens=reorder_hydrogens)
+            for sub_smiles_str in smiles_str.split('.')
+        ]
+        sub_mols = [Molecule.read_xyz_string(xyz) for xyz in sub_xyzs]
+
+        mol = sub_mols[0]
+        for sub_mol in sub_mols[1:]:
+            center_a = mol.center_of_mass_in_bohr()
+            coords_a = mol.get_coordinates_in_bohr()
+
+            center_b = sub_mol.center_of_mass_in_bohr()
+            coords_b = sub_mol.get_coordinates_in_bohr()
+
+            translate = center_a - center_b
+            translate[0] += np.max(coords_a[:, 0]) - center_a[0]
+            translate[0] += center_b[0] - np.min(coords_b[:, 0])
+            translate[0] += 10.0  # add a space of 10 Bohr
+
+            for idx in range(coords_b.shape[0]):
+                sub_mol.set_atom_coordinates(idx, coords_b[idx] + translate)
+
+            mol = Molecule(mol, sub_mol)
+    else:
+        # single component
+        xyz = Molecule.smiles_to_xyz(smiles_str,
+                                     optimize=True,
+                                     reorder_hydrogens=reorder_hydrogens)
+        mol = Molecule.read_xyz_string(xyz)
 
     mol_chg = Molecule.smiles_formal_charge(smiles_str)
     mol.set_charge(mol_chg)
@@ -394,7 +458,7 @@ def _Molecule_read_xyz_string(xyz):
 
 
 @staticmethod
-def _Molecule_from_dict(mol_dict):
+def _Molecule_from_input_dict(mol_dict):
     """
     Reads molecule from a dictionary.
 
@@ -443,7 +507,104 @@ def _Molecule_from_dict(mol_dict):
     return mol
 
 
-def _Molecule_get_connectivity_matrix(self, factor=1.3, H2_factor=1.7):
+def _Molecule_effective_nuclear_repulsion_energy(self, basis):
+    """
+    Computes effective nuclear repulsion energy of a molecule.
+
+    :param basis:
+        AO basis set object (for taking care of ECP core electrons).
+    :return:
+        The effective nuclear repulsion energy.
+    """
+
+    coords_in_au = self.get_coordinates_in_bohr()
+    elem_ids = self.get_effective_nuclear_charges(basis)
+
+    natoms = coords_in_au.shape[0]
+    e_nuc = 0.0
+
+    for i in range(natoms):
+        z_i = elem_ids[i]
+
+        for j in range(i + 1, natoms):
+            z_j = elem_ids[j]
+
+            distance = np.linalg.norm(coords_in_au[j] - coords_in_au[i])
+            e_nuc += z_i * z_j / distance
+
+    return e_nuc
+
+
+def _Molecule_nuclear_repulsion_energy(self, basis=None):
+    """
+    Computes nuclear potential energy of a molecule.
+
+    :param basis:
+        Optional AO basis set object (for taking care of ECP core electrons).
+    :return:
+        The nuclear potential energy.
+    """
+
+    coords_in_au = self.get_coordinates_in_bohr()
+    elem_ids = self.get_element_ids()
+
+    natoms = coords_in_au.shape[0]
+    e_nuc = 0.0
+
+    if basis is not None:
+        core_electrons = basis.get_number_of_ecp_core_electrons()
+        assert_msg_critical(
+            len(core_electrons) == natoms,
+            'Molecule.nuclear_repulsion_energy: ECP core electron list must match number of atoms'
+        )
+        assert_msg_critical(
+            np.all(np.array(core_electrons) >= 0),
+            'Molecule.nuclear_repulsion_energy: ECP core electrons must be non-negative'
+        )
+        elem_ids -= core_electrons
+
+    for i in range(natoms):
+        z_i = elem_ids[i]
+
+        for j in range(i + 1, natoms):
+            z_j = elem_ids[j]
+
+            distance = np.linalg.norm(coords_in_au[j] - coords_in_au[i])
+            e_nuc += z_i * z_j / distance
+
+    return e_nuc
+
+
+def _Molecule_get_effective_nuclear_charges(self, basis):
+    """
+    Returns effective nuclear charges after subtracting ECP core electrons.
+
+    :param basis:
+        The AO basis set.
+
+    :return:
+        Effective nuclear charges.
+    """
+
+    elem_ids = self.get_element_ids()
+    core_electrons = basis.get_number_of_ecp_core_electrons()
+
+    natoms = self.number_of_atoms()
+    assert_msg_critical(
+        len(core_electrons) == natoms,
+        'Molecule.get_effective_nuclear_charges: ECP core electron list must match number of atoms'
+    )
+    assert_msg_critical(
+        np.all(np.array(core_electrons) >= 0),
+        'Molecule.get_effective_nuclear_charges: ECP core electrons must be non-negative'
+    )
+
+    elem_ids -= core_electrons
+
+    return elem_ids
+
+
+def _Molecule_get_connectivity_matrix(self, factor=1.3, H2_factor=1.8):
     """
     Gets connectivity matrix.
 
@@ -661,16 +822,16 @@ def _Molecule_set_distance(self,
     i = distance_indices_one_based[0] - 1
     j = distance_indices_one_based[1] - 1
 
-    # disconnect i-j and find all atoms that at connected to j
+    # disconnect i-j and find all atoms that are connected to j
     connectivity_matrix = self.get_connectivity_matrix()
     connectivity_matrix[i, j] = 0
     connectivity_matrix[j, i] = 0
 
-    atoms_connected_to_j = self._find_connected_atoms(j, connectivity_matrix)
+    atoms_connected_to_j = self.find_connected_atoms(j, connectivity_matrix)
 
     assert_msg_critical(
         i not in atoms_connected_to_j,
-        'Molecule.set_distance: Cannot rotate distance ' +
+        'Molecule.set_distance: Cannot set distance ' +
         '(Maybe it is part of a ring?)')
 
     # rotate whole molecule around normal vector of i-j-k
@@ -833,11 +994,10 @@ def _Molecule_set_angle(self,
     connectivity_matrix[i, j] = 0
     connectivity_matrix[j, i] = 0
 
-    atoms_connected_to_j = self._find_connected_atoms(j, connectivity_matrix)
+    atoms_connected_to_j = self.find_connected_atoms(j, connectivity_matrix)
 
     assert_msg_critical(
-        i not in atoms_connected_to_j,
-        'Molecule.set_angle: Cannot rotate angle ' +
+        i not in atoms_connected_to_j, 'Molecule.set_angle: Cannot set angle ' +
         '(Maybe it is part of a ring?)')
 
     # rotate whole molecule around normal vector of i-j-k
@@ -1009,11 +1169,11 @@ def _Molecule_set_dihedral(self,
     connectivity_matrix[i, j] = 0
     connectivity_matrix[j, i] = 0
 
-    atoms_connected_to_j = self._find_connected_atoms(j, connectivity_matrix)
+    atoms_connected_to_j = self.find_connected_atoms(j, connectivity_matrix)
 
     assert_msg_critical(
         i not in atoms_connected_to_j,
-        'Molecule.set_dihedral: Cannot rotate dihedral ' +
+        'Molecule.set_dihedral: Cannot set dihedral ' +
         '(Maybe it is part of a ring?)')
 
     # rotate whole molecule around vector i->j
@@ -1284,7 +1444,10 @@ def _Molecule_show(self,
                    gradient=None,
                    starting_index=1,
                    bonds=None,
-                   dashed_bonds=None):
+                   forming_bonds=None,
+                   breaking_bonds=None,
+                   forming_width=0.15,
+                   breaking_width=0.15):
     """
     Creates a 3D view with py3dmol.
 
@@ -1299,18 +1462,33 @@ def _Molecule_show(self,
         that list as labels.
     :param gradient:
         The molecular gradient.
-    :starting_index:
+    :param starting_index:
         The starting index for atom indices.
-    :bonds:
-        A list of tuples with bonds to draw. If None, connectivity is based on
+    :param bonds:
+        A list of zero-indexed tuples with bonds to draw. If None, connectivity is based on
         proximity.
-    :dashed_bonds:
-        A list of tuples with bonds to draw as dashed lines.
+    :param forming_bonds:
+        A list of zero-indexed tuples with bonds to draw as green dashed lines.
+    :param breaking_bonds:
+        A list of zero-indexed tuples with bonds to draw as orange dashed lines.
+    :param forming_width:
+        The radius of forming bonds.
+    :param breaking_width:
+        The radius of breaking bonds.
     """
 
     try:
         import py3Dmol
         viewer = py3Dmol.view(width=width, height=height)
+
+        if forming_bonds is not None and breaking_bonds is not None:
+            dashed_bonds = forming_bonds + breaking_bonds
+        elif forming_bonds is not None:
+            dashed_bonds = forming_bonds
+        elif breaking_bonds is not None:
+            dashed_bonds = breaking_bonds
+        else:
+            dashed_bonds = None
 
         if bonds is None:
             viewer.addModel(self.get_xyz_string())
@@ -1354,7 +1532,6 @@ def _Molecule_show(self,
 
         else:
             from rdkit import Chem
-            import re
 
             rdmol = Chem.MolFromXYZBlock(self.get_xyz_string())
             edit_mol = Chem.EditableMol(rdmol)
@@ -1367,23 +1544,43 @@ def _Molecule_show(self,
                 edit_mol.AddBond(bond[0], bond[1], Chem.BondType.SINGLE)
 
             sdf = Chem.MolToMolBlock(edit_mol.GetMol())
-
-            if dashed_bonds is not None:
-                lines = sdf.split('\n')
-                last_line = lines[-2]
-                lines = lines[:-2]
-                for key in sorted(dashed_bonds):
-                    line = f" {key[0] + 1:<2} {key[1] + 1:<2} 0.5  0"
-                    lines.append(line)
-                lines.append(last_line)
-
-                splitline = re.split(r'(\s+)', lines[3])
-                splitline[4] = str(int(splitline[4]) + len(dashed_bonds))
-                splitline[3] = " " * (2 - len(splitline[4]))
-                lines[3] = ''.join(splitline)
-                sdf = '\n'.join(lines)
-
             viewer.addModel(sdf, 'sdf')
+
+        if dashed_bonds is not None:
+            coords = self.get_coordinates_in_angstrom()
+            for bond in dashed_bonds:
+                p1 = coords[bond[0]]
+                p2 = coords[bond[1]]
+                if bond in forming_bonds:
+                    colour = "#00a287"
+                    radius = forming_width
+                else:
+                    colour = "#ffa200"
+                    radius = breaking_width
+                if radius >= 0.17:
+                    dashed = False
+                else:
+                    dashed = True
+
+                viewer.addCylinder({
+                    "start": {
+                        "x": p1[0],
+                        "y": p1[1],
+                        "z": p1[2]
+                    },
+                    "end": {
+                        "x": p2[0],
+                        "y": p2[1],
+                        "z": p2[2]
+                    },
+                    "color": colour,
+                    "dashed": dashed,
+                    "radius": radius,
+                    "fromCap": "round",
+                    "toCap": "round",
+                    "dashLength": 0.075,
+                    "gapLength": 0.35 + radius
+                })
 
         if atom_indices or atom_labels:
             coords = self.get_coordinates_in_angstrom()
@@ -1436,14 +1633,13 @@ def _Molecule_draw_2d(smiles_str, width=400, height=300):
 
     try:
         from rdkit import Chem
+        from rdkit.Chem import Draw
         from IPython.display import SVG
         from IPython.display import display
 
-        mol_no_hydrogen = Molecule.smiles_to_xyz(smiles_str,
-                                                 optimize=True,
-                                                 hydrogen=False)
+        mol_no_hydrogen = Chem.RemoveHs(Chem.MolFromSmiles(smiles_str))
 
-        drawer = Chem.Draw.rdMolDraw2D.MolDraw2DSVG(width, height)
+        drawer = Draw.rdMolDraw2D.MolDraw2DSVG(width, height)
         drawer.DrawMolecule(mol_no_hydrogen)
         drawer.FinishDrawing()
 
@@ -1517,39 +1713,67 @@ def _Molecule_is_linear(self):
         return False
 
 
-def _Molecule_get_aufbau_alpha_occupation(self, n_mo):
+def _Molecule_get_aufbau_alpha_occupation(self, n_mo, basis=None):
     """
     Gets occupation numbers for alpha spin based on the aufbau principle.
 
     :param n_mo:
         The number of molecular orbitals.
+    :param basis:
+        The AO basis set.
 
     :return:
         The occupation numbers for alpha spin.
     """
 
-    nalpha = self.number_of_alpha_electrons()
+    if basis is not None:
+        nalpha = self.number_of_alpha_occupied_orbitals(basis)
+    else:
+        nalpha = self.number_of_alpha_electrons()
+
+    assert_msg_critical(
+        nalpha >= 0,
+        'Molecule.get_aufbau_alpha_occupation: Number of explicit alpha electrons must be non-negative'
+    )
+    assert_msg_critical(
+        n_mo >= nalpha,
+        'Molecule.get_aufbau_alpha_occupation: Number of molecular orbitals is too small for explicit alpha electrons'
+    )
 
     return np.hstack((np.ones(nalpha), np.zeros(n_mo - nalpha)))
 
 
-def _Molecule_get_aufbau_beta_occupation(self, n_mo):
+def _Molecule_get_aufbau_beta_occupation(self, n_mo, basis=None):
     """
     Gets occupation numbers for beta spin based on the aufbau principle.
 
     :param n_mo:
         The number of molecular orbitals.
+    :param basis:
+        The AO basis set.
 
     :return:
         The occupation numbers for beta spin.
     """
 
-    nbeta = self.number_of_beta_electrons()
+    if basis is not None:
+        nbeta = self.number_of_beta_occupied_orbitals(basis)
+    else:
+        nbeta = self.number_of_beta_electrons()
+
+    assert_msg_critical(
+        nbeta >= 0,
+        'Molecule.get_aufbau_beta_occupation: Number of explicit beta electrons must be non-negative'
+    )
+    assert_msg_critical(
+        n_mo >= nbeta,
+        'Molecule.get_aufbau_beta_occupation: Number of molecular orbitals is too small for explicit beta electrons'
+    )
 
     return np.hstack((np.ones(nbeta), np.zeros(n_mo - nbeta)))
 
 
-def _Molecule_get_aufbau_occupation(self, n_mo, flag='restricted'):
+def _Molecule_get_aufbau_occupation(self, n_mo, flag='restricted', basis=None):
     """
     Gets occupation vector(s) based on the aufbau principle.
 
@@ -1557,13 +1781,15 @@ def _Molecule_get_aufbau_occupation(self, n_mo, flag='restricted'):
         The number of molecular orbitals.
     :param flag:
         The flag (restricted or unrestricted).
+    :param basis:
+        The AO basis set.
 
     :return:
         The occupation vector(s).
     """
 
-    occ_a = self.get_aufbau_alpha_occupation(n_mo)
-    occ_b = self.get_aufbau_beta_occupation(n_mo)
+    occ_a = self.get_aufbau_alpha_occupation(n_mo, basis)
+    occ_b = self.get_aufbau_beta_occupation(n_mo, basis)
 
     if flag == 'restricted':
         return 0.5 * (occ_a + occ_b)
@@ -1632,6 +1858,42 @@ def _Molecule_number_of_beta_electrons(self):
     """
 
     return (self.number_of_electrons() - self.get_multiplicity() + 1) // 2
+
+
+def _Molecule_number_of_alpha_occupied_orbitals(self, basis):
+    """
+    Returns number of spin-alpha occupied orbitals.
+
+    :param basis:
+        The AO basis set.
+    :return:
+        The number of spin-alpha occupied orbitals.
+    """
+
+    nalpha = self.number_of_alpha_electrons()
+
+    core_electrons = basis.get_number_of_ecp_core_electrons()
+    n_ecp_elec = sum(core_electrons)
+
+    return nalpha - n_ecp_elec // 2
+
+
+def _Molecule_number_of_beta_occupied_orbitals(self, basis):
+    """
+    Returns number of spin-beta occupied orbitals.
+
+    :param basis:
+        The AO basis set.
+    :return:
+        The number of spin-beta occupied orbitals.
+    """
+
+    nbeta = self.number_of_beta_electrons()
+
+    core_electrons = basis.get_number_of_ecp_core_electrons()
+    n_ecp_elec = sum(core_electrons)
+
+    return nbeta - n_ecp_elec // 2
 
 
 def _Molecule_partition_atoms(self, comm):
@@ -1706,6 +1968,40 @@ def _Molecule_is_water_molecule(self):
         return False
 
     return True
+
+
+def _Molecule_contains_water_molecule(self):
+    """
+    Checks if a molecule contains a water molecule.
+
+    :return:
+        True if the molecule contains a water molecule, False otherwise.
+    """
+
+    conn = self.get_connectivity_matrix()
+    natoms = self.number_of_atoms()
+    visited = set()
+    labels = self.get_labels()
+
+    for i in range(natoms):
+        if i in visited:
+            continue
+        if labels[i] != 'O':
+            continue
+
+        connected_atoms = self.find_connected_atoms(i, conn)
+        if len(connected_atoms) != 3:
+            continue
+
+        connected_atoms.remove(i)
+        connected_atoms = list(connected_atoms)
+        if labels[connected_atoms[0]] == 'H' and labels[
+                connected_atoms[1]] == 'H':
+            return True
+
+        visited.update(connected_atoms)
+
+    return False
 
 
 @staticmethod
@@ -1809,9 +2105,9 @@ def _Molecule_builder():
 
 
 Molecule._get_input_keywords = _Molecule_get_input_keywords
-Molecule._find_connected_atoms = _Molecule_find_connected_atoms
 Molecule._rotate_around_vector = _Molecule_rotate_around_vector
 
+Molecule.find_connected_atoms = _Molecule_find_connected_atoms
 Molecule.smiles_formal_charge = _Molecule_smiles_formal_charge
 Molecule.smiles_to_xyz = _Molecule_smiles_to_xyz
 Molecule.read_gro_file = _Molecule_read_gro_file
@@ -1822,7 +2118,10 @@ Molecule.read_smiles = _Molecule_read_smiles
 Molecule.read_molecule_string = _Molecule_read_molecule_string
 Molecule.read_xyz_file = _Molecule_read_xyz_file
 Molecule.read_xyz_string = _Molecule_read_xyz_string
-Molecule.from_dict = _Molecule_from_dict
+Molecule.from_input_dict = _Molecule_from_input_dict
+Molecule.effective_nuclear_repulsion_energy = _Molecule_effective_nuclear_repulsion_energy
+Molecule.nuclear_repulsion_energy = _Molecule_nuclear_repulsion_energy
+Molecule.get_effective_nuclear_charges = _Molecule_get_effective_nuclear_charges
 Molecule.get_connectivity_matrix = _Molecule_get_connectivity_matrix
 Molecule.get_distance = _Molecule_get_distance
 Molecule.set_distance = _Molecule_set_distance
@@ -1854,8 +2153,11 @@ Molecule.print_keywords = _Molecule_print_keywords
 Molecule.check_multiplicity = _Molecule_check_multiplicity
 Molecule.number_of_alpha_electrons = _Molecule_number_of_alpha_electrons
 Molecule.number_of_beta_electrons = _Molecule_number_of_beta_electrons
+Molecule.number_of_alpha_occupied_orbitals = _Molecule_number_of_alpha_occupied_orbitals
+Molecule.number_of_beta_occupied_orbitals = _Molecule_number_of_beta_occupied_orbitals
 Molecule.partition_atoms = _Molecule_partition_atoms
 Molecule.is_water_molecule = _Molecule_is_water_molecule
+Molecule.contains_water_molecule = _Molecule_contains_water_molecule
 
 Molecule.read_name = _Molecule_read_name
 Molecule.name_to_smiles = _Molecule_name_to_smiles

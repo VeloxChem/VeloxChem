@@ -2,7 +2,6 @@ from mpi4py import MPI
 from pathlib import Path
 import numpy as np
 import pytest
-import sys
 
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.molecule import Molecule
@@ -10,10 +9,7 @@ from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.lrsolver import LinearResponseSolver
 
-try:
-    import pyframe
-except ImportError:
-    pass
+pytest.importorskip("pyframe")
 
 
 @pytest.mark.solvers
@@ -48,7 +44,7 @@ class TestPolarizableEmbedding:
             'settings': {
                 'embedding_method': 'PE',
                 'induced_dipoles': {
-                    'solver': 'jacobi',
+                    'solver': 'jidiis',
                     'mic': False,
                     'threshold': 1e-8,
                     'max_iterations': 100,
@@ -69,6 +65,7 @@ class TestPolarizableEmbedding:
         scf_drv = ScfRestrictedDriver()
         scf_drv.embedding = self.get_embedding_dict(options_file)
         scf_drv.conv_thresh = 1.0e-8
+        scf_drv.acc_type = 'l2_c2diis'
 
         scf_drv.ostream.mute()
 
@@ -90,8 +87,6 @@ class TestPolarizableEmbedding:
 
         return lrsolver.compute(mol, bas, scf_results)
 
-    @pytest.mark.skipif('pyframe' not in sys.modules,
-                        reason='pyframe not available')
     def test_scf_with_pe(self):
 
         scf_results = self.run_scf_with_pe(name='acrolein')
@@ -100,8 +95,6 @@ class TestPolarizableEmbedding:
             assert scf_results['scf_energy'] == pytest.approx(-188.314434428374,
                                                               rel=1e-10)
 
-    @pytest.mark.skipif('pyframe' not in sys.modules,
-                        reason='pyframe not available')
     def test_lrs_with_pe(self):
 
         scf_results = self.run_scf_with_pe(name='acrolein')

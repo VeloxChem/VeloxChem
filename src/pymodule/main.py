@@ -96,8 +96,8 @@ def select_scf_driver(task, scf_type):
         assert_msg_critical(task.mpi_size == 1 or task.mpi_size <= n_ao,
                             'SCF: too many MPI processes')
 
-    nalpha = task.molecule.number_of_alpha_electrons()
-    nbeta = task.molecule.number_of_beta_electrons()
+    nalpha = task.molecule.number_of_alpha_occupied_orbitals(task.ao_basis)
+    nbeta = task.molecule.number_of_beta_occupied_orbitals(task.ao_basis)
 
     if scf_type == 'restricted' and nalpha == nbeta:
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
@@ -135,10 +135,13 @@ def select_rsp_property(task, mol_orbs, rsp_dict, method_dict):
 
     # check number of MPI nodes
     if task.mpi_rank == mpi_master():
-        nocc = task.molecule.number_of_alpha_electrons()
-        n_ov = nocc * (mol_orbs.number_of_mos() - nocc)
-        assert_msg_critical(task.mpi_size == 1 or task.mpi_size <= n_ov,
-                            'Response: too many MPI processes')
+        nocc_a = task.molecule.number_of_alpha_occupied_orbitals(task.ao_basis)
+        nocc_b = task.molecule.number_of_beta_occupied_orbitals(task.ao_basis)
+        n_ov_a = nocc_a * (mol_orbs.number_of_mos() - nocc_a)
+        n_ov_b = nocc_b * (mol_orbs.number_of_mos() - nocc_b)
+        assert_msg_critical(
+            task.mpi_size == 1 or task.mpi_size <= min(n_ov_a, n_ov_b),
+            'Response: too many MPI processes')
 
     # check property type
     if 'property' in rsp_dict:
@@ -157,10 +160,22 @@ def select_rsp_property(task, mol_orbs, rsp_dict, method_dict):
             'uv-vis',
             'ecd',
     ]:
-        rsp_prop = Absorption(rsp_dict, method_dict)
+        assert_msg_critical(
+            not ('frequencies' in rsp_dict and 'nstates' in rsp_dict),
+            'Response: frequencies and nstates cannot both be specified')
+
+        if 'frequencies' not in rsp_dict:
+            rsp_prop = Absorption(rsp_dict, method_dict)
+        elif 'frequencies' in rsp_dict and prop_type in [
+                'absorption', 'uv-vis'
+        ]:
+            rsp_prop = LinearAbsorptionCrossSection(rsp_dict, method_dict)
+        elif 'frequencies' in rsp_dict and prop_type == 'ecd':
+            rsp_prop = CircularDichroismSpectrum(rsp_dict, method_dict)
 
     elif prop_type in [
-            'linear absorption cross-section',
+            'linear absorption cross-section (cpp)',
+            'linear absorption cross-section(cpp)',
             'linear absorption (cpp)',
             'linear absorption(cpp)',
             'absorption (cpp)',
@@ -169,7 +184,8 @@ def select_rsp_property(task, mol_orbs, rsp_dict, method_dict):
         rsp_prop = LinearAbsorptionCrossSection(rsp_dict, method_dict)
 
     elif prop_type in [
-            'circular dichroism spectrum',
+            'circular dichroism spectrum (cpp)',
+            'circular dichroism spectrum(cpp)',
             'circular dichroism (cpp)',
             'circular dichroism(cpp)',
             'ecd (cpp)',
@@ -280,7 +296,7 @@ def main():
 
         exciton_drv = ExcitonModelDriver(task.mpi_comm, task.ostream)
         exciton_drv.update_settings(exciton_dict, method_dict)
-        exciton_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        exciton_drv.compute(task.molecule, task.ao_basis)
 
     # Force field generator
 
@@ -313,7 +329,7 @@ def main():
 
         traj_drv = TrajectoryDriver(task.mpi_comm, task.ostream)
         traj_drv.update_settings(traj_dict, spect_dict, rsp_dict, method_dict)
-        traj_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        traj_drv.compute(task.molecule, task.ao_basis)
 
     # Diatomic vibronic spectrum using Numerov
 
@@ -326,7 +342,7 @@ def main():
 
         numerov_drv = NumerovDriver(task.mpi_comm, task.ostream)
         numerov_drv.update_settings(numerov_dict, scf_dict, method_dict)
-        numerov_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        numerov_drv.compute(task.molecule, task.ao_basis)
 
     # Self-consistent field
     run_scf = task_type in [
@@ -364,19 +380,39 @@ def main():
         else:
             scf_drv = select_scf_driver(task, scf_type)
             scf_drv.update_settings(scf_dict, method_dict)
-            scf_results = scf_drv.compute(task.molecule, task.ao_basis,
-                                          task.min_basis)
 
-            mol_orbs = scf_drv.molecular_orbitals
-            density = scf_drv.density
+            # For SCF geometry optimization, a common use case is to continue
+            # from a checkpoint. Here we check if this is the case, and if so,
+            # SCF for the input geometry will be skipped and will be taken care
+            # of by the optimization driver.
+            use_checkpoint_geometry = False
 
-            if not scf_drv.is_converged:
-                return
+            if task_type == 'optimize':
+                opt_dict = (dict(task.input_dict['optimize'])
+                            if 'optimize' in task.input_dict else {})
+                # not an excited state geometry optimization
+                if 'response' not in task.input_dict:
+                    # restart is default or True for optimization driver
+                    if ('restart' not in opt_dict) or opt_dict['restart']:
+                        # check validity of checkpoint
+                        use_checkpoint_geometry = scf_drv.validate_checkpoint(
+                            task.molecule.get_element_ids(),
+                            task.ao_basis.get_label(), scf_drv.scf_type)
 
-            if (scf_drv.electric_field is not None and
-                    task.molecule.get_charge() != 0):
-                task.finish()
-                return
+            if not use_checkpoint_geometry:
+                scf_results = scf_drv.compute(task.molecule, task.ao_basis,
+                                              task.min_basis)
+
+                mol_orbs = scf_drv.molecular_orbitals
+                density = scf_drv.density
+
+                if not scf_drv.is_converged:
+                    return
+
+                if (scf_drv.electric_field is not None and
+                        task.molecule.get_charge() != 0):
+                    task.finish()
+                    return
 
     # Gradient
 
@@ -489,8 +525,7 @@ def main():
                 opt_drv = OptimizationDriver(grad_drv)
                 opt_drv.keep_files = True
                 opt_drv.update_settings(opt_dict)
-                opt_results = opt_drv.compute(task.molecule, task.ao_basis,
-                                              scf_results)
+                opt_results = opt_drv.compute(task.molecule, task.ao_basis)
 
         elif run_excited_state_gradient:
 
@@ -578,7 +613,8 @@ def main():
                                                 polgrad_dict=polgrad_dict)
             elif run_excited_state_vibanalysis:
                 assert_msg_critical(
-                    rsp_dict['property'].lower() in ['absorption', 'uv-vis', 'ecd'],
+                    rsp_dict['property'].lower()
+                    in ['absorption', 'uv-vis', 'ecd'],
                     'Invalid response property for vibrational analysis')
 
                 rsp_prop = select_rsp_property(task, mol_orbs, rsp_dict,
@@ -621,7 +657,7 @@ def main():
         polgrad_drv = PolarizabilityGradient(scf_drv, task.mpi_comm,
                                              task.ostream)
         polgrad_drv.update_settings(polgrad_dict, orbrsp_dict, method_dict)
-        polgrad_drv.compute(task.molecule, task.ao_basis, scf_drv.scf_tensors,
+        polgrad_drv.compute(task.molecule, task.ao_basis, scf_drv.scf_results,
                             rsp_prop._rsp_property)
 
     # Response
@@ -666,7 +702,7 @@ def main():
                                                       task.ostream)
                     orbrsp_drv.update_settings(orbrsp_dict, method_dict)
                     orbrsp_drv.compute(task.molecule, task.ao_basis,
-                                       scf_drv.scf_tensors,
+                                       scf_drv.scf_results,
                                        rsp_prop._rsp_property)
             else:
                 orbrsp_dict = {}
@@ -692,7 +728,8 @@ def main():
                                 if 'hessian' in task.input_dict else {})
 
                 polgrad_dict = (task.input_dict['polarizability_gradient']
-                                if 'polarizability_gradient' in task.input_dict else {})
+                                if 'polarizability_gradient' in task.input_dict
+                                else {})
 
                 orbrsp_dict = (task.input_dict['orbital_response']
                                if 'orbital_response' in task.input_dict else {})
@@ -717,7 +754,8 @@ def main():
                                                 rsp_dict=rsp_dict,
                                                 polgrad_dict=polgrad_dict)
 
-                vib_results = vibrational_drv.compute(task.molecule, task.ao_basis)
+                vib_results = vibrational_drv.compute(task.molecule,
+                                                      task.ao_basis)
 
             # Excited state optimization
             if 'optimize_excited_state' in task.input_dict:

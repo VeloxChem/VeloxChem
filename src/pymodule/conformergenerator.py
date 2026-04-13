@@ -230,6 +230,24 @@ class ConformerGenerator:
         rotatable_bonds_zero_based = [(i - 1, j - 1) for (i, j) in rotatable_bonds]
         rotatable_dihedrals_dict = {}
 
+        # Due to size limit in mmforcefieldgenerator's cycle detection, we need
+        # to do another check and see if a rotatable bond is in a larger cycle.
+        # This check involves disconnecting i-j and finding all atoms that are
+        # connected to j. A rotatable bond in a macrocycle is rotatable in the
+        # force field, but not rotatable for conformeregnerator since we do
+        # rigid rotation here.
+        rotatable_bonds_zero_based_refined = []
+        conn_matrix = molecule.get_connectivity_matrix()
+        for (atom_i, atom_j) in rotatable_bonds_zero_based:
+            conn_mat_copy = np.copy(conn_matrix)
+            conn_mat_copy[atom_i, atom_j] = 0
+            conn_mat_copy[atom_j, atom_i] = 0
+            atoms_connected_to_j = molecule.find_connected_atoms(
+                atom_j, conn_mat_copy)
+            if atom_i not in atoms_connected_to_j:
+                rotatable_bonds_zero_based_refined.append((atom_i, atom_j))
+        rotatable_bonds_zero_based = rotatable_bonds_zero_based_refined
+
         def get_max_periodicity(periodicity):
             if isinstance(periodicity, list):
                 return max([abs(p) for p in periodicity])

@@ -42,6 +42,8 @@ from .molecularorbitals import MolecularOrbitals, molorb
 from .outputstream import OutputStream
 from .scfdriver import ScfDriver
 from .c2diis import CTwoDiis
+from .diis import Diis
+from .mathutils import solve_in_orthogonal_basis
 
 
 class ScfRestrictedDriver(ScfDriver):
@@ -188,7 +190,12 @@ class ScfRestrictedDriver(ScfDriver):
                 return (np.copy(self._fock_matrices_alpha[0]),)
 
             if len(self._fock_matrices_alpha) > 1:
-                acc_diis = CTwoDiis()
+
+                if self.acc_type.upper() in ['C2DIIS', 'L2_C2DIIS']:
+                    acc_diis = CTwoDiis()
+                elif self.acc_type.upper() in ['DIIS', 'L2_DIIS']:
+                    acc_diis = Diis()
+
                 acc_diis.compute_error_vectors_restricted(
                     self._fock_matrices_alpha, self._density_matrices_alpha,
                     ovl_mat, oao_mat)
@@ -219,7 +226,8 @@ class ScfRestrictedDriver(ScfDriver):
 
         return (effmat,)
 
-    def _gen_molecular_orbitals(self, molecule, eff_fock_mat, oao_mat):
+    def _gen_molecular_orbitals(self, molecule, ao_basis, eff_fock_mat,
+                                oao_mat):
         """
         Generates spin restricted molecular orbital by diagonalizing
         spin restricted closed shell Fock/Kohn-Sham matrix. Overloaded base
@@ -227,6 +235,8 @@ class ScfRestrictedDriver(ScfDriver):
 
         :param molecule:
             The molecule.
+        :param ao_basis:
+            The AO basis set.
         :param eff_fock_mat:
             The effective Fock/Kohn-Sham matrix.
         :param oao_mat:
@@ -238,13 +248,10 @@ class ScfRestrictedDriver(ScfDriver):
 
         if self.rank == mpi_master():
             tmat = oao_mat
-            eigs, evecs = np.linalg.eigh(
-                np.linalg.multi_dot([tmat.T, eff_fock_mat[0], tmat]))
-
-            orb_coefs = np.matmul(tmat, evecs)
+            eigs, orb_coefs = solve_in_orthogonal_basis(eff_fock_mat[0], tmat)
             orb_coefs, eigs = self._delete_mos(orb_coefs, eigs)
 
-            occa = molecule.get_aufbau_alpha_occupation(eigs.size)
+            occa = molecule.get_aufbau_alpha_occupation(eigs.size, ao_basis)
 
             if self.pfon and (self.pfon_temperature > 0):
 
@@ -254,7 +261,7 @@ class ScfRestrictedDriver(ScfDriver):
                 kT = boltzmann_in_hartreeperkelvin() * self.pfon_temperature
                 inv_kT = 1.0 / kT
 
-                nocc_a = molecule.number_of_alpha_electrons()
+                nocc_a = molecule.number_of_alpha_occupied_orbitals(ao_basis)
                 e_fermi_a = 0.5 * (eigs[nocc_a - 1] + eigs[nocc_a])
                 idx_start_a = max(0, nocc_a - self.pfon_nocc)
                 idx_end_a = min(eigs.size, nocc_a + self.pfon_nvir)
@@ -310,12 +317,7 @@ class ScfRestrictedDriver(ScfDriver):
 
         for key, val in vars(self).items():
             if isinstance(val, (MPI.Intracomm, OutputStream)):
-                pass
-            elif isinstance(val, XCFunctional):
-                new_scf_drv.key = XCFunctional(val)
-            elif isinstance(val, MolecularGrid):
-                new_scf_drv.key = MolecularGrid(val)
-            else:
-                new_scf_drv.key = deepcopy(val)
+                continue
+            setattr(new_scf_drv, key, deepcopy(val))
 
         return new_scf_drv

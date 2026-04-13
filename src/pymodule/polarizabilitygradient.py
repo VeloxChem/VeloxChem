@@ -48,7 +48,7 @@ from .veloxchemlib import partition_atoms, make_matrix, mat_t
 
 from .polorbitalresponse import PolOrbitalResponse
 from .lrsolver import LinearResponseSolver
-from .cppsolver import ComplexResponse
+from .cppsolver import ComplexResponseSolver
 from .molecule import Molecule
 from .outputstream import OutputStream
 from .matrices import Matrices
@@ -1491,11 +1491,11 @@ class PolarizabilityGradient:
         """
 
         if self.is_complex:
-            lr_drv = ComplexResponse(self.comm, self.ostream)
+            lr_drv = ComplexResponseSolver(self.comm, self.ostream)
             lr_drv.frequencies = self.frequencies
             lr_drv.damping = self.damping
             # get absorption cross section from CPP calculations
-            lr_drv.cpp_flag = 'absorption'
+            lr_drv.property = 'absorption'
         else:
             lr_drv = LinearResponseSolver(self.comm, self.ostream)
             lr_drv.frequencies = self.frequencies

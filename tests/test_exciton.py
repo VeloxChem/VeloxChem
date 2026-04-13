@@ -1,9 +1,12 @@
+from mpi4py import MPI
 from pathlib import Path
 import numpy as np
 import pytest
 
 from veloxchem.veloxchemlib import OverlapDriver
 from veloxchem.veloxchemlib import mpi_master
+from veloxchem.veloxchemlib import hartree_in_ev
+from veloxchem.veloxchemlib import rotatory_strength_in_cgs
 from veloxchem.veloxchemlib import get_dimer_ao_indices
 from veloxchem.mpitask import MpiTask
 from veloxchem.molecule import Molecule
@@ -38,6 +41,15 @@ class TestExciton:
                 smat[ao_inds_2[row], ao_inds_2[col]] = s22[row, col]
 
         return smat
+
+    @staticmethod
+    def get_plot_results():
+
+        return {
+            'adiabatic_eigenvalues': np.array([0.20, 0.35]),
+            'oscillator_strengths': np.array([0.10, 0.25]),
+            'rotatory_strengths': np.array([0.01, -0.02]),
+        }
 
     def test_assemble_matrices(self):
 
@@ -102,8 +114,24 @@ class TestExciton:
         exciton_dict['filename'] = task.input_dict['filename']
 
         exciton_drv = ExcitonModelDriver(task.mpi_comm, task.ostream)
-        exciton_drv.update_settings(exciton_dict, method_dict)
-        exciton_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+
+        # fragments: 3
+        # atoms_per_fragment: 3
+        # nstates: 2
+        # ct_nocc: 1
+        # ct_nvir: 1
+
+        # set attributes directly
+        exciton_drv.fragments = '3'
+        exciton_drv.atoms_per_fragment = '3'
+        exciton_drv.nstates = 2
+        exciton_drv.ct_nocc = 1
+        exciton_drv.ct_nvir = 1
+        exciton_drv.filename = exciton_dict['filename']
+        if 'xcfun' in method_dict:
+            exciton_drv.xcfun = method_dict['xcfun']
+
+        first_result = exciton_drv.compute(task.molecule, task.ao_basis)
 
         if task.mpi_rank == mpi_master():
 
@@ -121,13 +149,31 @@ class TestExciton:
 
             backup_H = np.array(exciton_drv.H)
 
+            np.testing.assert_allclose(first_result['hamiltonian'],
+                                       exciton_drv.H)
+            assert first_result['num_states'] == exciton_drv.H.shape[0]
+
         task.mpi_comm.barrier()
 
+        # reset attributes and test update_settings
+        exciton_drv.fragments = None
+        exciton_drv.atoms_per_fragment = None
+        exciton_drv.nstates = None
+        exciton_drv.ct_nocc = None
+        exciton_drv.ct_nvir = None
+        exciton_drv.filename = None
+        exciton_drv.xcfun = None
+        exciton_drv.update_settings(exciton_dict, method_dict)
+
         exciton_drv.restart = True
-        exciton_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        second_result = exciton_drv.compute(task.molecule, task.ao_basis)
 
         if task.mpi_rank == mpi_master():
             assert np.max(np.abs(backup_H - exciton_drv.H)) < 1.0e-10
+
+            np.testing.assert_allclose(second_result['hamiltonian'],
+                                       exciton_drv.H)
+            assert second_result['num_states'] == first_result['num_states']
 
             exciton_h5 = Path(exciton_drv.checkpoint_file)
 
@@ -312,20 +358,17 @@ class TestExciton:
         molecule = Molecule.read_xyz_string(mol_xyz)
         basis = MolecularBasis.read(molecule, 'def2-svp')
 
-        exmod_settings = {
-            'fragments': '2',
-            'atoms_per_fragment': '6',
-            'charges': '0',
-            'nstates': '5',
-            'ct_nocc': '1',
-            'ct_nvir': '1',
-        }
-
-        method_settings = {}
         exmod_drv = ExcitonModelDriver()
-        exmod_drv.update_settings(exmod_settings, method_settings)
+
+        exmod_drv.fragments = '2'
+        exmod_drv.atoms_per_fragment = '6'
+        exmod_drv.charges = '0'
+        exmod_drv.nstates = 5
+        exmod_drv.ct_nocc = 1
+        exmod_drv.ct_nvir = 1
+
         exmod_drv.ostream.mute()
-        exmod_drv.compute(molecule, basis)
+        exmod_results = exmod_drv.compute(molecule, basis)
 
         if exmod_drv.rank == mpi_master():
             eigvals, eigvecs = np.linalg.eigh(exmod_drv.H)
@@ -376,3 +419,69 @@ class TestExciton:
             assert np.max(np.abs(excitation_energies - ref_ene)) < 1.0e-6
             assert np.max(np.abs(oscillator_strengths - ref_osc)) < 1.0e-5
             assert np.max(np.abs(rotatory_strengths - ref_rot)) < 1.0e-5
+
+            assert np.max(
+                np.abs(exmod_results['excitation_energies_in_ev'] /
+                       hartree_in_ev() - ref_ene)) < 1.0e-6
+            assert np.max(
+                np.abs(exmod_results['oscillator_strengths'] -
+                       ref_osc)) < 1.0e-5
+            assert np.max(
+                np.abs(exmod_results['rotatory_strengths'] /
+                       rotatory_strength_in_cgs() - ref_rot)) < 1.0e-5
+
+    def test_get_spectrum_plot_dict(self):
+
+        exciton_drv = ExcitonModelDriver()
+        exciton_results = self.get_plot_results()
+
+        plot_dict = exciton_drv._get_spectrum_plot_dict(exciton_results)
+
+        np.testing.assert_allclose(plot_dict['eigenvalues'],
+                                   exciton_results['adiabatic_eigenvalues'])
+        np.testing.assert_allclose(plot_dict['oscillator_strengths'],
+                                   exciton_results['oscillator_strengths'])
+        np.testing.assert_allclose(plot_dict['rotatory_strengths'],
+                                   exciton_results['rotatory_strengths'])
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    def test_get_spectrum_plot_dict_missing_key(self):
+
+        exciton_drv = ExcitonModelDriver()
+        exciton_results = self.get_plot_results()
+        exciton_results.pop('rotatory_strengths')
+
+        with pytest.raises(AssertionError,
+                           match='Missing key "rotatory_strengths"'):
+            exciton_drv._get_spectrum_plot_dict(exciton_results)
+
+    def test_plot_uv_vis(self):
+
+        exciton_drv = ExcitonModelDriver()
+        exciton_results = self.get_plot_results()
+        plt = pytest.importorskip('matplotlib.pyplot')
+
+        fig, ax = plt.subplots()
+        try:
+            exciton_drv.plot_uv_vis(exciton_results,
+                                    broadening_type='gaussian',
+                                    broadening_value=0.15,
+                                    ax=ax)
+        finally:
+            plt.close(fig)
+
+    def test_plot_ecd(self):
+
+        exciton_drv = ExcitonModelDriver()
+        exciton_results = self.get_plot_results()
+        plt = pytest.importorskip('matplotlib.pyplot')
+
+        fig, ax = plt.subplots()
+        try:
+            exciton_drv.plot_ecd(exciton_results,
+                                 broadening_type='lorentzian',
+                                 broadening_value=0.20,
+                                 ax=ax)
+        finally:
+            plt.close(fig)

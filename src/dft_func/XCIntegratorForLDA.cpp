@@ -108,18 +108,12 @@ integrateVxcFockForLdaClosedShell(const CMolecule&                  molecule,
 
     // set up pointers to OMP data
 
-    auto ptr_counts = counts.data();
-
-    auto ptr_displacements = displacements.data();
-
     auto ptr_gto_blocks = gto_blocks.data();
-
-    auto ptr_gsDensityPointers = gsDensityPointers.data();
 
     auto ptr_xcFunctional = &xcFunctional;
 
-#pragma omp parallel shared(ptr_counts, ptr_displacements, xcoords, ycoords, zcoords, \
-                            ptr_gto_blocks, ptr_gsDensityPointers, ptr_xcFunctional, \
+#pragma omp parallel shared(counts, displacements, xcoords, ycoords, zcoords, \
+                            ptr_gto_blocks, gsDensityPointers, ptr_xcFunctional, \
                             n_boxes, n_gto_blocks, naos, nele, xcene, mat_Vxc)
     {
 
@@ -200,7 +194,7 @@ integrateVxcFockForLdaClosedShell(const CMolecule&                  molecule,
 
             // go through GTO blocks
 
-            for (size_t i_block = 0, idx = 0; i_block < n_gto_blocks; i_block++)
+            for (int i_block = 0, idx = 0; i_block < static_cast<int>(n_gto_blocks); i_block++)
             {
                 const auto& gto_block = ptr_gto_blocks[i_block];
 
@@ -384,18 +378,12 @@ integrateVxcFockForLdaOpenShell(const CMolecule&                  molecule,
 
     // set up pointers to OMP data
 
-    auto ptr_counts = counts.data();
-
-    auto ptr_displacements = displacements.data();
-
     auto ptr_gto_blocks = gto_blocks.data();
-
-    auto ptr_gsDensityPointers = gsDensityPointers.data();
 
     auto ptr_xcFunctional = &xcFunctional;
 
-#pragma omp parallel shared(ptr_counts, ptr_displacements, xcoords, ycoords, zcoords, \
-                            ptr_gto_blocks, ptr_gsDensityPointers, ptr_xcFunctional, \
+#pragma omp parallel shared(displacements, xcoords, ycoords, zcoords, \
+                            ptr_gto_blocks, gsDensityPointers, ptr_xcFunctional, \
                             n_boxes, n_gto_blocks, naos, nele, xcene, mat_Vxc)
     {
 
@@ -477,7 +465,7 @@ integrateVxcFockForLdaOpenShell(const CMolecule&                  molecule,
 
             // go through GTO blocks
 
-            for (size_t i_block = 0, idx = 0; i_block < n_gto_blocks; i_block++)
+            for (int i_block = 0, idx = 0; i_block < static_cast<int>(n_gto_blocks); i_block++)
             {
                 const auto& gto_block = ptr_gto_blocks[i_block];
 
@@ -662,18 +650,12 @@ integrateFxcFockForLdaClosedShell(const std::vector<double*>&       aoFockPointe
 
     // set up pointers to OMP data
 
-    auto ptr_counts = counts.data();
-
-    auto ptr_displacements = displacements.data();
-
     auto ptr_gto_blocks = gto_blocks.data();
-
-    auto ptr_gsDensityPointers = gsDensityPointers.data();
 
     auto ptr_xcFunctional = &xcFunctional;
 
-#pragma omp parallel shared(ptr_counts, ptr_displacements, xcoords, ycoords, zcoords, \
-                            ptr_gto_blocks, ptr_gsDensityPointers, ptr_xcFunctional, \
+#pragma omp parallel shared(displacements, xcoords, ycoords, zcoords, \
+                            ptr_gto_blocks, gsDensityPointers, ptr_xcFunctional, \
                             n_boxes, n_gto_blocks, n_rw_densities, naos, \
                             aoFockPointers, rwDensityPointers)
     {
@@ -739,7 +721,7 @@ integrateFxcFockForLdaClosedShell(const std::vector<double*>&       aoFockPointe
 
             std::vector<CDenseMatrix> rw_sub_dens_mat_vec(n_rw_densities);
 
-            for (size_t idensity = 0; idensity < n_rw_densities; idensity++)
+            for (int idensity = 0; idensity < static_cast<int>(n_rw_densities); idensity++)
             {
                 rw_sub_dens_mat_vec[idensity] = dftsubmat::getSubDensityMatrix(rwDensityPointers[idensity], aoinds, naos);
             }
@@ -762,7 +744,7 @@ integrateFxcFockForLdaClosedShell(const std::vector<double*>&       aoFockPointe
 
             // go through GTO blocks
 
-            for (size_t i_block = 0, idx = 0; i_block < n_gto_blocks; i_block++)
+            for (int i_block = 0, idx = 0; i_block < static_cast<int>(n_gto_blocks); i_block++)
             {
                 const auto& gto_block = ptr_gto_blocks[i_block];
 
@@ -819,7 +801,7 @@ integrateFxcFockForLdaClosedShell(const std::vector<double*>&       aoFockPointe
 
             // go through rhow density matrices
 
-            for (size_t idensity = 0; idensity < n_rw_densities; idensity++)
+            for (int idensity = 0; idensity < static_cast<int>(n_rw_densities); idensity++)
             {
                 omptimers[thread_id].start("Generate density grid");
 
@@ -940,18 +922,12 @@ integrateFxcFockForLdaOpenShell(const std::vector<double*>&       aoFockPointers
 
     // set up pointers to OMP data
 
-    auto ptr_counts = counts.data();
-
-    auto ptr_displacements = displacements.data();
-
     auto ptr_gto_blocks = gto_blocks.data();
-
-    auto ptr_gsDensityPointers = gsDensityPointers.data();
 
     auto ptr_xcFunctional = &xcFunctional;
 
-#pragma omp parallel shared(ptr_counts, ptr_displacements, xcoords, ycoords, zcoords, \
-                            ptr_gto_blocks, ptr_gsDensityPointers, ptr_xcFunctional, \
+#pragma omp parallel shared(displacements, xcoords, ycoords, zcoords, \
+                            ptr_gto_blocks, gsDensityPointers, ptr_xcFunctional, \
                             n_boxes, n_gto_blocks, n_rw_densities, naos, \
                             aoFockPointers, rwDensityPointers)
     {
@@ -1019,7 +995,7 @@ integrateFxcFockForLdaOpenShell(const std::vector<double*>&       aoFockPointers
             std::vector<CDenseMatrix> rw_sub_dens_mat_vec_a(n_rw_densities);
             std::vector<CDenseMatrix> rw_sub_dens_mat_vec_b(n_rw_densities);
 
-            for (size_t idensity = 0; idensity < n_rw_densities; idensity++)
+            for (int idensity = 0; idensity < static_cast<int>(n_rw_densities); idensity++)
             {
                 rw_sub_dens_mat_vec_a[idensity] = dftsubmat::getSubDensityMatrix(rwDensityPointers[idensity * 2 + 0], aoinds, naos);
                 rw_sub_dens_mat_vec_b[idensity] = dftsubmat::getSubDensityMatrix(rwDensityPointers[idensity * 2 + 1], aoinds, naos);
@@ -1043,7 +1019,7 @@ integrateFxcFockForLdaOpenShell(const std::vector<double*>&       aoFockPointers
 
             // go through GTO blocks
 
-            for (size_t i_block = 0, idx = 0; i_block < n_gto_blocks; i_block++)
+            for (int i_block = 0, idx = 0; i_block < static_cast<int>(n_gto_blocks); i_block++)
             {
                 const auto& gto_block = ptr_gto_blocks[i_block];
 
@@ -1100,7 +1076,7 @@ integrateFxcFockForLdaOpenShell(const std::vector<double*>&       aoFockPointers
 
             // go through rhow density matrices
 
-            for (size_t idensity = 0; idensity < n_rw_densities; idensity++)
+            for (int idensity = 0; idensity < static_cast<int>(n_rw_densities); idensity++)
             {
                 omptimers[thread_id].start("Generate density grid");
 
@@ -1231,18 +1207,12 @@ integrateKxcFockForLdaClosedShell(const std::vector<double*>& aoFockPointers,
 
     // set up pointers to OMP data
 
-    auto ptr_counts = counts.data();
-
-    auto ptr_displacements = displacements.data();
-
     auto ptr_gto_blocks = gto_blocks.data();
-
-    auto ptr_gsDensityPointers = gsDensityPointers.data();
 
     auto ptr_xcFunctional = &xcFunctional;
 
-#pragma omp parallel shared(ptr_counts, ptr_displacements, xcoords, ycoords, zcoords, \
-                            ptr_gto_blocks, ptr_gsDensityPointers, ptr_xcFunctional, \
+#pragma omp parallel shared(displacements, xcoords, ycoords, zcoords, \
+                            ptr_gto_blocks, gsDensityPointers, ptr_xcFunctional, \
                             n_boxes, n_gto_blocks, n_rw2_densities, naos, \
                             aoFockPointers, rwDensityPointers, rw2DensityPointers)
     {
@@ -1328,7 +1298,7 @@ integrateKxcFockForLdaClosedShell(const std::vector<double*>& aoFockPointers,
 
             // go through GTO blocks
 
-            for (size_t i_block = 0, idx = 0; i_block < n_gto_blocks; i_block++)
+            for (int i_block = 0, idx = 0; i_block < static_cast<int>(n_gto_blocks); i_block++)
             {
                 const auto& gto_block = ptr_gto_blocks[i_block];
 
@@ -1505,18 +1475,12 @@ integrateKxcLxcFockForLdaClosedShell(const std::vector<double*>& aoFockPointers,
 
     // set up pointers to OMP data
 
-    auto ptr_counts = counts.data();
-
-    auto ptr_displacements = displacements.data();
-
     auto ptr_gto_blocks = gto_blocks.data();
-
-    auto ptr_gsDensityPointers = gsDensityPointers.data();
 
     auto ptr_xcFunctional = &xcFunctional;
 
-#pragma omp parallel shared(ptr_counts, ptr_displacements, xcoords, ycoords, zcoords, \
-                            ptr_gto_blocks, ptr_gsDensityPointers, ptr_xcFunctional, \
+#pragma omp parallel shared(displacements, xcoords, ycoords, zcoords, \
+                            ptr_gto_blocks, gsDensityPointers, ptr_xcFunctional, \
                             n_boxes, n_gto_blocks, n_rw2_densities, n_rw3_densities, naos, \
                             aoFockPointers, rwDensityPointers, rw2DensityPointers, \
                             rw3DensityPointers)
@@ -1605,7 +1569,7 @@ integrateKxcLxcFockForLdaClosedShell(const std::vector<double*>& aoFockPointers,
 
             // go through GTO blocks
 
-            for (size_t i_block = 0, idx = 0; i_block < n_gto_blocks; i_block++)
+            for (int i_block = 0, idx = 0; i_block < static_cast<int>(n_gto_blocks); i_block++)
             {
                 const auto& gto_block = ptr_gto_blocks[i_block];
 

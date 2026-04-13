@@ -412,6 +412,9 @@ class OutputStream:
             exec_str += ' on ' + str(num_nodes) + ' MPI processes'
         exec_str += ' at ' + tm.asctime(tm.localtime(start_time)) + '.'
         self.print_title(exec_str)
+        commit_hash_str = self.get_commit_hash()
+        if commit_hash_str.lower() != 'unknown':
+            self.print_title(f'(build commit {commit_hash_str})')
         self.print_separator()
         self.print_blank()
 
@@ -460,3 +463,18 @@ class OutputStream:
         self.print_separator()
 
         self.flush()
+
+    @staticmethod
+    def get_commit_hash():
+        """
+        Gets commit hash (if it exists).
+
+        :return:
+            The commit hash string.
+        """
+
+        try:
+            from . import __commit__
+            return __commit__
+        except (ImportError, NameError):
+            return 'unknown'

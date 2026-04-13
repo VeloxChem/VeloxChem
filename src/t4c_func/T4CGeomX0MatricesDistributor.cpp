@@ -482,8 +482,6 @@ CT4CGeomX0MatricesDistributor::accumulate_values(double* values, const CMatrix* 
             {
                 const auto suffix = std::to_string(i);
 
-                auto fock = _focks->matrix(keys[i]);
-
                 double local_value = 0.0;
 
                 if ((_label == "2jk") || (_label == "2jkx") || (_label == "j") || (_label == "j_rs"))

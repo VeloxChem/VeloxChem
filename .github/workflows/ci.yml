@@ -26,7 +26,7 @@ jobs:
         shell: bash -l {0}
 
     container:
-      image: ghcr.io/veloxchem/meta-vlx/vlx-ci_gnu:sha-468ec9b
+      image: ghcr.io/veloxchem/meta-vlx/vlx-ci_gnu:sha-2074132
 
     env:
       VLX_NUM_BUILD_JOBS: 4
@@ -65,7 +65,9 @@ jobs:
           CC=gcc CXX=g++ python -m pip install MDAnalysis
           git config --global --add safe.directory $PWD
           git clone -b 3.4.0 https://gitlab.com/libeigen/eigen.git
+          git clone -b boost-1.90.0 https://github.com/boostorg/math.git boost-math
           export EIGEN_INCLUDE_DIR=$(pwd)/eigen
+          export BOOST_INCLUDE_DIR=$(pwd)/boost-math/include
           CXX=g++ python -m pip install git+https://github.com/VeloxChem/PyFraME.git
           python -m pip install dftd4 xtb
           python -m pip install openmm rdkit pymbar

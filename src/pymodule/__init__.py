@@ -36,6 +36,8 @@ from .veloxchemlib import BasisFunction
 from .veloxchemlib import GtoBlock
 from .veloxchemlib import GtoPairBlock
 from .veloxchemlib import BlockedGtoPairBlock
+from .veloxchemlib import BaseCorePotential
+from .veloxchemlib import AtomCorePotential
 from .veloxchemlib import T3FlatBuffer
 from .veloxchemlib import OverlapDriver
 from .veloxchemlib import KineticEnergyDriver
@@ -62,6 +64,17 @@ from .veloxchemlib import ThreeCenterElectronRepulsionGeom100Driver
 from .veloxchemlib import ThreeCenterElectronRepulsionGeom010Driver
 from .veloxchemlib import TwoCenterElectronRepulsionDriver
 from .veloxchemlib import TwoCenterElectronRepulsionGeom100Driver
+from .veloxchemlib import LocalECPDriver
+from .veloxchemlib import LocalECPGeom100Driver
+from .veloxchemlib import LocalECPGeom200Driver
+from .veloxchemlib import LocalECPGeom101Driver
+from .veloxchemlib import LocalECPGeom010Driver
+from .veloxchemlib import LocalECPGeom020Driver
+from .veloxchemlib import LocalECPGeom110Driver
+from .veloxchemlib import ProjectedECPDriver
+from .veloxchemlib import ProjectedECPGeom100Driver
+from .veloxchemlib import ProjectedECPGeom200Driver
+from .veloxchemlib import ECPDriver
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import FockGeom1000Driver
 from .veloxchemlib import FockGeom2000Driver
@@ -144,9 +157,9 @@ from .lreigensolver import LinearResponseEigenSolver
 from .lreigensolverunrest import LinearResponseUnrestrictedEigenSolver
 from .lrsolver import LinearResponseSolver
 from .lrsolverunrest import LinearResponseUnrestrictedSolver
-from .cppsolver import ComplexResponse
-from .cppsolverunrest import ComplexResponseUnrestricted
-from .tdacppsolver import ComplexResponseTDA
+from .cppsolver import ComplexResponseSolver
+from .cppsolverunrest import ComplexResponseUnrestrictedSolver
+from .tdacppsolver import ComplexResponseTdaSolver
 from .c6driver import C6Driver
 from .quadraticresponsedriver import QuadraticResponseDriver
 from .cubicresponsedriver import CubicResponseDriver
@@ -171,6 +184,7 @@ from .localizationdriver import LocalizationDriver
 from .mpitask import MpiTask
 from .subcommunicators import SubCommunicators
 from .peforcefieldgenerator import PEForceFieldGenerator
+from .firstorderpropdriver import FirstOrderPropertyDriver
 from .firstorderprop import FirstOrderProperties
 from .tddftorbitalresponse import TddftOrbitalResponse
 from .tddftgradientdriver import TddftGradientDriver
@@ -215,6 +229,8 @@ from .reactionmatcher import ReactionMatcher
 from .smddriver import SmdDriver
 from .atombdedriver import AtomBdeDriver
 # for backward compatibility only
+from .cppsolver import ComplexResponseSolver as ComplexResponse
+from .tdacppsolver import ComplexResponseTdaSolver as ComplexResponseTDA
 from .peforcefieldgenerator import PEForceFieldGenerator as LoPropDriver
 
 # Python functions
@@ -226,7 +242,7 @@ from .oneeints import compute_nuclear_potential_integrals
 from .oneeints import compute_electric_dipole_integrals
 from .oneeints import compute_linear_momentum_integrals
 from .oneeints import compute_angular_momentum_integrals
-from .checkpoint import read_results
+from .checkpoint import read_molecule_and_basis, read_results
 
 # Environment variable: basis set path, number of OpenMP threads, MKL linking
 from .environment import (set_vlxbasispath, get_basis_path, set_vlxdatapath,

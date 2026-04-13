@@ -39,6 +39,7 @@ from .molecularbasis import MolecularBasis
 from .visualizationdriver import VisualizationDriver
 from .densityviewer import DensityViewer
 from .errorhandler import assert_msg_critical
+from .mathutils import symmetric_matrix_function
 
 try:
     import matplotlib.pyplot as plt
@@ -184,7 +185,7 @@ class ValetAnalyzer:
 
         # Get MO coefficients and orbital information
         mo = scf_results["C_alpha"]
-        nocc = self._molecule.number_of_alpha_electrons()
+        nocc = self._molecule.number_of_alpha_occupied_orbitals(self._basis)
         norb = mo.shape[1]
         nvir = norb - nocc
         mo_occ = mo[:, :nocc].copy()
@@ -239,9 +240,6 @@ class ValetAnalyzer:
         # Get density matrices
         densities = self.compute_detach_attach_densities(scf_results, rsp_results, state_index)
         
-        # Get overlap matrix
-        S = scf_results["S"]
-        
         # Map atoms to AOs
         vis_drv = VisualizationDriver()
         atom_to_aos = vis_drv.map_atom_to_atomic_orbitals(self._molecule, self._basis)
@@ -249,16 +247,11 @@ class ValetAnalyzer:
         detach_dens_ao = densities['detachment_density_matrix_AO']
         attach_dens_ao = densities['attachment_density_matrix_AO']
 
-        # Note: detachment density is negative, so we take absolute values
-        detach_dens_ao = np.abs(detach_dens_ao)
-        
-        # Compute attachment charges using Lowdin analysis
+        # Compute charges using Lowdin analysis
         S = scf_results['S']
-        S_eigvals, S_eigvecs = np.linalg.eigh(S)
-        S_eigvals = np.where(S_eigvals > 1.0e-12, S_eigvals,
-                             0.0)
-        S_sqrt = np.matmul(S_eigvecs * np.sqrt(S_eigvals),
-                           S_eigvecs.T)
+        S_sqrt = symmetric_matrix_function(S,
+                                           np.sqrt,
+                                           thresh=1.0e-12)
 
         diag_DS = np.diag(
             np.linalg.multi_dot([S_sqrt, detach_dens_ao, S_sqrt]))
@@ -376,8 +369,16 @@ class ValetAnalyzer:
             # Handle both single atom and list of atoms
             if isinstance(atom_indices, (list, tuple)):
                 for atom in atom_indices:
+                    assert_msg_critical(
+                        1 <= atom <= num_atoms,
+                        'ValetAnalyzer: subgroup atom indices must be in the '
+                        f'range [1, {num_atoms}].')
                     sg_atom_map[atom - 1] = i + 1  # Convert 1-based to 0-based
             else:
+                assert_msg_critical(
+                    1 <= atom_indices <= num_atoms,
+                    'ValetAnalyzer: subgroup atom indices must be in the '
+                    f'range [1, {num_atoms}].')
                 sg_atom_map[atom_indices - 1] = i + 1  # Convert 1-based to 0-based
             sg_names.append(name)
 

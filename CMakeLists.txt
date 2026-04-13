@@ -52,6 +52,7 @@ include(${PROJECT_SOURCE_DIR}/cmake/downloaded/autocmake_default_build_paths.cma
 include(${PROJECT_SOURCE_DIR}/cmake/downloaded/autocmake_safeguards.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/compiler_flags/CXXFlags.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/custom/eigen.cmake)
+include(${PROJECT_SOURCE_DIR}/cmake/custom/boostmath.cmake)
 
 # find external dependencies
 # Python 3.10+
@@ -60,8 +61,8 @@ find_package(Python 3.10 REQUIRED COMPONENTS Interpreter Development)
 find_package(pybind11 2.6 CONFIG REQUIRED)
 # Libxc
 find_package(Libxc CONFIG REQUIRED COMPONENTS C)
-if(Libxc_VERSION VERSION_LESS "6")
-  message(FATAL_ERROR "Libxc version must be 6 or higher!")
+if(Libxc_VERSION VERSION_LESS "7")
+  message(FATAL_ERROR "Libxc version must be 7 or higher!")
 endif()
 get_property(_loc TARGET Libxc::xc PROPERTY LOCATION)
 message(STATUS "Found Libxc: ${_loc} (found version \"${Libxc_VERSION}\")") 

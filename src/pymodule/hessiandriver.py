@@ -128,7 +128,7 @@ class HessianDriver:
                 'memory_profiling': ('bool', 'whether to profile memory'),
                 'memory_tracing': ('bool', 'whether to trace memory'),
                 'print_level': ('int', 'verbosity of output (1-3)'),
-                },
+            },
             'method_settings': {
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
                 'grid_level': ('int', 'accuracy level of DFT grid'),
@@ -168,7 +168,7 @@ class HessianDriver:
         self.method_dict = dict(method_dict)
         self.hess_dict = dict(hess_dict)
 
-    def compute(self, molecule, ao_basis=None, min_basis=None):
+    def compute(self, molecule, ao_basis=None):
         """
         Performs calculation of molecular Hessian.
 
@@ -176,19 +176,19 @@ class HessianDriver:
             The molecule.
         :param ao_basis:
             The AO basis set.
-        :param min_basis:
-            The minimal AO basis set.
         """
 
         return
 
-    def hess_nuc_contrib(self, molecule):
+    def hess_nuc_contrib(self, molecule, basis=None):
         """
         Calculates the contribution of the nuclear-nuclear repulsion
         to the analytical nuclear Hessian.
 
         :param molecule:
             The molecule.
+        :param basis:
+            The optional AO basis set.
 
         :return:
             The nuclear contribution to the Hessian.
@@ -204,7 +204,8 @@ class HessianDriver:
         coords = molecule.get_coordinates_in_bohr()
 
         # atomic charges
-        nuclear_charges = molecule.get_element_ids()
+        nuclear_charges = (molecule.get_effective_nuclear_charges(basis)
+                           if basis is not None else molecule.get_element_ids())
 
         # loop over all distinct atom pairs and add energy contribution
         for i in range(natm):
@@ -458,11 +459,12 @@ class HessianDriver:
                                      (2.0 * self.delta_h))
                     if self.do_dipole_gradient:
                         if self.rank == mpi_master():
-                            dipole_gradient[i, d] = ((dipmom_plus - dipmom_minus) /
-                                                     (2.0 * self.delta_h))
+                            dipole_gradient[i,
+                                            d] = ((dipmom_plus - dipmom_minus) /
+                                                  (2.0 * self.delta_h))
 
         # save energy for thermodynamics
-        # and restore scf_tensors to results for the original geometry.
+        # and restore scf_results to results for the original geometry.
         self.elec_energy = self.compute_energy(molecule, *args)
 
         # save Hessian in the usual shape

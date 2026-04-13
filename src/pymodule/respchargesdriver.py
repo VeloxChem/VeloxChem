@@ -38,7 +38,8 @@ from .veloxchemlib import mpi_master, bohr_in_angstrom
 from .outputstream import OutputStream
 from .espchargesdriver import EspChargesDriver
 from .inputparser import parse_input, print_keywords
-from .errorhandler import assert_msg_critical, safe_solve
+from .errorhandler import assert_msg_critical
+from .mathutils import safe_solve
 
 
 class RespChargesDriver(EspChargesDriver):

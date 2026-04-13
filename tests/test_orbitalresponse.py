@@ -33,7 +33,7 @@ class TestOrbitalResponse:
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
         scf_drv.update_settings(task.input_dict['scf'],
                                 task.input_dict['method_settings'])
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        scf_drv.compute(task.molecule, task.ao_basis)
 
         # Our references: lambda and omega in AO basis
 
@@ -42,7 +42,7 @@ class TestOrbitalResponse:
             tda_solver.update_settings(rsp_dict,
                                        task.input_dict['method_settings'])
             rsp_results = tda_solver.compute(task.molecule, task.ao_basis,
-                                             scf_drv.scf_tensors)
+                                             scf_drv.scf_results)
 
             orb_resp = TddftOrbitalResponse(task.mpi_comm, task.ostream)
             orbrsp_dict['tamm_dancoff'] = 'yes'
@@ -53,7 +53,7 @@ class TestOrbitalResponse:
             rpa_solver.update_settings({'nstates': 3},
                                        task.input_dict['method_settings'])
             rsp_results = rpa_solver.compute(task.molecule, task.ao_basis,
-                                             scf_drv.scf_tensors)
+                                             scf_drv.scf_results)
 
             orb_resp = TddftOrbitalResponse(task.mpi_comm, task.ostream)
             lambda_ref = 'lambda_rpa'
@@ -62,11 +62,11 @@ class TestOrbitalResponse:
         orb_resp.update_settings(orbrsp_dict,
                                  task.input_dict['method_settings'])
 
-        orb_resp.compute(task.molecule, task.ao_basis, scf_drv.scf_tensors,
+        orb_resp.compute(task.molecule, task.ao_basis, scf_drv.scf_results,
                          rsp_results)
         orb_resp_results = orb_resp.cphf_results
         #omega_ao = orb_resp.compute_omega(task.molecule, task.ao_basis,
-        #                                  scf_drv.scf_tensors)
+        #                                  scf_drv.scf_results)
 
         dft_dict = {'dft_func_label': 'HF'}
         pe_dict = {'potfile_text': ''}
@@ -88,7 +88,7 @@ class TestOrbitalResponse:
 
         if task.mpi_rank == mpi_master():
             nocc = task.molecule.number_of_alpha_electrons()
-            mo = scf_drv.scf_tensors['C_alpha']
+            mo = scf_drv.scf_results['C_alpha']
             mo_occ = mo[:, :nocc]
             mo_vir = mo[:, nocc:]
             nvir = mo_vir.shape[1]

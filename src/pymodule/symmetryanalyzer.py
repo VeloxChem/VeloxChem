@@ -39,7 +39,8 @@ from .symmetryoperations import (Inversion, Rotation, Reflection,
                                  ImproperRotation)
 from .symmetryoperations import rotation_matrix
 from .sanitychecks import molecule_sanity_check
-from .errorhandler import assert_msg_critical, safe_arccos, safe_arcsin
+from .errorhandler import assert_msg_critical
+from .mathutils import safe_arccos, safe_arcsin
 
 
 class SymmetryAnalyzer:
@@ -138,7 +139,7 @@ class SymmetryAnalyzer:
             "C4h": ["E", "2C4", "C2", "i", "2S4", "sigma_h"],
             "C5h": ["E", "4C5", "4S5", "sigma_h"],
             "C6h": ["E", "2C6", "2C3", "C2", "i", "2S3", "2S6", "sigma_h"],
-            "C7h": ["E", "6C5", "6S7", "sigma_h"],
+            "C7h": ["E", "6C7", "6S7", "sigma_h"],
             "C8h": ["E", "4C8", "2C4", "C2", "i", "2S4", "4S8", "sigma_h"],
             "D2h": ["E", "3C2", "i", "sigma_h", "sigma_v", "sigma_d"],
             "D3h": ["E", "2C3", "3C2", "2S3", "sigma_h", "3sigma_v"],
@@ -821,7 +822,7 @@ class SymmetryAnalyzer:
                 if not is_idealized[sym_idx]:
                     continue
 
-                if isinstance(sym_op, (Rotation, ImproperRotation)):
+                if isinstance(sym_op, Rotation):
                     axis = np.array(sym_op._axis)
 
                     dot = np.dot(u_vec_a, axis)
@@ -832,7 +833,7 @@ class SymmetryAnalyzer:
                         atoms[a] = np.array(factor * axis * vec_a_norm)
                         break
 
-                elif isinstance(sym_op, (Reflection, ImproperRotation)):
+                elif isinstance(sym_op, Reflection):
                     axis = np.array(sym_op._axis)
 
                     dot = np.dot(u_vec_a, axis)
@@ -843,6 +844,11 @@ class SymmetryAnalyzer:
                         y_axis /= np.linalg.norm(y_axis)
                         atoms[a] = np.array(np.cross(y_axis, axis) * vec_a_norm)
                         break
+
+                elif isinstance(sym_op, ImproperRotation):
+                    # General-position atoms in Sn groups should usually not be
+                    # snapped to the axis or perpendicular plane here.
+                    continue
 
         # generate molecule from unique atoms
 
@@ -901,6 +907,14 @@ class SymmetryAnalyzer:
 
         for i in range(self._natoms):
             centered_mol.set_atom_coordinates(i, rot_coords[i])
+
+        # Recenter after idealization/reorientation to remove residual
+        # mass-center drift from symmetry-orbit reconstruction.
+        center_of_mass = centered_mol.center_of_mass_in_bohr()
+        recentered_coords = centered_mol.get_coordinates_in_bohr() - center_of_mass
+
+        for i in range(self._natoms):
+            centered_mol.set_atom_coordinates(i, recentered_coords[i])
 
         return centered_mol
 

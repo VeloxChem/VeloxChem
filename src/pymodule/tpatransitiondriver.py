@@ -42,12 +42,12 @@ from .veloxchemlib import (mpi_master, bohr_in_angstrom, hartree_in_ev,
                            speed_of_light_in_vacuum_in_SI)
 from .profiler import Profiler
 from .outputstream import OutputStream
-from .cppsolver import ComplexResponse
+from .cppsolver import ComplexResponseSolver
 from .linearsolver import LinearSolver
 from .nonlinearsolver import NonlinearSolver
 from .distributedarray import DistributedArray
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           dft_sanity_check)
+                           ri_sanity_check, dft_sanity_check)
 from .errorhandler import assert_msg_critical
 from .checkpoint import (check_distributed_focks, read_distributed_focks,
                          write_distributed_focks)
@@ -146,6 +146,9 @@ class TpaTransitionDriver(NonlinearSolver):
         # update checkpoint_file after scf_results_sanity_check
         if self.filename is not None and self.checkpoint_file is None:
             self.checkpoint_file = f'{self.filename}_rsp.h5'
+
+        # check RI setup
+        ri_sanity_check(self)
 
         # check dft setup
         dft_sanity_check(self, 'compute', 'nonlinear')
@@ -273,7 +276,7 @@ class TpaTransitionDriver(NonlinearSolver):
             X = None
 
         # Computing the first-order response vectors (3 per frequency)
-        N_drv = ComplexResponse(self.comm, self.ostream)
+        N_drv = ComplexResponseSolver(self.comm, self.ostream)
 
         cpp_keywords = {
             'damping', 'norm_thresh', 'lindep_thresh', 'conv_thresh',
@@ -384,7 +387,7 @@ class TpaTransitionDriver(NonlinearSolver):
 
         ret_dict = {}
         M_tensors = {}
-        excited_state_dipole_moments = {}
+        excited_state_dipole_moments = np.zeros((len(freqs), 3))
 
         # Compute dipole vector
         scf_prop = FirstOrderProperties(self.comm, self.ostream)
@@ -393,13 +396,13 @@ class TpaTransitionDriver(NonlinearSolver):
         for w_ind, w in enumerate(freqs):
             m = np.zeros((3, 3), dtype='complex128')
 
-            N0_x = ComplexResponse.get_full_solution_vector(Nx[('x', 0)])
-            N0_y = ComplexResponse.get_full_solution_vector(Nx[('y', 0)])
-            N0_z = ComplexResponse.get_full_solution_vector(Nx[('z', 0)])
+            N0_x = ComplexResponseSolver.get_full_solution_vector(Nx[('x', 0)])
+            N0_y = ComplexResponseSolver.get_full_solution_vector(Nx[('y', 0)])
+            N0_z = ComplexResponseSolver.get_full_solution_vector(Nx[('z', 0)])
 
-            N_x = ComplexResponse.get_full_solution_vector(Nx[('x', w)])
-            N_y = ComplexResponse.get_full_solution_vector(Nx[('y', w)])
-            N_z = ComplexResponse.get_full_solution_vector(Nx[('z', w)])
+            N_x = ComplexResponseSolver.get_full_solution_vector(Nx[('x', w)])
+            N_y = ComplexResponseSolver.get_full_solution_vector(Nx[('y', w)])
+            N_z = ComplexResponseSolver.get_full_solution_vector(Nx[('z', w)])
 
             Nc = LinearResponseEigenSolver.get_full_solution_vector(Xf[w_ind])
 
@@ -441,9 +444,8 @@ class TpaTransitionDriver(NonlinearSolver):
                 val_A2 = -(Nc_starA2Nc + NcA2Nc_star)
                 val_E3 = NaE3NbNc
 
-                excited_state_dipole_moments.update({
-                    (w, 'x'): (val_E3 + val_A2 + ground_state_dipole_x).real
-                })
+                excited_state_dipole_moments[w_ind, 0] = (
+                    -(val_E3 + val_A2) + ground_state_dipole_x).real
 
                 # Double residue y-component
 
@@ -461,9 +463,8 @@ class TpaTransitionDriver(NonlinearSolver):
                 val_A2 = -(Nc_starA2Nc + NcA2Nc_star)
                 val_E3 = NaE3NbNc
 
-                excited_state_dipole_moments.update({
-                    (w, 'y'): (val_E3 + val_A2 + ground_state_dipole_y).real
-                })
+                excited_state_dipole_moments[w_ind, 1] = (
+                    -(val_E3 + val_A2) + ground_state_dipole_y).real
 
                 # Double residue z-component
 
@@ -481,9 +482,8 @@ class TpaTransitionDriver(NonlinearSolver):
                 val_A2 = -(Nc_starA2Nc + NcA2Nc_star)
                 val_E3 = NaE3NbNc
 
-                excited_state_dipole_moments.update({
-                    (w, 'z'): (val_E3 + val_A2 + ground_state_dipole_z).real
-                })
+                excited_state_dipole_moments[w_ind, 2] = (
+                    -(val_E3 + val_A2) + ground_state_dipole_z).real
 
                 # xx
 
@@ -589,7 +589,19 @@ class TpaTransitionDriver(NonlinearSolver):
                 m[1, 2] = val_E3 + val_A2 + val_X2
                 m[2, 1] = val_E3 + val_A2 + val_X2
 
-                M_tensors.update({w: m})
+                abs_tol = 1.0e-10
+                rel_tol = 1.0e-8
+                real_norm = np.linalg.norm(m.real)
+                imag_norm = np.linalg.norm(m.imag)
+                assert_msg_critical(
+                    imag_norm <= abs_tol + rel_tol * real_norm,
+                    'TpaTransitionDriver: unexpected imaginary part in '
+                    f'TPA transition tensor for excited state {w_ind} '
+                    f'(||Im||_F = {imag_norm:.3e}, '
+                    f'||Re||_F = {real_norm:.3e}, '
+                    f'abs_tol = {abs_tol:.1e}, rel_tol = {rel_tol:.1e})')
+
+                M_tensors.update({w_ind: m.real.copy()})
 
         diagonalized_tensors = {}
 
@@ -604,26 +616,17 @@ class TpaTransitionDriver(NonlinearSolver):
         self.ostream.print_header('=' * (len(w_str) + 2))
         self.ostream.print_blank()
 
-        # conversion factor for TPA cross-sections in GM
-        # a0 in cm, c in cm/s, gamma (0.1 eV) in au
-        alpha = fine_structure_constant()
-        a0 = bohr_in_angstrom() * 1.0e-8
-        c = speed_of_light_in_vacuum_in_SI() * 100.0
-        gamma = 0.1 / hartree_in_ev()
-        au2gm = (8.0 * np.pi**2 * alpha * a0**5) / (c * gamma) * 1.0e+50
-
         if self.rank == mpi_master():
             tpa_strengths = {'linear': {}, 'circular': {}}
-            tpa_cross_sections = {'linear': {}, 'circular': {}}
 
-            for w in M_tensors.keys():
+            for state_ind in M_tensors.keys():
                 Df = 0.0
                 Dg = 0.0
                 for i in range(3):
                     for j in range(3):
-                        Mii = M_tensors[w][(i, i)]
-                        Mij = M_tensors[w][(i, j)]
-                        Mjj = M_tensors[w][(j, j)]
+                        Mii = M_tensors[state_ind][(i, i)]
+                        Mij = M_tensors[state_ind][(i, j)]
+                        Mjj = M_tensors[state_ind][(j, j)]
                         Df += (Mii * Mjj).real
                         Dg += (Mij * Mij).real
                 Df /= 30.0
@@ -632,18 +635,14 @@ class TpaTransitionDriver(NonlinearSolver):
                 D_linear = 2.0 * Df + 4.0 * Dg
                 D_circular = -2.0 * Df + 6.0 * Dg
 
-                tpa_strengths['linear'][w] = D_linear
-                tpa_strengths['circular'][w] = D_circular
-
-                tpa_cross_sections['linear'][w] = au2gm * w**2 * D_linear
-                tpa_cross_sections['circular'][w] = au2gm * w**2 * D_circular
+                tpa_strengths['linear'][state_ind] = D_linear
+                tpa_strengths['circular'][state_ind] = D_circular
 
             profiler.check_memory_usage('End of QRF')
 
             ret_dict = {
                 'photon_energies': [-w for w in freqs],
                 'transition_moments': M_tensors,
-                'cross_sections': tpa_cross_sections,
                 'tpa_strengths': tpa_strengths,
                 'excited_state_dipole_moments': excited_state_dipole_moments,
                 'ground_state_dipole_moments':
@@ -681,9 +680,9 @@ class TpaTransitionDriver(NonlinearSolver):
 
         for w_ind, w in enumerate(freqs):
 
-            nx = ComplexResponse.get_full_solution_vector(Nx[('x', w)])
-            ny = ComplexResponse.get_full_solution_vector(Nx[('y', w)])
-            nz = ComplexResponse.get_full_solution_vector(Nx[('z', w)])
+            nx = ComplexResponseSolver.get_full_solution_vector(Nx[('x', w)])
+            ny = ComplexResponseSolver.get_full_solution_vector(Nx[('y', w)])
+            nz = ComplexResponseSolver.get_full_solution_vector(Nx[('z', w)])
 
             Nc = LinearResponseEigenSolver.get_full_solution_vector(Xf[w_ind])
 
@@ -897,9 +896,9 @@ class TpaTransitionDriver(NonlinearSolver):
 
             vec_pack = self._collect_vectors_in_columns(vec_pack)
 
-            Nbx = ComplexResponse.get_full_solution_vector(Nx[('x', w)])
-            Nby = ComplexResponse.get_full_solution_vector(Nx[('y', w)])
-            Nbz = ComplexResponse.get_full_solution_vector(Nx[('z', w)])
+            Nbx = ComplexResponseSolver.get_full_solution_vector(Nx[('x', w)])
+            Nby = ComplexResponseSolver.get_full_solution_vector(Nx[('y', w)])
+            Nbz = ComplexResponseSolver.get_full_solution_vector(Nx[('z', w)])
 
             Nc = LinearResponseEigenSolver.get_full_solution_vector(Xf[w_ind])
 
@@ -1020,8 +1019,8 @@ class TpaTransitionDriver(NonlinearSolver):
         self.ostream.print_header(title)
         self.ostream.print_header('-' * width)
 
-        title = '  {:<9s} {:>12s}{:>11s}{:>11s}{:>11s}{:>11s}{:>11s}{:>11s} '.format(
-            'Ex. State', 'Ex. Energy', 'Sxx  ', 'Syy  ', 'Szz  ', 'Sxy  ',
+        title = '  {:<9s}{:>13s}{:>11s}{:>11s}{:>11s}{:>11s}{:>11s}{:>11s} '.format(
+            'State', 'Photon Energy', 'Sxx  ', 'Syy  ', 'Szz  ', 'Sxy  ',
             'Sxz  ', 'Syz  ')
         self.ostream.print_header(title.ljust(width))
         self.ostream.print_header('-' * width)
@@ -1029,53 +1028,48 @@ class TpaTransitionDriver(NonlinearSolver):
         for w_ind, w in enumerate(freqs):
             exec_str = '{:7d}   '.format(w_ind + 1)
             exec_str += '{:11.6f} eV'.format(w * hartree_in_ev())
-            exec_str += '{:11.4f}'.format(M_tensors[-w][0, 0].real)
-            exec_str += '{:11.4f}'.format(M_tensors[-w][1, 1].real)
-            exec_str += '{:11.4f}'.format(M_tensors[-w][2, 2].real)
-            exec_str += '{:11.4f}'.format(M_tensors[-w][0, 1].real)
-            exec_str += '{:11.4f}'.format(M_tensors[-w][0, 2].real)
-            exec_str += '{:11.4f}'.format(M_tensors[-w][1, 2].real)
+            exec_str += '{:11.4f}'.format(M_tensors[w_ind][0, 0].real)
+            exec_str += '{:11.4f}'.format(M_tensors[w_ind][1, 1].real)
+            exec_str += '{:11.4f}'.format(M_tensors[w_ind][2, 2].real)
+            exec_str += '{:11.4f}'.format(M_tensors[w_ind][0, 1].real)
+            exec_str += '{:11.4f}'.format(M_tensors[w_ind][0, 2].real)
+            exec_str += '{:11.4f}'.format(M_tensors[w_ind][1, 2].real)
             self.ostream.print_header(exec_str.ljust(width))
         self.ostream.print_blank()
         self.ostream.print_blank()
 
         tpa_strengths = rsp_results['tpa_strengths']
-        tpa_cross_sections = rsp_results['cross_sections']
 
-        title = 'TPA Strength and Cross-Section (Linear Polarization)'
+        title = 'TPA Strength (Linear Polarization)'
         self.ostream.print_header(title)
         self.ostream.print_header('-' * width)
 
-        title = '  {:<9s} {:>12s}{:>28s}{:>28s}'.format(
-            'Ex. State', 'Ex. Energy', 'TPA strength    ',
-            'TPA cross-section    ')
+        title = '  {:<9s}{:>13s}{:>28s}'.format('State', 'Photon Energy',
+                                                'TPA strength    ')
         self.ostream.print_header(title.ljust(width))
         self.ostream.print_header('-' * width)
 
         for w_ind, w in enumerate(freqs):
             exec_str = '{:7d}   '.format(w_ind + 1)
             exec_str += '{:11.6f} eV'.format(w * hartree_in_ev())
-            exec_str += '{:20.6f} a.u.'.format(tpa_strengths['linear'][-w])
-            exec_str += '{:20.6f} GM'.format(tpa_cross_sections['linear'][-w])
+            exec_str += '{:20.6f} a.u.'.format(tpa_strengths['linear'][w_ind])
             self.ostream.print_header(exec_str.ljust(width))
         self.ostream.print_blank()
         self.ostream.print_blank()
 
-        title = 'TPA Strength and Cross-Section (Circular Polarization)'
+        title = 'TPA Strength (Circular Polarization)'
         self.ostream.print_header(title)
         self.ostream.print_header('-' * width)
 
-        title = '  {:<9s} {:>12s}{:>28s}{:>28s}'.format(
-            'Ex. State', 'Ex. Energy', 'TPA strength    ',
-            'TPA cross-section    ')
+        title = '  {:<9s}{:>13s}{:>28s}'.format('State', 'Photon Energy',
+                                                'TPA strength    ')
         self.ostream.print_header(title.ljust(width))
         self.ostream.print_header('-' * width)
 
         for w_ind, w in enumerate(freqs):
             exec_str = '{:7d}   '.format(w_ind + 1)
             exec_str += '{:11.6f} eV'.format(w * hartree_in_ev())
-            exec_str += '{:20.6f} a.u.'.format(tpa_strengths['circular'][-w])
-            exec_str += '{:20.6f} GM'.format(tpa_cross_sections['circular'][-w])
+            exec_str += '{:20.6f} a.u.'.format(tpa_strengths['circular'][w_ind])
             self.ostream.print_header(exec_str.ljust(width))
         self.ostream.print_blank()
         self.ostream.print_blank()
@@ -1121,13 +1115,13 @@ class TpaTransitionDriver(NonlinearSolver):
         alpha = fine_structure_constant()
         a0_in_cm = bohr_in_angstrom() * 1.0e-8
         c_in_cm_per_s = speed_of_light_in_vacuum_in_SI() * 100.0
-        au2gm = (8.0 * np.pi**2 * alpha * a0_in_cm**5) / c_in_cm_per_s * 1.0e+50
+        au2gm = (4.0 * np.pi**2 * alpha * a0_in_cm**5) / c_in_cm_per_s * 1.0e+50
 
         tpa_ene_au = []
         tpa_str = []
 
-        for w, s in rsp_results['tpa_strengths']['linear'].items():
-            tpa_ene_au.append(-w)
+        for state_ind, s in rsp_results['tpa_strengths']['linear'].items():
+            tpa_ene_au.append(rsp_results['photon_energies'][state_ind])
             tpa_str.append(s)
 
         spectrum = {}
