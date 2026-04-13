@@ -35,16 +35,16 @@ from mpi4py import MPI
 import sys
 import numpy as np
 import csv
+import re
 from .outputstream import OutputStream
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 from .scfrestdriver import ScfRestrictedDriver
+from .scfrestopendriver import ScfRestrictedOpenDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .lreigensolver import LinearResponseEigenSolver
+from .cppsolver import ComplexResponseSolver
 from .spectrumaverager import SpectrumAverager
-from .sanitychecks import ensemble_driver_scf_sanity_check
-from .sanitychecks import ensemble_driver_rsp_sanity_check
-
 from .veloxchemlib import (mpi_master, bohr_in_angstrom)
 
 class EnsembleDriver:
@@ -106,40 +106,12 @@ class EnsembleDriver:
         self.size = self.comm.Get_size()
         self.ostream = ostream
 
-        # settings for SCF and choice of rsp driver
-        self._is_restricted = True
-        self._rsp_property = None
-
-        # Other possible settings
-        self.xcfun = None
-        self.potfile = None
-        self.embedding = None
-        self.eri_thresh = None
-        self.ri_coulomb = None
-        self.grid_level = None
-
-        # added scf_dict, method_dict and rsp_dict as
-        # instance variables. Updated in update_settings
-        # and used in compute
-        self.scf_dict = None
-        self.method_dict = None
-        self.rsp_dict = None
-
-        self.excited_states = False
-
-        # response settings are also added here in a similar way
-        self.nstates = None
-        self.nto = None
-        self.core_excitation = None
-        self.num_core_orbitals = None
-
         db_dir = Path(__file__).resolve().parent / "database" / "environment_parameters"
 
         sep_parameters_file = db_dir / "pe_sep.csv"
         cp3_parameters_file = db_dir / "pe_cp3.csv"
         tip3p_parameters_file = db_dir / "npe_tip3p.csv"
         ff19sb_parameters_file = db_dir / "npe_ff19sb.csv"
-
 
         if self.rank == mpi_master():
             self._sep_db = self._load_pe_db(sep_parameters_file)
@@ -168,33 +140,6 @@ class EnsembleDriver:
 
         self.pe_model = None
         self.npe_model = None
-    
-    # A good routine to have to enable input-output runs later one.
-    def update_settings(self, scf_dict=None, method_dict=None, rsp_dict=None):
-        """
-        Updates settings in the ensemble driver.
-
-        :param scf_dict:
-            The dictionary of SCF settings.
-        :param method_dict:
-            The dictionary of method settings.
-        :param rsp_dict:
-            The dictionary of response settings.
-        """
-        if scf_dict is None:
-            scf_dict = {}
-        if method_dict is None:
-            method_dict = {}
-        if rsp_dict is None:
-            rsp_dict = {}
-
-        self.scf_dict = dict(scf_dict)
-        self.method_dict = dict(method_dict) 
-        self.rsp_dict = dict(rsp_dict)
-
-        # Auto-enable response if response settings are provided
-        if self.rsp_dict:
-            self.excited_states = True
 
     @staticmethod
     def _parse_six_floats(field: str) -> list[float]:
@@ -556,7 +501,6 @@ class EnsembleDriver:
         :return:
             A matching atom name in the db, or None.
         """
-        import re
 
         atom_name = str(atom_name)
         avail = set(str(a) for a in available_atoms)
@@ -920,10 +864,90 @@ class EnsembleDriver:
                         )
                 fh.write("@end\n")
 
+    @staticmethod
+    def _apply_options_to_driver(driver, options: dict, skip_keys: set[str] | None = None):
+        """
+        Apply dictionary options to a driver using setattr with key validation.
+        """
+        if skip_keys is None:
+            skip_keys = set()
+        for key, val in options.items():
+            if key in skip_keys:
+                continue
+            if not hasattr(driver, key):
+                raise ValueError(
+                    f"Unknown option '{key}' for {type(driver).__name__}."
+                )
+            setattr(driver, key, val)
+
+    @staticmethod
+    def _build_scf_driver(scf_options: dict):
+        """
+        Build SCF driver from scf_options['scf_type'].
+        Allowed values:
+            - 'scf'   : ScfRestrictedDriver
+            - 'roscf' : ScfRestrictedOpenDriver
+            - 'uscf'  : ScfUnrestrictedDriver
+        """
+        scf_type = str(scf_options.get("scf_type", "scf")).lower()
+        if scf_type == "scf":
+            return ScfRestrictedDriver()
+        if scf_type == "roscf":
+            return ScfRestrictedOpenDriver()
+        if scf_type == "uscf":
+            return ScfUnrestrictedDriver()
+        raise ValueError(
+            "Invalid scf_type in scf_options. "
+            "Expected one of: 'scf', 'roscf', 'uscf'."
+        )
+
+    @staticmethod
+    def _build_property_driver(property_options: dict):
+        """
+        Build response driver from property_options using rules:
+        - property='absorption' or 'ecd' + nstates      -> LinearResponseEigenSolver
+        - property='absorption' or 'ecd' + frequencies  -> ComplexResponse
+        """
+        if not property_options:
+            return None
+ 
+        if "property" not in property_options:
+            raise ValueError("property_options must contain key 'property'.")
+ 
+        prop = str(property_options["property"]).lower().strip()
+        has_nstates = "nstates" in property_options
+        has_freqs = "frequencies" in property_options
+ 
+        if prop not in {"absorption", "ecd"}:
+            raise ValueError(
+                "Invalid property in property_options. "
+                "Expected 'absorption' or 'ecd'."
+            )
+ 
+        if has_nstates and has_freqs:
+            raise ValueError(
+                "property_options cannot contain both 'nstates' and 'frequencies'."
+            )
+ 
+        if has_freqs:
+            drv = ComplexResponseSolver()
+            drv.set_cpp_property("absorption" if prop == "absorption" else "ecd")
+            return drv
+ 
+        if has_nstates:
+            return LinearResponseEigenSolver()
+ 
+        raise ValueError(
+            "property_options must define either 'nstates' (TD-DFT) "
+            "or 'frequencies' (CPP)."
+        )
+
     def compute(
         self,
         snapshots,
         basis_set: str,
+        scf_options: dict | None = None,
+        property_options: dict | None = None,
         potdir: str | Path = "pot_frames",
         write_pe_potfiles: bool = True,
         qm_charge: int | None = None,
@@ -933,13 +957,19 @@ class EnsembleDriver:
         Drives the computation over the ensemble of snapshots.
 
         For each snapshot, an SCF calculation is performed for the QM subsystem, with
-        optional PE/NPE environment terms. Linear-response calculations are optional
-        and are controlled by :attr:`excited_states` and the response options.
+        optional PE/NPE environment terms. Optional response calculations are
+        controlled via property_options.
 
         :param snapshots:
             A list of snapshot dictionaries (or a single snapshot dict).
         :param basis_set: (str)
             Basis set.
+        :param scf_options: (dict)
+            SCF/method options merged in one dictionary.
+            Includes optional key 'scf_type' in {'scf', 'roscf', 'uscf'} to select the SCF driver.
+        :param property_options: (dict)
+            Property options dictionary with keys:
+            'property' ('absorption' or 'ecd') + ('nstates' or 'frequencies').
         :param potdir : (str or Path)
             Directory to store/read PE potfiles.
         :param write_pe_potfiles: (bool)
@@ -964,6 +994,14 @@ class EnsembleDriver:
    
         if isinstance(snapshots, dict):
             snapshots = [snapshots]
+
+        if scf_options is None:
+            scf_options = {}
+        else:
+            scf_options = dict(scf_options)
+
+        if property_options is None:
+            property_options = {}
 
         if qm_charge is not None:
             qm_charge = int(qm_charge)
@@ -996,47 +1034,22 @@ class EnsembleDriver:
 
         if write_pe_potfiles and has_any_pe:
             self.write_pot_files(snapshots, outdir=potdir)
-
-        # Here starts the suggestion of how to handle 
-        # SCF under the hood
-        if self._is_restricted:
-            scf_driver = ScfRestrictedDriver()
-        else:
-            scf_driver = ScfUnrestrictedDriver()
-
-        rsp_driver = LinearResponseEigenSolver()
         
-        # update settings for scf if necessary
-        if self.scf_dict is not None or self.method_dict is not None:
-            scf_driver.update_settings(self.scf_dict or {}, self.method_dict or {})
+        # SCF driver from scf_options
+        scf_driver = self._build_scf_driver(scf_options)
+        self._apply_options_to_driver(scf_driver, scf_options, skip_keys={"scf_type"})
 
-        do_rsp = bool(self.excited_states)
-        if not do_rsp:
-            rsp_opts_set = (
-                (self.rsp_dict is not None and len(self.rsp_dict) > 0)
-            or (self.nstates is not None)
-            or (self.nto is not None)
-            or (self.core_excitation is not None)
-            or (self.num_core_orbitals is not None)
+        # Property/response driver from property_options
+        rsp_driver = self._build_property_driver(property_options)
+        do_rsp = (rsp_driver is not None)
+        if do_rsp:
+            # property is routing metadata; do not setattr it on the driver
+            self._apply_options_to_driver(
+                rsp_driver,
+                property_options,
+                skip_keys={"property"},
             )
-            if rsp_opts_set:
-                do_rsp = True
-                self.excited_states = True
-        
-        rsp_driver = None
-        if do_rsp:
-            rsp_driver = LinearResponseEigenSolver()
 
-            # update settings for rsp if necessary
-            if self.rsp_dict is not None or self.method_dict is not None:
-                rsp_driver.update_settings(self.rsp_dict or {}, self.method_dict or {})
-
-        # sanity check -- update settings in scf and rsp according to
-        # which variables the user set.
-        ensemble_driver_scf_sanity_check(scf_driver, self)
-        if do_rsp:
-            ensemble_driver_rsp_sanity_check(rsp_driver, self)
-        
         scf_all = []
         rsp_all = [] if do_rsp else None
 
@@ -1156,8 +1169,8 @@ class EnsembleDriver:
         if "rsp_all" not in results or results.get("rsp_all", None) is None:
             raise KeyError(
                 "No 'rsp_all' found in results. Make sure you ran a response calculation "
-                "(e.g., set ens_drv.excited_states=True or set ens_drv.nstates / rsp_dict "
-                "before calling compute())."
+                "(e.g., pass property_optios with 'property' and either "
+                "'nstates' or 'frequencies' to EnsembleDriver.compute())"
             )
 
         rsp_all = results["rsp_all"]
