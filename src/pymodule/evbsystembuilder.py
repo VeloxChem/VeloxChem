@@ -1677,7 +1677,6 @@ class EvbSystemBuilder():
                 lam, self.angle_lambda_switch)
             if (key in self.reactant.angles.keys()
                     and key in self.product.angles.keys()):
-                self.ostream.flush()
 
                 angleA = self.reactant.angles[key]
                 angleB = self.product.angles[key]
@@ -1784,10 +1783,10 @@ class EvbSystemBuilder():
 
         a = -1 / lambda_switch
         b = 1
-        reascale = a * lam + b
+        reascale = max(0, a * lam + b)
         a = 1 / (1 - lambda_switch)
         b = 1 - a
-        proscale = a * lam + b
+        proscale = max(0, a * lam + b)
         return reascale, proscale
 
     def _create_improper_torsion_forces(self, lam):
