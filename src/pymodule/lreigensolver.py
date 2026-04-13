@@ -196,6 +196,10 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
                     (self.num_virtual_orbitals)),
                 f'{type(self).__name__}: too many excited states')
 
+        self._check_mpi_oversubscription(
+            self._get_excitation_space_dimension_restricted(nocc, norb),
+            'excitation space')
+
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
 
@@ -231,6 +235,8 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
                 self.restart = check_rsp_hdf5(self.checkpoint_file,
                                               rsp_vector_labels, molecule,
                                               basis, dft_dict, pe_dict)
+                if self.restart:
+                    self.restart = self.match_settings(self.checkpoint_file)
             self.restart = self.comm.bcast(self.restart, root=mpi_master())
 
         # read initial guess from restart file
@@ -572,9 +578,10 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
                     if self.detach_attach_charges:
                         atom_to_ao = vis_drv.map_atom_to_atomic_orbitals(
                             molecule, basis)
-                        S = scf_results['S']
-                        S_sqrt = symmetric_matrix_function(
-                            S, np.sqrt, thresh=1.0e-12)
+                        if self.rank == mpi_master():
+                            S = scf_results['S']
+                            S_sqrt = symmetric_matrix_function(
+                                S, np.sqrt, thresh=1.0e-12)
 
                     if self.cube_origin is None or self.cube_stepsize is None:
                         cubic_grid = vis_drv.gen_cubic_grid(

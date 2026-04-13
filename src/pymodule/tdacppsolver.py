@@ -59,7 +59,7 @@ except ImportError:
     pass
 
 
-class ComplexResponseTDA(LinearSolver):
+class ComplexResponseTdaSolver(LinearSolver):
     """
     Implements the complex linear response solver using the Tamm-Dancoff approximation.
 
@@ -360,6 +360,10 @@ class ComplexResponseTDA(LinearSolver):
         norb = orb_ene.shape[0]
         nocc = molecule.number_of_alpha_electrons()
 
+        self._check_mpi_oversubscription(
+            self._get_excitation_space_dimension_restricted(nocc, norb),
+            'response space')
+
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
 
@@ -442,6 +446,8 @@ class ComplexResponseTDA(LinearSolver):
                 self.restart = check_rsp_hdf5(self.checkpoint_file,
                                               rsp_vector_labels, molecule,
                                               basis, dft_dict, pe_dict)
+                if self.restart:
+                    self.restart = self.match_settings(self.checkpoint_file)
             self.restart = self.comm.bcast(self.restart, root=mpi_master())
 
         # read initial guess from restart file
@@ -1205,7 +1211,10 @@ class ComplexResponseTDA(LinearSolver):
             dist_new_b.data -= dist_new_proj.data
 
         if renormalize:
-            if dist_new_b.data.ndim > 0 and dist_new_b.shape(0) > 0:
+            has_global_rows = self.comm.allreduce(
+                int(dist_new_b.data.ndim > 0 and dist_new_b.shape(0) > 0),
+                op=MPI.SUM) > 0
+            if has_global_rows:
                 dist_new_b = self.remove_linear_dependence(
                     dist_new_b, self.lindep_thresh)
 
@@ -1476,6 +1485,8 @@ class ComplexResponseTDA(LinearSolver):
         success = self.comm.bcast(success, root=mpi_master())
 
         if success:
+            self._write_settings_to_checkpoint(self.checkpoint_file)
+
             if self.nonlinear:
                 dist_arrays = [
                     self._dist_bger, self._dist_e2bger, self._dist_fock_ger

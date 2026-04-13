@@ -159,7 +159,7 @@ from .lrsolver import LinearResponseSolver
 from .lrsolverunrest import LinearResponseUnrestrictedSolver
 from .cppsolver import ComplexResponseSolver
 from .cppsolverunrest import ComplexResponseUnrestrictedSolver
-from .tdacppsolver import ComplexResponseTDA
+from .tdacppsolver import ComplexResponseTdaSolver
 from .c6driver import C6Driver
 from .quadraticresponsedriver import QuadraticResponseDriver
 from .cubicresponsedriver import CubicResponseDriver
@@ -233,6 +233,7 @@ from .ensembledriver import EnsembleDriver
 from .spectrumaverager import SpectrumAverager
 # for backward compatibility only
 from .cppsolver import ComplexResponseSolver as ComplexResponse
+from .tdacppsolver import ComplexResponseTdaSolver as ComplexResponseTDA
 from .peforcefieldgenerator import PEForceFieldGenerator as LoPropDriver
 
 # Python functions

@@ -1,3 +1,4 @@
+from pathlib import Path
 from copy import deepcopy
 
 import h5py
@@ -206,6 +207,10 @@ class TestOptimizationDriverCoverage:
             with h5py.File(filename + ".h5") as h5f:
                 assert "opt/scan_energies" in h5f
                 assert "opt/scan_coordinates_au" in h5f
+
+            fpath = Path('scan-final.xyz')
+            if fpath.is_file():
+                fpath.unlink()
 
     def test_optimizationengine_calc_new_and_deepcopy(self, tmp_path):
         molecule = self.make_molecule("""2

@@ -432,6 +432,8 @@ class CphfSolver(LinearSolver):
                 self.restart = check_rsp_hdf5(self.checkpoint_file,
                                               orbrsp_vector_labels, molecule,
                                               basis, dft_dict, pe_dict)
+                if self.restart:
+                    self.restart = self.match_settings(self.checkpoint_file)
             self.restart = self.comm.bcast(self.restart, root=mpi_master())
 
         # read initial guess from restart file
@@ -1396,7 +1398,10 @@ class CphfSolver(LinearSolver):
 
         # remove linear dependencies and orthonormalize trial vectors
         if renormalize:
-            if dist_trials.data.ndim > 0 and dist_trials.shape(0) > 0:
+            has_global_rows = self.comm.allreduce(
+                int(dist_trials.data.ndim > 0 and dist_trials.shape(0) > 0),
+                op=MPI.SUM) > 0
+            if has_global_rows:
                 dist_trials = self._remove_linear_dependence_half_size(
                     dist_trials, self.lindep_thresh)
                 dist_trials = (

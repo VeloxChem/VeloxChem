@@ -240,9 +240,6 @@ class ValetAnalyzer:
         # Get density matrices
         densities = self.compute_detach_attach_densities(scf_results, rsp_results, state_index)
         
-        # Get overlap matrix
-        S = scf_results["S"]
-        
         # Map atoms to AOs
         vis_drv = VisualizationDriver()
         atom_to_aos = vis_drv.map_atom_to_atomic_orbitals(self._molecule, self._basis)
@@ -250,10 +247,7 @@ class ValetAnalyzer:
         detach_dens_ao = densities['detachment_density_matrix_AO']
         attach_dens_ao = densities['attachment_density_matrix_AO']
 
-        # Note: detachment density is negative, so we take absolute values
-        detach_dens_ao = np.abs(detach_dens_ao)
-        
-        # Compute attachment charges using Lowdin analysis
+        # Compute charges using Lowdin analysis
         S = scf_results['S']
         S_sqrt = symmetric_matrix_function(S,
                                            np.sqrt,
@@ -375,8 +369,16 @@ class ValetAnalyzer:
             # Handle both single atom and list of atoms
             if isinstance(atom_indices, (list, tuple)):
                 for atom in atom_indices:
+                    assert_msg_critical(
+                        1 <= atom <= num_atoms,
+                        'ValetAnalyzer: subgroup atom indices must be in the '
+                        f'range [1, {num_atoms}].')
                     sg_atom_map[atom - 1] = i + 1  # Convert 1-based to 0-based
             else:
+                assert_msg_critical(
+                    1 <= atom_indices <= num_atoms,
+                    'ValetAnalyzer: subgroup atom indices must be in the '
+                    f'range [1, {num_atoms}].')
                 sg_atom_map[atom_indices - 1] = i + 1  # Convert 1-based to 0-based
             sg_names.append(name)
 

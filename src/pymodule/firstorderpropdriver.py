@@ -72,6 +72,8 @@ class FirstOrderPropertyDriver:
 
         self.property = 'electric dipole moment'
 
+        self.origin = None
+
     def compute(self, molecule, basis, scf_results):
         """
         Computes first-order property.
@@ -87,7 +89,6 @@ class FirstOrderPropertyDriver:
         assert_msg_critical(
             self.property.lower() in [
                 'electric dipole moment',
-                'electric_dipole_moment',
             ],
             f'{type(self).__name__}: Property {self.property} not yet supported'
         )
@@ -99,7 +100,6 @@ class FirstOrderPropertyDriver:
 
         if self.property.lower() in [
                 'electric dipole moment',
-                'electric_dipole_moment',
         ]:
             dipole_dict = self.compute_electric_dipole_moment(
                 molecule, basis, total_density)
@@ -108,7 +108,6 @@ class FirstOrderPropertyDriver:
 
         return {
             'electric dipole moment': dipole_dict,
-            'electric_dipole_moment': dipole_dict,
         }
 
     def compute_electric_dipole_moment(self, molecule, basis, total_density):
@@ -128,8 +127,12 @@ class FirstOrderPropertyDriver:
         # choose center of nuclear charges as origin
         coords = molecule.get_coordinates_in_bohr()
         nuclear_charges = molecule.get_effective_nuclear_charges(basis)
-        origin = np.sum(coords.T * nuclear_charges,
-                        axis=1) / np.sum(nuclear_charges)
+
+        if self.origin is None:
+            origin = np.sum(coords.T * nuclear_charges,
+                            axis=1) / np.sum(nuclear_charges)
+        else:
+            origin = np.array(self.origin)
 
         dipole_moment = None
         if self.rank == mpi_master():
