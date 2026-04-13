@@ -1779,6 +1779,8 @@ class EvbSystemBuilder():
     def _get_lambda_scaling(self, lam, lambda_switch):
         if lambda_switch == 0:
             return 1 - lam, lam
+        if lambda_switch == 1:
+            return 0, 0
 
         a = -1 / lambda_switch
         b = 1

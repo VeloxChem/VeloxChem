@@ -643,10 +643,11 @@ class ReactionMatcher:
             breaking_edges = A.edges - B_copy.edges
             forming_edges = B_copy.edges - A.edges
             # If the forced breaking or forced forming edges are not respected, skip this mapping
-            if (forced_breaking_edges.issubset(forming_edges)
-                    and len(forced_breaking_edges)
-                    > 0) or (forced_forming_edges.issubset(breaking_edges)
-                             and len(forced_forming_edges) > 0):
+            forced_breaking_respected = (
+                forced_breaking_edges.issubset(breaking_edges))
+            forced_forming_respected = (
+                forced_forming_edges.issubset(forming_edges))
+            if not forced_forming_respected or not forced_breaking_respected:
                 continue
 
             changing_bonds = breaking_edges | forming_edges
