@@ -15,11 +15,107 @@ except ImportError:
     pass
 
 
-@pytest.mark.skipif(('openmm' not in sys.modules),
-                    reason='openmm not available')
-@pytest.mark.timeconsuming
 class TestTransitionStateGuesser:
 
+    @staticmethod
+    def _make_scan_dict():
+        """Minimal synthetic scan dict: 3 lambda points, 2 conformers each."""
+        return {
+            0.0: [{
+                'v': 10.0,
+                'e1': 10.0,
+                'e2': 30.0,
+                'e_int': 10.0,
+                'xyz': ''
+            }, {
+                'v': 15.0,
+                'e1': 15.0,
+                'e2': 35.0,
+                'e_int': 15.0,
+                'xyz': ''
+            }],
+            0.5: [{
+                'v': 20.0,
+                'e1': 12.0,
+                'e2': 28.0,
+                'e_int': 20.0,
+                'xyz': ''
+            }, {
+                'v': 18.0,
+                'e1': 11.0,
+                'e2': 25.0,
+                'e_int': 18.0,
+                'xyz': ''
+            }],
+            1.0: [{
+                'v': 12.0,
+                'e1': 20.0,
+                'e2': 12.0,
+                'e_int': 12.0,
+                'xyz': ''
+            }, {
+                'v': 14.0,
+                'e1': 22.0,
+                'e2': 14.0,
+                'e_int': 14.0,
+                'xyz': ''
+            }]
+        }
+
+    @staticmethod
+    def _make_qm_scan_dict():
+        """Scan dict with qm_energy populated, including NaN entries."""
+        return {
+            0.0: [{
+                'v': 10.0,
+                'e1': 10.0,
+                'e2': 30.0,
+                'e_int': 0.0,
+                'xyz': '',
+                'qm_energy': -100.0
+            }, {
+                'v': 15.0,
+                'e1': 15.0,
+                'e2': 35.0,
+                'e_int': 0.0,
+                'xyz': '',
+                'qm_energy': float('nan')
+            }],
+            0.5: [{
+                'v': 20.0,
+                'e1': 12.0,
+                'e2': 28.0,
+                'e_int': 0.0,
+                'xyz': '',
+                'qm_energy': -95.0
+            }, {
+                'v': 18.0,
+                'e1': 11.0,
+                'e2': 25.0,
+                'e_int': 0.0,
+                'xyz': '',
+                'qm_energy': -98.0
+            }],
+            1.0: [{
+                'v': 12.0,
+                'e1': 20.0,
+                'e2': 12.0,
+                'e_int': 0.0,
+                'xyz': '',
+                'qm_energy': float('nan')
+            }, {
+                'v': 14.0,
+                'e1': 22.0,
+                'e2': 14.0,
+                'e_int': 0.0,
+                'xyz': '',
+                'qm_energy': float('nan')
+            }]
+        }
+
+    @pytest.mark.skipif(('openmm' not in sys.modules),
+                        reason='openmm not available')
+    @pytest.mark.timeconsuming
     def test_ts_guesser(self):
 
         rea = Molecule.read_str("""
@@ -91,3 +187,121 @@ class TestTransitionStateGuesser:
             assert icrmsd['bonds']['max'] < max_bond_max
             assert icrmsd['angles']['rms'] < max_angle_rms
             assert icrmsd['angles']['max'] < max_angle_max
+
+    def test_check_discontinuities_smooth(self):
+        guesser = TransitionStateGuesser()
+        E1 = [10.0, 12.0, 14.0, 16.0]  # monotonically increasing — no drop
+        E2 = [16.0, 14.0, 12.0, 10.0]  # monotonically decreasing — no rise
+        assert guesser._check_discontinuities(E1, E2) == set()
+
+    def test_check_discontinuities_e1_drop(self):
+        guesser = TransitionStateGuesser()
+        E1 = [10.0, 12.0, 8.0, 16.0]  # drops between index 1→2
+        E2 = [16.0, 14.0, 12.0, 10.0]  # smooth
+        result = guesser._check_discontinuities(E1, E2)
+        assert {1, 2}.issubset(result)
+
+    def test_check_discontinuities_e2_rise(self):
+        guesser = TransitionStateGuesser()
+        E1 = [10.0, 12.0, 14.0, 16.0]  # smooth
+        E2 = [16.0, 14.0, 18.0, 10.0]  # rises between index 1→2
+        result = guesser._check_discontinuities(E1, E2)
+        assert {1, 2}.issubset(result)
+
+    def test_check_discontinuities_both(self):
+        guesser = TransitionStateGuesser()
+        E1 = [10.0, 14.0, 8.0, 16.0]  # drops at 1→2
+        E2 = [16.0, 10.0, 15.0, 8.0]  # rises at 1→2
+        assert guesser._check_discontinuities(E1, E2) == {1, 2}
+
+    def test_check_discontinuities_returns_set_no_duplicates(self):
+        guesser = TransitionStateGuesser()
+        # E1 drops at 0→1 and 1→2 — index 1 is a violation from both pairs
+        E1 = [15.0, 10.0, 8.0, 12.0]
+        E2 = [10.0, 12.0, 11.0, 9.0]  # smooth
+        result = guesser._check_discontinuities(E1, E2)
+        assert isinstance(result, set)
+        assert result == {0, 1, 2}
+
+    def test_get_best_mm_E_selects_lowest_v(self):
+        # lambda=0.0: lowest v=10.0 at conf 0 → e1=10.0, e2=30.0
+        # lambda=0.5: lowest v=18.0 at conf 1 → e1=11.0, e2=25.0
+        # lambda=1.0: lowest v=12.0 at conf 0 → e1=20.0, e2=12.0
+        V, E1, E2, conf_indices = TransitionStateGuesser._get_best_mm_E_from_scan_dict(
+            self._make_scan_dict())
+        assert V == [10.0, 18.0, 12.0]
+        assert E1 == [10.0, 11.0, 20.0]
+        assert E2 == [30.0, 25.0, 12.0]
+        assert conf_indices == [0, 1, 0]
+
+    def test_get_best_mm_E_single_conformer(self):
+        scan = {
+            0.0: [{
+                'v': 5.0,
+                'e1': 1.0,
+                'e2': 9.0,
+                'e_int': 5.0,
+                'xyz': ''
+            }],
+            0.5: [{
+                'v': 8.0,
+                'e1': 3.0,
+                'e2': 7.0,
+                'e_int': 8.0,
+                'xyz': ''
+            }],
+            1.0: [{
+                'v': 3.0,
+                'e1': 7.0,
+                'e2': 3.0,
+                'e_int': 3.0,
+                'xyz': ''
+            }],
+        }
+        V, _, _, conf_indices = TransitionStateGuesser._get_best_mm_E_from_scan_dict(
+            scan)
+        assert V == [5.0, 8.0, 3.0]
+        assert conf_indices == [0, 0, 0]
+
+    def test_get_best_mm_E_length_matches_lambda_count(self):
+        scan = {
+            l: [{
+                'v': float(i),
+                'e1': 0.0,
+                'e2': 0.0,
+                'e_int': 0.0,
+                'xyz': ''
+            }]
+            for i, l in enumerate([0.0, 0.25, 0.5, 0.75, 1.0])
+        }
+        V, E1, E2, conf_indices = TransitionStateGuesser._get_best_mm_E_from_scan_dict(
+            scan)
+        assert len(V) == len(E1) == len(E2) == len(conf_indices) == 5
+
+    # --- _get_best_qm_E_from_scan_dict ---
+
+    def test_get_best_qm_E_skips_nan(self):
+        qm_energies, conf_indices = TransitionStateGuesser._get_best_qm_E_from_scan_dict(
+            self._make_qm_scan_dict())
+        # lambda=0.0: only conf 0 is valid (-100.0); conf 1 is nan
+        assert qm_energies[0] == -100.0
+        assert conf_indices[0] == 0
+
+    def test_get_best_qm_E_selects_lowest_valid(self):
+        qm_energies, conf_indices = TransitionStateGuesser._get_best_qm_E_from_scan_dict(
+            self._make_qm_scan_dict())
+        # lambda=0.5: conf 0 has -95.0, conf 1 has -98.0 → pick -98.0
+        assert qm_energies[1] == -98.0
+        assert conf_indices[1] == 1
+
+    def test_get_best_qm_E_all_nan_returns_none(self):
+        qm_energies, _ = TransitionStateGuesser._get_best_qm_E_from_scan_dict(
+            self._make_qm_scan_dict())
+        # lambda=1.0: both conformers are nan → sentinel None
+        assert qm_energies[2] is None
+
+    def test_get_best_qm_E_no_qm_energy_key(self):
+        # Plain MM-only scan dict — no 'qm_energy' key present
+        qm_energies, _ = TransitionStateGuesser._get_best_qm_E_from_scan_dict(
+            self._make_scan_dict())
+        assert all(e is None for e in qm_energies)
