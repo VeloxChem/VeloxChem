@@ -27,10 +27,10 @@ class TestTransitionStateGuesser:
         pro = Molecule.read_smiles("C=CC1CC1")
         ts_guesser = TransitionStateGuesser()
         # ts_guesser.ostream.mute()
-        # ts_guesser.scf_xcfun = "HF"
-        # ts_guesser.scf_basis = "STO-3G"
+        # ts_guesser.qm_xcfun = "HF"
+        # ts_guesser.qm_basis = "STO-3G"
         ts_guesser.mm_steps = 200
-        ts_guesser.lambda_vec = [0, 0.2, 0.4, 0.45, 0.5, 0.55, 0.6, 0.8, 1.0]
+        ts_guesser.lambda_vector = [0, 0.2, 0.4, 0.45, 0.5, 0.55, 0.6, 0.8, 1.0]
         # ts_guesser.do_qm_scan = True
         results = ts_guesser.find_transition_state(rea, pro)
 

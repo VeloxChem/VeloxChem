@@ -113,7 +113,7 @@ class TransitionStateGuesser():
         self.max_qm_conformers = 5
         self.mute_scf = True
 
-        self.sys_builder_configuration = conf = {
+        self.sys_builder_configuration = {
             "name": "vacuum",
             "bonded_integration": True,
             "soft_core_coulomb_pes": True,
@@ -154,7 +154,6 @@ class TransitionStateGuesser():
 
         # Scan QM
         if self.do_qm_scan:
-            # assert False, 'Not implemented yet'
             self.scan_qm(self.results)
 
         return self.results
@@ -269,7 +268,6 @@ class TransitionStateGuesser():
                     "force_conformer_search true. Doing conformer search at every lambda."
                 )
                 self.ostream.flush()
-                # positions, V, E1, E2, E_int, N_conf = self._run_mm_scan(
                 scan_dict = self._run_mm_scan(
                     self.lambda_vector,
                     rea_sim,
@@ -331,7 +329,6 @@ class TransitionStateGuesser():
                     )
                     for l in scan_dict_peak_conf.keys():
                         scan_dict[l] += scan_dict_peak_conf[l]
-                    pass
 
                 if self.discont_conformer_search:
                     discont_indices = self._check_discontinuities(E1, E2)
@@ -377,51 +374,42 @@ class TransitionStateGuesser():
                         discont_indices = self._check_discontinuities(E1, E2)
 
         except Exception as e:
-            self.ostream.print_warning(f"Error in the ff scan: {e}")
-            self.ostream.flush()
-            exception = e
-
-        if exception is None:
-            max_mm_energy = None
-            for i, (l, mm_result) in enumerate(scan_dict.items()):
-                min_local_E = None
-                for j, conformer in enumerate(mm_result):
-                    if min_local_E is None or conformer['v'] < min_local_E:
-                        min_local_E = conformer['v']
-                        min_local_conformer_index = j
-
-                if max_mm_energy is None or min_local_E > max_mm_energy:
-                    max_mm_xyz = mm_result[min_local_conformer_index]['xyz']
-                    max_mm_energy = min_local_E
-                    max_mm_lambda = l
-                    min_mm_conformer_index = min_local_conformer_index
-
-            self.ostream.print_info(
-                f"Found highest MM E: {max_mm_energy:.3f} at Lammba: {max_mm_lambda} and conformer index: {min_mm_conformer_index}."
-            )
-            self.ostream.print_blank()
-            self.results.update({
-                'scan':
-                scan_dict,
-                'max_mm_xyz':
-                max_mm_xyz,
-                'max_mm_lambda':
-                max_mm_lambda,
-                'min_mm_conformer_index':
-                min_mm_conformer_index,
-            })
-            self.molecule = Molecule.read_xyz_string(max_mm_xyz)
-            self.molecule.set_multiplicity(self.mol_multiplicity)
-            self.molecule.set_charge(self.mol_charge)
-            self.save_results(self.results_file, self.results)
-            return self.results
-        else:
-            self.ostream.flush()
+            self.ostream.print_warning(f"Error in the MM scan: {e}")
             self.results.update({'scan': scan_dict})
             self.ostream.print_warning(
                 "The force field scan crashed. Saving results in self.results and raising exception"
             )
-            raise exception
+            raise
+
+        max_mm_energy = None
+        for i, (l, mm_result) in enumerate(scan_dict.items()):
+            min_local_E = None
+            for j, conformer in enumerate(mm_result):
+                if min_local_E is None or conformer['v'] < min_local_E:
+                    min_local_E = conformer['v']
+                    min_local_conformer_index = j
+
+            if max_mm_energy is None or min_local_E > max_mm_energy:
+                max_mm_xyz = mm_result[min_local_conformer_index]['xyz']
+                max_mm_energy = min_local_E
+                max_mm_lambda = l
+                min_mm_conformer_index = min_local_conformer_index
+
+        self.ostream.print_info(
+            f"Found highest MM E: {max_mm_energy:.3f} at Lamba: {max_mm_lambda} and conformer index: {min_mm_conformer_index}."
+        )
+        self.ostream.print_blank()
+        self.results.update({
+            'scan': scan_dict,
+            'max_mm_xyz': max_mm_xyz,
+            'max_mm_lambda': max_mm_lambda,
+            'min_mm_conformer_index': min_mm_conformer_index,
+        })
+        self.molecule = Molecule.read_xyz_string(max_mm_xyz)
+        self.molecule.set_multiplicity(self.mol_multiplicity)
+        self.molecule.set_charge(self.mol_charge)
+        self.save_results(self.results_file, self.results)
+        return self.results
 
     def _check_discontinuities(self, E1, E2):
         discont_indices = []
@@ -469,7 +457,7 @@ class TransitionStateGuesser():
             pos = result[arg]['pos']
             n_conf = len(result)
 
-            self._print_mm_iter(l, e1, e2, v, e_int, n_conf)
+            self._print_mm_iter(l, e1, e2, v, n_conf)
 
         if self.mm_scan_backward and not skip_backward:
             self.ostream.print_info(
@@ -497,7 +485,7 @@ class TransitionStateGuesser():
                 e_int = result[arg]['e_int']
                 pos = result[arg]['pos']
                 n_conf = len(result)
-                self._print_mm_iter(l, e1, e2, v, e_int, n_conf)
+                self._print_mm_iter(l, e1, e2, v, n_conf)
                 self.ostream.flush()
 
         self.ostream.print_blank()
@@ -563,6 +551,9 @@ class TransitionStateGuesser():
             snapshots=snapshots,
             temperature=self.mm_temperature,
         )
+
+        os.remove(pdb_name)
+
         result = []
         for e_int, temp_mol in zip(conformers_dict['energies'],
                                    conformers_dict['molecules']):
@@ -671,8 +662,12 @@ class TransitionStateGuesser():
             self.molecule.set_charge(self.mol_charge)
         except Exception as e:
             self.ostream.print_warning(f"Error in the QM scan: {e}")
+            self.ostream.print_warning(
+                "The QM scan crashed. Saving results in self.results and raising exception"
+            )
             self.ostream.flush()
             self.results.update(results)
+            raise
         self.save_results(self.results_file, self.results)
         return self.results
 
@@ -729,14 +724,11 @@ class TransitionStateGuesser():
 
         if ts_results is None:
             if filename is not None:
-                try:
-                    ostream.print_info(f"Loading results from {filename}")
-                    ts_results = TransitionStateGuesser.load_results(
-                        filename,
-                        ostream,
-                    )
-                except Exception as e:
-                    raise e
+                ostream.print_info(f"Loading results from {filename}")
+                ts_results = TransitionStateGuesser.load_results(
+                    filename,
+                    ostream,
+                )
             else:
                 raise ValueError(
                     "No results provided. Provide either ts_results or filename."
@@ -941,7 +933,6 @@ class TransitionStateGuesser():
         ax1.set_ylabel('Relative MM energy [kJ/mol]')
 
         if rel_qm_energies is not None:
-            # ax2 = ax1.twinx()
             ax1.plot(
                 x,
                 np.interp(x, lambda_vec, rel_qm_energies),
@@ -1110,7 +1101,7 @@ class TransitionStateGuesser():
 
             scan_grp = hf.create_group('scan')
             for l, conf_scan in results['scan'].items():
-                l_grp = scan_grp.create_group(f'{l}')
+                l_grp = scan_grp.create_group(f'{round(l,3)}')
                 for i, conf in enumerate(conf_scan):
                     conf_grp = l_grp.create_group(str(i))
                     # v e1 e2 e_int xyz qm
@@ -1151,7 +1142,9 @@ class TransitionStateGuesser():
             }
 
             # Lambda vector
-            results['lambda_vec'] = [float(l) for l in hf['lambda_vec'][()]]
+            results['lambda_vec'] = [
+                round(float(l), 3) for l in hf['lambda_vec'][()]
+            ]
 
             # Reactant and product forcefields and xyz
             reactant_ff = MMForceFieldGenerator.load_forcefield_from_json_string(
@@ -1197,7 +1190,7 @@ class TransitionStateGuesser():
                     if 'qm_energy' in conf_grp:
                         conf['qm_energy'] = conf_grp['qm_energy'][()]
                     conf_scan.append(conf)
-                results['scan'][float(l)] = conf_scan
+                results['scan'][round(float(l), 3)] = conf_scan
 
         return results
 
@@ -1239,7 +1232,7 @@ class TransitionStateGuesser():
         self.ostream.print_header(60 * '-')
         self.ostream.flush()
 
-    def _print_mm_iter(self, l, e1, e2, v, e_int, n_conf=None):
+    def _print_mm_iter(self, l, e1, e2, v, n_conf=None):
 
         valstr = "{:6.2f}   {:10.2f}   {:10.2f}   {:9.2f}   {:6}".format(
             l, e1, e2, v, n_conf)

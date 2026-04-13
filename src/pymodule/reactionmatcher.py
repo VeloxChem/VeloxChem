@@ -77,6 +77,7 @@ class ReactionMatcher:
         self.rdFMCS_assist_assign = False
         self.rdRascalMCES_assist_assign = False
         self._reduce_hydrogen = False
+        self._assist_min_depth = 3
 
         self.max_break_attempts_guess = 1e7
         self._breaking_depth = -1  # how many breaking edges to try
@@ -350,7 +351,7 @@ class ReactionMatcher:
         # # Upper bound for a starting guess. A linear molecule would need at least N/2 range to cover the entire molecule
         # depth = int((len(rea_graph.nodes) - H_count) / 4)
 
-        min_depth = 2
+        min_depth = 3
         assisting_map = {}
         rea_cc = list(nx.connected_components(rea_graph))
         range_spans_cc = [False] * len(rea_cc)
@@ -372,7 +373,7 @@ class ReactionMatcher:
         shuffled_indices = [(i * step) % total_nodes
                             for i in range(total_nodes)]
 
-        while depth >= min_depth:
+        while depth >= self._assist_min_depth:
             for rea_id in shuffled_indices:
 
                 # Break early
