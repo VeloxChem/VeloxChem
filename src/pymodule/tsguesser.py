@@ -90,6 +90,16 @@ class TransitionStateGuesser():
         self.results = {}
         self.lambda_vector = list(np.round(np.linspace(0, 1, 21), 3))
         self.mute_ff_build = True
+
+        # File I/O controls
+        # Set save_intermediates=True to write reactant/product JSON and
+        # system XML files to disk — useful for debugging but off by default
+        # to avoid unnecessary file I/O on HPC shared filesystems.
+        self.save_intermediates = False
+        # Set save_results_file=True (default) to write the HDF5 results file
+        # after each scan. This enables crash recovery and load_results().
+        self.save_results_file = True
+
         timing_str = str(int(time.time()))
         self.folder_name = f'ts_data_{timing_str}'
         self.results_file = f'ts_results_{timing_str}.h5'
@@ -188,14 +198,16 @@ class TransitionStateGuesser():
         self.mol_charge = self.molecule.get_charge()
         self.mol_multiplicity = self.molecule.get_multiplicity()
 
-        self.ostream.print_info(
-            f"Saving reactant and product forcefield as json to {self.folder_name}"
-        )
-        self.ostream.flush()
-        self.reactant.save_forcefield_as_json(
-            self.reactant, f"{self.folder_name}/reactant.json")
-        self.product.save_forcefield_as_json(
-            self.product, f"{self.folder_name}/product.json")
+        if self.save_intermediates:
+            os.makedirs(self.folder_name, exist_ok=True)
+            self.ostream.print_info(
+                f"Saving reactant and product forcefield as json to {self.folder_name}"
+            )
+            self.ostream.flush()
+            self.reactant.save_forcefield_as_json(
+                self.reactant, f"{self.folder_name}/reactant.json")
+            self.product.save_forcefield_as_json(
+                self.product, f"{self.folder_name}/product.json")
 
         rea_bonds = set(self.reactant.bonds.keys())
         pro_bonds = set(self.product.bonds.keys())
@@ -230,11 +242,12 @@ class TransitionStateGuesser():
             self.ostream.print_blank()
             self.ostream.flush()
             sysbuilder.ostream.unmute()
-        self.ostream.print_info(
-            f"Saving systems as xml to {self.folder_name}/systems")
-        self.ostream.flush()
-        sysbuilder.save_systems_as_xml(self.systems,
-                                       self.folder_name + "/systems")
+        if self.save_intermediates:
+            systems_dir = self.folder_name + "/systems"
+            os.makedirs(systems_dir, exist_ok=True)
+            self.ostream.print_info(f"Saving systems as xml to {systems_dir}")
+            self.ostream.flush()
+            sysbuilder.save_systems_as_xml(self.systems, systems_dir)
         self.results.update({'lambda_vec': self.lambda_vector})
 
     def scan_mm(self):
@@ -374,12 +387,14 @@ class TransitionStateGuesser():
                         discont_indices = self._check_discontinuities(E1, E2)
 
         except Exception as e:
-            self.ostream.print_warning(f"Error in the MM scan: {e}")
+
+            err_str = f"The MM scan crashed. Saving results in self.results and raising exception"
+            self.ostream.print_warning(err_str)
+            self.ostream.flush()
             self.results.update({'scan': scan_dict})
-            self.ostream.print_warning(
-                "The force field scan crashed. Saving results in self.results and raising exception"
-            )
             raise
+        if self.save_results_file:
+            self.save_results(self.results_file, self.results)
 
         max_mm_energy = None
         for i, (l, mm_result) in enumerate(scan_dict.items()):
@@ -408,7 +423,8 @@ class TransitionStateGuesser():
         self.molecule = Molecule.read_xyz_string(max_mm_xyz)
         self.molecule.set_multiplicity(self.mol_multiplicity)
         self.molecule.set_charge(self.mol_charge)
-        self.save_results(self.results_file, self.results)
+        if self.save_results_file:
+            self.save_results(self.results_file, self.results)
         return self.results
 
     def _check_discontinuities(self, E1, E2):
@@ -531,7 +547,10 @@ class TransitionStateGuesser():
         # platform settings for small molecule
         opm_dyn.openmm_platform = "CPU"
         # opm_dyn.create_system_from_molecule(mol, ff_gen)
-        pdb_name = self.folder_name + f'/conf_top_{l}.pdb'
+        if self.save_intermediates:
+            pdb_name = self.folder_name + f'/conf_top_{l}.pdb'
+        else:
+            pdb_name = f'topology.pdb'
 
         pdb = mmapp.PDBFile.writeFile(
             topology,
@@ -551,8 +570,8 @@ class TransitionStateGuesser():
             snapshots=snapshots,
             temperature=self.mm_temperature,
         )
-
-        os.remove(pdb_name)
+        if not self.save_intermediates:
+            os.remove(pdb_name)
 
         result = []
         for e_int, temp_mol in zip(conformers_dict['energies'],
@@ -661,14 +680,13 @@ class TransitionStateGuesser():
             self.molecule.set_multiplicity(self.mol_multiplicity)
             self.molecule.set_charge(self.mol_charge)
         except Exception as e:
-            self.ostream.print_warning(f"Error in the QM scan: {e}")
-            self.ostream.print_warning(
-                "The QM scan crashed. Saving results in self.results and raising exception"
-            )
+            err_str = f"The QM scan crashed. Saving results in self.results and raising exception"
+            self.ostream.print_warning(err_str)
             self.ostream.flush()
             self.results.update(results)
             raise
-        self.save_results(self.results_file, self.results)
+        if self.save_results_file:
+            self.save_results(self.results_file, self.results)
         return self.results
 
     def _get_qm_energy(self, xyz):
