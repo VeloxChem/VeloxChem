@@ -128,7 +128,7 @@ class EvbSystemBuilder():
         # self.bonded_integration: bool = True  # If the integration potential should use bonded (harmonic/morse) forces for forming/breaking bonds, instead of replacing them with nonbonded potentials
         self.bonded_integration_bond_fac: float = 0.2  # Scaling factor for the bonded integration forces.
         self.bonded_integration_angle_fac: float = 0.1  # Scaling factor for the bonded integration forces.
-        self.angle_lambda_switch: float = 0.5
+        self.angle_lambda_switch: float = 0
         self.torsion_lambda_switch: float = 0.25  # The minimum (1-maximum) lambda value at which to start turning on (have turned of) the proper torsion for the product (reactant)
 
         self.int_nb_const_exceptions = True  # If the exceptions for the integration nonbonded force should be kept constant over the entire simulation
@@ -1675,8 +1675,6 @@ class EvbSystemBuilder():
                 continue
             reascale, proscale = self._get_lambda_scaling(
                 lam, self.angle_lambda_switch)
-            reascale = 1
-            proscale = 1
             if (key in self.reactant.angles.keys()
                     and key in self.product.angles.keys()):
                 self.ostream.flush()
@@ -1693,7 +1691,7 @@ class EvbSystemBuilder():
             elif key in self.reactant.angles.keys():
                 # take angle from reactant, and from product structure
                 angleA = self.reactant.angles[key]
-                
+
                 fcA = angleA['force_constant'] * reascale
                 eqA = angleA['equilibrium']
                 if model_broken:
@@ -1779,6 +1777,9 @@ class EvbSystemBuilder():
 
     # Create a linear switching function that turns the force on only past the lambda-switch
     def _get_lambda_scaling(self, lam, lambda_switch):
+        if lambda_switch == 0:
+            return 1 - lam, lam
+
         a = -1 / lambda_switch
         b = 1
         reascale = a * lam + b
@@ -2167,8 +2168,9 @@ class EvbSystemBuilder():
             if i != base_particle:
                 exclusions.add(i)
             if current_level > 0:
-                EvbSystemBuilder._add_exclusions_to_set(
-                    bonded12, exclusions, base_particle, i, current_level - 1)
+                EvbSystemBuilder._add_exclusions_to_set(bonded12, exclusions,
+                                                        base_particle, i,
+                                                        current_level - 1)
 
     def _create_constraint_forces(self, lam):
 

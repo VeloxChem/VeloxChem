@@ -31,6 +31,7 @@
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from mpi4py import MPI
+import uuid
 import sys
 import numpy as np
 import os
@@ -393,8 +394,6 @@ class TransitionStateGuesser():
             self.ostream.flush()
             self.results.update({'scan': scan_dict})
             raise
-        if self.save_results_file:
-            self.save_results(self.results_file, self.results)
 
         max_mm_energy = None
         for i, (l, mm_result) in enumerate(scan_dict.items()):
@@ -411,7 +410,7 @@ class TransitionStateGuesser():
                 min_mm_conformer_index = min_local_conformer_index
 
         self.ostream.print_info(
-            f"Found highest MM E: {max_mm_energy:.3f} at Lamba: {max_mm_lambda} and conformer index: {min_mm_conformer_index}."
+            f"Found highest MM E: {max_mm_energy:.3f} at Lambda: {max_mm_lambda} and conformer index: {min_mm_conformer_index}."
         )
         self.ostream.print_blank()
         self.results.update({
@@ -550,7 +549,7 @@ class TransitionStateGuesser():
         if self.save_intermediates:
             pdb_name = self.folder_name + f'/conf_top_{l}.pdb'
         else:
-            pdb_name = f'topology.pdb'
+            pdb_name = f'topology_{uuid.uuid4().hex[:8]}.pdb'
 
         pdb = mmapp.PDBFile.writeFile(
             topology,

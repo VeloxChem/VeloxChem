@@ -101,7 +101,7 @@ class ReactionMatcher:
 
         if len(self.assisting_map) == len(self.rea_graph.nodes):
             # inverted_map = {v: k for k, v in self.assisting_map.items()}
-            return self.assisting_map, breaking_bonds, forming_bonds
+            return self.assisting_map, set(), set()
 
         if self._breaking_depth == -1:
             self._breaking_depth = self._decide_breaking_depth()
@@ -642,7 +642,7 @@ class ReactionMatcher:
 
             breaking_edges = A.edges - B_copy.edges
             forming_edges = B_copy.edges - A.edges
-            # Check if we obey the forced breaking and forming edges
+            # If the forced breaking or forced forming edges are not respected, skip this mapping
             if (forced_breaking_edges.issubset(forming_edges)
                     and len(forced_breaking_edges)
                     > 0) or (forced_forming_edges.issubset(breaking_edges)

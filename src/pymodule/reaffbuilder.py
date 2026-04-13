@@ -100,13 +100,9 @@ class ReactionForceFieldBuilder():
         self.product_mapping: dict[int, int] | None = None  # one-indexed
         self.mute_scf: bool = True
         self.skip_reaction_matching: bool = False
-        #Todo get a better functional and basis set from here https://pubs.acs.org/doi/10.1021/acs.jctc.3c00558
+
         self.hessian_xc_fun: str = 'B3LYP'
-        #Todo get better basis set once we have f-functionals
-        # Can (should?) be scaled up to def2-TZVPPD, and if only we had our ECP's by now
         self.hessian_basis = 'def2-SV_P_'
-        self.guessed_dynamic_bond_factor = 0.7
-        self.guessed_dynamic_angle_factor = 0.5
 
     def build_forcefields(
         self,
