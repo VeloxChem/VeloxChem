@@ -213,27 +213,6 @@ class ReactionForceFieldBuilder():
         for bond in forming_bonds:
             product_ff.bonds[bond]['comment'] += ', formed in reaction'
 
-        # forming_bonds = set(product_ff.bonds.keys()) - set(reactant_ff.bonds.keys())
-        # breaking_bonds = set(reactant_ff.bonds.keys()) - set(product_ff.bonds.keys())
-        # forming_angles = set(product_ff.angles.keys()) - set(reactant_ff.angles.keys())
-        # breaking_angles = set(reactant_ff.angles.keys()) - set(product_ff.angles.keys())
-        # for bond in forming_bonds:
-        #     if 'Guessed' in product_ff.bonds[bond]['comment']:
-        #         product_ff.bonds[bond]['force_constant'] *= self.guessed_dynamic_bond_factor
-        #         product_ff.bonds[bond]['comment'] = 'Guessed (forming bond)'
-        # for bond in breaking_bonds:
-        #     if reactant_ff.bonds[bond]['comment'] == 'Guessed':
-        #         reactant_ff.bonds[bond]['force_constant'] *= self.guessed_dynamic_bond_factor
-        #         reactant_ff.bonds[bond]['comment'] = 'Guessed (breaking bond)'
-        # for angle in forming_angles:
-        #     if product_ff.angles[angle]['comment'] == 'Guessed':
-        #         product_ff.angles[angle]['force_constant'] *= self.guessed_dynamic_angle_factor
-        #         product_ff.angles[angle]['comment'] = 'Guessed (forming angle)'
-        # for angle in breaking_angles:
-        #     if reactant_ff.angles[angle]['comment'] == 'Guessed':
-        #         reactant_ff.angles[angle]['force_constant'] *= self.guessed_dynamic_angle_factor
-        #         reactant_ff.angles[angle]['comment'] = 'Guessed (breaking angle)'
-
         self.ostream.flush()
         if self.optimize_ff:
             # TODO this optimisation can likely be taken care of by the openmmdynamics class
