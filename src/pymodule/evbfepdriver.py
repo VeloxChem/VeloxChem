@@ -459,6 +459,8 @@ class EvbFepDriver():
 
     def _equilibrate(self, system, l, positions, velocities=None):
         simulation = self._get_simulation(system, self.equil_step_size)
+        if self.pdb is not None:
+            simulation.context.setParameter('posres_k', 0)
         simulation.context.setPositions(positions)
         if velocities is not None:
             simulation.context.setVelocities(velocities)
@@ -572,6 +574,8 @@ class EvbFepDriver():
         sz = self.step_size * mmunit.picoseconds
         simulation.integrator.setStepSize(sz)
         simulation.context.setState(initial_state)
+        if self.pdb is not None:
+            simulation.context.setParameter('posres_k', 0)
         if l == 0:
             append = False
         else:
