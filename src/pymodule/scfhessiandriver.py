@@ -44,7 +44,7 @@ from .veloxchemlib import NuclearPotentialGeom200Driver
 from .veloxchemlib import NuclearPotentialGeom020Driver
 from .veloxchemlib import NuclearPotentialGeom110Driver
 from .veloxchemlib import NuclearPotentialGeom101Driver
-from .veloxchemlib import ECPHessianDriver
+from .veloxchemlib import EcpHessianDriver
 from .veloxchemlib import ElectricDipoleMomentGeom100Driver
 from .veloxchemlib import FockGeom2000Driver
 from .veloxchemlib import FockGeom1100Driver
@@ -396,7 +396,7 @@ class ScfHessianDriver(HessianDriver):
         npot_hess_101_drv = NuclearPotentialGeom101Driver()
 
         if ao_basis.has_ecp():
-            ecp_hess_drv = ECPHessianDriver()
+            ecp_hess_drv = EcpHessianDriver()
             core_electrons = ao_basis.get_number_of_ecp_core_electrons()
             ecp_atom_inds = [
                 idx for idx, nelec in enumerate(core_electrons) if nelec > 0
@@ -1192,7 +1192,7 @@ class ScfHessianDriver(HessianDriver):
         npot_hess_101_drv = NuclearPotentialGeom101Driver()
 
         if ao_basis.has_ecp():
-            ecp_hess_drv = ECPHessianDriver()
+            ecp_hess_drv = EcpHessianDriver()
             core_electrons = ao_basis.get_number_of_ecp_core_electrons()
             ecp_atom_inds = [
                 idx for idx, nelec in enumerate(core_electrons) if nelec > 0

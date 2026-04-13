@@ -60,13 +60,14 @@ from .rspcdspec import CircularDichroismSpectrum
 from .rspc6 import C6
 from .rsprixs import RIXS
 from .rspshg import SHG
+from .rspthg import THG
+from .rspthgred import ThgReduced
 from .rsptpatransition import TpaTransition
 from .rspdoublerestrans import DoubleResTransition
 from .rspthreepatransition import ThreePATransition
 from .rsptpa import TPA
 from .polarizabilitygradient import PolarizabilityGradient
 from .vibrationalanalysis import VibrationalAnalysis
-#from .rspcustomproperty import CustomProperty
 from .visualizationdriver import VisualizationDriver
 from .trajectorydriver import TrajectoryDriver
 from .xtbdriver import XtbDriver
@@ -208,14 +209,17 @@ def select_rsp_property(task, mol_orbs, rsp_dict, method_dict):
     elif prop_type == 'transition dipole moment':
         rsp_prop = DoubleResTransition(rsp_dict, method_dict)
 
+    elif prop_type == 'thg':
+        rsp_prop = THG(rsp_dict, method_dict)
+
+    elif prop_type in ['thgred', 'thg reduced']:
+        rsp_prop = ThgReduced(rsp_dict, method_dict)
+
     elif prop_type == '3pa transition':
         rsp_prop = ThreePATransition(rsp_dict, method_dict)
 
     elif prop_type == 'tpa':
         rsp_prop = TPA(rsp_dict, method_dict)
-
-    # elif prop_type == 'custom':
-    #     rsp_prop = CustomProperty(rsp_dict, method_dict)
 
     else:
         assert_msg_critical(False,

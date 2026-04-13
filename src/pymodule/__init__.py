@@ -64,17 +64,7 @@ from .veloxchemlib import ThreeCenterElectronRepulsionGeom100Driver
 from .veloxchemlib import ThreeCenterElectronRepulsionGeom010Driver
 from .veloxchemlib import TwoCenterElectronRepulsionDriver
 from .veloxchemlib import TwoCenterElectronRepulsionGeom100Driver
-from .veloxchemlib import LocalECPDriver
-from .veloxchemlib import LocalECPGeom100Driver
-from .veloxchemlib import LocalECPGeom200Driver
-from .veloxchemlib import LocalECPGeom101Driver
-from .veloxchemlib import LocalECPGeom010Driver
-from .veloxchemlib import LocalECPGeom020Driver
-from .veloxchemlib import LocalECPGeom110Driver
-from .veloxchemlib import ProjectedECPDriver
-from .veloxchemlib import ProjectedECPGeom100Driver
-from .veloxchemlib import ProjectedECPGeom200Driver
-from .veloxchemlib import ECPDriver
+from .veloxchemlib import EcpDriver
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import FockGeom1000Driver
 from .veloxchemlib import FockGeom2000Driver
@@ -178,9 +168,10 @@ from .rspabsorption import Absorption
 from .rspc6 import C6
 from .rspshg import SHG
 from .rsptpa import TPA
+from .rspthg import THG
+from .rspthgred import ThgReduced
 from .rixsdriver import RixsDriver
 from .localizationdriver import LocalizationDriver
-#from .rspcustomproperty import CustomProperty
 from .mpitask import MpiTask
 from .subcommunicators import SubCommunicators
 from .peforcefieldgenerator import PEForceFieldGenerator
@@ -245,7 +236,7 @@ from .oneeints import compute_nuclear_potential_integrals
 from .oneeints import compute_electric_dipole_integrals
 from .oneeints import compute_linear_momentum_integrals
 from .oneeints import compute_angular_momentum_integrals
-from .checkpoint import read_molecule_and_basis, read_results
+from .resultsio import read_molecule_and_basis, read_results
 
 # Environment variable: basis set path, number of OpenMP threads, MKL linking
 from .environment import (set_vlxbasispath, get_basis_path, set_vlxdatapath,
