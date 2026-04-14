@@ -39,6 +39,7 @@ import numpy as np
 import json
 import h5py
 import sys
+from sys import stdout
 import math
 import random
 from copy import deepcopy
@@ -135,6 +136,15 @@ class OpenMMIMDynamics:
         assert_msg_critical(
             'openmm' in sys.modules,
             'OpenMM is required for OpenMMDynamics.')
+
+        if comm is None:
+            comm = MPI.COMM_WORLD
+
+        if ostream is None:
+            if comm.Get_rank() == mpi_master():
+                ostream = OutputStream(stdout)
+            else:
+                ostream = OutputStream(None)
 
         self.comm = comm
         try:
@@ -276,177 +286,177 @@ class OpenMMIMDynamics:
         engine.rank = self._mpi_interp_comm.Get_rank()
         engine.size = self._mpi_interp_comm.Get_size()
     # Loading methods
-    # TODO: Integrate the guess with the read_pdb_file in Molecule.
-    def load_system_PDB(self, filename):
-        """
-        Loads a system from a PDB file, extracting unique residues and their details.
+    # # TODO: Integrate the guess with the read_pdb_file in Molecule.
+    # def load_system_PDB(self, filename):
+    #     """
+    #     Loads a system from a PDB file, extracting unique residues and their details.
 
-        :param filename: 
-            Path to the PDB file. Example: 'system.pdb'.
-        """
+    #     :param filename: 
+    #         Path to the PDB file. Example: 'system.pdb'.
+    #     """
         
-        pdb_path = Path(filename)
-        if not pdb_path.is_file():
-            raise FileNotFoundError(f"{filename} does not exist.")
+    #     pdb_path = Path(filename)
+    #     if not pdb_path.is_file():
+    #         raise FileNotFoundError(f"{filename} does not exist.")
         
-        pdbstr = pdb_path.read_text()
-        residues = {}
+    #     pdbstr = pdb_path.read_text()
+    #     residues = {}
 
-        # Formatting issues flags
-        label_guess_warning = False
-        conect_warning = True
+    #     # Formatting issues flags
+    #     label_guess_warning = False
+    #     conect_warning = True
 
-        self.unique_residues = []  # Initialize unique_residues earlier
+    #     self.unique_residues = []  # Initialize unique_residues earlier
 
-        for line in pdbstr.strip().splitlines():
-            # Skip the header lines
-            if line.startswith(('REMARK', 'HEADER', 'TITLE', 'COMPND', 'SOURCE')):
-                continue
-            # Skip the CRYST1 record it will be extracted from the System object
-            if line.startswith('CRYST1'):
-                continue
-            # Add the ATOM and HETATM records to the residues dictionary
-            if line.startswith(('ATOM', 'HETATM')):
-                atom_label = line[76:78].strip()
-                if not atom_label:
-                    label_guess_warning = True
-                    atom_name = line[12:16].strip()
-                    atom_label = atom_name[0]
+    #     for line in pdbstr.strip().splitlines():
+    #         # Skip the header lines
+    #         if line.startswith(('REMARK', 'HEADER', 'TITLE', 'COMPND', 'SOURCE')):
+    #             continue
+    #         # Skip the CRYST1 record it will be extracted from the System object
+    #         if line.startswith('CRYST1'):
+    #             continue
+    #         # Add the ATOM and HETATM records to the residues dictionary
+    #         if line.startswith(('ATOM', 'HETATM')):
+    #             atom_label = line[76:78].strip()
+    #             if not atom_label:
+    #                 label_guess_warning = True
+    #                 atom_name = line[12:16].strip()
+    #                 atom_label = atom_name[0]
 
-                residue = line[17:20].strip()
-                residue_number = int(line[22:26])
-                coordinates = [float(line[i:i+8]) for i in range(30, 54, 8)]
+    #             residue = line[17:20].strip()
+    #             residue_number = int(line[22:26])
+    #             coordinates = [float(line[i:i+8]) for i in range(30, 54, 8)]
 
-                residue_identifier = (residue, residue_number)
+    #             residue_identifier = (residue, residue_number)
 
-                if residue_identifier not in residues:
-                    residues[residue_identifier] = {
-                        'labels': [],
-                        'coordinates': []
-                    }
+    #             if residue_identifier not in residues:
+    #                 residues[residue_identifier] = {
+    #                     'labels': [],
+    #                     'coordinates': []
+    #                 }
                 
-                residues[residue_identifier]['labels'].append(atom_label)
-                residues[residue_identifier]['coordinates'].append(coordinates)
+    #             residues[residue_identifier]['labels'].append(atom_label)
+    #             residues[residue_identifier]['coordinates'].append(coordinates)
             
-            # If a line starts with TER, skip it
-            if line.startswith('TER'):
-                continue
-            # If any line starts with CONECT, set the conect_warning flag to False
-            if line.startswith('CONECT'):
-                conect_warning = False
+    #         # If a line starts with TER, skip it
+    #         if line.startswith('TER'):
+    #             continue
+    #         # If any line starts with CONECT, set the conect_warning flag to False
+    #         if line.startswith('CONECT'):
+    #             conect_warning = False
 
-            # If a line starts with END, break the loop
-            if line.startswith('END'):
-                break
+    #         # If a line starts with END, break the loop
+    #         if line.startswith('END'):
+    #             break
             
 
-        # Overwrite the PDB file with the guessed atom labels in columns 77-78
-        # if the labels are missing
-        if label_guess_warning:
-            with open(filename, 'w') as f:
-                for line in pdbstr.strip().splitlines():
-                    if line.startswith(('ATOM', 'HETATM')):
-                        atom_name = line[12:16].strip()
-                        atom_label = atom_name[0]
-                        new_line = line[:76] + f"{atom_label:>2}" + line[78:] + '\n'
-                        f.write(new_line)
-                    else:
-                        f.write(line + '\n')
-            msg = 'Atom labels were guessed based on atom names (first character).'
-            msg += f'Please verify the atom labels in the {filename} PDB file.'
-            self.ostream.print_warning(msg)
-            self.ostream.flush()
+    #     # Overwrite the PDB file with the guessed atom labels in columns 77-78
+    #     # if the labels are missing
+    #     if label_guess_warning:
+    #         with open(filename, 'w') as f:
+    #             for line in pdbstr.strip().splitlines():
+    #                 if line.startswith(('ATOM', 'HETATM')):
+    #                     atom_name = line[12:16].strip()
+    #                     atom_label = atom_name[0]
+    #                     new_line = line[:76] + f"{atom_label:>2}" + line[78:] + '\n'
+    #                     f.write(new_line)
+    #                 else:
+    #                     f.write(line + '\n')
+    #         msg = 'Atom labels were guessed based on atom names (first character).'
+    #         msg += f'Please verify the atom labels in the {filename} PDB file.'
+    #         self.ostream.print_warning(msg)
+    #         self.ostream.flush()
 
-        if conect_warning:
-            msg = 'CONECT records not found in the PDB file.'
-            msg += 'The connectivity matrix will be used to determine the bonds.'
-            self.ostream.print_warning(msg)
-            self.ostream.flush()
-            # Create a molecule from the PDB file
-            molecule = Molecule.read_pdb_file(filename)
-            connectivity_matrix = molecule.get_connectivity_matrix()
-            # Determine all the bonds in the molecule
-            with open(filename, 'a') as f:
-                for i in range(connectivity_matrix.shape[0]):
-                    for j in range(i + 1, connectivity_matrix.shape[1]):
-                        if connectivity_matrix[i, j] == 1:
-                            # Convert indices to 1-based index for PDB format and ensure proper column alignment
-                            i_index = i + 1
-                            j_index = j + 1
-                            # Align to the right 
-                            con_string = "{:6s}{:>5d}{:>5d}".format('CONECT', i_index, j_index)
-                            f.write(con_string + '\n')
+    #     if conect_warning:
+    #         msg = 'CONECT records not found in the PDB file.'
+    #         msg += 'The connectivity matrix will be used to determine the bonds.'
+    #         self.ostream.print_warning(msg)
+    #         self.ostream.flush()
+    #         # Create a molecule from the PDB file
+    #         molecule = Molecule.read_pdb_file(filename)
+    #         connectivity_matrix = molecule.get_connectivity_matrix()
+    #         # Determine all the bonds in the molecule
+    #         with open(filename, 'a') as f:
+    #             for i in range(connectivity_matrix.shape[0]):
+    #                 for j in range(i + 1, connectivity_matrix.shape[1]):
+    #                     if connectivity_matrix[i, j] == 1:
+    #                         # Convert indices to 1-based index for PDB format and ensure proper column alignment
+    #                         i_index = i + 1
+    #                         j_index = j + 1
+    #                         # Align to the right 
+    #                         con_string = "{:6s}{:>5d}{:>5d}".format('CONECT', i_index, j_index)
+    #                         f.write(con_string + '\n')
 
-        # Create VeloxChem Molecule objects for each unique residue
+    #     # Create VeloxChem Molecule objects for each unique residue
 
-        molecules = []
-        unq_residues = []
+    #     molecules = []
+    #     unq_residues = []
 
-        for (residue, number), data in residues.items():
-            coordinates_array = np.array(data['coordinates'])
-            mol = Molecule(data['labels'], coordinates_array, "angstrom")
-            molecules.append(mol)
-            unq_residues.append((residue, number))
+    #     for (residue, number), data in residues.items():
+    #         coordinates_array = np.array(data['coordinates'])
+    #         mol = Molecule(data['labels'], coordinates_array, "angstrom")
+    #         molecules.append(mol)
+    #         unq_residues.append((residue, number))
 
 
-        # Initialize a set to track the first occurrence of each residue name
-        seen_residue_names = set()
+    #     # Initialize a set to track the first occurrence of each residue name
+    #     seen_residue_names = set()
 
-        # Lists to store the filtered residues and molecules
-        self.unique_residues = []
-        self.unique_molecules = []
+    #     # Lists to store the filtered residues and molecules
+    #     self.unique_residues = []
+    #     self.unique_molecules = []
 
-        for index, (residue_name, number) in enumerate(unq_residues):
-            if residue_name not in seen_residue_names:
-                seen_residue_names.add(residue_name)
-                self.unique_residues.append((residue_name, number))
-                self.unique_molecules.append(molecules[index])
+    #     for index, (residue_name, number) in enumerate(unq_residues):
+    #         if residue_name not in seen_residue_names:
+    #             seen_residue_names.add(residue_name)
+    #             self.unique_residues.append((residue_name, number))
+    #             self.unique_molecules.append(molecules[index])
 
-        # Print results
-        info_msg = f"Unique Residues: {self.unique_residues}, saved as molecules."
-        self.ostream.print_info(info_msg)
-        self.ostream.flush()
+    #     # Print results
+    #     info_msg = f"Unique Residues: {self.unique_residues}, saved as molecules."
+    #     self.ostream.print_info(info_msg)
+    #     self.ostream.flush()
     
-    def load_system_from_files(self, system_xml, system_pdb):
-        """
-        Loads a preexisting system from an XML file and a PDB file.
+    # def load_system_from_files(self, system_xml, system_pdb):
+    #     """
+    #     Loads a preexisting system from an XML file and a PDB file.
 
-        :param system_xml: 
-            XML file containing the system parameters.
-        :param system_pdb: 
-            PDB file containing the system coordinates.
-        """
-        self.pdb = app.PDBFile(system_pdb)
+    #     :param system_xml: 
+    #         XML file containing the system parameters.
+    #     :param system_pdb: 
+    #         PDB file containing the system coordinates.
+    #     """
+    #     self.pdb = app.PDBFile(system_pdb)
 
-        with open(system_xml, 'r') as file:
-            self.system = mm.XmlSerializer.deserialize(file.read())
+    #     with open(system_xml, 'r') as file:
+    #         self.system = mm.XmlSerializer.deserialize(file.read())
 
-        self.phase = 'gas'
-        self.qm_atoms = []
-        self.qm_force_index = -1  # Initialize with an invalid index
+    #     self.phase = 'gas'
+    #     self.qm_atoms = []
+    #     self.qm_force_index = -1  # Initialize with an invalid index
 
-        # Iterate over all forces in the system to find the CustomExternalForce and detect QM atoms
-        for i, force in enumerate(self.system.getForces()):
-            if isinstance(force, mm.CustomExternalForce):
-                self.qm_force_index = i  # Set the index of the QM force
-                # Assuming that the particle indices are directly stored in the force
-                for j in range(force.getNumParticles()):
-                    # Get the actual particle index (usually force index and particle index are the same)
-                    index, parameters = force.getParticleParameters(j)
-                    self.qm_atoms.append(index)
-                msg = f"QM Atoms detected: {self.qm_atoms}"
-                self.ostream.print_info(msg)
-                self.ostream.flush()
-                break
+    #     # Iterate over all forces in the system to find the CustomExternalForce and detect QM atoms
+    #     for i, force in enumerate(self.system.getForces()):
+    #         if isinstance(force, mm.CustomExternalForce):
+    #             self.qm_force_index = i  # Set the index of the QM force
+    #             # Assuming that the particle indices are directly stored in the force
+    #             for j in range(force.getNumParticles()):
+    #                 # Get the actual particle index (usually force index and particle index are the same)
+    #                 index, parameters = force.getParticleParameters(j)
+    #                 self.qm_atoms.append(index)
+    #             msg = f"QM Atoms detected: {self.qm_atoms}"
+    #             self.ostream.print_info(msg)
+    #             self.ostream.flush()
+    #             break
 
-        if self.qm_force_index == -1:
-            msg = "No CustomExternalForce found, no QM atoms detected."
-            self.ostream.print_info(msg)
-            self.ostream.flush()
-        else:
-            msg = f"CustomExternalForce found at index {self.qm_force_index}."
-            self.ostream.print_info(msg)
-            self.ostream.flush()
+    #     if self.qm_force_index == -1:
+    #         msg = "No CustomExternalForce found, no QM atoms detected."
+    #         self.ostream.print_info(msg)
+    #         self.ostream.flush()
+    #     else:
+    #         msg = f"CustomExternalForce found at index {self.qm_force_index}."
+    #         self.ostream.print_info(msg)
+    #         self.ostream.flush()
             
     # Method to generate OpenMM system from VeloxChem objects
     def create_system_from_molecule(self, 
@@ -480,6 +490,7 @@ class OpenMMIMDynamics:
         self.molecule = molecule
         self.positions = molecule.get_coordinates_in_angstrom()
         self.labels = molecule.get_labels()
+        self.interpolation_settings = interpol_settings
 
         self.set_up_the_system(molecule, interpol_settings)
 
@@ -599,225 +610,225 @@ class OpenMMIMDynamics:
         
         self.phase = phase
 
-    # Methods to build a custom system from a PDB file and custom XML files
-    def create_md_system_from_files(self, 
-                            pdb_file, 
-                            xml_file,
-                            filename='custom'):
-        """
-        Creates a system from a PDB file containing multiple residues and custom XML files.
+    # # Methods to build a custom system from a PDB file and custom XML files
+    # def create_md_system_from_files(self, 
+    #                         pdb_file, 
+    #                         xml_file,
+    #                         filename='custom'):
+    #     """
+    #     Creates a system from a PDB file containing multiple residues and custom XML files.
         
-        :param system_pdb:
-            PDB file containing the system or a list of PDB files.
-        :param xml_file:
-            XML file containing the forcefield parameters or a list of XML files.
-        :param filename:
-            Base filename for output and intermediate files. Default is 'custom_system'.
-        """
+    #     :param system_pdb:
+    #         PDB file containing the system or a list of PDB files.
+    #     :param xml_file:
+    #         XML file containing the forcefield parameters or a list of XML files.
+    #     :param filename:
+    #         Base filename for output and intermediate files. Default is 'custom_system'.
+    #     """
         
-        # Load the PDB file and format it correctly
-        # This method already prints the unique residues info!
-        self.load_system_PDB(pdb_file)
+    #     # Load the PDB file and format it correctly
+    #     # This method already prints the unique residues info!
+    #     self.load_system_PDB(pdb_file)
 
-        # Load the generated QM region topology and system PDB
-        self.pdb = app.PDBFile(pdb_file)
-        # Check if the system is periodic from the PDB file
-        if self.pdb.topology.getUnitCellDimensions() is not None:
-            periodic = True
-            msg = 'PBC detected from the PDB file.'
-            self.ostream.print_info(msg)
-            self.ostream.flush()
-        else:
-            periodic = False
+    #     # Load the generated QM region topology and system PDB
+    #     self.pdb = app.PDBFile(pdb_file)
+    #     # Check if the system is periodic from the PDB file
+    #     if self.pdb.topology.getUnitCellDimensions() is not None:
+    #         periodic = True
+    #         msg = 'PBC detected from the PDB file.'
+    #         self.ostream.print_info(msg)
+    #         self.ostream.flush()
+    #     else:
+    #         periodic = False
 
-        # Combine XML files into a forcefield
-        xml_files = [xml_file] if isinstance(xml_file, str) else xml_file
-        msg = f'Added XML Files: {xml_files}'
-        self.ostream.print_info(msg)
-        self.ostream.flush()
+    #     # Combine XML files into a forcefield
+    #     xml_files = [xml_file] if isinstance(xml_file, str) else xml_file
+    #     msg = f'Added XML Files: {xml_files}'
+    #     self.ostream.print_info(msg)
+    #     self.ostream.flush()
 
-        # Combine XML files into a forcefield
-        forcefield = app.ForceField(*xml_files, self.parent_ff, self.water_ff)
+    #     # Combine XML files into a forcefield
+    #     forcefield = app.ForceField(*xml_files, self.parent_ff, self.water_ff)
 
-        # Create the system with appropriate nonbonded settings
-        if periodic:
-            nonbondedMethod = app.PME  # Particle Mesh Ewald method for periodic systems
-            nonbondedCutoff = self.cutoff * unit.nanometer  # Assuming self.cutoff is defined elsewhere appropriately
-            constraints = app.HBonds
-        else:
-            nonbondedMethod = app.NoCutoff  # No cutoff for non-periodic systems
-            nonbondedCutoff = None
-            constraints = app.HBonds
+    #     # Create the system with appropriate nonbonded settings
+    #     if periodic:
+    #         nonbondedMethod = app.PME  # Particle Mesh Ewald method for periodic systems
+    #         nonbondedCutoff = self.cutoff * unit.nanometer  # Assuming self.cutoff is defined elsewhere appropriately
+    #         constraints = app.HBonds
+    #     else:
+    #         nonbondedMethod = app.NoCutoff  # No cutoff for non-periodic systems
+    #         nonbondedCutoff = None
+    #         constraints = app.HBonds
 
-        # Check if nonbondedCutoff is defined before using it in createSystem
-        system_arguments = {
-            'nonbondedMethod': nonbondedMethod,
-            'constraints': constraints
-        }   
+    #     # Check if nonbondedCutoff is defined before using it in createSystem
+    #     system_arguments = {
+    #         'nonbondedMethod': nonbondedMethod,
+    #         'constraints': constraints
+    #     }   
         
-        if nonbondedCutoff is not None:
-            system_arguments['nonbondedCutoff'] = nonbondedCutoff
+    #     if nonbondedCutoff is not None:
+    #         system_arguments['nonbondedCutoff'] = nonbondedCutoff
 
-        self.system = forcefield.createSystem(self.pdb.topology, 
-                                              **system_arguments)
+    #     self.system = forcefield.createSystem(self.pdb.topology, 
+    #                                           **system_arguments)
 
-        # Save system to XML and PDB for inspection and reuse
-        with open(f'{filename}_system.xml', 'w') as f:
-            f.write(mm.XmlSerializer.serialize(self.system))
-            msg = f'System parameters written to {filename}_system.xml'
-            self.ostream.print_info(msg)
-            self.ostream.flush()
+    #     # Save system to XML and PDB for inspection and reuse
+    #     with open(f'{filename}_system.xml', 'w') as f:
+    #         f.write(mm.XmlSerializer.serialize(self.system))
+    #         msg = f'System parameters written to {filename}_system.xml'
+    #         self.ostream.print_info(msg)
+    #         self.ostream.flush()
 
-        with open(f'{filename}_system.pdb', 'w') as pdb_file:
-            app.PDBFile.writeFile(self.pdb.topology, 
-                                  self.pdb.positions, 
-                                  pdb_file)
-            msg = f'System coordinates written to {filename}_system.pdb'
-            self.ostream.print_info(msg)
-            self.ostream.flush()
+    #     with open(f'{filename}_system.pdb', 'w') as pdb_file:
+    #         app.PDBFile.writeFile(self.pdb.topology, 
+    #                               self.pdb.positions, 
+    #                               pdb_file)
+    #         msg = f'System coordinates written to {filename}_system.pdb'
+    #         self.ostream.print_info(msg)
+    #         self.ostream.flush()
 
-        self.phase = 'gas'
+    #     self.phase = 'gas'
 
-    def create_qmmm_system_from_files(self, 
-                            pdb_file, 
-                            xml_file, 
-                            qm_residue, 
-                            ff_gen_qm=None, 
-                            qm_atoms='all', 
-                            filename='custom'):
-        """
-        Builds a QM/MM system from a PDB file containing multiple residues and custom XML files.
+    # def create_qmmm_system_from_files(self, 
+    #                         pdb_file, 
+    #                         xml_file, 
+    #                         qm_residue, 
+    #                         ff_gen_qm=None, 
+    #                         qm_atoms='all', 
+    #                         filename='custom'):
+    #     """
+    #     Builds a QM/MM system from a PDB file containing multiple residues and custom XML files.
         
-        :param pdb_file: 
-            PDB file containing the system.
-        :param xml_file: 
-            XML file containing the forcefield parameters. Can be a list of XML files.
-        :param qm_residue: 
-            Tuple containing the name and number of the QM residue. (e.g. ('MOL', 1))
-        :param ff_gen_qm: 
-            Optional custom forcefield generator for the QM region. If None, a new one will be created.
-        :param qm_atoms:
-            Options: 'all' or a list of atom indices for QM region.
-        :param filename: 
-            Base filename for output and intermediate files.
-        """
+    #     :param pdb_file: 
+    #         PDB file containing the system.
+    #     :param xml_file: 
+    #         XML file containing the forcefield parameters. Can be a list of XML files.
+    #     :param qm_residue: 
+    #         Tuple containing the name and number of the QM residue. (e.g. ('MOL', 1))
+    #     :param ff_gen_qm: 
+    #         Optional custom forcefield generator for the QM region. If None, a new one will be created.
+    #     :param qm_atoms:
+    #         Options: 'all' or a list of atom indices for QM region.
+    #     :param filename: 
+    #         Base filename for output and intermediate files.
+    #     """
 
-        # Load the PDB file and format it correctly
-        self.load_system_PDB(pdb_file)
+    #     # Load the PDB file and format it correctly
+    #     self.load_system_PDB(pdb_file)
 
-        # Extracting the residue name and number for clarity and correct usage
-        qm_residue_name, qm_residue_number = qm_residue
-        qm_residue_index = self.unique_residues.index((qm_residue_name, qm_residue_number))
-        msg = f'QM Residue: {qm_residue_name}'
-        self.ostream.print_info(msg)
-        self.ostream.flush()
+    #     # Extracting the residue name and number for clarity and correct usage
+    #     qm_residue_name, qm_residue_number = qm_residue
+    #     qm_residue_index = self.unique_residues.index((qm_residue_name, qm_residue_number))
+    #     msg = f'QM Residue: {qm_residue_name}'
+    #     self.ostream.print_info(msg)
+    #     self.ostream.flush()
 
-        qm_molecule = self.unique_molecules[qm_residue_index]
+    #     qm_molecule = self.unique_molecules[qm_residue_index]
 
-        # Generate or use an existing forcefield generator for the QM region
-        if ff_gen_qm is None:
-            ff_gen_qm = MMForceFieldGenerator()
-            ff_gen_qm.create_topology(qm_molecule)
+    #     # Generate or use an existing forcefield generator for the QM region
+    #     if ff_gen_qm is None:
+    #         ff_gen_qm = MMForceFieldGenerator()
+    #         ff_gen_qm.create_topology(qm_molecule)
 
-        # Determine qm_atoms based on the QM residue
-        if qm_atoms == 'all':
-            msg = 'Full molecule as QM region'
-            self.ostream.print_info(msg)
-            qm_atoms = list(range(qm_molecule.number_of_atoms()))
-            self._create_QM_residue(ff_gen_qm,
-                        qm_atoms, 
-                        filename=filename, 
-                        residue_name=qm_residue_name)
-        elif isinstance(qm_atoms, list):
-            if qm_atoms == list(range(qm_molecule.number_of_atoms())): 
-                msg = 'Full molecule as QM region'
-                self.ostream.print_info(msg)
-                self._create_QM_residue(ff_gen_qm,
-                        qm_atoms, 
-                        filename=filename, 
-                        residue_name=qm_residue_name)
-            msg = 'QM/MM partition inside the molecule'
-            self.ostream.print_info(msg)
-            qm_atoms = qm_atoms
-            self._create_QM_subregion(ff_gen_qm,
-                                      qm_atoms, 
-                                      qm_molecule, 
-                                      filename,
-                                      residue_name=qm_residue_name)
-        else:
-            raise ValueError('Invalid value for qm_atoms. Please use "all" or a list of atom indices.')
+    #     # Determine qm_atoms based on the QM residue
+    #     if qm_atoms == 'all':
+    #         msg = 'Full molecule as QM region'
+    #         self.ostream.print_info(msg)
+    #         qm_atoms = list(range(qm_molecule.number_of_atoms()))
+    #         self._create_QM_residue(ff_gen_qm,
+    #                     qm_atoms, 
+    #                     filename=filename, 
+    #                     residue_name=qm_residue_name)
+    #     elif isinstance(qm_atoms, list):
+    #         if qm_atoms == list(range(qm_molecule.number_of_atoms())): 
+    #             msg = 'Full molecule as QM region'
+    #             self.ostream.print_info(msg)
+    #             self._create_QM_residue(ff_gen_qm,
+    #                     qm_atoms, 
+    #                     filename=filename, 
+    #                     residue_name=qm_residue_name)
+    #         msg = 'QM/MM partition inside the molecule'
+    #         self.ostream.print_info(msg)
+    #         qm_atoms = qm_atoms
+    #         self._create_QM_subregion(ff_gen_qm,
+    #                                   qm_atoms, 
+    #                                   qm_molecule, 
+    #                                   filename,
+    #                                   residue_name=qm_residue_name)
+    #     else:
+    #         raise ValueError('Invalid value for qm_atoms. Please use "all" or a list of atom indices.')
 
-        # Load the generated QM region topology and system PDB
-        self.pdb = app.PDBFile(pdb_file)
+    #     # Load the generated QM region topology and system PDB
+    #     self.pdb = app.PDBFile(pdb_file)
 
-        # Check if the system is periodic from the PDB file
-        if self.pdb.topology.getUnitCellDimensions() is not None:
-            periodic = True
-            msg = 'PBC detected from the PDB file.'
-            self.ostream.print_info(msg)
-            self.ostream.flush()
+    #     # Check if the system is periodic from the PDB file
+    #     if self.pdb.topology.getUnitCellDimensions() is not None:
+    #         periodic = True
+    #         msg = 'PBC detected from the PDB file.'
+    #         self.ostream.print_info(msg)
+    #         self.ostream.flush()
 
-        # Get self.positions from the topology
-        self.positions = self.pdb.positions
+    #     # Get self.positions from the topology
+    #     self.positions = self.pdb.positions
 
-        # Combine XML files into a forcefield
-        xml_files = [f'{filename}.xml'] + ([xml_file] if isinstance(xml_file, str) else xml_file)
-        msg = f'Added XML Files: {xml_files}'
-        self.ostream.print_info(msg)
-        self.ostream.flush()
+    #     # Combine XML files into a forcefield
+    #     xml_files = [f'{filename}.xml'] + ([xml_file] if isinstance(xml_file, str) else xml_file)
+    #     msg = f'Added XML Files: {xml_files}'
+    #     self.ostream.print_info(msg)
+    #     self.ostream.flush()
 
-        # Combine XML files into a forcefield
-        forcefield = app.ForceField(*xml_files)
+    #     # Combine XML files into a forcefield
+    #     forcefield = app.ForceField(*xml_files)
 
-        # Create the system with appropriate nonbonded settings
-        if periodic:
-            nonbondedMethod = app.PME  # Particle Mesh Ewald method for periodic systems
-            nonbondedCutoff = self.cutoff * unit.nanometer  # Assuming self.cutoff is defined elsewhere appropriately
-            constraints = app.HBonds
-        else:
-            nonbondedMethod = app.NoCutoff  # No cutoff for non-periodic systems
-            nonbondedCutoff = None
-            constraints = app.HBonds
+    #     # Create the system with appropriate nonbonded settings
+    #     if periodic:
+    #         nonbondedMethod = app.PME  # Particle Mesh Ewald method for periodic systems
+    #         nonbondedCutoff = self.cutoff * unit.nanometer  # Assuming self.cutoff is defined elsewhere appropriately
+    #         constraints = app.HBonds
+    #     else:
+    #         nonbondedMethod = app.NoCutoff  # No cutoff for non-periodic systems
+    #         nonbondedCutoff = None
+    #         constraints = app.HBonds
 
-        # Check if nonbondedCutoff is defined before using it in createSystem
-        system_arguments = {
-            'nonbondedMethod': nonbondedMethod,
-            'constraints': constraints
-        }   
+    #     # Check if nonbondedCutoff is defined before using it in createSystem
+    #     system_arguments = {
+    #         'nonbondedMethod': nonbondedMethod,
+    #         'constraints': constraints
+    #     }   
 
-        if nonbondedCutoff is not None:
-            system_arguments['nonbondedCutoff'] = nonbondedCutoff
+    #     if nonbondedCutoff is not None:
+    #         system_arguments['nonbondedCutoff'] = nonbondedCutoff
 
-        self.system = forcefield.createSystem(self.pdb.topology, **system_arguments)
+    #     self.system = forcefield.createSystem(self.pdb.topology, **system_arguments)
 
-        # Set QM atoms based on the QM residue
-        #self.qm_atoms = [atom.index for atom in self.pdb.topology.atoms() if (atom.residue.name == qm_residue_name and atom.residue.id == str(qm_residue_number))]
-        self.qm_atoms = qm_atoms
+    #     # Set QM atoms based on the QM residue
+    #     #self.qm_atoms = [atom.index for atom in self.pdb.topology.atoms() if (atom.residue.name == qm_residue_name and atom.residue.id == str(qm_residue_number))]
+    #     self.qm_atoms = qm_atoms
 
-        # Setting QM/MM system
-        self.set_qm_mm_system('periodic' if periodic else 'gas', ff_gen_qm)
+    #     # Setting QM/MM system
+    #     self.set_qm_mm_system('periodic' if periodic else 'gas', ff_gen_qm)
 
-        # Adding the stabilizer force to the QM region
-        # self.qm_stabilizer(ff_gen_qm)
+    #     # Adding the stabilizer force to the QM region
+    #     # self.qm_stabilizer(ff_gen_qm)
 
-        # Save system to XML and PDB for inspection and reuse
-        with open(f'{filename}_system.xml', 'w') as f:
-            f.write(mm.XmlSerializer.serialize(self.system))
-            msg = f'System parameters written to {filename}_system.xml'
-            self.ostream.print_info(msg)
-            self.ostream.flush()
+    #     # Save system to XML and PDB for inspection and reuse
+    #     with open(f'{filename}_system.xml', 'w') as f:
+    #         f.write(mm.XmlSerializer.serialize(self.system))
+    #         msg = f'System parameters written to {filename}_system.xml'
+    #         self.ostream.print_info(msg)
+    #         self.ostream.flush()
 
-        with open(f'{filename}_system.pdb', 'w') as pdb_file:
-            app.PDBFile.writeFile(self.pdb.topology, self.pdb.positions, pdb_file)
-            msg = f'System coordinates written to {filename}_system.pdb'
-            self.ostream.print_info(msg)
-            self.ostream.flush()
+    #     with open(f'{filename}_system.pdb', 'w') as pdb_file:
+    #         app.PDBFile.writeFile(self.pdb.topology, self.pdb.positions, pdb_file)
+    #         msg = f'System coordinates written to {filename}_system.pdb'
+    #         self.ostream.print_info(msg)
+    #         self.ostream.flush()
 
-        # Correct phase setting
-        self.phase = 'gas'
+    #     # Correct phase setting
+    #     self.phase = 'gas'
     
     def _reload_interpolation_root_from_hdf5(self, root, inv_sqrt_masses):
-        driver_object = self.impes_drivers[root]
+        driver_object = self.im_drivers[root]
 
         im_labels, _ = driver_object.read_labels()
 
@@ -1006,9 +1017,6 @@ class OpenMMIMDynamics:
         return cluster_info, angle_library, point_index
 
     def run_immm(self, 
-                 im_driver,
-                 interpolation_settings,
-                 system_information,
                  roots_to_follow=[0],
                  restart_file = None, 
                  ensemble='NVE', 
@@ -1060,62 +1068,56 @@ class OpenMMIMDynamics:
         self.friction = friction / unit.picosecond
         self.timestep = timestep * unit.femtoseconds
         self.nsteps = nsteps
-    
-        self.im_driver = im_driver
       
-        if isinstance(self.im_driver, InterpolationDriver):
-            interpolation_settings_dict = {}
-            if len(interpolation_settings) != len(roots_to_follow):
-                for i, root in enumerate(roots_to_follow):
-                    interpolation_settings_dict[root] = interpolation_settings[i]
-            else:
-                for i, root in enumerate(roots_to_follow):
-                    interpolation_settings_dict[root] = interpolation_settings[i]
-            self.roots_to_follow = roots_to_follow
-            self.qm_symmetry_datapoint_dict = {root: {} for root in self.roots_to_follow}
-            self.qm_data_point_dict = {root: [] for root in self.roots_to_follow}
-            self.sorted_state_spec_im_labels = {root: [] for root in self.roots_to_follow}
-            self.root_spec_molecules = {root: [] for root in self.roots_to_follow}
-            self.impes_drivers = {root: None for root in self.roots_to_follow}
-            self.interpolation_settings = interpolation_settings_dict
-            masses = self.molecule.get_masses().copy()
-        
-            masses_cart = np.repeat(masses, 3)
-            inv_sqrt_masses = 1.0 / np.sqrt(masses_cart)
-            self.inv_sqrt_masses = inv_sqrt_masses
-            for root in self.roots_to_follow:
-                # Dynamically create an attribute name
-                attribute_name = f'impes_driver_{root}'
-                # Initialize the object
-                driver_object = InterpolationDriver(self.roots_z_matrix[root])
-                driver_object.update_settings(self.interpolation_settings[root])
-
-                # print('Interpolation driver settings updated for root', root, self.eq_bond_force_constants)
-
-                driver_object.impes_coordinate.inv_sqrt_masses = inv_sqrt_masses
-                if root == 0:
-                    driver_object.symmetry_information = system_information['gs']
-                else:
-                    driver_object.symmetry_information = self.symmetry_information['es']
-               
-                self.impes_drivers[root] = driver_object
-                self._reload_interpolation_root_from_hdf5(root, inv_sqrt_masses)
-                self.qm_rotor_cluster_banks[root] = self._load_rotor_cluster_bank_for_root(root)
-                driver_object.qm_rotor_cluster_banks = self.qm_rotor_cluster_banks[root]
-
-                if driver_object.qm_rotor_cluster_banks:
-                    first_family = next(iter(driver_object.qm_rotor_cluster_banks.values()))
-                    driver_object.rotor_cluster_information = first_family.get("cluster_info")
-                else:
-                    driver_object.rotor_cluster_information = None
-                print('In set up', driver_object.rotor_cluster_information)
-                # Set the object as an attribute of the instance
-                setattr(self, attribute_name, driver_object)
-                # Append the object to the list
-                self.impes_drivers[root] = driver_object
-                self.current_state = self.roots_to_follow[0]
+        interpolation_settings_dict = {}
+        if len(self.interpolation_settings) != len(roots_to_follow):
+            for i, root in enumerate(roots_to_follow):
+                interpolation_settings_dict[root] = self.interpolation_settings[i]
         else:
-            raise ValueError('Invalid QM driver. Please use a valid VeloxChem driver.')
+            for i, root in enumerate(roots_to_follow):
+                interpolation_settings_dict[root] = self.interpolation_settings[i]
+        self.roots_to_follow = roots_to_follow
+        self.qm_symmetry_datapoint_dict = {root: {} for root in self.roots_to_follow}
+        self.qm_data_point_dict = {root: [] for root in self.roots_to_follow}
+        self.sorted_state_spec_im_labels = {root: [] for root in self.roots_to_follow}
+        self.root_spec_molecules = {root: [] for root in self.roots_to_follow}
+        self.qm_rotor_cluster_banks = {root: {} for root in self.roots_to_follow}
+        self.im_drivers = {root: None for root in self.roots_to_follow}
+        self.interpolation_settings = interpolation_settings_dict
+        masses = self.molecule.get_masses().copy()
+    
+        masses_cart = np.repeat(masses, 3)
+        inv_sqrt_masses = 1.0 / np.sqrt(masses_cart)
+        self.inv_sqrt_masses = inv_sqrt_masses
+        for root in self.roots_to_follow:
+            # Dynamically create an attribute name
+            attribute_name = f'impes_driver_{root}'
+            # Initialize the object
+            driver_object = InterpolationDriver(self.roots_z_matrix[root])
+            driver_object.update_settings(self.interpolation_settings[root])
+            # print('Interpolation driver settings updated for root', root, self.eq_bond_force_constants)
+            driver_object.impes_coordinate.inv_sqrt_masses = inv_sqrt_masses
+            if root == 0:
+                driver_object.symmetry_information = self.symmetry_information['gs']
+            else:
+                driver_object.symmetry_information = self.symmetry_information['es']
+           
+            self.im_drivers[root] = driver_object
+            self._reload_interpolation_root_from_hdf5(root, inv_sqrt_masses)
+            self.qm_rotor_cluster_banks[root] = self._load_rotor_cluster_bank_for_root(root)
+            driver_object.qm_rotor_cluster_banks = self.qm_rotor_cluster_banks[root]
+            if driver_object.qm_rotor_cluster_banks:
+                first_family = next(iter(driver_object.qm_rotor_cluster_banks.values()))
+                driver_object.rotor_cluster_information = first_family.get("cluster_info")
+            else:
+                driver_object.rotor_cluster_information = None
+            print('In set up', driver_object.rotor_cluster_information)
+            # Set the object as an attribute of the instance
+            setattr(self, attribute_name, driver_object)
+            # Append the object to the list
+            self.im_drivers[root] = driver_object
+            self.current_state = self.roots_to_follow[0]
+
 
         runtime_cache = self._build_run_qmmm_runtime_cache()
         self.qm_potentials = []
@@ -1204,6 +1206,8 @@ class OpenMMIMDynamics:
             observables = self._collect_step_observables_optimized(
                     self.simulation.context,
                     runtime_cache)
+            
+            self._append_step_observables(observables)
 
             self._print_run_qmmm_step(step, timestep, observables, save_freq)
             # Potential energies
@@ -1310,13 +1314,7 @@ class OpenMMIMDynamics:
             groups=runtime_cache['mm_groups']).getPotentialEnergy().value_in_unit(energy_unit)
         kinetic = context.getState(getEnergy=True).getKineticEnergy().value_in_unit(energy_unit)
 
-        meta_bias = 0.0
-        if runtime_cache['metadynamics_enabled']:
-            group = runtime_cache['metadynamics_group']
-            meta_bias_q = context.getState(getEnergy=True, groups=group).getPotentialEnergy()
-            meta_bias = meta_bias_q.value_in_unit(energy_unit)
-
-        potential = qm + qm_mm + mm + meta_bias
+        potential = qm + qm_mm + mm
 
         if runtime_cache['has_temp_method']:
             temperature = self.integrator.computeSystemTemperature().value_in_unit(unit.kelvin)
@@ -1329,7 +1327,6 @@ class OpenMMIMDynamics:
             'qm': qm,
             'qm_mm': qm_mm,
             'mm': mm,
-            'metad_bias':float(meta_bias),
             'potential': potential,
             'kinetic': kinetic,
             'temperature': float(temperature),
@@ -1353,9 +1350,10 @@ class OpenMMIMDynamics:
         """
         Prints per-step simulation diagnostics.
         """
-
+        
         if step % save_freq != 0:
             return
+ 
         self.dynamic_molecules.append(self.current_molecule)
         print(f"Step: {step} / {self.nsteps} Time: {round((step * timestep) / 1000, 2)} ps")
         print('Potential Energy QM region:', observables['qm'], 'kJ/mol')
@@ -1364,9 +1362,7 @@ class OpenMMIMDynamics:
         print('Total Potential Energy:', observables['potential'])
         print('Kinetic Energy:', observables['kinetic'])
         print('Temperature:', observables['temperature'], 'K')
-        print('Total Energy:', observables['total'], '±', np.std(self.total_energies), 'kJ/mol')
-        if 'metad_bias' in observables:
-            print('Metadynamics Bias Energy:', observables['metad_bias'], 'kJ/mol') 
+        print('Total Energy:', observables['total'], '±', np.std(self.total_energies), 'kJ/mol') 
         print('Current State (PES):', self.current_state)
         print('-' * 60)
     
@@ -2126,7 +2122,7 @@ class OpenMMIMDynamics:
                         current_NAC = self.im_drivers[self.roots_to_follow[root_1]].impes_coordinate.NAC.flatten()
                         current_velocitites = self.velocities_np[-1].flatten() * 4.566180e-4
 
-                        hopping_potential = np.exp(-abs((np.pi/(4)) * (( self.impes_drivers[self.roots_to_follow[root_2]].impes_coordinate.energy - self.impes_drivers[self.roots_to_follow[root_1]].impes_coordinate.energy ) / np.linalg.multi_dot([current_NAC, current_velocitites]))))
+                        hopping_potential = np.exp(-abs((np.pi/(4)) * (( self.im_drivers[self.roots_to_follow[root_2]].impes_coordinate.energy - self.im_drivers[self.roots_to_follow[root_1]].impes_coordinate.energy ) / np.linalg.multi_dot([current_NAC, current_velocitites]))))
                         print('#######################', '\n\n', hopping_potential, potential_kjmol_2 - potential_kjmol, '\n\n', '#######################')
 
                     if abs(potential_kjmol_2 - potential_kjmol) < 20:
@@ -2727,8 +2723,9 @@ class OpenMMIMDynamics:
         self.symmetry_information = {'gs': (), 'es': ()}
         
         self.molecule = molecule
-        
+        self.roots_z_matrix = {}
         for root in interpolation_settings.keys():
+            
             # generate the z-matrix based for the interpolation database provided
             int_driver = InterpolationDriver()
             int_driver.update_settings(interpolation_settings[root])
@@ -2866,7 +2863,7 @@ class OpenMMIMDynamics:
         
         return mapping_dict
 
-    def adjust_symmetry_dihedrals(self, molecule, symmetry_groups, rot_bonds):
+    def _adjust_symmetry_dihedrals(self, molecule, symmetry_groups, rot_bonds, z_matrix):
         
         def symmetry_group_dihedral(reference_set, dihedrals, rot_bonds):
             rot_bond_set = {frozenset(bond) for bond in rot_bonds}
@@ -2881,33 +2878,37 @@ class OpenMMIMDynamics:
                         filtered_dihedrals.append(d)
             return filtered_dihedrals
         
-        z_matrix = self.define_z_matrix(molecule)
-        all_dihedrals = [element for element in z_matrix if len(element) == 4]
+        all_dihedrals = [element for element in z_matrix['dihedrals']]
 
         symmetry_group_dihedral_dict = {} 
+
+        sym_groups_dih = {3: {}}
+
         angles_to_set = {}
         periodicities = {}
-        dihedral_groups = {2: [], 3: []}
+        dihedral_groups = {2: {}, 3: {}}
 
         for symmetry_group in symmetry_groups:
              
             symmetry_group_dihedral_list = symmetry_group_dihedral(symmetry_group, all_dihedrals, rot_bonds)
             symmetry_group_dihedral_dict[tuple(symmetry_group)] = symmetry_group_dihedral_list
-
+            
             if len(symmetry_group) == 3:
 
                 # angles_to_set[symmetry_group_dihedral_list[0]] = ([0.0, np.pi/3.0])
-                angles_to_set[symmetry_group_dihedral_list[0]] = ([0.0, np.pi/3.0])
+                angles_to_set[tuple(symmetry_group_dihedral_list[0])] = ([0.0, np.pi/6.0, np.pi/3.0, np.pi/2.0])
 
-                periodicities[symmetry_group_dihedral_list[0]] = 3
-                dihedral_groups[3].extend([tuple(sorted(element, reverse=False)) for element in symmetry_group_dihedral_list])
+                periodicities[tuple(symmetry_group_dihedral_list[0])] = 3
+                dihedral_groups[3][tuple(symmetry_group_dihedral_list[0][1:3])] = [tuple(sorted(element, reverse=False)) for element in symmetry_group_dihedral_list]
+                
+                sym_groups_dih[3][tuple(symmetry_group_dihedral_list[0][1:3])] = [tuple(element) for element in symmetry_group_dihedral_list]
 
             elif len(symmetry_group) == 2:
 
                 # angles_to_set[symmetry_group_dihedral_list[0]] = ([0.0, np.pi/3.0])
-                angles_to_set[symmetry_group_dihedral_list[0]] = ([0.0, np.pi/2.0])
+                angles_to_set[tuple(symmetry_group_dihedral_list[0])] = ([0.0, np.pi/2.0])
 
-                periodicities[symmetry_group_dihedral_list[0]] = 2
+                periodicities[tuple(symmetry_group_dihedral_list[0])] = 2
                 dihedral_groups[2].extend([tuple(sorted(element, reverse=False)) for element in symmetry_group_dihedral_list])
 
-        return angles_to_set, periodicities, symmetry_group_dihedral_dict, dihedral_groups
+        return angles_to_set, periodicities, symmetry_group_dihedral_dict, dihedral_groups, sym_groups_dih
