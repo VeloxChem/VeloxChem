@@ -1127,6 +1127,8 @@ class EnsembleDriver:
         title: str = "Absorption Spectrum (Averaged)",
         ax=None,
         xlim_nm=None,
+        save_averaged_spectra: bool = False,
+        averaged_spectra_filename: str | Path = "averaged_spectra.csv",
     ):
         """
         Convenience wrapper to plot averaged UV/Vis spectra for an ensemble.
@@ -1156,6 +1158,11 @@ class EnsembleDriver:
             created.
         :param xlim_nm:
             Tuple (xmin, xmax) to set x-axis limits in nm. If None, automatic limits are used.
+        :param save_averaged_spectra:
+            If True, saves the averaged spectra data to a CSV.
+        :param averaged_spectra_filename:
+            Filename for saving the averaged spectra CSV if `save_averaged_spectra` is True.
+            Default is "averaged_spectra.csv" in current working directory.
         :return:
             The Matplotlib Axes object containing the plot.
         :raises KeyError:
@@ -1186,4 +1193,8 @@ class EnsembleDriver:
             title=title,
             ax=ax,
             xlim_nm=xlim_nm,
+            save_averaged_spectra=save_averaged_spectra,
+            averaged_spectra_filename=averaged_spectra_filename,
         )
+
+        return ax

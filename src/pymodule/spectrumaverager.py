@@ -276,6 +276,8 @@ class SpectrumAverager:
         title="Absorption Spectrum (Averaged)",
         ax=None,
         xlim_nm=None,
+        save_averaged_spectra=False,
+        averaged_spectra_filename="averaged_spectra.csv",
     ):
         """
         Plot an averaged UV/Vis spectrum from multiple response results.
@@ -302,6 +304,11 @@ class SpectrumAverager:
             created.
         :param xlim_nm:
             Tuple (xmin, xmax) to set x-axis limits in nm. If None, automatic limits are used.
+        :param save_averaged_spectra:
+            If True, saves the averaged spectra data to a CSV file.
+        :param averaged_spectra_filename:
+            Filename for saving the averaged spectra data if save_averaged_spectra is True.
+            Default is "averaged_spectra.csv" in current working directory.
         :return:
             The Matplotlib Axes object containing the plot.
         :raises ImportError:
@@ -362,5 +369,15 @@ class SpectrumAverager:
 
             ax2.set_ylim(0.0, max(0.2, ax2.get_ylim()[1]))
             ax2.set_xlim(ax.get_xlim())
+        
+        if save_averaged_spectra:
+            data = np.column_stack((wl, ymean))
+            np.savetxt(
+                averaged_spectra_filename,
+                data,
+                delimiter=",",
+                header="Wavelength [nm],epsilon [L mol^-1 cm^-1]",
+                comments="",
+            )
 
         return ax
