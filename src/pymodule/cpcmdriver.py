@@ -708,6 +708,74 @@ class CpcmDriver:
         v.zoomTo()
         v.show()
 
+    def visualize_cpcm_charges(self, molecule, grid, q, colorbar = False):
+        """
+	Visualizes the CPCM charges. 
+        :param molecule:
+            The molecule.
+        :param q:
+            The q-vector
+        :param grid:
+            The grid.
+        """
+
+        try:
+            import py3Dmol as p3d
+        except ImportError:
+            raise ImportError('Unable to import py3Dmol.')
+
+        try:
+            import matplotlib.colors as mcolors
+        except ImportError:
+            raise ImportError('Unable to import mcolors.')
+
+        try:
+            import matplotlib.pyplot as plt
+        except ImportError:
+            raise ImportError('Unable to import matplotlib for colormapping.')
+
+
+        assert_msg_critical(grid.shape[1] == 6,
+                            'CpcmDriver.visualize_grid: Invalid grid size')
+        assert_msg_critical(len(q) == len(grid),
+                    'CpcmDriver.visualize_grid: Invalid q-vector size')
+
+        grid_in_angstrom = grid[:, :3] * bohr_in_angstrom()
+
+        grid_xyz_string = f'{grid_in_angstrom.shape[0]}\n\n'
+
+        for i in range(grid_in_angstrom.shape[0]):
+            x, y, z = grid_in_angstrom[i]
+            grid_xyz_string += f'He {x} {y} {z}\n'
+
+        q_absmax = np.max(np.abs(q))
+        norm = mcolors.TwoSlopeNorm(vmin=-q_absmax, vcenter=0.0, vmax=q_absmax)
+        v = p3d.view(width=600, height=600)
+      
+        v.addModel(molecule.get_xyz_string(), 'xyz')
+        v.setStyle({'stick': {}})
+        cmap = plt.get_cmap('coolwarm_r') 
+
+        for k in range(grid_in_angstrom.shape[0]):
+            x, y, z = grid_in_angstrom[k, :3]
+
+            color = mcolors.to_hex(cmap(norm(q[k])))
+            v.addSphere({
+                'center': {'x': x, 'y': y, 'z': z},
+                'radius': 0.05,
+                'color': color,
+                'opacity': 0.9
+            })
+        
+        v.zoomTo()
+        v.show()
+        if colorbar:
+            fig, ax = plt.subplots(figsize=(6, 1))
+            fig.subplots_adjust(bottom=0.5)
+            sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+            cb = plt.colorbar(sm, cax=ax, orientation='horizontal')
+            cb.set_label('Charge sign and value')
+
     def grad_Aij(self, molecule, grid, q, eps, x):
         """
         Calculates the (off-diagonal) cavity-cavity gradient contribution.

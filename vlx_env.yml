@@ -11,7 +11,8 @@ dependencies:
   - mpich
   - mpi4py
   - numpy
-
+  - py3dmol
+  - rdkit
   # choose NumPy backend
   # option 1: use OpenBLAS with OpenMP
   - libblas=*=*openblas
