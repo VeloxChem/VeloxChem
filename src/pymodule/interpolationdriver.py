@@ -1048,6 +1048,7 @@ class InterpolationDriver():
         if not isinstance(family_bank.get("clusters"), dict):
             return None
         pes, gradient = self._assemble_clustered_family_model(family_label, org_int_coords)
+
         return pes, gradient, 0.0
     
     ###### End of the new rotor set up #####################

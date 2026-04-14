@@ -36,6 +36,8 @@ from time import time
 from xml.dom import minidom
 import xml.etree.ElementTree as ET
 import numpy as np
+import json
+import h5py
 import sys
 import math
 import random
@@ -52,6 +54,15 @@ from .optimizationdriver import OptimizationDriver
 from .interpolationdatapoint import InterpolationDatapoint
 from .scfrestdriver import ScfRestrictedDriver
 from .interpolationdriver import InterpolationDriver
+
+from .rotorclass import (
+    RotorDefinition,
+    RotorClusterDefinition,
+    RotorClusterInformation,
+    RotorClusterStateDefinition,
+    RotorClusterAngleLibrary,
+)
+
 # from .atommapper import AtomMapper
 from .errorhandler import assert_msg_critical
 from .mofutils import svd_superimpose
@@ -125,20 +136,20 @@ class OpenMMIMDynamics:
             'openmm' in sys.modules,
             'OpenMM is required for OpenMMDynamics.')
 
-        # MPI and output stream
-        if comm is None:
-            comm = MPI.COMM_WORLD
-
-        if ostream is None:
-            if comm.Get_rank() == mpi_master():
-                ostream = OutputStream(sys.stdout)
-            else:
-                ostream = OutputStream(None)
-
-        # mpi information
         self.comm = comm
-        self.rank = self.comm.Get_rank()
-        self.nodes = self.comm.Get_size()
+        try:
+            self._mpi_ctrl_comm = self.comm.Dup()
+        except Exception:
+            self._mpi_ctrl_comm = self.comm
+
+        try:
+            self._mpi_interp_comm = self.comm.Dup()
+        except Exception:
+            self._mpi_interp_comm = self._mpi_ctrl_comm
+
+        # MPI information (based on control communicator)
+        self.rank = self._mpi_ctrl_comm.Get_rank()
+        self.nodes = self._mpi_ctrl_comm.Get_size()
 
         # output stream
         self.ostream = ostream
@@ -185,12 +196,14 @@ class OpenMMIMDynamics:
         self.current_state = None
         self.current_molecule = None
 
+        self.roots_z_matrix = None
         self.roots_to_follow = None
         self.qm_symmetry_datapoint_dict = None
         self.qm_data_point_dict = None
+        self.qm_rotor_cluster_banks = None
         self.sorted_state_spec_im_labels = None
         self.root_spec_molecules = None
-        self.interpolation_settings_dict = None
+        self.interpolation_settings = None
         self.dihedrals_dict = None
         self.basis_set_label = 'def2-svp'
         self.ab_init_drivers = None
@@ -209,7 +222,59 @@ class OpenMMIMDynamics:
 
         # Default value for the C-H linker distance
         self.linking_atom_distance = 1.0705 
-        
+
+        self.mpi_control_plane_enabled = (self.nodes > 1)
+        self.mpi_root_worker_mode = (self.nodes > 1)
+        self.mpi_reload_from_hdf5 = True
+        self.mpi_debug_sync = False
+        self._mpi_pending_sync_roots = set()
+
+        self._MPI_CMD_STEP = 1
+        self._MPI_CMD_STOP = 2
+        self._MPI_CMD_AUX = 3
+    
+    def _mpi_is_active(self):
+        return bool(self.nodes > 1 and self.mpi_control_plane_enabled)
+
+    def _mpi_is_root(self):
+        return self.rank == mpi_master()
+
+    def _mpi_mark_root_dirty(self, root):
+        if self._mpi_is_active() and self.mpi_root_worker_mode:
+            self._mpi_pending_sync_roots.add(int(root))
+
+    def _mpi_bcast_control(self, message):
+        if not self._mpi_is_active():
+            return message
+        return self._mpi_ctrl_comm.bcast(message if self._mpi_is_root() else None, root=mpi_master())
+
+    def _mpi_decode_cmd(self, cmd_obj):
+        if isinstance(cmd_obj, np.ndarray):
+            arr = np.asarray(cmd_obj)
+            if arr.size == 1:
+                return int(arr.reshape(-1)[0])
+            raise RuntimeError(
+                f"MPI control-channel desync on rank {self.rank}: expected scalar command, "
+                f"got ndarray shape={arr.shape} dtype={arr.dtype}")
+
+        if isinstance(cmd_obj, (int, np.integer)):
+            return int(cmd_obj)
+
+        raise RuntimeError(
+            f"MPI control-channel desync on rank {self.rank}: expected int command, "
+            f"got {type(cmd_obj).__name__}")
+    
+    def _ensure_interp_engine_comm(self, driver):
+        engine = getattr(driver, 'mpi_engine', None)
+        if engine is None:
+            return
+
+        if getattr(engine, 'comm', None) is self._mpi_interp_comm:
+            return
+
+        engine.comm = self._mpi_interp_comm
+        engine.rank = self._mpi_interp_comm.Get_rank()
+        engine.size = self._mpi_interp_comm.Get_size()
     # Loading methods
     # TODO: Integrate the guess with the read_pdb_file in Molecule.
     def load_system_PDB(self, filename):
@@ -386,7 +451,7 @@ class OpenMMIMDynamics:
     # Method to generate OpenMM system from VeloxChem objects
     def create_system_from_molecule(self, 
                              molecule,
-                             z_matrix, 
+                             interpol_settings, 
                              ff_gen, 
                              solvent='gas', 
                              qm_atoms=None, 
@@ -415,10 +480,8 @@ class OpenMMIMDynamics:
         self.molecule = molecule
         self.positions = molecule.get_coordinates_in_angstrom()
         self.labels = molecule.get_labels()
-        self.z_matrix = z_matrix
 
-        if self.use_symmetry:
-            self.set_up_the_system(molecule)
+        self.set_up_the_system(molecule, interpol_settings)
 
         # Options for the QM region if it's required.
         # TODO: Take this if else tree to a separate method.
@@ -752,442 +815,200 @@ class OpenMMIMDynamics:
 
         # Correct phase setting
         self.phase = 'gas'
+    
+    def _reload_interpolation_root_from_hdf5(self, root, inv_sqrt_masses):
+        driver_object = self.impes_drivers[root]
 
-    # Simulation methods
-    def conformational_sampling(self, 
-                                ensemble='NVT', 
-                                temperature=700, 
-                                timestep=2.0, 
-                                nsteps=10000, 
-                                snapshots=10,
-                                unique_conformers=True,
-                                im_driver=None,
-                                basis=None,
-                                constraints=None):
+        im_labels, _ = driver_object.read_labels()
 
-        """
-        Runs a high-temperature MD simulation to sample conformations and minimize the energy of these conformations.
+        self.qm_data_point_dict[root] = []
+        self.qm_symmetry_datapoint_dict[root] = {}
+        self.sorted_state_spec_im_labels[root] = []
 
-        :param ensemble:
-            Type of ensemble. Options are 'NVE', 'NVT', 'NPT'. Default is 'NVT'.
-        :param temperature:
-            Temperature of the system in Kelvin. Default is 700 K.
-        :param timestep:
-            Timestep of the simulation in femtoseconds. Default is 2.0 fs.
-        :param nsteps:
-            Number of steps in the simulation. Default is 1000.
-        :param snapshots:
-            The number of snapshots to save. Default is 10.
-        :param lowest_conformations:
-            Number of lowest energy conformations to save. Default is None.
-        :param qm_minimization:
-            QM driver object for energy minimization. Default is None.
-        :param basis:
-            Basis set for the SCF driver if im_driver is not None.
-        :param constraints:
-            Constraints for the system. Default is None.
-        :param minimize:
-            If True, the energy of the conformations will be minimized. Default is True.
+        old_label = None
 
-        :return:
-            conformers_dict: Dictionary with lists of potential energies of the conformations, the minimized molecule objects, 
-            and their corresponding coordinates in XYZ format.
+        for label in im_labels:
+            qm_data_point = InterpolationDatapoint(self.roots_z_matrix[root])
+            qm_data_point.update_settings(self.interpolation_settings[root])
+            qm_data_point.read_hdf5(self.interpolation_settings[root]['imforcefield_file'], label)
+            qm_data_point.inv_sqrt_masses = inv_sqrt_masses
             
-        """
+            if qm_data_point.bank_role == "core" or "cluster" not in qm_data_point.point_label and "symmetry" not in qm_data_point.point_label:
 
-        if self.system is None:
-            raise RuntimeError('System has not been created! First create a system using the appropriate method.')
 
-        self.ensemble = ensemble
-        self.temperature = temperature * unit.kelvin
-        self.timestep = timestep * unit.femtosecond
-        self.nsteps = nsteps
+                self.qm_data_point_dict[root].append(qm_data_point)
+                self.sorted_state_spec_im_labels[root].append(label)
 
-        self.integrator = self._create_integrator()
-        topology = self.pdb.topology
-        self.positions = self.pdb.positions
+                old_label = qm_data_point.point_label
+                self.qm_symmetry_datapoint_dict[root][old_label] = [qm_data_point]
+            elif qm_data_point.bank_role == "symmetry":
 
-        self.simulation = app.Simulation(topology, self.system, self.integrator)
-        self.simulation.context.setPositions(self.positions)
-        self.simulation.context.setVelocitiesToTemperature(self.temperature)
+                self.qm_symmetry_datapoint_dict[root][old_label].append(qm_data_point)
 
-        if self.molecule is None:
-            if len(self.unique_molecules) > 1:
-                # There are several residues in the system, print a warning because the conformational sampling may not be meaningful
-                warning_msg = 'You are using a PDB file to run the simulation. The coordinates saved will correspond to the whole PDB file.'
-                warning_msg += 'Make sure you have one residue in your PDB file or the results may not be meaningful.'
-                self.ostream.print_warning(warning_msg)
-                self.ostream.flush()
-            # This is the case where the user has not created a molecule object and used files to create the system.
-            self.labels = [atom.element.symbol for atom in self.pdb.topology.atoms()]
-
-        # Determine the frequency of saving depending on the number of snapshots.
-        save_freq = max(nsteps // snapshots, 1)
-        energies = []
-        opt_coordinates = []
-
-        # Run MD
-        for i in range(snapshots):
-            self.simulation.step(save_freq)
+        driver_object.qm_symmetry_data_points = self.qm_symmetry_datapoint_dict[root]
+        driver_object.qm_data_points = self.qm_data_point_dict[root]
+        driver_object.labels = self.sorted_state_spec_im_labels[root]
         
-            minimized_system = app.Simulation(topology, self.system, self._create_integrator())
-            minimized_system.context.setPositions(self.simulation.context.getState(getPositions=True).getPositions())
-            
-            minimized_system.minimizeEnergy()
-            minimized_state = minimized_system.context.getState(getPositions=True, getEnergy=True)
-            
-            minimized_coordinates = minimized_state.getPositions()
-            minimized_energy = minimized_state.getPotentialEnergy().value_in_unit(unit.kilojoules_per_mole)
-            energies.append(minimized_energy)
-            
-            self.ostream.print_info(f'Minimized energy: {minimized_energy}')
-            self.ostream.flush()
-            xyz = f"{len(self.labels)}\n\n"
-            for label, coord in zip(self.labels, minimized_coordinates):
-                xyz += f"{label} {coord.x * 10} {coord.y * 10} {coord.z * 10}\n"  
-            self.ostream.print_info(f'Saved coordinates for step {save_freq * (i + 1)}')
-            self.ostream.flush()
-            opt_coordinates.append(xyz)
+        print(len(self.qm_data_point_dict[root]), driver_object.impes_coordinate.eq_bond_lengths, self.qm_data_point_dict[root][0].eq_bond_lengths)
+        if len(self.qm_data_point_dict[root]) > 0:
+            driver_object.impes_coordinate.eq_bond_lengths = self.qm_data_point_dict[root][0].eq_bond_lengths
 
-        self.ostream.print_info('Conformational sampling completed!')
-        self.ostream.print_info(f'Number of conformations: {len(opt_coordinates)}')
-        self.ostream.flush()
+        driver_object.mark_runtime_data_cache_dirty()
+        driver_object.prepare_runtime_data_cache(force=True)
 
-        equiv_conformer_pairs= []
-        if unique_conformers:
-            msg = f'Filtering for unique conformers'
-            self.ostream.print_info(msg)
-            self.ostream.flush()
-            
-            # reorder coordinates and energies by increasing energy
-            index_ẹnergy = [(i, energies[i]) for i in range(len(energies))]
-            sorted_index_energy = sorted(index_ẹnergy, key=lambda x: x[1]) # sorted by increasing energy
-            sorted_indices = [i[0] for i in sorted_index_energy]
+        use_mpi_preload = bool(self.interpolation_settings[root].get('use_mpi_preload', False))
+        # In root-worker mode, avoid immediate preload collectives here; rebuild lazily
+        # in synchronized compute path on the next step.
+        force_rebuild_preload = not (self._mpi_is_active() and self.mpi_root_worker_mode)
+        driver_object.set_mpi_preload_engine(
+            comm=self._mpi_interp_comm,
+            enabled=(use_mpi_preload and self.nodes > 1),
+            force_rebuild=force_rebuild_preload,
+        )
+
+        driver_object._mpi_preload_enabled_config = bool(getattr(driver_object, 'mpi_preload_enabled', False))
+        self._ensure_interp_engine_comm(driver_object)
+        # In root-worker mode, keep preload disabled outside synchronized compute
+        # phases to prevent root-only branches from emitting collective packets.
+        if self._mpi_is_active() and self.mpi_root_worker_mode:
+            driver_object.mpi_preload_enabled = False
+    
+    def _load_rotor_cluster_bank_for_root(self, root):
+        out = {}
+        imff_file = self.interpolation_settings[root]["imforcefield_file"]
+        families = self._list_rotor_cluster_families_from_registry(root)
+
+        for family in families:
+            cluster_info, angle_library, point_index = self._read_cluster_registry_for_family(
+                imff_file, root, family
+            )
+            fam = {
+                "cluster_info": cluster_info,
+                "cluster_angle_library": angle_library,
+                "point_index": point_index,
+                "core": None,
+                "clusters": {
+                    cid: {
+                        "cluster_type": cluster.cluster_type,
+                        "rotor_ids": tuple(cluster.rotor_ids),
+                        "expected_states": {state.state_id: None for state in angle_library.state_banks[cid]},
+                    }
+                    for cid, cluster in cluster_info.clusters.items()
+                },
+            }
+
+            core_dp = InterpolationDatapoint(self.roots_z_matrix[root])
+            core_dp.update_settings(self.interpolation_settings[root])
+            core_dp.read_hdf5(imff_file, point_index["core_label"])
+            fam["core"] = core_dp
+
+            for cid, state_map in point_index["cluster_state_labels"].items():
+                for sid, label in state_map.items():
+                    dp = InterpolationDatapoint(self.roots_z_matrix[root])
+                    dp.update_settings(self.interpolation_settings[root])
+                    dp.read_hdf5(imff_file, label)
+                    fam["clusters"][cid]["expected_states"][sid] = dp
+
+            for cid, cbank in fam["clusters"].items():
+                expected = cbank["expected_states"]
+                if 0 in expected and expected[0] is None:
+                    expected[0] = fam["core"]
+
+            out[family] = fam
+        return out
+    
+    def _list_rotor_cluster_families_from_registry(self, root):
+        imff_file = self.interpolation_settings[root]["imforcefield_file"]
+        prefix = f"rotor_cluster_registry/root_{root}"
+        with h5py.File(imff_file, "r") as h5f:
+            if prefix not in h5f:
+                return []
+            return sorted(name.replace("family_", "", 1) for name in h5f[prefix].keys())
 
 
-            minimized_energy = [energies[i] for i in sorted_indices]
-            opt_coordinates = [opt_coordinates[i] for i in sorted_indices]
+    def _read_cluster_registry_for_family(self, imff_file, root, family_label):
+        def _read_scalar_string(ds):
+            val = ds[()]
+            return val.decode("utf-8") if isinstance(val, bytes) else str(val)
 
+        with h5py.File(imff_file, "r") as h5f:
+            prefix = f"rotor_cluster_registry/root_{root}/family_{family_label}"
+            info_json = _read_scalar_string(h5f[prefix + "/cluster_info_json"])
+            library_json = _read_scalar_string(h5f[prefix + "/cluster_angle_library_json"])
+            index_json = _read_scalar_string(h5f[prefix + "/point_index_json"])
 
-            # Filter out the conformations with RMSD < 0.1 and keep the lowest energy one.
-            for i, coord in enumerate(opt_coordinates):
-                mol= Molecule.read_xyz_string(coord)
-                xyz_i = mol.get_coordinates_in_angstrom()
-                ene_i = minimized_energy[i]
-
-                for j in range(i + 1, len(opt_coordinates)):
-                    mol_j= Molecule.read_xyz_string(opt_coordinates[j])
-                    xyz_j = mol_j.get_coordinates_in_angstrom()
-                    ene_j = minimized_energy[j]
-                    if abs(ene_i - ene_j) < self.energy_threshold:
-                        rmsd, rot, trans = svd_superimpose(xyz_j, xyz_i)
-                        if rmsd < self.rmsd_threshold:
-                            equiv_conformer_pairs.append((i, j))
-
-            duplicate_conformers = [j for i, j in equiv_conformer_pairs]
-            duplicate_conformers = sorted(list(set(duplicate_conformers)))
-
-            filtered_energies = [
-                e
-                for i, e in enumerate(minimized_energy)
-                if i not in duplicate_conformers
-            ]
-
-            filtered_geometries = [
-                g
-                for i, g in enumerate(opt_coordinates)
-                if i not in duplicate_conformers
-            ]
-            
-            opt_coordinates = filtered_geometries
-            energies = filtered_energies
-
-
+        info_payload = json.loads(info_json)
+        library_payload = json.loads(library_json)
+        index_payload = json.loads(index_json)
         
-        
-            # print table of results
-            msg = f'\nNumber of unique conformers: {len(opt_coordinates)}'
-            self.ostream.print_info(msg)
-            self.ostream.flush()
-
-        if im_driver:
-            # Use qm_miniization to minimize the energy of the conformations
-            # Name flag based on if is instance of the XtbDriver or ScfDriver
-            if isinstance(im_driver, XtbDriver):
-                drv_name = 'XTB Driver'
-            elif isinstance(im_driver, ScfRestrictedDriver):
-                drv_name = 'RSCF Driver'
-            elif isinstance(im_driver, ScfUnrestrictedDriver):
-                drv_name = 'USCF Driver'
-            elif isinstance(im_driver, ScfRestrictedOpenDriver):
-                drv_name = 'ROSCF Driver'
-
-            if drv_name != 'XTB Driver' and basis is None:
-                raise ValueError('Basis set is required for the SCF driver.')
-
-            msg = f'Requested QM minimization with {drv_name}'
-            self.ostream.print_info(msg)
-            self.ostream.flush()
-            qm_energies = []
-            qm_opt_coordinates = []
-            for conf , coords in enumerate(opt_coordinates):
-                self.ostream.print_info(f'Conformation {conf}')
-                self.ostream.flush()
-                molecule = Molecule.from_xyz_string(coords)
-                qm_energy, qm_coords = self.qm_minimization(molecule, basis, im_driver, constraints)
-                qm_energies.append(qm_energy)
-                qm_opt_coordinates.append(qm_coords)
-                msg = f'Energy of the conformation: {qm_energy}'
-                self.ostream.print_info(msg)
-                self.ostream.flush()
-
-            energies = qm_energies
-            opt_coordinates = qm_opt_coordinates
-
-        # Save final molecules, coordinates and corresponding energies to a dictionary
-        conformers_dict = {
-                'energies': energies,
-                'molecules': [Molecule.from_xyz_string(coords) for coords in opt_coordinates],
-                'geometries': opt_coordinates
+        rotor_to_cluster_map = {
+            int(rid): int(cid) for rid, cid in info_payload["rotor_to_cluster"].items()
         }
+        cluster_info = RotorClusterInformation(
+            dihedral_start=int(info_payload["dihedral_start"]),
+            dihedral_end=int(info_payload["dihedral_end"]),
+            rotor_to_cluster=rotor_to_cluster_map,
+        )
+        for rotor_id, rotor_data in info_payload["rotors"].items():
+            cluster_info.rotors[int(rotor_id)] = RotorDefinition(
+                rotor_id=int(rotor_id),
+                center=tuple(rotor_data["center"]),
+                torsion_rows=tuple(rotor_data["torsion_rows"]),
+                torsion_coords=tuple(tuple(x) for x in rotor_data["torsion_coords"]),
+                symmetry_order=int(rotor_data["symmetry_order"]),
+                atom_group=tuple(rotor_data["atom_group"]),
+            )
+        for cid, cdata in info_payload["clusters"].items():
+            cluster_info.clusters[int(cid)] = RotorClusterDefinition(
+                cluster_id=int(cid),
+                rotor_ids=tuple(cdata["rotor_ids"]),
+                cluster_type=cdata["cluster_type"],
+                torsion_rows=tuple(cdata["torsion_rows"]),
+            )
 
-        self.conformer_dict = conformers_dict
+        angle_library = RotorClusterAngleLibrary()
+        for cid, state_list in library_payload.items():
+            bank = []
+            for state in state_list:
+                aa = {}
+                for key, val in state["angle_assignment"].items():
+                    aa[tuple(int(x) for x in key.split(","))] = float(val)
+                bank.append(
+                    RotorClusterStateDefinition(
+                        cluster_id=int(cid),
+                        state_id=int(state["state_id"]),
+                        cluster_type=state["cluster_type"],
+                        rotor_ids=tuple(state["rotor_ids"]),
+                        angle_assignment=aa,
+                        dihedrals_to_rotate=(
+                            None
+                            if state["dihedrals_to_rotate"] is None
+                            else tuple(tuple(int(x) for x in row) for row in state["dihedrals_to_rotate"])
+                        ),
+                        phase_signature=(
+                            None if state["phase_signature"] is None
+                            else np.asarray(state["phase_signature"], dtype=np.float64)
+                        ),
+                        is_anchor=bool(state.get("is_anchor", False)),
+                        label_suffix=str(state.get("label_suffix", "")),
+                    )
+                )
+            angle_library.state_banks[int(cid)] = tuple(bank)
 
-        return conformers_dict
-    
-    def calculate_boltzmann_distribution(self, energies=None, T=300, unit='kj/mol'):
-        """ 
-        Calculate the Boltzmann distribution of conformers based on their energies.
-        
-        :param energies: 
-            list of energies. If None, it will use the energies from the conformers_dict from the conformational sampling.
-        :param T: 
-            temperature in Kelvin
-        :param unit: 
-            unit of energy, options are 'kj/mol', 'kcal/mol', 'hartree'
-
-        :return: 
-            list of probabilities for each conformer
-        
-        """
-        if unit=='kj/mol':
-            R = 0.008314462618
-        elif unit=='kcal/mol':
-            R = 1.98720425864083e-3
-        elif unit=='hartree':
-            R = 3.166811563671e-6
-        else:
-            raise ValueError('Invalid unit')
-        # calculate relative energies
-        if energies is None:
-            energies = self.conformer_dict['energies']
-        else:
-            energies = energies
-
-        relative_energies = [energy - min(energies) for energy in energies]
-
-        # calculate the boltzmann factors
-        boltzmann_factors = [np.exp(-energy/(R*T)) for energy in relative_energies]
-        # calculate the partition function
-        partition_function = sum(boltzmann_factors)
-        # calculate the probabilities
-        probabilities = [factor/partition_function for factor in boltzmann_factors]
-        
-        return probabilities
-    
-    def show_conformers(self, number=5, atom_indices=False, atom_labels=False, boltzmann_distribution=True):
-        weights = None
-        if boltzmann_distribution:
-            weights = self.calculate_boltzmann_distribution(T=300, unit='kj/mol')
-
-        if number > len(self.conformer_dict["energies"]):
-            number = len(self.conformer_dict["energies"])
-            print(f"Only {number} conformers available, showing all.")
-        for i in range(number):
-            if weights is not None:
-                msg = f'\nConformation {i+1}: Energy: {self.conformer_dict["energies"][i]:.3f} kJ/mol, Weight: {weights[i]:.4f}'   
-            else:
-                msg = f'\nConformation {i+1}: Energy: {self.conformer_dict["energies"][i]:.3f} kJ/mol'
-            self.ostream.print_info(msg)
-            self.ostream.flush()
-            self.conformer_dict["molecules"][i].show(
-                atom_indices=atom_indices, atom_labels=atom_labels)
-                
-    def run_md(self, 
-               restart_file=None,
-               ensemble='NVE',
-               temperature=298.15, 
-               pressure=1.0, 
-               friction=1.0,
-               timestep=2.0, 
-               nsteps=1000, 
-               snapshots=100, 
-               traj_file='trajectory.pdb',
-               state_file='output.xml',
-               save_last_frame=True,
-               output_file='output'):
-        """
-        Runs an MD simulation using OpenMM, storing the trajectory and simulation data.
-
-        :param restart_file:
-            Last state of the simulation to restart from. Default is None.
-        :param ensemble:
-            Type of ensemble. Options are 'NVE', 'NVT', 'NPT'. Default is 'NVE'.
-        :param temperature:
-            Temperature of the system in Kelvin. Default is 298.15 K.
-        :param pressure:
-            Pressure of the system in atmospheres. Default is 1.0 atm.
-        :param friction:
-            Friction coefficient in 1/ps. Default is 1.0.
-        :param timestep:
-            Timestep of the simulation in femtoseconds. Default is 2.0 fs.
-        :param nsteps:
-            Number of steps in the simulation. Default is 1000.
-        :param snapshots:
-            Frequency of snapshots. Default is 100.
-        :param traj_file:
-            Output file name for the trajectory. Default is 'trajectory.pdb'.
-        :param state_file:
-            Output file name for the simulation state. Default is 'output.xml'.
-        """
-
-        if self.system is None:
-            raise RuntimeError('System has not been created!')
-
-        self.ensemble = ensemble
-        self.temperature = temperature * unit.kelvin
-        self.friction = friction / unit.picosecond
-        self.timestep = timestep * unit.femtoseconds
-        self.nsteps = nsteps
-
-        self.total_potentials = []
-        self.kinetic_energies = []
-        self.temperatures = []
-        self.total_energies = []
-
-
-        # Create or update the integrator
-        if self.integrator is None:
-            new_integrator = self._create_integrator()
-        else:
-            new_integrator = self.integrator
-
-        self.topology = self.pdb.topology
-        
-        self.positions = self.pdb.positions
-        
-        self.simulation = app.Simulation(self.topology, self.system, new_integrator)
-
-        self.simulation.context.setPositions(self.positions)
-        
-        # Load the state if a restart file is provided
-        if restart_file is not None:
-            self.simulation.loadState(restart_file)
-            msg = f'Restarting simulation from {restart_file}'
-            self.ostream.print_info(msg)
-            self.ostream.flush()
-        
-        else:
-            self.simulation.context.setPositions(self.positions)
-
-            # Set initial velocities if the ensemble is NVT or NPT
-            if self.ensemble in ['NVT', 'NPT']:
-                self.simulation.context.setVelocitiesToTemperature(self.temperature)
-
-        # Minimize the energy before starting the simulation
-        self.simulation.minimizeEnergy()
-
-        # Set up reporting
-        save_freq = max(nsteps // snapshots, 1)
-        self.simulation.reporters.clear()  
-        self.simulation.reporters.append(app.PDBReporter(traj_file, save_freq))
-
-        # Print header
-        print('MD Simulation parameters:')
-        print('=' * 50)
-        print('Ensemble:', ensemble)
-        if ensemble in ['NVT', 'NPT']:
-            print('Temperature:', temperature, 'K')
-            if ensemble == 'NPT':
-                print('Pressure:', pressure, 'atm')
-        print('Friction:', friction, '1/ps')
-        print('Timestep:', timestep, 'fs')
-        print('Total simulation time in ns:', nsteps * timestep / 1e6)
-        print('=' * 50)
-
-
-        start_time = time()
-        for step in range(nsteps):
-            self.simulation.step(1)
-            if step % save_freq == 0:
-                state = self.simulation.context.getState(getEnergy=True)
-                print(f"Step: {step} / {nsteps} Time: {round((step * timestep)/1000, 2)} ps")
-
-                # Potential energy
-                pot = state.getPotentialEnergy().value_in_unit(unit.kilojoules_per_mole)
-                print('Potential Energy', pot, 'kJ/mol')
-                self.total_potentials.append(pot)
-
-                # Kinetic energy
-                kin = state.getKineticEnergy().value_in_unit(unit.kilojoules_per_mole)
-                print('Kinetic Energy:', kin, 'kJ/mol')
-                self.kinetic_energies.append(kin)
-
-                # Temperature
-                dof = self.system.getNumParticles() * 3 - self.system.getNumConstraints()
-                if hasattr(self.integrator, 'computeSystemTemperature'):
-                    temp = self.integrator.computeSystemTemperature().value_in_unit(unit.kelvin)
-                else:
-                    temp = (2*state.getKineticEnergy()/(dof * unit.MOLAR_GAS_CONSTANT_R)).value_in_unit(unit.kelvin) 
-
-                self.temperatures.append(temp)
-                print('Temperature:', temp, 'K')
-
-                # Total energy
-                total = pot + kin
-                self.total_energies.append(total)
-                print('Total Energy:', total, 'kJ/mol')
-                print('-' * 60)
-
-
-        end_time = time()
-        elapsed_time = end_time - start_time
-        elapsed_time_days = elapsed_time / (24 * 3600)
-        performance = (nsteps * timestep / 1e6) / elapsed_time_days
-
-        print('MD simulation completed!')
-        print(f'Number of steps: {nsteps}')
-        print(f'Trajectory saved as {traj_file}')
-        print('=' * 60)
-        print('Simulation Averages:')
-        print('=' * 60)
-        print('Total Potential Energy:', np.mean(self.total_potentials), '±', np.std(self.total_potentials), 'kJ/mol')
-        print('Kinetic Energy:', np.mean(self.kinetic_energies), '±', np.std(self.kinetic_energies), 'kJ/mol')
-        print('Temperature:', np.mean(self.temperatures), '±', np.std(self.temperatures), 'K')
-        print('Total Energy:', np.mean(self.total_energies), '±', np.std(self.total_energies), 'kJ/mol')
-        print('=' * 60)
-        print(f'Elapsed time: {int(elapsed_time // 60)} minutes, {int(elapsed_time % 60)} seconds')
-        print(f'Performance: {performance:.2f} ns/day')
-        print(f'Trajectory saved as {traj_file}')
-
-        # Save the state of the simulation
-        self.simulation.saveState(state_file)
-        print(f'Simulation state saved as {state_file}')
-
-        if save_last_frame:
-            # Save the last frame of the trajectory as last_frame.pdb
-            with open('last_frame.pdb', 'w') as f:
-                app.PDBFile.writeFile(self.simulation.topology, self.simulation.context.getState(getPositions=True).getPositions(), f)
-            print('Last frame saved as last_frame.pdb')
-
-        # Write the output to a file
-        self._save_output(output_file)
-        self.ostream.print_info(f'Simulation output saved as {output_file}')
-        self.ostream.flush()
+        point_index = {
+            "family_label": index_payload["family_label"],
+            "core_label": index_payload["core_label"],
+            "cluster_state_labels": {
+                int(cid): {int(sid): lbl for sid, lbl in smap.items()}
+                for cid, smap in index_payload["cluster_state_labels"].items()
+            },
+        }
+        return cluster_info, angle_library, point_index
 
     def run_immm(self, 
                  im_driver,
                  interpolation_settings,
+                 system_information,
                  roots_to_follow=[0],
                  restart_file = None, 
                  ensemble='NVE', 
@@ -1232,13 +1053,14 @@ class OpenMMIMDynamics:
         """
         if self.system is None:
             raise RuntimeError('System has not been created!')
-
+        if any(roots_to_follow) > 0:
+            raise RuntimeError('Currently Interpolation is restricted to ground state dynamics!')
         self.ensemble = ensemble
         self.temperature = temperature * unit.kelvin
         self.friction = friction / unit.picosecond
         self.timestep = timestep * unit.femtoseconds
         self.nsteps = nsteps
-
+    
         self.im_driver = im_driver
       
         if isinstance(self.im_driver, InterpolationDriver):
@@ -1254,55 +1076,48 @@ class OpenMMIMDynamics:
             self.qm_data_point_dict = {root: [] for root in self.roots_to_follow}
             self.sorted_state_spec_im_labels = {root: [] for root in self.roots_to_follow}
             self.root_spec_molecules = {root: [] for root in self.roots_to_follow}
-            self.interpolation_settings_dict = interpolation_settings_dict
+            self.impes_drivers = {root: None for root in self.roots_to_follow}
+            self.interpolation_settings = interpolation_settings_dict
+            masses = self.molecule.get_masses().copy()
+        
+            masses_cart = np.repeat(masses, 3)
+            inv_sqrt_masses = 1.0 / np.sqrt(masses_cart)
+            self.inv_sqrt_masses = inv_sqrt_masses
             for root in self.roots_to_follow:
                 # Dynamically create an attribute name
                 attribute_name = f'impes_driver_{root}'
                 # Initialize the object
-                driver_object = InterpolationDriver(self.z_matrix)
-                driver_object.update_settings(interpolation_settings_dict[root])
+                driver_object = InterpolationDriver(self.roots_z_matrix[root])
+                driver_object.update_settings(self.interpolation_settings[root])
+
+                # print('Interpolation driver settings updated for root', root, self.eq_bond_force_constants)
+
+                driver_object.impes_coordinate.inv_sqrt_masses = inv_sqrt_masses
                 if root == 0:
-                    driver_object.symmetry_information = self.symmetry_information['gs']
+                    driver_object.symmetry_information = system_information['gs']
                 else:
                     driver_object.symmetry_information = self.symmetry_information['es']
-                driver_object.use_symmetry = self.use_symmetry
+               
+                self.impes_drivers[root] = driver_object
+                self._reload_interpolation_root_from_hdf5(root, inv_sqrt_masses)
+                self.qm_rotor_cluster_banks[root] = self._load_rotor_cluster_bank_for_root(root)
+                driver_object.qm_rotor_cluster_banks = self.qm_rotor_cluster_banks[root]
 
-                im_labels, _ = driver_object.read_labels()
-                print('beginning labels', im_labels)
-                self.qm_data_points = []
-                self.qm_energies = []
-                old_label = None
-
-                for label in im_labels:
-                    if '_symmetry' not in label:
-                        qm_data_point = InterpolationDatapoint(self.z_matrix)
-                        qm_data_point.read_hdf5(interpolation_settings_dict[root]['imforcefield_file'], label)
-
-                        self.qm_data_point_dict[root].append(qm_data_point)
-                        
-                        self.sorted_state_spec_im_labels[root].append(label)
-                        
-                        old_label = qm_data_point.point_label
-                        driver_object.qm_symmetry_data_points[old_label] = [qm_data_point]
-                        self.qm_symmetry_datapoint_dict[root][old_label] = [qm_data_point]
-
-                    else:
-                        symmetry_data_point = InterpolationDatapoint(self.z_matrix)
-                        symmetry_data_point.read_hdf5(self.interpolation_settings_dict[root]['imforcefield_file'], label)
-                        
-                        driver_object.qm_symmetry_data_points[old_label].append(symmetry_data_point)
-                        self.qm_symmetry_datapoint_dict[root][old_label].append(symmetry_data_point)
-                        
-                        # driver_object.qm_symmetry_data_points_1 = {old_label: [self.qm_data_point_dict[root][2], self.qm_data_point_dict[root][4]]}
-                        # driver_object.qm_symmetry_data_points_2 = {old_label: [self.qm_data_point_dict[root][3], self.qm_data_point_dict[root][5]]}         
+                if driver_object.qm_rotor_cluster_banks:
+                    first_family = next(iter(driver_object.qm_rotor_cluster_banks.values()))
+                    driver_object.rotor_cluster_information = first_family.get("cluster_info")
+                else:
+                    driver_object.rotor_cluster_information = None
+                print('In set up', driver_object.rotor_cluster_information)
                 # Set the object as an attribute of the instance
                 setattr(self, attribute_name, driver_object)
                 # Append the object to the list
-                self.im_drivers[root] = driver_object
-            self.current_state = self.roots_to_follow[0]
+                self.impes_drivers[root] = driver_object
+                self.current_state = self.roots_to_follow[0]
         else:
             raise ValueError('Invalid QM driver. Please use a valid VeloxChem driver.')
 
+        runtime_cache = self._build_run_qmmm_runtime_cache()
         self.qm_potentials = []
         self.qm_mm_interaction_energies = []
         self.mm_potentials = []
@@ -1365,58 +1180,82 @@ class OpenMMIMDynamics:
         self.step = 0
         for step in range(nsteps):
 
-            self.update_forces(self.simulation.context)
+            if self._mpi_is_active() and self.mpi_root_worker_mode and self._mpi_is_root():
+                qm_positions_nm = np.array([
+                    p.value_in_unit(unit.nanometer)
+                    for p in self.simulation.context.getState(getPositions=True).getPositions()
+                ])[self.qm_atoms]
 
+                sync_roots = sorted(self._mpi_pending_sync_roots)
+                self._mpi_pending_sync_roots.clear()
+
+                if self.mpi_reload_from_hdf5 and len(sync_roots) > 0:
+                    for root_sync in sync_roots:
+                        self._reload_interpolation_root_from_hdf5(root_sync, self.inv_sqrt_masses)
+
+                self._mpi_bcast_control({
+                    'cmd': self._MPI_CMD_STEP,
+                    'step_idx': int(step),
+                    'qm_positions_nm': np.asarray(qm_positions_nm, dtype=np.float64),
+                    'sync_roots': sync_roots,
+                })
+
+            self.update_forces(self.simulation.context)
+            observables = self._collect_step_observables_optimized(
+                    self.simulation.context,
+                    runtime_cache)
+
+            self._print_run_qmmm_step(step, timestep, observables, save_freq)
             # Potential energies
             # QM region
-            qm = self.get_qm_potential_energy()
-            self.qm_potentials.append(qm)
+            # qm = self.get_qm_potential_energy()
+            # self.qm_potentials.append(qm)
 
-            # QM/MM interactions
-            qm_mm = self.simulation.context.getState(getEnergy=True, groups={1,2}).getPotentialEnergy()
-            self.qm_mm_interaction_energies.append(qm_mm.value_in_unit(unit.kilojoules_per_mole))
+            # # QM/MM interactions
+            # qm_mm = self.simulation.context.getState(getEnergy=True, groups={1,2}).getPotentialEnergy()
+            # self.qm_mm_interaction_energies.append(qm_mm.value_in_unit(unit.kilojoules_per_mole))
 
-            # MM region 
-            mm = self.simulation.context.getState(getEnergy=True, groups={3,4,5,6,7}).getPotentialEnergy()
-            self.mm_potentials.append(mm.value_in_unit(unit.kilojoules_per_mole))
+            # # MM region 
+            # mm = self.simulation.context.getState(getEnergy=True, groups={3,4,5,6,7}).getPotentialEnergy()
+            # self.mm_potentials.append(mm.value_in_unit(unit.kilojoules_per_mole))
 
-            # Total potential energy
-            pot = qm * unit.kilojoules_per_mole + qm_mm + mm
-            self.total_potentials.append(pot.value_in_unit(unit.kilojoules_per_mole))
+            # # Total potential energy
+            # pot = qm * unit.kilojoules_per_mole + qm_mm + mm
+            # self.total_potentials.append(pot.value_in_unit(unit.kilojoules_per_mole))
 
-            # Kinetic energyex
+            # # Kinetic energyex
             
-            kinetic = self.simulation.context.getState(getEnergy=True).getKineticEnergy()
-            self.kinetic_energies.append(kinetic.value_in_unit(unit.kilojoules_per_mole))
+            # kinetic = self.simulation.context.getState(getEnergy=True).getKineticEnergy()
+            # self.kinetic_energies.append(kinetic.value_in_unit(unit.kilojoules_per_mole))
 
-            # Temperature
-            dof = self.system.getNumParticles() * 3 - self.system.getNumConstraints()
-            if hasattr(self.integrator, 'computeSystemTemperature'):
-                temp = self.integrator.computeSystemTemperature().value_in_unit(unit.kelvin)
-            else:
-                temp = (2 * kinetic / (dof * unit.MOLAR_GAS_CONSTANT_R)).value_in_unit(unit.kelvin)
-            self.temperatures.append(temp)
+            # # Temperature
+            # dof = self.system.getNumParticles() * 3 - self.system.getNumConstraints()
+            # if hasattr(self.integrator, 'computeSystemTemperature'):
+            #     temp = self.integrator.computeSystemTemperature().value_in_unit(unit.kelvin)
+            # else:
+            #     temp = (2 * kinetic / (dof * unit.MOLAR_GAS_CONSTANT_R)).value_in_unit(unit.kelvin)
+            # self.temperatures.append(temp)
 
-            # Total energy
-            total = pot + kinetic
-            self.total_energies.append(total.value_in_unit(unit.kilojoules_per_mole))
+            # # Total energy
+            # total = pot + kinetic
+            # self.total_energies.append(total.value_in_unit(unit.kilojoules_per_mole))
 
 
-            # Information output
-            if step % save_freq == 0:
+            # # Information output
+            # if step % save_freq == 0:
                 
-                print(f"Step: {step} / {nsteps} Time: {round((step * timestep) / 1000, 2)} ps")
-                print('Potential Energy QM region:', qm, 'kJ/mol')
-                print('Potential Energy MM region:', mm)
-                print('QM/MM Interaction Energy:', qm_mm)
-                print('Total Potential Energy:', pot)
-                print('Kinetic Energy:', kinetic)
-                print('Temperature:', temp, 'K')
-                print('Total Energy:', total)
-                print('Current State (PES):', self.current_state)  
-                print('-' * 60)   
+            #     print(f"Step: {step} / {nsteps} Time: {round((step * timestep) / 1000, 2)} ps")
+            #     print('Potential Energy QM region:', qm, 'kJ/mol')
+            #     print('Potential Energy MM region:', mm)
+            #     print('QM/MM Interaction Energy:', qm_mm)
+            #     print('Total Potential Energy:', pot)
+            #     print('Kinetic Energy:', kinetic)
+            #     print('Temperature:', temp, 'K')
+            #     print('Total Energy:', total)
+            #     print('Current State (PES):', self.current_state)  
+            #     print('-' * 60)   
 
-                self.dynamic_molecules.append(self.current_molecule)    
+            #     self.dynamic_molecules.append(self.current_molecule)    
 
             self.simulation.step(1)
             self.step += 1
@@ -1451,317 +1290,103 @@ class OpenMMIMDynamics:
         print(f'Simulation state saved as {state_file}')
 
         # Write the output to a file
-        self.confirm_database_quality(self.ab_init_drivers, self.molecule, self.interpolation_settings_dict, self.basis_set_label, self.root_spec_molecules, dihedrals_dict=self.dihedrals_dict)
         self._save_output(output_file)
         self.ostream.print_info(f'Simulation report saved as {output_file}.out')
         self.ostream.flush()
 
+    def _collect_step_observables_optimized(self, context, runtime_cache):
+        """
+        Optimized observable collection avoiding repeated Quantity arithmetic.
+        """
+
+        energy_unit = runtime_cache['energy_unit']
+
+        qm = float(self.current_energy)
+        qm_mm = context.getState(
+            getEnergy=True,
+            groups=runtime_cache['qm_mm_groups']).getPotentialEnergy().value_in_unit(energy_unit)
+        mm = context.getState(
+            getEnergy=True,
+            groups=runtime_cache['mm_groups']).getPotentialEnergy().value_in_unit(energy_unit)
+        kinetic = context.getState(getEnergy=True).getKineticEnergy().value_in_unit(energy_unit)
+
+        meta_bias = 0.0
+        if runtime_cache['metadynamics_enabled']:
+            group = runtime_cache['metadynamics_group']
+            meta_bias_q = context.getState(getEnergy=True, groups=group).getPotentialEnergy()
+            meta_bias = meta_bias_q.value_in_unit(energy_unit)
+
+        potential = qm + qm_mm + mm + meta_bias
+
+        if runtime_cache['has_temp_method']:
+            temperature = self.integrator.computeSystemTemperature().value_in_unit(unit.kelvin)
+        else:
+            temperature = (2.0 * kinetic) / (runtime_cache['dof'] * runtime_cache['gas_constant'])
+
+        total = potential + kinetic
+
+        return {
+            'qm': qm,
+            'qm_mm': qm_mm,
+            'mm': mm,
+            'metad_bias':float(meta_bias),
+            'potential': potential,
+            'kinetic': kinetic,
+            'temperature': float(temperature),
+            'total': total,
+        }
+
+    def _append_step_observables(self, observables):
+        """
+        Appends per-step observables to trajectory history.
+        """
+
+        self.qm_potentials.append(observables['qm'])
+        self.qm_mm_interaction_energies.append(observables['qm_mm'])
+        self.mm_potentials.append(observables['mm'])
+        self.total_potentials.append(observables['potential'])
+        self.kinetic_energies.append(observables['kinetic'])
+        self.temperatures.append(observables['temperature'])
+        self.total_energies.append(observables['total'])
     
-    def confirm_database_quality(self, ab_init_drivers, molecule, states_interpolation_settings, basis_set_label, given_molecular_strucutres, nsamples=10, dihedrals_dict=None):
-        """Validates the quality of an interpolation database for a given molecule.
-
-       This function assesses the quality of the provided interpolation database 
-       comparing the interpolated energy with a QM-reference energy.
-
-       :param molecule:
-           A VeloxChem molecule object representing the reference molecular system.
-
-       :param im_database_file:
-           Interpolation database file.
-
-       :param given_molecular_strucutres:
-           An optional list of additional molecular structures that will be used for the validation.
-
-       :returns:
-           List of QM-energies, IM-energies.
+    def _print_run_qmmm_step(self, step, timestep, observables, save_freq):
+        """
+        Prints per-step simulation diagnostics.
         """
 
-        for root in self.roots_to_follow:
-            database_quality = False
-            drivers = None
-            if root == 0:
-                drivers = ab_init_drivers['ground_state']
-            else:
-                drivers = ab_init_drivers['excited_state']
-            all_structures = given_molecular_strucutres[root]
-            current_datafile = states_interpolation_settings[root]['imforcefield_file']
-            datapoint_molecules, _ = self.database_extracter(current_datafile, molecule.get_labels())
-            
-            if len(all_structures) == 0:
-                continue
-
-            while database_quality is False:
-                rmsd = -np.inf
-                random_structure_choices = None
-                counter = 0
-                # if given_molecular_strucutres is not None:
-                #     random_structure_choices = given_molecular_strucutres
-                dist_ok = False
-                while dist_ok == False and counter <= 20:
-                    print('Dihedrals dict is given here', dihedrals_dict)
-                    if dihedrals_dict is not None:
-                        selected_molecules = []
-                        for entries in dihedrals_dict:
-                            specific_dihedral = entries[0]
-                            state = entries[2]
-                            if state != root:
-                                continue
-                            desired_angles = np.linspace(0, 360, 36)
-                            angles_mols = {int(angle):[] for angle in desired_angles}
-
-                            keys = list(angles_mols.keys())
-
-                            for mol in all_structures:  
-                                mol_angle = (mol.get_dihedral_in_degrees(specific_dihedral) + 360) % 360
-                                
-                                
-                                for i in range(len(desired_angles) - 1):
-                                    
-                                    if keys[i] <= mol_angle < keys[i + 1]:
-                                        angles_mols[keys[i]].append(mol)
-                                        break
-                        
-                            # List to hold selected molecules
-                            
-                            total_molecules = sum(len(mols) for mols in angles_mols.values())
-
-                            # Adaptive selection based on bin sizes
-                
-                            for angle_bin, molecules_in_bin in angles_mols.items():
-                                num_mols_in_bin = len(molecules_in_bin)
-
-                                if num_mols_in_bin == 0:
-                                    continue  # Skip empty bins
-
-                                # If 2 or fewer molecules, take all
-                                elif num_mols_in_bin <= 2:
-                                    selected_molecules.extend(molecules_in_bin)
-
-                                else:
-                                    # Calculate proportional number of molecules to select
-                                    proportion = num_mols_in_bin / total_molecules
-                                    num_to_select = max(1, math.ceil(proportion * nsamples))
-
-                                    # Randomly select the proportional number
-                                    selected_mols = random.sample(molecules_in_bin, min(num_to_select, num_mols_in_bin))
-                                    selected_molecules.extend(selected_mols)
-                    else:
-                        selected_molecules = random.sample(all_structures, min(nsamples, len(all_structures)))
-                          
-                    individual_distances = []
-                    random_structure_choices = selected_molecules
-                    for datapoint_molecule in datapoint_molecules:
-                        for random_struc in random_structure_choices:
-                            
-                            distance_norm = self.calculate_distance_to_ref(random_struc.get_coordinates_in_bohr(), datapoint_molecule.get_coordinates_in_bohr())
-                            individual_distances.append(distance_norm / np.sqrt(len(molecule.get_labels())) * bohr_in_angstrom())
-                    
-                    rmsd = min(individual_distances)
-                    counter += 1
-                    if rmsd >= 0.1:
-                        print(f'The overall RMSD is {rmsd} -> The current structures are well seperated from the database conformations! loop is discontinued')
-                        dist_ok = True
-                    else:
-                        print(f'The overall RMSD is {rmsd} -> The current structures are not all well seperated from the database conformations! loop is continued')        
-                
-                # if self.roots_to_follow[0] == 0 and energy is None:
-                #     energy, scf_results = self.compute_energy(self.drivers['ground_state'][0], optimized_molecule, current_basis)
-                # elif self.roots_to_follow[0] > 0 and energy is None:
-                #     energy, scf_results = self.compute_energy(self.drivers['excited_state'][0], optimized_molecule, current_basis)
-                impes_driver = InterpolationDriver(self.z_matrix)
-                impes_driver.update_settings(states_interpolation_settings[root])
-                if root == 0:
-                    impes_driver.symmetry_information = self.symmetry_information['gs']
-                else:
-                    impes_driver.symmetry_information = self.symmetry_information['es']
-                
-                old_label = None
-                im_labels, _ = impes_driver.read_labels()
-                impes_driver.qm_data_points = []
-                for label in im_labels:
-                    if '_symmetry' not in label:
-                        qm_data_point = InterpolationDatapoint(self.z_matrix)
-                        qm_data_point.read_hdf5(current_datafile, label)
-                        
-                        old_label = qm_data_point.point_label
-                        impes_driver.qm_symmetry_data_points[old_label] = [qm_data_point]
-                        impes_driver.qm_data_points.append(qm_data_point)
-
-                    else:
-                        symmetry_data_point = InterpolationDatapoint(self.z_matrix)
-                        symmetry_data_point.read_hdf5(current_datafile, label)
-                        
-                        impes_driver.qm_symmetry_data_points[old_label].append(symmetry_data_point)
-
-
-                qm_energies = []
-                im_energies = []
-
-                for i, mol in enumerate(random_structure_choices):
-
-                    current_basis = MolecularBasis.read(mol, basis_set_label)
-                    impes_driver.compute(mol)
-                    reference_energy, scf_results = self.compute_energy(drivers[0], mol, current_basis)
-                    
-                    current_element = 0
-                    if root >= 1:
-                        current_element = root - 1
-                    
-                    qm_energies.append(reference_energy[current_element])
-                    im_energies.append(impes_driver.impes_coordinate.energy)
-                    
-                    print('Energies', qm_energies[-1], im_energies[-1])
-                    
-                    print(f'\n\n ########## Step {i} ######### \n')
-                    print(f'delta_E:   {abs(qm_energies[-1] - im_energies[-1]) * hartree_in_kjpermol()} kj/mol --> 	{abs(qm_energies[-1] - im_energies[-1]) * hartree_in_kjpermol() / 4,184} kcal/mol\n')
-                    if abs(qm_energies[-1] - im_energies[-1]) * hartree_in_kjpermol() > self.energy_threshold * hartree_in_kjpermol():
-                        
-                        print(mol.get_xyz_string())
-
-                        
-                    database_quality = True
-
-            
-            # self.plot_final_energies(qm_energies, im_energies)
-            self.structures_to_xyz_file(random_structure_choices, 'random_xyz_structures.xyz', im_energies, qm_energies)
+        if step % save_freq != 0:
+            return
+        self.dynamic_molecules.append(self.current_molecule)
+        print(f"Step: {step} / {self.nsteps} Time: {round((step * timestep) / 1000, 2)} ps")
+        print('Potential Energy QM region:', observables['qm'], 'kJ/mol')
+        print('Potential Energy MM region:', observables['mm'])
+        print('QM/MM Interaction Energy:', observables['qm_mm'])
+        print('Total Potential Energy:', observables['potential'])
+        print('Kinetic Energy:', observables['kinetic'])
+        print('Temperature:', observables['temperature'], 'K')
+        print('Total Energy:', observables['total'], '±', np.std(self.total_energies), 'kJ/mol')
+        if 'metad_bias' in observables:
+            print('Metadynamics Bias Energy:', observables['metad_bias'], 'kJ/mol') 
+        print('Current State (PES):', self.current_state)
+        print('-' * 60)
     
-    def compute_energy(self, qm_driver, molecule, basis=None):
-        """ Computes the QM energy using self.qm_driver.
-
-            :param molecule:
-                The molecule.
-            :param basis:
-                The basis set.
-
-            :returns the QM energy.
+    def _build_run_qmmm_runtime_cache(self):
         """
-        # Dtermine the type of energy driver, to be able to
-        # call it correctly.
-
-        qm_energy = None
-        scf_tensors = None
-
-        # XTB
-        # restricted SCF
-        if isinstance(qm_driver, ScfRestrictedDriver):
-            qm_driver.ostream.mute()
-            scf_tensors = qm_driver.compute(molecule, basis)
-            qm_energy = qm_driver.scf_energy
-            qm_energy = np.array([qm_energy])
-            qm_driver.ostream.unmute()
-        
-        if qm_energy is None:
-            error_txt = "Could not compute the QM energy. "
-            error_txt += "Please define a QM driver."
-            raise ValueError(error_txt)
-
-        return qm_energy, scf_tensors
-    # Post-simulation analysis methods
-    def plot_energy(self,
-                    components=['total'],
-                    filename='energy_plot.png'):
-        """
-        Plots the energy components of the simulation.
-
-        :param components:
-            List of energy components to plot. Default is ['total'].
-            It can include 'total', 'kinetic', 'potential', 'temperature', 'qm', 'mm', 'qm_mm'.
-        :param filename:
-            Name of the output file. Default is 'energy_plot.png'.
-        """
-        import matplotlib.pyplot as plt
-
-        fig, ax = plt.subplots(figsize=(10, 6))
-
-        # Plot also the trend of the energy components as a linear regression
-        if 'total' in components:
-            ax.plot(self.total_energies, label='Total Energy', marker='o')
-            # Linear regression excluding the first 10% of the data
-            x = np.arange(len(self.total_energies))
-            m, b = np.polyfit(x[int(0.1 * len(x)):], self.total_energies[int(0.1 * len(x)):], 1)
-            ax.plot(x, m * x + b, label=f'Total Energy Trend ({m:.4e} kJ/mol/step)', linestyle='--')
-
-        if 'kinetic' in components:
-            ax.plot(self.kinetic_energies, label='Kinetic Energy', marker='o')
-
-        if 'potential' in components:
-            ax.plot(self.total_potentials, label='Potential Energy', marker='o')
-        if 'temperature' in components:
-            ax.plot(self.temperatures, label='Temperature', marker='o')
-            ax.set_ylabel('Temperature (K)')
-        if 'qm' in components:
-            ax.plot(self.qm_potentials, label='QM Energy', marker='o')
-        if 'mm' in components:
-            ax.plot(self.mm_potentials, label='MM Energy', marker='o')
-        if 'qm_mm' in components:
-            ax.plot(self.qm_mm_interaction_energies, label='QM/MM Interaction Energy', marker='o')
-
-        ax.set_title('Energy Components of the Simulation')
-
-        ax.set_xlabel('Step')
-        ax.set_ylabel('Energy (kJ/mol)')
-        ax.legend()
-        plt.tight_layout()
-        plt.savefig(filename)
-        plt.show()
-        
-    def visualize_trajectory(self, 
-                             trajectory_file='trajectory.pdb', 
-                             interval=1):
-        """
-        Visualizes the trajectory of the simulation using py3Dmol.
-
-        :param trajectory_file:
-            Path to the PDB file containing the trajectory. Default is 'trajectory.pdb'.
-        """
-        try:
-            import py3Dmol
-
-        except ImportError:
-            raise ImportError("py3Dmol is not installed. Please install it using `pip install py3Dmol`.")
-        
-        viewer = py3Dmol.view(width=800, height=600)
-
-        viewer.addModelsAsFrames(open(trajectory_file, 'r').read(),'pdb', {'keepH': True})
-        viewer.animate({'interval': interval, 'loop': "forward", 'reps': 10})
-        viewer.setStyle({"stick":{},"sphere": {"scale":0.25}})
-        viewer.zoomTo()
-
-        viewer.show()
-    
-    # Other methods:
-    
-    def qm_minimization(self, molecule, basis, scf_drv, constraints=None):
-        """
-        Minimizes the energy using a QM driver.
-
-        :param molecule:
-            VeloxChem Molecule object.
-        :param basis:
-            Basis set for the SCF driver.
-        :param scf_drv:
-            VeloxChem SCF driver object.
-        :param constraints:
-            Constraints for the optimization. Default is None. Format example: ["set dihedral 6 1 2 3 0.0", "freeze distance 6 1", ...]
+        Builds cached constants used during the QM/MM integration loop.
         """
 
-        opt_drv = OptimizationDriver(scf_drv)
-        opt_drv.ostream.mute()
+        energy_unit = unit.kilojoules_per_mole
+        gas_constant = unit.MOLAR_GAS_CONSTANT_R.value_in_unit(energy_unit / unit.kelvin)
 
-        if constraints:
-            opt_drv.constraints(constraints)
+        return {
+            'energy_unit': energy_unit,
+            'qm_mm_groups': {1, 2},
+            'mm_groups': {3, 4, 5, 6, 7},
+            'dof': self.system.getNumParticles() * 3 - self.system.getNumConstraints(),
+            'has_temp_method': hasattr(self.integrator, 'computeSystemTemperature'),
+            'gas_constant': gas_constant,
+        }
 
-        basis = MolecularBasis.read(molecule, basis)
-
-        scf_results = scf_drv.compute(molecule, basis)
-
-        results = opt_drv.compute(molecule, basis, scf_results)
-
-        min_energy = results['opt_energies'][-1]
-        min_coords = results['opt_geometries'][-1]
-
-        return min_energy, min_coords
-    
     def add_bias_force(self, atoms, force_constant, target):
         """
         Method to add a biasing force to the system.
@@ -2898,7 +2523,7 @@ class OpenMMIMDynamics:
             with open(structure_filename, 'a') as file:
                 file.write(f"{updated_xyz_string}\n\n")
 
-    def set_up_the_system(self, molecule):
+    def set_up_the_system(self, molecule, interpolation_settings):
 
         """
         Assign the neccessary variables with respected values. 
@@ -2910,6 +2535,46 @@ class OpenMMIMDynamics:
         :param sampling_structures: devides the searchspace around given rotatbale dihedrals
             
         """
+        def _determine_cX_symmetry_groups(molecule):
+            """
+            Build symmetry groups for methyl rotors only.
+
+            Returns the same tuple shape used from AtomMapper:
+                (atom_map, symmetry_groups, rc_groups)
+            where:
+                atom_map: all atom indices
+                symmetry_groups: list of equivalent H triplets in CH3 groups
+                rc_groups: empty (not used in this CH3-only path)
+            """
+            labels = [str(x).strip().capitalize() for x in molecule.get_labels()]
+            conn = molecule.get_connectivity_matrix()
+            n_atoms = len(labels)
+
+            atom_map = list(range(n_atoms))
+            rc_groups = []
+
+            ch3_groups = []
+            seen = set()
+
+            allowed_neighbours = ["H", "F", "Cl", "Br"]
+
+            for c_idx, symbol in enumerate(labels):
+                if symbol != "C":
+                    continue
+
+                neighbors = [j for j, bonded in enumerate(conn[c_idx]) if bonded]
+                h_neighbors = [j for j in neighbors if labels[j] in allowed_neighbours]
+                heavy_neighbors = [j for j in neighbors if labels[j] not in allowed_neighbours]
+
+                # Rotor-relevant methyl carbon: C(H)3-X
+                if len(neighbors) == 4 and len(h_neighbors) == 3 and len(heavy_neighbors) == 1:
+                    group = tuple(sorted(h_neighbors))
+                    if group not in seen:
+                        seen.add(group)
+                        ch3_groups.append(list(group))
+
+            return atom_map, ch3_groups, rc_groups
+
 
         def regroup_by_rotatable_connection(molecule, groups, rotatable_bonds, conn):
             new_groups = {'gs': [], 'es': [], 'non_rotatable': []}
@@ -2921,7 +2586,6 @@ class OpenMMIMDynamics:
                 neighbors_a2 = sum(conn[a2])
                 element_a1 = labels[a1][0]
                 element_a2 = labels[a2][0]
-
                 # NH2 rule
                 if (element_a1 == 'N' and neighbors_a1 == 2) or (element_a2 == 'N' and neighbors_a2 == 2):
                     return 'gs'
@@ -2938,9 +2602,33 @@ class OpenMMIMDynamics:
                 # default → gs
                 return 'gs'
 
+            def determine_similar_groups(groups_to_process):
+                separated_groups = []
+                for group in groups_to_process:
+                    # Dictionary to group atoms by their exact neighborhood
+                    neighbor_map = {}
+                    for atom in group:
+                        # Find the indices of all atoms connected to this atom
+                        neighbors = tuple(sorted([i for i, is_bonded in enumerate(conn[atom]) if is_bonded]))
+                        neighbor_map.setdefault(neighbors, []).append(atom)
+                    
+                    # Extract the automatically separated groups
+                    for subgroup in neighbor_map.values():
+                        separated_groups.append(sorted(subgroup))
+                        
+                return separated_groups
+
+            # Apply the separation logic to fix lumped groups before iterating
+            groups = determine_similar_groups(groups)
+
+
             for group in groups:
+                if len(group) > 3:
+                    continue
+                    
                 connected_subgroups = {}  # key: (state, atom in bond), value: atoms in group connected to it
                 connected_rotatable_bonds = set()
+                
                 for atom in group:
                     for a1, a2 in rotatable_bonds:
                         state = determine_state(a1, a2)
@@ -2967,68 +2655,163 @@ class OpenMMIMDynamics:
                                 print(molecule.get_labels()[atom], sum(conn[atom]))
                             rot_groups[state].append(sorted(subgroup))
                             new_groups[state].append(sorted(subgroup))
-  
+
+
             return new_groups, rot_groups
-
-        angle_index = next((i for i, x in enumerate(self.z_matrix) if len(x) == 3), 0)
-        dihedral_index = next((i for i, x in enumerate(self.z_matrix) if len(x) == 4), 0)
-
-        self.qm_data_points = None
-        self.molecule = molecule
-
-        # atom_mapper = AtomMapper(molecule, molecule)
-        # symmetry_groups = atom_mapper.determine_symmetry_group()
-
-        if not self.use_symmetry:
-            symmetry_groups = (symmetry_groups[0], [], symmetry_groups[2])
-        ff_gen = MMForceFieldGenerator()
-        ff_gen.partial_charges = molecule.get_partial_charges(molecule.get_charge())
-        ff_gen.create_topology(molecule)
-
-        rotatable_bonds = deepcopy(ff_gen.rotatable_bonds)
-        dihedrals_dict = deepcopy(ff_gen.dihedrals)
-
-        rotatable_bonds_zero_based = [(i - 1, j - 1) for (i, j) in rotatable_bonds]
-        all_exclision = [element for rot_bond in rotatable_bonds_zero_based for element in rot_bond]
-
-        symmetry_groups_ref = [groups for groups in symmetry_groups[1] if not any(item in all_exclision for item in groups)]
-
-        regrouped, rot_groups = regroup_by_rotatable_connection(molecule, symmetry_groups_ref, rotatable_bonds_zero_based, molecule.get_connectivity_matrix())
-
         
+        def _promote_nonrotatable_ring_torsions_to_impropers(zmat, ff_gen, rotatable_bonds_zero_based):
+            """
+            Promote proper ring torsions around non-rotatable bonds to impropers.
+
+            Matching by full 4-atom set is too strict (and often fails), so we match
+            by the middle bond of the proper torsion and collect impropers touching
+            the same bond.
+            """
+            rot_set = {frozenset((int(i), int(j))) for i, j in rotatable_bonds_zero_based}
+
+            # Existing impropers from z-matrix (if any)
+            impropers = [tuple(int(x) for x in imp) for imp in zmat.get("impropers", [])]
+            impropers_seen = set(impropers)
+
+            # Build non-rotatable ring bond -> impropers map from MM impropers.
+            impropers_ff = [tuple(int(x) for x in t) for t in ff_gen.impropers.keys()]
+            bond_to_impropers = {}
+            for imp in impropers_ff:
+                center = int(imp[0])
+                for neigh in imp[1:]:
+                    neigh = int(neigh)
+                    bond = frozenset((center, neigh))
+                    if bond in rot_set:
+                        continue
+                    if not ff_gen.is_bond_in_ring(center, neigh):
+                        continue
+                    bond_to_impropers.setdefault(bond, []).append(imp)
+
+            kept_dihedrals = []
+            for dih_raw in zmat["dihedrals"]:
+                dih = tuple(int(x) for x in dih_raw)
+                mid = frozenset((dih[1], dih[2]))
+
+                # Keep proper terms for rotatable or non-ring bonds.
+                if mid in rot_set or ff_gen.is_bond_in_ring(dih[0], dih[1]) and ff_gen.is_bond_in_ring(dih[1], dih[2]) and ff_gen.is_bond_in_ring(dih[2], dih[3]):
+                    kept_dihedrals.append(dih)
+                    continue
+
+                # Non-rotatable ring bond: attach any corresponding impropers.
+                promoted = False
+                for imp in bond_to_impropers.get(mid, []):
+                    if imp not in impropers_seen:
+                        impropers.append(imp)
+                        impropers_seen.add(imp)
+                    promoted = True
+
+                # If no improper was found for this bond, keep the dihedral.
+                if not promoted:
+                    kept_dihedrals.append(dih)
+
+            zmat["dihedrals"] = kept_dihedrals
+            zmat["impropers"] = impropers
+            return zmat
+
+        # define global symmetry information object for gs and es
+        # used in all other classes for the construction
+        # 1. list of all atoms
+        # 2. all rotatable CH3 groups for ground-state
+        # 3. all groups that are assigned for rotation in the ground-state
+        # 4. all atoms that are not in the symmetry groups (CH3-groups excluded)
+        # 5. all CH3 symmetry groups
+        # 6. indices 0-based of all rotatable bonds
+        # 7. list of indices grouped for all dihedrals attached to a rotabale bond (z_matrix index)
+        # 8. actual dihedrals with the indices assigned to each atom
+        # 9. start and end of the dihedral section within the z_matrix
         self.symmetry_information = {'gs': (), 'es': ()}
-        for root in self.roots_to_follow:
-            if root == 0:
         
+        self.molecule = molecule
+        
+        for root in interpolation_settings.keys():
+            # generate the z-matrix based for the interpolation database provided
+            int_driver = InterpolationDriver()
+            int_driver.update_settings(interpolation_settings[root])
+    
+            _, z_matrix = int_driver.read_labels()
+            self.roots_z_matrix[root] = z_matrix
+
+            # The AtomMapper class is based on Turtlemap program which is used to
+            # determine equivalent atoms within a molecular structure
+            # atom_mapper = AtomMapper(molecule, molecule)
+            # symmetry_groups = atom_mapper.determine_symmetry_group()
+
+            symmetry_groups = _determine_cX_symmetry_groups(molecule)
+
+            if not self.use_symmetry:
+                symmetry_groups = (symmetry_groups[0], [], symmetry_groups[2])
+            
+            ff_gen = MMForceFieldGenerator()
+            ff_gen.ostream.mute()
+            ff_gen.partial_charges = molecule.get_partial_charges(molecule.get_charge())
+            ff_gen.create_topology(molecule)
+
+            rotatable_bonds = deepcopy(ff_gen.rotatable_bonds)
+            org_rotatable_bonds = deepcopy(ff_gen.rotatable_bonds)
+            es_rotatable_bonds = deepcopy(ff_gen.excited_states_rot_bond)
+
+            rotatable_bonds.extend(es_rotatable_bonds)
+
+            # Work in zero-based indexing (same convention as z-matrix dihedrals)
+            # and remove all symmetry-related rotatable bonds from the scan list.
+            rotatable_bonds_zero_based = [tuple(sorted((i - 1, j - 1))) for (i, j) in rotatable_bonds]
+
+            self.roots_z_matrix[root] = _promote_nonrotatable_ring_torsions_to_impropers(self.roots_z_matrix[root], ff_gen, rotatable_bonds_zero_based)
+
+            dihedral_start = len(self.roots_z_matrix[root]['bonds']) + len(self.roots_z_matrix[root]['angles'])
+            dihedral_end = dihedral_start + len(self.roots_z_matrix[root]['dihedrals'])
+
+            self.all_rotatable_bonds = rotatable_bonds_zero_based
+            all_exclision = [element for rot_bond in rotatable_bonds_zero_based for element in rot_bond]
+            
+            symmetry_groups_ref = [groups for groups in symmetry_groups[1] if not any(item in all_exclision for item in groups)]
+
+            # reduce the symmetry to only CH3 or CH2 symmetry groups for the time being
+            regrouped, rot_groups = regroup_by_rotatable_connection(molecule, symmetry_groups_ref, rotatable_bonds_zero_based, molecule.get_connectivity_matrix())
+            dih_list = []
+            if root == 0 or root == 1 and self.drivers['es'] is not None and self.drivers['es'][0].spin_flip:
+            
                 non_core_atoms = [element for group in regrouped['gs'] for element in group]
                 core_atoms = [element for element in symmetry_groups[0] if element not in non_core_atoms]
-                angles_to_set, _, _, self.symmetry_dihedral_lists = self.adjust_symmetry_dihedrals(molecule, rot_groups['gs'], rotatable_bonds_zero_based)
+                angles_to_set, _, _, self.symmetry_dihedral_lists, dih_list = self._adjust_symmetry_dihedrals(molecule, rot_groups['gs'], rotatable_bonds_zero_based, self.roots_z_matrix[root])
                 dihedrals_to_set = {key: [] for key in angles_to_set.keys()}
                 indices_list = []
                 for key, dihedral_list in self.symmetry_dihedral_lists.items():
                 
-                    for i, element in enumerate(self.z_matrix[dihedral_index:], start=dihedral_index):
-
+                    for i, element in enumerate(self.roots_z_matrix[root]['dihedrals']):
                         if tuple(sorted(element)) in dihedral_list:
                             indices_list.append(i)
-
-                self.symmetry_information['gs'] = (symmetry_groups[0], rot_groups['gs'], regrouped['gs'], core_atoms, non_core_atoms, rotatable_bonds_zero_based, indices_list, self.symmetry_dihedral_lists, dihedrals_to_set, [angle_index, dihedral_index])
-
-
-            if root == 1:
+                self.symmetry_information['gs'] = [symmetry_groups[0], rot_groups['gs'], regrouped['gs'], core_atoms, non_core_atoms, rotatable_bonds_zero_based, indices_list, self.symmetry_dihedral_lists, dihedrals_to_set, [dihedral_start, dihedral_end]]
+            if root == 1 and self.drivers['es'] is not None and self.drivers['es'][0].spin_flip is False:
+                non_core_atoms = [element for group in regrouped['gs'] for element in group]
+                core_atoms = [element for element in symmetry_groups[0] if element not in non_core_atoms]
+                angles_to_set, _, _, self.symmetry_dihedral_lists, dih_list = self._adjust_symmetry_dihedrals(molecule, rot_groups['gs'], rotatable_bonds_zero_based,  self.roots_z_matrix[root])
+                dihedrals_to_set = {key: [] for key in angles_to_set.keys()}
+                indices_list = []
+                for key, dihedral_list in self.symmetry_dihedral_lists.items():
+                
+                    for i, element in enumerate(self.roots_z_matrix[root]['dihedrals']):
+                        if tuple(sorted(element)) in dihedral_list:
+                            indices_list.append(i)
+                self.symmetry_information['es'] = [symmetry_groups[0], rot_groups['es'], regrouped['es'], core_atoms, non_core_atoms, rotatable_bonds_zero_based, indices_list, self.symmetry_dihedral_lists, dihedrals_to_set, [dihedral_start, dihedral_end]]
+            if root >= 2 and len(self.symmetry_information['es']) == 0 and self.drivers['es']:
                 non_core_atoms = [element for group in regrouped['es'] for element in group]
                 core_atoms = [element for element in symmetry_groups[0] if element not in non_core_atoms]
-                angles_to_set, _, _, self.symmetry_dihedral_lists = self.adjust_symmetry_dihedrals(molecule, rot_groups['es'], rotatable_bonds_zero_based)
+                print(rot_groups['es'], rotatable_bonds_zero_based)
+                angles_to_set, _, _, self.symmetry_dihedral_lists, dih_list = self._adjust_symmetry_dihedrals(molecule, rot_groups['es'], rotatable_bonds_zero_based,  self.roots_z_matrix[root])
                 dihedrals_to_set = {key: [] for key in angles_to_set.keys()}
                 indices_list = []
                 for key, dihedral_list in self.symmetry_dihedral_lists.items():
                 
-                    for i, element in enumerate(self.z_matrix[dihedral_index:], start=dihedral_index):
-
+                    for i, element in enumerate(self.roots_z_matrix[root]['dihedrals']):
                         if tuple(sorted(element)) in dihedral_list:
                             indices_list.append(i)
-
-                self.symmetry_information['es'] = (symmetry_groups[0], rot_groups['es'], regrouped['es'], core_atoms, non_core_atoms, rotatable_bonds_zero_based, indices_list, self.symmetry_dihedral_lists, dihedrals_to_set, [angle_index, dihedral_index])
+                self.symmetry_information['es'] = [symmetry_groups[0], rot_groups['es'], regrouped['es'], core_atoms, non_core_atoms, rotatable_bonds_zero_based, indices_list, self.symmetry_dihedral_lists, dihedrals_to_set, [dihedral_start, dihedral_end]]
 
 
     def define_z_matrix(self, molecule):

@@ -1434,7 +1434,6 @@ class IMForceFieldGenerator:
             self.sampling_states_interpolation_settings[self.roots_to_follow[0]]['imforcefield_file'] = self.sampling_imforcefieldfiles[self.roots_to_follow[0]]
 
 
-
             self.dynamics_settings = {  'drivers':self.drivers,
                                         'basis_set_label': states_basis,
                                         'duration':self.duration, 'temperature':self.temperature, 'solvent':self.solvent,
@@ -1633,7 +1632,7 @@ class IMForceFieldGenerator:
                         current_basis = MolecularBasis.read(optimized_molecule, states_basis['gs'])
                         molecules_to_add_info.append((optimized_molecule, current_basis, self.roots_to_follow, self.use_minimized_structures[1]))
 
-                        print(optimized_molecule.get_xyz_string())
+                        print('Optimized Molecule', optimized_molecule.get_xyz_string())
                     
                     elif  self.roots_to_follow[0] == 0 and isinstance(self.drivers['gs'][0], XtbDriver):
 
