@@ -103,8 +103,7 @@ try:
 except ImportError:
     pass
 
-from .trust_radius_grouping_analysis import (improved_group_by_connected_components, 
-    explain_grouping_result_for_non_experts,
+from .trust_radius_grouping_analysis import (improved_group_by_connected_components,
     TrustRadiusOptimizationAnalyzer,
     summarize_report_for_console)
 
@@ -362,6 +361,7 @@ class IMDatabasePointCollecter:
         self.qm_sampling_rotor_cluster_banks = None
         # rotor_id -> RotorDefinition mapping for currently analyzed symmetry rotors
         self.symmetry_rotors = None
+        self.rotor_corr_threshold = None
         self.cluster_run = None
         
 
@@ -3816,7 +3816,7 @@ class IMDatabasePointCollecter:
                 self.prev_dens_of_points[self.current_state] = self.density_around_data_point[0][self.current_state]        
                 trust_radius = None
                 sym_dict = self.non_core_symmetry_groups['gs']
-                if self.current_state > 0 or root == 1 and self.drivers['es'] is not None and self.drivers['es'][0].spin_flip:
+                if self.current_state > 0:
                     sym_dict = self.non_core_symmetry_groups['es']
                  
                 for run_through in range(1):
@@ -3839,17 +3839,7 @@ class IMDatabasePointCollecter:
                                                                 sym_dict,
                                                                 self.root_z_matrix[self.current_state],
                                                                 exponent_p_q = (self.impes_drivers[self.current_state].exponent_p, self.impes_drivers[self.current_state].exponent_q))
-                    
-                    
-                    elif self.use_opt_confidence_radius[1] == 'bayes':
-                        trust_radius = self.determine_beysian_trust_radius(self.allowed_molecules[self.current_state]['molecules'], 
-                                                                        self.allowed_molecules[self.current_state]['qm_energies'], 
-                                                                        self.qm_data_point_dict[self.current_state], 
-                                                                        self.interpolation_settings[self.current_state], 
-                                                                        self.qm_symmetry_datapoint_dict[self.current_state],
-                                                                        sym_dict)
                         
-      
                     for idx, trust_radius in enumerate(trust_radius):
                         print(self.sorted_state_spec_im_labels[self.current_state][idx])
                         self.qm_data_point_dict[self.current_state][idx].update_confidence_radius(self.interpolation_settings[self.current_state]['imforcefield_file'], self.sorted_state_spec_im_labels[self.current_state][idx], trust_radius)
@@ -4624,7 +4614,7 @@ class IMDatabasePointCollecter:
                             coupling_map[a.rotor_id, b.rotor_id] = rotor_coupling
                             coupling_map[b.rotor_id, a.rotor_id] = rotor_coupling
 
-                    clusters = build_rotor_clusters(self.symmetry_rotors, coupling_map, threshold=0.04)
+                    clusters = build_rotor_clusters(self.symmetry_rotors, coupling_map, self.rotor_corr_threshold)
 
                     rotor_to_cluster_inf[state_key] = build_rotor_cluster_information(
                         self.symmetry_rotors,

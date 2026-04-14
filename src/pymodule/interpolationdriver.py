@@ -249,8 +249,11 @@ class InterpolationDriver():
             for key, val in self._input_keywords['im_settings'].items()
         }
 
-
         parse_input(self, im_keywords, impes_dict)
+
+                
+        if self.interpolation_type == 'simple':
+            AssertionError("simple interpolation scheme is not supported as it is considered worse then shepard interpolation.")
 
         if self.interpolation_type == 'shepard' and self.exponent_q is None:
             self.exponent_q = self.exponent_p / 2.0
@@ -2055,11 +2058,6 @@ class InterpolationDriver():
     
     def calculate_translation_coordinates(self, given_coordinates, weights=None):
         """Center the molecule by translating its geometric center to (0, 0, 0)."""
-        
-        if weights is not None:
-            w = np.asarray(w, dtype=float)
-            W = np.sum(w)
-            return given_coordinates - np.sum(given_coordinates * w[:, None], axis=0) / W
 
         center = np.mean(given_coordinates, axis=0)
         translated_coordinates = given_coordinates - center

@@ -47,13 +47,11 @@ from copy import deepcopy
 from .veloxchemlib import mpi_master
 from .veloxchemlib import hartree_in_kjpermol, bohr_in_angstrom
 from .molecule import Molecule
-from .molecularbasis import MolecularBasis
 from .outputstream import OutputStream
 from .mmforcefieldgenerator import MMForceFieldGenerator
 from .solvationbuilder import SolvationBuilder
-from .optimizationdriver import OptimizationDriver
+
 from .interpolationdatapoint import InterpolationDatapoint
-from .scfrestdriver import ScfRestrictedDriver
 from .interpolationdriver import InterpolationDriver
 
 from .rotorclass import (
@@ -66,7 +64,6 @@ from .rotorclass import (
 
 # from .atommapper import AtomMapper
 from .errorhandler import assert_msg_critical
-from .mofutils import svd_superimpose
 from contextlib import redirect_stderr
 from io import StringIO
 

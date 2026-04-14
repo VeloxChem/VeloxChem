@@ -237,6 +237,7 @@ class IMForceFieldGenerator:
         self.int_coord_bond_information = None
         self.symmetry_information = None
         self.symmetry_rotors = None
+        self.rotor_corr_threshold = 0.01
         self.symmetry_dihedral_lists = {}
         self.all_rotatable_bonds = None
 
@@ -384,12 +385,12 @@ class IMForceFieldGenerator:
 
         
         # set boolean for the optimization features of the metho
-        self.use_minimized_structures = [True, [], []], # to use minimum structures, specific constraints, root of the constraints
+        self.use_minimized_structures = [True, [], []] # to use minimum structures, specific constraints, root of the constraints
         self.add_conformal_structures = True # Add all conformal structures which are being generated for the input molecule
         self.use_symmetry = False # symmetry is considerd only for CH3 rotors for now
         self.cluster_run = False # use the cluster formulation in order to allow individual symmetry groups to be independent --> drastic point reduction
         self.identfy_relevant_int_coordinates = True # This constraint-optimizes new datapoints during construction run to presever optimal smoothness
-        self.use_opt_confidence_radius = [False, 'mutli_grad', 0.5, 0.3] # optimize the set of Trust radii of each datapoint given a set of references (energy, gradient))
+        self.use_opt_confidence_radius = [False, 'multi_grad', 0.5, 0.3] # optimize the set of Trust radii of each datapoint given a set of references (energy, gradient))
         self.exclude_non_core = False # use only core atoms (H exclusion) for the interpolation (seemed to be less stable)
 
         self.imp_int_coordinates = []
@@ -1744,6 +1745,7 @@ class IMForceFieldGenerator:
                         im_database_driver.use_symmetry = self.use_symmetry
                         im_database_driver.cluster_run = self.cluster_run
                         im_database_driver.symmetry_rotors = self.symmetry_rotors
+                        im_database_driver.rotor_corr_threshold = self.rotor_corr_threshold
 
                         im_database_driver.use_opt_confidence_radius = self.use_opt_confidence_radius
                         
@@ -1753,23 +1755,22 @@ class IMForceFieldGenerator:
                         if self.bias_force_reaction_prop is not None:
                             im_database_driver.bias_force_reaction_idx = self.bias_force_reaction_idx
                             im_database_driver.bias_force_reaction_prop = self.bias_force_reaction_prop
-                        desired_density = False
-                        current_structure_density = {}
                         
-                        desiered_point_density = int(self.dynamics_settings['desired_datapoint_density'])
+
                         density_of_datapoints = self.determine_datapoint_density(self.states_data_point_density, self.states_interpolation_settings)
                         self.density_of_datapoints = density_of_datapoints
                         print('density of points', self.states_data_point_density)
-                        for root in density_of_datapoints.keys():
+                        desired_point_density = int(self.dynamics_settings['desired_datapoint_density'])
+                        reached_target_density = False
+                        current_structure_density = {}
 
-                            current_structure_density[root] = density_of_datapoints[root][key][current_dihedral_angle]
-                            if density_of_datapoints[root][key][current_dihedral_angle] >= desiered_point_density:
-                                desiered_point_density = True
-                                print('database is already converged for state:', root)
-                                continue
-                        
-        
-                        if desired_density is False:
+                        for root in density_of_datapoints.keys():
+                            value = density_of_datapoints[root][key][current_dihedral_angle]
+                            current_structure_density[root] = value
+                            if value >= desired_point_density:
+                                reached_target_density = True
+
+                        if not reached_target_density:
                             im_database_driver.density_around_data_point = [current_structure_density, key, state, current_dihedral_angle]
                             if key is None:
                                 im_database_driver.allowed_molecule_deviation = self.allowed_deviation
@@ -1785,7 +1786,7 @@ class IMForceFieldGenerator:
                                 "current_structure_density": current_structure_density,
                             })
 
-                            stats = im_database_driver.run_qmmm(
+                            im_database_driver.run_qmmm(
                                 test_hooks={
                                     "run_start": _bridge("run_start"),
                                     "step": _bridge("step"),
@@ -1801,7 +1802,6 @@ class IMForceFieldGenerator:
                                 "state": int(state),
                                 "dihedral_key": key,
                                 "structure_index": int(i),
-                                "qmmm_stats": stats,
                             })
 
                             # individual impes run objects
@@ -1816,8 +1816,6 @@ class IMForceFieldGenerator:
 
                         self._confirm_database_quality(molecule, basis=states_basis, im_settings=self.states_interpolation_settings, given_molecular_strucutres=self.state_specific_molecules)
 
-            
-            desiered_point_density = int(self.dynamics_settings['desired_datapoint_density'])
             density_of_datapoints = self.determine_datapoint_density(self.states_data_point_density, self.states_interpolation_settings)
             self.states_data_point_density = density_of_datapoints
             
@@ -3243,7 +3241,7 @@ class IMForceFieldGenerator:
                             coupling_map[a.rotor_id, b.rotor_id] = rotor_coupling
                             coupling_map[b.rotor_id, a.rotor_id] = rotor_coupling
 
-                    clusters = build_rotor_clusters(self.symmetry_rotors, coupling_map, threshold=0.01)
+                    clusters = build_rotor_clusters(self.symmetry_rotors, coupling_map, self.rotor_corr_threshold)
 
                     rotor_to_cluster_inf[state_key] = build_rotor_cluster_information(
                         self.symmetry_rotors,
