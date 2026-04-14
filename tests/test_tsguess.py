@@ -179,7 +179,7 @@ class TestTransitionStateGuesser:
         max_angle_rms = 10
         max_angle_max = 20
 
-        assert results['max_mm_lambda'] == 0.6
+        assert results['max_mm_lambda'] == 0.55
         assert results['max_qm_lambda'] == 0.45
 
         for icrmsd in [mm_icrmsd, qm_icrmsd]:

@@ -388,7 +388,6 @@ class TransitionStateGuesser():
                         discont_indices = self._check_discontinuities(E1, E2)
 
         except Exception as e:
-
             err_str = f"The MM scan crashed. Saving results in self.results and raising exception"
             self.ostream.print_warning(err_str)
             self.ostream.flush()

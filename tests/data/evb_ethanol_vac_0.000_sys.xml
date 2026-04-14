@@ -1,9 +1,9 @@
 <?xml version="1.0" ?>
-<System openmmVersion="8.2" type="System" version="1">
+<System openmmVersion="8.4" type="System" version="1">
 	<PeriodicBoxVectors>
-		<A x="3.324873611207033" y="0" z="0"/>
-		<B x="0" y="3.2979210539515185" z="0"/>
-		<C x="0" y="0" z="3.3023162413101783"/>
+		<A x="3.2627823343769458" y="0" z="0"/>
+		<B x="0" y="3.3212556230929335" z="0"/>
+		<C x="0" y="0" z="3.2988925383360916"/>
 	</PeriodicBoxVectors>
 	<Particles>
 		<Particle mass="12.01078"/>

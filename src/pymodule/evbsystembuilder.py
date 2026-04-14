@@ -128,7 +128,6 @@ class EvbSystemBuilder():
         # self.bonded_integration: bool = True  # If the integration potential should use bonded (harmonic/morse) forces for forming/breaking bonds, instead of replacing them with nonbonded potentials
         self.bonded_integration_bond_fac: float = 0.2  # Scaling factor for the bonded integration forces.
         self.bonded_integration_angle_fac: float = 0.1  # Scaling factor for the bonded integration forces.
-        self.angle_lambda_switch: float = 0
         self.torsion_lambda_switch: float = 0.25  # The minimum (1-maximum) lambda value at which to start turning on (have turned of) the proper torsion for the product (reactant)
 
         self.int_nb_const_exceptions = True  # If the exceptions for the integration nonbonded force should be kept constant over the entire simulation
@@ -1673,8 +1672,6 @@ class EvbSystemBuilder():
             atom_ids = self._key_to_id(key, self.reaction_atoms)
             if atom_ids is None:
                 continue
-            reascale, proscale = self._get_lambda_scaling(
-                lam, self.angle_lambda_switch)
             if (key in self.reactant.angles.keys()
                     and key in self.product.angles.keys()):
 
@@ -1691,7 +1688,7 @@ class EvbSystemBuilder():
                 # take angle from reactant, and from product structure
                 angleA = self.reactant.angles[key]
 
-                fcA = angleA['force_constant'] * reascale
+                fcA = angleA['force_constant']
                 eqA = angleA['equilibrium']
                 if model_broken:
                     coords = self.product.molecule.get_coordinates_in_angstrom()
@@ -1709,7 +1706,7 @@ class EvbSystemBuilder():
             else:
                 angleB = self.product.angles[key]
                 eqB = angleB['equilibrium']
-                fcB = angleB['force_constant'] * proscale
+                fcB = angleB['force_constant']
                 fcA = fcB
                 if model_broken:
                     coords = self.reactant.molecule.get_coordinates_in_angstrom(
