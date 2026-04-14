@@ -33,8 +33,6 @@
 from os import environ, cpu_count
 from pathlib import Path
 
-from .mklconf import configure_mkl_rt
-
 
 def get_basis_path():
     """
