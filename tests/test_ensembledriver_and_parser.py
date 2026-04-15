@@ -4,14 +4,14 @@ import numpy as np
 import sys
 
 try:
-    import MDAnalysis  # noqa: F401
+    import MDAnalysis
 except ImportError:
     mdanalysis_available = False
 else:
     mdanalysis_available = True
 
 try:
-    import pyframe  # noqa: F401
+    import pyframe
 except ImportError:
     pass
 
@@ -131,3 +131,29 @@ class TestEnsembleDriverOptions:
                 rtol=0.0,
                 atol=2.0e-5,
             )
+        
+        # Ensemble-averaged UV/Vis spectrum CSV output
+        pytest.importorskip("matplotlib")
+        import matplotlib.pyplot as plt
+
+        generated_csv = tmp_path / "averaged_spectra.csv"
+        ax = ens_drv.plot_uv_vis_spectra(
+            results,
+            show_individual=True,
+            xlim_nm=(100, 200),
+            save_averaged_spectra=True,
+            averaged_spectra_filename=generated_csv,
+        )
+
+        assert ax is not None
+        assert generated_csv.is_file()
+
+        ref_csv = data_dir / "averaged_spectra.csv"
+        assert ref_csv.is_file(), f"Missing reference CSV: {ref_csv}"
+
+        got = np.loadtxt(generated_csv, delimiter=",", skiprows=1)
+        ref = np.loadtxt(ref_csv, delimiter=",", skiprows=1)
+        assert got.shape == ref.shape
+        np.testing.assert_allclose(got, ref, rtol=0.0, atol=1.0e-6)
+
+        plt.close(ax.figure)
