@@ -4799,7 +4799,8 @@ computeFockOnGPU(const              CMolecule& molecule,
             uint32_t* d_prec_cut_ij_tile = nullptr;
             uint32_t* d_screen_cut_ij_tile = nullptr;
 
-            const uint32_t max_nij_tiles = (max_prim_pair_count_local + TILE_DIM - 1) / TILE_DIM;
+            //const uint32_t max_nij_tiles = (max_prim_pair_count_local + TILE_DIM - 1) / TILE_DIM;
+            const uint32_t max_nij_tiles = max_prim_pair_count_local;
 
             gpuSafe(gpuMallocAsync(&d_s_prim_info_f, sizeof(float) * s_prim_info_f.size(), stream));
             gpuSafe(gpuMallocAsync(&d_p_prim_info_f, sizeof(float) * p_prim_info_f.size(), stream));
