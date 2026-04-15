@@ -276,7 +276,7 @@ class SpectrumAverager:
         title="Absorption Spectrum (Averaged)",
         ax=None,
         xlim_nm=None,
-        save_averaged_spectra=False,
+        save_averaged_spectra=True,
         averaged_spectra_filename="averaged_spectra.csv",
     ):
         """

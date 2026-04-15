@@ -1127,7 +1127,7 @@ class EnsembleDriver:
         title: str = "Absorption Spectrum (Averaged)",
         ax=None,
         xlim_nm=None,
-        save_averaged_spectra: bool = False,
+        save_averaged_spectra: bool = True,
         averaged_spectra_filename: str | Path = "averaged_spectra.csv",
     ):
         """
@@ -1183,7 +1183,7 @@ class EnsembleDriver:
         rsp_all = results["rsp_all"]
 
         spec_avg = SpectrumAverager(comm=self.comm, ostream=self.ostream)
-        spec_avg.plot_uv_vis_spectra(
+        ax = spec_avg.plot_uv_vis_spectra(
             rsp_all,
             energy_min_ev=energy_min_ev,
             energy_max_ev=energy_max_ev,
@@ -1196,5 +1196,4 @@ class EnsembleDriver:
             save_averaged_spectra=save_averaged_spectra,
             averaged_spectra_filename=averaged_spectra_filename,
         )
-
         return ax
