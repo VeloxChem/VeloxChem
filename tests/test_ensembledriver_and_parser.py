@@ -23,7 +23,7 @@ if mdanalysis_available:
 @pytest.mark.skipif(not mdanalysis_available, reason="MDAnalysis not available")
 class TestEnsembleDriverOptions:
 
-    @pytest.mark.timeconsuming
+    # @pytest.mark.timeconsuming
     @pytest.mark.skipif("pyframe" not in sys.modules, reason="pyframe not available")
     def test_compute_with_scf_and_property_options(self, tmp_path):
         """
@@ -132,7 +132,7 @@ class TestEnsembleDriverOptions:
                 atol=2.0e-5,
             )
         
-        # Ensemble-averaged UV/Vis spectrum CSV output
+        # Ensemble-averaged spectra output
         pytest.importorskip("matplotlib")
         import matplotlib.pyplot as plt
 
