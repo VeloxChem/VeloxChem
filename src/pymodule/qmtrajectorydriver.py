@@ -44,6 +44,7 @@ from .scfunrestdriver import ScfUnrestrictedDriver
 from .scfrestopendriver import ScfRestrictedOpenDriver
 from .lreigensolver import LinearResponseEigenSolver
 from .cppsolver import ComplexResponseSolver
+from .respchargesdriver import RespChargesDriver
 from .veloxchemlib import mpi_master, hartree_in_ev, hartree_in_kjpermol
 from .errorhandler import assert_msg_critical
 
@@ -174,6 +175,11 @@ class QMTrajectoryDriver:
                 payload[f"scf_history_{key}"] = np.array(
                     [step[key] for step in scf_history]
                 )
+
+        if "charges_resp" in scf_results:
+            payload["charges_resp"] = np.asarray(
+                scf_results["charges_resp"], dtype=float
+            )
 
         return payload
 
@@ -788,6 +794,7 @@ class QMTrajectoryDriver:
         basis_set,
         scf_options=None,
         property_options=None,
+        resp_options=None,
         propagate_guess: bool = True,
         guess_fallback: bool = True,
         qm_charge: int | None = None,
@@ -795,6 +802,7 @@ class QMTrajectoryDriver:
         stacked_h5_file: str | Path | None = "trajectory.h5",
         scf_driver=None,
         prop_driver=None,
+        resp_driver=None,
     ):
         """
         Run SCF (and optionally property) calculations over a trajectory.
@@ -865,6 +873,15 @@ class QMTrajectoryDriver:
             Advanced use only — supply a pre-configured property driver
             instance directly.  When provided, ``property_options`` is
             ignored.
+        :param resp_options:
+            Dictionary of RESP charge options forwarded to
+            :class:`RespChargesDriver.update_settings`.  Pass an empty dict
+            ``{}`` to enable RESP with default settings.  If ``None``
+            (default), RESP charges are not computed.
+        :param resp_driver:
+            Advanced use only — supply a pre-configured
+            :class:`RespChargesDriver` instance directly.  When provided,
+            ``resp_options`` is ignored.
         :return:
             Dictionary with keys:
 
@@ -873,6 +890,10 @@ class QMTrajectoryDriver:
             - ``prop_all``: list of ``(frame, property_results)`` tuples
               (only present when a property driver is used; ``property_results``
               is ``None`` for frames that did not converge).
+            - ``resp_all``: list of ``(frame, charges)`` tuples where
+              ``charges`` is a 1-D NumPy array of length *natoms*, or
+              ``None`` for non-converged frames.  Only present when RESP is
+              requested.
         :raises ValueError:
             If ``qm_multiplicity`` is not a positive integer, or if a
             snapshot's charge/multiplicity combination is incompatible.
@@ -918,6 +939,13 @@ class QMTrajectoryDriver:
                 if isinstance(prop_driver, ComplexResponseSolver) and "property" in prop_opts:
                     prop_driver.set_cpp_property(prop_opts["property"])
 
+        # ── Build RESP driver from resp_options if not provided ───────────────
+        if resp_driver is None and resp_options is not None:
+            resp_driver = RespChargesDriver(self.comm, self.ostream)
+            if resp_options:
+                resp_driver.update_settings(resp_options)
+
+        do_resp = resp_driver is not None
         do_rsp = prop_driver is not None
         rsp_driver = prop_driver
         if do_rsp and hasattr(rsp_driver, "detach_attach"):
@@ -949,6 +977,7 @@ class QMTrajectoryDriver:
         scf_all = []
         scf_history_all = []
         rsp_all = [] if do_rsp else None
+        resp_all = [] if do_resp else None
 
         # ── Determine DFT label once (needed before the loop for H5 init) ─────
         _xcfun = getattr(scf_driver, "xcfun", None)
@@ -1058,6 +1087,8 @@ class QMTrajectoryDriver:
                 scf_history_all.append([])
                 if do_rsp:
                     rsp_all.append((frame, None))
+                if do_resp:
+                    resp_all.append((frame, None))
                 if h5_path is not None:
                     self._h5_append_frame(
                         h5_path,
@@ -1084,6 +1115,15 @@ class QMTrajectoryDriver:
                     molecule, fixed_basis, scf_results
                 )
                 rsp_all.append((frame, rsp_results))
+
+            if do_resp:
+                q = resp_driver.compute(molecule, fixed_basis, scf_results)
+                # RespChargesDriver also mutates scf_results['charges_resp'],
+                # which is then picked up by _get_scf_hdf5_payload_local.
+                if self.rank == mpi_master():
+                    resp_all.append((frame, np.asarray(q, dtype=float)))
+                else:
+                    resp_all.append((frame, None))
 
             if h5_path is not None:
                 self._h5_append_frame(
@@ -1121,6 +1161,8 @@ class QMTrajectoryDriver:
         results = {"scf_all": scf_all, "scf_history_all": scf_history_all}
         if do_rsp:
             results["prop_all"] = rsp_all
+        if do_resp:
+            results["resp_all"] = resp_all
 
         return results
 

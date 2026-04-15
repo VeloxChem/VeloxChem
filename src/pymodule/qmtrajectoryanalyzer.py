@@ -159,6 +159,7 @@ class QMTrajectoryAnalyzer:
             self._dft_label = hf['dft_func_label'][0].decode().strip() if 'dft_func_label' in hf else 'HF'
             self._trajectory_name = hf['trajectory_name'][0].decode().strip() if 'trajectory_name' in hf else ''
             self._has_rsp = 'rsp' in hf
+            self._has_resp = 'scf' in hf and 'charges_resp' in hf.get('scf', {})
 
     # ── Properties ─────────────────────────────────────────────────────────────
 
@@ -218,6 +219,47 @@ class QMTrajectoryAnalyzer:
                     if j < len(raw):
                         energies[row_idx] = raw[j]
         return energies * factor
+
+    def get_resp_charges(self, frame_ids=None):
+        """
+        Return RESP charges for the requested frames.
+
+        Non-converged frames or frames without RESP data are filled with
+        ``numpy.nan``.
+
+        :param frame_ids:
+            List of frame ids to extract.  Defaults to all
+            :attr:`converged_frames`.
+
+        :return:
+            numpy.ndarray of shape ``(n_frames, n_atoms)``.
+        :raises AssertionError:
+            If no RESP charges are stored in the HDF5 file.
+        """
+        assert_msg_critical(
+            self._has_resp,
+            "get_resp_charges: no RESP charges found in the H5 file. "
+            "Re-run with resp_options={} to compute them."
+        )
+
+        if frame_ids is None:
+            frame_ids = list(self._frame_ids)
+
+        with h5py.File(self._path, 'r') as hf:
+            raw = np.asarray(hf['scf']['charges_resp'], dtype=float)
+
+        # raw rows correspond only to converged frames
+        conv_indices = np.where(self._converged)[0]
+        natoms = raw.shape[1] if raw.ndim == 2 else raw.shape[0]
+
+        all_charges = np.full((self._n_frames, natoms), np.nan)
+        for j, row_idx in enumerate(conv_indices):
+            if j < len(raw):
+                all_charges[row_idx] = raw[j]
+
+        # Select requested frames
+        rows = [self._row_for_frame(fid) for fid in frame_ids]
+        return all_charges[rows]
 
     def get_molecule(self, frame_id):
         """
@@ -323,6 +365,8 @@ class QMTrajectoryAnalyzer:
             ]
         if self._has_rsp:
             lines.append("Response data      : present")
+        if self._has_resp:
+            lines.append("RESP charges       : present")
 
         print('\n'.join(lines))
 
@@ -458,9 +502,11 @@ class QMTrajectoryAnalyzer:
         basis_set=None,
         driver=None,
         update_h5=True,
+        resp_options=None,
+        resp_driver=None,
     ):
         """
-        Re-run SCF for the specified frames (default: all non-converged) and
+        Re-run SCF (and optionally RESP charges) for the specified frames and
         optionally patch the results back into the HDF5 file.
 
         :param frame_ids:
@@ -468,15 +514,20 @@ class QMTrajectoryAnalyzer:
             :attr:`non_converged_frames`.
         :param scf_options:
             Dict of SCF options to override (e.g. looser thresholds).
-            Merged on top of the basis/functional already stored in the H5.
         :param basis_set:
             Basis set label to use.  Defaults to the value stored in the H5.
         :param driver:
             A :class:`QMTrajectoryDriver` instance to use.  If ``None``,
             a fresh one is created.
         :param update_h5:
-            If ``True``, patch the converged results back into the HDF5 file
-            in-place.
+            If ``True``, patch the converged results back into the HDF5 file.
+        :param resp_options:
+            Dict of RESP charge options forwarded to
+            :class:`RespChargesDriver`.  Pass ``{}`` to use defaults.
+            If ``None`` (default), RESP charges are not recomputed.
+        :param resp_driver:
+            Pre-configured :class:`RespChargesDriver` instance.  When
+            provided, ``resp_options`` is ignored.
 
         :return:
             The ``results`` dict from :meth:`QMTrajectoryDriver.compute`.
@@ -504,6 +555,8 @@ class QMTrajectoryAnalyzer:
             snapshots,
             basis_set=_basis,
             scf_options=scf_options or {},
+            resp_options=resp_options,
+            resp_driver=resp_driver,
             stacked_h5_file=None,       # don't create a new H5
             propagate_guess=False,      # fresh SAD for each frame
         )
@@ -513,6 +566,7 @@ class QMTrajectoryAnalyzer:
             # Refresh cached arrays
             with h5py.File(self._path, 'r') as hf:
                 self._converged = np.asarray(hf['converged'], dtype=bool)
+                self._has_resp = 'scf' in hf and 'charges_resp' in hf.get('scf', {})
 
         return results
 
@@ -535,6 +589,7 @@ class QMTrajectoryAnalyzer:
         from .qmtrajectorydriver import QMTrajectoryDriver
 
         scf_all = {frame: res for frame, res in results.get('scf_all', [])}
+        resp_all = {frame: q for frame, q in results.get('resp_all', [])}
         scf_history_map = {}
         for idx, (frame, _) in enumerate(results.get('scf_all', [])):
             hist = results.get('scf_history_all', [])
@@ -599,3 +654,29 @@ class QMTrajectoryAnalyzer:
                             dset[row] = arr
                         except Exception:
                             pass  # shape mismatch — skip silently
+
+                # Patch RESP charges if present in recompute results
+                q = resp_all.get(int(fid))
+                if q is not None:
+                    q_arr = np.asarray(q, dtype=float)
+                    scf_grp = hf.require_group('scf')
+                    if 'charges_resp' not in scf_grp:
+                        natoms = q_arr.shape[0]
+                        n_total = len(self._frame_ids)
+                        placeholder = np.full((n_total, natoms), np.nan)
+                        scf_grp.create_dataset(
+                            'charges_resp',
+                            data=placeholder,
+                            maxshape=(None, natoms),
+                        )
+                        dset_q = scf_grp['charges_resp']
+                        from .qmtrajectorydriver import QMTrajectoryDriver as _D
+                        _D._apply_atomic_metadata(
+                            _D, dset_q, 'scf', 'charges_resp'
+                        )
+                    dset_q = scf_grp['charges_resp']
+                    if row < dset_q.shape[0]:
+                        try:
+                            dset_q[row] = q_arr
+                        except Exception:
+                            pass
