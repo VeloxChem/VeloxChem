@@ -43,8 +43,9 @@ from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            solvation_model_sanity_check)
 from .errorhandler import assert_msg_critical
 from .mathutils import safe_solve
-from .checkpoint import (check_rsp_hdf5, write_rsp_solution_with_multiple_keys)
+from .checkpoint import check_rsp_hdf5
 from .inputparser import parse_seq_fixed
+from .resultsio import write_rsp_solution_with_multiple_keys
 
 
 class ComplexResponseSolver(ComplexResponseSolverBase):
@@ -135,7 +136,7 @@ class ComplexResponseSolver(ComplexResponseSolverBase):
             self.set_cpp_property(self.property)
 
         # check molecule
-        molecule_sanity_check(molecule, 'restricted')
+        molecule_sanity_check(molecule, 'restricted', type(self).__name__)
         # check SCF results
         scf_results_sanity_check(self, scf_results)
 
@@ -175,6 +176,10 @@ class ComplexResponseSolver(ComplexResponseSolverBase):
         orb_ene = self.comm.bcast(orb_ene, root=mpi_master())
         norb = orb_ene.shape[0]
         nocc = molecule.number_of_alpha_occupied_orbitals(basis)
+
+        self._check_mpi_oversubscription(
+            self._get_excitation_space_dimension_restricted(nocc, norb),
+            'response space')
 
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
@@ -263,6 +268,8 @@ class ComplexResponseSolver(ComplexResponseSolverBase):
                 self.restart = check_rsp_hdf5(self.checkpoint_file,
                                               rsp_vector_labels, molecule,
                                               basis, dft_dict, pe_dict)
+                if self.restart:
+                    self.restart = self.match_settings(self.checkpoint_file)
             self.restart = self.comm.bcast(self.restart, root=mpi_master())
 
         # read initial guess from restart file
@@ -595,8 +602,13 @@ class ComplexResponseSolver(ComplexResponseSolverBase):
 
                     # write spectrum to h5 file
                     if final_h5_fname is not None:
+                        h5_ret_dict = {
+                            key: value
+                            for key, value in ret_dict.items()
+                            if key != 'solutions'
+                        }
                         self.write_cpp_rsp_results_to_hdf5(
-                            final_h5_fname, ret_dict)
+                            final_h5_fname, h5_ret_dict)
 
                     return ret_dict
                 else:

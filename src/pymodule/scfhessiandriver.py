@@ -44,7 +44,7 @@ from .veloxchemlib import NuclearPotentialGeom200Driver
 from .veloxchemlib import NuclearPotentialGeom020Driver
 from .veloxchemlib import NuclearPotentialGeom110Driver
 from .veloxchemlib import NuclearPotentialGeom101Driver
-from .veloxchemlib import ECPHessianDriver
+from .veloxchemlib import EcpHessianDriver
 from .veloxchemlib import ElectricDipoleMomentGeom100Driver
 from .veloxchemlib import FockGeom2000Driver
 from .veloxchemlib import FockGeom1100Driver
@@ -396,7 +396,7 @@ class ScfHessianDriver(HessianDriver):
         npot_hess_101_drv = NuclearPotentialGeom101Driver()
 
         if ao_basis.has_ecp():
-            ecp_hess_drv = ECPHessianDriver()
+            ecp_hess_drv = EcpHessianDriver()
             core_electrons = ao_basis.get_number_of_ecp_core_electrons()
             ecp_atom_inds = [
                 idx for idx, nelec in enumerate(core_electrons) if nelec > 0
@@ -879,6 +879,10 @@ class ScfHessianDriver(HessianDriver):
                             if self._dft:
                                 hessian_dft_xc[i * 3:i * 3 + 3,
                                                j * 3:j * 3 + 3] = 0.0
+                            if self.scf_driver.dispersion or (
+                                    self.scf_driver._dft and 'D4' in self.
+                                    scf_driver.xcfun.get_func_label().upper()):
+                                dftd4_hessian[i, :, j, :] = 0.0
 
             self.hessian = (
                 hessian_first_order_derivatives +
@@ -952,16 +956,21 @@ class ScfHessianDriver(HessianDriver):
         elem_ids_without_ecp = [
             z for z, ncore in zip(elem_ids, core_electrons) if ncore == 0
         ]
-        max_elem_id = max(elem_ids_without_ecp)
+        # If all atoms have ECP, set max_elem_id to 0 and let the regular
+        # grid-level logic below decide the outcome.
+        max_elem_id = max(elem_ids_without_ecp) if elem_ids_without_ecp else 0
 
         errmsg = 'Hessian calculation with '
         errmsg += self.scf_driver.xcfun.get_func_label().upper()
-        errmsg += ' functional and '
-        if basis.has_ecp():
-            errmsg += f'max element id {max_elem_id} '
-        else:
-            errmsg += 'effective core potential '
+        errmsg += ' functional '
+        if max_elem_id > 0:
+            errmsg += f'and max element id {max_elem_id} '
         errmsg += 'is not supported.'
+
+        ecp_errmsg = 'Hessian calculation with '
+        ecp_errmsg += self.scf_driver.xcfun.get_func_label().upper()
+        ecp_errmsg += ' functional and effective core potential '
+        ecp_errmsg += 'is not supported.'
 
         if default_grid_level <= 4:
             if max_elem_id <= 18:
@@ -974,7 +983,7 @@ class ScfHessianDriver(HessianDriver):
         elif default_grid_level in [5, 6]:
             # special case for the combination of default_grid_level 6 and ECP
             if default_grid_level == 6 and basis.has_ecp():
-                assert_msg_critical(False, errmsg)
+                assert_msg_critical(False, ecp_errmsg)
 
             if max_elem_id <= 10:
                 grid_level = max(6, grid_level)
@@ -1183,7 +1192,7 @@ class ScfHessianDriver(HessianDriver):
         npot_hess_101_drv = NuclearPotentialGeom101Driver()
 
         if ao_basis.has_ecp():
-            ecp_hess_drv = ECPHessianDriver()
+            ecp_hess_drv = EcpHessianDriver()
             core_electrons = ao_basis.get_number_of_ecp_core_electrons()
             ecp_atom_inds = [
                 idx for idx, nelec in enumerate(core_electrons) if nelec > 0
@@ -1734,6 +1743,10 @@ class ScfHessianDriver(HessianDriver):
                             if self._dft:
                                 hessian_dft_xc[i * 3:i * 3 + 3,
                                                j * 3:j * 3 + 3] = 0.0
+                            if self.scf_driver.dispersion or (
+                                    self.scf_driver._dft and 'D4' in self.
+                                    scf_driver.xcfun.get_func_label().upper()):
+                                dftd4_hessian[i, :, j, :] = 0.0
 
             self.hessian = (
                 hessian_first_order_derivatives +

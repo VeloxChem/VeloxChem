@@ -32,17 +32,15 @@
 
 import numpy as np
 import time as tm
-import h5py
 import sys
 
 from .veloxchemlib import bohr_in_angstrom
-from .molecule import Molecule
-from .molecularbasis import MolecularBasis
 from .outputstream import OutputStream
 from .visualizationdriver import VisualizationDriver
 from .lreigensolver import LinearResponseEigenSolver
 from .densityviewer import DensityViewer
 from .errorhandler import assert_msg_critical
+from .resultsio import read_results
 
 
 class ExcitedStateAnalysisDriver:
@@ -178,26 +176,8 @@ class ExcitedStateAnalysisDriver:
         :return:
             A tuple containing the scf and rsp dictionaries.
         """
-        h5f = h5py.File(filename, "r")
-
-        scf_results = {}
-        rsp_results = {}
-        for key in h5f:
-            if key == "atom_coordinates":
-                scf_results[key] = np.array(h5f[key])
-            if key == "nuclear_charges":
-                scf_results[key] = np.array(h5f[key])
-            if key == "basis_set":
-                scf_results[key] = np.array(h5f[key])
-            if key == "scf":
-                scf_results_dict = dict(h5f.get(key))
-                for scf_key in scf_results_dict:
-                    scf_results[scf_key] = np.array(scf_results_dict[scf_key])
-            elif key == "rsp":
-                rsp_results_dict = dict(h5f.get(key))
-                for rsp_key in rsp_results_dict:
-                    rsp_results[rsp_key] = np.array(rsp_results_dict[rsp_key])
-        h5f.close()
+        scf_results = read_results(filename, 'scf')
+        rsp_results = read_results(filename, 'rsp')
 
         return scf_results, rsp_results
 
@@ -230,26 +210,6 @@ class ExcitedStateAnalysisDriver:
         rsp_results['formatted'] = True
 
         return rsp_results
-
-    def create_molecule_and_basis(self, scf_results):
-        """
-        Creates molecule and basis objects from scf dictionary.
-
-        :param scf_results:
-            The dictionary containing the scf results dictionary.
-
-        :return:
-            A tuple containing the Molecule and Basis objects.
-        """
-
-        coordinates = scf_results['atom_coordinates']
-        nuclear_charges = np.array(scf_results['nuclear_charges'])
-        nuclear_charges = nuclear_charges.astype(int)
-        basis_set_label = scf_results['basis_set'][0].decode("utf-8")
-        molecule = Molecule(nuclear_charges, coordinates, units="au")
-        basis = MolecularBasis.read(molecule, basis_set_label)
-
-        return molecule, basis
 
     def compute_density_matrices(self,
                                  molecule,

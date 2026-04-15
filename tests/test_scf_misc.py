@@ -14,7 +14,7 @@ from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.scfrestopendriver import ScfRestrictedOpenDriver
 from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
 from veloxchem.dispersionmodel import DispersionModel
-from veloxchem.checkpoint import read_molecule_and_basis
+from veloxchem.resultsio import read_molecule_and_basis
 from veloxchem.inputparser import unparse_input, read_unparsed_input_from_hdf5
 
 

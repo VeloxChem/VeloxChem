@@ -42,7 +42,8 @@ from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            solvation_model_sanity_check)
 from .errorhandler import assert_msg_critical
 from .mathutils import safe_solve
-from .checkpoint import (check_rsp_hdf5, write_rsp_solution_with_multiple_keys)
+from .checkpoint import check_rsp_hdf5
+from .resultsio import write_rsp_solution_with_multiple_keys
 
 
 class LinearResponseSolver(LinearResponseSolverBase):
@@ -102,7 +103,7 @@ class LinearResponseSolver(LinearResponseSolverBase):
             self.set_lr_property(self.property)
 
         # check molecule
-        molecule_sanity_check(molecule, 'restricted')
+        molecule_sanity_check(molecule, 'restricted', type(self).__name__)
 
         # check SCF results
         scf_results_sanity_check(self, scf_results)
@@ -153,6 +154,10 @@ class LinearResponseSolver(LinearResponseSolverBase):
         orb_ene = self.comm.bcast(orb_ene, root=mpi_master())
         norb = orb_ene.shape[0]
         nocc = molecule.number_of_alpha_occupied_orbitals(basis)
+
+        self._check_mpi_oversubscription(
+            self._get_excitation_space_dimension_restricted(nocc, norb),
+            'response space')
 
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
@@ -226,6 +231,8 @@ class LinearResponseSolver(LinearResponseSolverBase):
                 self.restart = check_rsp_hdf5(self.checkpoint_file,
                                               rsp_vector_labels, molecule,
                                               basis, dft_dict, pe_dict)
+                if self.restart:
+                    self.restart = self.match_settings(self.checkpoint_file)
             self.restart = self.comm.bcast(self.restart, root=mpi_master())
 
         # read initial guess from restart file

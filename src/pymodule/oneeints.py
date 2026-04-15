@@ -39,7 +39,7 @@ from .veloxchemlib import KineticEnergyGeom100Driver
 from .veloxchemlib import NuclearPotentialDriver
 from .veloxchemlib import NuclearPotentialGeom100Driver
 from .veloxchemlib import NuclearPotentialGeom010Driver
-from .veloxchemlib import ECPGradientDriver
+from .veloxchemlib import EcpGradientDriver
 from .veloxchemlib import ElectricDipoleMomentDriver
 from .veloxchemlib import NuclearPotentialGeom200Driver
 from .veloxchemlib import NuclearPotentialGeom101Driver
@@ -244,7 +244,7 @@ def compute_ecp_gradient(molecule, basis, D_total, atom_list=None):
     if atom_list is None:
         atom_list = list(range(natoms))
 
-    ecp_grad_drv = ECPGradientDriver()
+    ecp_grad_drv = EcpGradientDriver()
 
     core_electrons = basis.get_number_of_ecp_core_electrons()
     ecp_atom_indices = [
