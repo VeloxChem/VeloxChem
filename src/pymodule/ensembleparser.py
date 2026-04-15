@@ -37,7 +37,7 @@ from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
 import MDAnalysis as mda
 import MDAnalysis.transformations as transform
-from MDAnalysis.topology.guessers import guess_atom_element
+from MDAnalysis.guesser.default_guesser import DefaultGuesser
 
 class EnsembleParser:
     """
@@ -490,13 +490,15 @@ class EnsembleParser:
         empty_obj = np.empty((0,), dtype=object)
         empty_int = np.empty((0,), dtype=int)
 
+        atom_guesser = DefaultGuesser(self.universe)
+
         snapshots = []
         for iframe in frame_indices:
             self.universe.trajectory[iframe]
 
             qm_coords = np.asarray(qm_atoms.positions, dtype=float).copy()
             qm_elements = np.asarray(
-                [guess_atom_element(n) for n in qm_atoms.names], dtype=object
+                [atom_guesser.guess_atom_element(n) for n in qm_atoms.names], dtype=object
             )
 
             pe_coords = empty_xyz
@@ -538,7 +540,7 @@ class EnsembleParser:
                 pe_coords = np.asarray(pe_region.positions, dtype=float).copy()
                 pe_atom_names = np.asarray(pe_region.names, dtype=object).copy()
                 pe_elements = np.asarray(
-                    [guess_atom_element(n) for n in pe_region.names], dtype=object
+                    [atom_guesser.guess_atom_element(n) for n in pe_region.names], dtype=object
                 )
                 pe_resids = np.asarray(pe_region.resids, dtype=int).copy()
                 pe_resindices = np.asarray(pe_region.resindices, dtype=int).copy()
@@ -580,7 +582,7 @@ class EnsembleParser:
                 npe_coords = np.asarray(npe_region.positions, dtype=float).copy()
                 npe_atom_names = np.asarray(npe_region.names, dtype=object).copy()
                 npe_elements = np.asarray(
-                    [guess_atom_element(n) for n in npe_region.names], dtype=object
+                    [atom_guesser.guess_atom_element(n) for n in npe_region.names], dtype=object
                 )
                 npe_resids = np.asarray(npe_region.resids, dtype=int).copy()
                 npe_resindices = np.asarray(npe_region.resindices, dtype=int).copy()
