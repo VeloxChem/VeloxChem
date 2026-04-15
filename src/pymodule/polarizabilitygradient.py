@@ -330,7 +330,6 @@ class PolarizabilityGradient:
             ]
 
             if 'dist_cphf_ov' in orbrsp_results.keys():
-                print("get lamda multipliers from distributed arrays")
                 # get lambda multipliers from distributed arrays
                 cphf_ov = self.get_lambda_response_vector(
                     molecule, basis, scf_tensors, orbrsp_results['dist_cphf_ov'],
@@ -366,13 +365,11 @@ class PolarizabilityGradient:
                                 cphf_ov[y, x] += cphf_ov[x, y]
 
             # get omega Lagrangian multipliers
-            print("get omega vectors, all nodes")
             omega_ao = self.get_omega_response_vector(
                 basis, orbrsp_results['dist_omega_ao'], f
             )
 
             if self.rank == mpi_master():
-                print("on master")
                 info_msg = f'Building gradient for frequency = {w:4.3f}'
                 self.ostream.print_info(info_msg)
                 self.ostream.print_blank()
@@ -431,7 +428,6 @@ class PolarizabilityGradient:
                 rel_dm_ao = unrel_dm_ao + lambda_ao
 
                 del x_plus_y_mo, x_minus_y_mo, cphf_ov, unrel_dm_ao, lambda_ao
-                print("leaving master, broadcasting")
             else:
                 gs_dm = None
                 x_plus_y_ao = None
@@ -458,9 +454,7 @@ class PolarizabilityGradient:
             profiler.start_timer("1-elec")
 
             # loop over atoms and contract integral derivatives with density matrices
-            print("Now loop over atoms for 1-elec contributions")
             for iatom in local_atoms:
-                print(f"iatom: {iatom}")
                 # core Hamiltonian contribution to gradients
                 gmats_kin = kin_grad_drv.compute(molecule, basis, iatom)
                 gmats_npot_100 = npot_grad_100_drv.compute(molecule, basis, iatom)
@@ -546,13 +540,11 @@ class PolarizabilityGradient:
 
             # ERI contribution
             profiler.start_timer("ERI")
-            print("call compute eri contrib")
             eri_contrib = self.compute_eri_contrib(molecule, basis, gs_dm,
                                                    rel_dm_ao, x_plus_y_ao, x_minus_y_ao,
                                                    local_atoms)
             profiler.stop_timer("ERI")
             profiler.check_memory_usage(f"ERI grad")
-            print("After compute eri")
 
             pol_gradient += eri_contrib
             # pol_gradient = self.comm.reduce(pol_gradient, root=mpi_master())
@@ -674,7 +666,6 @@ class PolarizabilityGradient:
             The ERI derivative integral contribution to the polarizability gradient.
         """
 
-        print("in compute_eti_contrib_real, all nodes")
         fock_type, exchange_scaling_factor = self.get_fock_type_and_x_frac()
 
         # scaling of ERI gradient for non-hybrid functionals
@@ -716,9 +707,7 @@ class PolarizabilityGradient:
         eri_deriv_contrib = np.zeros((dof, dof, natm, 3), dtype=self.grad_dt)
 
         # ERI gradient
-        print(f"Looping over atoms in local_atoms: {local_atoms}")
         for iatom in local_atoms:
-            print(f"iatom: {iatom}")
             # screening
             screener_atom = T4CScreener()
             screener_atom.partition_atom(basis, molecule, 'eri', iatom)
@@ -743,8 +732,8 @@ class PolarizabilityGradient:
 
                 for y in range(x, dof):
                     # relaxed DM
-                    den_mat_for_fock_rel = make_matrix(basis, mat_t.general)
-                    den_mat_for_fock_rel.set_values(2.0 * rel_dm_ao[x,y])
+                    den_mat_for_fock_rel_xy = make_matrix(basis, mat_t.general)
+                    den_mat_for_fock_rel_xy.set_values(2.0 * rel_dm_ao[x,y])
                     # (X+Y)_y
                     den_mat_for_fock_xpy_y = make_matrix(basis, mat_t.general)
                     den_mat_for_fock_xpy_y.set_values(x_plus_y_ao[y])
@@ -762,7 +751,7 @@ class PolarizabilityGradient:
                     # contraction of integrals and DMs
                     erigrad_rel = fock_grad_drv.compute(basis, screener_atom, screener,
                                                         den_mat_for_fock_gs,
-                                                        den_mat_for_fock_rel,
+                                                        den_mat_for_fock_rel_xy,
                                                         iatom, fock_type,
                                                         exchange_scaling_factor,
                                                         0.0, thresh_int)
@@ -772,35 +761,41 @@ class PolarizabilityGradient:
                                                            iatom, fock_type,
                                                            exchange_scaling_factor,
                                                            0.0, thresh_int)
-                    erigrad_xpy_yx = fock_grad_drv.compute(basis, screener_atom, screener,
-                                                           den_mat_for_fock_xpy_m_xpyT_x,
-                                                           den_mat_for_fock_xpy_y,
-                                                           iatom, fock_type,
-                                                           exchange_scaling_factor,
-                                                           0.0, thresh_int)
                     erigrad_xmy_xy = fock_grad_drv.compute(basis, screener_atom, screener,
                                                            den_mat_for_fock_xmy_x,
                                                            den_mat_for_fock_xmy_p_xmyT_y,
                                                            iatom, fock_type,
                                                            exchange_scaling_factor,
                                                            0.0, thresh_int)
-                    erigrad_xmy_yx = fock_grad_drv.compute(basis, screener_atom, screener,
-                                                           den_mat_for_fock_xmy_p_xmyT_x,
-                                                           den_mat_for_fock_xmy_y,
-                                                           iatom, fock_type,
-                                                           exchange_scaling_factor,
-                                                           0.0, thresh_int)
+                    if y == x:
+                        erigrad_xpy_yx = erigrad_xpy_xy   
+                        erigrad_xmy_yx = erigrad_xmy_xy   
+                    else:
+                    	erigrad_xpy_yx = fock_grad_drv.compute(basis, screener_atom, screener,
+                    	                                       den_mat_for_fock_xpy_m_xpyT_x,
+                    	                                       den_mat_for_fock_xpy_y,
+                    	                                       iatom, fock_type,
+                    	                                       exchange_scaling_factor,
+                    	                                       0.0, thresh_int)
+                    	erigrad_xmy_yx = fock_grad_drv.compute(basis, screener_atom, screener,
+                    	                                       den_mat_for_fock_xmy_p_xmyT_x,
+                    	                                       den_mat_for_fock_xmy_y,
+                    	                                       iatom, fock_type,
+                    	                                       exchange_scaling_factor,
+                    	                                       0.0, thresh_int)
                     eri_deriv_contrib[x, y, iatom] += np.array(erigrad_rel)
                     eri_deriv_contrib[x, y, iatom] += 0.5 * np.array(erigrad_xpy_xy)
                     eri_deriv_contrib[x, y, iatom] += 0.5 * np.array(erigrad_xpy_yx)
                     eri_deriv_contrib[x, y, iatom] += 0.5 * np.array(erigrad_xmy_xy)
                     eri_deriv_contrib[x, y, iatom] += 0.5 * np.array(erigrad_xmy_yx)
                     eri_deriv_contrib[x, y, iatom] *= factor
+
+                    # TODO fix so diagonal elements not computed twice
                     if need_omega:
                         # for range_separated functionals
                         erigrad_rel_rs = fock_grad_drv.compute(basis, screener_atom, screener,
                                                             den_mat_for_fock_gs,
-                                                            den_mat_for_fock_rel,
+                                                            den_mat_for_fock_rel_xy,
                                                             iatom, 'kx_rs', erf_k_coef,
                                                             omega, thresh_int)
                         erigrad_xpy_xy_rs = fock_grad_drv.compute(basis, screener_atom, screener,
@@ -828,7 +823,6 @@ class PolarizabilityGradient:
                         eri_deriv_contrib[x, y, iatom] -= 0.5 * np.array(erigrad_xpy_yx_rs)
                         eri_deriv_contrib[x, y, iatom] -= 0.5 * np.array(erigrad_xmy_xy_rs)
                         eri_deriv_contrib[x, y, iatom] -= 0.5 * np.array(erigrad_xmy_yx_rs)
-        print("done with eri deriv contrib")
 
         return eri_deriv_contrib
 
@@ -857,7 +851,6 @@ class PolarizabilityGradient:
             The ERI derivative integral contribution to the polarizability gradient.
         """
 
-        print("in compute_eri_contrib_complex, all nodes")
         # Fock type and sclaing of exact exhange
         fock_type, exchange_scaling_factor = self.get_fock_type_and_x_frac()
 
@@ -899,32 +892,19 @@ class PolarizabilityGradient:
 
         eri_deriv_contrib = np.zeros((dof, dof, natm, 3), dtype=self.grad_dt)
 
-        print(f"looping over atoms in local_atoms: {local_atoms}")
         for iatom in local_atoms:
-            print(f"iatom: {iatom}")
             # screening
             screener_atom = T4CScreener()
             screener_atom.partition_atom(basis, molecule, 'eri', iatom)
 
             # contraction with density matrices
-            print("loop through component pairs")
-            for x, y in xy_pairs:
-                print(f"x,y: {x},{y}")
-                # relaxed DM
-                den_mat_for_fock_rel_real = make_matrix(basis, mat_t.general)
-                den_mat_for_fock_rel_real.set_values(2.0 * rel_dm_ao[x,y].real)
-                den_mat_for_fock_rel_imag = make_matrix(basis, mat_t.general)
-                den_mat_for_fock_rel_imag.set_values(2.0 * rel_dm_ao[x,y].imag)
+            #for x, y in xy_pairs:
+            for x in range(dof):
                 # (X+Y)_x
                 den_mat_for_fock_xpy_x_real = make_matrix(basis, mat_t.general)
                 den_mat_for_fock_xpy_x_real.set_values(x_plus_y_ao[x].real)
                 den_mat_for_fock_xpy_x_imag = make_matrix(basis, mat_t.general)
                 den_mat_for_fock_xpy_x_imag.set_values(x_plus_y_ao[x].imag)
-                # (X+Y)_y
-                den_mat_for_fock_xpy_y_real = make_matrix(basis, mat_t.general)
-                den_mat_for_fock_xpy_y_real.set_values(x_plus_y_ao[y].real)
-                den_mat_for_fock_xpy_y_imag = make_matrix(basis, mat_t.general)
-                den_mat_for_fock_xpy_y_imag.set_values(x_plus_y_ao[y].imag)
                 # (X+Y)_x - (X+Y)_x
                 den_mat_for_fock_xpy_m_xpyT_x_real = make_matrix(basis, mat_t.general)
                 den_mat_for_fock_xpy_m_xpyT_x_real.set_values((x_plus_y_ao[x]
@@ -932,23 +912,11 @@ class PolarizabilityGradient:
                 den_mat_for_fock_xpy_m_xpyT_x_imag = make_matrix(basis, mat_t.general)
                 den_mat_for_fock_xpy_m_xpyT_x_imag.set_values((x_plus_y_ao[x]
                                                                - x_plus_y_ao[x].T).imag)
-                # (X+Y)_y - (X+Y)_y
-                den_mat_for_fock_xpy_m_xpyT_y_real = make_matrix(basis, mat_t.general)
-                den_mat_for_fock_xpy_m_xpyT_y_real.set_values((x_plus_y_ao[y]
-                                                               - x_plus_y_ao[y].T).real)
-                den_mat_for_fock_xpy_m_xpyT_y_imag = make_matrix(basis, mat_t.general)
-                den_mat_for_fock_xpy_m_xpyT_y_imag.set_values((x_plus_y_ao[y]
-                                                               - x_plus_y_ao[y].T).imag)
                 # (X-Y)_x
                 den_mat_for_fock_xmy_x_real = make_matrix(basis, mat_t.general)
                 den_mat_for_fock_xmy_x_real.set_values(x_minus_y_ao[x].real)
                 den_mat_for_fock_xmy_x_imag = make_matrix(basis, mat_t.general)
                 den_mat_for_fock_xmy_x_imag.set_values(x_minus_y_ao[x].imag)
-                # (X-Y)_y
-                den_mat_for_fock_xmy_y_real = make_matrix(basis, mat_t.general)
-                den_mat_for_fock_xmy_y_real.set_values(x_minus_y_ao[y].real)
-                den_mat_for_fock_xmy_y_imag = make_matrix(basis, mat_t.general)
-                den_mat_for_fock_xmy_y_imag.set_values(x_minus_y_ao[y].imag)
                 # (X-Y)_x + (X-Y)_x
                 den_mat_for_fock_xmy_p_xmyT_x_real = make_matrix(basis, mat_t.general)
                 den_mat_for_fock_xmy_p_xmyT_x_real.set_values(
@@ -956,333 +924,368 @@ class PolarizabilityGradient:
                 den_mat_for_fock_xmy_p_xmyT_x_imag = make_matrix(basis, mat_t.general)
                 den_mat_for_fock_xmy_p_xmyT_x_imag.set_values((x_minus_y_ao[x]
                                                                + x_minus_y_ao[x].T).imag)
-                # (X-Y)_y + (X-Y)_y
-                den_mat_for_fock_xmy_p_xmyT_y_real = make_matrix(basis, mat_t.general)
-                den_mat_for_fock_xmy_p_xmyT_y_real.set_values((x_minus_y_ao[y]
-                                                               + x_minus_y_ao[y].T).real)
-                den_mat_for_fock_xmy_p_xmyT_y_imag = make_matrix(basis, mat_t.general)
-                den_mat_for_fock_xmy_p_xmyT_y_imag.set_values((x_minus_y_ao[y]
-                                                               + x_minus_y_ao[y].T).imag)
-                # contraction of integrals and DMs
-                # Re
-                erigrad_rel_re = fock_grad_drv.compute(basis, screener_atom, screener,
-                                                       den_mat_for_fock_gs,
-                                                       den_mat_for_fock_rel_real,
-                                                       iatom, fock_type,
-                                                       exchange_scaling_factor,
-                                                       0.0, thresh_int)
-                # Im
-                erigrad_rel_im = fock_grad_drv.compute(basis, screener_atom, screener,
-                                                       den_mat_for_fock_gs,
-                                                       den_mat_for_fock_rel_imag,
-                                                       iatom, fock_type,
-                                                       exchange_scaling_factor,
-                                                       0.0, thresh_int)
-                # ReRe
-                erigrad_xpy_xy_rere = fock_grad_drv.compute(basis, screener_atom,
-                                                            screener,
-                                                            den_mat_for_fock_xpy_x_real,
-                                                            den_mat_for_fock_xpy_m_xpyT_y_real,
-                                                            iatom, fock_type,
-                                                            exchange_scaling_factor,
-                                                            0.0, thresh_int)
-                # ImIm
-                erigrad_xpy_xy_imim = fock_grad_drv.compute(basis, screener_atom,
-                                                            screener,
-                                                            den_mat_for_fock_xpy_x_imag,
-                                                            den_mat_for_fock_xpy_m_xpyT_y_imag,
-                                                            iatom, fock_type,
-                                                            exchange_scaling_factor,
-                                                            0.0, thresh_int)
-                # ReIm
-                erigrad_xpy_xy_reim = fock_grad_drv.compute(basis, screener_atom,
-                                                            screener,
-                                                            den_mat_for_fock_xpy_x_real,
-                                                            den_mat_for_fock_xpy_m_xpyT_y_imag,
-                                                            iatom, fock_type,
-                                                            exchange_scaling_factor,
-                                                            0.0, thresh_int)
-                # ImRe
-                erigrad_xpy_xy_imre = fock_grad_drv.compute(basis, screener_atom,
-                                                            screener,
-                                                            den_mat_for_fock_xpy_x_imag,
-                                                            den_mat_for_fock_xpy_m_xpyT_y_real,
-                                                            iatom, fock_type,
-                                                            exchange_scaling_factor,
-                                                            0.0, thresh_int)
-                # ReRe
-                erigrad_xpy_yx_rere = fock_grad_drv.compute(basis, screener_atom,
-                                                            screener,
-                                                            den_mat_for_fock_xpy_m_xpyT_x_real,
-                                                            den_mat_for_fock_xpy_y_real,
-                                                            iatom, fock_type,
-                                                            exchange_scaling_factor,
-                                                            0.0, thresh_int)
-                # ImIm
-                erigrad_xpy_yx_imim = fock_grad_drv.compute(basis, screener_atom,
-                                                            screener,
-                                                            den_mat_for_fock_xpy_m_xpyT_x_imag,
-                                                            den_mat_for_fock_xpy_y_imag,
-                                                            iatom, fock_type,
-                                                            exchange_scaling_factor,
-                                                            0.0, thresh_int)
-                # ReIm
-                erigrad_xpy_yx_reim = fock_grad_drv.compute(basis, screener_atom,
-                                                            screener,
-                                                            den_mat_for_fock_xpy_m_xpyT_x_real,
-                                                            den_mat_for_fock_xpy_y_imag,
-                                                            iatom, fock_type,
-                                                            exchange_scaling_factor,
-                                                            0.0, thresh_int)
-                # ImRe
-                erigrad_xpy_yx_imre = fock_grad_drv.compute(basis, screener_atom,
-                                                            screener,
-                                                            den_mat_for_fock_xpy_m_xpyT_x_imag,
-                                                            den_mat_for_fock_xpy_y_real,
-                                                            iatom, fock_type,
-                                                            exchange_scaling_factor,
-                                                            0.0, thresh_int)
-                # ReRe
-                erigrad_xmy_xy_rere = fock_grad_drv.compute(basis, screener_atom,
-                                                            screener,
-                                                            den_mat_for_fock_xmy_x_real,
-                                                            den_mat_for_fock_xmy_p_xmyT_y_real,
-                                                            iatom, fock_type,
-                                                            exchange_scaling_factor,
-                                                            0.0, thresh_int)
-                # ImIm
-                erigrad_xmy_xy_imim = fock_grad_drv.compute(basis, screener_atom,
-                                                            screener,
-                                                            den_mat_for_fock_xmy_x_imag,
-                                                            den_mat_for_fock_xmy_p_xmyT_y_imag,
-                                                            iatom, fock_type,
-                                                            exchange_scaling_factor,
-                                                            0.0, thresh_int)
-                # ReIm
-                erigrad_xmy_xy_reim = fock_grad_drv.compute(basis, screener_atom,
-                                                            screener,
-                                                            den_mat_for_fock_xmy_x_real,
-                                                            den_mat_for_fock_xmy_p_xmyT_y_imag,
-                                                            iatom, fock_type,
-                                                            exchange_scaling_factor,
-                                                            0.0, thresh_int)
-                # ImRe
-                erigrad_xmy_xy_imre = fock_grad_drv.compute(basis, screener_atom,
-                                                            screener,
-                                                            den_mat_for_fock_xmy_x_imag,
-                                                            den_mat_for_fock_xmy_p_xmyT_y_real,
-                                                            iatom, fock_type,
-                                                            exchange_scaling_factor,
-                                                            0.0, thresh_int)
-                # ReRe
-                erigrad_xmy_yx_rere = fock_grad_drv.compute(basis, screener_atom,
-                                                            screener,
-                                                            den_mat_for_fock_xmy_p_xmyT_x_real,
-                                                            den_mat_for_fock_xmy_y_real,
-                                                            iatom, fock_type,
-                                                            exchange_scaling_factor,
-                                                            0.0, thresh_int)
-                # ImIm
-                erigrad_xmy_yx_imim = fock_grad_drv.compute(basis, screener_atom,
-                                                            screener,
-                                                            den_mat_for_fock_xmy_p_xmyT_x_imag,
-                                                            den_mat_for_fock_xmy_y_imag,
-                                                            iatom, fock_type,
-                                                            exchange_scaling_factor,
-                                                            0.0, thresh_int)
-                # ReIm
-                erigrad_xmy_yx_reim = fock_grad_drv.compute(basis, screener_atom,
-                                                            screener,
-                                                            den_mat_for_fock_xmy_p_xmyT_x_real,
-                                                            den_mat_for_fock_xmy_y_imag,
-                                                            iatom, fock_type,
-                                                            exchange_scaling_factor,
-                                                            0.0, thresh_int)
-                # ImRe
-                erigrad_xmy_yx_imre = fock_grad_drv.compute(basis, screener_atom,
-                                                            screener,
-                                                            den_mat_for_fock_xmy_p_xmyT_x_imag,
-                                                            den_mat_for_fock_xmy_y_real,
-                                                            iatom, fock_type,
-                                                            exchange_scaling_factor,
-                                                            0.0, thresh_int)
 
-                # Real fmat contribution to gradient
-                erigrad_real = np.array(erigrad_rel_re)  # real DM
-                erigrad_real += 0.5 * np.array(erigrad_xpy_xy_rere)  # ReRe
-                erigrad_real -= 0.5 * np.array(erigrad_xpy_xy_imim)  # ImIm
-                erigrad_real += 0.5 * np.array(erigrad_xpy_yx_rere)  # ReRe
-                erigrad_real -= 0.5 * np.array(erigrad_xpy_yx_imim)  # ImIm
-                erigrad_real += 0.5 * np.array(erigrad_xmy_xy_rere)  # ReRe
-                erigrad_real -= 0.5 * np.array(erigrad_xmy_xy_imim)  # ImIm
-                erigrad_real += 0.5 * np.array(erigrad_xmy_yx_rere)  # ReRe
-                erigrad_real -= 0.5 * np.array(erigrad_xmy_yx_imim)  # ImIm
-                erigrad_real *= factor
-
-                # Imaginary fmat contribution to gradient
-                erigrad_imag = np.array(erigrad_rel_im)  # imag DM
-                erigrad_imag += 0.5 * np.array(erigrad_xpy_xy_reim)  # ReIm
-                erigrad_imag += 0.5 * np.array(erigrad_xpy_xy_imre)  # ImRe
-                erigrad_imag += 0.5 * np.array(erigrad_xpy_yx_reim)  # ReIm
-                erigrad_imag += 0.5 * np.array(erigrad_xpy_yx_imre)  # ImRe
-                erigrad_imag += 0.5 * np.array(erigrad_xmy_xy_reim)  # ReIm
-                erigrad_imag += 0.5 * np.array(erigrad_xmy_xy_imre)  # ImRe
-                erigrad_imag += 0.5 * np.array(erigrad_xmy_yx_reim)  # ReIm
-                erigrad_imag += 0.5 * np.array(erigrad_xmy_yx_imre)  # ImRe
-                erigrad_imag *= factor
-
-                if need_omega:
-                    # for range-separated functionals
+                for y in range(x, dof): 
+                    # relaxed DM
+                    den_mat_for_fock_rel_real_xy = make_matrix(basis, mat_t.general)
+                    den_mat_for_fock_rel_real_xy.set_values(2.0 * rel_dm_ao[x,y].real)
+                    den_mat_for_fock_rel_imag_xy = make_matrix(basis, mat_t.general)
+                    den_mat_for_fock_rel_imag_xy.set_values(2.0 * rel_dm_ao[x,y].imag)
+                    # (X+Y)_y
+                    den_mat_for_fock_xpy_y_real = make_matrix(basis, mat_t.general)
+                    den_mat_for_fock_xpy_y_real.set_values(x_plus_y_ao[y].real)
+                    den_mat_for_fock_xpy_y_imag = make_matrix(basis, mat_t.general)
+                    den_mat_for_fock_xpy_y_imag.set_values(x_plus_y_ao[y].imag)
+                    # (X+Y)_y - (X+Y)_y
+                    den_mat_for_fock_xpy_m_xpyT_y_real = make_matrix(basis, mat_t.general)
+                    den_mat_for_fock_xpy_m_xpyT_y_real.set_values((x_plus_y_ao[y]
+                                                                   - x_plus_y_ao[y].T).real)
+                    den_mat_for_fock_xpy_m_xpyT_y_imag = make_matrix(basis, mat_t.general)
+                    den_mat_for_fock_xpy_m_xpyT_y_imag.set_values((x_plus_y_ao[y]
+                                                                   - x_plus_y_ao[y].T).imag)
+                    # (X-Y)_y
+                    den_mat_for_fock_xmy_y_real = make_matrix(basis, mat_t.general)
+                    den_mat_for_fock_xmy_y_real.set_values(x_minus_y_ao[y].real)
+                    den_mat_for_fock_xmy_y_imag = make_matrix(basis, mat_t.general)
+                    den_mat_for_fock_xmy_y_imag.set_values(x_minus_y_ao[y].imag)
+                    # (X-Y)_y + (X-Y)_y
+                    den_mat_for_fock_xmy_p_xmyT_y_real = make_matrix(basis, mat_t.general)
+                    den_mat_for_fock_xmy_p_xmyT_y_real.set_values((x_minus_y_ao[y]
+                                                                   + x_minus_y_ao[y].T).real)
+                    den_mat_for_fock_xmy_p_xmyT_y_imag = make_matrix(basis, mat_t.general)
+                    den_mat_for_fock_xmy_p_xmyT_y_imag.set_values((x_minus_y_ao[y]
+                                                                   + x_minus_y_ao[y].T).imag)
+                    # contraction of integrals and DMs
                     # Re
-                    erigrad_rel_re_rs = fock_grad_drv.compute(basis, screener_atom, screener,
-                                                              den_mat_for_fock_gs,
-                                                              den_mat_for_fock_rel_real,
-                                                              iatom, 'kx_rs', erf_k_coef,
-                                                              omega, thresh_int)
+                    erigrad_rel_re = fock_grad_drv.compute(basis, screener_atom, screener,
+                                                           den_mat_for_fock_gs,
+                                                           den_mat_for_fock_rel_real_xy,
+                                                           iatom, fock_type,
+                                                           exchange_scaling_factor,
+                                                           0.0, thresh_int)
                     # Im
-                    erigrad_rel_im_rs = fock_grad_drv.compute(basis, screener_atom, screener,
-                                                              den_mat_for_fock_gs,
-                                                              den_mat_for_fock_rel_imag,
-                                                              iatom, 'kx_rs', erf_k_coef,
-                                                              omega, thresh_int)
+                    erigrad_rel_im = fock_grad_drv.compute(basis, screener_atom, screener,
+                                                           den_mat_for_fock_gs,
+                                                           den_mat_for_fock_rel_imag_xy,
+                                                           iatom, fock_type,
+                                                           exchange_scaling_factor,
+                                                           0.0, thresh_int)
                     # ReRe
-                    erigrad_xpy_xy_rere_rs = fock_grad_drv.compute(basis, screener_atom,
-                                                                   screener,
-                                                                   den_mat_for_fock_xpy_x_real,
-                                                                   den_mat_for_fock_xpy_m_xpyT_y_real,
-                                                                   iatom, 'kx_rs', erf_k_coef,
-                                                                   omega, thresh_int)
+                    erigrad_xpy_xy_rere = fock_grad_drv.compute(basis, screener_atom,
+                                                                screener,
+                                                                den_mat_for_fock_xpy_x_real,
+                                                                den_mat_for_fock_xpy_m_xpyT_y_real,
+                                                                iatom, fock_type,
+                                                                exchange_scaling_factor,
+                                                                0.0, thresh_int)
                     # ImIm
-                    erigrad_xpy_xy_imim_rs = fock_grad_drv.compute(basis, screener_atom,
-                                                                   screener,
-                                                                   den_mat_for_fock_xpy_x_imag,
-                                                                   den_mat_for_fock_xpy_m_xpyT_y_imag,
-                                                                   iatom, 'kx_rs', erf_k_coef,
-                                                                   omega, thresh_int)
+                    erigrad_xpy_xy_imim = fock_grad_drv.compute(basis, screener_atom,
+                                                                screener,
+                                                                den_mat_for_fock_xpy_x_imag,
+                                                                den_mat_for_fock_xpy_m_xpyT_y_imag,
+                                                                iatom, fock_type,
+                                                                exchange_scaling_factor,
+                                                                0.0, thresh_int)
                     # ReIm
-                    erigrad_xpy_xy_reim_rs = fock_grad_drv.compute(basis, screener_atom,
-                                                                   screener,
-                                                                   den_mat_for_fock_xpy_x_real,
-                                                                   den_mat_for_fock_xpy_m_xpyT_y_imag,
-                                                                   iatom, 'kx_rs', erf_k_coef,
-                                                                   omega, thresh_int)
+                    erigrad_xpy_xy_reim = fock_grad_drv.compute(basis, screener_atom,
+                                                                screener,
+                                                                den_mat_for_fock_xpy_x_real,
+                                                                den_mat_for_fock_xpy_m_xpyT_y_imag,
+                                                                iatom, fock_type,
+                                                                exchange_scaling_factor,
+                                                                0.0, thresh_int)
                     # ImRe
-                    erigrad_xpy_xy_imre_rs = fock_grad_drv.compute(basis, screener_atom,
-                                                                   screener,
-                                                                   den_mat_for_fock_xpy_x_imag,
-                                                                   den_mat_for_fock_xpy_m_xpyT_y_real,
-                                                                   iatom, 'kx_rs', erf_k_coef,
-                                                                   omega, thresh_int)
+                    erigrad_xpy_xy_imre = fock_grad_drv.compute(basis, screener_atom,
+                                                                screener,
+                                                                den_mat_for_fock_xpy_x_imag,
+                                                                den_mat_for_fock_xpy_m_xpyT_y_real,
+                                                                iatom, fock_type,
+                                                                exchange_scaling_factor,
+                                                                0.0, thresh_int)
                     # ReRe
-                    erigrad_xpy_yx_rere_rs = fock_grad_drv.compute(basis, screener_atom,
-                                                                   screener,
-                                                                   den_mat_for_fock_xpy_m_xpyT_x_real,
-                                                                   den_mat_for_fock_xpy_y_real,
-                                                                   iatom, 'kx_rs', erf_k_coef,
-                                                                   omega, thresh_int)
+                    erigrad_xmy_xy_rere = fock_grad_drv.compute(basis, screener_atom,
+                                                                screener,
+                                                                den_mat_for_fock_xmy_x_real,
+                                                                den_mat_for_fock_xmy_p_xmyT_y_real,
+                                                                iatom, fock_type,
+                                                                exchange_scaling_factor,
+                                                                0.0, thresh_int)
                     # ImIm
-                    erigrad_xpy_yx_imim_rs = fock_grad_drv.compute(basis, screener_atom,
-                                                                   screener,
-                                                                   den_mat_for_fock_xpy_m_xpyT_x_imag,
-                                                                   den_mat_for_fock_xpy_y_imag,
-                                                                   iatom, 'kx_rs', erf_k_coef,
-                                                                   omega, thresh_int)
+                    erigrad_xmy_xy_imim = fock_grad_drv.compute(basis, screener_atom,
+                                                                screener,
+                                                                den_mat_for_fock_xmy_x_imag,
+                                                                den_mat_for_fock_xmy_p_xmyT_y_imag,
+                                                                iatom, fock_type,
+                                                                exchange_scaling_factor,
+                                                                0.0, thresh_int)
                     # ReIm
-                    erigrad_xpy_yx_reim_rs = fock_grad_drv.compute(basis, screener_atom,
-                                                                   screener,
-                                                                   den_mat_for_fock_xpy_m_xpyT_x_real,
-                                                                   den_mat_for_fock_xpy_y_imag,
-                                                                   iatom, 'kx_rs', erf_k_coef,
-                                                                   omega, thresh_int)
+                    erigrad_xmy_xy_reim = fock_grad_drv.compute(basis, screener_atom,
+                                                                screener,
+                                                                den_mat_for_fock_xmy_x_real,
+                                                                den_mat_for_fock_xmy_p_xmyT_y_imag,
+                                                                iatom, fock_type,
+                                                                exchange_scaling_factor,
+                                                                0.0, thresh_int)
                     # ImRe
-                    erigrad_xpy_yx_imre_rs = fock_grad_drv.compute(basis, screener_atom,
-                                                                   screener,
-                                                                   den_mat_for_fock_xpy_m_xpyT_x_imag,
-                                                                   den_mat_for_fock_xpy_y_real,
-                                                                   iatom, 'kx_rs', erf_k_coef,
-                                                                   omega, thresh_int)
-                    # ReRe
-                    erigrad_xmy_xy_rere_rs = fock_grad_drv.compute(basis, screener_atom,
-                                                                   screener,
-                                                                   den_mat_for_fock_xmy_x_real,
-                                                                   den_mat_for_fock_xmy_p_xmyT_y_real,
-                                                                   iatom, 'kx_rs', erf_k_coef,
-                                                                   omega, thresh_int)
-                    # ImIm
-                    erigrad_xmy_xy_imim_rs = fock_grad_drv.compute(basis, screener_atom,
-                                                                   screener,
-                                                                   den_mat_for_fock_xmy_x_imag,
-                                                                   den_mat_for_fock_xmy_p_xmyT_y_imag,
-                                                                   iatom, 'kx_rs', erf_k_coef,
-                                                                   omega, thresh_int)
-                    # ReIm
-                    erigrad_xmy_xy_reim_rs = fock_grad_drv.compute(basis, screener_atom,
-                                                                   screener,
-                                                                   den_mat_for_fock_xmy_x_real,
-                                                                   den_mat_for_fock_xmy_p_xmyT_y_imag,
-                                                                   iatom, 'kx_rs', erf_k_coef,
-                                                                   omega, thresh_int)
-                    # ImRe
-                    erigrad_xmy_xy_imre_rs = fock_grad_drv.compute(basis, screener_atom,
-                                                                   screener,
-                                                                   den_mat_for_fock_xmy_x_imag,
-                                                                   den_mat_for_fock_xmy_p_xmyT_y_real,
-                                                                   iatom, 'kx_rs', erf_k_coef,
-                                                                   omega, thresh_int)
-                    # ReRe
-                    erigrad_xmy_yx_rere_rs = fock_grad_drv.compute(basis, screener_atom,
-                                                                   screener,
-                                                                   den_mat_for_fock_xmy_p_xmyT_x_real,
-                                                                   den_mat_for_fock_xmy_y_real,
-                                                                   iatom, 'kx_rs', erf_k_coef,
-                                                                   omega, thresh_int)
-                    # ImIm
-                    erigrad_xmy_yx_imim_rs = fock_grad_drv.compute(basis, screener_atom,
-                                                                   screener,
-                                                                   den_mat_for_fock_xmy_p_xmyT_x_imag,
-                                                                   den_mat_for_fock_xmy_y_imag,
-                                                                   iatom, 'kx_rs', erf_k_coef,
-                                                                   omega, thresh_int)
-                    # ReIm
-                    erigrad_xmy_yx_reim_rs = fock_grad_drv.compute(basis, screener_atom,
-                                                                   screener,
-                                                                   den_mat_for_fock_xmy_p_xmyT_x_real,
-                                                                   den_mat_for_fock_xmy_y_imag,
-                                                                   iatom, 'kx_rs', erf_k_coef,
-                                                                   omega, thresh_int)
-                    # ImRe
-                    erigrad_xmy_yx_imre_rs = fock_grad_drv.compute(basis, screener_atom,
-                                                                   screener,
-                                                                   den_mat_for_fock_xmy_p_xmyT_x_imag,
-                                                                   den_mat_for_fock_xmy_y_real,
-                                                                   iatom, 'kx_rs', erf_k_coef,
-                                                                   omega, thresh_int)
+                    erigrad_xmy_xy_imre = fock_grad_drv.compute(basis, screener_atom,
+                                                                screener,
+                                                                den_mat_for_fock_xmy_x_imag,
+                                                                den_mat_for_fock_xmy_p_xmyT_y_real,
+                                                                iatom, fock_type,
+                                                                exchange_scaling_factor,
+                                                                0.0, thresh_int)
+                    if y == x:
+                        erigrad_xpy_yx_rere = erigrad_xpy_xy_rere
+                        erigrad_xpy_yx_imim = erigrad_xpy_xy_imim
+                        erigrad_xpy_yx_reim = erigrad_xpy_xy_reim
+                        erigrad_xpy_yx_imre = erigrad_xpy_xy_imre
 
-                    # Real range-separated fmat contribution to gradient
-                    erigrad_real -= np.array(erigrad_rel_re_rs)  # real DM
-                    erigrad_real -= 0.5 * np.array(erigrad_xpy_xy_rere_rs)  # ReRe
-                    erigrad_real += 0.5 * np.array(erigrad_xpy_xy_imim_rs)  # ImIm
-                    erigrad_real -= 0.5 * np.array(erigrad_xpy_yx_rere_rs)  # ReRe
-                    erigrad_real += 0.5 * np.array(erigrad_xpy_yx_imim_rs)  # ImIm
-                    erigrad_real -= 0.5 * np.array(erigrad_xmy_xy_rere_rs)  # ReRe
-                    erigrad_real += 0.5 * np.array(erigrad_xmy_xy_imim_rs)  # ImIm
-                    erigrad_real -= 0.5 * np.array(erigrad_xmy_yx_rere_rs)  # ReRe
-                    erigrad_real += 0.5 * np.array(erigrad_xmy_yx_imim_rs)  # ImIm
+                        erigrad_xmy_yx_rere = erigrad_xmy_xy_rere
+                        erigrad_xmy_yx_imim = erigrad_xmy_xy_imim
+                        erigrad_xmy_yx_reim = erigrad_xmy_xy_reim
+                        erigrad_xmy_yx_imre = erigrad_xmy_xy_imre
+                    else:
+                        # ReRe
+                        erigrad_xpy_yx_rere = fock_grad_drv.compute(basis, screener_atom,
+                                                                    screener,
+                                                                    den_mat_for_fock_xpy_m_xpyT_x_real,
+                                                                    den_mat_for_fock_xpy_y_real,
+                                                                    iatom, fock_type,
+                                                                    exchange_scaling_factor,
+                                                                    0.0, thresh_int)
+                        # ImIm
+                        erigrad_xpy_yx_imim = fock_grad_drv.compute(basis, screener_atom,
+                                                                    screener,
+                                                                    den_mat_for_fock_xpy_m_xpyT_x_imag,
+                                                                    den_mat_for_fock_xpy_y_imag,
+                                                                    iatom, fock_type,
+                                                                    exchange_scaling_factor,
+                                                                    0.0, thresh_int)
+                        # ReIm
+                        erigrad_xpy_yx_reim = fock_grad_drv.compute(basis, screener_atom,
+                                                                    screener,
+                                                                    den_mat_for_fock_xpy_m_xpyT_x_real,
+                                                                    den_mat_for_fock_xpy_y_imag,
+                                                                    iatom, fock_type,
+                                                                    exchange_scaling_factor,
+                                                                    0.0, thresh_int)
+                        # ImRe
+                        erigrad_xpy_yx_imre = fock_grad_drv.compute(basis, screener_atom,
+                                                                    screener,
+                                                                    den_mat_for_fock_xpy_m_xpyT_x_imag,
+                                                                    den_mat_for_fock_xpy_y_real,
+                                                                    iatom, fock_type,
+                                                                    exchange_scaling_factor,
+                                                                    0.0, thresh_int)
+                        # ReRe
+                        erigrad_xmy_yx_rere = fock_grad_drv.compute(basis, screener_atom,
+                                                                    screener,
+                                                                    den_mat_for_fock_xmy_p_xmyT_x_real,
+                                                                    den_mat_for_fock_xmy_y_real,
+                                                                    iatom, fock_type,
+                                                                    exchange_scaling_factor,
+                                                                    0.0, thresh_int)
+                        # ImIm
+                        erigrad_xmy_yx_imim = fock_grad_drv.compute(basis, screener_atom,
+                                                                    screener,
+                                                                    den_mat_for_fock_xmy_p_xmyT_x_imag,
+                                                                    den_mat_for_fock_xmy_y_imag,
+                                                                    iatom, fock_type,
+                                                                    exchange_scaling_factor,
+                                                                    0.0, thresh_int)
+                        # ReIm
+                        erigrad_xmy_yx_reim = fock_grad_drv.compute(basis, screener_atom,
+                                                                    screener,
+                                                                    den_mat_for_fock_xmy_p_xmyT_x_real,
+                                                                    den_mat_for_fock_xmy_y_imag,
+                                                                    iatom, fock_type,
+                                                                    exchange_scaling_factor,
+                                                                    0.0, thresh_int)
+                        # ImRe
+                        erigrad_xmy_yx_imre = fock_grad_drv.compute(basis, screener_atom,
+                                                                    screener,
+                                                                    den_mat_for_fock_xmy_p_xmyT_x_imag,
+                                                                    den_mat_for_fock_xmy_y_real,
+                                                                    iatom, fock_type,
+                                                                    exchange_scaling_factor,
+                                                                    0.0, thresh_int)
 
-                    # Imaginary range-separated fmat contribution to gradient
-                    erigrad_imag -= np.array(erigrad_rel_im_rs)  # imag DM
-                    erigrad_imag -= 0.5 * np.array(erigrad_xpy_xy_reim_rs)  # ReIm
-                    erigrad_imag -= 0.5 * np.array(erigrad_xpy_xy_imre_rs)  # ImRe
-                    erigrad_imag -= 0.5 * np.array(erigrad_xpy_yx_reim_rs)  # ReIm
-                    erigrad_imag -= 0.5 * np.array(erigrad_xpy_yx_imre_rs)  # ImRe
-                    erigrad_imag -= 0.5 * np.array(erigrad_xmy_xy_reim_rs)  # ReIm
-                    erigrad_imag -= 0.5 * np.array(erigrad_xmy_xy_imre_rs)  # ImRe
-                    erigrad_imag -= 0.5 * np.array(erigrad_xmy_yx_reim_rs)  # ReIm
-                    erigrad_imag -= 0.5 * np.array(erigrad_xmy_yx_imre_rs)  # ImRe
+                    # Real fmat contribution to gradient
+                    erigrad_real = np.array(erigrad_rel_re)  # real DM
+                    erigrad_real += 0.5 * np.array(erigrad_xpy_xy_rere)  # ReRe
+                    erigrad_real -= 0.5 * np.array(erigrad_xpy_xy_imim)  # ImIm
+                    erigrad_real += 0.5 * np.array(erigrad_xpy_yx_rere)  # ReRe
+                    erigrad_real -= 0.5 * np.array(erigrad_xpy_yx_imim)  # ImIm
+                    erigrad_real += 0.5 * np.array(erigrad_xmy_xy_rere)  # ReRe
+                    erigrad_real -= 0.5 * np.array(erigrad_xmy_xy_imim)  # ImIm
+                    erigrad_real += 0.5 * np.array(erigrad_xmy_yx_rere)  # ReRe
+                    erigrad_real -= 0.5 * np.array(erigrad_xmy_yx_imim)  # ImIm
+                    erigrad_real *= factor
 
-                # add to complex variable
-                eri_deriv_contrib[x, y, iatom] += erigrad_real + 1j * erigrad_imag
-        print("The end of eri_deriv_contrib")
+                    # Imaginary fmat contribution to gradient
+                    erigrad_imag = np.array(erigrad_rel_im)  # imag DM
+                    erigrad_imag += 0.5 * np.array(erigrad_xpy_xy_reim)  # ReIm
+                    erigrad_imag += 0.5 * np.array(erigrad_xpy_xy_imre)  # ImRe
+                    erigrad_imag += 0.5 * np.array(erigrad_xpy_yx_reim)  # ReIm
+                    erigrad_imag += 0.5 * np.array(erigrad_xpy_yx_imre)  # ImRe
+                    erigrad_imag += 0.5 * np.array(erigrad_xmy_xy_reim)  # ReIm
+                    erigrad_imag += 0.5 * np.array(erigrad_xmy_xy_imre)  # ImRe
+                    erigrad_imag += 0.5 * np.array(erigrad_xmy_yx_reim)  # ReIm
+                    erigrad_imag += 0.5 * np.array(erigrad_xmy_yx_imre)  # ImRe
+                    erigrad_imag *= factor
+
+                    # TODO fix so diagonal elements not computed twice
+                    if need_omega:
+                        # for range-separated functionals
+                        # Re
+                        erigrad_rel_re_rs = fock_grad_drv.compute(basis, screener_atom, screener,
+                                                                  den_mat_for_fock_gs,
+                                                                  den_mat_for_fock_rel_real_xy,
+                                                                  iatom, 'kx_rs', erf_k_coef,
+                                                                  omega, thresh_int)
+                        # Im
+                        erigrad_rel_im_rs = fock_grad_drv.compute(basis, screener_atom, screener,
+                                                                  den_mat_for_fock_gs,
+                                                                  den_mat_for_fock_rel_imag_xy,
+                                                                  iatom, 'kx_rs', erf_k_coef,
+                                                                  omega, thresh_int)
+                        # ReRe
+                        erigrad_xpy_xy_rere_rs = fock_grad_drv.compute(basis, screener_atom,
+                                                                       screener,
+                                                                       den_mat_for_fock_xpy_x_real,
+                                                                       den_mat_for_fock_xpy_m_xpyT_y_real,
+                                                                       iatom, 'kx_rs', erf_k_coef,
+                                                                       omega, thresh_int)
+                        # ImIm
+                        erigrad_xpy_xy_imim_rs = fock_grad_drv.compute(basis, screener_atom,
+                                                                       screener,
+                                                                       den_mat_for_fock_xpy_x_imag,
+                                                                       den_mat_for_fock_xpy_m_xpyT_y_imag,
+                                                                       iatom, 'kx_rs', erf_k_coef,
+                                                                       omega, thresh_int)
+                        # ReIm
+                        erigrad_xpy_xy_reim_rs = fock_grad_drv.compute(basis, screener_atom,
+                                                                       screener,
+                                                                       den_mat_for_fock_xpy_x_real,
+                                                                       den_mat_for_fock_xpy_m_xpyT_y_imag,
+                                                                       iatom, 'kx_rs', erf_k_coef,
+                                                                       omega, thresh_int)
+                        # ImRe
+                        erigrad_xpy_xy_imre_rs = fock_grad_drv.compute(basis, screener_atom,
+                                                                       screener,
+                                                                       den_mat_for_fock_xpy_x_imag,
+                                                                       den_mat_for_fock_xpy_m_xpyT_y_real,
+                                                                       iatom, 'kx_rs', erf_k_coef,
+                                                                       omega, thresh_int)
+                        # ReRe
+                        erigrad_xpy_yx_rere_rs = fock_grad_drv.compute(basis, screener_atom,
+                                                                       screener,
+                                                                       den_mat_for_fock_xpy_m_xpyT_x_real,
+                                                                       den_mat_for_fock_xpy_y_real,
+                                                                       iatom, 'kx_rs', erf_k_coef,
+                                                                       omega, thresh_int)
+                        # ImIm
+                        erigrad_xpy_yx_imim_rs = fock_grad_drv.compute(basis, screener_atom,
+                                                                       screener,
+                                                                       den_mat_for_fock_xpy_m_xpyT_x_imag,
+                                                                       den_mat_for_fock_xpy_y_imag,
+                                                                       iatom, 'kx_rs', erf_k_coef,
+                                                                       omega, thresh_int)
+                        # ReIm
+                        erigrad_xpy_yx_reim_rs = fock_grad_drv.compute(basis, screener_atom,
+                                                                       screener,
+                                                                       den_mat_for_fock_xpy_m_xpyT_x_real,
+                                                                       den_mat_for_fock_xpy_y_imag,
+                                                                       iatom, 'kx_rs', erf_k_coef,
+                                                                       omega, thresh_int)
+                        # ImRe
+                        erigrad_xpy_yx_imre_rs = fock_grad_drv.compute(basis, screener_atom,
+                                                                       screener,
+                                                                       den_mat_for_fock_xpy_m_xpyT_x_imag,
+                                                                       den_mat_for_fock_xpy_y_real,
+                                                                       iatom, 'kx_rs', erf_k_coef,
+                                                                       omega, thresh_int)
+                        # ReRe
+                        erigrad_xmy_xy_rere_rs = fock_grad_drv.compute(basis, screener_atom,
+                                                                       screener,
+                                                                       den_mat_for_fock_xmy_x_real,
+                                                                       den_mat_for_fock_xmy_p_xmyT_y_real,
+                                                                       iatom, 'kx_rs', erf_k_coef,
+                                                                       omega, thresh_int)
+                        # ImIm
+                        erigrad_xmy_xy_imim_rs = fock_grad_drv.compute(basis, screener_atom,
+                                                                       screener,
+                                                                       den_mat_for_fock_xmy_x_imag,
+                                                                       den_mat_for_fock_xmy_p_xmyT_y_imag,
+                                                                       iatom, 'kx_rs', erf_k_coef,
+                                                                       omega, thresh_int)
+                        # ReIm
+                        erigrad_xmy_xy_reim_rs = fock_grad_drv.compute(basis, screener_atom,
+                                                                       screener,
+                                                                       den_mat_for_fock_xmy_x_real,
+                                                                       den_mat_for_fock_xmy_p_xmyT_y_imag,
+                                                                       iatom, 'kx_rs', erf_k_coef,
+                                                                       omega, thresh_int)
+                        # ImRe
+                        erigrad_xmy_xy_imre_rs = fock_grad_drv.compute(basis, screener_atom,
+                                                                       screener,
+                                                                       den_mat_for_fock_xmy_x_imag,
+                                                                       den_mat_for_fock_xmy_p_xmyT_y_real,
+                                                                       iatom, 'kx_rs', erf_k_coef,
+                                                                       omega, thresh_int)
+                        # ReRe
+                        erigrad_xmy_yx_rere_rs = fock_grad_drv.compute(basis, screener_atom,
+                                                                       screener,
+                                                                       den_mat_for_fock_xmy_p_xmyT_x_real,
+                                                                       den_mat_for_fock_xmy_y_real,
+                                                                       iatom, 'kx_rs', erf_k_coef,
+                                                                       omega, thresh_int)
+                        # ImIm
+                        erigrad_xmy_yx_imim_rs = fock_grad_drv.compute(basis, screener_atom,
+                                                                       screener,
+                                                                       den_mat_for_fock_xmy_p_xmyT_x_imag,
+                                                                       den_mat_for_fock_xmy_y_imag,
+                                                                       iatom, 'kx_rs', erf_k_coef,
+                                                                       omega, thresh_int)
+                        # ReIm
+                        erigrad_xmy_yx_reim_rs = fock_grad_drv.compute(basis, screener_atom,
+                                                                       screener,
+                                                                       den_mat_for_fock_xmy_p_xmyT_x_real,
+                                                                       den_mat_for_fock_xmy_y_imag,
+                                                                       iatom, 'kx_rs', erf_k_coef,
+                                                                       omega, thresh_int)
+                        # ImRe
+                        erigrad_xmy_yx_imre_rs = fock_grad_drv.compute(basis, screener_atom,
+                                                                       screener,
+                                                                       den_mat_for_fock_xmy_p_xmyT_x_imag,
+                                                                       den_mat_for_fock_xmy_y_real,
+                                                                       iatom, 'kx_rs', erf_k_coef,
+                                                                       omega, thresh_int)
+
+                        # Real range-separated fmat contribution to gradient
+                        erigrad_real -= np.array(erigrad_rel_re_rs)  # real DM
+                        erigrad_real -= 0.5 * np.array(erigrad_xpy_xy_rere_rs)  # ReRe
+                        erigrad_real += 0.5 * np.array(erigrad_xpy_xy_imim_rs)  # ImIm
+                        erigrad_real -= 0.5 * np.array(erigrad_xpy_yx_rere_rs)  # ReRe
+                        erigrad_real += 0.5 * np.array(erigrad_xpy_yx_imim_rs)  # ImIm
+                        erigrad_real -= 0.5 * np.array(erigrad_xmy_xy_rere_rs)  # ReRe
+                        erigrad_real += 0.5 * np.array(erigrad_xmy_xy_imim_rs)  # ImIm
+                        erigrad_real -= 0.5 * np.array(erigrad_xmy_yx_rere_rs)  # ReRe
+                        erigrad_real += 0.5 * np.array(erigrad_xmy_yx_imim_rs)  # ImIm
+
+                        # Imaginary range-separated fmat contribution to gradient
+                        erigrad_imag -= np.array(erigrad_rel_im_rs)  # imag DM
+                        erigrad_imag -= 0.5 * np.array(erigrad_xpy_xy_reim_rs)  # ReIm
+                        erigrad_imag -= 0.5 * np.array(erigrad_xpy_xy_imre_rs)  # ImRe
+                        erigrad_imag -= 0.5 * np.array(erigrad_xpy_yx_reim_rs)  # ReIm
+                        erigrad_imag -= 0.5 * np.array(erigrad_xpy_yx_imre_rs)  # ImRe
+                        erigrad_imag -= 0.5 * np.array(erigrad_xmy_xy_reim_rs)  # ReIm
+                        erigrad_imag -= 0.5 * np.array(erigrad_xmy_xy_imre_rs)  # ImRe
+                        erigrad_imag -= 0.5 * np.array(erigrad_xmy_yx_reim_rs)  # ReIm
+                        erigrad_imag -= 0.5 * np.array(erigrad_xmy_yx_imre_rs)  # ImRe
+
+                    # add to complex variable
+                    eri_deriv_contrib[x, y, iatom] += erigrad_real + 1j * erigrad_imag
 
         return eri_deriv_contrib
 
@@ -1362,7 +1365,6 @@ class PolarizabilityGradient:
             The orbital response lambda vector.
         """
 
-        print("In get_lambda_response_vector")
 
         if self.rank == mpi_master():
             # MO coefficients
@@ -1386,16 +1388,13 @@ class PolarizabilityGradient:
         dof_red, xy_pairs = self.comm.bcast((dof_red, xy_pairs), root=mpi_master())
 
         if self.is_complex:
-            print("complex, read lambda from dist")
             for idx, xy in enumerate(xy_pairs):
-                print(f"idx, xy: {idx}, {xy}")
                 tmp_lambda_re = lambda_list[
                     2 * dof_red * fdx + idx].get_full_vector()
                 tmp_lambda_im = lambda_list[
                     2 * dof_red * fdx + dof_red + idx].get_full_vector()
 
                 if self.rank == mpi_master():
-                    print("master, combine Re and Im into lambda_ov")
                     x = xy[0]
                     y = xy[1]
 
@@ -1404,9 +1403,7 @@ class PolarizabilityGradient:
                     if y != x:
                         lambda_ov[y, x] += lambda_ov[x, y]
         else:
-            print("real, read lambda from dist")
             for idx, xy in enumerate(xy_pairs):
-                print(f"idx, xy: {idx}, {xy}")
                 tmp_lambda_ov = lambda_list[dof_red * fdx + idx].get_full_vector()
 
                 if self.rank == mpi_master():
@@ -1656,6 +1653,7 @@ class PolarizabilityGradient:
                 x_minus_y_sym_m = self.comm.bcast(x_minus_y_sym_m, root=mpi_master())
                 x_minus_y_sym_n = self.comm.bcast(x_minus_y_sym_n, root=mpi_master())
 
+                # TODO: unpack the function below, not optimal to have it like this
                 polgrad_xcgrad = self.calculate_xc_mn_contrib_real(
                     molecule, ao_basis, [rhow_dm_sym],
                     [x_minus_y_sym_m], [x_minus_y_sym_n],
@@ -1743,6 +1741,7 @@ class PolarizabilityGradient:
                 x_minus_y_sym_n_list_imag = self.comm.bcast(x_minus_y_sym_n_list_imag,
                                                             root=mpi_master())
 
+                # TODO: unpack the function below, not optimal to have it like this
                 polgrad_xcgrad = self.calculate_xc_mn_contrib_complex(
                     molecule, ao_basis, rhow_dm_sym_list_real,
                     rhow_dm_sym_list_imag,
@@ -1792,6 +1791,7 @@ class PolarizabilityGradient:
             molecule, ao_basis, rhow_den, gs_density, gs_density, mol_grid,
             xcfun_label)
 
+        # TODO fix so if diagonal element, things are not computed twice
         polgrad_xcgrad += 0.5 * xcgrad_drv.integrate_fxc_gradient(
             molecule, ao_basis, x_minus_y_den_m, x_minus_y_den_n, gs_density,
             mol_grid, xcfun_label)
@@ -1848,6 +1848,7 @@ class PolarizabilityGradient:
             molecule, ao_basis, rhow_den_real, gs_density, gs_density, mol_grid,
             xcfun_label)
 
+        # TODO fix so if diagonal element, things are not computed twice
         polgrad_xcgrad_real += 0.5 * xcgrad_drv.integrate_fxc_gradient(  # ReRe
             molecule, ao_basis, x_minus_y_den_real_m, x_minus_y_den_real_n,
             gs_density, mol_grid, xcfun_label)
@@ -1882,29 +1883,29 @@ class PolarizabilityGradient:
             molecule, ao_basis, rhow_den_imag, gs_density, gs_density, mol_grid,
             xcfun_label)
 
-        polgrad_xcgrad_imag += 0.5*xcgrad_drv.integrate_fxc_gradient(  # ReIm
+        polgrad_xcgrad_imag += 0.5 * xcgrad_drv.integrate_fxc_gradient(  # ReIm
             molecule, ao_basis, x_minus_y_den_real_m, x_minus_y_den_imag_n,
             gs_density, mol_grid, xcfun_label)
-        polgrad_xcgrad_imag += 0.5*xcgrad_drv.integrate_fxc_gradient(  # ReIm
+        polgrad_xcgrad_imag += 0.5 * xcgrad_drv.integrate_fxc_gradient(  # ReIm
             molecule, ao_basis, x_minus_y_den_real_n, x_minus_y_den_imag_m,
             gs_density, mol_grid, xcfun_label)
-        polgrad_xcgrad_imag += 0.5*xcgrad_drv.integrate_kxc_gradient(  # ReIm
+        polgrad_xcgrad_imag += 0.5 * xcgrad_drv.integrate_kxc_gradient(  # ReIm
             molecule, ao_basis, x_minus_y_den_real_m, x_minus_y_den_imag_n,
             gs_density, mol_grid, xcfun_label)
-        polgrad_xcgrad_imag += 0.5*xcgrad_drv.integrate_kxc_gradient(  # ReIm
+        polgrad_xcgrad_imag += 0.5 * xcgrad_drv.integrate_kxc_gradient(  # ReIm
             molecule, ao_basis, x_minus_y_den_real_n, x_minus_y_den_imag_m,
             gs_density, mol_grid, xcfun_label)
 
-        polgrad_xcgrad_imag += 0.5*xcgrad_drv.integrate_fxc_gradient(  # ImRe
+        polgrad_xcgrad_imag += 0.5 * xcgrad_drv.integrate_fxc_gradient(  # ImRe
             molecule, ao_basis, x_minus_y_den_imag_m, x_minus_y_den_real_n,
             gs_density, mol_grid, xcfun_label)
-        polgrad_xcgrad_imag += 0.5*xcgrad_drv.integrate_fxc_gradient(  # ImRe
+        polgrad_xcgrad_imag += 0.5 * xcgrad_drv.integrate_fxc_gradient(  # ImRe
             molecule, ao_basis, x_minus_y_den_imag_n, x_minus_y_den_real_m,
             gs_density, mol_grid, xcfun_label)
-        polgrad_xcgrad_imag += 0.5*xcgrad_drv.integrate_kxc_gradient(  # ImRe
+        polgrad_xcgrad_imag += 0.5 * xcgrad_drv.integrate_kxc_gradient(  # ImRe
             molecule, ao_basis, x_minus_y_den_imag_m, x_minus_y_den_real_n,
             gs_density, mol_grid, xcfun_label)
-        polgrad_xcgrad_imag += 0.5*xcgrad_drv.integrate_kxc_gradient(  # ImRe
+        polgrad_xcgrad_imag += 0.5 * xcgrad_drv.integrate_kxc_gradient(  # ImRe
             molecule, ao_basis, x_minus_y_den_imag_n, x_minus_y_den_real_m,
             gs_density, mol_grid, xcfun_label)
 
