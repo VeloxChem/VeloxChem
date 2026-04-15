@@ -41,7 +41,7 @@ from .dftutils import get_default_grid_level
 from .errorhandler import assert_msg_critical
 
 
-def molecule_sanity_check(mol, method_type=None):
+def molecule_sanity_check(mol, method_type=None, caller_name=None):
     """
     Checks molecule for charge/multiplicity combination and geometry.
 
@@ -49,6 +49,8 @@ def molecule_sanity_check(mol, method_type=None):
         The molecule.
     :param method_type:
         The method type (restricted, unrestricted or restricted_openshell).
+    :param caller_name:
+        The caller name used for method-specific error messages.
     """
 
     assert_msg_critical(
@@ -56,9 +58,13 @@ def molecule_sanity_check(mol, method_type=None):
         'Molecule: Incompatible multiplicity and number of electrons')
 
     if method_type == 'restricted':
+        if caller_name is None:
+            err_msg = f'Molecule: Invalid multiplicity for {method_type}'
+        else:
+            err_msg = f'{caller_name}: not implemented for unrestricted case'
         assert_msg_critical(
             mol.get_multiplicity() == 1,
-            f'Molecule: Invalid multiplicity for {method_type}')
+            err_msg)
 
     assert_msg_critical(mol.check_proximity(0.1), 'Molecule: Atoms too close')
 
@@ -170,6 +176,7 @@ def rsp_results_solvation_sanity_check(obj, rsp_results):
     for key, val in updated_rsp_info.items():
         setattr(obj, key, val)
 
+
 def dft_sanity_check(obj, method_flag='compute', response_flag='none'):
     """
     Checks DFT settings and updates relevant attributes.
@@ -221,6 +228,38 @@ def dft_sanity_check(obj, method_flag='compute', response_flag='none'):
         err_msg_scan += 'SCAN family of functional is not supported'
         assert_msg_critical('scan' not in obj.xcfun.get_func_label().lower(),
                             err_msg_scan)
+
+
+def ri_sanity_check(obj):
+    """
+    Checks RI settings and updates relevant attributes.
+
+    :param obj:
+        The object (SCF or response driver) that is being updated.
+    """
+
+    ri_coulomb = getattr(obj, 'ri_coulomb', False)
+    ri_jk = getattr(obj, 'ri_jk', False)
+
+    if not (ri_coulomb or ri_jk):
+        return
+
+    err_msg = f'{type(obj).__name__}: please use either ri_coulomb or ri_jk, '
+    err_msg += 'not both.'
+    assert_msg_critical(not (ri_coulomb and ri_jk), err_msg)
+
+    if (ri_coulomb or ri_jk) and hasattr(obj, 'acc_type'):
+        # RI uses plain DIIS variants
+        if obj.acc_type.upper() == 'L2_C2DIIS':
+            obj.acc_type = 'C2DIIS'
+        elif obj.acc_type.upper() == 'L2_DIIS':
+            obj.acc_type = 'DIIS'
+
+    if ri_coulomb and obj.ri_auxiliary_basis == 'def2-universal-jkfit':
+        obj.ri_auxiliary_basis = 'def2-universal-jfit'
+
+    if ri_jk and obj.ri_auxiliary_basis == 'def2-universal-jfit':
+        obj.ri_auxiliary_basis = 'def2-universal-jkfit'
 
 
 def polorbrsp_sanity_check_1(obj):

@@ -1,21 +1,53 @@
 target_sources(vlxobjs
   PRIVATE
     LocalCorePotentialDriver.cpp
+    LocalCorePotentialPrimRecDD.cpp
+    LocalCorePotentialPrimRecDF.cpp
+    LocalCorePotentialPrimRecDG.cpp
+    LocalCorePotentialPrimRecDH.cpp
+    LocalCorePotentialPrimRecDI.cpp
+    LocalCorePotentialPrimRecDP.cpp
     LocalCorePotentialPrimRecDS.cpp
+    LocalCorePotentialPrimRecFD.cpp
+    LocalCorePotentialPrimRecFF.cpp
+    LocalCorePotentialPrimRecFG.cpp
+    LocalCorePotentialPrimRecFH.cpp
+    LocalCorePotentialPrimRecFI.cpp
+    LocalCorePotentialPrimRecFP.cpp
     LocalCorePotentialPrimRecFS.cpp
+    LocalCorePotentialPrimRecGD.cpp
+    LocalCorePotentialPrimRecGF.cpp
+    LocalCorePotentialPrimRecGG.cpp
+    LocalCorePotentialPrimRecGH.cpp
+    LocalCorePotentialPrimRecGI.cpp
+    LocalCorePotentialPrimRecGP.cpp
     LocalCorePotentialPrimRecGS.cpp
+    LocalCorePotentialPrimRecHD.cpp
+    LocalCorePotentialPrimRecHF.cpp
+    LocalCorePotentialPrimRecHG.cpp
+    LocalCorePotentialPrimRecHH.cpp
+    LocalCorePotentialPrimRecHI.cpp
+    LocalCorePotentialPrimRecHP.cpp
     LocalCorePotentialPrimRecHS.cpp
+    LocalCorePotentialPrimRecID.cpp
+    LocalCorePotentialPrimRecIF.cpp
+    LocalCorePotentialPrimRecIG.cpp
+    LocalCorePotentialPrimRecIH.cpp
+    LocalCorePotentialPrimRecII.cpp
+    LocalCorePotentialPrimRecIP.cpp
     LocalCorePotentialPrimRecIS.cpp
-    LocalCorePotentialPrimRecKS.cpp
-    LocalCorePotentialPrimRecLS.cpp
+    LocalCorePotentialPrimRecPD.cpp
+    LocalCorePotentialPrimRecPF.cpp
+    LocalCorePotentialPrimRecPG.cpp
+    LocalCorePotentialPrimRecPH.cpp
+    LocalCorePotentialPrimRecPI.cpp
+    LocalCorePotentialPrimRecPP.cpp
     LocalCorePotentialPrimRecPS.cpp
     LocalCorePotentialPrimRecSD.cpp
     LocalCorePotentialPrimRecSF.cpp
     LocalCorePotentialPrimRecSG.cpp
     LocalCorePotentialPrimRecSH.cpp
     LocalCorePotentialPrimRecSI.cpp
-    LocalCorePotentialPrimRecSK.cpp
-    LocalCorePotentialPrimRecSL.cpp
     LocalCorePotentialPrimRecSP.cpp
     LocalCorePotentialPrimRecSS.cpp
   )

@@ -30,24 +30,23 @@
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-from mpi4py import MPI
 import numpy as np
 import time as tm
-import sys
 
 from .veloxchemlib import mpi_master
-from .outputstream import OutputStream
 from .profiler import Profiler
 from .distributedarray import DistributedArray
-from .linearsolver import LinearSolver
+from .lrsolverbase import LinearResponseSolverBase
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           dft_sanity_check, pe_sanity_check,
+                           ri_sanity_check, dft_sanity_check, pe_sanity_check,
                            solvation_model_sanity_check)
-from .errorhandler import assert_msg_critical, safe_solve
-from .checkpoint import (check_rsp_hdf5, write_rsp_solution_with_multiple_keys)
+from .errorhandler import assert_msg_critical
+from .mathutils import safe_solve
+from .checkpoint import check_rsp_hdf5
+from .resultsio import write_rsp_solution_with_multiple_keys
 
 
-class LinearResponseSolver(LinearSolver):
+class LinearResponseSolver(LinearResponseSolverBase):
     """
     Implements linear response solver.
 
@@ -66,52 +65,6 @@ class LinearResponseSolver(LinearSolver):
         - b_components: Cartesian components of the B operator.
         - frequencies: The frequencies.
     """
-
-    def __init__(self, comm=None, ostream=None):
-        """
-        Initializes linear response solver to default setup.
-        """
-
-        if comm is None:
-            comm = MPI.COMM_WORLD
-
-        if ostream is None:
-            if comm.Get_rank() == mpi_master():
-                ostream = OutputStream(sys.stdout)
-            else:
-                ostream = OutputStream(None)
-
-        super().__init__(comm, ostream)
-
-        # operators and frequencies
-        self.a_operator = 'electric dipole'
-        self.a_components = 'xyz'
-        self.b_operator = 'electric dipole'
-        self.b_components = 'xyz'
-        self.frequencies = (0,)
-
-        self._input_keywords['response'].update({
-            'a_operator': ('str_lower', 'A operator'),
-            'a_components': ('str_lower', 'Cartesian components of A operator'),
-            'b_operator': ('str_lower', 'B operator'),
-            'b_components': ('str_lower', 'Cartesian components of B operator'),
-            'frequencies': ('seq_range', 'frequencies'),
-        })
-
-    def update_settings(self, rsp_dict, method_dict=None):
-        """
-        Updates response and method settings in linear response solver.
-
-        :param rsp_dict:
-            The dictionary of response input.
-        :param method_dict:
-            The dictionary of method settings.
-        """
-
-        if method_dict is None:
-            method_dict = {}
-
-        super().update_settings(rsp_dict, method_dict)
 
     def compute(self, molecule, basis, scf_results, v_grad=None):
         """
@@ -145,8 +98,12 @@ class LinearResponseSolver(LinearSolver):
 
         self.has_external_rhs = False
 
+        # make sure that lr_property is properly set
+        if self.property is not None:
+            self.set_lr_property(self.property)
+
         # check molecule
-        molecule_sanity_check(molecule)
+        molecule_sanity_check(molecule, 'restricted', type(self).__name__)
 
         # check SCF results
         scf_results_sanity_check(self, scf_results)
@@ -154,6 +111,9 @@ class LinearResponseSolver(LinearSolver):
         # update checkpoint_file after scf_results_sanity_check
         if self.filename is not None and self.checkpoint_file is None:
             self.checkpoint_file = f'{self.filename}_rsp.h5'
+
+        # check RI setup
+        ri_sanity_check(self)
 
         # check dft setup
         dft_sanity_check(self, 'compute')
@@ -187,20 +147,17 @@ class LinearResponseSolver(LinearSolver):
 
         self.start_time = tm.time()
 
-        # sanity check
-        nalpha = molecule.number_of_alpha_electrons()
-        nbeta = molecule.number_of_beta_electrons()
-        assert_msg_critical(
-            nalpha == nbeta,
-            f'{type(self).__name__}: not implemented for unrestricted case')
-
         if self.rank == mpi_master():
             orb_ene = scf_results['E_alpha']
         else:
             orb_ene = None
         orb_ene = self.comm.bcast(orb_ene, root=mpi_master())
         norb = orb_ene.shape[0]
-        nocc = molecule.number_of_alpha_electrons()
+        nocc = molecule.number_of_alpha_occupied_orbitals(basis)
+
+        self._check_mpi_oversubscription(
+            self._get_excitation_space_dimension_restricted(nocc, norb),
+            'response space')
 
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
@@ -212,7 +169,7 @@ class LinearResponseSolver(LinearSolver):
         pe_dict = self._init_pe(molecule, basis)
 
         # CPCM information
-        self._init_cpcm(molecule)
+        self._init_cpcm(molecule, basis)
 
         # right-hand side (gradient)
         if self.rank == mpi_master():
@@ -274,11 +231,88 @@ class LinearResponseSolver(LinearSolver):
                 self.restart = check_rsp_hdf5(self.checkpoint_file,
                                               rsp_vector_labels, molecule,
                                               basis, dft_dict, pe_dict)
+                if self.restart:
+                    self.restart = self.match_settings(self.checkpoint_file)
             self.restart = self.comm.bcast(self.restart, root=mpi_master())
 
         # read initial guess from restart file
         if self.restart:
             self._read_checkpoint(rsp_vector_labels)
+
+            checkpoint_frequencies = self._read_frequencies_from_checkpoint()
+
+            # Note that we only handle the restart with additional frequencies when
+            # `self.nonlinear` is inactive (and also `self.has_external_rhs` for
+            # LR solver)
+
+            # print warning if frequencies is not present in the restart file
+            if checkpoint_frequencies is None and not (self.nonlinear or
+                                                       self.has_external_rhs):
+                self.ostream.print_warning(
+                    'Could not find the frequencies key in the checkpoint file.'
+                )
+                self.ostream.print_blank()
+                self.ostream.print_info(
+                    'Assuming that frequencies is not changed before and after '
+                    + 'the restart.')
+                self.ostream.print_blank()
+                self.ostream.flush()
+
+            # generate necessary initial guesses if more frequencies are requested
+            # in a restart calculation
+            elif not (self.nonlinear or self.has_external_rhs):
+                extra_freqs = []
+                for w in self.frequencies:
+                    if w not in checkpoint_frequencies:
+                        extra_freqs.append(w)
+
+                if extra_freqs:
+                    self.ostream.print_info(
+                        f'Generating initial guesses for {len(extra_freqs)} ' +
+                        'more frequencies...')
+                    self.ostream.print_blank()
+
+                    if self.rank == mpi_master():
+                        extra_v_grad = {
+                            (op, w): v
+                            for op, v in zip(self.b_components, b_grad)
+                            for w in extra_freqs
+                        }
+                        extra_op_freq_keys = list(extra_v_grad.keys())
+                    else:
+                        extra_op_freq_keys = None
+                    extra_op_freq_keys = self.comm.bcast(extra_op_freq_keys,
+                                                         root=mpi_master())
+
+                    extra_precond = {
+                        w: self._get_precond(orb_ene, nocc, norb, w)
+                        for w in extra_freqs
+                    }
+
+                    extra_dist_grad = {}
+                    for key in extra_op_freq_keys:
+                        if self.rank == mpi_master():
+                            gradger, gradung = self._decomp_grad(
+                                extra_v_grad[key])
+                            grad_mat = np.hstack((
+                                gradger.reshape(-1, 1),
+                                gradung.reshape(-1, 1),
+                            ))
+                        else:
+                            grad_mat = None
+                        extra_dist_grad[key] = DistributedArray(
+                            grad_mat, self.comm)
+
+                    dist_grad.update(extra_dist_grad)
+
+                    bger, bung = self._setup_trials(extra_dist_grad,
+                                                    extra_precond)
+
+                    profiler.set_timing_key('Preparation')
+
+                    self._e2n_half_size(bger, bung, molecule, basis,
+                                        scf_results, eri_dict, dft_dict,
+                                        pe_dict, profiler)
 
         # generate initial guess from scratch
         else:
@@ -455,6 +489,7 @@ class LinearResponseSolver(LinearSolver):
             if self.force_checkpoint:
                 self._write_checkpoint(molecule, basis, dft_dict, pe_dict,
                                        rsp_vector_labels)
+                self._add_frequencies_to_checkpoint()
 
             self._e2n_half_size(new_trials_ger, new_trials_ung, molecule, basis,
                                 scf_results, eri_dict, dft_dict, pe_dict,
@@ -468,6 +503,7 @@ class LinearResponseSolver(LinearSolver):
 
         self._write_checkpoint(molecule, basis, dft_dict, pe_dict,
                                rsp_vector_labels)
+        self._add_frequencies_to_checkpoint()
 
         # converged?
         if self.rank == mpi_master():
@@ -553,59 +589,6 @@ class LinearResponseSolver(LinearSolver):
             else:
                 return {}
 
-    @staticmethod
-    def get_full_solution_vector(solution):
-        """
-        Gets a full solution vector from the distributed solution.
-
-        :param solution:
-            The distributed solution as a tuple.
-
-        :return:
-            The full solution vector.
-        """
-
-        x_ger = solution.get_full_vector(0)
-        x_ung = solution.get_full_vector(1)
-
-        if solution.rank == mpi_master():
-            x_ger_full = np.hstack((x_ger, x_ger))
-            x_ung_full = np.hstack((x_ung, -x_ung))
-            return x_ger_full + x_ung_full
-        else:
-            return None
-
-    def _print_iteration(self, relative_residual_norm, xvs):
-        """
-        Prints information of the iteration.
-
-        :param relative_residual_norm:
-            Relative residual norms.
-        :param xvs:
-            A list of tuples containing operator component, frequency, and
-            property.
-        """
-
-        width = 92
-        output_header = '*** Iteration:   {} '.format(self._cur_iter + 1)
-        output_header += '* Residuals (Max,Min): '
-        output_header += '{:.2e} and {:.2e}'.format(
-            max(relative_residual_norm.values()),
-            min(relative_residual_norm.values()))
-        self.ostream.print_header(output_header.ljust(width))
-        self.ostream.print_blank()
-
-        if self.print_level > 1:
-            for op, freq, xv in xvs:
-                ops_label = '<<{};{}>>_{:.4f}'.format(op, op, freq)
-                rel_res = relative_residual_norm[(op, freq)]
-                output_iter = '{:<15s}: {:15.8f} '.format(ops_label, -xv)
-                output_iter += 'Residual Norm: {:.8f}'.format(rel_res)
-                self.ostream.print_header(output_iter.ljust(width))
-            self.ostream.print_blank()
-
-        self.ostream.flush()
-
     def _get_precond(self, orb_ene, nocc, norb, w):
         """
         Constructs the preconditioners.
@@ -642,106 +625,3 @@ class LinearResponseSolver(LinearSolver):
         ))
 
         return DistributedArray(p_mat, self.comm)
-
-    def _preconditioning(self, precond, v_in):
-        """
-        Applies preconditioner to a tuple of distributed trial vectors.
-
-        :param precond:
-            The preconditioner.
-        :param v_in:
-            The input trial vectors.
-
-        :return:
-            A tuple of distributed trial vectors after preconditioning.
-        """
-
-        pa = precond.data[:, 0]
-        pb = precond.data[:, 1]
-
-        v_in_rg = v_in.data[:, 0]
-        v_in_ru = v_in.data[:, 1]
-
-        v_out_rg = pa * v_in_rg + pb * v_in_ru
-        v_out_ru = pb * v_in_rg + pa * v_in_ru
-
-        v_mat = np.hstack((
-            v_out_rg.reshape(-1, 1),
-            v_out_ru.reshape(-1, 1),
-        ))
-
-        return DistributedArray(v_mat, self.comm, distribute=False)
-
-    def _precond_trials(self, vectors, precond):
-        """
-        Applies preconditioner to distributed trial vectors.
-
-        :param vectors:
-            The set of vectors.
-        :param precond:
-            The preconditioner.
-
-        :return:
-            The preconditioned gerade and ungerade trial vectors.
-        """
-
-        trials_ger = []
-        trials_ung = []
-
-        for (op, w), vec in vectors.items():
-            v = self._preconditioning(precond[w], vec)
-            norms_2 = 2.0 * v.squared_norm(axis=0)
-            vn = np.sqrt(np.sum(norms_2))
-
-            if vn > self.norm_thresh:
-                norms = np.sqrt(norms_2)
-                # gerade
-                if norms[0] > self.norm_thresh:
-                    trials_ger.append(v.data[:, 0])
-                # ungerade
-                if norms[1] > self.norm_thresh:
-                    trials_ung.append(v.data[:, 1])
-
-        new_ger = np.array(trials_ger).T
-        new_ung = np.array(trials_ung).T
-
-        dist_new_ger = DistributedArray(new_ger, self.comm, distribute=False)
-        dist_new_ung = DistributedArray(new_ung, self.comm, distribute=False)
-
-        return dist_new_ger, dist_new_ung
-
-    def _print_results(self, rsp_funcs, ostream):
-        """
-        Prints polarizability to output stream.
-
-        :param rsp_funcs:
-            The response functions.
-        :param ostream:
-            The output stream.
-        """
-
-        width = 92
-
-        dipole_ops = ['dipole', 'electric dipole', 'electric_dipole']
-
-        if self.a_operator in dipole_ops and self.b_operator in dipole_ops:
-
-            for w in self.frequencies:
-                w_str = 'Polarizability (w={:.4f})'.format(w)
-                ostream.print_header(w_str.ljust(width))
-                ostream.print_header(('-' * len(w_str)).ljust(width))
-
-                valstr = '{:<5s}'.format('')
-                for b in self.b_components:
-                    valstr += '{:>15s}'.format(b.upper())
-                ostream.print_header(valstr.ljust(width))
-
-                for a in self.a_components:
-                    valstr = '{:<5s}'.format(a.upper())
-                    for b in self.b_components:
-                        prop = -rsp_funcs[(a, b, w)]
-                        valstr += '{:15.8f}'.format(prop)
-                    ostream.print_header(valstr.ljust(width))
-                ostream.print_blank()
-
-        ostream.flush()

@@ -406,3 +406,21 @@ class TestGrad:
         ])
 
         self.run_grad(mol, 'b3lyp', 'def2-tzvp', ref_grad, 1.0e-4)
+
+    @pytest.mark.solvers
+    def test_hgcl2_def2svp(self):
+
+        molstr = """
+        Hg   0.00  0.00  0.00
+        Cl   0.00  0.00  2.35
+        Cl   0.00  0.10 -2.40
+        """
+        mol = Molecule.read_molecule_string(molstr, units='angstrom')
+
+        ref_grad = np.array([[
+            [0., -0.002402804, 0.011511892],
+            [0., 0.000708243, 0.012513817],
+            [0., 0.00169456, -0.02402571],
+        ]])
+
+        self.run_grad(mol, 'hf', 'def2-svp', ref_grad, 1.0e-5)

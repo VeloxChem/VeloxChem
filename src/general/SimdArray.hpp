@@ -107,7 +107,7 @@ class CSimdArray
 
             void *ptr = nullptr;
 
-            auto ierr = ::posix_memalign(&ptr, 64, nelems * simd::width<T>() * sizeof(T));
+            ::posix_memalign(&ptr, 64, nelems * simd::width<T>() * sizeof(T));
 
             _data = (T*)ptr;
 

@@ -40,13 +40,13 @@ from .oneeints import compute_electric_dipole_integrals
 from .veloxchemlib import mpi_master, hartree_in_wavenumber
 from .profiler import Profiler
 from .outputstream import OutputStream
-from .cppsolver import ComplexResponse
+from .cppsolver import ComplexResponseSolver
 from .linearsolver import LinearSolver
 from .nonlinearsolver import NonlinearSolver
 from .distributedarray import DistributedArray
 from .firstorderprop import FirstOrderProperties
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           dft_sanity_check)
+                           ri_sanity_check, dft_sanity_check)
 from .errorhandler import assert_msg_critical
 from .checkpoint import (check_distributed_focks, read_distributed_focks,
                          write_distributed_focks)
@@ -155,7 +155,7 @@ class ShgDriver(NonlinearSolver):
             self.lindep_thresh = self.conv_thresh * 1.0e-6
 
         # check molecule
-        molecule_sanity_check(molecule)
+        molecule_sanity_check(molecule, 'restricted', type(self).__name__)
 
         # check SCF results
         scf_results_sanity_check(self, scf_results)
@@ -163,6 +163,9 @@ class ShgDriver(NonlinearSolver):
         # update checkpoint_file after scf_results_sanity_check
         if self.filename is not None and self.checkpoint_file is None:
             self.checkpoint_file = f'{self.filename}_rsp.h5'
+
+        # check RI setup
+        ri_sanity_check(self)
 
         # check dft setup
         dft_sanity_check(self, 'compute', 'nonlinear')
@@ -182,13 +185,6 @@ class ShgDriver(NonlinearSolver):
             self._print_header(title)
 
         start_time = time.time()
-
-        # sanity check
-        nalpha = molecule.number_of_alpha_electrons()
-        nbeta = molecule.number_of_beta_electrons()
-        assert_msg_critical(
-            nalpha == nbeta,
-            'SHG Driver: not implemented for unrestricted case')
 
         if self.rank == mpi_master():
             S = scf_results['S']
@@ -270,7 +266,7 @@ class ShgDriver(NonlinearSolver):
 
         # Computing the first-order response vectors (3 per frequency)
 
-        N_drv = ComplexResponse(self.comm, self.ostream)
+        N_drv = ComplexResponseSolver(self.comm, self.ostream)
 
         cpp_keywords = [
             'frequencies', 'damping', 'norm_thresh', 'lindep_thresh',
@@ -430,7 +426,7 @@ class ShgDriver(NonlinearSolver):
         F0 = self.comm.bcast(F0, root=mpi_master())
         norb = self.comm.bcast(norb, root=mpi_master())
 
-        nocc = molecule.number_of_alpha_electrons()
+        nocc = molecule.number_of_alpha_occupied_orbitals(ao_basis)
 
         eri_dict = self._init_eri(molecule, ao_basis)
 
@@ -458,18 +454,18 @@ class ShgDriver(NonlinearSolver):
         for (wb, wc) in freqpairs:
 
             Na = {
-                'x': ComplexResponse.get_full_solution_vector(Nx[('x',
+                'x': ComplexResponseSolver.get_full_solution_vector(Nx[('x',
                                                                   (wb + wc))]),
-                'y': ComplexResponse.get_full_solution_vector(Nx[('y',
+                'y': ComplexResponseSolver.get_full_solution_vector(Nx[('y',
                                                                   (wb + wc))]),
-                'z': ComplexResponse.get_full_solution_vector(Nx[('z',
+                'z': ComplexResponseSolver.get_full_solution_vector(Nx[('z',
                                                                   (wb + wc))]),
             }
 
             Nb = {
-                'x': ComplexResponse.get_full_solution_vector(Nx[('x', wb)]),
-                'y': ComplexResponse.get_full_solution_vector(Nx[('y', wb)]),
-                'z': ComplexResponse.get_full_solution_vector(Nx[('z', wb)]),
+                'x': ComplexResponseSolver.get_full_solution_vector(Nx[('x', wb)]),
+                'y': ComplexResponseSolver.get_full_solution_vector(Nx[('y', wb)]),
+                'z': ComplexResponseSolver.get_full_solution_vector(Nx[('z', wb)]),
             }
 
             if self.rank == mpi_master():
@@ -559,9 +555,9 @@ class ShgDriver(NonlinearSolver):
 
         for (wb, wc) in freqpairs:
 
-            nx = ComplexResponse.get_full_solution_vector(Nx[('x', wb)])
-            ny = ComplexResponse.get_full_solution_vector(Nx[('y', wb)])
-            nz = ComplexResponse.get_full_solution_vector(Nx[('z', wb)])
+            nx = ComplexResponseSolver.get_full_solution_vector(Nx[('x', wb)])
+            ny = ComplexResponseSolver.get_full_solution_vector(Nx[('y', wb)])
+            nz = ComplexResponseSolver.get_full_solution_vector(Nx[('z', wb)])
 
             if self.rank == mpi_master():
 
@@ -814,9 +810,9 @@ class ShgDriver(NonlinearSolver):
 
             vec_pack = self._collect_vectors_in_columns(vec_pack)
 
-            nx = ComplexResponse.get_full_solution_vector(Nx[('x', wb)])
-            ny = ComplexResponse.get_full_solution_vector(Nx[('y', wb)])
-            nz = ComplexResponse.get_full_solution_vector(Nx[('z', wb)])
+            nx = ComplexResponseSolver.get_full_solution_vector(Nx[('x', wb)])
+            ny = ComplexResponseSolver.get_full_solution_vector(Nx[('y', wb)])
+            nz = ComplexResponseSolver.get_full_solution_vector(Nx[('z', wb)])
 
             if self.rank != mpi_master():
                 continue

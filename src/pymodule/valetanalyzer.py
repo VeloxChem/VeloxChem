@@ -39,6 +39,7 @@ from .molecularbasis import MolecularBasis
 from .visualizationdriver import VisualizationDriver
 from .densityviewer import DensityViewer
 from .errorhandler import assert_msg_critical
+from .mathutils import symmetric_matrix_function
 
 try:
     import matplotlib.pyplot as plt
@@ -123,40 +124,6 @@ class ValetAnalyzer:
         self._subgroups = subgroups
         print(f"Subgroups updated: {[name for name, _ in subgroups]}")
 
-    @staticmethod
-    def _extract_molecule_from_scf(scf_results):
-        """
-        Extracts molecule from SCF results.
-        
-        :param scf_results:
-            The dictionary of results from converged SCF wavefunction.
-            
-        :return:
-            The Molecule object.
-        """
-        coordinates = scf_results['atom_coordinates']
-        nuclear_charges = np.array(scf_results['nuclear_charges'])
-        nuclear_charges = nuclear_charges.astype(int)
-        molecule = Molecule(nuclear_charges, coordinates, units="au")
-        return molecule
-
-    @staticmethod
-    def _extract_basis_from_scf(scf_results, molecule):
-        """
-        Extracts basis from SCF results.
-        
-        :param scf_results:
-            The dictionary of results from converged SCF wavefunction.
-        :param molecule:
-            The Molecule object.
-            
-        :return:
-            The MolecularBasis object.
-        """
-        basis_set_label = scf_results['basis_set'][0].decode("utf-8")
-        basis = MolecularBasis.read(molecule, basis_set_label)
-        return basis
-
     def compute_detach_attach_densities(self, scf_results, rsp_results, state_index=1):
         """
         Computes NTO attachment and detachment densities for a given excited state.
@@ -239,9 +206,6 @@ class ValetAnalyzer:
         # Get density matrices
         densities = self.compute_detach_attach_densities(scf_results, rsp_results, state_index)
         
-        # Get overlap matrix
-        S = scf_results["S"]
-        
         # Map atoms to AOs
         vis_drv = VisualizationDriver()
         atom_to_aos = vis_drv.map_atom_to_atomic_orbitals(self._molecule, self._basis)
@@ -249,16 +213,11 @@ class ValetAnalyzer:
         detach_dens_ao = densities['detachment_density_matrix_AO']
         attach_dens_ao = densities['attachment_density_matrix_AO']
 
-        # Note: detachment density is negative, so we take absolute values
-        detach_dens_ao = np.abs(detach_dens_ao)
-        
-        # Compute attachment charges using Lowdin analysis
+        # Compute charges using Lowdin analysis
         S = scf_results['S']
-        S_eigvals, S_eigvecs = np.linalg.eigh(S)
-        S_eigvals = np.where(S_eigvals > 1.0e-12, S_eigvals,
-                             0.0)
-        S_sqrt = np.matmul(S_eigvecs * np.sqrt(S_eigvals),
-                           S_eigvecs.T)
+        S_sqrt = symmetric_matrix_function(S,
+                                           np.sqrt,
+                                           thresh=1.0e-12)
 
         diag_DS = np.diag(
             np.linalg.multi_dot([S_sqrt, detach_dens_ao, S_sqrt]))
@@ -376,8 +335,16 @@ class ValetAnalyzer:
             # Handle both single atom and list of atoms
             if isinstance(atom_indices, (list, tuple)):
                 for atom in atom_indices:
+                    assert_msg_critical(
+                        1 <= atom <= num_atoms,
+                        'ValetAnalyzer: subgroup atom indices must be in the '
+                        f'range [1, {num_atoms}].')
                     sg_atom_map[atom - 1] = i + 1  # Convert 1-based to 0-based
             else:
+                assert_msg_critical(
+                    1 <= atom_indices <= num_atoms,
+                    'ValetAnalyzer: subgroup atom indices must be in the '
+                    f'range [1, {num_atoms}].')
                 sg_atom_map[atom_indices - 1] = i + 1  # Convert 1-based to 0-based
             sg_names.append(name)
 

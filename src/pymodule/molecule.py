@@ -38,7 +38,8 @@ from .veloxchemlib import Molecule
 from .veloxchemlib import bohr_in_angstrom, mpi_master
 from .outputstream import OutputStream
 from .inputparser import print_keywords
-from .errorhandler import assert_msg_critical, safe_arccos
+from .errorhandler import assert_msg_critical
+from .mathutils import safe_arccos
 from .pubchemfetcher import (get_data_from_name, get_all_conformer_IDs,
                              get_conformer_data, get_pubchem_sketcher_reference)
 
@@ -68,7 +69,10 @@ def _Molecule_smiles_formal_charge(smiles_str):
 
 
 @staticmethod
-def _Molecule_smiles_to_xyz(smiles_str, optimize=True, hydrogen=True):
+def _Molecule_smiles_to_xyz(smiles_str,
+                            optimize=True,
+                            hydrogen=True,
+                            reorder_hydrogens=False):
     """
     Converts SMILES string to xyz string.
 
@@ -78,6 +82,9 @@ def _Molecule_smiles_to_xyz(smiles_str, optimize=True, hydrogen=True):
         Boolean indicating whether to perform geometry optimization.
     :param hydrogen:
         Boolean indicating whether to include hydrogens.
+    :param reorder_hydrogens:
+        Boolean indicating whether to reorder hydrogen atoms such that they are
+        close to their bonded neighbor.
 
     :return:
         An xyz string (including number of atoms).
@@ -97,6 +104,29 @@ def _Molecule_smiles_to_xyz(smiles_str, optimize=True, hydrogen=True):
             AllChem.UFFOptimizeMolecule(mol_full)
 
         if hydrogen:
+            if reorder_hydrogens:
+                reordering = []
+                for atom in mol_full.GetAtoms():
+                    # add non-hydrogen atom
+                    if (atom.GetAtomicNum() != 1 and
+                            atom.GetIdx() not in reordering):
+                        reordering.append(atom.GetIdx())
+                        for nbr in atom.GetNeighbors():
+                            # add neighboring hydrogen atoms
+                            if (nbr.GetAtomicNum() == 1 and
+                                    nbr.GetIdx() not in reordering):
+                                reordering.append(nbr.GetIdx())
+                for atom in mol_full.GetAtoms():
+                    # For completeness, add remaining atoms
+                    # This is necessary for e.g. H2 molecule
+                    if atom.GetIdx() not in reordering:
+                        reordering.append(atom.GetIdx())
+                assert_msg_critical(
+                    len(reordering) == mol_full.GetNumAtoms(),
+                    'Molecule.smiles_to_xyz: Invalid list of indices for reordering'
+                )
+                mol_full_reordered = Chem.RenumberAtoms(mol_full, reordering)
+                mol_full = mol_full_reordered
             return Chem.MolToXYZBlock(mol_full)
         else:
             return Chem.MolToXYZBlock(Chem.RemoveHs(mol_full))
@@ -106,19 +136,53 @@ def _Molecule_smiles_to_xyz(smiles_str, optimize=True, hydrogen=True):
 
 
 @staticmethod
-def _Molecule_read_smiles(smiles_str):
+def _Molecule_read_smiles(smiles_str, reorder_hydrogens=False):
     """
     Reads molecule from SMILES string.
 
     :param smiles_str:
         The SMILES string.
+    :param reorder_hydrogens:
+        Boolean indicating whether to reorder hydrogen atoms such that they are
+        close to their bonded neighbor.
 
     :return:
         The molecule.
     """
 
-    xyz = Molecule.smiles_to_xyz(smiles_str, optimize=True)
-    mol = Molecule.read_xyz_string(xyz)
+    if '.' in smiles_str:
+        # multi-components
+        sub_xyzs = [
+            Molecule.smiles_to_xyz(sub_smiles_str,
+                                   optimize=True,
+                                   reorder_hydrogens=reorder_hydrogens)
+            for sub_smiles_str in smiles_str.split('.')
+        ]
+        sub_mols = [Molecule.read_xyz_string(xyz) for xyz in sub_xyzs]
+
+        mol = sub_mols[0]
+        for sub_mol in sub_mols[1:]:
+            center_a = mol.center_of_mass_in_bohr()
+            coords_a = mol.get_coordinates_in_bohr()
+
+            center_b = sub_mol.center_of_mass_in_bohr()
+            coords_b = sub_mol.get_coordinates_in_bohr()
+
+            translate = center_a - center_b
+            translate[0] += np.max(coords_a[:, 0]) - center_a[0]
+            translate[0] += center_b[0] - np.min(coords_b[:, 0])
+            translate[0] += 10.0  # add a space of 10 Bohr
+
+            for idx in range(coords_b.shape[0]):
+                sub_mol.set_atom_coordinates(idx, coords_b[idx] + translate)
+
+            mol = Molecule(mol, sub_mol)
+    else:
+        # single component
+        xyz = Molecule.smiles_to_xyz(smiles_str,
+                                     optimize=True,
+                                     reorder_hydrogens=reorder_hydrogens)
+        mol = Molecule.read_xyz_string(xyz)
 
     mol_chg = Molecule.smiles_formal_charge(smiles_str)
     mol.set_charge(mol_chg)
@@ -443,6 +507,34 @@ def _Molecule_from_input_dict(mol_dict):
     return mol
 
 
+def _Molecule_effective_nuclear_repulsion_energy(self, basis):
+    """
+    Computes effective nuclear repulsion energy of a molecule.
+
+    :param basis:
+        AO basis set object (for taking care of ECP core electrons).
+    :return:
+        The effective nuclear repulsion energy.
+    """
+
+    coords_in_au = self.get_coordinates_in_bohr()
+    elem_ids = self.get_effective_nuclear_charges(basis)
+
+    natoms = coords_in_au.shape[0]
+    e_nuc = 0.0
+
+    for i in range(natoms):
+        z_i = elem_ids[i]
+
+        for j in range(i + 1, natoms):
+            z_j = elem_ids[j]
+
+            distance = np.linalg.norm(coords_in_au[j] - coords_in_au[i])
+            e_nuc += z_i * z_j / distance
+
+    return e_nuc
+
+
 def _Molecule_nuclear_repulsion_energy(self, basis=None):
     """
     Computes nuclear potential energy of a molecule.
@@ -481,6 +573,35 @@ def _Molecule_nuclear_repulsion_energy(self, basis=None):
             e_nuc += z_i * z_j / distance
 
     return e_nuc
+
+
+def _Molecule_get_effective_nuclear_charges(self, basis):
+    """
+    Returns effective nuclear charges after subtracting ECP core electrons.
+
+    :param basis:
+        The AO basis set.
+
+    :return:
+        Effective nuclear charges.
+    """
+
+    elem_ids = self.get_element_ids()
+    core_electrons = basis.get_number_of_ecp_core_electrons()
+
+    natoms = self.number_of_atoms()
+    assert_msg_critical(
+        len(core_electrons) == natoms,
+        'Molecule.get_effective_nuclear_charges: ECP core electron list must match number of atoms'
+    )
+    assert_msg_critical(
+        np.all(np.array(core_electrons) >= 0),
+        'Molecule.get_effective_nuclear_charges: ECP core electrons must be non-negative'
+    )
+
+    elem_ids -= core_electrons
+
+    return elem_ids
 
 
 def _Molecule_get_connectivity_matrix(self, factor=1.3, H2_factor=1.8):
@@ -701,12 +822,12 @@ def _Molecule_set_distance(self,
     i = distance_indices_one_based[0] - 1
     j = distance_indices_one_based[1] - 1
 
-    # disconnect i-j and find all atoms that at connected to j
+    # disconnect i-j and find all atoms that are connected to j
     connectivity_matrix = self.get_connectivity_matrix()
     connectivity_matrix[i, j] = 0
     connectivity_matrix[j, i] = 0
 
-    atoms_connected_to_j = self._find_connected_atoms(j, connectivity_matrix)
+    atoms_connected_to_j = self.find_connected_atoms(j, connectivity_matrix)
 
     assert_msg_critical(
         i not in atoms_connected_to_j,
@@ -873,7 +994,7 @@ def _Molecule_set_angle(self,
     connectivity_matrix[i, j] = 0
     connectivity_matrix[j, i] = 0
 
-    atoms_connected_to_j = self._find_connected_atoms(j, connectivity_matrix)
+    atoms_connected_to_j = self.find_connected_atoms(j, connectivity_matrix)
 
     assert_msg_critical(
         i not in atoms_connected_to_j, 'Molecule.set_angle: Cannot set angle ' +
@@ -1048,7 +1169,7 @@ def _Molecule_set_dihedral(self,
     connectivity_matrix[i, j] = 0
     connectivity_matrix[j, i] = 0
 
-    atoms_connected_to_j = self._find_connected_atoms(j, connectivity_matrix)
+    atoms_connected_to_j = self.find_connected_atoms(j, connectivity_matrix)
 
     assert_msg_critical(
         i not in atoms_connected_to_j,
@@ -1868,7 +1989,7 @@ def _Molecule_contains_water_molecule(self):
         if labels[i] != 'O':
             continue
 
-        connected_atoms = self._find_connected_atoms(i, conn)
+        connected_atoms = self.find_connected_atoms(i, conn)
         if len(connected_atoms) != 3:
             continue
 
@@ -1984,9 +2105,9 @@ def _Molecule_builder():
 
 
 Molecule._get_input_keywords = _Molecule_get_input_keywords
-Molecule._find_connected_atoms = _Molecule_find_connected_atoms
 Molecule._rotate_around_vector = _Molecule_rotate_around_vector
 
+Molecule.find_connected_atoms = _Molecule_find_connected_atoms
 Molecule.smiles_formal_charge = _Molecule_smiles_formal_charge
 Molecule.smiles_to_xyz = _Molecule_smiles_to_xyz
 Molecule.read_gro_file = _Molecule_read_gro_file
@@ -1998,7 +2119,9 @@ Molecule.read_molecule_string = _Molecule_read_molecule_string
 Molecule.read_xyz_file = _Molecule_read_xyz_file
 Molecule.read_xyz_string = _Molecule_read_xyz_string
 Molecule.from_input_dict = _Molecule_from_input_dict
+Molecule.effective_nuclear_repulsion_energy = _Molecule_effective_nuclear_repulsion_energy
 Molecule.nuclear_repulsion_energy = _Molecule_nuclear_repulsion_energy
+Molecule.get_effective_nuclear_charges = _Molecule_get_effective_nuclear_charges
 Molecule.get_connectivity_matrix = _Molecule_get_connectivity_matrix
 Molecule.get_distance = _Molecule_get_distance
 Molecule.set_distance = _Molecule_set_distance

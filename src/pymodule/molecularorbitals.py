@@ -454,20 +454,18 @@ class MolecularOrbitals:
 
         return MolecularOrbitals(mo_coefs, mo_enes, mo_occs, mo_type)
 
-    def write_hdf5(self, fname, nuclear_charges=None, basis_set=None, label=''):
+    def write_hdf5(self, fname, label=''):
         """
         Writes molecular orbitals to hdf5 file.
 
         :param fname:
             The name of the hdf5 file.
-        :param nuclear_charges:
-            The nuclear charges.
-        :param basis_set:
-            Name of the basis set.
+        :param label:
+            Dataset prefix, including any trailing separator such as "_".
         """
 
         if label and isinstance(label, str):
-            prefix = label + '_'
+            prefix = label
         else:
             prefix = ''
 
@@ -480,8 +478,7 @@ class MolecularOrbitals:
                 prefix + 'beta_orbitals',
                 prefix + 'beta_energies',
                 prefix + 'beta_occupations',
-                prefix + 'nuclear_charges',
-                prefix + 'basis_set',
+                prefix + 'scf_type',
         ]:
             if key in hf:
                 del hf[key]
@@ -497,16 +494,18 @@ class MolecularOrbitals:
             hf.create_dataset(prefix + 'beta_energies', data=self.eb_to_numpy())
             hf.create_dataset(prefix + 'beta_occupations',
                               data=self.occb_to_numpy())
+            hf.create_dataset(prefix + 'scf_type',
+                              data=np.bytes_(['unrestricted']))
 
         elif self._orbitals_type == molorb.restopen:
             hf.create_dataset(prefix + 'beta_occupations',
                               data=self.occb_to_numpy())
+            hf.create_dataset(prefix + 'scf_type',
+                              data=np.bytes_(['restricted_openshell']))
 
-        if nuclear_charges is not None:
-            hf.create_dataset(prefix + 'nuclear_charges', data=nuclear_charges)
-
-        if basis_set is not None:
-            hf.create_dataset(prefix + 'basis_set', data=np.bytes_([basis_set]))
+        else:
+            hf.create_dataset(prefix + 'scf_type',
+                              data=np.bytes_(['restricted']))
 
         hf.close()
 
@@ -517,13 +516,15 @@ class MolecularOrbitals:
 
         :param fname:
             The name of the hdf5 file.
+        :param label:
+            Dataset prefix, including any trailing separator such as "_".
 
         :return:
             True if the label is valid, False otherwise.
         """
 
         if label and isinstance(label, str):
-            prefix = label + '_'
+            prefix = label
         else:
             prefix = ''
 
@@ -546,13 +547,15 @@ class MolecularOrbitals:
 
         :param fname:
             The name of the hdf5 file.
+        :param label:
+            Dataset prefix, including any trailing separator such as "_".
 
         :return:
             The molecular orbitals.
         """
 
         if label and isinstance(label, str):
-            prefix = label + '_'
+            prefix = label
         else:
             prefix = ''
 
@@ -564,7 +567,7 @@ class MolecularOrbitals:
             assert_msg_critical((prefix + key) in hf,
                                 f'MolecularOrbitals.read_hdf5: {key} not found')
 
-        if 'beta_orbitals' in hf or 'beta_energies' in hf:
+        if (prefix + 'beta_orbitals') in hf or (prefix + 'beta_energies') in hf:
             orbs_type = molorb.unrest
 
             for key in ['beta_orbitals', 'beta_energies', 'beta_occupations']:
@@ -572,8 +575,24 @@ class MolecularOrbitals:
                     (prefix + key) in hf,
                     f'MolecularOrbitals.read_hdf5: {key} not found')
 
-        elif 'beta_occupations' in hf:
+        elif (prefix + 'beta_occupations') in hf:
             orbs_type = molorb.restopen
+
+        if (prefix + 'scf_type') in hf:
+            scf_type = hf.get(prefix + 'scf_type')[0].decode('utf-8')
+
+            err_scf_orbs_match = 'MolecularOrbitals.read_hdf5: '
+            err_scf_orbs_match += 'Inconsistent scf_type and orbs_type'
+
+            if scf_type == 'restricted':
+                assert_msg_critical(orbs_type == molorb.rest,
+                                    err_scf_orbs_match)
+            elif scf_type == 'unrestricted':
+                assert_msg_critical(orbs_type == molorb.unrest,
+                                    err_scf_orbs_match)
+            elif scf_type == 'restricted_openshell':
+                assert_msg_critical(orbs_type == molorb.restopen,
+                                    err_scf_orbs_match)
 
         orbs = []
         enes = []
@@ -596,7 +615,7 @@ class MolecularOrbitals:
         return MolecularOrbitals(orbs, enes, occs, orbs_type)
 
     @staticmethod
-    def match_hdf5(fname, nuclear_charges, basis_set, scf_type):
+    def match_hdf5(fname, nuclear_charges, basis_set, scf_type, label=''):
         """
         Checks if the hdf5 file matches the given nuclear charges and basis set.
 
@@ -614,6 +633,11 @@ class MolecularOrbitals:
             Whether the hdf5 file matches the given nuclear charges and basis set.
         """
 
+        if label and isinstance(label, str):
+            prefix = label
+        else:
+            prefix = ''
+
         hf = h5py.File(fname, 'r')
 
         match_nuclear_charges = False
@@ -628,13 +652,19 @@ class MolecularOrbitals:
             h5_basis_set = hf.get('basis_set')[0].decode('utf-8')
             match_basis_set = (h5_basis_set.upper() == basis_set.upper())
 
-        if 'beta_orbitals' in hf or 'beta_energies' in hf:
-            h5_scf_type = 'unrestricted'
-        elif 'beta_occupations' in hf:
-            h5_scf_type = 'restricted_openshell'
+        match_scf_type = False
+        if (prefix + 'scf_type') in hf:
+            h5_scf_type = hf.get(prefix + 'scf_type')[0].decode('utf-8')
+            match_scf_type = (h5_scf_type == scf_type)
         else:
-            h5_scf_type = 'restricted'
-        match_scf_type = (h5_scf_type == scf_type)
+            if (prefix + 'beta_orbitals') in hf or (prefix +
+                                                    'beta_energies') in hf:
+                h5_scf_type = 'unrestricted'
+            elif (prefix + 'beta_occupations') in hf:
+                h5_scf_type = 'restricted_openshell'
+            else:
+                h5_scf_type = 'restricted'
+            match_scf_type = (h5_scf_type == scf_type)
 
         hf.close()
 
@@ -730,4 +760,25 @@ class MolecularOrbitals:
             A deepcopy of self.
         """
 
-        return MolecularOrbitals(self)
+        if self.is_empty():
+            return MolecularOrbitals()
+
+        if self._orbitals_type == molorb.rest:
+            return MolecularOrbitals([self.alpha_to_numpy()],
+                                     [self.ea_to_numpy()],
+                                     [self.occa_to_numpy()], molorb.rest)
+        elif self._orbitals_type == molorb.unrest:
+            return MolecularOrbitals([self.alpha_to_numpy(),
+                                      self.beta_to_numpy()],
+                                     [self.ea_to_numpy(),
+                                      self.eb_to_numpy()],
+                                     [self.occa_to_numpy(),
+                                      self.occb_to_numpy()], molorb.unrest)
+        elif self._orbitals_type == molorb.restopen:
+            return MolecularOrbitals([self.alpha_to_numpy()],
+                                     [self.ea_to_numpy()],
+                                     [self.occa_to_numpy(),
+                                      self.occb_to_numpy()],
+                                     molorb.restopen)
+        else:
+            return MolecularOrbitals()

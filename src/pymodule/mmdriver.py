@@ -37,7 +37,8 @@ import sys
 from .veloxchemlib import mpi_master
 from .veloxchemlib import bohr_in_angstrom, hartree_in_kjpermol
 from .outputstream import OutputStream
-from .errorhandler import assert_msg_critical, safe_arccos
+from .errorhandler import assert_msg_critical
+from .mathutils import safe_arccos
 
 
 class MMDriver:

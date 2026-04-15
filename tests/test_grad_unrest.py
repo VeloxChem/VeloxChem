@@ -160,3 +160,22 @@ class TestGradUnrestrictedSCF:
         ])
 
         self.run_grad(mol, 'lrc-wpbeh', 'def2-svp', ref_grad, 1.0e-4)
+
+    def test_auh2_svp(self):
+
+        molstr = """
+        Au   0.00  0.00  0.00
+        H    0.00  0.00  1.55
+        H    0.00  0.10 -1.60
+        """
+        mol = Molecule.read_molecule_string(molstr, units='angstrom')
+        mol.set_charge(0)
+        mol.set_multiplicity(2)
+
+        ref_grad = np.array([[[
+            [0., 0.008160607, 0.008546413],
+            [0., -0.003138707, -0.040246835],
+            [0., -0.0050219, 0.031700422],
+        ]]])
+
+        self.run_grad(mol, 'hf', 'def2-svp', ref_grad, 1.0e-5)

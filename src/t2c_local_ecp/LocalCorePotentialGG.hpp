@@ -14,20 +14,16 @@
 #include "LocalCorePotentialPrimRecSD.hpp"
 #include "LocalCorePotentialPrimRecSF.hpp"
 #include "LocalCorePotentialPrimRecSG.hpp"
-#include "LocalCorePotentialPrimRecSH.hpp"
-#include "LocalCorePotentialPrimRecSI.hpp"
-#include "LocalCorePotentialPrimRecSK.hpp"
-#include "LocalCorePotentialPrimRecSL.hpp"
-#include "T2CHrrABRecPG.hpp"
-#include "T2CHrrABRecPH.hpp"
-#include "T2CHrrABRecPI.hpp"
-#include "T2CHrrABRecPK.hpp"
-#include "T2CHrrABRecDG.hpp"
-#include "T2CHrrABRecDH.hpp"
-#include "T2CHrrABRecDI.hpp"
-#include "T2CHrrABRecFG.hpp"
-#include "T2CHrrABRecFH.hpp"
-#include "T2CHrrABRecGG.hpp"
+#include "LocalCorePotentialPrimRecPP.hpp"
+#include "LocalCorePotentialPrimRecPD.hpp"
+#include "LocalCorePotentialPrimRecPF.hpp"
+#include "LocalCorePotentialPrimRecPG.hpp"
+#include "LocalCorePotentialPrimRecDD.hpp"
+#include "LocalCorePotentialPrimRecDF.hpp"
+#include "LocalCorePotentialPrimRecDG.hpp"
+#include "LocalCorePotentialPrimRecFF.hpp"
+#include "LocalCorePotentialPrimRecFG.hpp"
+#include "LocalCorePotentialPrimRecGG.hpp"
 #include "T2CUtils.hpp"
 #include "T2CTransform.hpp"
 #include "BatchFunc.hpp"
@@ -88,17 +84,15 @@ comp_local_core_potential_gg(T& distributor,
 
     // allocate aligned 2D arrays for ket side
 
-    CSimdArray<double> pfactors(12, ket_npgtos);
-
-    CSimdArray<double> cfactors(6, 1);
+    CSimdArray<double> pfactors(15, ket_npgtos);
 
     // allocate aligned primitive integrals
 
-    CSimdArray<double> pbuffer(165, ket_npgtos);
+    CSimdArray<double> pbuffer(798, ket_npgtos);
 
     // allocate aligned contracted integrals
 
-    CSimdArray<double> cbuffer(1414, 1);
+    CSimdArray<double> cbuffer(225, 1);
 
     CSimdArray<double> sbuffer(81, 1);
 
@@ -117,8 +111,6 @@ comp_local_core_potential_gg(T& distributor,
         pfactors.load(ket_gto_norms, ket_range, 1, ket_npgtos);
 
         pfactors.replicate_points(ket_gto_coords, ket_range, 2, ket_npgtos);
-
-        cfactors.replicate_points(ket_gto_coords, ket_range, 0, 1);
 
         // set up active SIMD width
 
@@ -140,8 +132,6 @@ comp_local_core_potential_gg(T& distributor,
 
             const auto r_a = bra_gto_coords[j];
 
-            t2cfunc::comp_distances_ab(cfactors, 3, 0, r_a);
-
             for (size_t k = 0; k < bra_npgtos; k++)
             {
                 const auto a_exp = bra_gto_exps[k * bra_ncgtos + j];
@@ -156,62 +146,47 @@ comp_local_core_potential_gg(T& distributor,
 
                     t2cfunc::comp_coordinates_r(pfactors, 5, 2, r_a, a_exp, c_exp);
 
-                    t2cfunc::comp_distances_rb(pfactors, 8, 5, 2);
+                    t2cfunc::comp_distances_ra(pfactors, 8 , 5, r_a);
 
-                    t2cfunc::comp_inverted_zeta(pfactors, 11, a_exp, c_exp);
+                    t2cfunc::comp_distances_rb(pfactors, 11, 5, 2);
 
-                    t2lecp::comp_prim_local_core_potential_ss(pbuffer, 0, pfactors, r_a, a_exp, c_exp, a_norm, c_norm);
+                    t2cfunc::comp_inverted_zeta(pfactors, 14, a_exp, c_exp);
 
-                    t2lecp::comp_prim_local_core_potential_sp(pbuffer, 1, 0, pfactors);
+                    t2lecp::comp_prim_local_core_potential_ss(pbuffer, 0, pfactors, 5, 14, r_a, a_exp, c_exp, a_norm, c_norm);
 
-                    t2lecp::comp_prim_local_core_potential_sd(pbuffer, 4, 0, 1, pfactors);
+                    t2lecp::comp_prim_local_core_potential_sp(pbuffer, 1, 0, pfactors, 11, 14);
 
-                    t2lecp::comp_prim_local_core_potential_sf(pbuffer, 10, 1, 4, pfactors);
+                    t2lecp::comp_prim_local_core_potential_sd(pbuffer, 4, 0, 1, pfactors, 11, 14);
 
-                    t2lecp::comp_prim_local_core_potential_sg(pbuffer, 20, 4, 10, pfactors);
+                    t2lecp::comp_prim_local_core_potential_sf(pbuffer, 10, 1, 4, pfactors, 11, 14);
 
-                    t2lecp::comp_prim_local_core_potential_sh(pbuffer, 35, 10, 20, pfactors);
+                    t2lecp::comp_prim_local_core_potential_sg(pbuffer, 20, 4, 10, pfactors, 11, 14);
 
-                    t2lecp::comp_prim_local_core_potential_si(pbuffer, 56, 20, 35, pfactors);
+                    t2lecp::comp_prim_local_core_potential_pp(pbuffer, 35, 0, 1, pfactors, 8, 14);
 
-                    t2lecp::comp_prim_local_core_potential_sk(pbuffer, 84, 35, 56, pfactors);
+                    t2lecp::comp_prim_local_core_potential_pd(pbuffer, 44, 1, 4, pfactors, 8, 14);
 
-                    t2lecp::comp_prim_local_core_potential_sl(pbuffer, 120, 56, 84, pfactors);
+                    t2lecp::comp_prim_local_core_potential_pf(pbuffer, 62, 4, 10, pfactors, 8, 14);
 
-                    t2cfunc::reduce(cbuffer, 0, pbuffer, 20, 15, ket_width, ket_npgtos);
+                    t2lecp::comp_prim_local_core_potential_pg(pbuffer, 92, 10, 20, pfactors, 8, 14);
 
-                    t2cfunc::reduce(cbuffer, 15, pbuffer, 35, 21, ket_width, ket_npgtos);
+                    t2lecp::comp_prim_local_core_potential_dd(pbuffer, 137, 4, 35, 44, pfactors, 8, 14);
 
-                    t2cfunc::reduce(cbuffer, 36, pbuffer, 56, 28, ket_width, ket_npgtos);
+                    t2lecp::comp_prim_local_core_potential_df(pbuffer, 173, 10, 44, 62, pfactors, 8, 14);
 
-                    t2cfunc::reduce(cbuffer, 64, pbuffer, 84, 36, ket_width, ket_npgtos);
+                    t2lecp::comp_prim_local_core_potential_dg(pbuffer, 233, 20, 62, 92, pfactors, 8, 14);
 
-                    t2cfunc::reduce(cbuffer, 100, pbuffer, 120, 45, ket_width, ket_npgtos);
+                    t2lecp::comp_prim_local_core_potential_ff(pbuffer, 323, 62, 137, 173, pfactors, 8, 14);
 
+                    t2lecp::comp_prim_local_core_potential_fg(pbuffer, 423, 92, 173, 233, pfactors, 8, 14);
+
+                    t2lecp::comp_prim_local_core_potential_gg(pbuffer, 573, 233, 323, 423, pfactors, 8, 14);
+
+                    t2cfunc::reduce(cbuffer, pbuffer, 573, ket_width, ket_npgtos);
                 }
             }
 
-            t2chrr::comp_hrr_pg(cbuffer, 145, 0, 15, cfactors);
-
-            t2chrr::comp_hrr_ph(cbuffer, 190, 15, 36, cfactors);
-
-            t2chrr::comp_hrr_pi(cbuffer, 253, 36, 64, cfactors);
-
-            t2chrr::comp_hrr_pk(cbuffer, 337, 64, 100, cfactors);
-
-            t2chrr::comp_hrr_dg(cbuffer, 445, 145, 190, cfactors);
-
-            t2chrr::comp_hrr_dh(cbuffer, 535, 190, 253, cfactors);
-
-            t2chrr::comp_hrr_di(cbuffer, 661, 253, 337, cfactors);
-
-            t2chrr::comp_hrr_fg(cbuffer, 829, 445, 535, cfactors);
-
-            t2chrr::comp_hrr_fh(cbuffer, 979, 535, 661, cfactors);
-
-            t2chrr::comp_hrr_gg(cbuffer, 1189, 829, 979, cfactors);
-
-            t2cfunc::transform<4, 4>(sbuffer, cbuffer, 1189);
+            t2cfunc::transform<4, 4>(sbuffer, cbuffer);
 
             distributor.distribute(sbuffer, bra_gto_indices, ket_gto_indices, 4, 4, j, ket_range, bra_eq_ket);
         }

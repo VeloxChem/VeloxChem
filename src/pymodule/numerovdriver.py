@@ -193,7 +193,7 @@ class NumerovDriver:
         if method_dict is not None:
             self.method_dict = dict(method_dict)
 
-    def compute(self, molecule=None, ao_basis=None, min_basis=None):
+    def compute(self, molecule=None, ao_basis=None):
         """
         Computes vibronic wave functions and energy levels and the IR or UV/Vis
         spectrum for a diatomic molecule.
@@ -202,8 +202,6 @@ class NumerovDriver:
             The molecule.
         :param ao_basis:
             The AO basis set.
-        :param min_basis:
-            The minimal AO basis set.
 
         :return:
             The vibronic wave functions, the energy levels, the excitation
@@ -220,7 +218,7 @@ class NumerovDriver:
         if not self.pec_data:
             # carry out PEC scan
             self.pec_energies, self.properties = self.generate_pec(
-                molecule, ao_basis, min_basis)
+                molecule, ao_basis)
 
         assert_msg_critical(
             self.reduced_mass,
@@ -356,7 +354,7 @@ class NumerovDriver:
                 'oscillator_strengths': spectrum[1],
             }
 
-    def generate_pec(self, molecule, ao_basis, min_basis=None):
+    def generate_pec(self, molecule, ao_basis):
         """
         Carries out a potential energy curve scan of a diatomic molecule for the
         electronic ground state and an electronically excited state.
@@ -365,8 +363,6 @@ class NumerovDriver:
             The molecule.
         :param ao_basis:
             The AO basis set.
-        :param min_basis:
-            The minimal AO basis set.
 
         :return:
             The total energies and dipoles or transition moments.
@@ -409,7 +405,7 @@ class NumerovDriver:
                 '{}  0 0 0\n{}  {} 0 0'.format(atom1, atom2,
                                                x * bohr_in_angstrom()))
 
-            scf_results = scf_drv.compute(geometry, ao_basis, min_basis)
+            scf_results = scf_drv.compute(geometry, ao_basis)
             scf_prop.compute_scf_prop(geometry, ao_basis, scf_results)
 
             # save energies and dipole moments

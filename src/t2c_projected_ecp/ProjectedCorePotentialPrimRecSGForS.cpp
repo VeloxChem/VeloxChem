@@ -35,13 +35,10 @@ comp_prim_projected_core_potential_sg_s(CSimdArray<double>& pbuffer,
 
     auto tg_0_xx_s_0_0_0 = pbuffer.data(idx_sd_s_0_0_0);
 
-    auto tg_0_xy_s_0_0_0 = pbuffer.data(idx_sd_s_0_0_0 + 1);
 
-    auto tg_0_xz_s_0_0_0 = pbuffer.data(idx_sd_s_0_0_0 + 2);
 
     auto tg_0_yy_s_0_0_0 = pbuffer.data(idx_sd_s_0_0_0 + 3);
 
-    auto tg_0_yz_s_0_0_0 = pbuffer.data(idx_sd_s_0_0_0 + 4);
 
     auto tg_0_zz_s_0_0_0 = pbuffer.data(idx_sd_s_0_0_0 + 5);
 
@@ -49,13 +46,11 @@ comp_prim_projected_core_potential_sg_s(CSimdArray<double>& pbuffer,
 
     auto tg_0_xxx_s_0_0_0 = pbuffer.data(idx_sf_s_0_0_0);
 
-    auto tg_0_xxy_s_0_0_0 = pbuffer.data(idx_sf_s_0_0_0 + 1);
 
     auto tg_0_xxz_s_0_0_0 = pbuffer.data(idx_sf_s_0_0_0 + 2);
 
     auto tg_0_xyy_s_0_0_0 = pbuffer.data(idx_sf_s_0_0_0 + 3);
 
-    auto tg_0_xyz_s_0_0_0 = pbuffer.data(idx_sf_s_0_0_0 + 4);
 
     auto tg_0_xzz_s_0_0_0 = pbuffer.data(idx_sf_s_0_0_0 + 5);
 
@@ -71,13 +66,10 @@ comp_prim_projected_core_potential_sg_s(CSimdArray<double>& pbuffer,
 
     auto tg_0_xx_s_0_1_0 = pbuffer.data(idx_sd_s_0_1_0);
 
-    auto tg_0_xy_s_0_1_0 = pbuffer.data(idx_sd_s_0_1_0 + 1);
 
-    auto tg_0_xz_s_0_1_0 = pbuffer.data(idx_sd_s_0_1_0 + 2);
 
     auto tg_0_yy_s_0_1_0 = pbuffer.data(idx_sd_s_0_1_0 + 3);
 
-    auto tg_0_yz_s_0_1_0 = pbuffer.data(idx_sd_s_0_1_0 + 4);
 
     auto tg_0_zz_s_0_1_0 = pbuffer.data(idx_sd_s_0_1_0 + 5);
 
@@ -85,13 +77,11 @@ comp_prim_projected_core_potential_sg_s(CSimdArray<double>& pbuffer,
 
     auto tg_0_xxx_s_0_1_0 = pbuffer.data(idx_sf_s_0_1_0);
 
-    auto tg_0_xxy_s_0_1_0 = pbuffer.data(idx_sf_s_0_1_0 + 1);
 
     auto tg_0_xxz_s_0_1_0 = pbuffer.data(idx_sf_s_0_1_0 + 2);
 
     auto tg_0_xyy_s_0_1_0 = pbuffer.data(idx_sf_s_0_1_0 + 3);
 
-    auto tg_0_xyz_s_0_1_0 = pbuffer.data(idx_sf_s_0_1_0 + 4);
 
     auto tg_0_xzz_s_0_1_0 = pbuffer.data(idx_sf_s_0_1_0 + 5);
 
@@ -146,17 +136,17 @@ comp_prim_projected_core_potential_sg_s(CSimdArray<double>& pbuffer,
 
         const double fb_0 = b_exps[i];
 
-        tg_0_xxxx_s_0_0_0[i] = 3.0 * tg_0_xx_s_0_0_0[i] * fzi_0 + 3.0 * tg_0_xx_s_0_1_0[i] * fazi_0 * fazi_0 + 2.0 * tg_0_xxx_s_0_1_0[i] * rb_x[i] * fazi_0 * fazi_0 * fb_0 + tg_0_xxx_s_0_0_0[i] * rb_x[i] * fbz_0;
+        tg_0_xxxx_s_0_0_0[i] = 3.0 / 2.0 * tg_0_xx_s_0_0_0[i] * fzi_0 + 3.0 * tg_0_xx_s_0_1_0[i] * fazi_0 * fazi_0 + 2.0 * tg_0_xxx_s_0_1_0[i] * rb_x[i] * fazi_0 * fazi_0 * fb_0 + tg_0_xxx_s_0_0_0[i] * rb_x[i] * fbz_0;
 
         tg_0_xxxy_s_0_0_0[i] = 2.0 * tg_0_xxx_s_0_1_0[i] * rb_y[i] * fazi_0 * fazi_0 * fb_0 + tg_0_xxx_s_0_0_0[i] * rb_y[i] * fbz_0;
 
         tg_0_xxxz_s_0_0_0[i] = 2.0 * tg_0_xxx_s_0_1_0[i] * rb_z[i] * fazi_0 * fazi_0 * fb_0 + tg_0_xxx_s_0_0_0[i] * rb_z[i] * fbz_0;
 
-        tg_0_xxyy_s_0_0_0[i] = tg_0_yy_s_0_0_0[i] * fzi_0 + tg_0_yy_s_0_1_0[i] * fazi_0 * fazi_0 + 2.0 * tg_0_xyy_s_0_1_0[i] * rb_x[i] * fazi_0 * fazi_0 * fb_0 + tg_0_xyy_s_0_0_0[i] * rb_x[i] * fbz_0;
+        tg_0_xxyy_s_0_0_0[i] = 1.0 / 2.0 * tg_0_yy_s_0_0_0[i] * fzi_0 + tg_0_yy_s_0_1_0[i] * fazi_0 * fazi_0 + 2.0 * tg_0_xyy_s_0_1_0[i] * rb_x[i] * fazi_0 * fazi_0 * fb_0 + tg_0_xyy_s_0_0_0[i] * rb_x[i] * fbz_0;
 
         tg_0_xxyz_s_0_0_0[i] = 2.0 * tg_0_xxz_s_0_1_0[i] * rb_y[i] * fazi_0 * fazi_0 * fb_0 + tg_0_xxz_s_0_0_0[i] * rb_y[i] * fbz_0;
 
-        tg_0_xxzz_s_0_0_0[i] = tg_0_zz_s_0_0_0[i] * fzi_0 + tg_0_zz_s_0_1_0[i] * fazi_0 * fazi_0 + 2.0 * tg_0_xzz_s_0_1_0[i] * rb_x[i] * fazi_0 * fazi_0 * fb_0 + tg_0_xzz_s_0_0_0[i] * rb_x[i] * fbz_0;
+        tg_0_xxzz_s_0_0_0[i] = 1.0 / 2.0 * tg_0_zz_s_0_0_0[i] * fzi_0 + tg_0_zz_s_0_1_0[i] * fazi_0 * fazi_0 + 2.0 * tg_0_xzz_s_0_1_0[i] * rb_x[i] * fazi_0 * fazi_0 * fb_0 + tg_0_xzz_s_0_0_0[i] * rb_x[i] * fbz_0;
 
         tg_0_xyyy_s_0_0_0[i] = 2.0 * tg_0_yyy_s_0_1_0[i] * rb_x[i] * fazi_0 * fazi_0 * fb_0 + tg_0_yyy_s_0_0_0[i] * rb_x[i] * fbz_0;
 
@@ -166,15 +156,15 @@ comp_prim_projected_core_potential_sg_s(CSimdArray<double>& pbuffer,
 
         tg_0_xzzz_s_0_0_0[i] = 2.0 * tg_0_zzz_s_0_1_0[i] * rb_x[i] * fazi_0 * fazi_0 * fb_0 + tg_0_zzz_s_0_0_0[i] * rb_x[i] * fbz_0;
 
-        tg_0_yyyy_s_0_0_0[i] = 3.0 * tg_0_yy_s_0_0_0[i] * fzi_0 + 3.0 * tg_0_yy_s_0_1_0[i] * fazi_0 * fazi_0 + 2.0 * tg_0_yyy_s_0_1_0[i] * rb_y[i] * fazi_0 * fazi_0 * fb_0 + tg_0_yyy_s_0_0_0[i] * rb_y[i] * fbz_0;
+        tg_0_yyyy_s_0_0_0[i] = 3.0 / 2.0 * tg_0_yy_s_0_0_0[i] * fzi_0 + 3.0 * tg_0_yy_s_0_1_0[i] * fazi_0 * fazi_0 + 2.0 * tg_0_yyy_s_0_1_0[i] * rb_y[i] * fazi_0 * fazi_0 * fb_0 + tg_0_yyy_s_0_0_0[i] * rb_y[i] * fbz_0;
 
         tg_0_yyyz_s_0_0_0[i] = 2.0 * tg_0_yyy_s_0_1_0[i] * rb_z[i] * fazi_0 * fazi_0 * fb_0 + tg_0_yyy_s_0_0_0[i] * rb_z[i] * fbz_0;
 
-        tg_0_yyzz_s_0_0_0[i] = tg_0_zz_s_0_0_0[i] * fzi_0 + tg_0_zz_s_0_1_0[i] * fazi_0 * fazi_0 + 2.0 * tg_0_yzz_s_0_1_0[i] * rb_y[i] * fazi_0 * fazi_0 * fb_0 + tg_0_yzz_s_0_0_0[i] * rb_y[i] * fbz_0;
+        tg_0_yyzz_s_0_0_0[i] = 1.0 / 2.0 * tg_0_zz_s_0_0_0[i] * fzi_0 + tg_0_zz_s_0_1_0[i] * fazi_0 * fazi_0 + 2.0 * tg_0_yzz_s_0_1_0[i] * rb_y[i] * fazi_0 * fazi_0 * fb_0 + tg_0_yzz_s_0_0_0[i] * rb_y[i] * fbz_0;
 
         tg_0_yzzz_s_0_0_0[i] = 2.0 * tg_0_zzz_s_0_1_0[i] * rb_y[i] * fazi_0 * fazi_0 * fb_0 + tg_0_zzz_s_0_0_0[i] * rb_y[i] * fbz_0;
 
-        tg_0_zzzz_s_0_0_0[i] = 3.0 * tg_0_zz_s_0_0_0[i] * fzi_0 + 3.0 * tg_0_zz_s_0_1_0[i] * fazi_0 * fazi_0 + 2.0 * tg_0_zzz_s_0_1_0[i] * rb_z[i] * fazi_0 * fazi_0 * fb_0 + tg_0_zzz_s_0_0_0[i] * rb_z[i] * fbz_0;
+        tg_0_zzzz_s_0_0_0[i] = 3.0 / 2.0 * tg_0_zz_s_0_0_0[i] * fzi_0 + 3.0 * tg_0_zz_s_0_1_0[i] * fazi_0 * fazi_0 + 2.0 * tg_0_zzz_s_0_1_0[i] * rb_z[i] * fazi_0 * fazi_0 * fb_0 + tg_0_zzz_s_0_0_0[i] * rb_z[i] * fbz_0;
     }
 
     if (m > 0)
@@ -185,13 +175,10 @@ comp_prim_projected_core_potential_sg_s(CSimdArray<double>& pbuffer,
 
         auto tg_0_xx_s_0_0_1 = pbuffer.data(idx_sd_s_0_0_1);
 
-        auto tg_0_xy_s_0_0_1 = pbuffer.data(idx_sd_s_0_0_1 + 1);
 
-        auto tg_0_xz_s_0_0_1 = pbuffer.data(idx_sd_s_0_0_1 + 2);
 
         auto tg_0_yy_s_0_0_1 = pbuffer.data(idx_sd_s_0_0_1 + 3);
 
-        auto tg_0_yz_s_0_0_1 = pbuffer.data(idx_sd_s_0_0_1 + 4);
 
         auto tg_0_zz_s_0_0_1 = pbuffer.data(idx_sd_s_0_0_1 + 5);
 
@@ -199,13 +186,11 @@ comp_prim_projected_core_potential_sg_s(CSimdArray<double>& pbuffer,
 
         auto tg_0_xxx_s_0_0_1 = pbuffer.data(idx_sf_s_0_0_1);
 
-        auto tg_0_xxy_s_0_0_1 = pbuffer.data(idx_sf_s_0_0_1 + 1);
 
         auto tg_0_xxz_s_0_0_1 = pbuffer.data(idx_sf_s_0_0_1 + 2);
 
         auto tg_0_xyy_s_0_0_1 = pbuffer.data(idx_sf_s_0_0_1 + 3);
 
-        auto tg_0_xyz_s_0_0_1 = pbuffer.data(idx_sf_s_0_0_1 + 4);
 
         auto tg_0_xzz_s_0_0_1 = pbuffer.data(idx_sf_s_0_0_1 + 5);
 

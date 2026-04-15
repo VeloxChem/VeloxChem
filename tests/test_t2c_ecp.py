@@ -1,7 +1,7 @@
 from pathlib import Path
 import numpy as np
 
-from veloxchem.veloxchemlib import ECPDriver
+from veloxchem.veloxchemlib import EcpDriver
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.molecule import Molecule
 from veloxchem.submatrix import SubMatrix
@@ -9,7 +9,7 @@ from veloxchem.veloxchemlib import BaseCorePotential
 from veloxchem.veloxchemlib import AtomCorePotential
 
 
-class TestECPDriver:
+class TestEcpDriver:
 
     def get_auh2_svp_data(self):
 
@@ -19,6 +19,17 @@ class TestECPDriver:
              H   0.100  -0.900  -1.000
         """
         mol = Molecule.read_str(auh2str, 'au')
+        bas = MolecularBasis.read(mol, 'def2-svp')
+
+        return mol, bas
+        
+    def get_aucl_svp_data(self):
+
+        auclstr = """
+            Au 0.000   0.000   0.000
+            Cl 0.000   2.550   0.000
+        """
+        mol = Molecule.read_str(auclstr)
         bas = MolecularBasis.read(mol, 'def2-svp')
 
         return mol, bas
@@ -71,7 +82,7 @@ class TestECPDriver:
         
         atom_pot = AtomCorePotential(lpot, [spot, ppot, dpot], [0, 1, 2], 60);
         
-        ecp_drv = ECPDriver()
+        ecp_drv = EcpDriver()
         ecp_mat = ecp_drv.compute(mol_auh2, bas_svp, atom_pot)
         
         # load reference overlap data
@@ -124,7 +135,7 @@ class TestECPDriver:
         
         atom_pot = AtomCorePotential(lpot, [spot, ppot, dpot, fpot, gpot], [0, 1, 2, 3, 4], 60);
         
-        ecp_drv = ECPDriver()
+        ecp_drv = EcpDriver()
         ecp_mat = ecp_drv.compute(mol_gdh3, bas_svp, atom_pot)
         
         # load reference overlap data
@@ -136,7 +147,7 @@ class TestECPDriver:
         indexes = np.triu_indices(5)
         basdims = [0, 16, 43, 63, 84, 93]
         
-        print(ref_mat.shape)
+        #print(ref_mat.shape)
         
         # check individual overlap submatrices
         for i, j in zip(indexes[0], indexes[1]):
@@ -179,7 +190,7 @@ class TestECPDriver:
         
         atom_pot = AtomCorePotential(lpot, [spot, ppot, dpot, fpot, gpot], [0, 1, 2, 3, 4], 60);
         
-        ecp_drv = ECPDriver()
+        ecp_drv = EcpDriver()
         ecp_mat = ecp_drv.compute(mol_gdh3, bas_tzvpp, atom_pot)
         
         # load reference overlap data
@@ -191,7 +202,7 @@ class TestECPDriver:
         indexes = np.triu_indices(5)
         basdims = [0, 19, 58, 98, 126, 144]
         
-        print(ref_mat.shape)
+        #print(ref_mat.shape)
         
         # check individual overlap submatrices
         for i, j in zip(indexes[0], indexes[1]):
@@ -215,3 +226,38 @@ class TestECPDriver:
         fref = SubMatrix([0, 0, 144, 144])
         fref.set_values(np.ascontiguousarray(ref_mat))
         assert fmat == fref
+
+    def test_ecp_aucl_svp(self):
+
+        mol_aucl, bas_svp = self.get_aucl_svp_data()
+        
+        lpot = BaseCorePotential([4.78982000, 2.39491000],
+                                 [30.49008890, 5.17107381],
+                                 [2, 2])
+        
+        spot = BaseCorePotential([ 13.20510000,  6.60255000,   4.78982000,  2.39491000],
+                                 [426.84667920, 37.00708285, -30.49008890, -5.17107381],
+                                 [2, 2, 2, 2])
+                                 
+        ppot = BaseCorePotential([ 10.45202000, 5.22601000, 4.78982000, 2.39491000],
+                                 [261.19958038, 26.96249604, -30.49008890, -5.17107381],
+                                 [2, 2, 2, 2])
+                                 
+        dpot = BaseCorePotential([7.85110000, 3.92555000, 4.78982000, 2.39491000],
+                                 [124.79066561, 16.30072573, -30.49008890, -5.17107381],
+                                 [2, 2, 2, 2])
+        
+        atom_pot = AtomCorePotential(lpot, [spot, ppot, dpot], [0, 1, 2], 60);
+        
+        #atom_pot = AtomCorePotential(lpot, [], [], 60);
+        
+        #print(bas_svp.info_str('TEST'))
+        
+        ecp_drv = EcpDriver()
+        ecp_mat = ecp_drv.compute(mol_aucl, bas_svp, atom_pot)
+       
+        #print(np.max(ecp_mat.full_matrix().to_numpy()))
+        
+        #print(np.min(ecp_mat.full_matrix().to_numpy()))
+       
+        #assert False
