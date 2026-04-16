@@ -184,15 +184,14 @@ class QMTrajectoryParser:
         start_frame: int | None = None,
         end_frame: int | None = None,
         stride: int = 1,
-        start: float | None = None,
-        end: float | None = None,
     ) -> list[dict]:
         """
         Parse a trajectory and return sequentially ordered snapshot
         dictionaries for :class:`QMTrajectoryDriver`.
 
         Dispatches to a built-in XYZ reader for ``.xyz`` files, and to
-        MDAnalysis for ``.xtc``/``.pdb`` files.
+        MDAnalysis for ``.xtc``/``.pdb`` files. Frame selection is controlled
+        via ``start_frame``, ``end_frame``, ``stride``, and ``num_frames``.
 
         :param trajectory_file:
             Path to the trajectory file (``*.xyz``, ``*.xtc``, or ``*.pdb``).
