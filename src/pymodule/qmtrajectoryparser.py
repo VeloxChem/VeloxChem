@@ -261,7 +261,7 @@ class QMTrajectoryParser:
             return self._structures_mda(
                 trajectory_file, topology_file, trajectory_name, num_frames,
                 qm_region, qm_charge, qm_multiplicity, start_frame, end_frame,
-                stride,
+                stride, start, end,
             )
 
     def _structures_xyz(
