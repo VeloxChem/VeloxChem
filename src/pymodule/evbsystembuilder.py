@@ -262,7 +262,10 @@ class EvbSystemBuilder():
             ][0]
 
         nb_force.setName("NonbondedForce")
-        nb_force.setNonbondedMethod(mm.NonbondedForce.PME)
+        if self.solvent:
+            nb_force.setNonbondedMethod(mm.NonbondedForce.PME)
+        else:
+            nb_force.setNonbondedMethod(mm.NonbondedForce.NoCutoff)
         cmm_remover.setName("CMMotionRemover")
         if not self.no_force_groups:
             nb_force.setForceGroup(EvbForceGroup.NB_FORCE_INT.value)
@@ -275,11 +278,11 @@ class EvbSystemBuilder():
         box = None
         if self.CNT or self.graphene:
             box = self._add_CNT_graphene(system, nb_force, topology, vlx_mol)
-        box = self._configure_pbc(system, topology, nb_force, box)  # A
 
         # assert False, "Rethink CNT/graphene input"
 
         if self.solvent:
+            box = self._configure_pbc(system, topology, nb_force, box)  # A
             #todo what about the box, and especially giving it to the solvator
             box = self._add_solvent(system, vlx_mol, self.solvent, topology,
                                     nb_force, self.neutralize, self.padding,
