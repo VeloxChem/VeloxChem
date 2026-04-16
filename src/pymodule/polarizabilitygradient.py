@@ -547,14 +547,8 @@ class PolarizabilityGradient:
             profiler.check_memory_usage(f"ERI grad")
 
             pol_gradient += eri_contrib
-            # pol_gradient = self.comm.reduce(pol_gradient, root=mpi_master())
 
             del eri_contrib
-
-            # if self.rank == mpi_master():
-            #     for x in range(dof):
-            #         for y in range(x + 1, dof):
-            #             pol_gradient[y, x] += pol_gradient[x, y]
 
             if self._dft:
                 profiler.start_timer("XC")
@@ -564,8 +558,6 @@ class PolarizabilityGradient:
                     molecule, basis, gs_dm, rel_dm_ao, x_minus_y_ao, profiler)
 
                 # add contribution to the SCF polarizability gradient
-                # if self.rank == mpi_master():
-                #     pol_gradient += polgrad_xc_contrib
                 pol_gradient += polgrad_xc_contrib
 
                 profiler.stop_timer("XC")
@@ -713,7 +705,6 @@ class PolarizabilityGradient:
             screener_atom.partition_atom(basis, molecule, 'eri', iatom)
 
             # contraction with density matrices
-            #for x, y in xy_pairs:
             for x in range(dof):
                 # (X+Y)_x
                 den_mat_for_fock_xpy_x = make_matrix(basis, mat_t.general)
@@ -901,7 +892,6 @@ class PolarizabilityGradient:
             screener_atom.partition_atom(basis, molecule, 'eri', iatom)
 
             # contraction with density matrices
-            #for x, y in xy_pairs:
             for x in range(dof):
                 # (X+Y)_x
                 den_mat_for_fock_xpy_x_real = make_matrix(basis, mat_t.general)
@@ -1037,6 +1027,7 @@ class PolarizabilityGradient:
                                                                 iatom, fock_type,
                                                                 exchange_scaling_factor,
                                                                 0.0, thresh_int)
+                    # if diagonal tensor component we don't need to do it all again
                     if y == x:
                         erigrad_xpy_yx_rere = erigrad_xpy_xy_rere
                         erigrad_xpy_yx_imim = erigrad_xpy_xy_imim
@@ -1207,6 +1198,7 @@ class PolarizabilityGradient:
                                                                        den_mat_for_fock_xmy_p_xmyT_y_real,
                                                                        iatom, 'kx_rs', erf_k_coef,
                                                                        omega, thresh_int)
+                        # if diagonal tensor component we don't need to do it all again
                         if y == x:
                             erigrad_xpy_yx_rere_rs = erigrad_xpy_xy_rere_rs
                             erigrad_xpy_yx_imim_rs = erigrad_xpy_xy_imim_rs
@@ -1633,16 +1625,20 @@ class PolarizabilityGradient:
         """
 
         dof = len(self.vector_components)
+        mol_grid = self._scf_drv._mol_grid
 
-        if self.rank == mpi_master():
-            natm = molecule.number_of_atoms()
-            xc_pol_gradient = np.zeros((dof, dof, natm, 3))
-        else:
-            xc_pol_gradient = None
+#        if self.rank == mpi_master():
+#            natm = molecule.number_of_atoms()
+#            xc_pol_gradient = np.zeros((dof, dof, natm, 3))
+#        else:
+#            xc_pol_gradient = None
 
         # FIXME is this not a waste of communication?
         # Maybe natm/xc_pol_gradient should both happen on all ranks
-        xc_pol_gradient = self.comm.bcast(xc_pol_gradient, root=mpi_master())
+#        xc_pol_gradient = self.comm.bcast(xc_pol_gradient, root=mpi_master())
+
+        natm = molecule.number_of_atoms()
+        xc_pol_gradient = np.zeros((dof, dof, natm, 3))
 
         for m in range(dof):
             for n in range(m, dof):
@@ -1666,14 +1662,6 @@ class PolarizabilityGradient:
                 x_minus_y_sym_m = self.comm.bcast(x_minus_y_sym_m, root=mpi_master())
                 x_minus_y_sym_n = self.comm.bcast(x_minus_y_sym_n, root=mpi_master())
 
-            #    polgrad_xcgrad = self.calculate_xc_mn_contrib_real(
-            #        molecule, ao_basis, [rhow_dm_sym],
-            #        [x_minus_y_sym_m], [x_minus_y_sym_n],
-            #        [gs_dm], xcfun_label, profiler)
-##########
-# WIP
-                mol_grid = self._scf_drv._mol_grid
-
                 xcgrad_drv = XCMolecularGradient()
 
                 polgrad_xcgrad = xcgrad_drv.integrate_vxc_gradient(
@@ -1691,6 +1679,7 @@ class PolarizabilityGradient:
                     molecule, ao_basis, [x_minus_y_sym_m], [x_minus_y_sym_n], [gs_dm],
                     mol_grid, xcfun_label)
 
+                # if diagonal tensor component we don't need to do it all again
                 if n == m:
                     polgrad_fxc_nm = polgrad_fxc_mn
                     polgrad_kxc_nm = polgrad_kxc_mn
@@ -1702,8 +1691,6 @@ class PolarizabilityGradient:
                     polgrad_kxc_nm = 0.5 * xcgrad_drv.integrate_kxc_gradient(
                         molecule, ao_basis, [x_minus_y_sym_n], [x_minus_y_sym_m], [gs_dm],
                         mol_grid, xcfun_label)
-
-##########
 
                 xc_pol_gradient[m, n] += polgrad_xcgrad + polgrad_fxc_mn + polgrad_kxc_mn + polgrad_fxc_nm + polgrad_kxc_nm
 
@@ -1734,16 +1721,21 @@ class PolarizabilityGradient:
 
         dof = len(self.vector_components)
 
-        if self.rank == mpi_master():
-            natm = molecule.number_of_atoms()
-            xc_pol_gradient = np.zeros((dof, dof, natm, 3),
-                                       dtype=np.dtype('complex128'))
-        else:
-            xc_pol_gradient = None
+        mol_grid = self._scf_drv._mol_grid
+
+        #if self.rank == mpi_master():
+        #    natm = molecule.number_of_atoms()
+        #    xc_pol_gradient = np.zeros((dof, dof, natm, 3),
+        #                               dtype=np.dtype('complex128'))
+        #else:
+        #    xc_pol_gradient = None
 
         # FIXME is this not a waste of communication?
         # Maybe natm/xc_pol_gradient should both happen on all ranks
-        xc_pol_gradient = self.comm.bcast(xc_pol_gradient, root=mpi_master())
+        #xc_pol_gradient = self.comm.bcast(xc_pol_gradient, root=mpi_master())
+
+        natm = molecule.number_of_atoms()
+        xc_pol_gradient = np.zeros((dof, dof, natm, 3), dtype=np.dtype('complex128'))
 
         # FIXME change "m,n" to "x,y" for consistency
         for m in range(dof):
@@ -1787,73 +1779,48 @@ class PolarizabilityGradient:
                 x_minus_y_sym_n_list_imag = self.comm.bcast(x_minus_y_sym_n_list_imag,
                                                             root=mpi_master())
 
-                # TODO: unpack the function below, not optimal to have it like this
-                #polgrad_xcgrad = self.calculate_xc_mn_contrib_complex(
-                #    molecule, ao_basis, rhow_dm_sym_list_real,
-                #    rhow_dm_sym_list_imag,
-                #    x_minus_y_sym_m_list_real,
-                #    x_minus_y_sym_n_list_real,
-                #    x_minus_y_sym_m_list_imag,
-                #    x_minus_y_sym_n_list_imag,
-                #    [gs_dm], xcfun_label,
-                #    profiler)
-##########
-# WIP
-                mol_grid = self._scf_drv._mol_grid
-
                 xcgrad_drv = XCMolecularGradient()
 
                 # real contribution
                 polgrad_xcgrad_real = xcgrad_drv.integrate_vxc_gradient(  # Re DM
-                    #molecule, ao_basis, rhow_den_real, gs_density, mol_grid,
                     molecule, ao_basis, rhow_dm_sym_list_real, [gs_dm], mol_grid,
                     xcfun_label)
                 polgrad_xcgrad_real += xcgrad_drv.integrate_fxc_gradient(  # Re DM
-                    #molecule, ao_basis, rhow_den_real, gs_density, gs_density, mol_grid,
                     molecule, ao_basis, rhow_dm_sym_list_real, [gs_dm], [gs_dm], mol_grid,
                     xcfun_label)
 
-                # TODO fix so if diagonal element, things are not computed twice
                 polgrad_fxc_rere_mn = 0.5 * xcgrad_drv.integrate_fxc_gradient(  # ReRe
-                    #molecule, ao_basis, x_minus_y_den_real_m, x_minus_y_den_real_n,
                     molecule, ao_basis, x_minus_y_sym_m_list_real, x_minus_y_sym_n_list_real,
                     [gs_dm], mol_grid, xcfun_label)
                 polgrad_kxc_rere_mn = 0.5 * xcgrad_drv.integrate_kxc_gradient(  # ReRe
-                    #molecule, ao_basis, x_minus_y_den_real_m, x_minus_y_den_real_n,
                     molecule, ao_basis, x_minus_y_sym_m_list_real, x_minus_y_sym_n_list_real,
                     [gs_dm], mol_grid, xcfun_label)
 
                 polgrad_fxc_imim_mn = -0.5 * xcgrad_drv.integrate_fxc_gradient(  # ImIm
-                   # molecule, ao_basis, x_minus_y_den_imag_m, x_minus_y_den_imag_n,
                     molecule, ao_basis, x_minus_y_sym_m_list_imag, x_minus_y_sym_n_list_imag,
                     [gs_dm], mol_grid, xcfun_label)
                 polgrad_kxc_imim_mn = -0.5 * xcgrad_drv.integrate_kxc_gradient(  # ImIm
-                    #molecule, ao_basis, x_minus_y_den_imag_m, x_minus_y_den_imag_n,
                     molecule, ao_basis, x_minus_y_sym_m_list_imag, x_minus_y_sym_n_list_imag,
                     [gs_dm], mol_grid, xcfun_label)
 
+                # if diagonal tensor component we don't need to do it all again
                 if n == m:
                     polgrad_fxc_rere_nm = polgrad_fxc_rere_mn
                     polgrad_kxc_rere_nm = polgrad_kxc_rere_mn
-
                     polgrad_fxc_imim_nm = polgrad_fxc_imim_mn
                     polgrad_kxc_imim_nm = polgrad_kxc_imim_mn
                 else:
                     polgrad_fxc_rere_nm = 0.5 * xcgrad_drv.integrate_fxc_gradient(  # ReRe
-                        #molecule, ao_basis, x_minus_y_den_real_n, x_minus_y_den_real_m,
                         molecule, ao_basis, x_minus_y_sym_n_list_real, x_minus_y_sym_m_list_real,
                         [gs_dm], mol_grid, xcfun_label)
                     polgrad_kxc_rere_nm = 0.5 * xcgrad_drv.integrate_kxc_gradient(  # ReRe
-                        #molecule, ao_basis, x_minus_y_den_real_n, x_minus_y_den_real_m,
                         molecule, ao_basis, x_minus_y_sym_n_list_real, x_minus_y_sym_m_list_real,
                         [gs_dm], mol_grid, xcfun_label)
 
                     polgrad_fxc_imim_nm = -0.5 * xcgrad_drv.integrate_fxc_gradient(  # ImIm
-                        #molecule, ao_basis, x_minus_y_den_imag_n, x_minus_y_den_imag_m,
                         molecule, ao_basis, x_minus_y_sym_n_list_imag, x_minus_y_sym_m_list_imag,
                         [gs_dm], mol_grid, xcfun_label)
                     polgrad_kxc_imim_nm = -0.5 * xcgrad_drv.integrate_kxc_gradient(  # ImIm
-                        #molecule, ao_basis, x_minus_y_den_imag_n, x_minus_y_den_imag_m,
                         molecule, ao_basis, x_minus_y_sym_n_list_imag, x_minus_y_sym_m_list_imag,
                         [gs_dm], mol_grid, xcfun_label)
 
@@ -1862,68 +1829,58 @@ class PolarizabilityGradient:
 
                 # imaginary contribution
                 polgrad_xcgrad_imag = xcgrad_drv.integrate_vxc_gradient(  # Im DM
-                    #molecule, ao_basis, rhow_den_imag, gs_density, mol_grid,
                     molecule, ao_basis, rhow_dm_sym_list_imag, [gs_dm], mol_grid,
                     xcfun_label)
                 polgrad_xcgrad_imag += xcgrad_drv.integrate_fxc_gradient(  # Im DM
-                    #molecule, ao_basis, rhow_den_imag, gs_density, gs_density, mol_grid,
                     molecule, ao_basis, rhow_dm_sym_list_imag, [gs_dm], [gs_dm], mol_grid,
                     xcfun_label)
 
                 polgrad_fxc_reim_mn = 0.5 * xcgrad_drv.integrate_fxc_gradient(  # ReIm
-                    #molecule, ao_basis, x_minus_y_den_real_m, x_minus_y_den_imag_n,
                     molecule, ao_basis, x_minus_y_sym_m_list_real, x_minus_y_sym_n_list_imag, 
                     [gs_dm], mol_grid, xcfun_label)
                 polgrad_kxc_reim_mn = 0.5 * xcgrad_drv.integrate_kxc_gradient(  # ReIm
-                    #molecule, ao_basis, x_minus_y_den_real_m, x_minus_y_den_imag_n,
                     molecule, ao_basis, x_minus_y_sym_m_list_real, x_minus_y_sym_n_list_imag, 
                     [gs_dm], mol_grid, xcfun_label)
 
                 polgrad_fxc_imre_mn = 0.5 * xcgrad_drv.integrate_fxc_gradient(  # ImRe
-                    #molecule, ao_basis, x_minus_y_den_imag_m, x_minus_y_den_real_n,
                     molecule, ao_basis, x_minus_y_sym_m_list_imag, x_minus_y_sym_n_list_real, 
                     [gs_dm], mol_grid, xcfun_label)
                 polgrad_kxc_imre_mn = 0.5 * xcgrad_drv.integrate_kxc_gradient(  # ImRe
-                    #molecule, ao_basis, x_minus_y_den_imag_m, x_minus_y_den_real_n,
                     molecule, ao_basis, x_minus_y_sym_m_list_imag, x_minus_y_sym_n_list_real, 
                     [gs_dm], mol_grid, xcfun_label)
 
+                # if diagonal tensor component we don't need to do it all again
                 if n == m:
                     polgrad_fxc_reim_nm = polgrad_fxc_reim_mn
                     polgrad_kxc_reim_nm = polgrad_kxc_reim_mn
                     polgrad_fxc_imre_nm = polgrad_fxc_imre_mn
                     polgrad_kxc_imre_nm = polgrad_kxc_imre_mn
-
                 else:
                     polgrad_fxc_reim_nm = 0.5 * xcgrad_drv.integrate_fxc_gradient(  # ReIm
-                        #molecule, ao_basis, x_minus_y_den_real_n, x_minus_y_den_imag_m,
                         molecule, ao_basis, x_minus_y_sym_n_list_real, x_minus_y_sym_m_list_imag, 
                         [gs_dm], mol_grid, xcfun_label)
                     polgrad_kxc_reim_nm = 0.5 * xcgrad_drv.integrate_kxc_gradient(  # ReIm
-                        #molecule, ao_basis, x_minus_y_den_real_n, x_minus_y_den_imag_m,
                         molecule, ao_basis, x_minus_y_sym_n_list_real, x_minus_y_sym_m_list_imag, 
                         [gs_dm], mol_grid, xcfun_label)
 
                     polgrad_fxc_imre_nm = 0.5 * xcgrad_drv.integrate_fxc_gradient(  # ImRe
-                        #molecule, ao_basis, x_minus_y_den_imag_n, x_minus_y_den_real_m,
                         molecule, ao_basis, x_minus_y_sym_n_list_imag, x_minus_y_sym_m_list_real, 
                         [gs_dm], mol_grid, xcfun_label)
                     polgrad_kxc_imre_nm = 0.5 * xcgrad_drv.integrate_kxc_gradient(  # ImRe
-                        #molecule, ao_basis, x_minus_y_den_imag_n, x_minus_y_den_real_m,
                         molecule, ao_basis, x_minus_y_sym_n_list_imag, x_minus_y_sym_m_list_real, 
                         [gs_dm], mol_grid, xcfun_label)
 
                 polgrad_xcgrad_imag += polgrad_fxc_reim_mn + polgrad_kxc_reim_mn + polgrad_fxc_reim_nm + polgrad_kxc_reim_nm   
                 polgrad_xcgrad_imag += polgrad_fxc_imre_mn + polgrad_kxc_imre_mn + polgrad_fxc_imre_nm + polgrad_kxc_imre_nm
 
+                # combiner to complex array
                 polgrad_xcgrad = polgrad_xcgrad_real + 1j * polgrad_xcgrad_imag
 
-##########
                 xc_pol_gradient[m, n] += polgrad_xcgrad
 
         return xc_pol_gradient
 
-# TODO remove this function
+# TODO remove this unused function
     def calculate_xc_mn_contrib_real(self, molecule, ao_basis, rhow_den,
                                      x_minus_y_den_m, x_minus_y_den_n,
                                      gs_density, xcfun_label, profiler):
@@ -1959,7 +1916,6 @@ class PolarizabilityGradient:
             molecule, ao_basis, rhow_den, gs_density, gs_density, mol_grid,
             xcfun_label)
 
-        # TODO fix so if diagonal element, things are not computed twice
         polgrad_xcgrad += 0.5 * xcgrad_drv.integrate_fxc_gradient(
             molecule, ao_basis, x_minus_y_den_m, x_minus_y_den_n, gs_density,
             mol_grid, xcfun_label)
@@ -1978,6 +1934,7 @@ class PolarizabilityGradient:
 
         return polgrad_xcgrad
 
+# TODO remove this unused function
     def calculate_xc_mn_contrib_complex(self, molecule, ao_basis, rhow_den_real,
                                         rhow_den_imag, x_minus_y_den_real_m,
                                         x_minus_y_den_real_n, x_minus_y_den_imag_m,
@@ -2016,7 +1973,6 @@ class PolarizabilityGradient:
             molecule, ao_basis, rhow_den_real, gs_density, gs_density, mol_grid,
             xcfun_label)
 
-        # TODO fix so if diagonal element, things are not computed twice
         polgrad_xcgrad_real += 0.5 * xcgrad_drv.integrate_fxc_gradient(  # ReRe
             molecule, ao_basis, x_minus_y_den_real_m, x_minus_y_den_real_n,
             gs_density, mol_grid, xcfun_label)
