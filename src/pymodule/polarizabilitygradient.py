@@ -1625,19 +1625,9 @@ class PolarizabilityGradient:
         """
 
         dof = len(self.vector_components)
+        natm = molecule.number_of_atoms()
         mol_grid = self._scf_drv._mol_grid
 
-#        if self.rank == mpi_master():
-#            natm = molecule.number_of_atoms()
-#            xc_pol_gradient = np.zeros((dof, dof, natm, 3))
-#        else:
-#            xc_pol_gradient = None
-
-        # FIXME is this not a waste of communication?
-        # Maybe natm/xc_pol_gradient should both happen on all ranks
-#        xc_pol_gradient = self.comm.bcast(xc_pol_gradient, root=mpi_master())
-
-        natm = molecule.number_of_atoms()
         xc_pol_gradient = np.zeros((dof, dof, natm, 3))
 
         for m in range(dof):
@@ -1720,21 +1710,9 @@ class PolarizabilityGradient:
         """
 
         dof = len(self.vector_components)
-
+        natm = molecule.number_of_atoms()
         mol_grid = self._scf_drv._mol_grid
 
-        #if self.rank == mpi_master():
-        #    natm = molecule.number_of_atoms()
-        #    xc_pol_gradient = np.zeros((dof, dof, natm, 3),
-        #                               dtype=np.dtype('complex128'))
-        #else:
-        #    xc_pol_gradient = None
-
-        # FIXME is this not a waste of communication?
-        # Maybe natm/xc_pol_gradient should both happen on all ranks
-        #xc_pol_gradient = self.comm.bcast(xc_pol_gradient, root=mpi_master())
-
-        natm = molecule.number_of_atoms()
         xc_pol_gradient = np.zeros((dof, dof, natm, 3), dtype=np.dtype('complex128'))
 
         # FIXME change "m,n" to "x,y" for consistency
