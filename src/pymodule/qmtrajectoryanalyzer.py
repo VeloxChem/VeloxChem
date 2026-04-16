@@ -754,7 +754,7 @@ class QMTrajectoryAnalyzer:
                         dset_q = scf_grp['charges_resp']
                         from .qmtrajectorydriver import QMTrajectoryDriver as _D
                         _D._apply_atomic_metadata(
-                            _D, dset_q, 'scf', 'charges_resp'
+                            dset_q, 'scf', 'charges_resp'
                         )
                     dset_q = scf_grp['charges_resp']
                     if row < dset_q.shape[0]:
