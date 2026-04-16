@@ -127,7 +127,7 @@ class SpectrumAverager:
 
         A common energy grid (in a.u.) is constrcuted from the global minimum
         and maximum excitation energies across snapshots (plus padding). Each
-        snapshpt is broadened and converted to molar absorptivity epsilon on the
+        snapshot is broadened and converted to molar absorptivity epsilon on the
         common grid, and the mean and standard deviation are computed.
         Followed Eqn (1) and procedure here:
         https://doi.org/10.1021/acs.jctc.5c01719
