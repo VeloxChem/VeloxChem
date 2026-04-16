@@ -598,7 +598,12 @@ def _lr_ecd_curve(rsp_results, x_data, x_unit, broadening_type,
 
     xmin = float(np.min(x_grid_ev))
     xmax = float(np.max(x_grid_ev))
-    xstep = float(np.min(np.diff(x_grid_ev))) if x_grid_ev.size > 1 else 0.003
+    if x_grid_ev.size > 1:
+        xdiff = np.abs(np.diff(x_grid_ev))
+        xdiff = xdiff[xdiff > 0.0]
+        xstep = float(np.min(xdiff)) if xdiff.size > 0 else 0.003
+    else:
+        xstep = 0.003
 
     if broadening_type.lower() == 'lorentzian':
         xi, yi = lorentzian_ecd(exc_ene_ev, rot_str,
