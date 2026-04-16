@@ -1666,7 +1666,6 @@ class PolarizabilityGradient:
                 x_minus_y_sym_m = self.comm.bcast(x_minus_y_sym_m, root=mpi_master())
                 x_minus_y_sym_n = self.comm.bcast(x_minus_y_sym_n, root=mpi_master())
 
-                # TODO: unpack the function below, not optimal to have it like this
             #    polgrad_xcgrad = self.calculate_xc_mn_contrib_real(
             #        molecule, ao_basis, [rhow_dm_sym],
             #        [x_minus_y_sym_m], [x_minus_y_sym_n],
@@ -1684,7 +1683,6 @@ class PolarizabilityGradient:
                     molecule, ao_basis, [rhow_dm_sym], [gs_dm], [gs_dm], mol_grid,
                     xcfun_label)
 
-                # TODO fix so if diagonal element, things are not computed twice
                 polgrad_fxc_mn = 0.5 * xcgrad_drv.integrate_fxc_gradient(
                     molecule, ao_basis, [x_minus_y_sym_m], [x_minus_y_sym_n], [gs_dm],
                     mol_grid, xcfun_label)
