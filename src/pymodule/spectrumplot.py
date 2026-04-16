@@ -552,7 +552,8 @@ def _lr_absorption_curve(rsp_results, x_data, x_unit, broadening_type,
 
     xmin = float(np.min(x_grid_au))
     xmax = float(np.max(x_grid_au))
-    xstep = float(np.min(np.diff(x_grid_au))) if x_grid_au.size > 1 else 1.0e-4
+    xstep = float(np.min(np.abs(np.diff(x_grid_au)))
+                  ) if x_grid_au.size > 1 else 1.0e-4
 
     if broadening_type.lower() == 'lorentzian':
         xi, lineshape = lorentzian_absorption(exc_ene_au, osc_str,
