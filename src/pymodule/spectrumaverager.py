@@ -142,7 +142,7 @@ class SpectrumAverager:
             Maximum photon energy in eV for the common grid. If None, it is set to
             (global max excitation energy + padding).
         :return:
-            A dictionary containing the averaged spectrum and auxilary data:
+            A dictionary containing the averaged spectrum and auxiliary data:
               - frames: frame indices (or None)
               - xgrid_au: energy grid in a.u.
               - xgrid_ev: energy grid in eV
