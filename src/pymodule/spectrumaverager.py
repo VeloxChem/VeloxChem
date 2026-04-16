@@ -125,7 +125,7 @@ class SpectrumAverager:
         """
         Compute an averaged UV/Vis spectrum from multiple response results.
 
-        A common energy grid (in a.u.) is constrcuted from the global minimum
+        A common energy grid (in a.u.) is constructed from the global minimum
         and maximum excitation energies across snapshots (plus padding). Each
         snapshot is broadened and converted to molar absorptivity epsilon on the
         common grid, and the mean and standard deviation are computed.
