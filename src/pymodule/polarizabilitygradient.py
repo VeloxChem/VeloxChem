@@ -1790,20 +1790,142 @@ class PolarizabilityGradient:
                                                             root=mpi_master())
 
                 # TODO: unpack the function below, not optimal to have it like this
-                polgrad_xcgrad = self.calculate_xc_mn_contrib_complex(
-                    molecule, ao_basis, rhow_dm_sym_list_real,
-                    rhow_dm_sym_list_imag,
-                    x_minus_y_sym_m_list_real,
-                    x_minus_y_sym_n_list_real,
-                    x_minus_y_sym_m_list_imag,
-                    x_minus_y_sym_n_list_imag,
-                    [gs_dm], xcfun_label,
-                    profiler)
+                #polgrad_xcgrad = self.calculate_xc_mn_contrib_complex(
+                #    molecule, ao_basis, rhow_dm_sym_list_real,
+                #    rhow_dm_sym_list_imag,
+                #    x_minus_y_sym_m_list_real,
+                #    x_minus_y_sym_n_list_real,
+                #    x_minus_y_sym_m_list_imag,
+                #    x_minus_y_sym_n_list_imag,
+                #    [gs_dm], xcfun_label,
+                #    profiler)
+##########
+# WIP
+                mol_grid = self._scf_drv._mol_grid
 
+                xcgrad_drv = XCMolecularGradient()
+
+                # real contribution
+                polgrad_xcgrad_real = xcgrad_drv.integrate_vxc_gradient(  # Re DM
+                    #molecule, ao_basis, rhow_den_real, gs_density, mol_grid,
+                    molecule, ao_basis, rhow_dm_sym_list_real, [gs_dm], mol_grid,
+                    xcfun_label)
+                polgrad_xcgrad_real += xcgrad_drv.integrate_fxc_gradient(  # Re DM
+                    #molecule, ao_basis, rhow_den_real, gs_density, gs_density, mol_grid,
+                    molecule, ao_basis, rhow_dm_sym_list_real, [gs_dm], [gs_dm], mol_grid,
+                    xcfun_label)
+
+                # TODO fix so if diagonal element, things are not computed twice
+                polgrad_fxc_rere_mn = 0.5 * xcgrad_drv.integrate_fxc_gradient(  # ReRe
+                    #molecule, ao_basis, x_minus_y_den_real_m, x_minus_y_den_real_n,
+                    molecule, ao_basis, x_minus_y_sym_m_list_real, x_minus_y_sym_n_list_real,
+                    [gs_dm], mol_grid, xcfun_label)
+                polgrad_kxc_rere_mn = 0.5 * xcgrad_drv.integrate_kxc_gradient(  # ReRe
+                    #molecule, ao_basis, x_minus_y_den_real_m, x_minus_y_den_real_n,
+                    molecule, ao_basis, x_minus_y_sym_m_list_real, x_minus_y_sym_n_list_real,
+                    [gs_dm], mol_grid, xcfun_label)
+
+                polgrad_fxc_imim_mn = -0.5 * xcgrad_drv.integrate_fxc_gradient(  # ImIm
+                   # molecule, ao_basis, x_minus_y_den_imag_m, x_minus_y_den_imag_n,
+                    molecule, ao_basis, x_minus_y_sym_m_list_imag, x_minus_y_sym_n_list_imag,
+                    [gs_dm], mol_grid, xcfun_label)
+                polgrad_kxc_imim_mn = -0.5 * xcgrad_drv.integrate_kxc_gradient(  # ImIm
+                    #molecule, ao_basis, x_minus_y_den_imag_m, x_minus_y_den_imag_n,
+                    molecule, ao_basis, x_minus_y_sym_m_list_imag, x_minus_y_sym_n_list_imag,
+                    [gs_dm], mol_grid, xcfun_label)
+
+                if n == m:
+                    polgrad_fxc_rere_nm = polgrad_fxc_rere_mn
+                    polgrad_kxc_rere_nm = polgrad_kxc_rere_mn
+
+                    polgrad_fxc_imim_nm = polgrad_fxc_imim_mn
+                    polgrad_kxc_imim_nm = polgrad_kxc_imim_mn
+                else:
+                    polgrad_fxc_rere_nm = 0.5 * xcgrad_drv.integrate_fxc_gradient(  # ReRe
+                        #molecule, ao_basis, x_minus_y_den_real_n, x_minus_y_den_real_m,
+                        molecule, ao_basis, x_minus_y_sym_n_list_real, x_minus_y_sym_m_list_real,
+                        [gs_dm], mol_grid, xcfun_label)
+                    polgrad_kxc_rere_nm = 0.5 * xcgrad_drv.integrate_kxc_gradient(  # ReRe
+                        #molecule, ao_basis, x_minus_y_den_real_n, x_minus_y_den_real_m,
+                        molecule, ao_basis, x_minus_y_sym_n_list_real, x_minus_y_sym_m_list_real,
+                        [gs_dm], mol_grid, xcfun_label)
+
+                    polgrad_fxc_imim_nm = -0.5 * xcgrad_drv.integrate_fxc_gradient(  # ImIm
+                        #molecule, ao_basis, x_minus_y_den_imag_n, x_minus_y_den_imag_m,
+                        molecule, ao_basis, x_minus_y_sym_n_list_imag, x_minus_y_sym_m_list_imag,
+                        [gs_dm], mol_grid, xcfun_label)
+                    polgrad_kxc_imim_nm = -0.5 * xcgrad_drv.integrate_kxc_gradient(  # ImIm
+                        #molecule, ao_basis, x_minus_y_den_imag_n, x_minus_y_den_imag_m,
+                        molecule, ao_basis, x_minus_y_sym_n_list_imag, x_minus_y_sym_m_list_imag,
+                        [gs_dm], mol_grid, xcfun_label)
+
+                polgrad_xcgrad_real += polgrad_fxc_rere_mn + polgrad_kxc_rere_mn + polgrad_fxc_rere_nm + polgrad_kxc_rere_nm   
+                polgrad_xcgrad_real += polgrad_fxc_imim_mn + polgrad_kxc_imim_mn + polgrad_fxc_imim_nm + polgrad_kxc_imim_nm
+
+                # imaginary contribution
+                polgrad_xcgrad_imag = xcgrad_drv.integrate_vxc_gradient(  # Im DM
+                    #molecule, ao_basis, rhow_den_imag, gs_density, mol_grid,
+                    molecule, ao_basis, rhow_dm_sym_list_imag, [gs_dm], mol_grid,
+                    xcfun_label)
+                polgrad_xcgrad_imag += xcgrad_drv.integrate_fxc_gradient(  # Im DM
+                    #molecule, ao_basis, rhow_den_imag, gs_density, gs_density, mol_grid,
+                    molecule, ao_basis, rhow_dm_sym_list_imag, [gs_dm], [gs_dm], mol_grid,
+                    xcfun_label)
+
+                polgrad_fxc_reim_mn = 0.5 * xcgrad_drv.integrate_fxc_gradient(  # ReIm
+                    #molecule, ao_basis, x_minus_y_den_real_m, x_minus_y_den_imag_n,
+                    molecule, ao_basis, x_minus_y_sym_m_list_real, x_minus_y_sym_n_list_imag, 
+                    [gs_dm], mol_grid, xcfun_label)
+                polgrad_kxc_reim_mn = 0.5 * xcgrad_drv.integrate_kxc_gradient(  # ReIm
+                    #molecule, ao_basis, x_minus_y_den_real_m, x_minus_y_den_imag_n,
+                    molecule, ao_basis, x_minus_y_sym_m_list_real, x_minus_y_sym_n_list_imag, 
+                    [gs_dm], mol_grid, xcfun_label)
+
+                polgrad_fxc_imre_mn = 0.5 * xcgrad_drv.integrate_fxc_gradient(  # ImRe
+                    #molecule, ao_basis, x_minus_y_den_imag_m, x_minus_y_den_real_n,
+                    molecule, ao_basis, x_minus_y_sym_m_list_imag, x_minus_y_sym_n_list_real, 
+                    [gs_dm], mol_grid, xcfun_label)
+                polgrad_kxc_imre_mn = 0.5 * xcgrad_drv.integrate_kxc_gradient(  # ImRe
+                    #molecule, ao_basis, x_minus_y_den_imag_m, x_minus_y_den_real_n,
+                    molecule, ao_basis, x_minus_y_sym_m_list_imag, x_minus_y_sym_n_list_real, 
+                    [gs_dm], mol_grid, xcfun_label)
+
+                if n == m:
+                    polgrad_fxc_reim_nm = polgrad_fxc_reim_mn
+                    polgrad_kxc_reim_nm = polgrad_kxc_reim_mn
+                    polgrad_fxc_imre_nm = polgrad_fxc_imre_mn
+                    polgrad_kxc_imre_nm = polgrad_kxc_imre_mn
+
+                else:
+                    polgrad_fxc_reim_nm = 0.5 * xcgrad_drv.integrate_fxc_gradient(  # ReIm
+                        #molecule, ao_basis, x_minus_y_den_real_n, x_minus_y_den_imag_m,
+                        molecule, ao_basis, x_minus_y_sym_n_list_real, x_minus_y_sym_m_list_imag, 
+                        [gs_dm], mol_grid, xcfun_label)
+                    polgrad_kxc_reim_nm = 0.5 * xcgrad_drv.integrate_kxc_gradient(  # ReIm
+                        #molecule, ao_basis, x_minus_y_den_real_n, x_minus_y_den_imag_m,
+                        molecule, ao_basis, x_minus_y_sym_n_list_real, x_minus_y_sym_m_list_imag, 
+                        [gs_dm], mol_grid, xcfun_label)
+
+                    polgrad_fxc_imre_nm = 0.5 * xcgrad_drv.integrate_fxc_gradient(  # ImRe
+                        #molecule, ao_basis, x_minus_y_den_imag_n, x_minus_y_den_real_m,
+                        molecule, ao_basis, x_minus_y_sym_n_list_imag, x_minus_y_sym_m_list_real, 
+                        [gs_dm], mol_grid, xcfun_label)
+                    polgrad_kxc_imre_nm = 0.5 * xcgrad_drv.integrate_kxc_gradient(  # ImRe
+                        #molecule, ao_basis, x_minus_y_den_imag_n, x_minus_y_den_real_m,
+                        molecule, ao_basis, x_minus_y_sym_n_list_imag, x_minus_y_sym_m_list_real, 
+                        [gs_dm], mol_grid, xcfun_label)
+
+                polgrad_xcgrad_imag += polgrad_fxc_reim_mn + polgrad_kxc_reim_mn + polgrad_fxc_reim_nm + polgrad_kxc_reim_nm   
+                polgrad_xcgrad_imag += polgrad_fxc_imre_mn + polgrad_kxc_imre_mn + polgrad_fxc_imre_nm + polgrad_kxc_imre_nm
+
+                polgrad_xcgrad = polgrad_xcgrad_real + 1j * polgrad_xcgrad_imag
+
+##########
                 xc_pol_gradient[m, n] += polgrad_xcgrad
 
         return xc_pol_gradient
 
+# TODO remove this function
     def calculate_xc_mn_contrib_real(self, molecule, ao_basis, rhow_den,
                                      x_minus_y_den_m, x_minus_y_den_n,
                                      gs_density, xcfun_label, profiler):
