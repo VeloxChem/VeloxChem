@@ -679,17 +679,33 @@ class QMTrajectoryAnalyzer:
             dft_label = self._dft_label or 'HF'
 
         with h5py.File(self._path, 'a') as hf:
+            # Root-level datasets are frame-aligned, but scf/ datasets are aligned
+            # only to the subset of frames that were already converged in the file.
+            original_converged = np.asarray(hf['converged'][:], dtype=bool)
+            converged_rows = np.flatnonzero(original_converged)
+            converged_row_map = {
+                int(full_row): idx for idx, full_row in enumerate(converged_rows)
+            }
+
             for snap, fid in zip(snapshots, frame_ids):
-                row = self._row_for_frame(fid)
+                full_row = self._row_for_frame(fid)
                 scf_res = scf_all.get(int(fid))
                 converged = scf_res is not None
 
-                # Update root-level converged flag
-                hf['converged'][row] = converged
+                # Update root-level converged flag using the full trajectory row.
+                hf['converged'][full_row] = converged
 
                 if not converged:
                     continue
 
+                # Reuse `row` below as the index into converged-only datasets
+                # (for example scf/ and downstream response payloads).
+                row = converged_row_map.get(int(full_row))
+
+                # Newly converged frames do not have a pre-existing scf/ row in
+                # files written without placeholders, so avoid misaligned writes.
+                if row is None:
+                    continue
                 # Patch scf group — only scf_energy and a few key scalars
                 if 'scf' not in hf:
                     continue
