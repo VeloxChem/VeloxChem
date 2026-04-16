@@ -4745,7 +4745,6 @@ class IMDatabasePointCollecter:
                                             key = tuple(sorted(reordered_element))
                                             z_mat_index = z_matrix_dict.get(key)
                                             mask.append(z_mat_index)
-                                            print(reorded_int_coords, z_mat_index, z_matrix_dict)
                                             reorded_int_coord[i] = (float(reorded_int_coords[0][z_mat_index]))
 
                                         reorded_int_coords.append(reorded_int_coord)
