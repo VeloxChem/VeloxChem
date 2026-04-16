@@ -718,6 +718,7 @@ class TransitionStateGuesser():
 
         try:
             import ipywidgets
+            from IPython.display import display as ipy_display
         except ImportError:
             raise ImportError(
                 'ipywidgets is required for this functionality.')
@@ -738,9 +739,11 @@ class TransitionStateGuesser():
                 raise ValueError(
                     "No results provided. Provide either ts_results or filename."
                 )
+
+        scan = ts_results['scan']
         lambda_vec = [round(float(l), 3) for l in ts_results['lambda_vec']]
 
-        if ts_results['scan'][0][0].get('qm_energy', None) is not None:
+        if scan[0][0].get('qm_energy', None) is not None:
             final_lambda = round(float(ts_results.get('max_qm_lambda', 0)), 3)
         else:
             final_lambda = round(float(ts_results['max_mm_lambda']), 3)
@@ -749,20 +752,121 @@ class TransitionStateGuesser():
         breaking_bonds = set(ts_results.get('breaking_bonds', None))
         bonds = set(ts_results.get('static_bonds', None))
 
-        ipywidgets.interact(
-            TransitionStateGuesser._show_lambda_iteration,
-            step=ipywidgets.SelectionSlider(
-                options=lambda_vec,
-                description='Lambda',
-                value=final_lambda,
-            ),
-            lambda_vec=ipywidgets.fixed(lambda_vec),
-            scan=ipywidgets.fixed(ts_results['scan']),
-            bonds=ipywidgets.fixed(bonds),
-            forming_bonds=ipywidgets.fixed(forming_bonds),
-            breaking_bonds=ipywidgets.fixed(breaking_bonds),
-            **mol_show_kwargs,
+        def _best_conformer_index(step):
+            best_index = 0
+            min_energy = None
+            if scan[0][0].get('qm_energy', None) is not None:
+                for i, conf in enumerate(scan[step]):
+                    qm_E = conf.get('qm_energy', None)
+                    if min_energy is None or (qm_E is not None
+                                              and qm_E < min_energy):
+                        min_energy = qm_E
+                        best_index = i
+            else:
+                for i, conf in enumerate(scan[step]):
+                    if min_energy is None or conf['v'] < min_energy:
+                        min_energy = conf['v']
+                        best_index = i
+            return best_index
+
+        initial_best = _best_conformer_index(final_lambda)
+
+        lambda_slider = ipywidgets.SelectionSlider(
+            options=lambda_vec,
+            description='Lambda',
+            value=final_lambda,
         )
+        conformer_dropdown = ipywidgets.Dropdown(
+            options=list(range(1, len(scan[final_lambda]) + 1)),
+            description='Conf. ID',
+            value=initial_best + 1,
+        )
+
+        def _on_lambda_change(change):
+            step = change['new']
+            options = list(range(1, len(scan[step]) + 1))
+            best = _best_conformer_index(step)
+            conformer_dropdown.options = options
+            conformer_dropdown.value = best + 1
+
+        lambda_slider.observe(_on_lambda_change, names='value')
+
+        import threading
+
+        max_conformers = max(len(scan[step]) for step in lambda_vec)
+
+        step_slider = ipywidgets.SelectionSlider(
+            options=lambda_vec,
+            description='Lambda',
+            value=final_lambda,
+        )
+        conformer_slider = ipywidgets.IntSlider(
+            min=1,
+            max=max_conformers,
+            value=initial_best + 1,
+            description='Conf. ID',
+        )
+
+        def _render_interact(step, conformer_id):
+            # Clamp conformer_id in case it exceeds available conformers for
+            # the current lambda.
+            n_conf = len(scan[step])
+            TransitionStateGuesser._show_conformer_iteration(
+                step,
+                min(conformer_id, n_conf),
+                lambda_vec,
+                scan,
+                bonds=bonds,
+                forming_bonds=forming_bonds,
+                breaking_bonds=breaking_bonds,
+                **mol_show_kwargs,
+            )
+
+        w = ipywidgets.interactive(
+            _render_interact,
+            step=step_slider,
+            conformer_id=conformer_slider,
+        )
+
+        # display='none' reserves no space (unlike visibility='hidden') so
+        # the widget appears as just the sliders until the clean render is ready.
+        out_widget = w.children[-1]
+        out_widget.layout.display = 'none'
+
+        ipy_display(w)
+
+        def _do_render():
+            import time
+            # Short pause so the browser can process execute_reply and render
+            # the widget before our comm message arrives.
+            time.sleep(0.3)
+            try:
+                # w.update() re-runs the function with the current widget
+                # values via the same comm pathway as a user interaction, so
+                # py3Dmol's script executes correctly.  No slider toggling
+                # needed — one clean render at the correct position.
+                w.update()
+                time.sleep(0.5)
+            except Exception:
+                pass
+            finally:
+                out_widget.layout.display = ''
+
+        # Start _do_render from a post_execute hook so the timer begins the
+        # moment the cell finishes, not after a fixed worst-case delay.
+        try:
+            from IPython import get_ipython as _get_ipython
+            _ip = _get_ipython()
+        except Exception:
+            _ip = None
+
+        if _ip is not None:
+            def _on_post_execute():
+                _ip.events.unregister('post_execute', _on_post_execute)
+                threading.Thread(target=_do_render, daemon=True).start()
+            _ip.events.register('post_execute', _on_post_execute)
+        else:
+            threading.Thread(target=_do_render, daemon=True).start()
 
     @staticmethod
     def _show_lambda_iteration(
@@ -978,6 +1082,22 @@ class TransitionStateGuesser():
         add = 0.1
         breaking_width = offset + add * (1 - step)
         forming_width = offset + add * (step)
+
+        # Hide py3Dmol's red warning div before it appears so it never
+        # flashes.  py3Dmol always inserts the warning element first and
+        # removes it via JavaScript; this CSS makes it invisible from the
+        # start so the removal is imperceptible.
+        try:
+            from IPython.display import display as _ipy_display, HTML as _HTML
+            _ipy_display(
+                _HTML(
+                    '<style>[id^="3dmolwarning_"]'
+                    '{display:none!important}</style>'
+                )
+            )
+        except Exception:
+            pass
+
         if bonds is not None and (forming_bonds is not None
                                   or breaking_bonds is not None):
             mol.show(
