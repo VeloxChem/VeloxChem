@@ -407,10 +407,10 @@ class IMForceFieldGenerator:
         self.profile_interpolation_timing = False
         
         # mpi section of the code Xin needs to check as the code differs from normal MPI integration frameworks
-        self.use_mpi_preload = True
-        self.mpi_control_plane_enabled = True
-        self.mpi_root_worker_mode = True
-        self.mpi_reload_from_hdf5 = True
+        self.use_mpi_preload = False
+        self.mpi_control_plane_enabled = False
+        self.mpi_root_worker_mode = False
+        self.mpi_reload_from_hdf5 = False
         self.mpi_debug_sync = False
 
         self._test_hooks = {}
