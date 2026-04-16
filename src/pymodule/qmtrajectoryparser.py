@@ -183,6 +183,7 @@ class QMTrajectoryParser:
         qm_multiplicity: int = 1,
         start_frame: int | None = None,
         end_frame: int | None = None,
+        stride: int = 1,
         start: float | None = None,
         end: float | None = None,
     ) -> list[dict]:
@@ -199,10 +200,11 @@ class QMTrajectoryParser:
             Path to the topology file.  Required for ``.xtc``; ignored for
             ``.xyz`` and ``.pdb``.
         :param num_frames:
-            Maximum number of frames to extract.  Frames are taken
-            **sequentially from the start** of the selected window — no
-            sub-sampling is applied.  If ``None``, all frames in the window
-            are returned.
+            Maximum number of frames to extract after optional stride-based
+            sub-sampling. If ``None``, all selected frames are returned.
+        :param stride:
+            Use every ``stride``-th frame from the selected window.
+            Default is 1, i.e. no sub-sampling.
         :param qm_region:
             MDAnalysis atom-selection string defining the QM atoms.  Only used
             for MDAnalysis-based trajectories (``.xtc``/``.pdb``).  If
@@ -244,18 +246,23 @@ class QMTrajectoryParser:
             raise ValueError("qm_multiplicity must be a positive integer.")
         qm_multiplicity = int(qm_multiplicity)
 
+        stride = int(stride)
+        if stride <= 0:
+            raise ValueError("stride must be a positive integer.")
+
         trajectory_file = str(trajectory_file)
         trajectory_name = Path(trajectory_file).name
 
         if trajectory_file.lower().endswith(".xyz"):
             return self._structures_xyz(
                 trajectory_file, trajectory_name, num_frames,
-                qm_charge, qm_multiplicity, start_frame, end_frame,
+                qm_charge, qm_multiplicity, start_frame, end_frame, stride,
             )
         else:
             return self._structures_mda(
                 trajectory_file, topology_file, trajectory_name, num_frames,
                 qm_region, qm_charge, qm_multiplicity, start_frame, end_frame,
+                stride,
             )
 
     def _structures_xyz(
@@ -267,6 +274,7 @@ class QMTrajectoryParser:
         qm_multiplicity,
         start_frame,
         end_frame,
+        stride,
     ):
         """Parse a multi-frame XYZ trajectory and return snapshots."""
         raw_frames = self._parse_xyz_frames(trajectory_file)
@@ -287,27 +295,27 @@ class QMTrajectoryParser:
                 f"start_frame ({s}) must be less than end_frame ({e})."
             )
 
-        window = raw_frames[s:e]
+        frame_indices = np.arange(s, e, stride, dtype=int)
 
         if num_frames is not None:
             num_frames = int(num_frames)
             if num_frames <= 0:
                 raise ValueError("num_frames must be a positive integer.")
-            if num_frames > len(window):
+            if num_frames > len(frame_indices):
                 raise ValueError(
                     f"Requested num_frames ({num_frames}) exceeds the "
-                    f"{len(window)} frames available in the window "
-                    f"[{s}, {e})."
+                    f"{len(frame_indices)} frames available in the window "
+                    f"[{s}, {e}) with stride {stride}."
                 )
-            window = window[:num_frames]
+            frame_indices = frame_indices[:num_frames]
 
-        total_frames = len(window)
+        total_frames = len(frame_indices)
         snapshots = []
 
-        for seq_idx, (elements, coords) in enumerate(window):
-            orig_frame = s + seq_idx
+        for seq_idx, iframe in enumerate(frame_indices):
+            elements, coords = raw_frames[iframe]
             snapshots.append({
-                "frame": orig_frame,
+                "frame": int(iframe),
                 "frame_index": seq_idx,
                 "trajectory_name": trajectory_name,
                 "total_frames": total_frames,
@@ -338,6 +346,7 @@ class QMTrajectoryParser:
         qm_multiplicity,
         start_frame,
         end_frame,
+        stride,
     ):
         """Parse a trajectory via MDAnalysis and return snapshots."""
         try:
@@ -380,7 +389,7 @@ class QMTrajectoryParser:
             raise ValueError(
                 f"start_frame ({s}) must be less than end_frame ({e})."
             )
-        frame_indices = np.arange(s, e, dtype=int)
+        frame_indices = np.arange(s, e, stride, dtype=int)
 
         if num_frames is not None:
             num_frames = int(num_frames)
@@ -390,7 +399,7 @@ class QMTrajectoryParser:
                 raise ValueError(
                     f"Requested num_frames ({num_frames}) exceeds the "
                     f"{len(frame_indices)} frames available in the selected "
-                    f"window."
+                    f"window with stride {stride}."
                 )
             frame_indices = frame_indices[:num_frames]
 

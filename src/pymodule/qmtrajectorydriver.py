@@ -47,6 +47,7 @@ from .cppsolver import ComplexResponseSolver
 from .respchargesdriver import RespChargesDriver
 from .veloxchemlib import mpi_master, hartree_in_ev, hartree_in_kjpermol
 from .errorhandler import assert_msg_critical
+from .spectrumplot import plot_trajectory_spectrum
 
 
 class QMTrajectoryDriver:
@@ -191,6 +192,12 @@ class QMTrajectoryDriver:
             if "vector" in key or "cube" in key or "file" in key or "details" in key:
                 continue
             payload[key] = value
+
+        if 'rotatory_strengths' in rsp_results:
+            payload['property'] = np.bytes_(['ecd'])
+        elif 'oscillator_strengths' in rsp_results:
+            payload['property'] = np.bytes_(['absorption'])
+
         return payload
 
     @staticmethod
@@ -948,6 +955,9 @@ class QMTrajectoryDriver:
         do_resp = resp_driver is not None
         do_rsp = prop_driver is not None
         rsp_driver = prop_driver
+        self.scf_driver = scf_driver
+        self.prop_driver = rsp_driver
+        self.resp_driver = resp_driver
         if do_rsp and hasattr(rsp_driver, "detach_attach"):
             rsp_driver.detach_attach = True
 
@@ -1161,10 +1171,61 @@ class QMTrajectoryDriver:
         results = {"scf_all": scf_all, "scf_history_all": scf_history_all}
         if do_rsp:
             results["prop_all"] = rsp_all
+            results["prop_backend"] = (
+                'cpp' if hasattr(rsp_driver, 'get_spectrum') and
+                'response_functions' in next(
+                    (rsp for _, rsp in rsp_all if rsp is not None), {}
+                ) else 'lr'
+            )
+            prop_name = getattr(rsp_driver, 'property', None)
+            if prop_name is None:
+                sample_rsp = next((rsp for _, rsp in rsp_all if rsp is not None), {})
+                if 'rotatory_strengths' in sample_rsp:
+                    prop_name = 'ecd'
+                elif sample_rsp:
+                    prop_name = 'absorption'
+            if prop_name is not None:
+                results['prop_property'] = str(prop_name).lower()
         if do_resp:
             results["resp_all"] = resp_all
 
         return results
+
+    def plot_spectrum(self,
+                      results,
+                      property=None,
+                      x_unit='nm',
+                      broadening_type='lorentzian',
+                      broadening_value=None,
+                      x_range=None,
+                      show_frames=True,
+                      show_average=True,
+                      show_sticks=True,
+                      ax=None):
+        """Plot one spectrum per frame together with the average spectrum."""
+        assert_msg_critical(
+            isinstance(results, dict) and results.get('prop_all'),
+            'plot_spectrum: no property results found. Run compute() with property_options first.'
+        )
+
+        prop_name = property or results.get('prop_property')
+        if broadening_value is None:
+            from .veloxchemlib import hartree_in_wavenumber
+            broadening_value = (1000.0 / hartree_in_wavenumber() *
+                                hartree_in_ev())
+
+        return plot_trajectory_spectrum(
+            results['prop_all'],
+            property=prop_name,
+            x_unit=x_unit,
+            broadening_type=broadening_type,
+            broadening_value=broadening_value,
+            x_range=x_range,
+            show_frames=show_frames,
+            show_average=show_average,
+            show_sticks=show_sticks,
+            ax=ax,
+        )
 
     def plot_scf(self, results, y_unit='a.u.', ax=None):
         """

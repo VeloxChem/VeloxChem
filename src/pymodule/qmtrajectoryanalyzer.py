@@ -41,6 +41,7 @@ from .veloxchemlib import bohr_in_angstrom
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 from .errorhandler import assert_msg_critical
+from .spectrumplot import plot_trajectory_spectrum
 
 
 def show_trajectory(snapshots, mode='animate', stride=1, width=600, height=400,
@@ -332,6 +333,40 @@ class QMTrajectoryAnalyzer:
                 })
         return snapshots
 
+    def _get_rsp_frame_results(self, frame_ids=None):
+        """Collect per-frame response dictionaries from the stacked HDF5 file."""
+        assert_msg_critical(
+            self._has_rsp,
+            'plot_spectrum: no response data found in the H5 file.'
+        )
+
+        if frame_ids is None:
+            frame_ids = list(self._frame_ids)
+
+        conv_rows = {
+            int(fid): i for i, fid in enumerate(self._frame_ids[self._converged])
+        }
+        frame_results = []
+
+        with h5py.File(self._path, 'r') as hf:
+            rsp_grp = hf['rsp']
+            keys = list(rsp_grp.keys())
+            for fid in frame_ids:
+                fid = int(fid)
+                if fid not in conv_rows:
+                    continue
+                row = conv_rows[fid]
+                rsp_res = {}
+                for key in keys:
+                    dset = rsp_grp[key]
+                    if dset.ndim == 0:
+                        rsp_res[key] = dset[()]
+                    elif dset.shape[0] > row:
+                        rsp_res[key] = np.asarray(dset[row])
+                frame_results.append((fid, rsp_res))
+
+        return frame_results
+
     # ── Diagnostics ─────────────────────────────────────────────────────────────
 
     def summary(self):
@@ -459,6 +494,37 @@ class QMTrajectoryAnalyzer:
         if fig is not None:
             fig.tight_layout()
             plt.show()
+
+    def plot_spectrum(self,
+                      property=None,
+                      x_unit='nm',
+                      broadening_type='lorentzian',
+                      broadening_value=None,
+                      x_range=None,
+                      frame_ids=None,
+                      show_frames=True,
+                      show_average=True,
+                      show_sticks=True,
+                      ax=None):
+        """Plot one stored spectrum per frame together with the average."""
+        if broadening_value is None:
+            from .veloxchemlib import hartree_in_wavenumber
+            broadening_value = (1000.0 / hartree_in_wavenumber() *
+                                hartree_in_ev())
+
+        frame_results = self._get_rsp_frame_results(frame_ids)
+        return plot_trajectory_spectrum(
+            frame_results,
+            property=property,
+            x_unit=x_unit,
+            broadening_type=broadening_type,
+            broadening_value=broadening_value,
+            x_range=x_range,
+            show_frames=show_frames,
+            show_average=show_average,
+            show_sticks=show_sticks,
+            ax=ax,
+        )
 
     def show_trajectory(self, frame_range=None, mode='animate', stride=1,
                         width=600, height=400, interval=100, loop='forward'):
