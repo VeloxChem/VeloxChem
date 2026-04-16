@@ -5628,22 +5628,6 @@ class IMDatabasePointCollecter:
         exponent_p_q,
         cluster_banks=None,
     ):
-        if len(molecules) == 0:
-            return {
-                "scenario": scenario_name,
-                "n_dp": int(len(datapoints_eval)),
-                "n_ref": 0,
-                "energy_errors_kcal": [],
-                "gradient_rmsd_kcal_per_mol_A": [],
-                "summary": {
-                    "energy_mae": math.nan,
-                    "energy_rmse": math.nan,
-                    "energy_max_abs": math.nan,
-                    "gradient_mean_rmsd": math.nan,
-                    "gradient_rmse_rmsd": math.nan,
-                    "gradient_max_rmsd": math.nan,
-                },
-            }
 
         drv = self._build_interp_driver_for_trust_radius_eval(
             z_matrix=z_matrix,
@@ -5661,8 +5645,16 @@ class IMDatabasePointCollecter:
         e_err = []
         g_rmsd = []
 
+        n_dp = len(drv.qm_data_points)
+        n_ref = len(molecules)
+        w_dpref = np.zeros((n_dp, n_ref), dtype=np.float64)
+
         for i, mol in enumerate(molecules):
             self._interp_compute_root_local_serial(drv, mol)
+            
+            for dp_idx, weight in drv.weights.items():
+                w_dpref[int(dp_idx), i] = float(weight)
+            
             e_im = float(drv.get_energy())
             g_im = np.asarray(drv.get_gradient(), dtype=np.float64)
 
@@ -5685,6 +5677,7 @@ class IMDatabasePointCollecter:
             "n_ref": int(len(molecules)),
             "energy_errors_kcal": e_arr.tolist(),
             "gradient_rmsd_kcal_per_mol_A": g_arr.tolist(),
+            "weights_refs": w_dpref,
             "summary": {
                 "energy_mae": float(np.mean(np.abs(e_arr))),
                 "energy_rmse": float(np.sqrt(np.mean(e_arr**2))),
@@ -5984,10 +5977,113 @@ class IMDatabasePointCollecter:
             )
         )  
         
-        D_dp, D_ref, D_dpref = self._build_dp_ref_distance_matrix(datapoints, molecules, sym_dict)
+        w_dpref = stage_results[-1]['weights_refs']
+        n_dp, n_ref = w_dpref.shape
+
+        support_mask = np.zeros((n_dp, n_ref), dtype=bool)
+        selected_weight_matrix = np.zeros((n_dp, n_ref), dtype=np.float64)
+        reference_sample_idx = np.arange(len(molecules), dtype=int)
+        coverage_mass = 0.90
+        min_supported_references = 4
+        min_shared_references = 4
+        min_overlap_fraction = 0.50
+        min_references_per_group = 10
+        min_datapoints_per_group = 4
+        
+
+        for j in range(n_ref):
+            weight_col_agg = w_dpref[:, j]
+            finite_mask = np.isfinite(weight_col_agg) & (weight_col_agg > 0.0)
+            idx = np.where(finite_mask)[0]
+            order = idx[np.argsort(weight_col_agg[idx])[::-1]]
+            sorted_weight_col_agg = weight_col_agg[order]
+            cummulative = np.cumsum(sorted_weight_col_agg)
+            
+            target = float(np.clip(coverage_mass, 0.0, 1.0) * cummulative[-1])
+
+            cutoff_pos = int(np.searchsorted(cummulative, target, side="left"))
+            selected_dp = order[:cutoff_pos + 1]
+            print(selected_dp)
+            if selected_dp.size == 0:
+                continue
+            support_mask[selected_dp, j] = True
+            selected_weight_matrix[selected_dp, j] = w_dpref[selected_dp, j]
+        support_int = support_mask.astype(np.int32)
+        shared_reference_counts = (support_int @ support_int.T)
+        support_counts = np.sum(support_int, axis=1).astype(np.int32)
+
+        overlap_denominator = np.minimum.outer(support_counts, support_counts).astype(np.float64)
+        normalized_overlap = np.divide(
+            shared_reference_counts.astype(np.float64),
+            overlap_denominator,
+            out=np.zeros_like(shared_reference_counts, dtype=np.float64),
+            where=overlap_denominator > 0.0,
+        )
+        active_dp_mask = support_counts >= min_supported_references
+        adjacency_dp = (
+            (shared_reference_counts >= min_shared_references)
+            & (normalized_overlap >= min_overlap_fraction)
+            & active_dp_mask[:, None]
+            & active_dp_mask[None, :]
+        )
+
+        np.fill_diagonal(adjacency_dp, False)
+
+        graph = csr_matrix(adjacency_dp.astype(np.int8))
+        _, dp_labels = connected_components(csgraph=graph, directed=False, return_labels=True)
+
+        basin_groups = []
+        active_indices = np.where(active_dp_mask)[0]
+
+        for component_id in np.unique(dp_labels[active_indices]):
+            dp_idx = np.where((dp_labels == component_id) & active_dp_mask)[0]
+
+            if dp_idx.size < min_datapoints_per_group:
+                continue
+
+            # Reference union of this datapoint component:
+            # keep every sampled reference supported by at least one datapoint
+            # in the component.
+            ref_local_idx = np.where(np.any(support_mask[dp_idx], axis=0))[0]
+
+            if ref_local_idx.size < min_references_per_group:
+                continue
+
+            basin_groups.append({
+                "basin_id": int(len(basin_groups)),
+                "datapoint_indices": dp_idx.astype(int).tolist(),
+                "reference_indices": reference_sample_idx[ref_local_idx].astype(int).tolist(),
+            })
+
+        groups = {
+            "groups": basin_groups,
+            "diagnostics": {
+                "mode": "normalized_support_overlap",
+                "coverage_mass": float(coverage_mass),
+                "min_supported_references": int(min_supported_references),
+                "min_shared_references": int(min_shared_references),
+                "min_overlap_fraction": float(min_overlap_fraction),
+                "n_datapoints": int(n_dp),
+                "n_reference_samples": int(n_ref),
+                "n_active_datapoints": int(np.sum(active_dp_mask)),
+                "n_groups": int(len(basin_groups)),
+            },
+            "support_mask": support_mask,
+            "selected_weight_matrix": selected_weight_matrix,
+            "shared_reference_counts": shared_reference_counts,
+            "normalized_overlap": normalized_overlap,
+            "support_counts": support_counts,
+        }
+
+        # print("support counts", support_counts)
+        # print("shared reference", shared_reference_counts)
+        # print("normalized overlap", np.round(normalized_overlap, 3))
+        # print("[trust-opt][normalized-overlap-grouping]", groups["diagnostics"])
+        print("basin groups", groups['groups'])
+        # D_dp, D_ref, D_dpref = self._build_dp_ref_distance_matrix(datapoints, molecules, sym_dict)
 
 
-        groups = improved_group_by_connected_components(D_dp, D_ref, D_dpref)
+        # groups = improved_group_by_connected_components(D_dp, D_ref, D_dpref)
 
         final_alphas = initial_alphas.copy()
 

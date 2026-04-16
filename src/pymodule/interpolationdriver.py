@@ -2118,12 +2118,16 @@ class InterpolationDriver():
         dq_eff = dq_raw.copy()
         chain = np.ones_like(dq_raw)
 
-        for idx, coord in enumerate(self.impes_coordinate.z_matrix):
-            if len(coord) == 4:
+        bounds = self._get_internal_coordinate_partitions()
+        dstart = int(bounds["dihedral_start"])
+        dend = int(bounds["dihedral_end"])
 
-                dq_eff[idx] = np.sin(dq_raw[idx])
-                chain[idx] = np.cos(dq_raw[idx])
-            else:
+        for idx in range(len(dq_raw)):
+            if dstart <= idx < dend:  # proper dihedrals only
+                d = self._principal_torsion_delta(dq_raw[idx])
+                dq_eff[idx] = np.sin(d)
+                chain[idx] = np.cos(d)
+            else:  # bonds, angles, impropers -> linear
                 dq_eff[idx] = dq_raw[idx]
                 chain[idx] = 1.0
 
@@ -2395,9 +2399,7 @@ class InterpolationDriver():
         Impropers:
             wrapped to principal interval if needed, but kept linear:
             dq_eff = dq_raw, chain = 1
-
-        No novelty bonuses are used here.
-        No torsion exploration bonuses are used here.
+z
         """
         # ------------------------------------------------------------------
         # Hyperparameters
@@ -2474,23 +2476,17 @@ class InterpolationDriver():
                 symmetry_information=self.symmetry_information,
             )
 
-            pred_E, pred_G_mw, _ = self.compute_potential(
-                datapoint, self.impes_coordinate.internal_coordinates_values
-            )
-
-            pred_im_G_int = self.transform_gradient_to_internal_coordinates(
-                molecule, pred_G_mw, self.impes_coordinate.b_matrix
-            )
             pred_qm_G_int = self.transform_gradient_to_internal_coordinates(
                 molecule, qm_gradient_mw.reshape(qm_gradient.shape), self.impes_coordinate.b_matrix
             )
 
-            diag_result = self.compute_internal_gradient_diagnostics(
+            diag_result = self.compute_internal_gradient_diagnostics_runtime_model(
+                datapoint=datapoint,
+                molecule=molecule,
                 z_matrix=z_matrix,
-                dq_raw=dq_raw,
-                H=np.asarray(datapoint.internal_hessian, dtype=float),
-                g0=np.asarray(datapoint.internal_gradient, dtype=float),
-                g_qm=np.asarray(pred_qm_G_int, dtype=float),
+                q_current=q_current,
+                q_ref=q_dp,
+                g_qm_int=np.asarray(pred_qm_G_int, dtype=float),
             )
 
             response_score = np.asarray(diag_result["response_score"], dtype=float)
@@ -2704,6 +2700,7 @@ class InterpolationDriver():
             global_response_score=global_response,
             global_pair=global_pair,
             z_matrix=coords_flat,
+            coord_kinds=kinds_flat,
             max_constraints=max_constraints_to_return,
             singleton_dominance=singleton_dominance,
             singleton_source_frac=singleton_source_frac,
@@ -2950,6 +2947,176 @@ class InterpolationDriver():
 
         return partial_energies, partial_gradient
 
+    def _predict_internal_gradient_runtime(self, datapoint, molecule, org_int_coords):
+        """
+        Internal gradient from the exact interpolation model used in runtime:
+        includes rotor projectors, cluster assembly, mask-weighting, etc.
+        """
+        org_int_coords = np.asarray(org_int_coords, dtype=np.float64)
+
+        # Avoid polluting outer diagnostics buffers.
+        old_bond = self.bond_rmsd
+        old_angle = self.angle_rmsd
+        old_dihedral = self.dihedral_rmsd
+        self.bond_rmsd = []
+        self.angle_rmsd = []
+        self.dihedral_rmsd = []
+
+        try:
+            _, pred_g_mw_cart, _ = self.compute_potential(datapoint, org_int_coords)
+        finally:
+            self.bond_rmsd = old_bond
+            self.angle_rmsd = old_angle
+            self.dihedral_rmsd = old_dihedral
+
+        pred_g_int = self.transform_gradient_to_internal_coordinates(
+            molecule,
+            np.asarray(pred_g_mw_cart, dtype=np.float64),
+            self.impes_coordinate.b_matrix,
+        )
+        return np.asarray(pred_g_int, dtype=np.float64).reshape(-1)
+
+    def compute_internal_gradient_diagnostics_runtime_model(
+        self,
+        *,
+        datapoint,
+        molecule,
+        z_matrix,
+        q_current,
+        q_ref,
+        g_qm_int,
+        max_sources=None,
+        eps=1.0e-12,
+    ):
+        """
+        Source-blame diagnostics that mirror the actual interpolation model.
+        For each source j, remove its displacement and re-evaluate the full model.
+        """
+        coords_flat, kinds_flat = self._flatten_internal_coordinates(z_matrix)
+        N = len(coords_flat)
+
+        q_current = np.asarray(q_current, dtype=np.float64).reshape(-1)
+        q_ref = np.asarray(q_ref, dtype=np.float64).reshape(-1)
+        g_qm = np.asarray(g_qm_int, dtype=np.float64).reshape(-1)
+
+        if q_current.size != N or q_ref.size != N or g_qm.size != N:
+            raise ValueError("runtime diagnostics: size mismatch")
+
+        dq_raw, dq_eff, chain = self._compute_internal_differences(
+            q_current=q_current,
+            q_ref=q_ref,
+            z_matrix=z_matrix,
+            symmetry_information=self.symmetry_information,
+        )
+
+        # Current model prediction (exact runtime path).
+        g_model = self._predict_internal_gradient_runtime(datapoint, molecule, q_current)
+        delta_g_err = g_qm - g_model
+        abs_err = np.abs(delta_g_err)
+
+        # Select which sources to test (optional speed cap).
+        source_indices = np.arange(N, dtype=np.int64)
+        if isinstance(max_sources, int) and 0 < max_sources < N:
+            source_indices = np.argsort(-np.abs(dq_eff))[:max_sources]
+
+        blame_matrix = np.zeros((N, N), dtype=np.float64)
+
+        for j in source_indices:
+            q_wo_j = q_current.copy()
+
+            # Remove displacement of source j in the same coordinate chart.
+            if kinds_flat[j] == "dihedral":
+                # Keep periodic consistency.
+                d = self._principal_torsion_delta(q_current[j] - q_ref[j])
+                q_wo_j[j] = q_current[j] - d
+            else:
+                q_wo_j[j] = q_ref[j]
+
+            g_model_wo_j = self._predict_internal_gradient_runtime(datapoint, molecule, q_wo_j)
+            err_wo_j = np.abs(g_qm - g_model_wo_j)
+
+            # Positive => source j worsens row-i error.
+            blame_matrix[:, j] = abs_err - err_wo_j
+
+        harmful_matrix = np.maximum(blame_matrix, 0.0)
+        helpful_matrix = np.maximum(-blame_matrix, 0.0)
+
+        response_score = self._normalize_nonnegative(abs_err)
+
+        err_weights = abs_err / (abs_err.sum() + eps)
+        source_blame_score = self._normalize_nonnegative(harmful_matrix.T @ err_weights)
+        helpful_source_score = self._normalize_nonnegative(helpful_matrix.T @ err_weights)
+
+        pair_score = harmful_matrix + harmful_matrix.T
+        np.fill_diagonal(pair_score, 0.0)
+        if np.max(pair_score) > eps:
+            pair_score /= (np.max(pair_score) + eps)
+
+        rho = abs_err / (np.abs(g_model) + eps)
+
+        rows = []
+        for idx, (coord, kind) in enumerate(zip(coords_flat, kinds_flat)):
+            rows.append({
+                "idx": idx,
+                "coord": tuple(int(x) for x in coord),
+                "type": self.coord_type(tuple(coord), kind),
+                "dq_raw": float(dq_raw[idx]),
+                "dq_eff": float(dq_eff[idx]),
+                "abs_dq": float(abs(dq_eff[idx])),
+                "chain": float(chain[idx]),
+                "g_model": float(g_model[idx]),
+                "g_qm": float(g_qm[idx]),
+                "delta_g_err": float(delta_g_err[idx]),
+                "abs_delta_g_err": float(abs_err[idx]),
+                "rho": float(rho[idx]),
+                "source_blame_score": float(source_blame_score[idx]),
+                "helpful_source_score": float(helpful_source_score[idx]),
+                "response_score": float(response_score[idx]),
+                # Keep compatibility keys expected by print helpers.
+                "diag_resp": 0.0,
+                "abs_diag_resp": 0.0,
+                "offdiag_resp": 0.0,
+                "abs_offdiag_resp": 0.0,
+                "Hdq": 0.0,
+                "abs_Hdq": 0.0,
+                "pE_total": 0.0,
+                "abs_pE_total": 0.0,
+                "g0": 0.0,
+            })
+
+        by_abs_dq = sorted(rows, key=lambda r: r["abs_dq"], reverse=True)
+        by_abs_Hdq = sorted(rows, key=lambda r: r["abs_Hdq"], reverse=True)
+        by_abs_err = sorted(rows, key=lambda r: r["abs_delta_g_err"], reverse=True)
+        by_rho = sorted(rows, key=lambda r: r["rho"], reverse=True)
+        by_abs_pE = sorted(rows, key=lambda r: r["abs_pE_total"], reverse=True)
+        by_source_blame = sorted(rows, key=lambda r: r["source_blame_score"], reverse=True)
+
+        return {
+            "rows": rows,
+            "dq_eff": dq_eff,
+            "chain": chain,
+            "Hdq": np.zeros(N, dtype=np.float64),
+            "diag_resp": np.zeros(N, dtype=np.float64),
+            "offdiag_resp": np.zeros(N, dtype=np.float64),
+            "g_model": g_model,
+            "delta_g_err": delta_g_err,
+            "rho": rho,
+            "pE_total": np.zeros(N, dtype=np.float64),
+            "source_contrib": blame_matrix,  # semantic reuse for compatibility
+            "blame_matrix": blame_matrix,
+            "harmful_matrix": harmful_matrix,
+            "helpful_matrix": helpful_matrix,
+            "response_score": response_score,
+            "source_blame_score": source_blame_score,
+            "helpful_source_score": helpful_source_score,
+            "pair_score": pair_score,
+            "by_abs_dq": by_abs_dq,
+            "by_abs_Hdq": by_abs_Hdq,
+            "by_abs_err": by_abs_err,
+            "by_rho": by_rho,
+            "by_abs_pE": by_abs_pE,
+            "by_source_blame": by_source_blame,
+        }
 
     def compute_internal_gradient_diagnostics(
         self,
@@ -3039,6 +3206,7 @@ class InterpolationDriver():
             H=H,
             g0=g0,
         )
+
 
         # ------------------------------------------------------------------
         # New source-blame analysis
@@ -3216,6 +3384,7 @@ class InterpolationDriver():
         global_response_score: np.ndarray,
         global_pair: np.ndarray,
         z_matrix: List[Tuple[int, ...]],
+        coord_kinds: List[str],
         max_constraints: int = 3,
         singleton_dominance: float = 1.35,
         singleton_source_frac: float = 0.85,
@@ -3245,7 +3414,7 @@ class InterpolationDriver():
 
         block_scores = {i: float(global_coord_score[i]) for i in block_indices}
         steering_score = {
-            i: float(0.70 * global_source_blame[i] + 0.30 * global_response_score[i])
+            i: float(0.5 * global_source_blame[i] + 0.5 * global_response_score[i])
             for i in block_indices
         }
 
@@ -3371,173 +3540,32 @@ class InterpolationDriver():
                 f"{vals['sum_abs_pE']:14.6e} "
                 f"{vals['sum_src_blame']:14.6e}"
             )
-
-
-    def print_source_decomposition(
-        self,
-        z_matrix,
-        dq_raw: np.ndarray,
-        H: np.ndarray,
-        g0: np.ndarray,
-        g_qm: np.ndarray,
-        target_idx: int,
-        top_m: int = 8,
-    ) -> None:
-        """
-        For one response coordinate i, print the largest modeled source terms and their blame.
-
-        contrib_ij = chain[i] * H[i,j] * dq_eff[j]
-        blame_ij   = |err_i| - |err_i + contrib_ij|
-
-        Positive blame means source j worsens the error in target row i.
-        """
-        result = self.compute_internal_gradient_diagnostics(
-            z_matrix=z_matrix,
-            dq_raw=dq_raw,
-            H=H,
-            g0=g0,
-            g_qm=g_qm,
-        )
-
-        coords_flat, kinds_flat = self._flatten_internal_coordinates(z_matrix)
-        source_contrib = np.asarray(result["source_contrib"], dtype=float)
-        blame_matrix = np.asarray(result["blame_matrix"], dtype=float)
-        dq_eff = np.asarray(result["dq_eff"], dtype=float)
-        delta_g_err = np.asarray(result["delta_g_err"], dtype=float)
-
-        N = len(coords_flat)
-        if target_idx < 0 or target_idx >= N:
-            raise IndexError(f"target_idx {target_idx} out of range 0..{N-1}")
-
-        terms = []
-        for j in range(N):
-            terms.append({
-                "j": j,
-                "coord_j": coords_flat[j],
-                "type_j": kinds_flat[j],
-                "dq_eff_j": dq_eff[j],
-                "H_ij": H[target_idx, j],
-                "contrib": source_contrib[target_idx, j],
-                "blame": blame_matrix[target_idx, j],
-                "abs_contrib": abs(source_contrib[target_idx, j]),
-            })
-
-        terms_sorted = sorted(
-            terms,
-            key=lambda t: (max(t["blame"], 0.0), t["abs_contrib"]),
-            reverse=True,
-        )
-
-        target_coord = coords_flat[target_idx]
-        print(f"\nSource decomposition for target idx={target_idx}, coord={self.format_coord(target_coord)}")
-        print(f"Row error err_i = {delta_g_err[target_idx]:.6e}")
-        print(
-            f"{'rank':>4} {'j':>4} {'type':>10} {'coord_j':>18} "
-            f"{'dq_eff_j':>12} {'H[i,j]':>12} {'contrib':>15} {'blame':>12}"
-        )
-        print("-" * 104)
-
-        for rank, t in enumerate(terms_sorted[:top_m]):
-            print(
-                f"{rank:4d} "
-                f"{t['j']:4d} "
-                f"{t['type_j']:>10} "
-                f"{self.format_coord(t['coord_j']):>18} "
-                f"{t['dq_eff_j']:12.6e} "
-                f"{t['H_ij']:12.6e} "
-                f"{t['contrib']:15.6e} "
-                f"{t['blame']:12.6e}"
-            )
-
-
-    def run_full_internal_diagnostic(
-        self,
-        z_matrix,
-        dq_raw: np.ndarray,
-        H: np.ndarray,
-        g0: np.ndarray,
-        g_qm: np.ndarray,
-        top_n: int = 10,
-        decompose_top_err: int = 3,
-    ) -> Dict[str, Any]:
-        """
-        Run the full diagnostic workflow and print useful summaries.
-        """
-        result = self.compute_internal_gradient_diagnostics(
-            z_matrix=z_matrix,
-            dq_raw=dq_raw,
-            H=H,
-            g0=g0,
-            g_qm=g_qm,
-        )
-
-        rows = result["rows"]
-
-        self.print_ranked_table(result["by_abs_dq"], "Ranked by |dq_eff| (moved coordinates)", n=top_n)
-        self.print_ranked_table(result["by_abs_Hdq"], "Ranked by |H dq_eff| (response channels)", n=top_n)
-        self.print_ranked_table(result["by_abs_err"], "Ranked by |g_qm - g_model| (failing response coordinates)", n=top_n)
-        self.print_ranked_table(result["by_rho"], "Ranked by rho = |err| / (|H dq_eff| + eps)", n=top_n)
-        self.print_ranked_table(result["by_source_blame"], "Ranked by source blame (most harmful source coordinates)", n=top_n)
-
-        self.print_type_summary(rows)
-
-        for r in result["by_abs_err"][:decompose_top_err]:
-            self.print_source_decomposition(
-                z_matrix=z_matrix,
-                dq_raw=dq_raw,
-                H=H,
-                g0=g0,
-                g_qm=g_qm,
-                target_idx=r["idx"],
-                top_m=8,
-            )
-
-        return result
     
-
-
-    
+   
     def transform_gradient_to_internal_coordinates(self, molecule, gradient, b_matrix, tol=1e-6):
-        """
-        Transforms the gradient from Cartesian to internal coordinates.
-        :param tol:
-            Tolerance for the singular values of the B matrix.
-        """
-        
-        dimension = gradient.shape[0] * 3 - 6
-        if gradient.shape[0] == 2:
-            dimension += 1
-        
-        g_matrix = np.dot(b_matrix, b_matrix.T)
-        
-        U, s, Vt = np.linalg.svd(g_matrix)
+        grad = np.asarray(gradient, dtype=np.float64).reshape(-1)
+        B = np.asarray(b_matrix, dtype=np.float64)
 
-        # Make zero the values of s_inv that are smaller than tol
-        s_inv = np.array([1 / s_i if s_i > tol else 0.0 for s_i in s])
-        
-        # Critical assertion, check that the remaining positive values are equal to dimension (3N-6)
-        number_of_positive_values = np.count_nonzero(s_inv)
-        print(number_of_positive_values, dimension)
-        # If more elements are zero than allowed, restore the largest ones
-        if number_of_positive_values > dimension:
-            print('InterpolationDatapoint: The number of positive singular values is not equal to the dimension of the Hessian., restoring the last biggest elements')
-            # Get indices of elements originally set to zero
-            zero_indices = np.where(s_inv == 0.0)[0]
-            
-            # Sort these indices based on their corresponding values in 's' (descending order)
-            sorted_zero_indices = zero_indices[np.argsort(s[zero_indices])[::-1]]
-            
-            # Calculate how many elements need to be restored
-            num_to_restore = abs(number_of_positive_values - dimension)
-            
-            # Restore the largest elements among those set to zero
-            for idx in sorted_zero_indices[:num_to_restore]:
-                s_inv[idx] = 1 / s[idx]
-        g_minus_matrix = np.dot(U, np.dot(np.diag(s_inv), Vt))
-        gradient_flat = gradient.flatten()
-        internal_gradient = np.dot(g_minus_matrix, np.dot(b_matrix, gradient_flat))
+        natm = grad.size // 3
+        target_rank = 3 * natm - 6
+        if natm == 2:
+            target_rank += 1
+        target_rank = max(1, int(target_rank))
 
-        return internal_gradient
+        G = B @ B.T
+        U, s, Vt = np.linalg.svd(G, full_matrices=False)
+
+        s_inv = np.zeros_like(s)
+        nz = np.where(s > tol)[0]
+
+        if nz.size >= target_rank:
+            keep = nz[np.argsort(s[nz])[-target_rank:]]
+        else:
+            keep = np.argsort(s)[-target_rank:]
+
+        s_inv[keep] = 1.0 / s[keep]
+        G_pinv = (U * s_inv) @ Vt
+        return G_pinv @ (B @ grad)
 
     def get_energy(self):
         """ Returns the potential energy obtained by interpolation.
