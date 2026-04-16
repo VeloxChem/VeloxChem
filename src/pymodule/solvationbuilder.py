@@ -719,7 +719,7 @@ class SolvationBuilder:
                 else:
                     if self.solvents[i].is_water_molecule():
                         # auto-detect water molecule and use ctip3p as default
-                        solvent_ff.create_topology(self.solvents[i], water_model='ctip3p') #should this be ctip3p or tip3p?
+                        solvent_ff.create_topology(self.solvents[i], water_model='ctip3p')
                     else:
                         solvent_ff.create_topology(self.solvents[i])
                 solvent_ffs.append(solvent_ff)
@@ -753,6 +753,8 @@ class SolvationBuilder:
         simulation = app.Simulation(topology, system, integrator)
         simulation.context.setPositions(positions)
 
+        self.ostream.print_info("Running NPT Equilibration...")
+        self.ostream.flush()
         # Minimize the energy
         simulation.minimizeEnergy()
 

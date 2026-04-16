@@ -151,6 +151,7 @@ class SolvationFepDriver:
         self.save_trajectory_xtc = False
         self.save_system_xml = False
         self.save_energies_txt = False
+        self.overlap_matrix = []
 
         # Alchemical parameters
         self.alpha = 5 * unit.kilocalories_per_mole
@@ -758,8 +759,19 @@ class SolvationFepDriver:
 
     def _calculate_free_energy(self, u_kn):
 
-        mbar = MBAR(u_kn, N_k = self.N_k, n_bootstraps=50, solver_protocol='robust') 
+        mbar = MBAR(u_kn, N_k=self.N_k, n_bootstraps=50, solver_protocol='robust') 
         delta_f = mbar.compute_free_energy_differences(uncertainty_method='bootstrap')
+
+        # Safely extract the overlap matrix
+        try:
+            # pymbar 4.x syntax (Primary)
+            overlap_results = mbar.compute_overlap()
+            overlap_matrix = overlap_results['matrix']
+        except AttributeError:
+            # pymbar 3.x fallback
+            overlap_matrix, _ = mbar.computeOverlap()
+
+        self.overlap_matrix.append(overlap_matrix)
 
         return delta_f
 

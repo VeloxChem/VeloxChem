@@ -1499,13 +1499,6 @@ class MMForceFieldGenerator:
         ff_data_dict = None
         ff_data_lines = None
 
-        # Check OpenFF version, if no version is set, use 2.2.0
-        if self.force_field.strip().lower() == ('openff'):
-                self.force_field = 'openff-2.2.0'
-                self.ostream.print_info("No OpenFF version explicitly specified. Defaulting to 'openff-2.2.0'.")
-                self.ostream.print_blank()
-                self.ostream.flush()
-
         # Read the force field data
 
         if use_xml:
@@ -1670,6 +1663,13 @@ class MMForceFieldGenerator:
         # Read the force field and include the data in the topology dictionary.
 
         if self.force_field.startswith('openff'):
+            self.print_references(None, False, False, False, False)
+            # Check OpenFF version, if no version is set, use 2.2.0
+            if self.force_field.strip().lower() == ('openff'):
+                    self.force_field = 'openff-2.2.0'
+                    self.ostream.print_info("No OpenFF version explicitly specified. Defaulting to 'openff-2.2.0'.")
+                    self.ostream.print_blank()
+                    self.ostream.flush()
             # OpenFF Sage: all parameters come from SmirnoffTyper
             # via SMIRKS-based assignment — bypass the individual populate_*
             # methods entirely.
@@ -1687,11 +1687,6 @@ class MMForceFieldGenerator:
                 dihedral_indices,
                 list(atomtypeidentifier.equivalent_atoms),
             )
-            self.ostream.print_info(f'Using OpenFF {self.force_field} (Sage) parameters.')
-            openff_ref = f'OpenFF {self.force_field}, https://github.com/openforcefield/openff-forcefields (MIT)'
-            self.ostream.print_reference('Reference: ' + openff_ref)
-            self.ostream.print_blank()
-            self.ostream.flush()
 
         else:
             # GAFF / OPLS path — use the existing populate_* methods.
@@ -2340,9 +2335,22 @@ class MMForceFieldGenerator:
         # Bonds 
         bonds = {}
         for ij, bp in raw['bonds'].items():
+            i, j = ij
+            r = bp['length']
+            
+            # Distance in nm
+            r_eq = np.linalg.norm(coords[i] - coords[j]) * 0.1
+
+            # Override with QM geometry if requested
+            if self.eq_param:
+                if abs(r - r_eq) > self.r_thresh:
+                    msg = f'Updated bond length {i + 1}-{j + 1} (OpenFF) to {r_eq:.3f} nm'
+                    self.ostream.print_info(msg)
+                r = r_eq
+
             bonds[ij] = {
                 'type':           'harmonic',
-                'equilibrium':    bp['length'],
+                'equilibrium':    r,
                 'force_constant': bp['k'],
                 'comment':        f'openff bond {ij[0]+1}-{ij[1]+1}',
             }
@@ -2350,9 +2358,26 @@ class MMForceFieldGenerator:
         # Angles 
         angles = {}
         for ijk, ap in raw['angles'].items():
+            i, j, k = ijk
+            theta = ap['angle']
+            
+            # Angle in degrees
+            a = coords[i] - coords[j]
+            b = coords[k] - coords[j]
+            theta_eq = safe_arccos(
+                np.dot(a, b) / np.linalg.norm(a) /
+                np.linalg.norm(b)) * 180 / np.pi
+
+            # Override with QM geometry if requested
+            if self.eq_param:
+                if abs(theta - theta_eq) > self.theta_thresh:
+                    msg = f'Updated bond angle {i + 1}-{j + 1}-{k + 1} (OpenFF) to {theta_eq:.3f} deg'
+                    self.ostream.print_info(msg)
+                theta = theta_eq
+
             angles[ijk] = {
                 'type':           'harmonic',
-                'equilibrium':    ap['angle'],  # Degrees directly from Typer
+                'equilibrium':    theta,  
                 'force_constant': ap['k'],
                 'comment':        f'openff angle {ijk[0]+1}-{ijk[1]+1}-{ijk[2]+1}',
             }
@@ -2401,7 +2426,7 @@ class MMForceFieldGenerator:
                 continue
             rotatable_bonds.append([j + 1, k + 1])   
 
-        # Impropers
+        # Improper Dihedrals
         impropers = {}
         for ijkl, terms in raw['impropers'].items():
             if not terms:
@@ -2464,6 +2489,17 @@ class MMForceFieldGenerator:
             tm_ref = 'F. Šebesta, V. Sláma, J. Melcr, Z. Futera, and J. V. Burda.'
             tm_ref += ' J. Chem. Theory Comput. 2016, 12, 3681-3688.'
             self.ostream.print_reference('Reference: ' + tm_ref)
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+        if self.force_field.startswith('openff'):
+            self.ostream.print_info(f'Using OpenFF (Sage) parameters.')
+            off_ref = 'S. Boothroyd, P. K. Behara, O. C. Madin, D. F. Hahn, H. Jang, '
+            off_ref += 'V. Gapsys, J. R. Wagner, J. T. Horton, D. L. Dotson, '
+            off_ref += 'M. W. Thompson, et al. J. Chem. Theory Comput. 2023, 19, 3251-3275.'
+            self.ostream.print_reference('Reference: ' + off_ref)
+            github_ref = 'OpenFF Force Fields, https://github.com/openforcefield/openff-forcefields (MIT)'
+            self.ostream.print_reference('Source:    ' + github_ref)
             self.ostream.print_blank()
             self.ostream.flush()
 
@@ -3465,11 +3501,11 @@ class MMForceFieldGenerator:
                 cur_str += '        fudgeLJ   fudgeQQ\n'
                 f_top.write(cur_str)
                 gen_pairs = 'yes' if self.gen_pairs else 'no'
-                # OPLS-AA and OpenFF both use geometric-mean LJ mixing
+                # OPLS-AA use geometric-mean LJ mixing
                 # (comb_rule 3) and equal 1-4 scaling (fudgeLJ = fudgeQQ = 0.5).
-                # GAFF/AMBER uses Lorentz-Berthelot mixing (comb_rule 2) and
+                # GAFF/AMBER and OpenFF uses Lorentz-Berthelot mixing (comb_rule 2) and
                 # fudgeQQ = 1/1.2.
-                if self.force_field in ('opls',) or self.force_field.startswith('openff'):
+                if self.force_field in ('opls',):
                     comb_rule = 3
                     fudgeLJ = 0.5
                     fudgeQQ = 0.5
@@ -3522,7 +3558,20 @@ class MMForceFieldGenerator:
             # oplsaa.ff/ffnonbonded.itp and must NOT be redeclared in the
             # molecule itp. For GAFF/UFF, types are non-standard and must be
             # declared explicitly.
-            if self.force_field not in ('opls',) and not self.force_field.startswith('openff'):
+            if self.force_field == 'opls':
+                pass
+            elif self.force_field.startswith('openff'):
+                # Each OpenFF atom has a unique type (openff_N) carrying its
+                # own sigma/epsilon — write one line per atom directly.
+                for i, atom in self.atoms.items():
+                    # Left-aligned (<12) to prevent string overflow bugs in GROMACS!
+                    line_str = '{:<12}{:<12}{:12.5f}{:9.5f}{:>4}'.format(
+                        atom['type'].strip(), atom['type'].strip(), 0., 0., 'A')
+                    line_str += '{:16.5e}{:14.5e}\n'.format(
+                        atom['sigma'], atom['epsilon'])
+                    f_itp.write(line_str)
+            else:
+                # GAFF/UFF standard path
                 # TODO: Make unique_atom_types and atom['type'] more consistent
                 for at in self.unique_atom_types:
                     for i, atom in self.atoms.items():
@@ -3935,7 +3984,7 @@ class MMForceFieldGenerator:
         if mol_name is None:
             mol_name = Path(self.molecule_name).stem
 
-        if self.force_field in ('opls',) or self.force_field.startswith('openff'):
+        if self.force_field in ('opls',):
             warnmsg = (
                 'MMForceFieldGenerator: OPLS-AA uses geometric-mean combining '
                 'rules (comb-rule 3) for LJ interactions. OpenMM only supports '
