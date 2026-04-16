@@ -281,6 +281,8 @@ class QMTrajectoryAnalyzer:
             mult = int(np.asarray(hf['spin_multiplicity'][row]))
 
         mol = Molecule(charges, coords, units='bohr')
+        mol.set_charge(charge)
+        mol.set_multiplicity(mult)
         return mol
 
     def get_snapshots(self, frame_ids=None):
