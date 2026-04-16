@@ -1151,11 +1151,10 @@ class MMForceFieldGenerator:
         atomtypeidentifier.identify_equivalences()
         self.equivalent_atoms = atomtypeidentifier.equivalent_atoms
         self.equivalent_charges = atomtypeidentifier.equivalent_charges
-
-        contains_water = molecule.contains_water_molecule()
+        
+        # Only apply MM water model when it is a isolated water molecule, not when it is a part of the system. 
         is_water = molecule.is_water_molecule()
-        use_water_model = ((water_model is not None) and
-                           (is_water or contains_water))
+        use_water_model = ((water_model is not None) and is_water)
         skip_resp = (not resp) or ((water_model is not None) and is_water)
 
         if skip_resp:
