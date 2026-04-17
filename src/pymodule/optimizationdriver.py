@@ -52,6 +52,10 @@ from .scfgradientdriver import ScfGradientDriver
 from .scfhessiandriver import ScfHessianDriver
 from .vibrationalanalysis import VibrationalAnalysis
 from .tddftgradientdriver import TddftGradientDriver
+from .serenityscfdriver import SerenityScfDriver
+from .serenitygradientdriver import SerenityGradientDriver
+from .serenitylrrspeigensolver import SerenityLinearResponseSolver
+from .serenityexcitedstategradientdriver import SerenityExcitedStateGradientDriver
 from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
 from .openmmdriver import OpenMMDriver
@@ -230,6 +234,12 @@ class OptimizationDriver:
         if isinstance(drv, (ScfRestrictedDriver, ScfUnrestrictedDriver,
                             ScfRestrictedOpenDriver)):
             grad_drv = ScfGradientDriver(drv)
+        
+        if isinstance(drv, SerenityScfDriver):
+            grad_drv = SerenityGradientDriver(drv)
+
+        if isinstance(drv, SerenityExcitedStateGradientDriver):
+            grad_drv = drv
 
         elif isinstance(drv, XtbDriver):
             grad_drv = XtbGradientDriver(drv)
