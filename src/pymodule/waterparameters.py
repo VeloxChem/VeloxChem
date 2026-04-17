@@ -69,7 +69,7 @@ def get_water_parameters():
                 'name': 'H',
                 'mass': 1.007825,
                 'charge': 0.4238,
-                'sigma': 1.0,
+                'sigma': 1.0000e-01,
                 'epsilon': 0.0,
                 'equivalent_atom': 'hw_00',
                 'comment': 'SPC/E water'
@@ -142,7 +142,7 @@ def get_water_parameters():
                 'name': 'H',
                 'mass': 1.007825,
                 'charge': 0.417,
-                'sigma': 1.0,
+                'sigma': 1.0000e-01,
                 'epsilon': 0.0,
                 'equivalent_atom': 'hw_00',
                 'comment': 'TIP-3P water'
