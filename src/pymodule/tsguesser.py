@@ -786,12 +786,12 @@ class TransitionStateGuesser():
 
         initial_best = _best_conformer_index(final_lambda)
 
-        lambda_slider = ipywidgets.SelectionSlider(
+        step_selector = ipywidgets.SelectionSlider(
             options=lambda_vec,
             description='Lambda',
             value=final_lambda,
         )
-        conformer_dropdown = ipywidgets.Dropdown(
+        conformer_selector = ipywidgets.Dropdown(
             options=list(range(1,
                                len(scan[final_lambda]) + 1)),
             description='Conf. ID',
@@ -802,26 +802,12 @@ class TransitionStateGuesser():
             step = change['new']
             options = list(range(1, len(scan[step]) + 1))
             best = _best_conformer_index(step)
-            conformer_dropdown.options = options
-            conformer_dropdown.value = best + 1
+            conformer_selector.options = options
+            conformer_selector.value = best + 1
 
-        lambda_slider.observe(_on_lambda_change, names='value')
+        step_selector.observe(_on_lambda_change, names='value')
 
         import threading
-
-        max_conformers = max(len(scan[step]) for step in lambda_vec)
-
-        step_slider = ipywidgets.SelectionSlider(
-            options=lambda_vec,
-            description='Lambda',
-            value=final_lambda,
-        )
-        conformer_slider = ipywidgets.IntSlider(
-            min=1,
-            max=max_conformers,
-            value=initial_best + 1,
-            description='Conf. ID',
-        )
 
         def _render_interact(step, conformer_id):
             # Clamp conformer_id in case it exceeds available conformers for
@@ -838,18 +824,18 @@ class TransitionStateGuesser():
                 **mol_show_kwargs,
             )
 
-        w = ipywidgets.interactive(
+        window = ipywidgets.interactive(
             _render_interact,
-            step=step_slider,
-            conformer_id=conformer_slider,
+            step=step_selector,
+            conformer_id=conformer_selector,
         )
 
         # display='none' reserves no space (unlike visibility='hidden') so
         # the widget appears as just the sliders until the clean render is ready.
-        out_widget = w.children[-1]
+        out_widget = window.children[-1]
         out_widget.layout.display = 'none'
 
-        ipy_display(w)
+        ipy_display(window)
 
         def _do_render():
             import time
@@ -861,7 +847,7 @@ class TransitionStateGuesser():
                 # values via the same comm pathway as a user interaction, so
                 # py3Dmol's script executes correctly.  No slider toggling
                 # needed — one clean render at the correct position.
-                w.update()
+                window.update()
                 time.sleep(0.5)
             except Exception:
                 pass
@@ -885,53 +871,6 @@ class TransitionStateGuesser():
             _ip.events.register('post_execute', _on_post_execute)
         else:
             threading.Thread(target=_do_render, daemon=True).start()
-
-    @staticmethod
-    def _show_lambda_iteration(
-        step,
-        lambda_vec,
-        scan,
-        bonds=None,
-        forming_bonds=None,
-        breaking_bonds=None,
-        **mol_show_kwargs,
-    ):
-
-        try:
-            import ipywidgets
-        except ImportError:
-            raise ImportError('ipywidgets is required for this functionality.')
-
-        options = list(range(1, len(scan[step]) + 1))
-        best_index = 0
-        min_energy = None
-        if scan[0][0].get('qm_energy', None) is not None:
-            for i, conf in enumerate(scan[step]):
-                qm_E = conf.get('qm_energy', None)
-                if min_energy is None or (qm_E is not None
-                                          and qm_E < min_energy):
-                    min_energy = qm_E
-                    best_index = i
-        else:
-            for i, conf in enumerate(scan[step]):
-                if min_energy is None or conf['v'] < min_energy:
-                    min_energy = conf['v']
-                    best_index = i
-        ipywidgets.interact(
-            TransitionStateGuesser._show_conformer_iteration,
-            step=ipywidgets.fixed(step),
-            conformer_id=ipywidgets.Dropdown(
-                options=options,
-                description='Conf. ID',
-                value=best_index + 1,
-            ),
-            lambda_vec=ipywidgets.fixed(lambda_vec),
-            scan=ipywidgets.fixed(scan),
-            bonds=ipywidgets.fixed(bonds),
-            forming_bonds=ipywidgets.fixed(forming_bonds),
-            breaking_bonds=ipywidgets.fixed(breaking_bonds),
-            **mol_show_kwargs,
-        )
 
     @staticmethod
     def _show_conformer_iteration(
