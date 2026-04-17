@@ -819,6 +819,18 @@ class TddftGradientDriver(GradientDriver):
         else:
             return None
 
+    def get_gradient(self):
+        """
+        Gets the gradient for the target excited state.
+
+        :return:
+            The gradient with shape (natoms, 3).
+        """
+
+        if self.gradient.ndim == 3:
+            return self.gradient[0].copy()
+        return self.gradient.copy()
+
     def compute_energy(self, molecule, basis, scf_drv, rsp_drv, rsp_results):
         """
         Computes the energy at the current position.
