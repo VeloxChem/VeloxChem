@@ -789,6 +789,12 @@ class RespChargesDriver(EspChargesDriver):
             charge_max = float(np.max(np.abs(charges)))
             if charge_max < 1e-6:
                 charge_max = 1.0
+        else:
+            charge_max = float(charge_max)
+            if charge_max <= 0.0:
+                raise ValueError(
+                    'charge_max must be a positive number when provided '
+                    'explicitly.')
         norm = mcolors.TwoSlopeNorm(vmin=-charge_max,
                                     vcenter=0.0,
                                     vmax=charge_max)
