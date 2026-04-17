@@ -380,7 +380,11 @@ class EnsembleParser:
         else:
             if topology_file is None:
                 raise ValueError("topology_file is required unless trajectory_file is a .pdb")
-            self.universe = mda.Universe(topology_file, trajectory_file)
+            # Refresh XDR offsets to avid stale .xtc_offsets cache warinings
+            # when trajectory metadata changes between runs/environments:
+            self.universe = mda.Universe(
+                topology_file, trajectory_file, refresh_offsets=True
+            )
 
         total_frames = len(self.universe.trajectory)
         self.ostream.print_blank()
