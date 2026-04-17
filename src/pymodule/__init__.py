@@ -224,6 +224,11 @@ from .cppsolver import ComplexResponseSolver as ComplexResponse
 from .tdacppsolver import ComplexResponseTdaSolver as ComplexResponseTDA
 from .peforcefieldgenerator import PEForceFieldGenerator as LoPropDriver
 
+from .serenityscfdriver import SerenityScfDriver
+from .serenitygradientdriver import SerenityGradientDriver
+from .serenitylrrspeigensolver import SerenityLinearResponseSolver
+from .serenityexcitedstategradientdriver import SerenityExcitedStateGradientDriver
+
 # Python functions
 from .errorhandler import assert_msg_critical
 from .features import print_features
