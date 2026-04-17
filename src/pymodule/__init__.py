@@ -219,6 +219,10 @@ from .tsguesser import TransitionStateGuesser
 from .reactionmatcher import ReactionMatcher
 from .smddriver import SmdDriver
 from .atombdedriver import AtomBdeDriver
+from .qmtrajectoryparser import QMTrajectoryParser
+from .qmtrajectorydriver import QMTrajectoryDriver
+from .qmtrajectoryanalyzer import QMTrajectoryAnalyzer
+from .spectrumaverager import SpectrumAverager
 # for backward compatibility only
 from .cppsolver import ComplexResponseSolver as ComplexResponse
 from .tdacppsolver import ComplexResponseTdaSolver as ComplexResponseTDA

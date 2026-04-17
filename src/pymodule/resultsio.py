@@ -363,6 +363,34 @@ def write_scf_results_to_hdf5(fname, scf_results):
                           value_label='SCF result')
 
 
+def write_scf_property_to_hdf5(fname, key, data):
+    """
+    Writes a single SCF property dataset to the scf group in HDF5 file.
+
+    :param fname:
+        Name of the HDF5 file.
+    :param key:
+        Dataset name inside the scf group.
+    :param data:
+        Dataset values.
+    """
+
+    valid_checkpoint = (fname and isinstance(fname, str) and
+                        Path(fname).is_file())
+
+    if valid_checkpoint:
+        hf = h5py.File(fname, 'a')
+
+        scf_group = hf.require_group('scf')
+        label = f'scf/{key}'
+        if label in hf:
+            del hf[label]
+
+        scf_group.create_dataset(key, data=data)
+
+        hf.close()
+
+
 def write_opt_results_to_hdf5(fname, opt_results):
     """
     Writes optimization results to HDF5 file.
