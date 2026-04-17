@@ -96,7 +96,7 @@ class EvbDriver():
 
         self.t_label = int(time.time())
         self.water_model = 'cspce'
-        
+
         self.ffbuilder = ReactionForceFieldBuilder(ostream=self.ostream)
 
     def build_and_run_default_water_EVB(
@@ -153,15 +153,11 @@ class EvbDriver():
             optimize_mol (bool): If True, does an xtb optimization of every provided molecule object before reparameterisation. Defaults to False.
             optimize_ff (bool): If True, does an mm optimization of the combined reactant and product after reparameterisation. Defaults to True.
         """
-        
 
         self.ffbuilder.water_model = self.water_model
 
         self.reactant, self.product, self.forming_bonds, self.breaking_bonds, self.reactants, self.products, self.product_mapping = self.ffbuilder.build_forcefields(
-            reactant=reactant,
-            product=product,
-            **kwargs
-        )
+            reactant=reactant, product=product, **kwargs)
 
     def build_systems(
         self,
@@ -338,7 +334,8 @@ class EvbDriver():
         }
         if load_systems:
             sysbuilder = EvbSystemBuilder()
-            systems = sysbuilder.load_systems_from_xml(str(Path(data_folder) / "run"))
+            systems = sysbuilder.load_systems_from_xml(
+                str(Path(data_folder) / "run"))
             conf["systems"] = systems
         else:
             systems = []
@@ -696,16 +693,30 @@ class EvbDriver():
             def save_group(data, group):
                 for k, v in data.items():
                     if isinstance(v, dict):
+                        # Recurse into nested dicts as HDF5 subgroups
                         subgroup = group.create_group(k)
                         save_group(v, subgroup)
-                    elif isinstance(v, np.ndarray) or isinstance(v, list):
-                        group.create_dataset(k, data=v)
-                    elif isinstance(v, set):
-                        group.create_dataset(k, data=list(v))
-                    elif isinstance(v, object):
-                        continue
-                    else:
+                    elif isinstance(v, (np.ndarray, list, set)):
+                        # sets are unordered so convert to list first; np.array handles both
+                        group.create_dataset(
+                            k,
+                            data=np.array(list(v) if isinstance(v, set) else v))
+                    elif isinstance(v, (bool, int, float, str, bytes, np.generic)):
+                        # np.generic covers numpy scalars (np.float64, np.int32, etc.)
                         group[k] = v
+                    elif hasattr(v, '__dict__'):
+                        # Custom objects: recurse into their attributes as a subgroup
+                        subgroup = group.create_group(k)
+                        save_group(vars(v), subgroup)
+                    else:
+                        # Last resort: let h5py try; fall back to repr string if it fails
+                        try:
+                            group[k] = v
+                        except TypeError:
+                            group.attrs[k] = repr(v)
+                            self.ostream.print_warning(
+                                f"Key '{k}': stored {type(v).__name__} as string repr"
+                            )
 
             save_group(data, file)
 
