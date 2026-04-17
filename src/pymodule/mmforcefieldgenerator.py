@@ -1378,6 +1378,8 @@ class MMForceFieldGenerator:
         # Process water model if requested
         if use_water_model:
             self.apply_water_model(water_model)
+        else:
+            self._check_ow_hw_atoms()
 
         self.ostream.flush()
 
@@ -1457,7 +1459,7 @@ class MMForceFieldGenerator:
 
         assert_msg_critical(
             water_model.lower() in self.water_parameters,
-            f"Error: '{water_model}' is not available. Available models " +
+            f"MMForceFieldGenerator: '{water_model}' is not available. Available models " +
             f"are: {list(self.water_parameters.keys())}")
 
         self.ostream.print_info(f'Using water model parameters for {water_model}.')
@@ -1496,6 +1498,42 @@ class MMForceFieldGenerator:
 
         for angle_idx in water_angles:
             self.angles[angle_idx].update(water_params['angles'])
+
+    def _check_ow_hw_atoms(self):
+        """
+        Checks if ow/hw atom types exist in the system.
+        """
+
+        hydrogen_indices = [idx for idx, atom in self.atoms.items() if atom['type'] == 'hw']
+        oxygen_indices = [idx for idx, atom in self.atoms.items() if atom['type'] == 'ow']
+
+        # We have updated the ow/hw sigma/epsilon parameters in database/gaff-2.11.xml.
+        # By default, if no water model is used, the ow/hw sigma/epsilon parameters
+        # will follow the cSPE/E model (JCTC 2010, 6, 607).
+
+        # Here we double check the ow/hw sigma/epsilon parameters.
+        cspce_ow_sigma = self.water_parameters['cspce']['ow']['sigma']
+        cspce_ow_epsilon = self.water_parameters['cspce']['ow']['epsilon']
+        cspce_hw_sigma = self.water_parameters['cspce']['hw']['sigma']
+        cspce_hw_epsilon = self.water_parameters['cspce']['hw']['epsilon']
+
+        for idx in oxygen_indices:
+            assert_msg_critical(
+                (self.atoms[idx]['sigma'] == cspce_ow_sigma and
+                    self.atoms[idx]['epsilon'] == cspce_ow_epsilon),
+                "MMForceFieldGenerator: Incorrect 'ow' sigma/epsilon parameters.")
+
+        for idx in hydrogen_indices:
+            assert_msg_critical(
+                (self.atoms[idx]['sigma'] == cspce_hw_sigma and
+                    self.atoms[idx]['epsilon'] == cspce_hw_epsilon),
+                "MMForceFieldGenerator: Incorrect 'hw' sigma/epsilon parameters.")
+
+        if hydrogen_indices or oxygen_indices:
+            warnmsg = 'MMForceFieldGenerator: ow/hw atom types identified. '
+            warnmsg += 'Using sigma and epsilon parameters from the cSPE/E model. '
+            warnmsg += '(JCTC 2010, 6, 607)'
+            self.ostream.print_warning(warnmsg)
 
     def populate_impropers(self, use_xml, ff_data_dict, ff_data_lines, n_atoms,
                            angle_indices):
