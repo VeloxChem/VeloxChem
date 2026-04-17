@@ -101,6 +101,10 @@ def scf_results_sanity_check(obj, scf_results):
                 updated_scf_info['xcfun'] = scf_results['xcfun']
                 if 'grid_level' in scf_results:
                     updated_scf_info['grid_level'] = scf_results['grid_level']
+                if 'rs_omega' in scf_results:
+                    updated_scf_info['rs_omega'] = scf_results['rs_omega']
+                if 'frac_exact_exchange' in scf_results:
+                    updated_scf_info['frac_exact_exchange'] = scf_results['frac_exact_exchange']
 
         if scf_results.get('potfile', None) is not None:
             # do not overwrite potfile if it is already specified
@@ -215,7 +219,18 @@ def dft_sanity_check(obj, method_flag='compute', response_flag='none'):
             obj.ostream.print_warning(warn_msg)
         obj.ostream.flush()
 
-	# TODO: ask Xin why this is not supported
+    # check user-defined rs_omega
+    if obj._dft and obj.rs_omega is not None:
+        if obj.xcfun.is_range_separated():
+            obj.xcfun.set_rs_omega(obj.rs_omega)
+
+    # check user-defined fraction of exact exchange
+    if obj._dft and obj.frac_exact_exchange is not None:
+        if obj.xcfun.is_hybrid() and not obj.xcfun.is_range_separated():
+            obj.xcfun.set_frac_of_exact_exchange(obj.frac_exact_exchange)
+    
+
+    # TODO: ask Xin why this is not supported
     # check if SCAN family of functional is used in nonliear response
     #if obj._dft and response_flag.lower() == 'nonlinear':
     #    err_msg_scan = f'{type(obj).__name__}: Nonlinear response with '

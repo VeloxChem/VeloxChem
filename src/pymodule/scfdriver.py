@@ -233,6 +233,8 @@ class ScfDriver:
         self.grid_level = None
         self._dft = False
         self._mol_grid = None
+        self.rs_omega = None
+        self.frac_exact_exchange = None
 
         # polarizable embedding
         self.potfile = None
@@ -1760,6 +1762,10 @@ class ScfDriver:
                     self._scf_results['xcfun'] = self.xcfun.get_func_label()
                     if self.grid_level is not None:
                         self._scf_results['grid_level'] = self.grid_level
+                    if self.xcfun.is_hybrid() and not self.xcfun.is_range_separated():
+                        self._scf_results['frac_exact_exchange'] = self.xcfun.get_frac_exact_exchange()
+                    if self.xcfun.is_range_separated():
+                        self._scf_results['rs_omega'] = self.xcfun.get_rs_omega()
 
                 if self._pe:
                     # pe info, energy and potential matrix
@@ -2786,6 +2792,15 @@ class ScfDriver:
                           if self.grid_level is None else self.grid_level)
             cur_str = 'Molecular Grid Level            : ' + str(grid_level)
             self.ostream.print_header(cur_str.ljust(str_width))
+            if self.xcfun.is_hybrid():
+                if self.xcfun.is_range_separated():
+                    rs_omega = self.xcfun.get_rs_omega()
+                    cur_str = 'Range-Separated Omega           : {:.2f}'.format(rs_omega)
+                    self.ostream.print_header(cur_str.ljust(str_width))
+                else:
+                    frac = self.xcfun.get_frac_exact_exchange()
+                    cur_str = 'Fraction of Exact Exchange      : {:.2f}'.format(frac)
+                    self.ostream.print_header(cur_str.ljust(str_width))
 
         if self.dispersion or (self._dft and
                                'D4' in self.xcfun.get_func_label().upper()):

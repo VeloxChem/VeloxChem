@@ -106,6 +106,8 @@ class RespChargesDriver(EspChargesDriver):
         self.xcfun = None
         self.grid_level = None
         self.solvation_model = None
+        self.rs_omega = None
+        self.frac_exact_exchange = None
 
         # conformers
         self.xyz_file = None

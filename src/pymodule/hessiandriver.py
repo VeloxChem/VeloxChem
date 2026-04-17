@@ -101,6 +101,8 @@ class HessianDriver:
         self._dft = False
         self.grid_level = None
         self.xcfun = None
+        self.rs_omega = None
+        self.frac_exact_exchange = None
 
         self.potfile = None
 

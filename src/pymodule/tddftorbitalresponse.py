@@ -716,6 +716,15 @@ class TddftOrbitalResponse(CphfSolver):
                           if self.grid_level is None else self.grid_level)
             cur_str = 'Molecular Grid Level            : ' + str(grid_level)
             self.ostream.print_header(cur_str.ljust(str_width))
+            if self.xcfun.is_hybrid():
+                if self.xcfun.is_range_separated():
+                    rs_omega = self.xcfun.get_rs_omega()
+                    cur_str = 'Range-Separated Omega           : {:.2f}'.format(rs_omega)
+                    self.ostream.print_header(cur_str.ljust(str_width))
+                else:
+                    frac = self.xcfun.get_frac_exact_exchange()
+                    cur_str = 'Fraction of Exact Exchange      : {:.2f}'.format(frac)
+                    self.ostream.print_header(cur_str.ljust(str_width))
 
         if self._cpcm:
             cur_str = 'Solvation Model                 : '

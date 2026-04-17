@@ -118,6 +118,8 @@ class NonlinearSolver:
         self._dft = False
         self.xcfun = None
         self.grid_level = None
+        self.rs_omega = None
+        self.frac_exact_exchange = None
 
         # polarizable embedding
         self.potfile = None
