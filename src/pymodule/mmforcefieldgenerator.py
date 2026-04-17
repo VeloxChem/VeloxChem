@@ -1229,10 +1229,9 @@ class MMForceFieldGenerator:
         self.equivalent_atoms = atomtypeidentifier.equivalent_atoms
         self.equivalent_charges = atomtypeidentifier.equivalent_charges
 
-        contains_water = molecule.contains_water_molecule()
+        #skip applying MM water model parameters for system containing water molecule
         is_water = molecule.is_water_molecule()
-        use_water_model = ((water_model is not None) and
-                           (is_water or contains_water))
+        use_water_model = ((water_model is not None) and is_water)
         assert_msg_critical(
             (not is_water) or (water_model is not None),
             'MMForceFieldGenerator: explicit water_model is required for isolated water molecules.'
