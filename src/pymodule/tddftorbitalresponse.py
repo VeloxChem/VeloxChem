@@ -200,7 +200,7 @@ class TddftOrbitalResponse(CphfSolver):
         pe_dict = self._init_pe(molecule, basis, silent=True)
 
         # CPCM_information
-        self._init_cpcm(molecule)
+        self._init_cpcm(molecule, basis)
 
         profiler = Profiler({
             'timing': self.timing,
@@ -234,7 +234,7 @@ class TddftOrbitalResponse(CphfSolver):
             ovlp = scf_tensors['S']
             mo = scf_tensors['C_alpha']
 
-            nocc = molecule.number_of_alpha_electrons()
+            nocc = molecule.number_of_alpha_occupied_orbitals(basis)
             mo_occ = mo[:, :nocc].copy()
             mo_vir = mo[:, nocc:].copy()
             nvir = mo_vir.shape[1]
@@ -510,7 +510,7 @@ class TddftOrbitalResponse(CphfSolver):
         pe_dict = self._init_pe(molecule, basis, silent=True)
 
         # CPCM_information
-        self._init_cpcm(molecule)
+        self._init_cpcm(molecule, basis)
 
         profiler.stop_timer('Prep')
 
@@ -520,7 +520,7 @@ class TddftOrbitalResponse(CphfSolver):
 
             # Get overlap, MO coefficients from scf_tensors
             ovlp = scf_tensors['S']
-            nocc = molecule.number_of_alpha_electrons()
+            nocc = molecule.number_of_alpha_occupied_orbitals(basis)
             mo = scf_tensors['C_alpha']
             mo_occ = mo[:, :nocc]
             mo_vir = mo[:, nocc:]

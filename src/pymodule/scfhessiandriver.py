@@ -44,7 +44,7 @@ from .veloxchemlib import NuclearPotentialGeom200Driver
 from .veloxchemlib import NuclearPotentialGeom020Driver
 from .veloxchemlib import NuclearPotentialGeom110Driver
 from .veloxchemlib import NuclearPotentialGeom101Driver
-from .veloxchemlib import ECPHessianDriver
+from .veloxchemlib import EcpHessianDriver
 from .veloxchemlib import ElectricDipoleMomentGeom100Driver
 from .veloxchemlib import FockGeom2000Driver
 from .veloxchemlib import FockGeom1100Driver
@@ -140,7 +140,7 @@ class ScfHessianDriver(HessianDriver):
 
         self.cphf_dict = dict(cphf_dict)
 
-    def compute(self, molecule, ao_basis, scf_results=None):
+    def compute(self, molecule, ao_basis, scf_results_not_used=None):
         """
         Computes the analytical or numerical nuclear Hessian.
 
@@ -148,7 +148,14 @@ class ScfHessianDriver(HessianDriver):
             The molecule.
         :param ao_basis:
             The AO basis set.
+        :param scf_results_not_used:
+            For backward compatibility.
         """
+
+        # TODO: enable RI-JK
+        assert_msg_critical(
+            not self.scf_driver.ri_jk,
+            f'{type(self).__name__}.compute: RI-JK is not yet supported')
 
         if self.rank == mpi_master():
             self.print_header()
@@ -162,7 +169,10 @@ class ScfHessianDriver(HessianDriver):
             'memory_tracing': self.memory_tracing,
         })
 
+        scf_results = self.scf_driver.scf_results
         if scf_results is None:
+            # run SCF if needed
+            scf_energy_not_used = self.compute_energy(molecule, ao_basis)
             scf_results = self.scf_driver.scf_results
 
         # Save the electronic energy
@@ -220,11 +230,6 @@ class ScfHessianDriver(HessianDriver):
         :param atom_pairs:
             The atom pairs to compute the Hessian for.
         """
-
-        assert_msg_critical(
-            self.scf_driver.scf_type == 'restricted',
-            'ScfHessianDriver: Analytical Hessian only implemented ' +
-            'for restricted case')
 
         assert_msg_critical(
             self.scf_driver.solvation_model is None,
@@ -391,7 +396,7 @@ class ScfHessianDriver(HessianDriver):
         npot_hess_101_drv = NuclearPotentialGeom101Driver()
 
         if ao_basis.has_ecp():
-            ecp_hess_drv = ECPHessianDriver()
+            ecp_hess_drv = EcpHessianDriver()
             core_electrons = ao_basis.get_number_of_ecp_core_electrons()
             ecp_atom_inds = [
                 idx for idx, nelec in enumerate(core_electrons) if nelec > 0
@@ -453,8 +458,7 @@ class ScfHessianDriver(HessianDriver):
         # Parts related to second-order integral derivatives
         hessian_2nd_order_derivatives = np.zeros((natm, natm, 3, 3))
 
-        mol_charges = molecule.get_element_ids()
-        mol_charges -= ao_basis.get_number_of_ecp_core_electrons()
+        mol_charges = molecule.get_effective_nuclear_charges(ao_basis)
         mol_coords = molecule.get_coordinates_in_bohr()
 
         for i in local_atoms:
@@ -787,8 +791,7 @@ class ScfHessianDriver(HessianDriver):
             hessian_point_charges = np.zeros((natm, natm, 3, 3))
 
             qm_coords = molecule.get_coordinates_in_bohr()
-            nuclear_charges = molecule.get_element_ids()
-            nuclear_charges -= ao_basis.get_number_of_ecp_core_electrons()
+            nuclear_charges = molecule.get_effective_nuclear_charges(ao_basis)
 
             for i in range(self.rank, natm, self.nodes):
                 if atom_pairs is not None:
@@ -876,6 +879,10 @@ class ScfHessianDriver(HessianDriver):
                             if self._dft:
                                 hessian_dft_xc[i * 3:i * 3 + 3,
                                                j * 3:j * 3 + 3] = 0.0
+                            if self.scf_driver.dispersion or (
+                                    self.scf_driver._dft and 'D4' in self.
+                                    scf_driver.xcfun.get_func_label().upper()):
+                                dftd4_hessian[i, :, j, :] = 0.0
 
             self.hessian = (
                 hessian_first_order_derivatives +
@@ -949,16 +956,21 @@ class ScfHessianDriver(HessianDriver):
         elem_ids_without_ecp = [
             z for z, ncore in zip(elem_ids, core_electrons) if ncore == 0
         ]
-        max_elem_id = max(elem_ids_without_ecp)
+        # If all atoms have ECP, set max_elem_id to 0 and let the regular
+        # grid-level logic below decide the outcome.
+        max_elem_id = max(elem_ids_without_ecp) if elem_ids_without_ecp else 0
 
         errmsg = 'Hessian calculation with '
         errmsg += self.scf_driver.xcfun.get_func_label().upper()
-        errmsg += ' functional and '
-        if basis.has_ecp():
-            errmsg += f'max element id {max_elem_id} '
-        else:
-            errmsg += 'effective core potential '
+        errmsg += ' functional '
+        if max_elem_id > 0:
+            errmsg += f'and max element id {max_elem_id} '
         errmsg += 'is not supported.'
+
+        ecp_errmsg = 'Hessian calculation with '
+        ecp_errmsg += self.scf_driver.xcfun.get_func_label().upper()
+        ecp_errmsg += ' functional and effective core potential '
+        ecp_errmsg += 'is not supported.'
 
         if default_grid_level <= 4:
             if max_elem_id <= 18:
@@ -971,7 +983,7 @@ class ScfHessianDriver(HessianDriver):
         elif default_grid_level in [5, 6]:
             # special case for the combination of default_grid_level 6 and ECP
             if default_grid_level == 6 and basis.has_ecp():
-                assert_msg_critical(False, errmsg)
+                assert_msg_critical(False, ecp_errmsg)
 
             if max_elem_id <= 10:
                 grid_level = max(6, grid_level)
@@ -1006,6 +1018,11 @@ class ScfHessianDriver(HessianDriver):
         assert_msg_critical(
             self.scf_driver.solvation_model is None,
             'ScfHessianDriver: Solvation model not implemented')
+
+        # sanity checks
+        molecule_sanity_check(molecule)
+        scf_results_sanity_check(self, self.scf_driver.scf_results)
+        dft_sanity_check(self, 'compute')
 
         # use _determine_xc_hessian_grid_level here to ensure early exit for
         # unsupported cases
@@ -1175,7 +1192,7 @@ class ScfHessianDriver(HessianDriver):
         npot_hess_101_drv = NuclearPotentialGeom101Driver()
 
         if ao_basis.has_ecp():
-            ecp_hess_drv = ECPHessianDriver()
+            ecp_hess_drv = EcpHessianDriver()
             core_electrons = ao_basis.get_number_of_ecp_core_electrons()
             ecp_atom_inds = [
                 idx for idx, nelec in enumerate(core_electrons) if nelec > 0
@@ -1246,8 +1263,7 @@ class ScfHessianDriver(HessianDriver):
         # Parts related to second-order integral derivatives
         hessian_2nd_order_derivatives = np.zeros((natm, natm, 3, 3))
 
-        mol_charges = molecule.get_element_ids()
-        mol_charges -= ao_basis.get_number_of_ecp_core_electrons()
+        mol_charges = molecule.get_effective_nuclear_charges(ao_basis)
         mol_coords = molecule.get_coordinates_in_bohr()
 
         for i in local_atoms:
@@ -1639,8 +1655,7 @@ class ScfHessianDriver(HessianDriver):
             hessian_point_charges = np.zeros((natm, natm, 3, 3))
 
             qm_coords = molecule.get_coordinates_in_bohr()
-            nuclear_charges = molecule.get_element_ids()
-            nuclear_charges -= ao_basis.get_number_of_ecp_core_electrons()
+            nuclear_charges = molecule.get_effective_nuclear_charges(ao_basis)
 
             for i in range(self.rank, natm, self.nodes):
                 if atom_pairs is not None:
@@ -1728,6 +1743,10 @@ class ScfHessianDriver(HessianDriver):
                             if self._dft:
                                 hessian_dft_xc[i * 3:i * 3 + 3,
                                                j * 3:j * 3 + 3] = 0.0
+                            if self.scf_driver.dispersion or (
+                                    self.scf_driver._dft and 'D4' in self.
+                                    scf_driver.xcfun.get_func_label().upper()):
+                                dftd4_hessian[i, :, j, :] = 0.0
 
             self.hessian = (
                 hessian_first_order_derivatives +
@@ -1783,8 +1802,7 @@ class ScfHessianDriver(HessianDriver):
 
         # Number of atoms and atomic charges
         natm = molecule.number_of_atoms()
-        nuclear_charges = molecule.get_element_ids()
-        nuclear_charges -= ao_basis.get_number_of_ecp_core_electrons()
+        nuclear_charges = molecule.get_effective_nuclear_charges(ao_basis)
 
         # Dipole integrals
         dipole_mats = compute_electric_dipole_integrals(molecule, ao_basis,
@@ -1896,8 +1914,7 @@ class ScfHessianDriver(HessianDriver):
 
         # Number of atoms and atomic charges
         natm = molecule.number_of_atoms()
-        nuclear_charges = molecule.get_element_ids()
-        nuclear_charges -= ao_basis.get_number_of_ecp_core_electrons()
+        nuclear_charges = molecule.get_effective_nuclear_charges(ao_basis)
 
         # Dipole integrals
         dipole_mats = compute_electric_dipole_integrals(molecule, ao_basis,
@@ -2023,18 +2040,22 @@ class ScfHessianDriver(HessianDriver):
             The molecule.
         :param basis:
         """
-        self.scf_driver.restart = False
-        self.scf_driver.ostream.mute()
-        scf_results = self.scf_driver.compute(molecule, basis)
-        self.scf_driver.ostream.unmute()
-        assert_msg_critical(self.scf_driver.is_converged,
-                            'ScfHessianDriver: SCF did not converge')
 
-        if self.rank == mpi_master():
-            scf_energy = self.scf_driver.get_scf_energy()
-            return scf_energy
+        if self.numerical:
+            # disable restarting scf for numerical calculation
+            self.scf_driver.restart = False
         else:
-            return None
+            # always try restarting scf for analytical calculation
+            self.scf_driver.restart = True
+
+        self.scf_driver.ostream.mute()
+        scf_results_not_used = self.scf_driver.compute(molecule, basis)
+        self.scf_driver.ostream.unmute()
+
+        assert_msg_critical(self.scf_driver.is_converged,
+                            f'{type(self).__name__}: SCF did not converge')
+
+        return self.scf_driver.get_scf_energy()
 
     def compute_gradient(self, molecule, basis):
         """
@@ -2045,25 +2066,17 @@ class ScfHessianDriver(HessianDriver):
         :param basis:
             The AO basis set.
         """
-        # Recalculate the ground state energy for the new geometry
-        self.scf_driver.restart = False
-        self.scf_driver.ostream.mute()
-        scf_results = self.scf_driver.compute(molecule, basis)
-        self.scf_driver.ostream.unmute()
-        assert_msg_critical(self.scf_driver.is_converged,
-                            'ScfHessianDriver: SCF did not converge')
 
-        # Calculate the gradient.
+        scf_energy_not_used = self.compute_energy(molecule, basis)
+
         gradient_driver = ScfGradientDriver(self.scf_driver)
+
         gradient_driver.ostream.mute()
-        gradient_driver.compute(molecule, basis, scf_results)
+        gradient_driver.compute(molecule, basis)
         gradient_driver.ostream.unmute()
 
         return gradient_driver.gradient.copy()
 
-    # NOTE: This routine does not recalculate the SCF, so
-    # it has to be called after compute_gradient.
-    # TODO: Is there a better way to avoid re-running the SCF?
     def compute_electric_dipole_moment(self, molecule, basis):
         """
         Computes the electric dipole moment calculated in
@@ -2074,10 +2087,15 @@ class ScfHessianDriver(HessianDriver):
         :param basis:
             The AO basis set.
         """
-        # First-order properties for gradient of dipole moment
-        prop = FirstOrderProperties(self.comm, self.ostream)
+
+        # Note: This routine does not recalculate the SCF, so it needs to be
+        # called after compute_energy or compute_gradient.
+
         scf_results = self.scf_driver.scf_results
+
+        prop = FirstOrderProperties(self.comm, self.ostream)
         prop.compute_scf_prop(molecule, basis, scf_results)
+
         if self.rank == mpi_master():
             dipole_moment = prop.get_property('dipole moment')
             return dipole_moment

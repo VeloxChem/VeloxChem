@@ -88,7 +88,6 @@ local_matrix_A_dot_vector(const int     npoints,
         const double xi = ptr_grid_data[i * ncols + 0];
         const double yi = ptr_grid_data[i * ncols + 1];
         const double zi = ptr_grid_data[i * ncols + 2];
-        const double wi = ptr_grid_data[i * ncols + 3];
 
         const double zeta_i = ptr_grid_data[i * ncols + 4];
         const double zeta_i2 = zeta_i * zeta_i;
@@ -106,7 +105,6 @@ local_matrix_A_dot_vector(const int     npoints,
                 const double xj = ptr_grid_data[j * ncols + 0];
                 const double yj = ptr_grid_data[j * ncols + 1];
                 const double zj = ptr_grid_data[j * ncols + 2];
-                const double wj = ptr_grid_data[j * ncols + 3];
 
                 const double zeta_j = ptr_grid_data[j * ncols + 4];
                 const double zeta_j2 = zeta_j * zeta_j;
@@ -253,7 +251,6 @@ comp_grad_Aii(const double* ptr_grid_coords,
         const auto z_i = ptr_grid_coords[i * 3 + 2];
 
         const auto zeta_i = ptr_zeta[i];
-        const auto zeta_i2 = zeta_i * zeta_i;
 
         const auto sw_f_i = ptr_sw_f[i];
         const auto q_i = ptr_q[i];

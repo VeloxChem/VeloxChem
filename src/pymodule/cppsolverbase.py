@@ -44,6 +44,7 @@ from .outputstream import OutputStream
 from .distributedarray import DistributedArray
 from .linearsolver import LinearSolver
 from .errorhandler import assert_msg_critical
+from .resultsio import write_results_to_hdf5
 
 try:
     import matplotlib.pyplot as plt
@@ -220,7 +221,7 @@ class ComplexResponseSolverBase(LinearSolver):
         return dist_new_ger, dist_new_ung
 
     @staticmethod
-    def get_full_solution_vector(solution):
+    def get_full_solution_vector(solution, root=mpi_master()):
         """
         Gets a full solution vector from the distributed solution.
 
@@ -231,12 +232,12 @@ class ComplexResponseSolverBase(LinearSolver):
             The full solution vector.
         """
 
-        x_realger = solution.get_full_vector(0)
-        x_realung = solution.get_full_vector(1)
-        x_imagung = solution.get_full_vector(2)
-        x_imagger = solution.get_full_vector(3)
+        x_realger = solution.get_full_vector(0, root=root)
+        x_realung = solution.get_full_vector(1, root=root)
+        x_imagung = solution.get_full_vector(2, root=root)
+        x_imagger = solution.get_full_vector(3, root=root)
 
-        if solution.rank == mpi_master():
+        if solution.rank == root:
             x_real = np.hstack((x_realger, x_realger)) + np.hstack(
                 (x_realung, -x_realung))
             x_imag = np.hstack((x_imagung, -x_imagung)) + np.hstack(
@@ -711,29 +712,24 @@ class ComplexResponseSolverBase(LinearSolver):
         Writes the results of a linear response calculation to HDF5 file.
         """
 
-        if fname and isinstance(fname, str):
-            hf = h5py.File(fname, 'a')
+        h5_rsp_results = dict(rsp_results)
 
-            xlabel = self.group_label + '/frequencies'
-            if xlabel in hf:
-                del hf[xlabel]
-            hf.create_dataset(xlabel, data=rsp_results['frequencies'])
+        spectrum = self.get_spectrum(rsp_results, 'au')
 
-            spectrum = self.get_spectrum(rsp_results, 'au')
+        if spectrum is not None:
+            y_data = np.array(spectrum['y_data'])
 
-            if spectrum is not None:
-                y_data = np.array(spectrum['y_data'])
+            if self.property == 'absorption':
+                assert_msg_critical(
+                    '[a.u.]' in spectrum['y_label'],
+                    f'{type(self).__name__}.write_cpp_rsp_results_to_hdf5: '
+                    + 'In valid unit in y_label')
+                h5_rsp_results['sigma'] = y_data
+            elif self.property == 'ecd':
+                h5_rsp_results['delta-epsilon'] = y_data
 
-                if self.property == 'absorption':
-                    assert_msg_critical(
-                        '[a.u.]' in spectrum['y_label'],
-                        f'{type(self).__name__}.write_cpp_rsp_results_to_hdf5: '
-                        + 'In valid unit in y_label')
-                    ylabel = self.group_label + '/sigma'
-                elif self.property == 'ecd':
-                    ylabel = self.group_label + '/delta-epsilon'
-                if ylabel in hf:
-                    del hf[ylabel]
-                hf.create_dataset(ylabel, data=y_data)
-
-            hf.close()
+        write_results_to_hdf5(fname,
+                              self.group_label,
+                              h5_rsp_results,
+                              value_label='response result',
+                              replace_group=False)

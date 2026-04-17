@@ -75,7 +75,8 @@ def plot_uv_vis_spectrum(rsp_results,
                          broadening_type="lorentzian",
                          broadening_value=(1000.0 / hartree_in_wavenumber() *
                                            hartree_in_ev()),
-                         ax=None):
+                         ax=None,
+                         x_unit="nm"):
     """
     Plot the UV-Vis absorption spectrum from the response calculation.
 
@@ -87,13 +88,15 @@ def plot_uv_vis_spectrum(rsp_results,
         The broadening value in eV.
     :param ax:
         The matplotlib axis to plot on.
+    :param x_unit:
+        The unit of x-axis. Either 'nm' or 'ev'.
     """
 
     plot_absorption_spectrum(rsp_results,
                              broadening_type=broadening_type,
                              broadening_value=broadening_value,
                              ax=ax,
-                             x_unit="nm")
+                             x_unit=x_unit)
 
 
 def plot_absorption_spectrum(

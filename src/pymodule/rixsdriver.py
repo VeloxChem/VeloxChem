@@ -147,12 +147,30 @@ class RixsDriver(LinearSolver):
         if key in rsp_dict:
             val = rsp_dict[key]
 
-            if isinstance(val, list):
-                rsp_dict[key] = [float(str(x).strip()) for x in val]
+            if isinstance(val, (list, tuple, np.ndarray)):
+                if len(val) == 0:
+                    raise ValueError(
+                        'RixsDriver.update_settings: photon_energy must '
+                        'contain at least one numeric value.')
+                try:
+                    rsp_dict[key] = [float(str(x).strip()) for x in val]
+                except ValueError as exc:
+                    raise ValueError(
+                        'RixsDriver.update_settings: Invalid photon_energy '
+                        'value. Expected numeric values.') from exc
 
             elif isinstance(val, str):
                 parts = val.replace(',', ' ').split()
-                rsp_dict[key] = [float(x) for x in parts]
+                if len(parts) == 0:
+                    raise ValueError(
+                        'RixsDriver.update_settings: photon_energy must '
+                        'contain at least one numeric value.')
+                try:
+                    rsp_dict[key] = [float(x) for x in parts]
+                except ValueError as exc:
+                    raise ValueError(
+                        'RixsDriver.update_settings: Invalid photon_energy '
+                        'value. Expected numeric values.') from exc
 
         super().update_settings(rsp_dict, method_dict)
 
@@ -171,9 +189,15 @@ class RixsDriver(LinearSolver):
             mo_vir_ind = info['mo_virtual_indices']
             ce_states = info['core_states']
             ve_states = info['valence_states']
-            print(f'\nNumber of states: (intermediate, final): ({intermed_states}, {final_states})')
-            print(f'\nMO indices (core, valence, virtual): ({mo_c_ind}, {mo_val_ind}, {mo_vir_ind})')
-            print(f'\nState indices (intermediate, final): ({ce_states}, {ve_states})')
+            self.ostream.print_info(
+                f'Number of states: (intermediate, final): '
+                f'({intermed_states}, {final_states})')
+            self.ostream.print_info(
+                f'MO indices (core, valence, virtual): '
+                f'({mo_c_ind}, {mo_val_ind}, {mo_vir_ind})')
+            self.ostream.print_info(
+                f'State indices (intermediate, final): '
+                f'({ce_states}, {ve_states})')
 
     def compute(self, molecule, basis, scf_results,
                 rsp_results=None, cvs_rsp_results=None):
@@ -202,10 +226,10 @@ class RixsDriver(LinearSolver):
             and the scattering amplitude tensor.
         """
 
-        # TODO: enable ECP
         assert_msg_critical(
             not basis.has_ecp(),
-            f'{type(self).__name__}.compute: ECP is not yet supported')
+            f'{type(self).__name__}.compute: ECPs are not supported for ' +
+            'RIXS calculations. Explicit core orbitals are required.')
 
         if rsp_results is None:
 
@@ -273,7 +297,7 @@ class RixsDriver(LinearSolver):
 
             cvs_rsp_results = cvs_rsp_drv.compute(molecule, basis, scf_results)
 
-        nocc = molecule.number_of_alpha_electrons()
+        nocc = molecule.number_of_alpha_occupied_orbitals(basis)
 
         self.twoshot = (not self.restricted_subspace)
         init_photon_set = True
@@ -417,6 +441,27 @@ class RixsDriver(LinearSolver):
         elif isinstance(self.photon_energy, (float, int, np.floating)):
             self.photon_energy = [self.photon_energy]
 
+        assert_msg_critical(
+            self.photon_energy is not None,
+            'RixsDriver.compute: Unable to determine an incident photon '
+            'energy automatically. Set photon_energy explicitly or include '
+            'at least one core-excited state with oscillator strength > 1e-3.')
+        assert_msg_critical(
+            len(self.photon_energy) > 0,
+            'RixsDriver.compute: photon_energy must contain at least one '
+            'value.')
+
+        photon_energy_arr = np.asarray(self.photon_energy, dtype=float)
+        assert_msg_critical(
+            np.all(np.isfinite(photon_energy_arr)),
+            'RixsDriver.compute: photon_energy must contain only finite '
+            'numeric values.')
+        assert_msg_critical(
+            np.all(np.abs(photon_energy_arr) > 0.0),
+            'RixsDriver.compute: photon_energy must not contain zero, since '
+            'the RIXS prefactor divides by the incident photon energy.')
+        self.photon_energy = photon_energy_arr.tolist()
+
         # Define the return objects
         self.ene_losses             = np.zeros((num_final_states, len(self.photon_energy)))
         self.emission_enes          = np.zeros((num_final_states, len(self.photon_energy)))
@@ -426,7 +471,7 @@ class RixsDriver(LinearSolver):
                                                3, 3), dtype=complex)
 
         if self.rank == mpi_master():
-            self._print_header(molecule)
+            self._print_header(molecule, basis)
 
         ave, rem = divmod(num_final_states, self.nodes)
         counts = [ave + 1 if p < rem else ave for p in range(self.nodes)]
@@ -511,8 +556,7 @@ class RixsDriver(LinearSolver):
             self.ostream.print_info('Writing to files...')
             self.ostream.print_blank()
             self.ostream.flush()
-            # TODO: append to final h5 (instead of writting new file)
-            self._write_hdf5(self.filename + '_rixs')
+            self._write_hdf5(self.filename)
 
         if not init_photon_set:
             self.photon_energy = None
@@ -873,23 +917,27 @@ class RixsDriver(LinearSolver):
         if not fname:
             raise ValueError('No filename given to _write_hdf5()')
 
-        # TODO: use pathlib for handling file extension
-        # Add the .h5 extension if not given
-        if not fname[-3:] == '.h5':
-            fname += '.h5'
-
-        # TODO: append to final h5 (instead of writting new file)
+        fpath = Path(fname)
+        if fpath.suffix != '.h5':
+            fpath = fpath.with_suffix('.h5')
 
         # Save all the internal data to the h5 datafile named 'fname'
-        with h5py.File(fname, 'w') as hf:
-            hf.create_dataset('photon_energies', data=self.photon_energy)
-            hf.create_dataset('cross_sections', data=self.cross_sections)
-            hf.create_dataset('emission_energies', data=self.emission_enes)
-            hf.create_dataset('energy_losses', data=self.ene_losses)
-            hf.create_dataset('elastic_cross_sections', data=self.elastic_cross_sections)
-            hf.create_dataset('scattering_amplitudes', data=self.scattering_amplitudes)
+        with h5py.File(fpath, 'a') as hf:
+            datasets = {
+                'rixs/photon_energies': self.photon_energy,
+                'rixs/cross_sections': self.cross_sections,
+                'rixs/emission_energies': self.emission_enes,
+                'rixs/energy_losses': self.ene_losses,
+                'rixs/elastic_cross_sections': self.elastic_cross_sections,
+                'rixs/scattering_amplitudes': self.scattering_amplitudes,
+            }
 
-    def _print_header(self, molecule):
+            for name, data in datasets.items():
+                if name in hf:
+                    del hf[name]
+                hf.create_dataset(name, data=data)
+
+    def _print_header(self, molecule, basis):
         """
         Prints RIXS calculation setup details to output stream.
         """
@@ -950,7 +998,7 @@ class RixsDriver(LinearSolver):
             return labels
 
         str_width   = 60
-        nocc        = molecule.number_of_alpha_electrons()
+        nocc        = molecule.number_of_alpha_occupied_orbitals(basis)
 
         self.ostream.print_blank()
         title = 'Resonant Inelastic X-ray Scattering (RIXS) Setup'

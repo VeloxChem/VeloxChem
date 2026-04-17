@@ -47,9 +47,9 @@ from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            ri_sanity_check, dft_sanity_check, pe_sanity_check,
                            solvation_model_sanity_check)
 from .errorhandler import assert_msg_critical
-from .checkpoint import (read_rsp_hdf5, write_rsp_hdf5,
-                         write_lr_rsp_results_to_hdf5,
-                         write_detach_attach_to_hdf5)
+from .checkpoint import read_rsp_hdf5, write_rsp_hdf5
+from .resultsio import (write_lr_rsp_results_to_hdf5,
+                        write_detach_attach_to_hdf5)
 
 
 class TdaEigenSolver(TdaEigenSolverBase):
@@ -121,7 +121,7 @@ class TdaEigenSolver(TdaEigenSolverBase):
             self.lindep_thresh = self.conv_thresh * 1.0e-2
 
         # check molecule
-        molecule_sanity_check(molecule, 'restricted')
+        molecule_sanity_check(molecule, 'restricted', type(self).__name__)
 
         # check SCF results
         scf_results_sanity_check(self, scf_results)
@@ -185,7 +185,14 @@ class TdaEigenSolver(TdaEigenSolverBase):
 
         else:
             orb_ene = None
+            norb = None
             nocc = None
+
+        norb, nocc = self.comm.bcast((norb, nocc), root=mpi_master())
+
+        self._check_mpi_oversubscription(
+            self._get_excitation_space_dimension_restricted(nocc, norb),
+            'excitation space')
 
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
@@ -197,7 +204,7 @@ class TdaEigenSolver(TdaEigenSolverBase):
         pe_dict = self._init_pe(molecule, basis)
 
         # CPCM_information
-        self._init_cpcm(molecule)
+        self._init_cpcm(molecule, basis)
 
         # set up trial excitation vectors on master node
 
@@ -218,6 +225,8 @@ class TdaEigenSolver(TdaEigenSolverBase):
                     molecule, basis, dft_dict, pe_dict, self.ostream)
                 self.restart = (rst_trial_mat is not None and
                                 rst_sig_mat is not None)
+                if self.restart:
+                    self.restart = self.match_settings(self.checkpoint_file)
             self.restart = self.comm.bcast(self.restart, root=mpi_master())
 
         if self.restart:
@@ -329,6 +338,7 @@ class TdaEigenSolver(TdaEigenSolverBase):
                 write_rsp_hdf5(self.checkpoint_file, [trials, sigmas],
                                ['TDA_trials', 'TDA_sigmas'], molecule, basis,
                                dft_dict, pe_dict, self.ostream)
+            self._write_settings_to_checkpoint()
             self._add_nstates_to_checkpoint()
 
             # finish TDA after convergence
@@ -526,7 +536,15 @@ class TdaEigenSolver(TdaEigenSolverBase):
 
             if (self.save_solutions and final_h5_fname is not None):
                 # Write response results to final checkpoint file.
-                write_lr_rsp_results_to_hdf5(final_h5_fname, ret_dict)
+                # Keep the legacy rsp HDF5 layout for compatibility.
+                # Eigenvectors are written separately as S1/S2/... datasets, so
+                # they do not belong in this HDF5-facing payload.
+                h5_ret_dict = {
+                    key: value
+                    for key, value in ret_dict.items()
+                    if key != 'eigenvectors'
+                }
+                write_lr_rsp_results_to_hdf5(final_h5_fname, h5_ret_dict)
 
             self._print_results(ret_dict)
 

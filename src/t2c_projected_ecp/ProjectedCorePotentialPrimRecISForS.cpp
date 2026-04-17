@@ -37,27 +37,21 @@ comp_prim_projected_core_potential_is_s(CSimdArray<double>& pbuffer,
 
     auto tg_xxxx_0_s_0_0_0 = pbuffer.data(idx_gs_s_0_0_0);
 
-    auto tg_xxxy_0_s_0_0_0 = pbuffer.data(idx_gs_s_0_0_0 + 1);
 
-    auto tg_xxxz_0_s_0_0_0 = pbuffer.data(idx_gs_s_0_0_0 + 2);
 
     auto tg_xxyy_0_s_0_0_0 = pbuffer.data(idx_gs_s_0_0_0 + 3);
 
-    auto tg_xxyz_0_s_0_0_0 = pbuffer.data(idx_gs_s_0_0_0 + 4);
 
     auto tg_xxzz_0_s_0_0_0 = pbuffer.data(idx_gs_s_0_0_0 + 5);
 
     auto tg_xyyy_0_s_0_0_0 = pbuffer.data(idx_gs_s_0_0_0 + 6);
 
-    auto tg_xyyz_0_s_0_0_0 = pbuffer.data(idx_gs_s_0_0_0 + 7);
 
-    auto tg_xyzz_0_s_0_0_0 = pbuffer.data(idx_gs_s_0_0_0 + 8);
 
     auto tg_xzzz_0_s_0_0_0 = pbuffer.data(idx_gs_s_0_0_0 + 9);
 
     auto tg_yyyy_0_s_0_0_0 = pbuffer.data(idx_gs_s_0_0_0 + 10);
 
-    auto tg_yyyz_0_s_0_0_0 = pbuffer.data(idx_gs_s_0_0_0 + 11);
 
     auto tg_yyzz_0_s_0_0_0 = pbuffer.data(idx_gs_s_0_0_0 + 12);
 
@@ -69,31 +63,25 @@ comp_prim_projected_core_potential_is_s(CSimdArray<double>& pbuffer,
 
     auto tg_xxxxx_0_s_0_0_0 = pbuffer.data(idx_hs_s_0_0_0);
 
-    auto tg_xxxxy_0_s_0_0_0 = pbuffer.data(idx_hs_s_0_0_0 + 1);
 
     auto tg_xxxxz_0_s_0_0_0 = pbuffer.data(idx_hs_s_0_0_0 + 2);
 
     auto tg_xxxyy_0_s_0_0_0 = pbuffer.data(idx_hs_s_0_0_0 + 3);
 
-    auto tg_xxxyz_0_s_0_0_0 = pbuffer.data(idx_hs_s_0_0_0 + 4);
 
     auto tg_xxxzz_0_s_0_0_0 = pbuffer.data(idx_hs_s_0_0_0 + 5);
 
     auto tg_xxyyy_0_s_0_0_0 = pbuffer.data(idx_hs_s_0_0_0 + 6);
 
-    auto tg_xxyyz_0_s_0_0_0 = pbuffer.data(idx_hs_s_0_0_0 + 7);
 
-    auto tg_xxyzz_0_s_0_0_0 = pbuffer.data(idx_hs_s_0_0_0 + 8);
 
     auto tg_xxzzz_0_s_0_0_0 = pbuffer.data(idx_hs_s_0_0_0 + 9);
 
     auto tg_xyyyy_0_s_0_0_0 = pbuffer.data(idx_hs_s_0_0_0 + 10);
 
-    auto tg_xyyyz_0_s_0_0_0 = pbuffer.data(idx_hs_s_0_0_0 + 11);
 
     auto tg_xyyzz_0_s_0_0_0 = pbuffer.data(idx_hs_s_0_0_0 + 12);
 
-    auto tg_xyzzz_0_s_0_0_0 = pbuffer.data(idx_hs_s_0_0_0 + 13);
 
     auto tg_xzzzz_0_s_0_0_0 = pbuffer.data(idx_hs_s_0_0_0 + 14);
 
@@ -113,27 +101,21 @@ comp_prim_projected_core_potential_is_s(CSimdArray<double>& pbuffer,
 
     auto tg_xxxx_0_s_1_0_0 = pbuffer.data(idx_gs_s_1_0_0);
 
-    auto tg_xxxy_0_s_1_0_0 = pbuffer.data(idx_gs_s_1_0_0 + 1);
 
-    auto tg_xxxz_0_s_1_0_0 = pbuffer.data(idx_gs_s_1_0_0 + 2);
 
     auto tg_xxyy_0_s_1_0_0 = pbuffer.data(idx_gs_s_1_0_0 + 3);
 
-    auto tg_xxyz_0_s_1_0_0 = pbuffer.data(idx_gs_s_1_0_0 + 4);
 
     auto tg_xxzz_0_s_1_0_0 = pbuffer.data(idx_gs_s_1_0_0 + 5);
 
     auto tg_xyyy_0_s_1_0_0 = pbuffer.data(idx_gs_s_1_0_0 + 6);
 
-    auto tg_xyyz_0_s_1_0_0 = pbuffer.data(idx_gs_s_1_0_0 + 7);
 
-    auto tg_xyzz_0_s_1_0_0 = pbuffer.data(idx_gs_s_1_0_0 + 8);
 
     auto tg_xzzz_0_s_1_0_0 = pbuffer.data(idx_gs_s_1_0_0 + 9);
 
     auto tg_yyyy_0_s_1_0_0 = pbuffer.data(idx_gs_s_1_0_0 + 10);
 
-    auto tg_yyyz_0_s_1_0_0 = pbuffer.data(idx_gs_s_1_0_0 + 11);
 
     auto tg_yyzz_0_s_1_0_0 = pbuffer.data(idx_gs_s_1_0_0 + 12);
 
@@ -145,31 +127,25 @@ comp_prim_projected_core_potential_is_s(CSimdArray<double>& pbuffer,
 
     auto tg_xxxxx_0_s_1_0_0 = pbuffer.data(idx_hs_s_1_0_0);
 
-    auto tg_xxxxy_0_s_1_0_0 = pbuffer.data(idx_hs_s_1_0_0 + 1);
 
     auto tg_xxxxz_0_s_1_0_0 = pbuffer.data(idx_hs_s_1_0_0 + 2);
 
     auto tg_xxxyy_0_s_1_0_0 = pbuffer.data(idx_hs_s_1_0_0 + 3);
 
-    auto tg_xxxyz_0_s_1_0_0 = pbuffer.data(idx_hs_s_1_0_0 + 4);
 
     auto tg_xxxzz_0_s_1_0_0 = pbuffer.data(idx_hs_s_1_0_0 + 5);
 
     auto tg_xxyyy_0_s_1_0_0 = pbuffer.data(idx_hs_s_1_0_0 + 6);
 
-    auto tg_xxyyz_0_s_1_0_0 = pbuffer.data(idx_hs_s_1_0_0 + 7);
 
-    auto tg_xxyzz_0_s_1_0_0 = pbuffer.data(idx_hs_s_1_0_0 + 8);
 
     auto tg_xxzzz_0_s_1_0_0 = pbuffer.data(idx_hs_s_1_0_0 + 9);
 
     auto tg_xyyyy_0_s_1_0_0 = pbuffer.data(idx_hs_s_1_0_0 + 10);
 
-    auto tg_xyyyz_0_s_1_0_0 = pbuffer.data(idx_hs_s_1_0_0 + 11);
 
     auto tg_xyyzz_0_s_1_0_0 = pbuffer.data(idx_hs_s_1_0_0 + 12);
 
-    auto tg_xyzzz_0_s_1_0_0 = pbuffer.data(idx_hs_s_1_0_0 + 13);
 
     auto tg_xzzzz_0_s_1_0_0 = pbuffer.data(idx_hs_s_1_0_0 + 14);
 
@@ -317,27 +293,21 @@ comp_prim_projected_core_potential_is_s(CSimdArray<double>& pbuffer,
 
         auto tg_xxxx_0_s_0_0_1 = pbuffer.data(idx_gs_s_0_0_1);
 
-        auto tg_xxxy_0_s_0_0_1 = pbuffer.data(idx_gs_s_0_0_1 + 1);
 
-        auto tg_xxxz_0_s_0_0_1 = pbuffer.data(idx_gs_s_0_0_1 + 2);
 
         auto tg_xxyy_0_s_0_0_1 = pbuffer.data(idx_gs_s_0_0_1 + 3);
 
-        auto tg_xxyz_0_s_0_0_1 = pbuffer.data(idx_gs_s_0_0_1 + 4);
 
         auto tg_xxzz_0_s_0_0_1 = pbuffer.data(idx_gs_s_0_0_1 + 5);
 
         auto tg_xyyy_0_s_0_0_1 = pbuffer.data(idx_gs_s_0_0_1 + 6);
 
-        auto tg_xyyz_0_s_0_0_1 = pbuffer.data(idx_gs_s_0_0_1 + 7);
 
-        auto tg_xyzz_0_s_0_0_1 = pbuffer.data(idx_gs_s_0_0_1 + 8);
 
         auto tg_xzzz_0_s_0_0_1 = pbuffer.data(idx_gs_s_0_0_1 + 9);
 
         auto tg_yyyy_0_s_0_0_1 = pbuffer.data(idx_gs_s_0_0_1 + 10);
 
-        auto tg_yyyz_0_s_0_0_1 = pbuffer.data(idx_gs_s_0_0_1 + 11);
 
         auto tg_yyzz_0_s_0_0_1 = pbuffer.data(idx_gs_s_0_0_1 + 12);
 
@@ -349,31 +319,25 @@ comp_prim_projected_core_potential_is_s(CSimdArray<double>& pbuffer,
 
         auto tg_xxxxx_0_s_0_0_1 = pbuffer.data(idx_hs_s_0_0_1);
 
-        auto tg_xxxxy_0_s_0_0_1 = pbuffer.data(idx_hs_s_0_0_1 + 1);
 
         auto tg_xxxxz_0_s_0_0_1 = pbuffer.data(idx_hs_s_0_0_1 + 2);
 
         auto tg_xxxyy_0_s_0_0_1 = pbuffer.data(idx_hs_s_0_0_1 + 3);
 
-        auto tg_xxxyz_0_s_0_0_1 = pbuffer.data(idx_hs_s_0_0_1 + 4);
 
         auto tg_xxxzz_0_s_0_0_1 = pbuffer.data(idx_hs_s_0_0_1 + 5);
 
         auto tg_xxyyy_0_s_0_0_1 = pbuffer.data(idx_hs_s_0_0_1 + 6);
 
-        auto tg_xxyyz_0_s_0_0_1 = pbuffer.data(idx_hs_s_0_0_1 + 7);
 
-        auto tg_xxyzz_0_s_0_0_1 = pbuffer.data(idx_hs_s_0_0_1 + 8);
 
         auto tg_xxzzz_0_s_0_0_1 = pbuffer.data(idx_hs_s_0_0_1 + 9);
 
         auto tg_xyyyy_0_s_0_0_1 = pbuffer.data(idx_hs_s_0_0_1 + 10);
 
-        auto tg_xyyyz_0_s_0_0_1 = pbuffer.data(idx_hs_s_0_0_1 + 11);
 
         auto tg_xyyzz_0_s_0_0_1 = pbuffer.data(idx_hs_s_0_0_1 + 12);
 
-        auto tg_xyzzz_0_s_0_0_1 = pbuffer.data(idx_hs_s_0_0_1 + 13);
 
         auto tg_xzzzz_0_s_0_0_1 = pbuffer.data(idx_hs_s_0_0_1 + 14);
 

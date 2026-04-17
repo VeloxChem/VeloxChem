@@ -42,7 +42,7 @@ from .oneeints import (compute_electric_dipole_integrals,
                        compute_linear_momentum_integrals,
                        compute_angular_momentum_integrals)
 from .errorhandler import assert_msg_critical
-from .checkpoint import write_rsp_solution
+from .resultsio import write_rsp_solution
 from .spectrumplot import (plot_uv_vis_spectrum, plot_xas_spectrum,
                            plot_ecd_spectrum, plot_xcd_spectrum)
 
@@ -339,13 +339,7 @@ class TdaEigenSolverBase(LinearSolver):
         for key, val in vars(self).items():
             if isinstance(val, (MPI.Intracomm, OutputStream)):
                 continue
-
-            if isinstance(val, XCFunctional):
-                setattr(new_rsp_drv, key, XCFunctional(val))
-            elif isinstance(val, MolecularGrid):
-                setattr(new_rsp_drv, key, MolecularGrid(val))
-            else:
-                setattr(new_rsp_drv, key, deepcopy(val))
+            setattr(new_rsp_drv, key, deepcopy(val))
 
         return new_rsp_drv
 
