@@ -721,7 +721,11 @@ class RespChargesDriver(EspChargesDriver):
             The dipole moment vector in atomic units (e·bohr).
         """
 
-        charges = np.asarray(charges)
+        charges = np.asarray(charges).ravel()
+        if charges.size != molecule.number_of_atoms():
+            raise ValueError(
+                f'Expected {molecule.number_of_atoms()} charges but got '
+                f'{charges.size}.')
         coords = molecule.get_coordinates_in_bohr()
         nuclear_charges = molecule.get_element_ids()
         origin = (np.sum(coords.T * nuclear_charges, axis=1) /
@@ -784,7 +788,7 @@ class RespChargesDriver(EspChargesDriver):
             dipole_moment = self.get_dipole_moment(molecule, charges)
         dipole_moment = np.asarray(dipole_moment)
 
-        # Diverging colormap centered at zero charge
+        # Colormap centered at zero charge (normalization spans [-charge_max, charge_max])
         if charge_max is None:
             charge_max = float(np.max(np.abs(charges)))
             if charge_max < 1e-6:
@@ -798,7 +802,12 @@ class RespChargesDriver(EspChargesDriver):
         norm = mcolors.TwoSlopeNorm(vmin=-charge_max,
                                     vcenter=0.0,
                                     vmax=charge_max)
-        colormap = colormaps[cmap]
+        try:
+            colormap = colormaps[cmap]
+        except KeyError:
+            raise ValueError(
+                f"'{cmap}' is not a valid colormap name. "
+                'See list(matplotlib.colormaps) for available options.')
 
         atom_colors = [
             mcolors.to_hex(colormap(norm(float(q))), keep_alpha=False)
