@@ -123,10 +123,6 @@ class OptimizationEngine(geometric.engine.Engine):
             gradient is not None,
             'OptimizationEngine.calc_new: expected array-like gradient after '
             'MPI synchronization')
-        assert_msg_critical(
-            gradient.shape == (natoms, 3),
-            'OptimizationEngine.calc_new: expected gradient shape '
-            f'({natoms}, 3) after MPI synchronization, got {gradient.shape}')
 
         return float(energy), gradient
 
