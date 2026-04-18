@@ -171,6 +171,7 @@ from .rsptpa import TPA
 from .rspthg import THG
 from .rspthgred import ThgReduced
 from .rixsdriver import RixsDriver
+from .xpsdriver import XPSDriver
 from .localizationdriver import LocalizationDriver
 from .mpitask import MpiTask
 from .subcommunicators import SubCommunicators
