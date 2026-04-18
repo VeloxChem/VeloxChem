@@ -119,6 +119,25 @@ class XPSDriver:
             if key in xps_keywords:
                 setattr(self, key, xps_dict[key])
 
+    @staticmethod
+    def _get_xcfun_label(xcfun):
+        """
+        Get the label of a xcfun object.
+
+        :param xcfun:
+            The xcfun object.
+        :return:
+            The xcfun label.
+        """
+
+        if xcfun is None:
+            return 'HF'
+
+        if isinstance(xcfun, str):
+            return xcfun
+
+        return xcfun.get_func_label()
+
     def _detect_method_type(self, xcfun):
         """
         Detects whether the calculation is HF or DFT based on xcfun.
@@ -130,20 +149,15 @@ class XPSDriver:
             'hf' for Hartree-Fock, 'dft' for DFT methods.
         """
 
-        if xcfun is None:
-            return 'hf'
-
-        xcfun_lower = str(xcfun).lower()
-
         # HF-like functionals (no correlation or exchange-only)
-        hf_keywords = ['hf', 'hartree-fock', 'hartree_fock', 'slater']
+        hf_like_funcs = ['hf', 'slater']
 
-        for keyword in hf_keywords:
-            if keyword in xcfun_lower:
-                return 'hf'
+        xcfun_label = self._get_xcfun_label(xcfun)
 
-        # Everything else is DFT
-        return 'dft'
+        if xcfun_label.lower() in hf_like_funcs:
+            return 'hf'
+        else:
+            return 'dft'
 
     def _get_energy_ranges(self, method_type):
         """
@@ -158,10 +172,7 @@ class XPSDriver:
 
         if method_type == 'hf':
             return self.energy_ranges_hf
-        elif method_type == 'dft':
-            return self.energy_ranges_dft
         else:
-            # Fallback to DFT ranges (broader and safer)
             return self.energy_ranges_dft
 
     def _get_ao_to_atom_mapping(self, molecule, basis):
@@ -223,11 +234,7 @@ class XPSDriver:
         """
 
         # Get MO coefficients for this orbital
-        if isinstance(mo_coefficients, np.ndarray):
-            mo_coeff = mo_coefficients[:, mo_index]
-        else:
-            # Handle DenseMatrix type
-            mo_coeff = mo_coefficients.to_numpy()[:, mo_index]
+        mo_coeff = mo_coefficients[:, mo_index]
 
         # Get atom labels
         atom_labels = molecule.get_labels()
@@ -258,7 +265,7 @@ class XPSDriver:
 
         return assigned_atom, max_contrib
 
-    def _find_core_orbital_indices(self, molecule, basis, scf_results, element_symbol, method_type='dft'):
+    def _find_core_orbital_indices(self, molecule, basis, scf_results, element_symbol, method_type):
         """
         Finds the indices of core orbitals for a given element and assigns them to specific atoms.
 
@@ -299,13 +306,11 @@ class XPSDriver:
 
         # Count atoms of this element in the molecule
         elem_labels = molecule.get_labels()
-        expected_count = sum(1 for label in elem_labels if label == element_symbol)
+        expected_count = elem_labels.count(element_symbol)
 
-        if expected_count == 0:
-            if self.rank == mpi_master():
-                self.ostream.print_info(
-                    f'Warning: No {element_symbol} atoms found in molecule.')
-            return []
+        assert_msg_critical(
+            expected_count > 0,
+            'XpsDriver: No {element_symbol} atoms found in molecule.')
 
         # Start with method-specific energy range
         emin, emax = energy_ranges[element_symbol]
@@ -329,7 +334,7 @@ class XPSDriver:
             ]
 
             if len(indices) == expected_count:
-                if expansion > 0 and self.rank == mpi_master():
+                if expansion > 0:
                     self.ostream.print_info(
                         f'Found {len(indices)} core orbital(s) for {element_symbol} '
                         f'with expanded range [{emin_expanded:.3f}, {emax_expanded:.3f}] Ha')
@@ -352,14 +357,11 @@ class XPSDriver:
                 f'for {element_symbol}. Consider adjusting energy_ranges.')
 
         # Get MO coefficients for atom assignment
-        if 'C_alpha' in scf_results:
-            mo_coefficients = scf_results['C_alpha']
-        elif 'orbital_coefficients_alpha' in scf_results:
-            mo_coefficients = scf_results['orbital_coefficients_alpha']
-        else:
-            assert_msg_critical(
-                False,
-                f'XPSDriver._find_core_orbital_indices: Cannot find MO coefficients in scf_results')
+        assert_msg_critical(
+            'C_alpha' in scf_results,
+            f'XPSDriver._find_core_orbital_indices: Cannot find MO coefficients in scf_results')
+
+        mo_coefficients = scf_results['C_alpha']
 
         # Assign each core orbital to an atom
         assignments = []
@@ -396,22 +398,25 @@ class XPSDriver:
             assert_msg_critical(
                 False,
                 'XPSDriver.compute: Specify either element or elements, not both.')
-        
-        if element is not None:
-            elements_list = [element]
-        elif elements is not None:
-            if isinstance(elements, str):
-                elements_list = [elements]
-            else:
-                elements_list = list(elements)
-        else:
+
+        if element is None and elements is None:
             assert_msg_critical(
                 False,
                 'XPSDriver.compute: Must specify either element or elements parameter.')
+        
+        if element is not None:
+            assert_msg_critical(
+                isinstance(element, str),
+                'XPSDriver.compute: Invalid element input.')
+            elements_list = [element]
+        elif elements is not None:
+            assert_msg_critical(
+                isinstance(elements, (list, tuple)),
+                'XPSDriver.compute: Invalid elements input.')
+            elements_list = list(elements)
 
         # Detect method type (HF or DFT)
-        xcfun = scf_driver.xcfun
-        method_type = self._detect_method_type(xcfun)
+        method_type = self._detect_method_type(scf_driver.xcfun)
 
         energy_ranges = self._get_energy_ranges(method_type)
 
@@ -431,13 +436,14 @@ class XPSDriver:
             # TODO: this could be moved to a self.print_header?
             self.ostream.print_blank()
             self.ostream.print_header('XPS Driver')
-            self.ostream.print_header('=' * 80)
+            self.ostream.print_header('=' * 12)
             self.ostream.print_blank()
             elem_str = ', '.join(elements_list)
             self.ostream.print_info(f'Computing core ionization energies for element(s): {elem_str}')
             self.ostream.print_info(f'Method type: {method_type.upper()}')
-            xcfun_str = xcfun if xcfun else 'HF (Hartree-Fock)'
-            self.ostream.print_info(f'XC functional: {xcfun_str}')
+            xcfun_label = self._get_xcfun_label(scf_driver.xcfun)
+            if xcfun_label.lower() != 'hf':
+                self.ostream.print_info(f'XC functional: {xcfun_label}')
             self.ostream.print_info(f'Using {method_type.upper()} energy ranges for core orbital identification')
             self.ostream.print_blank()
             self.ostream.flush()
@@ -551,8 +557,7 @@ class XPSDriver:
 
         if self.rank == mpi_master():
             self.ostream.print_blank()
-            self.ostream.print_header('XPS Calculation Completed')
-            self.ostream.print_header('=' * 80)
+            self.ostream.print_header('*** XPS Calculation Completed.'.ljust(92))
             self.ostream.print_blank()
             self.ostream.flush()
 
