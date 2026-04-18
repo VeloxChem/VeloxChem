@@ -68,7 +68,7 @@ class TestLR:
 
         with pytest.raises(
                 AssertionError,
-                match="Molecule: Invalid multiplicity for restricted"):
+                match="LinearResponseSolver: not implemented for unrestricted case"):
             lr_results_not_used = lr_drv.compute(mol, bas, scf_results)
 
     def test_hf(self):

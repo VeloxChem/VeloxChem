@@ -35,14 +35,12 @@ import time as tm
 import sys
 
 from .veloxchemlib import bohr_in_angstrom
-from .molecule import Molecule
-from .molecularbasis import MolecularBasis
 from .outputstream import OutputStream
 from .visualizationdriver import VisualizationDriver
 from .lreigensolver import LinearResponseEigenSolver
 from .densityviewer import DensityViewer
 from .errorhandler import assert_msg_critical
-from .checkpoint import read_results
+from .resultsio import read_results, read_results_old
 
 
 class ExcitedStateAnalysisDriver:
@@ -179,9 +177,15 @@ class ExcitedStateAnalysisDriver:
             A tuple containing the scf and rsp dictionaries.
         """
 
-        scf_results = read_results(filename, "scf")
-        rsp_results = read_results(filename, "rsp")
+        try:
+            scf_results = read_results(filename, 'scf')
+            rsp_results = read_results(filename, 'rsp')
+        # For backward-compatibility with old vlx checkpoint files
+        except AssertionError:
+            scf_results = read_results_old(filename, 'scf')
+            rsp_results = read_results_old(filename, 'rsp')
 
+        # Decode strings
         for key in scf_results:
             if isinstance(scf_results[key], bytes):
                 scf_results[key] = scf_results[key].decode("utf-8")
@@ -217,26 +221,6 @@ class ExcitedStateAnalysisDriver:
         rsp_results['formatted'] = True
 
         return rsp_results
-
-    def create_molecule_and_basis(self, scf_results):
-        """
-        Creates molecule and basis objects from scf dictionary.
-
-        :param scf_results:
-            The dictionary containing the scf results dictionary.
-
-        :return:
-            A tuple containing the Molecule and Basis objects.
-        """
-
-        coordinates = scf_results['atom_coordinates']
-        nuclear_charges = np.array(scf_results['nuclear_charges'])
-        nuclear_charges = nuclear_charges.astype(int)
-        basis_set_label = scf_results['basis_set']
-        molecule = Molecule(nuclear_charges, coordinates, units="au")
-        basis = MolecularBasis.read(molecule, basis_set_label)
-
-        return molecule, basis
 
     def compute_density_matrices(self,
                                  molecule,

@@ -1,3 +1,4 @@
+from pathlib import Path
 import numpy as np
 
 from veloxchem.molecule import Molecule
@@ -6,6 +7,7 @@ from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.tdaeigensolver import TdaEigenSolver
 from veloxchem.lreigensolver import LinearResponseEigenSolver
 from veloxchem.excitedstateanalysisdriver import ExcitedStateAnalysisDriver
+from veloxchem.resultsio import read_molecule_and_basis
 
 
 class TestCTNumbers:
@@ -162,6 +164,183 @@ class TestCTNumbers:
 
         descriptor_dict_s1 = exc_drv.compute(molecule, basis, scf_results,
                                              lreig_results, 1)
+
+        assert np.max(np.abs(descriptor_dict_s1["ct_matrix"] -
+                             ct_matrix)) < 1.0e-06
+        assert np.max(
+            np.abs(descriptor_dict_s1["hole_participation_ratio"] -
+                   hole_participation_ratio)) < 1.0e-06
+        assert np.max(
+            np.abs(descriptor_dict_s1["particle_participation_ratio"] -
+                   particle_participation_ratio)) < 1.0e-06
+        assert np.max(
+            np.abs(descriptor_dict_s1["avg_participation_ratio"] -
+                   avg_participation_ratio)) < 1.0e-06
+        assert np.max(
+            np.abs(descriptor_dict_s1["avg_hole_position"] -
+                   avg_hole_position)) < 1.0e-06
+        assert np.max(
+            np.abs(descriptor_dict_s1["avg_particle_position"] -
+                   avg_particle_position)) < 1.0e-06
+        assert np.max(
+            np.abs(descriptor_dict_s1["avg_difference_vector"] -
+                   avg_difference_vec)) < 1.0e-06
+        assert np.max(np.abs(descriptor_dict_s1["ct_length"] -
+                             ct_length)) < 1.0e-06
+
+    def test_core_excited_rpa(self):
+        molecule_xyz = """8
+
+        C   -0.158859000000   1.034900000000    1.205196000000
+        C   -1.156627000000  -0.031075000000    1.507521000000
+        O   -2.065612000000   0.179139000000    2.354094000000
+        O   -1.110771000000  -1.239690000000    0.820160000000
+        H    0.760665000000   0.583534000000    0.777146000000
+        H    0.108925000000   1.580853000000    2.134378000000
+        H   -0.589966000000   1.747965000000    0.472205000000
+        H   -1.791528000000  -1.967324000000    1.002895000000
+        """
+        # reference hole and particle positions
+        avg_hole_position = np.array([-2.06430183, 0.17889688, 2.35290839])
+        avg_particle_position = np.array([-1.45474337, 0.02338098, 1.75900387])
+        avg_difference_vec = np.array([0.60955845, -0.1555159, -0.59390452])
+
+        # Molecule and basis
+        molecule = Molecule.from_xyz_string(molecule_xyz)
+        fragment_dict = {
+            "CH3": [1, 5, 6, 7],
+            "COOH": [2, 3, 4, 8],
+        }
+        basis = MolecularBasis.read(molecule, "def2-svp", ostream=None)
+
+        # SCF settings and calculation
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_results = scf_drv.compute(molecule, basis)
+
+        # Solve the TDDFT linear response equation for the first 2 excited states
+        lreig_drv = LinearResponseEigenSolver()
+        lreig_drv.ostream.mute()
+        lreig_drv.core_excitation = True
+        # Core-excited states, O 1s
+        lreig_drv.num_core_orbitals = 2
+        lreig_drv.nstates = 2
+        lreig_results = lreig_drv.compute(molecule, basis, scf_results)
+
+        exc_drv = ExcitedStateAnalysisDriver()
+        exc_drv.fragment_dict = fragment_dict
+
+        descriptor_dict_s1 = exc_drv.compute(
+            molecule=molecule,
+            basis=basis,
+            scf_results=scf_results,
+            rsp_results=lreig_results,
+            state_index=1,
+            num_core_orbitals=lreig_drv.num_core_orbitals)
+        assert np.max(
+            np.abs(descriptor_dict_s1["avg_hole_position"] -
+                   avg_hole_position)) < 1.0e-06
+        assert np.max(
+            np.abs(descriptor_dict_s1["avg_particle_position"] -
+                   avg_particle_position)) < 1.0e-06
+        assert np.max(
+            np.abs(descriptor_dict_s1["avg_difference_vector"] -
+                   avg_difference_vec)) < 1.0e-06
+
+    def test_core_excited_tda(self):
+        molecule_xyz = """8
+
+        C   -0.158859000000   1.034900000000    1.205196000000
+        C   -1.156627000000  -0.031075000000    1.507521000000
+        O   -2.065612000000   0.179139000000    2.354094000000
+        O   -1.110771000000  -1.239690000000    0.820160000000
+        H    0.760665000000   0.583534000000    0.777146000000
+        H    0.108925000000   1.580853000000    2.134378000000
+        H   -0.589966000000   1.747965000000    0.472205000000
+        H   -1.791528000000  -1.967324000000    1.002895000000
+        """
+        # reference hole and particle positions
+        avg_hole_position = np.array([-2.06430185, 0.17889688, 2.35290842])
+        avg_particle_position = np.array([-1.45471821, 0.02337554, 1.7589794])
+        avg_difference_vec = np.array([0.60958364, -0.15552134, -0.59392902])
+
+        # Molecule and basis
+        molecule = Molecule.from_xyz_string(molecule_xyz)
+        fragment_dict = {
+            "CH3": [1, 5, 6, 7],
+            "COOH": [2, 3, 4, 8],
+        }
+        basis = MolecularBasis.read(molecule, "def2-svp", ostream=None)
+
+        # SCF settings and calculation
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_results = scf_drv.compute(molecule, basis)
+
+        # Solve the TDDFT linear response equation for the first 2 excited states
+        tda_drv = TdaEigenSolver()
+        tda_drv.ostream.mute()
+        tda_drv.core_excitation = True
+        # Core-excited states, O 1s
+        tda_drv.num_core_orbitals = 2
+        tda_drv.nstates = 2
+        tda_results = tda_drv.compute(molecule, basis, scf_results)
+
+        exc_drv = ExcitedStateAnalysisDriver()
+        exc_drv.fragment_dict = fragment_dict
+
+        descriptor_dict_s1 = exc_drv.compute(
+            molecule=molecule,
+            basis=basis,
+            scf_results=scf_results,
+            rsp_results=tda_results,
+            state_index=1,
+            num_core_orbitals=tda_drv.num_core_orbitals)
+        assert np.max(
+            np.abs(descriptor_dict_s1["avg_hole_position"] -
+                   avg_hole_position)) < 1.0e-06
+        assert np.max(
+            np.abs(descriptor_dict_s1["avg_particle_position"] -
+                   avg_particle_position)) < 1.0e-06
+        assert np.max(
+            np.abs(descriptor_dict_s1["avg_difference_vector"] -
+                   avg_difference_vec)) < 1.0e-06
+
+    def test_analysis_from_file(self):
+        here = Path(__file__).parent
+        filename = str(here / 'data' / 'acetic_acid.h5')
+        fragment_dict = {
+            "CH3": [1, 5, 6, 7],
+            "COOH": [2, 3, 4, 8],
+        }
+
+        # reference values
+        ct_matrix = np.array([
+            [0.00806936, 0.05671282],
+            [0.12028262, 0.8164166],
+        ])
+        hole_participation_ratio = 1.1376616910096484
+        particle_participation_ratio = 1.2877855259522788
+        avg_participation_ratio = 1.2127236084809636
+        avg_hole_position = np.array([-1.77749224, 0.04863906, 2.05871356])
+        avg_particle_position = np.array([-1.28883208, 0.11053515, 1.59960834])
+        avg_difference_vec = np.array([0.48866016, 0.06189609, -0.45910522])
+        ct_length = 0.6733479630377631
+
+        # perform analysis using scf and linear response from h5
+        exc_drv = ExcitedStateAnalysisDriver()
+        exc_drv.ostream.mute()
+
+        exc_drv.fragment_dict = fragment_dict
+
+        molecule, basis = read_molecule_and_basis(filename)
+        scf_res, rsp_res = exc_drv.read_from_h5(filename)
+
+        descriptor_dict_s1 = exc_drv.compute(molecule,
+                                             basis,
+                                             scf_res,
+                                             rsp_res,
+                                             state_index=1)
 
         assert np.max(np.abs(descriptor_dict_s1["ct_matrix"] -
                              ct_matrix)) < 1.0e-06

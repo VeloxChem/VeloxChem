@@ -29,7 +29,8 @@ class TestOrbitalViewer:
 
         if scf_drv.rank == mpi_master():
             mo_coefs = scf_drv.molecular_orbitals.alpha_to_numpy()
-            homo = task.molecule.number_of_alpha_electrons() - 1
+            homo = (task.molecule.number_of_alpha_occupied_orbitals(
+                task.ao_basis) - 1)
 
             orb_viewer = OrbitalViewer()
             orb_viewer.initialize(task.molecule, task.ao_basis)
@@ -66,7 +67,7 @@ class TestOrbitalViewer:
         orbviewer = OrbitalViewer()
         orbviewer.interpolate = True
         orbviewer.initialize(mol, bas)
-        orbviewer._i_orb = mol.number_of_alpha_electrons() - 1
+        orbviewer._i_orb = mol.number_of_alpha_occupied_orbitals(bas) - 1
         orbviewer._mo_coefs = mol_orbs.alpha_to_numpy()
         orbital = orbviewer.compute_orbital(orbviewer._mo_coefs,
                                             orbviewer._i_orb)

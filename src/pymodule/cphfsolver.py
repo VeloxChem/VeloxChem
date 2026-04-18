@@ -126,10 +126,9 @@ class CphfSolver(LinearSolver):
             of the CPHF equations.
         """
 
-        # TODO: enable ECP
         assert_msg_critical(
             not basis.has_ecp(),
-            f'{type(self).__name__}.compute: ECP is not yet supported')
+            f'{type(self).__name__}.compute_solution_vectors: ECP is not supported')
 
         if self.norm_thresh is None:
             self.norm_thresh = self.conv_thresh * 1.0e-6
@@ -140,7 +139,7 @@ class CphfSolver(LinearSolver):
 
         # check molecule
         # this special method is only implemented for restricted case
-        molecule_sanity_check(molecule, 'restricted')
+        molecule_sanity_check(molecule, 'restricted', type(self).__name__)
 
         # check SCF results
         scf_results_sanity_check(self, scf_results)

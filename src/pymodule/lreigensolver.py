@@ -48,9 +48,9 @@ from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            solvation_model_sanity_check)
 from .errorhandler import assert_msg_critical
 from .mathutils import screened_eigh, symmetric_matrix_function
-from .checkpoint import (check_rsp_hdf5, write_rsp_solution,
-                         write_lr_rsp_results_to_hdf5,
-                         write_detach_attach_to_hdf5)
+from .checkpoint import check_rsp_hdf5
+from .resultsio import (write_lr_rsp_results_to_hdf5,
+                        write_detach_attach_to_hdf5, write_rsp_solution)
 
 
 class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
@@ -132,7 +132,7 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
         self._dist_fock_ung = None
 
         # check molecule
-        molecule_sanity_check(molecule, 'restricted')
+        molecule_sanity_check(molecule, 'restricted', type(self).__name__)
 
         # check SCF results
         scf_results_sanity_check(self, scf_results)
@@ -815,8 +815,17 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
                             final_h5_fname)
                         self.ostream.print_blank()
 
-                        # Write the response results to the final checkpoint file
-                        write_lr_rsp_results_to_hdf5(final_h5_fname, ret_dict)
+                        # Keep the legacy rsp HDF5 layout for compatibility.
+                        # Solution vectors are written separately as S1/S2/...
+                        # datasets, so the distributed in-memory vectors do not
+                        # belong in this HDF5-facing payload.
+                        h5_ret_dict = {
+                            key: value
+                            for key, value in ret_dict.items()
+                            if key != 'eigenvectors_distributed'
+                        }
+                        write_lr_rsp_results_to_hdf5(final_h5_fname,
+                                                     h5_ret_dict)
 
                     self._print_results(ret_dict)
 
@@ -1094,12 +1103,7 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
         self._dist_e2bger = None
         self._dist_e2bung = None
 
-        # sanity check
-        nalpha = molecule.number_of_alpha_electrons()
-        nbeta = molecule.number_of_beta_electrons()
-        assert_msg_critical(
-            nalpha == nbeta,
-            f'{type(self).__name__}: not implemented for unrestricted case')
+        molecule_sanity_check(molecule, 'restricted', type(self).__name__)
 
         if self.rank == mpi_master():
             orb_ene = scf_results['E_alpha']

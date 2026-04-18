@@ -80,6 +80,7 @@ class SymmetryAnalyzer:
         self._primary_axis = [1., 0., 0.]
         self._secondary_axis = [0., 1., 0.]
         self._molecule_type = ''
+        self._atom_basis_labels = None
 
         # Define tolerance parameters
         self._tolerance_params = {
@@ -210,6 +211,7 @@ class SymmetryAnalyzer:
         # in Molecule module
         coordinates = molecule.get_coordinates_in_bohr()
         self._symbols = molecule.get_labels()
+        self._atom_basis_labels = molecule.get_atom_basis_labels()
         self._natoms = molecule.number_of_atoms()
         center_of_mass = molecule.center_of_mass_in_bohr()
         self._centered_coords = coordinates - center_of_mass
@@ -608,7 +610,8 @@ class SymmetryAnalyzer:
         if point_group is None:
             point_group = symmetry_data['point_group']
 
-        centered_mol = Molecule(self._symbols, self._centered_coords, 'au')
+        centered_mol = Molecule(self._symbols, self._centered_coords, 'au',
+                                self._atom_basis_labels)
 
         if self._natoms == 1:
             return centered_mol
@@ -1557,7 +1560,8 @@ class SymmetryAnalyzer:
             List of points.
         """
 
-        centered_mol = Molecule(self._symbols, self._centered_coords, 'au')
+        centered_mol = Molecule(self._symbols, self._centered_coords, 'au',
+                                self._atom_basis_labels)
         connectivity_matrix = centered_mol.get_connectivity_matrix()
         Ivals, Ivecs = centered_mol.moments_of_inertia(principal_axes=True)
 

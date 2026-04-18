@@ -124,40 +124,6 @@ class ValetAnalyzer:
         self._subgroups = subgroups
         print(f"Subgroups updated: {[name for name, _ in subgroups]}")
 
-    @staticmethod
-    def _extract_molecule_from_scf(scf_results):
-        """
-        Extracts molecule from SCF results.
-        
-        :param scf_results:
-            The dictionary of results from converged SCF wavefunction.
-            
-        :return:
-            The Molecule object.
-        """
-        coordinates = scf_results['atom_coordinates']
-        nuclear_charges = np.array(scf_results['nuclear_charges'])
-        nuclear_charges = nuclear_charges.astype(int)
-        molecule = Molecule(nuclear_charges, coordinates, units="au")
-        return molecule
-
-    @staticmethod
-    def _extract_basis_from_scf(scf_results, molecule):
-        """
-        Extracts basis from SCF results.
-        
-        :param scf_results:
-            The dictionary of results from converged SCF wavefunction.
-        :param molecule:
-            The Molecule object.
-            
-        :return:
-            The MolecularBasis object.
-        """
-        basis_set_label = scf_results['basis_set'][0].decode("utf-8")
-        basis = MolecularBasis.read(molecule, basis_set_label)
-        return basis
-
     def compute_detach_attach_densities(self, scf_results, rsp_results, state_index=1):
         """
         Computes NTO attachment and detachment densities for a given excited state.

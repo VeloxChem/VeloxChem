@@ -139,7 +139,7 @@ class ThreePATransitionDriver(NonlinearSolver):
             self.lindep_thresh = self.conv_thresh * 1.0e-6
 
         # check molecule
-        molecule_sanity_check(molecule)
+        molecule_sanity_check(molecule, 'restricted', type(self).__name__)
 
         # check SCF results
         scf_results_sanity_check(self, scf_results)
@@ -165,13 +165,6 @@ class ThreePATransitionDriver(NonlinearSolver):
             self.print_header()
 
         start_time = time.time()
-
-        # sanity check
-        nalpha = molecule.number_of_alpha_electrons()
-        nbeta = molecule.number_of_beta_electrons()
-        assert_msg_critical(
-            nalpha == nbeta,
-            'TpaTransitionDriver: not implemented for unrestricted case')
 
         if self.rank == mpi_master():
             S = scf_results['S']
@@ -366,7 +359,7 @@ class ThreePATransitionDriver(NonlinearSolver):
         F0 = self.comm.bcast(F0, root=mpi_master())
         norb = self.comm.bcast(norb, root=mpi_master())
 
-        nocc = molecule.number_of_alpha_electrons()
+        nocc = molecule.number_of_alpha_occupied_orbitals(ao_basis)
 
         eri_dict = self._init_eri(molecule, ao_basis)
 

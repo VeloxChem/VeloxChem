@@ -10,6 +10,32 @@ from veloxchem.symmetryoperations import ImproperRotation, Rotation
 
 class TestPointGroup:
 
+    def gen_ammonia_with_ghost_nitrogen(self):
+
+        nh3_bq_str = """
+        Bq_N   -3.710    3.019   -0.037
+        H      -3.702    4.942    0.059
+        H      -4.704    2.415    1.497
+        H      -4.780    2.569   -1.573
+        """
+
+        mol = Molecule.read_molecule_string(nh3_bq_str.strip(), units='bohr')
+        mol.set_multiplicity(2)
+        return mol
+
+    def gen_ammonia_with_ghost_nitrogen_mixed_basis(self):
+
+        nh3_bq_str = """
+        N_Bq   -3.710    3.019   -0.037
+        H      -3.702    4.942    0.059  def2-svpd
+        H      -4.704    2.415    1.497
+        H      -4.780    2.569   -1.573
+        """
+
+        mol = Molecule.read_molecule_string(nh3_bq_str.strip(), units='bohr')
+        mol.set_multiplicity(2)
+        return mol
+
     def rotation_matrix(self):
 
         return np.array([[0.53667456, -0.38518553, -0.75074131],
@@ -363,6 +389,52 @@ class TestPointGroup:
         sym_res_after = SymmetryAnalyzer().identify_pointgroup(
             sym_mol, tolerance='very tight')
         assert sym_res_after['point_group'] == 'D6h'
+
+    def test_symmetrize_pointgroup_preserves_ghost_atom_info(self):
+
+        mol = self.gen_ammonia_with_ghost_nitrogen()
+
+        sym_analyzer = SymmetryAnalyzer()
+        sym_res = sym_analyzer.identify_pointgroup(mol)
+        assert sym_res['point_group'] == 'C3v'
+
+        sym_mol = sym_analyzer.symmetrize_pointgroup(sym_res)
+
+        assert sym_mol.number_of_atoms() == mol.number_of_atoms()
+        assert sym_mol.get_labels() == mol.get_labels()
+        assert sym_mol.get_identifiers() == mol.get_identifiers()
+        assert sym_mol.get_atom_basis_labels() == mol.get_atom_basis_labels()
+        assert 'Bq_N' in sym_mol.get_xyz_string()
+        assert sym_mol.get_xyz_string().count('\nH') == 3
+        np.testing.assert_allclose(sym_mol.center_of_mass_in_bohr(),
+                                   np.zeros(3),
+                                   atol=1.0e-12)
+
+    def test_symmetrize_pointgroup_preserves_mixed_basis_labels(self):
+
+        mol = self.gen_ammonia_with_ghost_nitrogen_mixed_basis()
+
+        sym_analyzer = SymmetryAnalyzer()
+        sym_res = sym_analyzer.identify_pointgroup(mol)
+        assert sym_res['point_group'] == 'C3v'
+
+        sym_mol = sym_analyzer.symmetrize_pointgroup(sym_res)
+
+        assert sym_mol.number_of_atoms() == mol.number_of_atoms()
+        assert sym_mol.get_labels() == mol.get_labels()
+        assert sym_mol.get_identifiers() == mol.get_identifiers()
+        assert sym_mol.get_atom_basis_labels() == [
+            ('', 'N'),
+            ('DEF2-SVPD', 'H'),
+            ('', 'H'),
+            ('', 'H'),
+        ]
+        assert sym_mol.get_atom_basis_labels() == mol.get_atom_basis_labels()
+        assert 'Bq_N' in sym_mol.get_xyz_string()
+        assert sym_mol.get_xyz_string().count('\nH') == 3
+        np.testing.assert_allclose(sym_mol.center_of_mass_in_bohr(),
+                                   np.zeros(3),
+                                   atol=1.0e-12)
 
     def test_c7h_expected_symmetry_elements(self):
 

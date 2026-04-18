@@ -30,63 +30,40 @@
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-from os import environ, cpu_count
-from pathlib import Path
+from .rspproperty import ResponseProperty
 
 
-def get_basis_path():
+class ThgReduced(ResponseProperty):
     """
-    Returns location of basis files within module.
+    Implements the two-photon absorption property.
 
-    :return:
-        The location of basis files within module.
-    """
-
-    return Path(__file__).parent / "basis"
-
-
-def set_vlxbasispath():
-    """
-    Sets location of basis files.
+    :param rsp_dict:
+        The dictionary of response input.
+    :param method_dict:
+        The dictionary of method settings.
     """
 
-    if 'VLXBASISPATH' not in environ:
-        environ['VLXBASISPATH'] = str(get_basis_path())
+    def __init__(self, rsp_dict=None, method_dict=None):
+        """
+        Initializes the THG reduced property.
+        """
 
+        if rsp_dict is None:
+            rsp_dict = {}
+        else:
+            rsp_dict = dict(rsp_dict)
 
-def get_data_path():
-    """
-    Returns location of data files within module.
+        if method_dict is None:
+            method_dict = {}
+        else:
+            method_dict = dict(method_dict)
 
-    :return:
-        The location of data files within module.
-    """
+        rsp_dict['property'] = 'thgred'
+        rsp_dict['order'] = 'cubic'
+        rsp_dict['residue'] = 'none'
+        rsp_dict['is_complex'] = 'yes'
 
-    return Path(__file__).parent / "database"
+        if 'frequencies' not in rsp_dict:
+            rsp_dict['frequencies'] = '0'
 
-
-def set_vlxdatapath():
-    """
-    Sets location of data files.
-    """
-
-    if 'VLXDATAPATH' not in environ:
-        environ['VLXDATAPATH'] = str(get_data_path())
-
-
-def set_omp_num_threads(ncores=None):
-    """
-    Sets number of OpenMP threads.
-
-    :param ncores:
-        The number of cores available for OpenMP threads.
-    """
-
-    if ncores is not None:
-        environ['OMP_NUM_THREADS'] = str(ncores)
-    else:
-        if 'OMP_NUM_THREADS' not in environ:
-            ncores = cpu_count()
-            if ncores is None:
-                ncores = 1
-            environ['OMP_NUM_THREADS'] = str(ncores)
+        super().__init__(rsp_dict, method_dict)

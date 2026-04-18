@@ -45,7 +45,7 @@ from .oneeints import compute_electric_dipole_integrals
 from .veloxchemlib import OverlapDriver, KineticEnergyDriver
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import XCIntegrator
-from .veloxchemlib import ECPDriver
+from .veloxchemlib import EcpDriver
 from .veloxchemlib import mpi_master
 from .veloxchemlib import bohr_in_angstrom, hartree_in_kjpermol
 from .veloxchemlib import xcfun as xcfun_enum
@@ -74,8 +74,8 @@ from .sanitychecks import (molecule_sanity_check, dft_sanity_check,
                            solvation_model_sanity_check)
 from .errorhandler import assert_msg_critical
 from .mathutils import screened_eigh
-from .checkpoint import (create_hdf5, write_scf_results_to_hdf5,
-                         write_cpcm_charges, read_cpcm_charges)
+from .checkpoint import write_cpcm_charges, read_cpcm_charges
+from .resultsio import create_hdf5, write_scf_results_to_hdf5
 
 
 class ScfDriver:
@@ -1692,7 +1692,7 @@ class ScfDriver:
                                                      verbose=False)
 
         if ao_basis.has_ecp():
-            ecp_drv = ECPDriver()
+            ecp_drv = EcpDriver()
             core_electrons = ao_basis.get_number_of_ecp_core_electrons()
             ecp_atom_inds = [
                 idx for idx, nelec in enumerate(core_electrons) if nelec > 0
@@ -1971,6 +1971,7 @@ class ScfDriver:
                     'scf_energy': self.scf_energy,
                     'restart': self.restart,
                     'filename': self.filename,
+                    'scf_history': self.history,
                     # scf tensors
                     'S': S,
                     'C_alpha': C_alpha,
@@ -3538,8 +3539,7 @@ class ScfDriver:
             potfile_text = ''
 
         create_hdf5(final_h5_fname, molecule, ao_basis, xc_label, potfile_text)
-        write_scf_results_to_hdf5(final_h5_fname, self.scf_results,
-                                  self.history)
+        write_scf_results_to_hdf5(final_h5_fname, self.scf_results)
 
         self.ostream.print_blank()
         self.ostream.print_info('SCF results written to file: ' +

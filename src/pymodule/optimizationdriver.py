@@ -39,9 +39,8 @@ import numpy as np
 import time as tm
 import tempfile
 import math
-import h5py
 
-from .veloxchemlib import mpi_master, hartree_in_kjpermol
+from .veloxchemlib import mpi_master, hartree_in_kjpermol, bohr_in_angstrom
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 from .outputstream import OutputStream
@@ -62,8 +61,8 @@ from .mmgradientdriver import MMGradientDriver
 from .inputparser import (parse_input, print_keywords,
                           get_random_string_parallel, unparse_input,
                           read_unparsed_input_from_hdf5)
-from .checkpoint import read_molecule_and_basis
 from .errorhandler import assert_msg_critical
+from .resultsio import read_molecule_and_basis, write_opt_results_to_hdf5
 
 with redirect_stderr(StringIO()) as fg_err:
     import geometric
@@ -400,6 +399,7 @@ class OptimizationDriver:
             constr_filename = None
 
         optinp_filename = Path(filename + '.optinp').as_posix()
+        basis = args[0] if args and isinstance(args[0], MolecularBasis) else None
 
         # prepare for post-opt Hessian
 
@@ -523,27 +523,28 @@ class OptimizationDriver:
                     opt_results['scan_energies'] = [
                         opt_energies[-1] for opt_energies in all_energies
                     ]
+                    opt_results['scan_coordinates_au'] = np.array(
+                        [opt_coords_au[-1] for opt_coords_au in all_coords_au])
 
-                    opt_results['scan_geometries'] = []
-                    labels = molecule.get_labels()
-                    for opt_coords_au in all_coords_au:
-                        mol = Molecule(labels, opt_coords_au[-1], 'au',
-                                       atom_basis_labels)
-                        opt_results['scan_geometries'].append(
-                            mol.get_xyz_string())
+                    opt_results['scan_geometries'] = [
+                        self._get_xyz_string(labels, opt_coords_au[-1])
+                        for opt_coords_au in all_coords_au
+                    ]
 
                 else:
                     self.print_opt_result(m)
 
                     opt_results['opt_energies'] = list(m.qm_energies)
 
-                    opt_results['opt_geometries'] = []
-                    labels = molecule.get_labels()
-                    for xyz in m.xyzs:
-                        mol = Molecule(labels, xyz / geometric.nifty.bohr2ang,
-                                       'au', atom_basis_labels)
-                        opt_results['opt_geometries'].append(
-                            mol.get_xyz_string())
+                    opt_coordinates_au = [
+                        xyz / geometric.nifty.bohr2ang for xyz in m.xyzs
+                    ]
+                    opt_results['opt_geometries'] = [
+                        self._get_xyz_string(labels, coords_au)
+                        for coords_au in opt_coordinates_au
+                    ]
+                    opt_results['opt_coordinates_au'] = np.array(
+                        opt_coordinates_au)
 
                     if self.ref_xyz:
                         self.print_ic_rmsd(final_mol, self.ref_xyz)
@@ -641,6 +642,33 @@ class OptimizationDriver:
                 extfile.unlink()
             except PermissionError:
                 pass
+
+    @staticmethod
+    def _get_xyz_string(labels, coords_au, precision=12):
+        """
+        Formats an xyz string from labels and Bohr coordinates.
+
+        :param labels:
+            The atomic labels.
+        :param coords_au:
+            Atomic coordinates in Bohr.
+        :param precision:
+            Decimal precision for coordinates in Angstrom.
+
+        :return:
+            The xyz string.
+        """
+
+        coords_angstrom = coords_au * bohr_in_angstrom()
+        xyz = f'{len(labels)}\n\n'
+
+        for label, (xa, ya, za) in zip(labels, coords_angstrom):
+            xyz += f'{label:<6s}'
+            xyz += f' {xa:{precision + 10}.{precision}f}'
+            xyz += f' {ya:{precision + 10}.{precision}f}'
+            xyz += f' {za:{precision + 10}.{precision}f}\n'
+
+        return xyz
 
     @staticmethod
     def get_ic_rmsd(opt_mol, ref_mol):
@@ -1033,7 +1061,7 @@ class OptimizationDriver:
 
     def _write_final_hdf5(self, fname, molecule, opt_results, basis=None):
         """
-        Creats a HDF5 file and saves the optimization results.
+        Creates a HDF5 file entry and saves the optimization results.
 
         :param fname:
             Name of the HDF5 file.
@@ -1046,53 +1074,19 @@ class OptimizationDriver:
         """
 
         if (fname and isinstance(fname, str) and Path(fname).is_file()):
-
-            hf = h5py.File(fname, 'a')
-
-            opt_group = 'opt/'
-
-            # Check if it is a scan job or not
-            if 'scan_energies' in opt_results.keys():
-                hf.create_dataset(opt_group + 'scan_energies',
-                                  data=opt_results['scan_energies'])
-
-                nuclear_repulsion_energies = []
-                scan_coordinates_au = []
-                for xyzstr in opt_results['scan_geometries']:
-                    mol = Molecule.read_xyz_string(xyzstr)
-                    nuclear_repulsion_energies.append(
-                        mol.effective_nuclear_repulsion_energy(basis))
-                    scan_coordinates_au.append(mol.get_coordinates_in_bohr())
-
-                hf.create_dataset(opt_group + 'scan_coordinates_au',
-                                  data=np.array(scan_coordinates_au))
-
-            else:
-                hf.create_dataset(opt_group + 'opt_energies',
-                                  data=opt_results['opt_energies'])
-
-                nuclear_repulsion_energies = []
-                opt_coordinates_au = []
-                for xyzstr in opt_results['opt_geometries']:
-                    mol = Molecule.read_xyz_string(xyzstr)
-                    nuclear_repulsion_energies.append(
-                        mol.effective_nuclear_repulsion_energy(basis))
-                    opt_coordinates_au.append(mol.get_coordinates_in_bohr())
-
-                hf.create_dataset(opt_group + 'opt_coordinates_au',
-                                  data=np.array(opt_coordinates_au))
-
-            # TODO: reconsider saving this
-            hf.create_dataset(opt_group + 'nuclear_repulsion_energies',
-                              data=np.array(nuclear_repulsion_energies))
+            # Keep Molecule as an in-memory convenience object, and serialize
+            # only data-backed optimization results.
+            h5_opt_results = {
+                key: value
+                for key, value in opt_results.items() if key != 'final_molecule'
+            }
+            write_opt_results_to_hdf5(fname, h5_opt_results)
 
             valstr = 'Optimization results written to file: '
             valstr += fname
             self.ostream.print_info(valstr)
             self.ostream.print_blank()
             self.ostream.flush()
-
-            hf.close()
 
     def __deepcopy__(self, memo):
         """

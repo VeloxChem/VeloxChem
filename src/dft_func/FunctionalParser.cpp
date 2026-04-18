@@ -46,7 +46,9 @@ getAvailableFunctionals()
                                      "BP86",   "PW91",   "MPW1K",   "OLYP",  "O3LYP",   "X3LYP",  "B97",       "B97-1", "B97-2",  "B97-3",
                                      "LRC-WPBEH", "CAM-B3LYP","RCAM-B3LYP", "CAM-B3LYP-100",  "WB97X-D4", "WB97M-D4",
                                      "TPSS",   "TPSSH",  "REVTPSS", "PKZB",  "SCAN",    "RSCAN",  "R2SCAN",    "M05",   "M05-2X", "M06",
-                                     "M06-2X", "M06-HF", "M06-L",   "M11-L", "MPW1B95", "MPWB1K", "PW6B95",    "PWB6K"});
+                                     "M06-2X", "M06-HF", "M06-L",   "M11-L",
+                                     "MN15",
+                                     "MPW1B95", "MPWB1K", "PW6B95",    "PWB6K"});
 }
 
 CXCFunctional
@@ -150,6 +152,8 @@ getExchangeCorrelationFunctional(const std::string &xcLabel)
         if (format::upper_case(xcLabel) == "M06-L") return CXCFunctional("M06-L", {"MGGA_X_M06_L", "MGGA_C_M06_L"}, {1.0, 1.0});
 
         if (format::upper_case(xcLabel) == "M11-L") return CXCFunctional("M11-L", {"MGGA_X_M11_L", "MGGA_C_M11_L"}, {1.0, 1.0});
+
+        if (format::upper_case(xcLabel) == "MN15") return CXCFunctional("MN15", {"HYB_MGGA_X_MN15", "MGGA_C_MN15"}, {1.0, 1.0});
 
         if (format::upper_case(xcLabel) == "MPW1B95") return CXCFunctional("MPW1B95", {"HYB_MGGA_XC_MPW1B95"}, {1.0});
 

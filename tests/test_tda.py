@@ -535,5 +535,5 @@ class TestTDA:
 
         with pytest.raises(
                 AssertionError,
-                match="Molecule: Invalid multiplicity for restricted"):
+                match="TdaEigenSolver: not implemented for unrestricted case"):
             lr_results_not_used = lr_drv.compute(mol, bas, scf_results)
