@@ -398,10 +398,12 @@ def main():
                 if 'response' not in task.input_dict:
                     # restart is default or True for optimization driver
                     if ('restart' not in opt_dict) or opt_dict['restart']:
-                        # check validity of checkpoint
-                        use_checkpoint_geometry = scf_drv.validate_checkpoint(
-                            task.molecule.get_element_ids(),
-                            task.ao_basis.get_label(), scf_drv.scf_type)
+                        # not an irc
+                        if not ('irc' in opt_dict and opt_dict['irc']):
+                            # check validity of checkpoint
+                            use_checkpoint_geometry = scf_drv.validate_checkpoint(
+                                task.molecule.get_element_ids(),
+                                task.ao_basis.get_label(), scf_drv.scf_type)
 
             if not use_checkpoint_geometry:
                 scf_results = scf_drv.compute(task.molecule, task.ao_basis,
