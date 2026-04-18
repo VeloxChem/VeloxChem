@@ -537,13 +537,13 @@ class OptimizationDriver:
                     opt_results['irc_energies'] = list(m.qm_energies)
                     opt_results['ts_index'] = int(np.argmax(m.qm_energies))
 
-                    opt_results['irc_geometries'] = []
-                    labels = molecule.get_labels()
-                    for xyz in m.xyzs:
-                        mol = Molecule(labels, xyz / geometric.nifty.bohr2ang,
-                                       'au', atom_basis_labels)
-                        opt_results['irc_geometries'].append(
-                            mol.get_xyz_string())
+                    opt_coordinates_au = [
+                        xyz / geometric.nifty.bohr2ang for xyz in m.xyzs
+                    ]
+                    opt_results['irc_geometries'] = [
+                        self._get_xyz_string(labels, coords_au)
+                        for coords_au in opt_coordinates_au
+                    ]
 
                 else:
                     self.print_opt_result(m)
