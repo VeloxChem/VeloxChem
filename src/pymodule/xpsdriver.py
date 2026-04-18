@@ -335,12 +335,11 @@ class XPSDriver:
                         f'with expanded range [{emin_expanded:.3f}, {emax_expanded:.3f}] Ha')
                 break
             elif len(indices) > expected_count:
-                # Too many found, likely overlapping ranges
-                if self.rank == mpi_master():
-                    self.ostream.print_info(
-                        f'Warning: Found {len(indices)} core orbitals but expected {expected_count} '
-                        f'for {element_symbol}. Using all found orbitals.')
-                break
+                assert_msg_critical(
+                    False,
+                    f'XPSDriver._find_core_orbital_indices: Found {len(indices)} core orbitals '
+                    f'but expected {expected_count} for {element_symbol}. '
+                    'Core orbital identification is ambiguous; adjust energy_ranges.')
 
         assert_msg_critical(
             len(indices) > 0,
@@ -414,6 +413,11 @@ class XPSDriver:
         xcfun = scf_driver.xcfun
         method_type = self._detect_method_type(xcfun)
         energy_ranges = self._get_energy_ranges(method_type)
+
+        # The current FCH setup assumes a closed-shell restricted reference.
+        assert_msg_critical(
+            scf_driver.scf_type == 'restricted' and molecule.get_multiplicity() == 1,
+            'XPSDriver.compute: Only closed-shell restricted SCF references are supported.')
 
         # Validate all elements are supported
         for elem in elements_list:
