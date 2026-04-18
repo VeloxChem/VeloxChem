@@ -877,9 +877,9 @@ class OptimizationDriver:
         ts_index = np.argmax(energies)
         e_ts = energies[ts_index]
 
-        line = '{:>8s}{:>20s}  {:>25s}{:>30s}{:>30}'.format(
+        line = '{:>8s}{:>21s}{:>25s}{:>23s}{:>28s}{:>7s}'.format(
             'IRC Pt.', 'Energy (a.u.)', 'Energy Change (a.u.)',
-            'E - E(TS) (kJ/mol)', 'Displacement (RMS, Max)')
+            'E - E(TS) (kJ/mol)', 'Displacement (RMS, Max)', '')
         self.ostream.print_header(line)
         self.ostream.print_header('-' * len(line))
 
@@ -893,27 +893,43 @@ class OptimizationDriver:
                 rmsd, maxd = 0.0, 0.0
             
             rel_e_ts = (energies[i] - e_ts) * hartree_in_kjpermol()
-            marker = ' <- TS' if i == ts_index else ''
-            
-            line = '{:>5d}   {:22.12f}{:22.12f}   {:15.3f}         {:15.3e}{:15.3e}{}'.format(
-                i, energies[i], delta_e, rel_e_ts, rmsd, maxd, marker)
+            status = '<- TS' if i == ts_index else ''
+
+            line = ('{:>5d}   {:22.12f}{:22.12f}   {:13.3f}'
+                    '     {:15.3e}{:15.3e}{:>7s}').format(
+                        i, energies[i], delta_e, rel_e_ts, rmsd, maxd,
+                        status)
             self.ostream.print_header(line)
 
         self.ostream.print_blank()
-        
+
         # Print summary statistics
         e_reactant = energies[0]
         e_product = energies[-1]
         barrier_fwd = (e_ts - e_reactant) * hartree_in_kjpermol()
         barrier_bwd = (e_ts - e_product) * hartree_in_kjpermol()
         reaction_energy = (e_product - e_reactant) * hartree_in_kjpermol()
-        
-        self.ostream.print_header('IRC Path Summary:')
-        self.ostream.print_header(f'  Transition State at point {ts_index}')
-        self.ostream.print_header(f'  Forward barrier (TS - Reactant):  {barrier_fwd:12.3f} kJ/mol')
-        self.ostream.print_header(f'  Backward barrier (TS - Product):  {barrier_bwd:12.3f} kJ/mol')
-        self.ostream.print_header(f'  Reaction energy (Product - Reactant): {reaction_energy:12.3f} kJ/mol')
-        
+
+        title = 'IRC Path Summary'
+        self.ostream.print_header(title)
+        self.ostream.print_header('-' * (len(title) + 2))
+
+        summary_items = [
+            ('Transition State Point', f'{ts_index:12d}'),
+            ('Forward Barrier (TS - Reactant)',
+             f'{barrier_fwd:12.3f} kJ/mol'),
+            ('Backward Barrier (TS - Product)',
+             f'{barrier_bwd:12.3f} kJ/mol'),
+            ('Reaction Energy (Product - Reactant)',
+             f'{reaction_energy:12.3f} kJ/mol'),
+        ]
+        lines = [
+            f'{label:<38s} :    {value}' for label, value in summary_items
+        ]
+        maxlen = max(len(line) for line in lines)
+        for line in lines:
+            self.ostream.print_header(line.ljust(maxlen))
+
         self.ostream.print_blank()
         self.ostream.flush()
 
