@@ -270,8 +270,10 @@ class OptimizationDriver:
         # update hessian option for transition state search
         if self.hessian == 'never' and (self.transition or self.irc):
             self.hessian = 'first'
+        elif self.hessian == 'last' and (self.transition or self.irc):
+            self.hessian = 'first+last'
 
-        if self.hessian or (self.transition or self.irc):
+        if (self.hessian != 'never') or (self.transition or self.irc):
             err_msg = (
                 'The installed geometric package does not support\n' +
                 '  Hessian or transition state search. Please install\n' +
