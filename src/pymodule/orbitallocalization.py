@@ -32,6 +32,8 @@
 
 import numpy as np
 
+from .mathutils import symmetric_matrix_function
+
 
 class OrbitalLocalization:
     """
@@ -47,12 +49,12 @@ class OrbitalLocalization:
         """
         Initializes the orbital localization driver
         """
+
         self.max_iter = 100
         self.thresh = 1e-6
 
-    # ============================================================
-    # Core rotation
-    # ============================================================
+        # TODO: use ostream
+        self.silent = False
 
     def _rotate(self, i, j, theta, method="boys"):
         """
@@ -92,13 +94,8 @@ class OrbitalLocalization:
             self.r[:, :, j] = -s * ri + c * rj
 
         else:
-            raise ValueError(f"Unknown method {method} "
-                              "provided in _rotate")
+            raise ValueError(f"Unknown method {method} provided in _rotate")
 
-    # ============================================================
-    # ---------------- PROJECTORS -------------------------------
-    # ============================================================
-    
     def _build_atom_projector(self):
         """
         Compute AO to atom projector
@@ -120,15 +117,9 @@ class OrbitalLocalization:
         Ci = self.C_eff[:, i]
         Cj = self.C_eff[:, j]
 
-        return (
-            np.matmul(self.P_atom, (Ci * Ci)),
-            np.matmul(self.P_atom, (Cj * Cj)),
-            np.matmul(self.P_atom, (Ci * Cj))
-        )
-
-    # ============================================================
-    # ---------------- THETA FUNCTIONS ---------------------------
-    # ============================================================
+        return (np.matmul(self.P_atom,
+                          (Ci * Ci)), np.matmul(self.P_atom, (Cj * Cj)),
+                np.matmul(self.P_atom, (Ci * Cj)))
 
     def _pm_optimal_theta(self, Qi, Qj, Pij):
         """
@@ -165,10 +156,6 @@ class OrbitalLocalization:
 
         return 0.25 * np.arctan2(g, h)
 
-    # ============================================================
-    # ---------------- PIPEK–MEZEY -------------------------------
-    # ============================================================
-
     def pipek_mezey(self, C, S, atom_map, projector="lowdin"):
         """
         Pipek–Mezey orbital localization
@@ -199,15 +186,25 @@ class OrbitalLocalization:
         self.S = np.array(S)
 
         # transform MOs according to projector
-        eigs, U = np.linalg.eigh(self.S)
+        eigs = np.linalg.eigvalsh(self.S)
+        min_eig = np.min(eigs)
+        # TODO: Double-check whether -1.0e-10 is the right cutoff for
+        # treating negative overlap eigenvalues as a hard error here.
+        if min_eig < -1.0e-10:
+            raise ValueError("Overlap matrix is not positive semidefinite; "
+                             f"minimum eigenvalue = {min_eig:.3e}")
         if projector == "lowdin":
-            self.X = np.matmul(U, np.matmul(np.diag(1.0 / np.sqrt(eigs)), U.T))
+            # TODO: Double-check whether 1.0e-8 is the right screening
+            # threshold for the overlap matrix function in PM localization.
+            self.X = symmetric_matrix_function(self.S,
+                                               lambda x: 1.0 / np.sqrt(x),
+                                               thresh=1.0e-8)
         elif projector == "mulliken":
-            self.X = np.matmul(U, np.matmul(np.diag(np.sqrt(eigs)), U.T))
+            self.X = symmetric_matrix_function(self.S, np.sqrt, thresh=1.0e-8)
         else:
-            raise NotImplementedError(f"requested projector {projector} "
-                                       "not implemented")
-        
+            raise NotImplementedError(
+                f"Requested projector {projector} not implemented")
+
         self.C_eff = np.matmul(self.X.T, self.C)
 
         self.atom_map = np.array(atom_map)
@@ -215,8 +212,7 @@ class OrbitalLocalization:
 
         # masks for AO to atom map
         self.atom_indices = [
-            np.where(self.atom_map == A)[0]
-            for A in range(self.n_atoms)
+            np.where(self.atom_map == A)[0] for A in range(self.n_atoms)
         ]
 
         self._build_atom_projector()
@@ -242,24 +238,20 @@ class OrbitalLocalization:
 
                     delta += abs(theta)
 
-            #print(f"PM Iter {it:3d}  delta = {delta:.6e}")
-
             if delta < self.thresh:
-                print(f"PM converged after {it:3d}  iterations")
+                if not self.silent:
+                    print(f"PM converged after {it:3d}  iterations")
                 break
 
             if it == self.max_iter - 1:
                 # return the object anyway, since unlike for SCF,
                 # reaching the convergence threshold is not necessarily
                 # required, as the physics are unchanged.
-                print(f"PM only converged to delta = {delta:.6e} , "
-                      f"instead of {self.thresh:.2e}")
+                if not self.silent:
+                    print(f"PM only converged to delta = {delta:.6e} , "
+                          f"instead of {self.thresh:.2e}")
 
         return self.C
-
-    # ============================================================
-    # -------------------- BOYS ----------------------------------
-    # ============================================================
 
     def boys(self, C, dipole_integrals):
         """
@@ -282,10 +274,8 @@ class OrbitalLocalization:
         self.nao, self.norb = self.C.shape
         mu = dipole_integrals
 
-        self.r = np.array([
-            np.matmul(self.C.T, np.matmul(mu[k], self.C))
-            for k in range(3)
-        ])
+        self.r = np.array(
+            [np.matmul(self.C.T, np.matmul(mu[k], self.C)) for k in range(3)])
 
         for it in range(self.max_iter):
 
@@ -307,24 +297,20 @@ class OrbitalLocalization:
 
                     delta += abs(theta)
 
-            #print(f"Boys Iter {it:3d}  delta = {delta:.6e}")
-
             if delta < self.thresh:
-                print(f"Boys converged after {it:3d}  iterations")
+                if not self.silent:
+                    print(f"Boys converged after {it:3d}  iterations")
                 break
 
             if it == self.max_iter - 1:
                 # return the object anyway, since unlike for SCF,
                 # reaching the convergence threshold is not necessarily
                 # required, as the physics are unchanged.
-                print(f"Boys only converged to delta = {delta:.6e} , "
-                      f"instead of {self.thresh:.2e}")
+                if not self.silent:
+                    print(f"Boys only converged to delta = {delta:.6e} , "
+                          f"instead of {self.thresh:.2e}")
 
         return self.C
-
-    # ============================================================
-    # -------- EDMISTON–RUEDENBERG -------------------------------
-    # ============================================================
 
     def edmiston_ruedenberg(self, eri):
         """
@@ -332,6 +318,5 @@ class OrbitalLocalization:
         """
 
         raise NotImplementedError(
-            "ER localization requires AO->MO 2e integral transformation "
-            "and is not implemented in this prototype."
-        )
+            "ER localization requires AO->MO 2e integral transformation " +
+            "and is not implemented.")
