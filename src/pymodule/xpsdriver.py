@@ -83,7 +83,7 @@ class XPSDriver:
         self.energy_ranges_hf = {
             'C': (-11.5, -11.0),
             'N': (-15.7, -15.6),
-            'O': (-20.7, -20.6),
+            'O': (-20.7, -20.5),
             'F': (-26.4, -26.3),
             'S': (-92.0, -91.0),
         }
@@ -412,6 +412,7 @@ class XPSDriver:
         # Detect method type (HF or DFT)
         xcfun = scf_driver.xcfun
         method_type = self._detect_method_type(xcfun)
+
         energy_ranges = self._get_energy_ranges(method_type)
 
         # The current FCH setup assumes a closed-shell restricted reference.
