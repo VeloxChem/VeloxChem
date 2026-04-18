@@ -111,8 +111,6 @@ try:
 except ImportError:
     pass
 
-from .imdatabasegrouper import (improved_group_by_connected_components)
-
 def _rank_root_print(*args, **kwargs):
     """
     Print only on MPI root rank to avoid delayed/duplicated worker stdout noise.
@@ -689,25 +687,47 @@ class IMDatabasePointCollecter:
         driver = self.impes_drivers[root]
         driver.mark_runtime_data_cache_dirty()
         driver.prepare_runtime_data_cache(force=True)
+        if getattr(driver, 'local_engine', None) is not None:
+            driver.local_engine.mark_dirty()
+            if self.nodes <= 1:
+                driver.local_engine.preload_static_data(force=True)
+
+        if self.nodes <= 1 and bool(getattr(driver, 'use_outer_parallel', False)):
+            n_labels = len(getattr(driver, 'qm_data_points', []) or [])
+            if driver._can_use_outer_parallel(n_labels):
+                try:
+                    n_workers = driver._resolve_outer_parallel_workers(n_labels)
+                    driver._ensure_outer_parallel_pool(n_workers)  # sets _outer_parallel_pool_dirty = False
+                except Exception as exc:
+                    driver._close_outer_parallel_pool()
+
         if getattr(driver, 'mpi_engine', None) is not None:
             driver.mpi_engine.mark_dirty()
             # In root-worker mode, defer preload rebuild until synchronized compute
             # to avoid standalone collectives desynchronizing the worker control loop.
             if not (self._mpi_is_active() and self.mpi_root_worker_mode):
                 driver.mpi_engine.preload_static_data(force=True)
-        
-        if self.sampling_enabled:
+
+        if self.sampling_enabled and self.sampling_impes_drivers is not None:
             samp_driver = self.sampling_impes_drivers[root]
-            samp_driver.mark_runtime_data_cache_dirty()
-            samp_driver.prepare_runtime_data_cache(force=True)
-            if getattr(driver, 'mpi_engine', None) is not None:
-                samp_driver.mpi_engine.mark_dirty()
-                # In root-worker mode, defer preload rebuild until synchronized compute
-                # to avoid standalone collectives desynchronizing the worker control loop.
-                if not (self._mpi_is_active() and self.mpi_root_worker_mode):
-                    samp_driver.mpi_engine.preload_static_data(force=True)
-            
+            if samp_driver is not None:
+                samp_driver.mark_runtime_data_cache_dirty()
+                samp_driver.prepare_runtime_data_cache(force=True)
+
+                if getattr(samp_driver, 'mpi_engine', None) is not None:
+                    samp_driver.mpi_engine.mark_dirty()
+                    # In root-worker mode, defer preload rebuild until synchronized compute
+                    # to avoid standalone collectives desynchronizing the worker control loop.
+                    if not (self._mpi_is_active() and self.mpi_root_worker_mode):
+                        samp_driver.mpi_engine.preload_static_data(force=True)
+
+                if getattr(samp_driver, 'local_engine', None) is not None:
+                    samp_driver.local_engine.mark_dirty()
+                    if self.nodes <= 1:
+                        samp_driver.local_engine.preload_static_data(force=True)
+
         self._mpi_mark_root_dirty(root)
+    
     
     def _mpi_is_active(self):
         return bool(self.nodes > 1 and self.mpi_control_plane_enabled)
@@ -1308,125 +1328,6 @@ class IMDatabasePointCollecter:
             f"[metadynamics] soft bias reset done (reason={reason}, "
         )
         return True
-
-
-    def conformational_sampling(self, 
-                                ensemble='NVT', 
-                                temperature=700, 
-                                timestep=2.0, 
-                                nsteps=10000, 
-                                snapshots=10,
-                                minimize=True):
-
-        """
-        Runs a high-temperature MD simulation to sample conformations and minimize the energy of these conformations.
-
-        :param ensemble:
-            Type of ensemble. Options are 'NVE', 'NVT', 'NPT'. Default is 'NVT'.
-        :param temperature:
-            Temperature of the system in Kelvin. Default is 700 K.
-        :param timestep:
-            Timestep of the simulation in femtoseconds. Default is 2.0 fs.
-        :param nsteps:
-            Number of steps in the simulation. Default is 1000.
-        :param snapshots:
-            The number of snapshots to save. Default is 10.
-
-
-        :return:
-            Tuple containing the minimized potential energies and the XYZ format strings of the relaxed coordinates.
-
-        """
-
-        assert_msg_critical('openmm' in sys.modules, 'OpenMM is required for IMDatabasePointCollecter.')
-
-        if self.system is None:
-            raise RuntimeError('System has not been created!')
-        if self.molecule is None:
-            raise RuntimeError('Molecule object does not exist!')
-
-        self.ensemble = ensemble
-        self.temperature = temperature * unit.kelvin
-
-        self.timestep = timestep * unit.femtosecond
-        self.nsteps = nsteps
-
-        self.integrator = self._create_integrator()
-        topology = self.modeller.topology if self.phase in ['water', 'periodic'] else self.pdb.topology
-        self.positions = self.modeller.positions if self.phase in ['water', 'periodic'] else self.pdb.positions
-
-        self.simulation = app.Simulation(topology, self.system, self.integrator,  platform=self._create_platform())
-        self.simulation.context.setPositions(self.positions)
-        self.simulation.context.setVelocitiesToTemperature(self.temperature)
-
-        save_freq = nsteps // snapshots if snapshots else nsteps
-        energies = []
-        opt_coordinates = []
-
-        for step in range(nsteps):
-            self.simulation.step(1)
-            if step % save_freq == 0:
-                state = self.simulation.context.getState(getPositions=True, getEnergy=True)
-                energy = state.getPotentialEnergy().value_in_unit(unit.kilojoules_per_mole)
-                coordinates = state.getPositions()
-                self.simulation.context.setPositions(coordinates) 
-
-                if minimize:
-
-                    print(f'Step: {step}, Potential energy: {energy}')
-                    self.simulation.minimizeEnergy()
-                    minimized_state = self.simulation.context.getState(getPositions=True, getEnergy=True)
-                    minimized_energy = minimized_state.getPotentialEnergy().value_in_unit(unit.kilojoules_per_mole)
-                    minimized_coordinates = minimized_state.getPositions()
-
-                    energies.append(minimized_energy)
-                    print(f'Minimized energy: {minimized_energy}')
-                    xyz = f"{len(self.labels)}\n\n"
-                    for label, coord in zip(self.labels, minimized_coordinates):
-                        xyz += f"{label} {coord.x * 10} {coord.y * 10} {coord.z * 10}\n"  # Convert nm to Angstroms
-                    print('Saved coordinates for step', step)
-                    opt_coordinates.append(xyz)
-
-                # Create a xyz with the coordinates
-                print('Energy of the conformation:', energy)
-                xyz = f"{len(self.labels)}\n\n"
-                for label, coord in zip(self.labels, coordinates):
-                    xyz += f"{label} {coord.x * 10} {coord.y * 10} {coord.z * 10}\n"
-                opt_coordinates.append(xyz)
-                energies.append(energy)
-                print('Saved coordinates for step', step)
-
-        print('Conformational sampling completed!')
-        print(f'Number of conformations: {len(opt_coordinates)}')
-
-        return energies, opt_coordinates
-
-    def sort_points_with_association(self, points, associated_list):
-        '''
-        This function is sorting the points from a given database
-        starting from the first entry to the last (point_0,..., point_n)
-
-        :param points:
-            list of database points
-        :param associated_list:
-            list of labels that are associated to the individual datapoints
-
-        '''
-        
-        # Define a custom key function to extract the numerical part
-        def extract_number(point):
-            return int(point.split('_')[1])
-
-        # Combine the points and associated list into tuples
-        combined = list(zip(points, associated_list))
-
-        # Sort the combined list using the custom key function
-        sorted_combined = sorted(combined, key=lambda x: extract_number(x[0]))
-
-        # Unzip the sorted combined list back into two lists
-        sorted_points, sorted_associated_list = zip(*sorted_combined)
-
-        return list(sorted_points), list(sorted_associated_list)
     
     def _validate_metadynamics_settings(self):
 
@@ -2025,6 +1926,37 @@ class IMDatabasePointCollecter:
 
         driver_object.mark_runtime_data_cache_dirty()
         driver_object.prepare_runtime_data_cache(force=True)
+
+        driver_object.mark_runtime_data_cache_dirty()
+        driver_object.prepare_runtime_data_cache(force=True)
+
+        use_local_preload = bool(self.interpolation_settings[root].get('use_local_preload', False))
+        local_workers = int(self.interpolation_settings[root].get('local_preload_workers', 0))
+        local_min_tasks = int(self.interpolation_settings[root].get('local_preload_min_tasks', 8))
+        local_omp_threads = int(self.interpolation_settings[root].get('local_preload_omp_threads', 1))
+
+        driver_object.set_local_preload_engine(
+            enabled=(use_local_preload and self.nodes <= 1),
+            n_workers=local_workers,
+            min_tasks=local_min_tasks,
+            omp_threads=local_omp_threads,
+            force_rebuild=use_local_preload,
+        )
+        driver_object._local_preload_enabled_config = bool(getattr(driver_object, 'local_preload_enabled', False))
+
+        use_outer_parallel = bool(self.interpolation_settings[root].get('use_outer_parallel', False))
+        outer_workers = int(self.interpolation_settings[root].get('outer_parallel_workers', 0))
+        outer_min_labels = int(self.interpolation_settings[root].get('outer_parallel_min_labels', 8))
+        outer_chunk_size = int(self.interpolation_settings[root].get('outer_parallel_chunk_size', 0))
+
+        driver_object.set_outer_parallel_engine(
+            enabled=(use_outer_parallel and self.nodes <= 1),
+            n_workers=outer_workers,
+            min_labels=outer_min_labels,
+            chunk_size=outer_chunk_size,
+            force_rebuild=True,
+        )
+        driver_object._outer_parallel_enabled_config = bool(getattr(driver_object, 'use_outer_parallel', False))
 
         use_mpi_preload = bool(self.interpolation_settings[root].get('use_mpi_preload', False))
         # In root-worker mode, avoid immediate preload collectives here; rebuild lazily
@@ -4102,7 +4034,7 @@ class IMDatabasePointCollecter:
             )
     
     
-    def _register_core_datapoint_runtime(self, root, impes_coordinate, new_label, energy_value):
+    def _register_core_datapoint_runtime(self, root, impes_coordinate, new_label, energy_value, refresh_driver_caches=True):
         self.qm_data_point_dict[root].append(impes_coordinate)
         self.sorted_state_spec_im_labels[root].append(new_label)
         self.qm_energies_dict[root].append(energy_value)
@@ -4114,7 +4046,10 @@ class IMDatabasePointCollecter:
         drv.qm_data_points = self.qm_data_point_dict[root]
         drv.qm_symmetry_data_points = self.qm_symmetry_datapoint_dict[root]
         drv.labels = self.sorted_state_spec_im_labels[root]
-        self._refresh_interpolation_driver_caches(root)
+
+        if refresh_driver_caches:
+            self._refresh_interpolation_driver_caches(root)
+
 
 
     def _refresh_rotor_cluster_runtime_for_root(self, root):
@@ -4553,6 +4488,7 @@ class IMDatabasePointCollecter:
                             impes_coordinate,
                             label,
                             energies[number],
+                            refresh_driver_caches=False,
                         )
                         self.density_around_data_point[0][target_root] += 1
                         # impes_coordinate.write_hdf5(self.interpolation_settings[target_root]['imforcefield_file'], label)
@@ -6140,104 +6076,6 @@ class IMDatabasePointCollecter:
                 "datapoints_sub": datapoints_sub,
                 "cluster_banks_sub": cluster_banks_sub,
             })
-    
-        # sensitivity_optimizers = []
-        # objective_fn = None
-        # if len(basin_payloads) > 0:
-        #     n_workers_sens = max(1, min(4, os.cpu_count() or 1))
-
-        #     for payload in basin_payloads:
-        #         sens_opt = IMTrustRadiusOptimizer(
-        #             z_matrix,
-        #             interpolation_setting,
-        #             sym_dict,
-        #             sym_datapoints,
-        #             payload["datapoints_sub"],
-        #             payload["molecules_sub"],
-        #             payload["qm_energies_sub"],
-        #             payload["qm_gradients_sub"],
-        #             exponent_p_q,
-        #             e_x=energy_weight,
-        #             beta=0.8,
-        #             n_workers=n_workers_sens,
-        #             verbose=False,
-        #             cluster_banks=payload["cluster_banks_sub"],
-        #         )
-        #         sensitivity_optimizers.append({
-        #             "dp_mask": payload["dp_mask"],
-        #             "optimizer": sens_opt,
-        #         })
-
-        #     def objective_fn(alpha_global):
-        #         alpha_vec = np.asarray(alpha_global, dtype=np.float64).reshape(-1)
-        #         if alpha_vec.size != len(datapoints):
-        #             raise ValueError(
-        #                 f"objective_fn expects alpha size {len(datapoints)}, got {alpha_vec.size}")
-        #         if len(sensitivity_optimizers) == 0:
-        #             return 0.0
-        #         losses = []
-        #         for item in sensitivity_optimizers:
-        #             sub_alpha = alpha_vec[item["dp_mask"]]
-        #             losses.append(float(item["optimizer"].fun(sub_alpha)))
-        #         return float(np.mean(losses))
-
-        # dp_labels = None
-        # if (isinstance(getattr(self, 'sorted_state_spec_im_labels', None), dict)
-        #         and self.current_state in self.sorted_state_spec_im_labels):
-        #     cand = self.sorted_state_spec_im_labels[self.current_state]
-        #     if len(cand) == len(datapoints):
-        #         dp_labels = list(cand)
-
-        # analyzer = TrustRadiusOptimizationAnalyzer()
-        # try:
-        #     report = analyzer.analyze(
-        #         initial_alphas=initial_alphas,
-        #         final_alphas=final_alphas,
-        #         groups=groups['groups'],
-        #         d_dpref=D_dpref,
-        #         grouping_diagnostics=groups["diagnostics"],
-        #         basin_optimizer_results=basin_results,
-        #         datapoint_labels=dp_labels,
-        #         objective_fn=objective_fn,
-        #     )
-        # finally:
-        #     for item in sensitivity_optimizers:
-        #         try:
-        #             item["optimizer"].close()
-        #         except Exception:
-        #             pass
-
-        # self.last_trust_radius_report = report
-
-        # print(summarize_report_for_console(report, top_k=10))
-        # print(report["summary"])
-        # print(report["problematic_datapoints"][:5])
-        # if "basin_optimizer_results" in report:
-        #     print("Trust-radius basin convergence summary")
-        #     for basin_entry in report["basin_optimizer_results"]:
-        #         basin_id = basin_entry.get("basin_id", "?")
-        #         result_info = basin_entry.get("result", {})
-        #         history = result_info.get("history", [])
-        #         comp = result_info.get("component_summary", {})
-
-        #         loss_start = math.nan
-        #         loss_end = math.nan
-        #         if len(history) > 0:
-        #             loss_start = float(history[0].get("loss_total", math.nan))
-        #             loss_end = float(history[-1].get("loss_total", math.nan))
-
-        #         print(
-        #             f"[trust-opt][basin {basin_id}] "
-        #             f"success={result_info.get('success', False)} "
-        #             f"nit={result_info.get('nit', -1)} "
-        #             f"nfev={result_info.get('nfev', -1)} "
-        #             f"hist={len(history)} "
-        #             f"L0={loss_start:.6e} "
-        #             f"Lf={loss_end:.6e} "
-        #             f"Le_f={float(comp.get('loss_energy', math.nan)):.6e} "
-        #             f"Lf_f={float(comp.get('loss_force', math.nan)):.6e}"
-        #         )
-        
         
         
         dp_eval_c = self._clone_datapoints_with_alphas(datapoints, final_alphas)

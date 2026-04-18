@@ -405,6 +405,16 @@ class IMForceFieldGenerator:
 
         self.profile_runtime_timing = False
         self.profile_interpolation_timing = False
+
+        self.use_local_preload = False
+        self.local_preload_workers = 2
+        self.local_preload_min_tasks = 8
+        self.local_preload_omp_threads = 1
+
+        self.use_outer_parallel = True
+        self.outer_parallel_workers = 10  # or 0 for auto in driver
+        self.outer_parallel_min_labels = 8
+        self.outer_parallel_chunk_size = 0
         
         # mpi section of the code Xin needs to check as the code differs from normal MPI integration frameworks
         self.use_mpi_preload = False
@@ -1470,7 +1480,14 @@ class IMForceFieldGenerator:
                                 'use_cosine_dihedral':self.use_cosine_dihedral,
                                 'use_tc_weights':self.use_tc_weights,
                                 'use_mpi_preload': self.use_mpi_preload,
-                                'use_symmetry': self.use_symmetry,
+                                'use_local_preload': self.use_local_preload,
+                                'local_preload_workers': self.local_preload_workers,
+                                'local_preload_min_tasks': self.local_preload_min_tasks,
+                                'local_preload_omp_threads': self.local_preload_omp_threads,
+                                'use_outer_parallel': self.use_outer_parallel,
+                                'outer_parallel_workers': self.outer_parallel_workers,
+                                'outer_parallel_min_labels': self.outer_parallel_min_labels,
+                                'outer_parallel_chunk_size': self.outer_parallel_chunk_size,
                             }
             self.sampling_states_interpolation_settings[self.roots_to_follow[0]] = self.states_interpolation_settings[self.roots_to_follow[0]].copy()
             self.sampling_states_interpolation_settings[self.roots_to_follow[0]]['imforcefield_file'] = self.sampling_imforcefieldfiles[self.roots_to_follow[0]]
