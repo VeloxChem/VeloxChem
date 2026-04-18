@@ -86,11 +86,11 @@ local_distribute_eri_tensor(CDense4DTensor*                  eri_tensor,
 
     for (int i = 0; i < acomps; i++)
     {
-        const auto p = i * adim + refp;
+        const auto p = static_cast<int>(i * adim + refp);
 
         for (int j = 0; j < bcomps; j++)
         {
-            const auto q = j * bdim + refq;
+            const auto q = static_cast<int>(j * bdim + refq);
 
             for (int k = 0; k < ccomps; k++)
             {
@@ -115,9 +115,9 @@ local_distribute_eri_tensor(CDense4DTensor*                  eri_tensor,
 
                         // compute r and s indexes
 
-                        const auto r = k * cdim + refr;
+                        const auto r = static_cast<int>(k * cdim + refr);
 
-                        const auto s = l * ddim + refs;
+                        const auto s = static_cast<int>(l * ddim + refs);
 
                         // prescale integral for accumulation to Fock matrix
 
