@@ -219,6 +219,9 @@ from .tsguesser import TransitionStateGuesser
 from .reactionmatcher import ReactionMatcher
 from .smddriver import SmdDriver
 from .atombdedriver import AtomBdeDriver
+from .ensembleparser import EnsembleParser
+from .ensembledriver import EnsembleDriver
+from .spectrumaverager import SpectrumAverager
 # for backward compatibility only
 from .cppsolver import ComplexResponseSolver as ComplexResponse
 from .tdacppsolver import ComplexResponseTdaSolver as ComplexResponseTDA
