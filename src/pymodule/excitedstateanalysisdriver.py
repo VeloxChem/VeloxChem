@@ -40,7 +40,7 @@ from .visualizationdriver import VisualizationDriver
 from .lreigensolver import LinearResponseEigenSolver
 from .densityviewer import DensityViewer
 from .errorhandler import assert_msg_critical
-from .resultsio import read_results
+from .resultsio import read_results, read_results_old
 
 
 class ExcitedStateAnalysisDriver:
@@ -176,8 +176,19 @@ class ExcitedStateAnalysisDriver:
         :return:
             A tuple containing the scf and rsp dictionaries.
         """
-        scf_results = read_results(filename, 'scf')
-        rsp_results = read_results(filename, 'rsp')
+
+        try:
+            scf_results = read_results(filename, 'scf')
+            rsp_results = read_results(filename, 'rsp')
+        # For backward-compatibility with old vlx checkpoint files
+        except AssertionError:
+            scf_results = read_results_old(filename, 'scf')
+            rsp_results = read_results_old(filename, 'rsp')
+
+        # Decode strings
+        for key in scf_results:
+            if isinstance(scf_results[key], bytes):
+                scf_results[key] = scf_results[key].decode("utf-8")
 
         return scf_results, rsp_results
 
@@ -290,9 +301,16 @@ class ExcitedStateAnalysisDriver:
             # Carl Svennerstedt, master thesis 2025
             y_mat = eigvec[nexc:]
             tdens_mo = np.zeros((norb, norb))
-            tdens_mo[:nocc, nocc:] = np.reshape(z_mat, (nocc, nvirt))
-            tdens_mo[nocc:, :nocc] = -np.reshape(y_mat,
-                                                 (nocc, nvirt)).transpose()
+            if num_core_orbitals is None:
+                tdens_mo[:nocc, nocc:] = np.reshape(z_mat, (nocc, nvirt))
+                tdens_mo[nocc:, :nocc] = -np.reshape(y_mat,
+                                                     (nocc, nvirt)).transpose()
+            else:
+                start_virt = molecule.number_of_alpha_electrons()
+
+                tdens_mo[:nocc, start_virt:] = np.reshape(z_mat, (nocc, nvirt))
+                tdens_mo[start_virt:, :nocc] = -np.reshape(
+                    y_mat, (nocc, nvirt)).transpose()
             tdens_ao = np.linalg.multi_dot([mo, tdens_mo, mo.T])
             hole_dens_mo = -np.matmul(tdens_mo, tdens_mo.T)
             hole_dens_ao = np.linalg.multi_dot([mo, hole_dens_mo, mo.T])
@@ -578,7 +596,12 @@ class ExcitedStateAnalysisDriver:
         viewer.zoomTo()
         viewer.show()
 
-    def show_density(self, molecule, basis, descriptors, use_k3d=False, interpolate=False):
+    def show_density(self,
+                     molecule,
+                     basis,
+                     descriptors,
+                     use_k3d=False,
+                     interpolate=False):
         """Displays the particle and hole densities of molecule.
 
         :param molecule:
