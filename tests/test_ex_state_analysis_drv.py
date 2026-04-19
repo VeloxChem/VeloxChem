@@ -1,7 +1,5 @@
-from mpi4py import MPI
 from pathlib import Path
 import numpy as np
-import pytest
 
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
@@ -12,8 +10,6 @@ from veloxchem.excitedstateanalysisdriver import ExcitedStateAnalysisDriver
 from veloxchem.resultsio import read_molecule_and_basis
 
 
-@pytest.mark.skipif(MPI.COMM_WORLD.Get_size() != 1,
-                    reason='runs only on a single MPI rank')
 class TestCTNumbers:
 
     def test_tda(self):
@@ -232,7 +228,6 @@ class TestCTNumbers:
         lreig_results = lreig_drv.compute(molecule, basis, scf_results)
 
         exc_drv = ExcitedStateAnalysisDriver()
-        exc_drv.ostream.mute()
         exc_drv.fragment_dict = fragment_dict
 
         descriptor_dict_s1 = exc_drv.compute(
@@ -292,7 +287,6 @@ class TestCTNumbers:
         tda_results = tda_drv.compute(molecule, basis, scf_results)
 
         exc_drv = ExcitedStateAnalysisDriver()
-        exc_drv.ostream.mute()
         exc_drv.fragment_dict = fragment_dict
 
         descriptor_dict_s1 = exc_drv.compute(
