@@ -40,7 +40,7 @@ from .visualizationdriver import VisualizationDriver
 from .lreigensolver import LinearResponseEigenSolver
 from .densityviewer import DensityViewer
 from .errorhandler import assert_msg_critical
-from .resultsio import read_results, read_results_old
+from .resultsio import read_results
 
 
 class ExcitedStateAnalysisDriver:
@@ -177,18 +177,8 @@ class ExcitedStateAnalysisDriver:
             A tuple containing the scf and rsp dictionaries.
         """
 
-        try:
-            scf_results = read_results(filename, 'scf')
-            rsp_results = read_results(filename, 'rsp')
-        # For backward-compatibility with old vlx checkpoint files
-        except AssertionError:
-            scf_results = read_results_old(filename, 'scf')
-            rsp_results = read_results_old(filename, 'rsp')
-
-        # Decode strings
-        for key in scf_results:
-            if isinstance(scf_results[key], bytes):
-                scf_results[key] = scf_results[key].decode("utf-8")
+        scf_results = read_results(filename, 'scf')
+        rsp_results = read_results(filename, 'rsp')
 
         return scf_results, rsp_results
 
