@@ -31,7 +31,6 @@
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from mpi4py import MPI
-import uuid
 import sys
 import numpy as np
 import os
@@ -39,6 +38,7 @@ import math
 import copy
 import h5py
 import time
+from random import getrandbits
 from pathlib import Path
 
 from .veloxchemlib import mpi_master, hartree_in_kjpermol, bohr_in_angstrom
@@ -206,9 +206,9 @@ class TransitionStateGuesser():
             )
             self.ostream.flush()
             self.reactant.save_forcefield_as_json(
-                self.reactant, f"{self.folder_name}/reactant.json")
+                self.reactant, str(Path(self.folder_name) / "reactant.json"))
             self.product.save_forcefield_as_json(
-                self.product, f"{self.folder_name}/product.json")
+                self.product, str(Path(self.folder_name) / "product.json"))
 
         rea_bonds = set(self.reactant.bonds.keys())
         pro_bonds = set(self.product.bonds.keys())
@@ -244,7 +244,7 @@ class TransitionStateGuesser():
             self.ostream.flush()
             sysbuilder.ostream.unmute()
         if self.save_intermediates:
-            systems_dir = self.folder_name + "/systems"
+            systems_dir = str(Path(self.folder_name) / "systems")
             os.makedirs(systems_dir, exist_ok=True)
             self.ostream.print_info(f"Saving systems as xml to {systems_dir}")
             self.ostream.flush()
@@ -546,9 +546,9 @@ class TransitionStateGuesser():
         opm_dyn.openmm_platform = "CPU"
         # opm_dyn.create_system_from_molecule(mol, ff_gen)
         if self.save_intermediates:
-            pdb_name = self.folder_name + f'/conf_top_{l}.pdb'
+            pdb_name = str(Path(self.folder_name) / f'conf_top_{l}.pdb')
         else:
-            pdb_name = f'topology_{uuid.uuid4().hex[:8]}.pdb'
+            pdb_name = f'topology_{getrandbits(32):08x}.pdb'
 
         pdb = mmapp.PDBFile.writeFile(
             topology,
