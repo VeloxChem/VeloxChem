@@ -230,8 +230,15 @@ class IMTrustRadiusOptimizer:
 
     def fun(self, alphas):
         key = self._key(alphas)
-        alphas_arr = np.asarray(alphas, dtype=np.float64)
-        # Build per-structure payloads with only structure index + alpha vector.
+        alphas_arr = np.asarray(alphas, dtype=np.float64).reshape(-1)
+
+        if alphas_arr.size != self.M:
+            raise ValueError(
+                f"AlphaOptimizer.fun expects full alpha size {self.M}, got {alphas_arr.size}"
+            )
+        if not np.all(np.isfinite(alphas_arr)):
+            raise ValueError("AlphaOptimizer.fun received non-finite alpha values")
+
         payloads = [(i, alphas_arr) for i in range(self.S)]
 
         chunksize = max(1, math.ceil(self.S / (4 * self._pool._max_workers)))
@@ -252,7 +259,7 @@ class IMTrustRadiusOptimizer:
         mean_loss = float(sum_loss / self.S)
         mean_energy = float(sum_energy / self.S)
         mean_force = float(sum_force / self.S)
-        self._cache_key  = key
+        self._cache_key = key
         self._cache_grad = sum_grad / self.S
         self._cache_metrics = {
             'loss_total': mean_loss,
@@ -275,6 +282,104 @@ class IMTrustRadiusOptimizer:
         # Fallback: compute once (will also cache)
         _ = self.fun(alphas)
         return self._cache_grad
+
+    def _validate_trainable_idx(self, trainable_idx):
+        idx = np.asarray(trainable_idx, dtype=np.int64).reshape(-1)
+
+        if idx.size == 0:
+            return idx
+
+        if np.any(idx < 0) or np.any(idx >= self.M):
+            raise ValueError(
+                f"trainable_idx out of bounds for M={self.M}: {idx.tolist()}"
+            )
+
+        if np.unique(idx).size != idx.size:
+            raise ValueError("trainable_idx contains duplicates")
+
+        return idx
+
+
+    def _validate_full_alpha(self, alpha_full):
+        alpha = np.asarray(alpha_full, dtype=np.float64).reshape(-1)
+
+        if alpha.size != self.M:
+            raise ValueError(
+                f"Expected full alpha size {self.M}, got {alpha.size}"
+            )
+        if not np.all(np.isfinite(alpha)):
+            raise ValueError("alpha contains non-finite values")
+
+        return alpha
+
+
+    def pack_reduced_alphas(self, alpha_full, trainable_idx):
+        """
+        Extract reduced variables u = alpha[T].
+        """
+        alpha = self._validate_full_alpha(alpha_full)
+        idx = self._validate_trainable_idx(trainable_idx)
+        return alpha[idx].copy()
+
+
+    def expand_reduced_alphas(self, x_var, trainable_idx, alpha_full_fixed):
+        """
+        Build full alpha from reduced variables:
+        alpha_i(u) = u_k if i == T_k else alpha_fixed_i
+        """
+        idx = self._validate_trainable_idx(trainable_idx)
+        alpha_fixed = self._validate_full_alpha(alpha_full_fixed)
+
+        x = np.asarray(x_var, dtype=np.float64).reshape(-1)
+        if x.size != idx.size:
+            raise ValueError(
+                f"Reduced alpha size mismatch: expected {idx.size}, got {x.size}"
+            )
+        if not np.all(np.isfinite(x)):
+            raise ValueError("x_var contains non-finite values")
+
+        alpha_full = alpha_fixed.copy()
+        alpha_full[idx] = x
+        return alpha_full
+
+
+    def project_full_gradient_to_reduced(self, grad_full, trainable_idx):
+        """
+        Chain-rule projection:
+        g_u = P_T^T g_alpha = g_alpha[T]
+        """
+        g = np.asarray(grad_full, dtype=np.float64).reshape(-1)
+        if g.size != self.M:
+            raise ValueError(
+                f"Expected full gradient size {self.M}, got {g.size}"
+            )
+        idx = self._validate_trainable_idx(trainable_idx)
+        return g[idx].copy()
+
+
+    def fun_reduced(self, x_var, trainable_idx, alpha_full_fixed):
+        """
+        Reduced objective:
+        J(u) = L(alpha(u))
+        """
+        alpha_full = self.expand_reduced_alphas(x_var, trainable_idx, alpha_full_fixed)
+        return self.fun(alpha_full)
+
+
+    def jac_reduced(self, x_var, trainable_idx, alpha_full_fixed):
+        """
+        Reduced gradient:
+        ∇_u J(u) = P_T^T ∇_alpha L(alpha(u))
+        """
+        alpha_full = self.expand_reduced_alphas(x_var, trainable_idx, alpha_full_fixed)
+        g_full = self.jac(alpha_full)
+        return self.project_full_gradient_to_reduced(g_full, trainable_idx)
+
+
+    def get_metrics_reduced(self, x_var, trainable_idx, alpha_full_fixed, evaluate_if_missing=True):
+        alpha_full = self.expand_reduced_alphas(x_var, trainable_idx, alpha_full_fixed)
+        return self.get_metrics(alpha_full, evaluate_if_missing=evaluate_if_missing)
+
 
     def get_metrics(self, alphas=None, evaluate_if_missing=True):
         """

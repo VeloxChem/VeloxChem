@@ -4215,7 +4215,6 @@ z
                 f"{vals['sum_abs_pE']:14.6e} "
                 f"{vals['sum_src_blame']:14.6e}"
             )
-    
    
     def transform_gradient_to_internal_coordinates(self, molecule, gradient, b_matrix, tol=1e-6):
         grad = np.asarray(gradient, dtype=np.float64).reshape(-1)
