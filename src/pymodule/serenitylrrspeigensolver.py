@@ -330,7 +330,7 @@ class SerenityLinearResponseSolver:
 
         self._lr_task.settings.method = self.exc_method
         self._lr_task.settings.nEigen = int(self.nstates)
-        
+        self._lr_task.settings.restart = True
         if self.spinflip:
             self._lr_task.settings.scfstab = 'spinflip'
         if self.conv_thresh is not None:

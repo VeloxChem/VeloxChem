@@ -254,7 +254,7 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
 
         grad_task.settings.lrscfSettings.method = self.exc_method
         grad_task.settings.lrscfSettings.nEigen = int(nstates_req)
-
+        grad_task.settings.lrscfSettings.restart = True
         if self.rsp_driver.conv_thresh is not None:
             grad_task.settings.lrscfSettings.conv = float(
                 self.rsp_driver.conv_thresh)
