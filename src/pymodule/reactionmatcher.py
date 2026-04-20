@@ -545,6 +545,7 @@ class ReactionMatcher:
             self.ostream.print_info(
                 f"Trying all {len(permuted_unassigned_nodes_B)} permutations of unassigned nodes. Expecting to consider {total_expected_perms} permutations based on element counts."
             )
+            self.ostream.flush()
             return self._find_brute_force_mapping(A, B, forced_breaking_edges,
                                                   forced_forming_edges, swapped,
                                                   unassigned_nodes_A,
@@ -643,11 +644,10 @@ class ReactionMatcher:
             breaking_edges = A.edges - B_copy.edges
             forming_edges = B_copy.edges - A.edges
             # If the forced breaking or forced forming edges are not respected, skip this mapping
-            forced_breaking_respected = (
-                forced_breaking_edges.issubset(breaking_edges))
-            forced_forming_respected = (
-                forced_forming_edges.issubset(forming_edges))
-            if not forced_forming_respected or not forced_breaking_respected:
+            if (forced_breaking_edges.issubset(forming_edges)
+                    and len(forced_breaking_edges)
+                    > 0) or (forced_forming_edges.issubset(breaking_edges)
+                             and len(forced_forming_edges) > 0):
                 continue
 
             changing_bonds = breaking_edges | forming_edges
