@@ -534,7 +534,7 @@ class PolOrbitalResponse(CphfSolver):
                     tot_rhs_mo = np.concatenate(
                         (tot_rhs_mo, rhs_red.real, rhs_red.imag))
 
-                profiler.print_memory_subspace(
+                profiler.print_memory_dictionary(
                     {
                         'fock_ao_rhs_real': fock_ao_rhs_real,
                         'fock_ao_rhs_imag': fock_ao_rhs_imag,
@@ -624,7 +624,7 @@ class PolOrbitalResponse(CphfSolver):
             profiler.stop_timer('total')
             profiler.check_memory_usage(f'RHS w={w:.4f}')
 
-        profiler.print_memory_subspace({
+        profiler.print_memory_dictionary({
             'dist_cphf_rhs': dist_cphf_rhs,
             'dist_fock_ao_rhs': dist_fock_ao_rhs,
             'dist_fock_gxc_ao': dist_fock_gxc_ao  # empty list if not DFT
@@ -904,7 +904,7 @@ class PolOrbitalResponse(CphfSolver):
                 else:
                     tot_rhs_mo = np.append(tot_rhs_mo, rhs_red, axis=0)
 
-                profiler.print_memory_subspace(
+                profiler.print_memory_dictionary(
                     {
                         'fock_ao_rhs': fock_ao_rhs,
                         'fock_gxc_ao': fock_gxc_ao,
@@ -942,7 +942,7 @@ class PolOrbitalResponse(CphfSolver):
             profiler.stop_timer('total')
             profiler.check_memory_usage(f'RHS w={w:.4f}')
 
-        profiler.print_memory_subspace({
+        profiler.print_memory_dictionary({
             'dist_cphf_rhs': dist_cphf_rhs,
             'dist_fock_ao_rhs': dist_fock_ao_rhs,
             'dist_fock_gxc_ao': dist_fock_gxc_ao
@@ -1661,6 +1661,7 @@ class PolOrbitalResponse(CphfSolver):
             if self.rank == mpi_master():
 
                 self.ostream.print_info(f'Building omega for w = {w:4.3f}')
+                self.ostream.print_blank()
                 self.ostream.flush()
 
                 # Note: polorbitalresponse uses r instead of mu for dipole operator
@@ -1831,7 +1832,7 @@ class PolOrbitalResponse(CphfSolver):
 
         self.cphf_results['dist_omega_ao'] = dist_omega
 
-        profiler.print_memory_subspace({
+        profiler.print_memory_dictionary({
             'dist_omega_ao': dist_omega
         }, self.ostream)
         profiler.check_memory_usage('End of omega')
@@ -1942,6 +1943,7 @@ class PolOrbitalResponse(CphfSolver):
             if self.rank == mpi_master():
 
                 self.ostream.print_info(f'Building omega for w = {w:4.3f}')
+                self.ostream.print_blank()
                 self.ostream.flush()
 
                 # Note: polorbitalresponse uses r instead of mu for dipole operator
@@ -2175,7 +2177,7 @@ class PolOrbitalResponse(CphfSolver):
 
         self.cphf_results['dist_omega_ao'] = dist_omega
 
-        profiler.print_memory_subspace({
+        profiler.print_memory_dictionary({
             'dist_omega_ao': dist_omega
         }, self.ostream)
         profiler.check_memory_usage('End of omega')

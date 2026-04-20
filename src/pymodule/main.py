@@ -354,8 +354,7 @@ def main():
         'hf', 'rhf', 'uhf', 'rohf', 'scf', 'uscf', 'roscf', 'wavefunction',
         'wave function', 'mp2', 'ump2', 'romp2', 'gradient', 'uscf_gradient',
         'hessian', 'optimize', 'response', 'pulses', 'visualization', 'loprop',
-        'pe force field', 'vibrational', 'polarizability_gradient_real',
-        'polarizability_gradient_complex'
+        'pe force field', 'vibrational', 'polarizability_gradient'
     ]
 
     scf_type = 'restricted'
@@ -647,9 +646,7 @@ def main():
 
     # Polarizability gradient
 
-    if task_type in [
-            'polarizability_gradient_real', 'polarizability_gradient_complex'
-    ]:
+    if task_type == 'polarizability_gradient':
 
         polgrad_dict = (task.input_dict['polarizability_gradient']
                         if 'polarizability_gradient' in task.input_dict else {})
@@ -662,18 +659,23 @@ def main():
         rsp_dict['filename'] = task.input_dict['filename']
         rsp_dict = updated_dict_with_eri_settings(rsp_dict, scf_drv)
 
-        if task_type == 'polarizability_gradient_real':
-            lr_drv = LinearResponseSolver()
-        elif task_type == 'polarizability_gradient_complex':
-            lr_drv = ComplexResponseSolver()
-        lr_drv.a_operator = "electric dipole"
-        lr_drv.b_operator = "electric dipole"
-        lr_drv.update_settings(rsp_dict, method_dict)
-        lr_results = lr_drv.compute(task.molecule, task.ao_basis, scf_results)
-
         polgrad_drv = PolarizabilityGradient(scf_drv, task.mpi_comm,
                                              task.ostream)
         polgrad_drv.update_settings(polgrad_dict, orbrsp_dict, method_dict)
+
+        polgrad_drv.print_level = 2
+        polgrad_drv.do_print_polgrad = True
+
+        if polgrad_drv.is_complex:
+            lr_drv = ComplexResponseSolver()
+        else:
+            lr_drv = LinearResponseSolver()
+        lr_drv.a_operator = "electric dipole"
+        lr_drv.b_operator = "electric dipole"
+        lr_drv.update_settings(rsp_dict, method_dict)
+        lr_drv.frequencies = polgrad_drv.frequencies
+        lr_results = lr_drv.compute(task.molecule, task.ao_basis, scf_results)
+
         polgrad_drv.compute(task.molecule, task.ao_basis, scf_drv.scf_results,
                             lr_results)
 

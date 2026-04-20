@@ -298,6 +298,7 @@ class TdaEigenSolverBase(LinearSolver):
         self.ostream.print_info('Response solution vectors written to file: ' +
                                 final_h5_fname)
         self.ostream.print_blank()
+        self.ostream.flush()
 
     def _print_results(self, results):
         """

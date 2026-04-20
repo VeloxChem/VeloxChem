@@ -814,6 +814,7 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
                             'Response solution vectors written to file: ' +
                             final_h5_fname)
                         self.ostream.print_blank()
+                        self.ostream.flush()
 
                         # Keep the legacy rsp HDF5 layout for compatibility.
                         # Solution vectors are written separately as S1/S2/...
