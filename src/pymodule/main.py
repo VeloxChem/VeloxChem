@@ -476,7 +476,6 @@ def main():
                                   rsp_prop._rsp_driver, rsp_prop._rsp_property)
 
     # Hessian
-    # TODO reconsider keeping this after introducing vibrationalanalysis class
     if task_type == 'hessian':
         hessian_dict = (dict(task.input_dict['hessian'])
                         if 'hessian' in task.input_dict else {})
@@ -642,6 +641,8 @@ def main():
         vib_results = vibrational_drv.compute(task.molecule, task.ao_basis)
 
     # Polarizability gradient
+# TODO this task is bugged: rsp property not set
+# TODO setup for complex and real
 
     if task_type == 'polarizability_gradient':
 
