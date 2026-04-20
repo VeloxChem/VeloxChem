@@ -807,8 +807,6 @@ class TransitionStateGuesser():
 
         step_selector.observe(_on_lambda_change, names='value')
 
-        import threading
-
         def _render_interact(step, conformer_id):
             # Clamp conformer_id in case it exceeds available conformers for
             # the current lambda.
@@ -830,32 +828,44 @@ class TransitionStateGuesser():
             conformer_id=conformer_selector,
         )
 
-        # display='none' reserves no space (unlike visibility='hidden') so
-        # the widget appears as just the sliders until the clean render is ready.
+        # Hide the output until the delayed update has populated it.  Keeping
+        # the output in the layout avoids a visible resize flicker when it is
+        # revealed.
         out_widget = window.children[-1]
-        out_widget.layout.display = 'none'
+        out_widget.layout.visibility = 'hidden'
 
         ipy_display(window)
 
+        def _finish_render():
+            out_widget.layout.visibility = 'visible'
+
         def _do_render():
-            import time
-            # Short pause so the browser can process execute_reply and render
-            # the widget before our comm message arrives.
-            time.sleep(0.3)
             try:
                 # w.update() re-runs the function with the current widget
                 # values via the same comm pathway as a user interaction, so
                 # py3Dmol's script executes correctly.  No slider toggling
-                # needed — one clean render at the correct position.
+                # needed: one clean render at the correct position.
                 window.update()
-                time.sleep(0.5)
             except Exception:
                 pass
             finally:
-                out_widget.layout.display = ''
+                _schedule_callback(_finish_render, delay=0.5)
 
-        # Start _do_render from a post_execute hook so the timer begins the
-        # moment the cell finishes, not after a fixed worst-case delay.
+        def _schedule_callback(callback, delay=0.0):
+            try:
+                loop = _ip.kernel.io_loop
+                loop.call_later(delay, callback)
+                return
+            except Exception:
+                pass
+
+            if delay > 0.0:
+                time.sleep(delay)
+            callback()
+
+        # Schedule _do_render from a post_execute hook so the delay begins when
+        # the cell finishes and the widget output area has been sent to the
+        # frontend.
         try:
             from IPython import get_ipython as _get_ipython
             _ip = _get_ipython()
@@ -866,11 +876,11 @@ class TransitionStateGuesser():
 
             def _on_post_execute():
                 _ip.events.unregister('post_execute', _on_post_execute)
-                threading.Thread(target=_do_render, daemon=True).start()
+                _schedule_callback(_do_render, delay=0.3)
 
             _ip.events.register('post_execute', _on_post_execute)
         else:
-            threading.Thread(target=_do_render, daemon=True).start()
+            _schedule_callback(_do_render, delay=0.3)
 
     @staticmethod
     def _show_conformer_iteration(
