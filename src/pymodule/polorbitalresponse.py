@@ -2020,7 +2020,8 @@ class PolOrbitalResponse(CphfSolver):
             return self.compute_omega_complex(molecule, basis, scf_tensors,
                                               lr_results)
         else:
-            return self.compute_omega_real(molecule, basis, scf_tensors,
+            #return self.compute_omega_real(molecule, basis, scf_tensors,
+            return self.compute_omega_real_red_dim(molecule, basis, scf_tensors,
                                            lr_results)
 
     def compute_omega_real(self, molecule, basis, scf_tensors, lr_results):
@@ -2275,6 +2276,7 @@ class PolOrbitalResponse(CphfSolver):
                     omega_red.append(omega[x, y].copy())
                 omega_red = np.array(omega_red)
                 # TODO remove debug print
+                print("\nomega_red")
                 print(omega_red)
 
                 del omega
@@ -2516,8 +2518,12 @@ class PolOrbitalResponse(CphfSolver):
                                                           dm_vv, cphf_ov)
                 del dm_oo, dm_vv
 
-                for m in range(dof):
-                    for n in range(m, dof):
+                #for m in range(dof):
+                #    for n in range(m, dof):
+# NOTE WIP
+                for idx, xy in enumerate(xy_pairs):
+                        m = xy[0]
+                        n = xy[1]
                         # TODO: move outside for-loop when all Fock matrices can be
                         # extracted into a numpy array at the same time.
 
@@ -2540,8 +2546,10 @@ class PolOrbitalResponse(CphfSolver):
 
                         fmat = (fock_cphf[m * dof + n] +
                                 fock_cphf[m * dof + n].T +
-                                fock_ao_rhs[m * dof + n])
+                                #fock_ao_rhs[m * dof + n])
+                                fock_ao_rhs[idx])
                         # TODO remove debug print
+                        print("fmat")
                         print(fmat)
 
                         # dof=3  (0,0), (0,1), (0,2); (1,0), (1,1), (1,2),
@@ -2574,6 +2582,7 @@ class PolOrbitalResponse(CphfSolver):
                 omega_red = np.array(omega_red)
 
                 # TODO remove debug print
+                print("\nomega_red")
                 print(omega_red)
                 del omega
 
