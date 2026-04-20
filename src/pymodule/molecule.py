@@ -108,13 +108,13 @@ def _Molecule_smiles_to_xyz(smiles_str,
                 reordering = []
                 for atom in mol_full.GetAtoms():
                     # add non-hydrogen atom
-                    if (atom.GetAtomicNum() != 1
-                            and atom.GetIdx() not in reordering):
+                    if (atom.GetAtomicNum() != 1 and
+                            atom.GetIdx() not in reordering):
                         reordering.append(atom.GetIdx())
                         for nbr in atom.GetNeighbors():
                             # add neighboring hydrogen atoms
-                            if (nbr.GetAtomicNum() == 1
-                                    and nbr.GetIdx() not in reordering):
+                            if (nbr.GetAtomicNum() == 1 and
+                                    nbr.GetIdx() not in reordering):
                                 reordering.append(nbr.GetIdx())
                 for atom in mol_full.GetAtoms():
                     # For completeness, add remaining atoms
@@ -666,8 +666,8 @@ def _Molecule_find_connected_atoms(self, atom_idx, connectivity_matrix=None):
         more_connected_atoms = set()
         for a in connected_atoms:
             for b in range(connectivity_matrix.shape[0]):
-                if (b not in connected_atoms
-                        and connectivity_matrix[a, b] == 1):
+                if (b not in connected_atoms and
+                        connectivity_matrix[a, b] == 1):
                     more_connected_atoms.add(b)
         if more_connected_atoms:
             connected_atoms.update(more_connected_atoms)
@@ -1436,21 +1436,19 @@ def _Molecule_write_xyz_file(self, xyz_filename):
         fh.write(self.get_xyz_string())
 
 
-def _Molecule_show(
-    self,
-    width=400,
-    height=300,
-    atom_indices=False,
-    atom_labels=False,
-    gradient=None,
-    starting_index=1,
-    bonds=None,
-    forming_bonds=None,
-    breaking_bonds=None,
-    forming_width=0.15,
-    breaking_width=0.15,
-    label_font_size=16,
-):
+def _Molecule_show(self,
+                   width=400,
+                   height=300,
+                   atom_indices=False,
+                   atom_labels=False,
+                   gradient=None,
+                   starting_index=1,
+                   bonds=None,
+                   forming_bonds=None,
+                   breaking_bonds=None,
+                   forming_width=0.15,
+                   breaking_width=0.15,
+                   label_font_size=16):
     """
     Creates a 3D view with py3dmol.
 
@@ -1964,8 +1962,10 @@ def _Molecule_is_water_molecule(self):
     conn = self.get_connectivity_matrix()
 
     bond_labels = [
-        sorted([labels[i], labels[j]]) for i in range(natoms)
-        for j in range(i, natoms) if conn[i, j] == 1
+        sorted([labels[i], labels[j]])
+        for i in range(natoms)
+        for j in range(i, natoms)
+        if conn[i, j] == 1
     ]
 
     if bond_labels != [['H', 'O'], ['H', 'O']]:
