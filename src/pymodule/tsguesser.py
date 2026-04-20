@@ -1046,18 +1046,6 @@ class TransitionStateGuesser():
         breaking_width = offset + add * (1 - step)
         forming_width = offset + add * (step)
 
-        # Hide py3Dmol's red warning div before it appears so it never
-        # flashes.  py3Dmol always inserts the warning element first and
-        # removes it via JavaScript; this CSS makes it invisible from the
-        # start so the removal is imperceptible.
-        try:
-            from IPython.display import display as _ipy_display, HTML as _HTML
-            _ipy_display(
-                _HTML('<style>[id^="3dmolwarning_"]'
-                      '{display:none!important}</style>'))
-        except Exception:
-            pass
-
         if bonds is not None and (forming_bonds is not None
                                   or breaking_bonds is not None):
             mol.show(
