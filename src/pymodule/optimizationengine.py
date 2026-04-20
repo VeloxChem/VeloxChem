@@ -43,6 +43,7 @@ from .scfgradientdriver import ScfGradientDriver
 from .molecule import Molecule
 from .profiler import Profiler
 from .inputparser import write_unparsed_input_to_hdf5
+from .errorhandler import assert_msg_critical
 
 with redirect_stderr(StringIO()) as fg_err:
     import geometric
@@ -97,6 +98,34 @@ class OptimizationEngine(geometric.engine.Engine):
 
         return 'custom engine'
 
+    def _validate_step_results(self, energy, gradient, natoms):
+        """Validates optimizer step results before returning to geomeTRIC.
+
+        :param energy:
+            The energy returned by the driver stack.
+        :param gradient:
+            The gradient returned by the driver stack.
+        :param natoms:
+            Number of atoms in the current molecule.
+        """
+
+        assert_msg_critical(
+            np.isscalar(energy),
+            'OptimizationEngine.calc_new: expected scalar energy after MPI '
+            'synchronization')
+
+        try:
+            gradient = np.asarray(gradient, dtype=float)
+        except (TypeError, ValueError):
+            gradient = None
+
+        assert_msg_critical(
+            gradient is not None,
+            'OptimizationEngine.calc_new: expected array-like gradient after '
+            'MPI synchronization')
+
+        return float(energy), gradient
+
     def calc_new(self, coords, dirname):
         """
         Implements calc_new method for the engine.
@@ -146,6 +175,8 @@ class OptimizationEngine(geometric.engine.Engine):
 
         energy = self.comm.bcast(energy, root=mpi_master())
         gradient = self.comm.bcast(gradient, root=mpi_master())
+        energy, gradient = self._validate_step_results(
+            energy, gradient, new_mol.number_of_atoms())
 
         self.opt_current_step += 1
 
