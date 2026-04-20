@@ -43,7 +43,6 @@ from .mmforcefieldgenerator import MMForceFieldGenerator
 from .respchargesdriver import RespChargesDriver
 from .espchargesdriver import EspChargesDriver
 from .excitondriver import ExcitonModelDriver
-from .rixsdriver import RixsDriver
 from .numerovdriver import NumerovDriver
 from .mp2driver import Mp2Driver
 from .peforcefieldgenerator import PEForceFieldGenerator
@@ -66,6 +65,8 @@ from .rsptpatransition import TpaTransition
 from .rspdoublerestrans import DoubleResTransition
 from .rspthreepatransition import ThreePATransition
 from .rsptpa import TPA
+from .lrsolver import LinearResponseSolver
+from .cppsolver import ComplexResponseSolver
 from .polarizabilitygradient import PolarizabilityGradient
 from .vibrationalanalysis import VibrationalAnalysis
 from .visualizationdriver import VisualizationDriver
@@ -353,7 +354,8 @@ def main():
         'hf', 'rhf', 'uhf', 'rohf', 'scf', 'uscf', 'roscf', 'wavefunction',
         'wave function', 'mp2', 'ump2', 'romp2', 'gradient', 'uscf_gradient',
         'hessian', 'optimize', 'response', 'pulses', 'visualization', 'loprop',
-        'pe force field', 'vibrational', 'polarizability_gradient'
+        'pe force field', 'vibrational', 'polarizability_gradient_real',
+        'polarizability_gradient_complex'
     ]
 
     scf_type = 'restricted'
@@ -380,7 +382,7 @@ def main():
             xtb_drv = XtbDriver(task.mpi_comm, task.ostream)
             xtb_drv.set_method(method_dict['xtb'].lower())
             xtb_drv.xtb_verbose = True
-            xtb_results = xtb_drv.compute(task.molecule)
+            xtb_results_not_used = xtb_drv.compute(task.molecule)
         else:
             scf_drv = select_scf_driver(task, scf_type)
             scf_drv.update_settings(scf_dict, method_dict)
@@ -523,14 +525,15 @@ def main():
                 opt_drv = OptimizationDriver(grad_drv)
                 opt_drv.keep_files = True
                 opt_drv.update_settings(opt_dict)
-                opt_results = opt_drv.compute(task.molecule)
+                opt_results_not_used = opt_drv.compute(task.molecule)
 
             else:
                 grad_drv = ScfGradientDriver(scf_drv)
                 opt_drv = OptimizationDriver(grad_drv)
                 opt_drv.keep_files = True
                 opt_drv.update_settings(opt_dict)
-                opt_results = opt_drv.compute(task.molecule, task.ao_basis)
+                opt_results_not_used = opt_drv.compute(task.molecule,
+                                                       task.ao_basis)
 
         elif run_excited_state_gradient:
 
@@ -561,9 +564,10 @@ def main():
             opt_drv = OptimizationDriver(tddftgrad_drv)
             opt_drv.keep_files = True
             opt_drv.update_settings(opt_dict)
-            opt_results = opt_drv.compute(task.molecule, task.ao_basis, scf_drv,
-                                          rsp_prop._rsp_driver,
-                                          rsp_prop._rsp_property)
+            opt_results_not_used = opt_drv.compute(task.molecule, task.ao_basis,
+                                                   scf_drv,
+                                                   rsp_prop._rsp_driver,
+                                                   rsp_prop._rsp_property)
 
     # Vibrational analysis
 
@@ -638,13 +642,14 @@ def main():
                                                 rsp_dict=rsp_dict,
                                                 polgrad_dict=polgrad_dict)
 
-        vib_results = vibrational_drv.compute(task.molecule, task.ao_basis)
+        vib_results_not_used = vibrational_drv.compute(task.molecule,
+                                                       task.ao_basis)
 
     # Polarizability gradient
-# TODO this task is bugged: rsp property not set
-# TODO setup for complex and real
 
-    if task_type == 'polarizability_gradient':
+    if task_type in [
+            'polarizability_gradient_real', 'polarizability_gradient_complex'
+    ]:
 
         polgrad_dict = (task.input_dict['polarizability_gradient']
                         if 'polarizability_gradient' in task.input_dict else {})
@@ -657,15 +662,20 @@ def main():
         rsp_dict['filename'] = task.input_dict['filename']
         rsp_dict = updated_dict_with_eri_settings(rsp_dict, scf_drv)
 
-        rsp_prop = select_rsp_property(task, mol_orbs, rsp_dict, method_dict)
-        rsp_prop.init_driver(task.mpi_comm, task.ostream)
-        rsp_prop.compute(task.molecule, task.ao_basis, scf_results)
+        if task_type == 'polarizability_gradient_real':
+            lr_drv = LinearResponseSolver()
+        elif task_type == 'polarizability_gradient_complex':
+            lr_drv = ComplexResponseSolver()
+        lr_drv.a_operator = "electric dipole"
+        lr_drv.b_operator = "electric dipole"
+        lr_drv.update_settings(rsp_dict, method_dict)
+        lr_results = lr_drv.compute(task.molecule, task.ao_basis, scf_results)
 
         polgrad_drv = PolarizabilityGradient(scf_drv, task.mpi_comm,
                                              task.ostream)
         polgrad_drv.update_settings(polgrad_dict, orbrsp_dict, method_dict)
         polgrad_drv.compute(task.molecule, task.ao_basis, scf_drv.scf_results,
-                            rsp_prop._rsp_property)
+                            lr_results)
 
     # Response
 
@@ -761,8 +771,8 @@ def main():
                                                 rsp_dict=rsp_dict,
                                                 polgrad_dict=polgrad_dict)
 
-                vib_results = vibrational_drv.compute(task.molecule,
-                                                      task.ao_basis)
+                vib_results_not_used = vibrational_drv.compute(
+                    task.molecule, task.ao_basis)
 
             # Excited state optimization
             if 'optimize_excited_state' in task.input_dict:
