@@ -1465,7 +1465,7 @@ class OpenMMDynamics:
 
         self.qm_driver = qm_driver
         self.grad_driver = grad_driver
-        self.qm_driver.ostream.mute()
+        #self.qm_driver.ostream.mute()
 
         # Driver flag 
         if isinstance(self.qm_driver, XtbDriver):
@@ -2530,6 +2530,8 @@ class OpenMMDynamics:
                 positions_ang[atom1] = positions_ang[atom2] - direction * self.linking_atom_distance
 
             new_molecule = Molecule(qm_atom_labels, positions_ang, units="angstrom")
+            new_molecule.set_charge(self.molecule.get_charge())
+            new_molecule.set_multiplicity(self.molecule.get_multiplicity())
             self.dynamic_molecules.append(new_molecule)
 
         else:
@@ -2537,6 +2539,8 @@ class OpenMMDynamics:
             atom_labels = [atom.element.symbol for atom in self.topology.atoms()]
             qm_atom_labels = [atom_labels[i] for i in self.qm_atoms]
             new_molecule = Molecule(qm_atom_labels, positions_ang, units="angstrom")
+            new_molecule.set_charge(self.molecule.get_charge())
+            new_molecule.set_multiplicity(self.molecule.get_multiplicity())
             self.dynamic_molecules.append(new_molecule)
 
         if isinstance(self.qm_driver, SerenityLinearResponseSolver):
@@ -2557,7 +2561,7 @@ class OpenMMDynamics:
             potential_kjmol = float(self.qm_driver.get_energy()) * hartree_in_kjpermol()
             gradient = self.grad_driver.get_gradient()
 
-        if self.basis is not None:
+        elif self.basis is not None:
             basis = MolecularBasis.read(new_molecule, self.basis)
             scf_results = self.qm_driver.compute(new_molecule, basis)
             gradient = self.grad_driver.compute(new_molecule, basis, scf_results)
