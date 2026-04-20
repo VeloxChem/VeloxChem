@@ -156,7 +156,7 @@ class TestTransitionStateGuesser:
         rea.set_charge(-1)
         pro.set_charge(-1)
         ts_guesser = TransitionStateGuesser()
-        # ts_guesser.ostream.mute()
+        ts_guesser.ostream.mute()
 
         ts_guesser.qm_xcfun = "HF"
         ts_guesser.qm_basis = "STO-3G"
