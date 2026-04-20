@@ -798,15 +798,6 @@ class TransitionStateGuesser():
             value=initial_best + 1,
         )
 
-        def _on_lambda_change(change):
-            step = change['new']
-            options = list(range(1, len(scan[step]) + 1))
-            best = _best_conformer_index(step)
-            conformer_selector.options = options
-            conformer_selector.value = best + 1
-
-        step_selector.observe(_on_lambda_change, names='value')
-
         def _render_interact(step, conformer_id):
             # Clamp conformer_id in case it exceeds available conformers for
             # the current lambda.
@@ -822,17 +813,42 @@ class TransitionStateGuesser():
                 **mol_show_kwargs,
             )
 
-        window = ipywidgets.interactive(
-            _render_interact,
-            step=step_selector,
-            conformer_id=conformer_selector,
-        )
-
         # Hide the output until the delayed update has populated it.  Keeping
         # the output in the layout avoids a visible resize flicker when it is
         # revealed.
-        out_widget = window.children[-1]
+        out_widget = ipywidgets.Output()
         out_widget.layout.visibility = 'hidden'
+        window = ipywidgets.VBox([
+            step_selector,
+            conformer_selector,
+            out_widget,
+        ])
+
+        lambda_change_in_progress = [False]
+
+        def _render_current_selection():
+            with out_widget:
+                out_widget.clear_output(wait=True)
+                _render_interact(step_selector.value, conformer_selector.value)
+
+        def _on_lambda_change(change):
+            lambda_change_in_progress[0] = True
+            try:
+                step = change['new']
+                options = list(range(1, len(scan[step]) + 1))
+                best = _best_conformer_index(step)
+                conformer_selector.options = options
+                conformer_selector.value = best + 1
+            finally:
+                lambda_change_in_progress[0] = False
+            _render_current_selection()
+
+        def _on_conformer_change(change):
+            if not lambda_change_in_progress[0]:
+                _render_current_selection()
+
+        step_selector.observe(_on_lambda_change, names='value')
+        conformer_selector.observe(_on_conformer_change, names='value')
 
         ipy_display(window)
 
@@ -841,11 +857,9 @@ class TransitionStateGuesser():
 
         def _do_render():
             try:
-                # w.update() re-runs the function with the current widget
-                # values via the same comm pathway as a user interaction, so
-                # py3Dmol's script executes correctly.  No slider toggling
-                # needed: one clean render at the correct position.
-                window.update()
+                # Render once the widget output has reached the frontend, so
+                # py3Dmol's script runs against an existing output area.
+                _render_current_selection()
             except Exception:
                 pass
             finally:
