@@ -147,7 +147,8 @@ class CpcmDriver:
         self._cpcm_precond = np.hstack(self._cpcm_precond)
 
         if do_nuclear:
-            self._cpcm_Bzvec = self.form_vector_Bz(self._cpcm_grid, molecule, basis)
+            self._cpcm_Bzvec = self.form_vector_Bz(self._cpcm_grid, molecule,
+                                                   basis)
         else:
             self._cpcm_Bzvec = None
 
@@ -723,9 +724,9 @@ class CpcmDriver:
         try:
             import matplotlib.pyplot as plt
         except ImportError:
-            raise ImportError("Unable to impoty matplotlib.")
+            raise ImportError("Unable to import matplotlib.")
         try:
-            import matplotlib.colors as molors
+            import matplotlib.colors as mcolors
         except ImportError:
             raise ImportError("Unable to import matplotlib.colors.")
 
@@ -733,20 +734,17 @@ class CpcmDriver:
             raise TypeError("CPCM grid not available. Driver not initialized.")
 
         if self._cpcm_q is None:
-            raise TypeError(
-                "CPCM charges not available.\n"
-                "Run SCF with CPCM first, then call this function"
-            )
+            raise TypeError("CPCM charges not available.\n"
+                            "Run SCF with CPCM first, then call this function")
 
         grid = self._cpcm_grid
         q = self._cpcm_q
 
+        assert_msg_critical(grid.shape[1] == 6,
+                            "CpcmDriver.visualize_grid: Invalid grid size")
         assert_msg_critical(
-            grid.shape[1] == 6, "CpcmDriver.visualize_grid: Invalid grid size"
-        )
-        assert_msg_critical(
-            len(q) == len(grid), "CpcmDriver.visualize_grid: Invalid q-vector size"
-        )
+            len(q) == len(grid),
+            "CpcmDriver.visualize_grid: Invalid q-vector size")
 
         grid_in_angstrom = grid[:, :3] * bohr_in_angstrom()
 
@@ -768,14 +766,16 @@ class CpcmDriver:
             x, y, z = grid_in_angstrom[k, :3]
 
             color = mcolors.to_hex(cmap(norm(q[k])))
-            v.addSphere(
-                {
-                    "center": {"x": x, "y": y, "z": z},
-                    "radius": 0.05,
-                    "color": color,
-                    "opacity": 0.9,
-                }
-            )
+            v.addSphere({
+                "center": {
+                    "x": x,
+                    "y": y,
+                    "z": z
+                },
+                "radius": 0.05,
+                "color": color,
+                "opacity": 0.9,
+            })
 
         v.zoomTo()
         v.show()
@@ -785,7 +785,6 @@ class CpcmDriver:
             sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
             cb = plt.colorbar(sm, cax=ax, orientation="horizontal")
             cb.set_label("Charge (a.u)")
-
 
     def grad_Aij(self, molecule, grid, q, eps, x):
         """
