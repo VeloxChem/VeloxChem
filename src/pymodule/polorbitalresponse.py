@@ -1145,6 +1145,8 @@ class PolOrbitalResponse(CphfSolver):
 
         for x in range(dof):
             for y in range(x, dof):
+
+## xy
                 # xmt,ymc->xytc
                 tmp = np.linalg.multi_dot(
                     [fock_ao_rhs_x_plus_y[x], x_plus_y_ao[y]])
@@ -1157,6 +1159,7 @@ class PolOrbitalResponse(CphfSolver):
                 # cl,ti,la,xytc->xyia
                 fock_mo_rhs_2pdm[x, y] += -1.0 * np.linalg.multi_dot(
                     [mo_occ.T, tmp, ovlp, mo_vir])
+## yx
                 # ymt,xmc->xytc
                 tmp = np.linalg.multi_dot(
                     [fock_ao_rhs_x_plus_y[y], x_plus_y_ao[x]])
@@ -1169,6 +1172,7 @@ class PolOrbitalResponse(CphfSolver):
                 # cl,ti,la,xytc->xyia
                 fock_mo_rhs_2pdm[x, y] += -1.0 * np.linalg.multi_dot(
                     [mo_occ.T, tmp, ovlp, mo_vir])
+## xy
                 # xtm,ymc->xytc
                 tmp = np.linalg.multi_dot(
                     [fock_ao_rhs_x_plus_y[x].T, x_plus_y_ao[y]])
@@ -1181,6 +1185,7 @@ class PolOrbitalResponse(CphfSolver):
                 # cl,ti,la,xytc->xyia
                 fock_mo_rhs_2pdm[x, y] += -1.0 * np.linalg.multi_dot(
                     [mo_occ.T, tmp, ovlp, mo_vir])
+## yx
                 # ytm,xmc->xytc
                 tmp = np.linalg.multi_dot(
                     [fock_ao_rhs_x_plus_y[y].T, x_plus_y_ao[x]])
@@ -1193,6 +1198,7 @@ class PolOrbitalResponse(CphfSolver):
                 # cl,ti,la,xytc->xyia
                 fock_mo_rhs_2pdm[x, y] += -1.0 * np.linalg.multi_dot(
                     [mo_occ.T, tmp, ovlp, mo_vir])
+## xy
                 # xmt,ycm->xyct
                 tmp = np.linalg.multi_dot(
                     [x_plus_y_ao[y], fock_ao_rhs_x_plus_y[x].T])
@@ -1205,6 +1211,7 @@ class PolOrbitalResponse(CphfSolver):
                 # cl,li,ta,xyct->xyia
                 fock_mo_rhs_2pdm[x, y] += np.linalg.multi_dot(
                     [mo_occ.T, ovlp.T, tmp, mo_vir])
+## yx
                 # ymt,xcm->xyct
                 tmp = np.linalg.multi_dot(
                     [x_plus_y_ao[x], fock_ao_rhs_x_plus_y[y].T])
@@ -1217,6 +1224,7 @@ class PolOrbitalResponse(CphfSolver):
                 # cl,li,ta,xyct->xyia
                 fock_mo_rhs_2pdm[x, y] += np.linalg.multi_dot(
                     [mo_occ.T, ovlp.T, tmp, mo_vir])
+## xy
                 # xtm,ycm->xytc
                 tmp = np.linalg.multi_dot(
                     [x_plus_y_ao[y], fock_ao_rhs_x_plus_y[x]]).T
@@ -1229,6 +1237,7 @@ class PolOrbitalResponse(CphfSolver):
                 # cl,li,ta,xytc->xyia
                 fock_mo_rhs_2pdm[x, y] += np.linalg.multi_dot(
                     [mo_vir.T, tmp, ovlp, mo_occ]).T
+## yx
                 # ytm,xcm->xytc
                 tmp = np.linalg.multi_dot(
                     [x_plus_y_ao[x], fock_ao_rhs_x_plus_y[y]]).T
@@ -1334,6 +1343,7 @@ class PolOrbitalResponse(CphfSolver):
 
         return rhs_dipole_contrib
 
+# TODO remove unused function
     def construct_dft_e3_dm_real(self, x_minus_y_ao):
         """
         Constructs the density matrices for E[3] term
@@ -1372,6 +1382,7 @@ class PolOrbitalResponse(CphfSolver):
 
         return perturbed_dm_ao_list, zero_dm_ao_list
 
+# TODO remove unused function
     def construct_dft_e3_dm_complex(self, x_minus_y_ao):
         """
         Constructs the density matrices for E[3] term
@@ -1453,6 +1464,7 @@ class PolOrbitalResponse(CphfSolver):
         return (perturbed_dm_ao_rere, perturbed_dm_ao_imim,
                 perturbed_dm_ao_reim, perturbed_dm_ao_imre, zero_dm_ao)
 
+# TODO remove unused function
     def integrate_gxc_real(self, molecule, basis, molgrid, gs_density,
                            zero_dm_ao, perturbed_dm_ao, fock_gxc_ao):
         """
@@ -1484,6 +1496,7 @@ class PolOrbitalResponse(CphfSolver):
                                   self.xcfun.get_func_label(), "qrf")
         return fock_gxc_ao
 
+# TODO remove unused function
     def integrate_gxc_complex(self, molecule, basis, molgrid, gs_density, zero_dm_ao,
                               perturbed_dm_ao_list, fock_gxc_ao_list):
         """
