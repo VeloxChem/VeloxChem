@@ -1480,6 +1480,8 @@ def _Molecule_show(
         The radius of forming bonds.
     :param breaking_width:
         The radius of breaking bonds.
+    :param label_font_size:
+        The font size for atom labels and indices.
     """
 
     try:

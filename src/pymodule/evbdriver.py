@@ -691,20 +691,31 @@ class EvbDriver():
             def save_group(data, group):
                 for k, v in data.items():
                     if isinstance(v, dict):
+                        # Recurse into nested dicts as HDF5 subgroups
                         subgroup = group.create_group(k)
                         save_group(v, subgroup)
-                    elif isinstance(v, np.ndarray) or isinstance(v, list):
-                        group.create_dataset(k, data=v)
-                    elif isinstance(v, set):
-                        group.create_dataset(k, data=list(v))
+                    elif isinstance(v, (np.ndarray, list, set)):
+                        # sets are unordered so convert to list first; np.array handles both
+                        group.create_dataset(
+                            k,
+                            data=np.array(list(v) if isinstance(v, set) else v))
+                    elif isinstance(v,
+                                    (bool, int, float, str, bytes, np.generic)):
+                        # np.generic covers numpy scalars (np.float64, np.int32, etc.)
+                        group[k] = v
+                    elif hasattr(v, '__dict__'):
+                        # Custom objects: recurse into their attributes as a subgroup
+                        subgroup = group.create_group(k)
+                        save_group(vars(v), subgroup)
                     else:
+                        # Last resort: let h5py try; fall back to repr string if it fails
                         try:
                             group[k] = v
                         except TypeError:
+                            group.attrs[k] = repr(v)
                             self.ostream.print_warning(
-                                f"Could not save {k} with value {v} of type {type(v)}. Skipping this entry."
+                                f"Key '{k}': stored {type(v).__name__} as string repr"
                             )
-                            continue
 
             save_group(data, file)
 

@@ -6,7 +6,7 @@ import sys
 from veloxchem.molecule import Molecule
 from veloxchem.evbdriver import EvbDriver
 from veloxchem.reaffbuilder import ReactionForceFieldBuilder
-from veloxchem.evbsystembuilder import EvbSystemBuilder
+from veloxchem.reactionsystembuilder import ReactionSystemBuilder
 from veloxchem.evbdataprocessing import EvbDataProcessing
 from veloxchem.xtbdriver import XtbDriver
 from veloxchem.mmforcefieldgenerator import MMForceFieldGenerator
@@ -68,7 +68,7 @@ class TestEvb:
         ]
 
         # todo how robust do I need to test these different input options?
-        reactant, product, formed_bonds, broken_bonds, reactants, products, mapping = ffbuilder.build_forcefields(
+        reactant, product, formed_bonds, broken_bonds, reactants, products, mapping = ffbuilder.build_force_fields(
             reactant=reactant,
             product=product,
         )
@@ -132,7 +132,7 @@ class TestEvb:
         propath = str(data_path / 'evb_ethene_H2O_ff_data.json')
 
         # build systems in water and vacuum
-        system_builder = EvbSystemBuilder()
+        system_builder = ReactionSystemBuilder()
         system_builder.ostream.mute()
 
         reactant_mol = Molecule.read_xyz_file(
