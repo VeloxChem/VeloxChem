@@ -33,7 +33,7 @@ class TestOrbitalResponse:
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
         scf_drv.update_settings(task.input_dict['scf'],
                                 task.input_dict['method_settings'])
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        scf_drv.compute(task.molecule, task.ao_basis)
 
         # Our references: lambda and omega in AO basis
 
@@ -87,7 +87,8 @@ class TestOrbitalResponse:
                 cphf_coefficients.append(solution_vec)
 
         if task.mpi_rank == mpi_master():
-            nocc = task.molecule.number_of_alpha_electrons()
+            nocc = task.molecule.number_of_alpha_occupied_orbitals(
+                task.ao_basis)
             mo = scf_drv.scf_results['C_alpha']
             mo_occ = mo[:, :nocc]
             mo_vir = mo[:, nocc:]

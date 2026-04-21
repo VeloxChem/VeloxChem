@@ -6,7 +6,7 @@ from veloxchem.outputstream import OutputStream
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
-from veloxchem.cppsolver import ComplexResponse
+from veloxchem.cppsolver import ComplexResponseSolver
 from veloxchem.quadraticresponsedriver import QuadraticResponseDriver
 
 
@@ -136,7 +136,7 @@ class TestQrfFD:
         scf_drv_plus.update_settings(scf_settings, method_dict_plus)
         scf_result_plus = scf_drv_plus.compute(molecule, basis)
 
-        cpp_plus = ComplexResponse(comm, ostream)
+        cpp_plus = ComplexResponseSolver(comm, ostream)
         cpp_plus.update_settings(cpp_settings, method_dict_plus)
         cpp_result_plus = cpp_plus.compute(molecule, basis, scf_result_plus)
 
@@ -144,7 +144,7 @@ class TestQrfFD:
         scf_drv_minus.update_settings(scf_settings, method_dict_minus)
         scf_result_minus = scf_drv_minus.compute(molecule, basis)
 
-        cpp_minus = ComplexResponse(comm, ostream)
+        cpp_minus = ComplexResponseSolver(comm, ostream)
         cpp_minus.update_settings(cpp_settings, method_dict_minus)
         cpp_result_minus = cpp_minus.compute(molecule, basis, scf_result_minus)
 

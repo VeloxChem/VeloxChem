@@ -9,7 +9,7 @@ VLX_TARGET := veloxchemlib.so
 VLX_MODULE := $(wildcard pymodule/*.py)
 VLX_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 
-LIB_LIST += -shared $(PYTHON_LD) $(OPENMP_LD) $(MATH_LD) $(LIBXC_LD)
+LIB_LIST += -shared $(PYTHON_LD) $(OPENMP_LD) $(MATH_LD) $(LIBXC_LD)  $(LIBBST_LD)
 
 # Select compiler flags
 ifneq "$(MAKECMDGOALS)" "release"
@@ -77,7 +77,6 @@ debug: $(VLX_LIBS)
 	$(CP) $(VLX_MODULE) $(CURDIR)/../build/python/veloxchem
 	$(CP) -r $(VLX_BAS) $(CURDIR)/../build/python/veloxchem
 	$(CP) -r ../database $(CURDIR)/../build/python/veloxchem
-	$(CP) pymodule/mklconf.py.in $(CURDIR)/../build/python/veloxchem/mklconf.py
 	@echo ""                               >> $(CURDIR)/../build/python/veloxchem/__init__.py
 	@echo "__commit__ = \"$(VLX_COMMIT)\"" >> $(CURDIR)/../build/python/veloxchem/__init__.py
 
@@ -92,7 +91,6 @@ release: $(VLX_LIBS)
 	$(CP) $(VLX_MODULE) $(CURDIR)/../build/python/veloxchem
 	$(CP) -r $(VLX_BAS) $(CURDIR)/../build/python/veloxchem
 	$(CP) -r ../database $(CURDIR)/../build/python/veloxchem
-	$(CP) pymodule/mklconf.py.in $(CURDIR)/../build/python/veloxchem/mklconf.py
 	@echo ""                               >> $(CURDIR)/../build/python/veloxchem/__init__.py
 	@echo "__commit__ = \"$(VLX_COMMIT)\"" >> $(CURDIR)/../build/python/veloxchem/__init__.py
 

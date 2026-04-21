@@ -52,7 +52,8 @@ from .mmdriver import MMDriver
 from .mmgradientdriver import MMGradientDriver
 from .optimizationdriver import OptimizationDriver
 from .inputparser import parse_input
-from .errorhandler import assert_msg_critical, safe_arccos
+from .errorhandler import assert_msg_critical
+from .mathutils import safe_arccos
 from .seminario import Seminario
 from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
@@ -376,19 +377,24 @@ class MMForceFieldGenerator:
                       scan_range=[0, 360],
                       n_points=7):
         """
-        Changes the dihedral constants for a specific rotatable bond in order to
-        fit the QM scan.
+        Runs a constrained QM scan for one rotatable bond.
 
         :param scf_driver:
-            The SCF driver. If None is provided it will use HF.
+            The SCF driver used to obtain the reference wavefunction.
         :param basis:
-            The AO basis set. If None is provided it will use 6-31G*.
+            The AO basis set.
         :param rotatable_bond:
-            The list of indices of the rotatable bond. (1-indexed)
+            The rotatable bond as a pair of 1-based atom indices.
+        :param scf_results:
+            Optional SCF results. If not provided, an SCF calculation is run.
         :param scan_range:
-            List with the range of dihedral angles. Default is [0, 360].
+            Two-element list with the start and end dihedral angles in degrees.
         :param n_points:
-            The number of points to be calculated. Default is 19.
+            The number of scan points.
+
+        :return:
+            A dictionary with scan angles, scan energies, scan geometries, and
+            the target dihedral indices.
         """
 
         assert_msg_critical(
@@ -411,6 +417,11 @@ class MMForceFieldGenerator:
         # Transform the dihedral indices to 1-indexed for printing
         dihedral_indices_one_based = [[i + 1, j + 1, k + 1, l + 1]
                                       for i, j, k, l in dihedral_indices]
+
+        assert_msg_critical(
+            len(dihedral_indices) > 0,
+            'MMForceFieldGenerator.scan_dihedral: rotatable_bond was not '
+            'found among dihedrals')
 
         # Print a header
         header = 'VeloxChem Dihedral Scan'
@@ -495,17 +506,25 @@ class MMForceFieldGenerator:
                                  show_diff=False,
                                  verbose=True):
         """
-        Changes the dihedral constants for a specific rotatable bond in order to
-        fit the QM scan.
+        Fits dihedral parameters for one rotatable bond to QM scan data.
 
         :param rotatable_bond:
-            The list of indices of the rotatable bond. (1-indexed)
+            The rotatable bond as a pair of 1-based atom indices.
+        :param scan_results:
+            Precomputed scan data returned by :meth:`scan_dihedral`.
         :param scan_file:
-            The file with the QM scan. If None is provided it a QM scan will be performed.
+            Path to an XYZ scan file. Exactly one of ``scan_results`` and
+            ``scan_file`` must be provided.
         :param visualize:
-            Whether the dihedral scans should be visualized.
+            Whether to display the fitted and reference scans.
         :param fit_extrema:
-            Whether the dihedral parameters should be fitted to the QM scan extrema.
+            Whether to fit only extrema rather than the full scan.
+        :param initial_validation:
+            Whether to validate the original force field before fitting.
+        :param show_diff:
+            Whether to display the QM-MM difference when visualizing.
+        :param verbose:
+            Whether to print progress and validation details.
         """
 
         try:
@@ -523,20 +542,31 @@ class MMForceFieldGenerator:
 
         # double check dihedral angle if scan file is provided
         if scan_file is not None:
-            with open(scan_file, 'r') as fh:
-                for line in fh:
-                    if line.startswith('Scan'):
-                        # Scan Cycle 1/19 ; Dihedral 3-4-6-7 = 0.00 ; Iteration 17 Energy -1089.05773546
-                        # Extract the dihedral indices
-                        scanned_dih = [
-                            int(i) for i in (
-                                line.split('Dihedral')[1].split()[0].split('-'))
-                        ]
-                        assert_msg_critical(
-                            sorted(scanned_dih[1:3]) == sorted(rotatable_bond),
-                            'MMForceFieldGenerator.reparameterize_dihedrals: ' +
-                            'The rotatable bond does not match the scan file')
-                        break
+            scan_lines = None
+            scan_path = Path(scan_file)
+            if self.rank == mpi_master():
+                with scan_path.open('r') as fh:
+                    scan_lines = fh.readlines()
+            scan_lines = self.comm.bcast(scan_lines, root=mpi_master())
+
+            scanned_dih = None
+            for line in scan_lines:
+                if line.startswith('Scan'):
+                    # Scan Cycle 1/19 ; Dihedral 3-4-6-7 = 0.00 ; Iteration 17 Energy -1089.05773546
+                    # Extract the dihedral indices
+                    scanned_dih = [
+                        int(i)
+                        for i in line.split('Dihedral')[1].split()[0].split('-')
+                    ]
+                    assert_msg_critical(
+                        sorted(scanned_dih[1:3]) == sorted(rotatable_bond),
+                        'MMForceFieldGenerator.reparameterize_dihedrals: ' +
+                        'The rotatable bond does not match the scan file')
+                    break
+            assert_msg_critical(
+                scanned_dih is not None,
+                'MMForceFieldGenerator.reparameterize_dihedrals: scan file '
+                'does not contain any Scan records')
 
         # Identify the dihedral indices for the rotatable bond
         dihedral_indices = []
@@ -553,6 +583,11 @@ class MMForceFieldGenerator:
         # Transform the dihedral indices to 1-indexed for printing
         dihedral_indices_one_based = [[i + 1, j + 1, k + 1, l + 1]
                                       for i, j, k, l in dihedral_indices]
+
+        assert_msg_critical(
+            len(dihedral_indices) > 0,
+            'MMForceFieldGenerator.reparameterize_dihedrals: rotatable_bond '
+            'was not found among dihedrals')
 
         # Print a header
         header = 'VeloxChem Dihedral Reparameterization'
@@ -574,9 +609,11 @@ class MMForceFieldGenerator:
                     f"{scanned_dih[0]}-{scanned_dih[1]}-{scanned_dih[2]}-{scanned_dih[3]}",
                     f"{scanned_dih[3]}-{scanned_dih[2]}-{scanned_dih[1]}-{scanned_dih[0]}"
             ]:
-                raise ValueError(
-                    'The scan file name does not match the dihedral indices. Format should be 1-2-3-4.xyz'
-                )
+                assert_msg_critical(
+                    False,
+                    'MMForceFieldGenerator.reparameterize_dihedrals: scan '
+                    'file name does not match dihedral indices. Format '
+                    'should be 1-2-3-4.xyz')
             self.read_qm_scan_xyz_files([scan_file])
         else:
             # process scan results
@@ -584,6 +621,8 @@ class MMForceFieldGenerator:
             self.scan_energies = scan_results['scan_energies']
             self.scan_geometries = scan_results['scan_geometries']
             self.target_dihedrals = scan_results['target_dihedrals']
+
+        target_scan_index = self._get_target_scan_index(rotatable_bond)
 
         # Group dihedrals by their types
         dihedral_groups = defaultdict(list)
@@ -630,7 +669,8 @@ class MMForceFieldGenerator:
         phases_array = np.array(phases, dtype=float)
         periodicities_array = np.array(periodicities, dtype=float)
         phases_array_rad = np.deg2rad(phases_array)
-        dihedral_angles_rad = np.deg2rad(self.scan_dih_angles[0])
+        dihedral_angles_rad = np.deg2rad(
+            self.scan_dih_angles[target_scan_index])
 
         # Set the dihedral barriers to zero for the scan
         for i, j, k, l in dihedral_indices:
@@ -648,7 +688,8 @@ class MMForceFieldGenerator:
         self.ostream.print_blank()
         self.ostream.flush()
 
-        initial_data = self.validate_force_field(0, verbose=verbose)
+        initial_data = self.validate_force_field(target_scan_index,
+                                                 verbose=verbose)
 
         qm_energies = np.array(initial_data['qm_scan_kJpermol'])
         mm_baseline = np.array(initial_data['mm_scan_kJpermol'])
@@ -717,8 +758,7 @@ class MMForceFieldGenerator:
             residuals = (qm_energies_rel - mm_energies_fit_rel)
             residuals += barriers_to_fit[-1]
 
-            # Return the squared residuals for optimization
-            return residuals**2
+            return residuals
 
         # Print initial barriers
         self.ostream.print_info(
@@ -889,6 +929,29 @@ class MMForceFieldGenerator:
             self.fitting_summary['standard_deviation'],
         }
 
+    def _get_target_scan_index(self, rotatable_bond):
+        """Gets the scan index matching a requested rotatable bond.
+
+        :param rotatable_bond:
+            The rotatable bond as a pair of 1-based atom indices.
+        :return:
+            The index of the matching scan entry.
+        """
+
+        matching_indices = []
+
+        for idx, dihedral in enumerate(self.target_dihedrals):
+            central_bond = sorted([dihedral[1] + 1, dihedral[2] + 1])
+            if central_bond == sorted(rotatable_bond):
+                matching_indices.append(idx)
+
+        assert_msg_critical(
+            len(matching_indices) > 0,
+            'MMForceFieldGenerator.reparameterize_dihedrals: The rotatable '
+            'bond does not match the scan data')
+
+        return matching_indices[0]
+
     def read_qm_scan_xyz_files(self, scan_xyz_files, inp_dir=None):
         """
         Reads QM scan xyz files.
@@ -912,7 +975,8 @@ class MMForceFieldGenerator:
         self.ostream.print_info('Reading QM scan from file...')
 
         for xyz in scan_xyz_files:
-            xyz_fname = str(inp_dir / xyz)
+            xyz_path = inp_dir / xyz
+            xyz_fname = str(xyz_path)
 
             self.ostream.print_info(f'  {xyz_fname}')
 
@@ -924,7 +988,7 @@ class MMForceFieldGenerator:
 
             xyz_lines = None
             if self.rank == mpi_master():
-                with open(xyz_fname, 'r') as f_xyz:
+                with xyz_path.open('r') as f_xyz:
                     xyz_lines = f_xyz.readlines()
             xyz_lines = self.comm.bcast(xyz_lines, root=mpi_master())
 
@@ -949,6 +1013,7 @@ class MMForceFieldGenerator:
             # read energies and dihedral angles
 
             pattern = re.compile(r'\AScan')
+            dih_inds = None
 
             for line in xyz_lines:
                 if re.search(pattern, line):
@@ -959,6 +1024,15 @@ class MMForceFieldGenerator:
                         for i in line.split('Dihedral')[1].split()[0].split('-')
                     ]
                     dih_inds = [i, j, k, l] if i < l else [l, k, j, i]
+            assert_msg_critical(
+                dih_inds is not None,
+                'MMForceFieldGenerator.read_qm_scan_xyz_files: QM scan file '
+                f'{xyz_fname} does not contain any Scan records')
+            assert_msg_critical(
+                len(geometries) == len(energies) == len(dih_angles),
+                'MMForceFieldGenerator.read_qm_scan_xyz_files: inconsistent '
+                'number of geometries, energies, and dihedral angles in QM '
+                f'scan file {xyz_fname}')
             self.scan_energies.append(energies)
             self.scan_dih_angles.append(dih_angles)
             self.target_dihedrals.append(dih_inds)
@@ -1494,6 +1568,11 @@ class MMForceFieldGenerator:
         :param resp:
             If RESP charges should be computed.
             If False partial charges will be set to zero.
+        :param water_model:
+            The explicit water model to use for isolated water molecules.
+        :param use_xml:
+            Whether to read GAFF parameters from the XML dataset instead of the
+            legacy data file.
         """
 
         ff_data_dict = None
@@ -1757,6 +1836,8 @@ class MMForceFieldGenerator:
         # Process water model if requested
         if use_water_model:
             self.apply_water_model(water_model)
+        else:
+            self._check_ow_hw_atoms()
 
         self.ostream.flush()
 
@@ -1777,10 +1858,10 @@ class MMForceFieldGenerator:
                 if k in [i, j]:
                     continue
                 if self.connectivity_matrix[j, k] == 1:
-                    inds = (i, j, k) if i < k else (k, j, i)
+                    inds = self._canonicalize_zero_based_angle_key((i, j, k))
                     angle_indices.add(inds)
                 if self.connectivity_matrix[k, i] == 1:
-                    inds = (k, i, j) if k < j else (j, i, k)
+                    inds = self._canonicalize_zero_based_angle_key((k, i, j))
                     angle_indices.add(inds)
         angle_indices = sorted(list(angle_indices))
 
@@ -1793,10 +1874,12 @@ class MMForceFieldGenerator:
                 if l in [i, j, k]:
                     continue
                 if self.connectivity_matrix[k, l] == 1:
-                    inds = (i, j, k, l) if i < l else (l, k, j, i)
+                    inds = self._canonicalize_zero_based_dihedral_key(
+                        (i, j, k, l))
                     dihedral_indices.add(inds)
                 if self.connectivity_matrix[l, i] == 1:
-                    inds = (l, i, j, k) if l < k else (k, j, i, l)
+                    inds = self._canonicalize_zero_based_dihedral_key(
+                        (l, i, j, k))
                     dihedral_indices.add(inds)
         dihedral_indices = sorted(list(dihedral_indices))
 
@@ -1834,8 +1917,8 @@ class MMForceFieldGenerator:
 
         assert_msg_critical(
             water_model.lower() in self.water_parameters,
-            f"Error: '{water_model}' is not available. Available models " +
-            f"are: {list(self.water_parameters.keys())}")
+            f"MMForceFieldGenerator: '{water_model}' is not available. Available models "
+            + f"are: {list(self.water_parameters.keys())}")
 
         self.ostream.print_info(
             f'Using water model parameters for {water_model}.')
@@ -1886,6 +1969,48 @@ class MMForceFieldGenerator:
 
         for angle_idx in water_angles:
             self.angles[angle_idx].update(water_params['angles'])
+
+    def _check_ow_hw_atoms(self):
+        """
+        Checks if ow/hw atom types exist in the system.
+        """
+
+        hydrogen_indices = [
+            idx for idx, atom in self.atoms.items() if atom['type'] == 'hw'
+        ]
+        oxygen_indices = [
+            idx for idx, atom in self.atoms.items() if atom['type'] == 'ow'
+        ]
+
+        # We have updated the ow/hw sigma/epsilon parameters in database/gaff-2.11.xml.
+        # By default, if no water model is used, the ow/hw sigma/epsilon parameters
+        # will follow the cSPE/E model (JCTC 2010, 6, 607).
+
+        # Here we double check the ow/hw sigma/epsilon parameters.
+        cspce_ow_sigma = self.water_parameters['cspce']['ow']['sigma']
+        cspce_ow_epsilon = self.water_parameters['cspce']['ow']['epsilon']
+        cspce_hw_sigma = self.water_parameters['cspce']['hw']['sigma']
+        cspce_hw_epsilon = self.water_parameters['cspce']['hw']['epsilon']
+
+        for idx in oxygen_indices:
+            assert_msg_critical((
+                self.atoms[idx]['sigma'] == cspce_ow_sigma
+                and self.atoms[idx]['epsilon'] == cspce_ow_epsilon
+            ), "MMForceFieldGenerator: Incorrect 'ow' sigma/epsilon parameters."
+                                )
+
+        for idx in hydrogen_indices:
+            assert_msg_critical((
+                self.atoms[idx]['sigma'] == cspce_hw_sigma
+                and self.atoms[idx]['epsilon'] == cspce_hw_epsilon
+            ), "MMForceFieldGenerator: Incorrect 'hw' sigma/epsilon parameters."
+                                )
+
+        if hydrogen_indices or oxygen_indices:
+            warnmsg = 'MMForceFieldGenerator: ow/hw atom types identified. '
+            warnmsg += 'Using sigma and epsilon parameters from the cSPE/E model. '
+            warnmsg += '(JCTC 2010, 6, 607)'
+            self.ostream.print_warning(warnmsg)
 
     def populate_impropers(self, use_xml, ff_data_dict, ff_data_lines, n_atoms,
                            angle_indices):
@@ -3156,10 +3281,6 @@ class MMForceFieldGenerator:
 
         :param bond:
             The bond to be added. As a list of 1-based atom indices.
-        :param force_constant:
-            The force constant of the bond. Default is 250000.00 kJ/mol/nm^2.
-        :param equilibrium:
-            The equilibrium distance of the bond. If none it will be calculated.
         """
 
         # Extract indices from the list
@@ -3186,15 +3307,15 @@ class MMForceFieldGenerator:
 
     def add_dihedral(self, dihedral, barrier=0.0, phase=0, periodicity=1):
         """
-        Adds a dihedral to the an existing dihedral in the topology
-        converting it in a multiple dihedral.
+        Adds a Fourier term to an existing proper dihedral.
 
         :param dihedral:
-            The dihedral to be added. As a list of 1-based atom indices.
+            The target dihedral as four 1-based atom indices. Reversed order is
+            also accepted.
         :param barrier:
-            The barrier of the dihedral. Default is 1.00 kJ/mol.
+            The barrier height in kJ/mol.
         :param phase:
-            The phase of the dihedral. Default is 0.00 degrees.
+            The phase angle in degrees.
         :param periodicity:
             The periodicity of the dihedral. Default is 1.
         """
@@ -3248,26 +3369,167 @@ class MMForceFieldGenerator:
         self.ostream.print_info(msg)
         self.ostream.flush()
 
-    def get_dihedral_params(self, atom_indices_for_dihedral):
+    @staticmethod
+    def _to_zero_based_indices(atom_indices):
+        """Converts one-based atom indices to zero-based tuple indices."""
+
+        assert_msg_critical(
+            all(index > 0 for index in atom_indices),
+            'MMForceFieldGenerator: one-based atom indices must be greater than 0'
+        )
+        return tuple(index - 1 for index in atom_indices)
+
+    @staticmethod
+    def _canonicalize_zero_based_bond_key(key):
+        """Canonicalizes a zero-based bond key."""
+
+        key = tuple(key)
+        assert_msg_critical(
+            all(index >= 0 for index in key),
+            'MMForceFieldGenerator: zero-based atom indices must be non-negative'
+        )
+        assert_msg_critical(
+            len(set(key)) == len(key),
+            'MMForceFieldGenerator: atom indices in a bond must be unique')
+        return tuple(sorted(key))
+
+    @staticmethod
+    def _canonicalize_zero_based_angle_key(key):
+        """Canonicalizes a zero-based angle key."""
+
+        key = tuple(key)
+        assert_msg_critical(
+            all(index >= 0 for index in key),
+            'MMForceFieldGenerator: zero-based atom indices must be non-negative'
+        )
+        assert_msg_critical(
+            len(set(key)) == len(key),
+            'MMForceFieldGenerator: atom indices in an angle must be unique')
+        return key if key[0] < key[2] else key[::-1]
+
+    @staticmethod
+    def _canonicalize_zero_based_dihedral_key(key):
+        """Canonicalizes a zero-based dihedral key."""
+
+        key = tuple(key)
+        assert_msg_critical(
+            all(index >= 0 for index in key),
+            'MMForceFieldGenerator: zero-based atom indices must be non-negative'
+        )
+        assert_msg_critical(
+            len(set(key)) == len(key),
+            'MMForceFieldGenerator: atom indices in a dihedral must be unique')
+        return key if key[0] < key[3] else key[::-1]
+
+    @staticmethod
+    def _canonicalize_one_based_bond_key(atom_indices_for_bond):
+        """Canonicalizes one-based bond indices to the zero-based storage key."""
+
+        key = MMForceFieldGenerator._to_zero_based_indices(
+            atom_indices_for_bond)
+        return MMForceFieldGenerator._canonicalize_zero_based_bond_key(key)
+
+    @staticmethod
+    def _canonicalize_one_based_angle_key(atom_indices_for_angle):
+        """Canonicalizes one-based angle indices to the zero-based storage key."""
+
+        key = MMForceFieldGenerator._to_zero_based_indices(
+            atom_indices_for_angle)
+        return MMForceFieldGenerator._canonicalize_zero_based_angle_key(key)
+
+    @staticmethod
+    def _canonicalize_one_based_dihedral_key(atom_indices_for_dihedral):
+        """Canonicalizes one-based dihedral indices to the zero-based storage key."""
+
+        key = MMForceFieldGenerator._to_zero_based_indices(
+            atom_indices_for_dihedral)
+        return MMForceFieldGenerator._canonicalize_zero_based_dihedral_key(key)
+
+    def set_bond_params(self, atom_indices_for_bond, bond_params):
         """
-        Gets dihedral parameters.
+        Sets bond parameters.
 
-        :param atom_indices_for_dihedral:
-            One-based atom indices for the dihedral.
-
-        :return:
-            The dihedral parameters in a dictionary.
+        :param atom_indices_for_bond:
+            One-based atom indices for the bond.
+        :param bond_params:
+            The bond parameters in a dictionary.
         """
 
         assert_msg_critical(
-            len(atom_indices_for_dihedral) == 4,
-            'MMForceFieldGenerator.get_dihedral_params: ' +
-            'Expecting a tuple of four atom indices')
+            len(atom_indices_for_bond) == 2,
+            'MMForceFieldGenerator.set_bond_params: ' +
+            'Expecting a tuple of two atom indices')
 
-        # convert 1-based indices to 0-based indices
-        key = tuple([x - 1 for x in atom_indices_for_dihedral])
+        assert_msg_critical(
+            isinstance(bond_params,
+                       dict), 'MMForceFieldGenerator.set_bond_params: ' +
+            'Expecting a dictionary of bond parameters')
 
-        return dict(self.dihedrals[key])
+        key = self._canonicalize_one_based_bond_key(atom_indices_for_bond)
+
+        self.bonds[key] = dict(bond_params)
+
+    def get_bond_params(self, atom_indices_for_bond):
+        """
+        Gets bond parameters.
+
+        :param atom_indices_for_bond:
+            One-based atom indices for the bond.
+        :return:
+            The bond parameters in a dictionary.
+        """
+
+        assert_msg_critical(
+            len(atom_indices_for_bond) == 2,
+            'MMForceFieldGenerator.set_bond_params: ' +
+            'Expecting a tuple of two atom indices')
+
+        key = self._canonicalize_one_based_bond_key(atom_indices_for_bond)
+
+        return deepcopy(self.bonds[key])
+
+    def set_angle_params(self, atom_indices_for_angle, angle_params):
+        """
+        Sets angle parameters.
+
+        :param atom_indices_for_angle:
+            One-based atom indices for the angle.
+        :param angle_params:
+            The angle parameters in a dictionary.
+        """
+
+        assert_msg_critical(
+            len(atom_indices_for_angle) == 3,
+            'MMForceFieldGenerator.set_angle_params: ' +
+            'Expecting a tuple of three atom indices')
+
+        assert_msg_critical(
+            isinstance(angle_params,
+                       dict), 'MMForceFieldGenerator.set_angle_params: ' +
+            'Expecting a dictionary of angle parameters')
+
+        key = self._canonicalize_one_based_angle_key(atom_indices_for_angle)
+
+        self.angles[key] = dict(angle_params)
+
+    def get_angle_params(self, atom_indices_for_angle):
+        """
+        Gets angle parameters.
+
+        :param atom_indices_for_angle:
+            One-based atom indices for the angle.
+        :return:
+            The angle parameters in a dictionary.
+        """
+
+        assert_msg_critical(
+            len(atom_indices_for_angle) == 3,
+            'MMForceFieldGenerator.set_angle_params: ' +
+            'Expecting a tuple of three atom indices')
+
+        key = self._canonicalize_one_based_angle_key(atom_indices_for_angle)
+
+        return deepcopy(self.angles[key])
 
     def set_dihedral_params(self, atom_indices_for_dihedral, dihedral_params):
         """
@@ -3289,10 +3551,30 @@ class MMForceFieldGenerator:
                        dict), 'MMForceFieldGenerator.set_dihedral_params: ' +
             'Expecting a dictionary of dihedral parameters')
 
-        # convert 1-based indices to 0-based indices
-        key = tuple([x - 1 for x in atom_indices_for_dihedral])
+        key = self._canonicalize_one_based_dihedral_key(
+            atom_indices_for_dihedral)
 
         self.dihedrals[key] = dict(dihedral_params)
+
+    def get_dihedral_params(self, atom_indices_for_dihedral):
+        """
+        Gets dihedral parameters.
+
+        :param atom_indices_for_dihedral:
+            One-based atom indices for the dihedral.
+        :return:
+            The dihedral parameters in a dictionary.
+        """
+
+        assert_msg_critical(
+            len(atom_indices_for_dihedral) == 4,
+            'MMForceFieldGenerator.set_dihedral_params: ' +
+            'Expecting a tuple of four atom indices')
+
+        key = self._canonicalize_one_based_dihedral_key(
+            atom_indices_for_dihedral)
+
+        return deepcopy(self.dihedrals[key])
 
     def check_rotatable_bonds(self, rotatable_bonds_types):
         """
@@ -3728,10 +4010,13 @@ class MMForceFieldGenerator:
 
     def write_itp(self, itp_file, mol_name=None):
         """
-        Writes an ITP file with the original parameters.
+        Writes a GROMACS ITP file for the current force field.
 
         :param itp_file:
             The ITP file path.
+        :param mol_name:
+            The residue and molecule name written to the file. Defaults to
+            ``MOL``.
         """
 
         itp_filename = str(itp_file)
@@ -4141,11 +4426,9 @@ class MMForceFieldGenerator:
         :param mol_name:
             The name of the molecule.
         :param amber_ff:
-            The name of the Amber force field.
-        :param water_model:
-            The name of the water model.
+            Optional Amber force-field include name for the topology file.
         :param gro_precision:
-            The number of decimal places in gro file.
+            The number of decimal places in the GRO file.
         """
 
         if mol_name is None:
@@ -4161,12 +4444,12 @@ class MMForceFieldGenerator:
 
     def write_openmm_files(self, filename, mol_name=None):
         """
-        Writes all the needed files for a MD simulation with OpenMM.
+        Writes the XML and PDB files needed for an OpenMM simulation.
 
         :param filename:
-            The name of the molecule.
+            Base filename used for the generated files.
         :param mol_name:
-            The name of the molecule.
+            Molecule or residue name written to the output files.
         """
 
         if mol_name is None:
@@ -4191,12 +4474,12 @@ class MMForceFieldGenerator:
     @staticmethod
     def copy_file(src, dest):
         """
-        Copies file (from src to dest).
+        Copies a text file if the destination differs from the source.
 
         :param src:
-            The source of copy.
+            Source path.
         :param dest:
-            The destination of copy.
+            Destination path.
         """
 
         if (not dest.is_file()) or (not src.samefile(dest)):
@@ -4206,13 +4489,16 @@ class MMForceFieldGenerator:
 
     def validate_force_field(self, i, verbose=True):
         """
-        Validates force field by RMSD of dihedral potentials.
+        Compares MM and QM dihedral scans for one target dihedral.
 
         :param i:
             The index of the target dihedral.
+        :param verbose:
+            Whether to print progress information.
 
         :return:
-            A dictionary containing the results of validation.
+            A dictionary with the dihedral indices, scan angles, and relative
+            MM and QM scan energies in kJ/mol.
         """
 
         dih = self.target_dihedrals[i]
@@ -4251,6 +4537,11 @@ class MMForceFieldGenerator:
             The scanned geometries for this dihedral.
         :param angles:
             The scanned angles for this dihedral.
+        :param verbose:
+            Whether to print progress information.
+
+        :return:
+            A list of MM energies in kJ/mol corresponding to ``angles``.
         """
 
         # select scan angles and geometries from QM data
@@ -4286,7 +4577,10 @@ class MMForceFieldGenerator:
         :param molecule:
             The molecule.
         :param constraints:
-            The constraints.
+            A list of geometry constraints passed to the optimizer.
+
+        :return:
+            The final MM energy in Hartree.
         """
 
         mm_drv = MMDriver(self.comm, self.ostream)
@@ -4308,8 +4602,10 @@ class MMForceFieldGenerator:
         """
         Prints validation summary.
 
-        :param validation_result:
+        :param fitted_dihedral_results:
             The dictionary containing the result of validation.
+        :param verbose:
+            Whether to print the pointwise MM/QM comparison before the summary.
         """
 
         if verbose:
@@ -4347,10 +4643,12 @@ class MMForceFieldGenerator:
 
     def visualize(self, validation_result, show_diff=False):
         """
-        Visualizes dihedral potential.
+        Plots QM and MM dihedral potentials.
 
         :param validation_result:
             The dictionary containing the result of validation.
+        :param show_diff:
+            Whether to plot the QM-MM difference curve.
         """
 
         try:
@@ -4420,10 +4718,13 @@ class MMForceFieldGenerator:
 
     def get_included_file(self, top_fname):
         """
-        Gets the name of the included itp file.
+        Gets the ITP file included by a topology file.
 
         :param top_fname:
             The topology file.
+
+        :return:
+            The included ITP file path.
         """
 
         itp_file = None
@@ -4475,20 +4776,8 @@ class MMForceFieldGenerator:
         Returns:
             MMForceFieldGenerator: The updated forcefield object with the loaded data.
         """
-        forcefield = MMForceFieldGenerator()
         ff_data = json.loads(json_string)
-
-        forcefield.atoms = MMForceFieldGenerator._str_to_tuple_key(
-            ff_data["atoms"])
-        forcefield.bonds = MMForceFieldGenerator._str_to_tuple_key(
-            ff_data["bonds"])
-        forcefield.angles = MMForceFieldGenerator._str_to_tuple_key(
-            ff_data["angles"])
-        forcefield.dihedrals = MMForceFieldGenerator._str_to_tuple_key(
-            ff_data["dihedrals"])
-        forcefield.impropers = MMForceFieldGenerator._str_to_tuple_key(
-            ff_data["impropers"])
-        return forcefield
+        return MMForceFieldGenerator._forcefield_from_json_data(ff_data)
 
     @staticmethod
     def load_forcefield_from_json_file(path: str):
@@ -4501,13 +4790,14 @@ class MMForceFieldGenerator:
         Returns:
             MMForceFieldGenerator: The updated forcefield object with the loaded data.
         """
-        with open(path, "r", encoding="utf-8") as file:
-            json_str = file.read()
-        forcefield = MMForceFieldGenerator.load_forcefield_from_json_string(
-            json_str)
-        return forcefield
+        json_path = Path(path)
+        json_string = json_path.read_text(encoding="utf-8")
+        return MMForceFieldGenerator.load_forcefield_from_json_string(
+            json_string)
 
     def print_bonds(self):
+        """Prints the bond parameters in a tabular format."""
+
         s = "Bonds: \n"
         s += f"{'Bond':>9} {'fc (kJ/mol nm^2)':>18} {'eq (nm)':>10} {'comment'}\n"
         for bond, params in self.bonds.items():
@@ -4516,6 +4806,8 @@ class MMForceFieldGenerator:
         self.ostream.flush()
 
     def print_angles(self):
+        """Prints the angle parameters in a tabular format."""
+
         s = "Angles: \n"
         s += f"{'Angle':>15} {'fc (kJ/mol rad^2)':>18} {'eq (rad)':>10} {'comment'}\n"
         for angle, params in self.angles.items():
@@ -4524,12 +4816,16 @@ class MMForceFieldGenerator:
         self.ostream.flush()
 
     def print_dihedrals(self):
+        """Prints the proper dihedral parameters in a tabular format."""
+
         s = "Proper dihedrals: \n"
         s += self.get_torsion_print_string(self.dihedrals)
         self.ostream.print_info(s)
         self.ostream.flush()
 
     def print_impropers(self):
+        """Prints the improper dihedral parameters in a tabular format."""
+
         s = "Improper dihedrals: \n"
         s += self.get_torsion_print_string(self.impropers)
         self.ostream.print_info(s)
@@ -4537,6 +4833,8 @@ class MMForceFieldGenerator:
 
     @staticmethod
     def get_torsion_print_string(torsions):
+        """Formats torsion parameters for the print helpers."""
+
         s = ""
         s += f"{'Torsion':>21} {'barrier (kJ/mol rad^2)':>22} {'phase (rad)':>11} {'periodicity':>12} {'comment'}\n"
         for torsion, params in torsions.items():
@@ -4592,14 +4890,27 @@ class MMForceFieldGenerator:
         Returns:
             None
         """
-        json = MMForceFieldGenerator.get_forcefield_as_json(forcefield)
-        cwd = Path().cwd()
-        path = cwd / Path(filename)
-        folder = str(path.parent)
-        if not Path(folder).exists():
-            Path(folder).mkdir(parents=True, exist_ok=True)
-        with open(path, "w", encoding="utf-8") as file:
-            file.write(json)
+        json_payload = MMForceFieldGenerator.get_forcefield_as_json(forcefield)
+        json_path = Path(filename)
+        json_path.parent.mkdir(parents=True, exist_ok=True)
+        json_path.write_text(json_payload, encoding="utf-8")
+
+    @staticmethod
+    def _forcefield_from_json_data(ff_data: dict):
+        """Builds a force field generator instance from decoded JSON data."""
+
+        forcefield = MMForceFieldGenerator()
+        forcefield.atoms = MMForceFieldGenerator._str_to_tuple_key(
+            ff_data["atoms"])
+        forcefield.bonds = MMForceFieldGenerator._str_to_tuple_key(
+            ff_data["bonds"])
+        forcefield.angles = MMForceFieldGenerator._str_to_tuple_key(
+            ff_data["angles"])
+        forcefield.dihedrals = MMForceFieldGenerator._str_to_tuple_key(
+            ff_data["dihedrals"])
+        forcefield.impropers = MMForceFieldGenerator._str_to_tuple_key(
+            ff_data["impropers"])
+        return forcefield
 
     @staticmethod
     def _str_to_tuple_key(dictionary: dict) -> dict:

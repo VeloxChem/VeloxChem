@@ -64,14 +64,7 @@ from .veloxchemlib import ThreeCenterElectronRepulsionGeom100Driver
 from .veloxchemlib import ThreeCenterElectronRepulsionGeom010Driver
 from .veloxchemlib import TwoCenterElectronRepulsionDriver
 from .veloxchemlib import TwoCenterElectronRepulsionGeom100Driver
-from .veloxchemlib import LocalECPDriver
-from .veloxchemlib import LocalECPGeom100Driver
-from .veloxchemlib import LocalECPGeom200Driver
-from .veloxchemlib import LocalECPGeom101Driver
-from .veloxchemlib import LocalECPGeom010Driver
-from .veloxchemlib import ProjectedECPDriver
-from .veloxchemlib import ProjectedECPGeom100Driver
-from .veloxchemlib import ECPDriver
+from .veloxchemlib import EcpDriver
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import FockGeom1000Driver
 from .veloxchemlib import FockGeom2000Driver
@@ -154,9 +147,9 @@ from .lreigensolver import LinearResponseEigenSolver
 from .lreigensolverunrest import LinearResponseUnrestrictedEigenSolver
 from .lrsolver import LinearResponseSolver
 from .lrsolverunrest import LinearResponseUnrestrictedSolver
-from .cppsolver import ComplexResponse
-from .cppsolverunrest import ComplexResponseUnrestricted
-from .tdacppsolver import ComplexResponseTDA
+from .cppsolver import ComplexResponseSolver
+from .cppsolverunrest import ComplexResponseUnrestrictedSolver
+from .tdacppsolver import ComplexResponseTdaSolver
 from .c6driver import C6Driver
 from .quadraticresponsedriver import QuadraticResponseDriver
 from .cubicresponsedriver import CubicResponseDriver
@@ -175,12 +168,15 @@ from .rspabsorption import Absorption
 from .rspc6 import C6
 from .rspshg import SHG
 from .rsptpa import TPA
+from .rspthg import THG
+from .rspthgred import ThgReduced
 from .rixsdriver import RixsDriver
+from .xpsdriver import XPSDriver
 from .localizationdriver import LocalizationDriver
-#from .rspcustomproperty import CustomProperty
 from .mpitask import MpiTask
 from .subcommunicators import SubCommunicators
 from .peforcefieldgenerator import PEForceFieldGenerator
+from .firstorderpropdriver import FirstOrderPropertyDriver
 from .firstorderprop import FirstOrderProperties
 from .tddftorbitalresponse import TddftOrbitalResponse
 from .tddftgradientdriver import TddftGradientDriver
@@ -224,7 +220,10 @@ from .tsguesser import TransitionStateGuesser
 from .reactionmatcher import ReactionMatcher
 from .smddriver import SmdDriver
 from .atombdedriver import AtomBdeDriver
+from .orbitallocalization import OrbitalLocalization
 # for backward compatibility only
+from .cppsolver import ComplexResponseSolver as ComplexResponse
+from .tdacppsolver import ComplexResponseTdaSolver as ComplexResponseTDA
 from .peforcefieldgenerator import PEForceFieldGenerator as LoPropDriver
 from .phfparameterizer import PHFParameterizer
 from .mmhessiandriver import MMHessianDriver
@@ -239,15 +238,14 @@ from .oneeints import compute_nuclear_potential_integrals
 from .oneeints import compute_electric_dipole_integrals
 from .oneeints import compute_linear_momentum_integrals
 from .oneeints import compute_angular_momentum_integrals
-from .checkpoint import read_molecule_and_basis, read_results
+from .resultsio import read_molecule_and_basis, read_results
 
-# Environment variable: basis set path, number of OpenMP threads, MKL linking
+# Environment variable: basis set path, number of OpenMP threads
 from .environment import (set_vlxbasispath, get_basis_path, set_vlxdatapath,
-                          get_data_path, set_omp_num_threads, configure_mkl_rt)
+                          get_data_path, set_omp_num_threads)
 
 set_vlxbasispath()
 set_vlxdatapath()
 set_omp_num_threads()
-configure_mkl_rt()
 
 __version__ = "1.0rc4"

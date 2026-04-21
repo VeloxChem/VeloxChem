@@ -206,7 +206,7 @@ class TrajectoryDriver:
         if method_dict is not None:
             self.method_dict = dict(method_dict)
 
-    def compute(self, molecule, basis, min_basis):
+    def compute(self, molecule, basis):
         """
         Performs trajectory calculation.
 
@@ -214,8 +214,6 @@ class TrajectoryDriver:
             The molecule.
         :param basis:
             The AO basis set.
-        :param min_basis:
-            The minimal AO basis set.
         """
 
         try:

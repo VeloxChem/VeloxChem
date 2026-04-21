@@ -43,7 +43,7 @@ from .oneeints import compute_angular_momentum_integrals
 from .veloxchemlib import mpi_master, hartree_in_wavenumber
 from .profiler import Profiler
 from .outputstream import OutputStream
-from .cppsolver import ComplexResponse
+from .cppsolver import ComplexResponseSolver
 from .linearsolver import LinearSolver
 from .nonlinearsolver import NonlinearSolver
 from .distributedarray import DistributedArray
@@ -195,7 +195,7 @@ class QuadraticResponseDriver(NonlinearSolver):
             self.lindep_thresh = self.conv_thresh * 1.0e-6
 
         # check molecule
-        molecule_sanity_check(molecule)
+        molecule_sanity_check(molecule, 'restricted', type(self).__name__)
 
         # check SCF results
         scf_results_sanity_check(self, scf_results)
@@ -221,13 +221,6 @@ class QuadraticResponseDriver(NonlinearSolver):
             self._print_header('Quadratic Response Driver Setup')
 
         start_time = time.time()
-
-        # sanity check
-        nalpha = molecule.number_of_alpha_electrons()
-        nbeta = molecule.number_of_beta_electrons()
-        assert_msg_critical(
-            nalpha == nbeta,
-            'QuadaticResponseDriver: not implemented for unrestricted case')
 
         if self.rank == mpi_master():
             S = scf_results['S']
@@ -357,7 +350,7 @@ class QuadraticResponseDriver(NonlinearSolver):
             self.comp = None
 
         # Computing the first-order response vectors (3 per frequency)
-        N_drv = ComplexResponse(self.comm, self.ostream)
+        N_drv = ComplexResponseSolver(self.comm, self.ostream)
 
         cpp_keywords = {
             'damping', 'norm_thresh', 'lindep_thresh', 'conv_thresh',
@@ -436,7 +429,7 @@ class QuadraticResponseDriver(NonlinearSolver):
         F0 = self.comm.bcast(F0, root=mpi_master())
         norb = self.comm.bcast(norb, root=mpi_master())
 
-        nocc = molecule.number_of_alpha_electrons()
+        nocc = molecule.number_of_alpha_occupied_orbitals(ao_basis)
 
         eri_dict = self._init_eri(molecule, ao_basis)
 
@@ -463,9 +456,9 @@ class QuadraticResponseDriver(NonlinearSolver):
 
         for (wb, wc) in freqpairs:
 
-            Na = ComplexResponse.get_full_solution_vector(Nx[('A', (wb + wc))])
-            Nb = ComplexResponse.get_full_solution_vector(Nx[('B', wb)])
-            Nc = ComplexResponse.get_full_solution_vector(Nx[('C', wc)])
+            Na = ComplexResponseSolver.get_full_solution_vector(Nx[('A', (wb + wc))])
+            Nb = ComplexResponseSolver.get_full_solution_vector(Nx[('B', wb)])
+            Nc = ComplexResponseSolver.get_full_solution_vector(Nx[('C', wc)])
 
             if self.rank == mpi_master():
 
@@ -588,8 +581,8 @@ class QuadraticResponseDriver(NonlinearSolver):
 
         for (wb, wc) in freqpairs:
 
-            Nb = ComplexResponse.get_full_solution_vector(Nx[('B', wb)])
-            Nc = ComplexResponse.get_full_solution_vector(Nx[('C', wc)])
+            Nb = ComplexResponseSolver.get_full_solution_vector(Nx[('B', wb)])
+            Nc = ComplexResponseSolver.get_full_solution_vector(Nx[('C', wc)])
 
             if self.rank == mpi_master():
 
@@ -770,8 +763,8 @@ class QuadraticResponseDriver(NonlinearSolver):
 
             vec_pack = self._collect_vectors_in_columns(vec_pack)
 
-            Nb = ComplexResponse.get_full_solution_vector(Nx[('B', wb)])
-            Nc = ComplexResponse.get_full_solution_vector(Nx[('C', wc)])
+            Nb = ComplexResponseSolver.get_full_solution_vector(Nx[('B', wb)])
+            Nc = ComplexResponseSolver.get_full_solution_vector(Nx[('C', wc)])
 
             if self.rank != mpi_master():
                 continue

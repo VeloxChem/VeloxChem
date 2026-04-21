@@ -30,6 +30,8 @@
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+from mpi4py import MPI
+from pathlib import Path
 from datetime import datetime
 import numpy as np
 import time as tm
@@ -58,7 +60,9 @@ from .sanitychecks import (dft_sanity_check, ri_sanity_check, pe_sanity_check,
                            solvation_model_sanity_check)
 from .errorhandler import assert_msg_critical
 from .inputparser import (parse_input, print_keywords, print_attributes,
-                          get_random_string_parallel)
+                          get_random_string_parallel, unparse_input,
+                          write_unparsed_input_to_hdf5,
+                          read_unparsed_input_from_hdf5)
 from .dftutils import get_default_grid_level, print_xc_reference
 from .checkpoint import write_rsp_hdf5
 from .batchsize import get_batch_size
@@ -347,9 +351,7 @@ class LinearSolver:
         if method_dict is None:
             method_dict = {}
 
-        rsp_keywords = {
-            key: val[0] for key, val in self._input_keywords['response'].items()
-        }
+        rsp_keywords = self._get_response_keywords()
 
         parse_input(self, rsp_keywords, rsp_dict)
 
@@ -360,10 +362,7 @@ class LinearSolver:
             if 'checkpoint_file' not in rsp_dict:
                 self.checkpoint_file = f'{self.filename}_rsp.h5'
 
-        method_keywords = {
-            key: val[0]
-            for key, val in self._input_keywords['method_settings'].items()
-        }
+        method_keywords = self._get_method_keywords()
 
         parse_input(self, method_keywords, method_dict)
 
@@ -390,6 +389,138 @@ class LinearSolver:
             # checkpoint file does not contain information about the electric
             # field
             self.restart = False
+
+    def _get_response_keywords(self):
+        """
+        Gets response keyword types.
+
+        :return:
+            The response keyword types.
+        """
+
+        return {
+            key: val[0] for key, val in self._input_keywords['response'].items()
+        }
+
+    def _get_method_keywords(self):
+        """
+        Gets method keyword types.
+
+        :return:
+            The method keyword types.
+        """
+
+        return {
+            key: val[0]
+            for key, val in self._input_keywords['method_settings'].items()
+        }
+
+    def read_settings(self, checkpoint_file):
+        """
+        Reads response and method settings from checkpoint file.
+
+        :param checkpoint_file:
+            The checkpoint file to read settings from.
+        """
+
+        if self.rank == mpi_master():
+            checkpoint_rsp_input = read_unparsed_input_from_hdf5(
+                checkpoint_file, group_name='response_settings')
+            checkpoint_method_input = read_unparsed_input_from_hdf5(
+                checkpoint_file, group_name='method_settings')
+        else:
+            checkpoint_rsp_input = None
+            checkpoint_method_input = None
+
+        checkpoint_rsp_input = self.comm.bcast(checkpoint_rsp_input,
+                                               root=mpi_master())
+        checkpoint_method_input = self.comm.bcast(checkpoint_method_input,
+                                                  root=mpi_master())
+
+        # Avoid importing restart state or checkpoint/output targets when
+        # copying settings from an external file.
+        checkpoint_rsp_input.pop('restart', None)
+        checkpoint_rsp_input.pop('checkpoint_file', None)
+        checkpoint_rsp_input.pop('filename', None)
+
+        self.update_settings(checkpoint_rsp_input, checkpoint_method_input)
+
+    def _write_settings_to_checkpoint(self, checkpoint_file=None):
+        """
+        Writes response and method settings to checkpoint file.
+
+        :param checkpoint_file:
+            The checkpoint file name.
+        """
+
+        if checkpoint_file is None:
+            checkpoint_file = self.checkpoint_file
+
+        if checkpoint_file is None:
+            return
+
+        if self.rank == mpi_master():
+            write_unparsed_input_to_hdf5(checkpoint_file,
+                                         unparse_input(
+                                             self,
+                                             self._get_response_keywords()),
+                                         group_name='response_settings')
+            write_unparsed_input_to_hdf5(checkpoint_file,
+                                         unparse_input(
+                                             self, self._get_method_keywords()),
+                                         group_name='method_settings')
+
+    def match_settings(self, checkpoint_file):
+        """
+        Checks whether response and method settings match a checkpoint file.
+
+        Missing settings groups are treated as a match for backward
+        compatibility.
+
+        :param checkpoint_file:
+            The checkpoint file to validate.
+
+        :return:
+            True if settings match or are unavailable, False otherwise.
+        """
+
+        valid_checkpoint = (checkpoint_file and
+                            isinstance(checkpoint_file, str) and
+                            Path(checkpoint_file).is_file())
+
+        if not valid_checkpoint:
+            return False
+
+        # Avoid comparing restart state or checkpoint/output targets
+        # Also avoid comparing nstates or frequencies such that restarting with
+        # more states or frequencies is possible
+        excluded_rsp_keys = {
+            'restart',
+            'filename',
+            'checkpoint_file',
+            'nstates',
+            'frequencies',
+        }
+
+        # for backward compatibility
+        with h5py.File(checkpoint_file, 'r') as h5f:
+            if ('response_settings' not in h5f or 'method_settings' not in h5f):
+                return True
+
+        checkpoint_rsp_input = read_unparsed_input_from_hdf5(
+            checkpoint_file, group_name='response_settings')
+        checkpoint_method_input = read_unparsed_input_from_hdf5(
+            checkpoint_file, group_name='method_settings')
+
+        current_rsp_input = unparse_input(self, self._get_response_keywords())
+        current_method_input = unparse_input(self, self._get_method_keywords())
+
+        for key in excluded_rsp_keys:
+            checkpoint_rsp_input.pop(key, None)
+            current_rsp_input.pop(key, None)
+
+        return (checkpoint_rsp_input == current_rsp_input and
+                checkpoint_method_input == current_method_input)
 
     def _init_eri(self, molecule, basis):
         """
@@ -527,12 +658,14 @@ class LinearSolver:
             'potfile_text': potfile_text,
         }
 
-    def _init_cpcm(self, molecule):
+    def _init_cpcm(self, molecule, basis):
         """
         Initializes C-PCM.
 
         :param molecule:
             The molecule.
+        :param basis:
+            The AO basis set.
         """
 
         # C-PCM setup
@@ -549,7 +682,7 @@ class LinearSolver:
 
             cpcm_grid_t0 = tm.time()
 
-            self.cpcm_drv.init(molecule, do_nuclear=False)
+            self.cpcm_drv.init(molecule, basis, do_nuclear=False)
 
             if self.print_level > 1:
                 self.ostream.print_info(
@@ -657,6 +790,19 @@ class LinearSolver:
         else:
             self._dist_fock_ung.append(fock_ung, axis=1)
 
+    def _clear_subspace_data(self):
+        """
+        Clears stored reduced-space trial, sigma, and nonlinear Fock data.
+        """
+
+        self._dist_bger = None
+        self._dist_bung = None
+        self._dist_e2bger = None
+        self._dist_e2bung = None
+
+        self._dist_fock_ger = None
+        self._dist_fock_ung = None
+
     def _get_initial_guess_size_for_excitations(self, nstates):
         """
         Gets the initial guess size for initial excitations.
@@ -677,6 +823,70 @@ class LinearSolver:
             return (
                 self.guess_scaling_threshold * self.initial_guess_multiplier +
                 (nstates - self.guess_scaling_threshold))
+
+    def _get_excitation_space_dimension_restricted(self, nocc, norb):
+        """
+        Gets the excitation-space dimension for restricted methods.
+
+        :param nocc:
+            Number of occupied orbitals.
+        :param norb:
+            Number of orbitals.
+
+        :return:
+            The excitation-space dimension.
+        """
+
+        if getattr(self, 'core_excitation', False):
+            return self.num_core_orbitals * (norb - nocc)
+
+        if getattr(self, 'restricted_subspace', False):
+            return ((self.num_core_orbitals + self.num_valence_orbitals) *
+                    self.num_virtual_orbitals)
+
+        return nocc * (norb - nocc)
+
+    def _get_excitation_space_dimension_unrestricted(self, nocc_a, nocc_b,
+                                                     norb):
+        """
+        Gets the excitation-space dimension for unrestricted methods.
+
+        :param nocc_a:
+            Number of alpha occupied orbitals.
+        :param nocc_b:
+            Number of beta occupied orbitals.
+        :param norb:
+            Number of orbitals.
+
+        :return:
+            The excitation-space dimension.
+        """
+
+        if getattr(self, 'core_excitation', False):
+            return (self.num_core_orbitals * (norb - nocc_a) +
+                    self.num_core_orbitals * (norb - nocc_b))
+
+        return (nocc_a * (norb - nocc_a) + nocc_b * (norb - nocc_b))
+
+    def _check_mpi_oversubscription(self, dimension, label):
+        """
+        Fails fast if the distributed space would assign zero rows to one or
+        more MPI ranks.
+
+        :param dimension:
+            The number of distributed rows.
+        :param label:
+            A short label for the distributed space.
+        """
+
+        assert_msg_critical(
+            dimension > 0,
+            f'{type(self).__name__}: invalid {label} dimension')
+        assert_msg_critical(
+            self.nodes <= dimension,
+            f'{type(self).__name__}: {self.nodes} MPI ranks exceed the '
+            f'{label} dimension ({dimension}). Please use at most {dimension} '
+            + 'MPI ranks for this calculation.')
 
     def _add_nstates_to_checkpoint(self):
         """
@@ -723,6 +933,53 @@ class LinearSolver:
         nstates = self.comm.bcast(nstates, root=mpi_master())
 
         return nstates
+
+    def _add_frequencies_to_checkpoint(self):
+        """
+        Add frequencies to checkpoint file.
+        """
+
+        # For LR/CPP
+
+        if self.checkpoint_file is None:
+            return
+
+        if self.rank == mpi_master():
+            hf = h5py.File(self.checkpoint_file, 'a')
+            key = 'frequencies'
+            if key in hf:
+                del hf[key]
+            hf.create_dataset(key, data=np.array(self.frequencies))
+            hf.close()
+
+        self.comm.barrier()
+
+    def _read_frequencies_from_checkpoint(self):
+        """
+        Read frequencies from checkpoint file.
+
+        :return:
+            The frequencies.
+        """
+
+        # For LR/CPP
+
+        if self.checkpoint_file is None:
+            return None
+
+        frequencies = None
+
+        if self.rank == mpi_master():
+            hf = h5py.File(self.checkpoint_file, 'r')
+            key = 'frequencies'
+            if key in hf:
+                frequencies = np.array(hf.get(key))
+                frequencies = [float(x) for x in frequencies]
+            hf.close()
+
+        frequencies = self.comm.bcast(frequencies, root=mpi_master())
+
+        return frequencies
 
     def compute(self, molecule, basis, scf_results, v_grad=None):
         """
@@ -1941,6 +2198,9 @@ class LinearSolver:
                 den_mat_for_ri_j.set_values(0.5 * (dens_Jab + dens_Jab.T))
 
                 fock_mat = self._ri_drv.compute(den_mat_for_ri_j, 'j')
+
+                fock_mat_a_np = fock_mat.to_numpy()
+                fock_mat_b_np = fock_mat.to_numpy()
             else:
                 # for now we calculate Ka, Kb and Jab separately for open-shell
                 den_mat_for_Ka = make_matrix(basis, mat_t.general)
@@ -2533,6 +2793,8 @@ class LinearSolver:
         success = self.comm.bcast(success, root=mpi_master())
 
         if success:
+            self._write_settings_to_checkpoint(self.checkpoint_file)
+
             if self.nonlinear:
                 dist_arrays = [
                     self._dist_bger, self._dist_bung, self._dist_e2bger,
@@ -2815,6 +3077,11 @@ class LinearSolver:
 
         dist_new_ger, dist_new_ung = self._precond_trials(vectors, precond)
 
+        if self.rank == mpi_master():
+            assert_msg_critical(
+                dist_new_ger.data.size > 0 or dist_new_ung.data.size > 0,
+                'LinearSolver: trial vectors are empty')
+
         if dist_new_ger.data.size == 0:
             dist_new_ger.data = np.zeros((dist_new_ung.shape(0), 0))
 
@@ -2834,24 +3101,25 @@ class LinearSolver:
             dist_new_ung.data -= dist_new_ung_proj.data
 
         if renormalize:
-            if dist_new_ger.data.ndim > 0 and dist_new_ger.shape(0) > 0:
+            has_global_ger_rows = self.comm.allreduce(
+                int(dist_new_ger.data.ndim > 0 and dist_new_ger.shape(0) > 0),
+                op=MPI.SUM) > 0
+            if has_global_ger_rows:
                 dist_new_ger = self._remove_linear_dependence_half_size(
                     dist_new_ger, self.lindep_thresh)
                 dist_new_ger = self._orthogonalize_gram_schmidt_half_size(
                     dist_new_ger)
                 dist_new_ger = self._normalize_half_size(dist_new_ger)
 
-            if dist_new_ung.data.ndim > 0 and dist_new_ung.shape(0) > 0:
+            has_global_ung_rows = self.comm.allreduce(
+                int(dist_new_ung.data.ndim > 0 and dist_new_ung.shape(0) > 0),
+                op=MPI.SUM) > 0
+            if has_global_ung_rows:
                 dist_new_ung = self._remove_linear_dependence_half_size(
                     dist_new_ung, self.lindep_thresh)
                 dist_new_ung = self._orthogonalize_gram_schmidt_half_size(
                     dist_new_ung)
                 dist_new_ung = self._normalize_half_size(dist_new_ung)
-
-        if self.rank == mpi_master():
-            assert_msg_critical(
-                dist_new_ger.data.size > 0 or dist_new_ung.data.size > 0,
-                'LinearSolver: trial vectors are empty')
 
         return dist_new_ger, dist_new_ung
 

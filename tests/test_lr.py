@@ -1,3 +1,6 @@
+from mpi4py import MPI
+from pathlib import Path
+import h5py
 import pytest
 
 from veloxchem.veloxchemlib import mpi_master
@@ -41,6 +44,32 @@ class TestLR:
                 ref_val = ref_rsp_func[key]
                 max_diff = max(max_diff, abs(val - ref_val))
             assert max_diff < tol
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    def test_compute_rejects_openshell_molecule(self):
+
+        xyz_string = """3
+        xyz
+        O   -0.1858140  -1.1749469   0.7662596
+        H   -0.1285513  -0.8984365   1.6808606
+        H   -0.0582782  -0.3702550   0.2638279
+        """
+        mol = Molecule.read_xyz_string(xyz_string)
+        mol.set_multiplicity(3)
+
+        bas = MolecularBasis.read(mol, 'def2-svp', ostream=None)
+
+        # empty scf results just for testing
+        scf_results = {}
+
+        lr_drv = LinearResponseSolver()
+        lr_drv.ostream.mute()
+
+        with pytest.raises(
+                AssertionError,
+                match="LinearResponseSolver: not implemented for unrestricted case"):
+            lr_results_not_used = lr_drv.compute(mol, bas, scf_results)
 
     def test_hf(self):
 
@@ -235,3 +264,86 @@ class TestLR:
         }
 
         self.run_lr_with_ecp(ref_rsp_func, 1.0e-5)
+
+    def test_checkpoint_restart_and_saved_solutions(self, tmp_path):
+
+        xyz_string = """3
+        xyz
+        O   -0.1858140  -1.1749469   0.7662596
+        H   -0.1285513  -0.8984365   1.6808606
+        H   -0.0582782  -0.3702550   0.2638279
+        """
+        mol = Molecule.read_xyz_string(xyz_string)
+        bas = MolecularBasis.read(mol, 'def2-svp', ostream=None)
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+
+        filename = str(tmp_path / 'lr_restart')
+        filename = scf_drv.comm.bcast(filename, root=mpi_master())
+
+        scf_drv.filename = filename
+        scf_drv.compute(mol, bas)
+        scf_drv.restart = True
+        scf_results = scf_drv.compute(mol, bas)
+
+        lr_drv = LinearResponseSolver()
+        lr_drv.filename = filename
+        lr_drv.ostream.mute()
+
+        lr_drv.frequencies = [0.05]
+        lr_drv.compute(mol, bas, scf_results)
+
+        lr_drv.restart = True
+        lr_drv.frequencies = [0.05, 0.06]
+        restarted_results = lr_drv.compute(mol, bas, scf_results)
+        assert lr_drv.restart is True
+
+        lr_drv.restart = False
+        lr_drv.frequencies = [0.05, 0.06]
+        fresh_results = lr_drv.compute(mol, bas, scf_results)
+        assert lr_drv.restart is False
+
+        if lr_drv.rank == mpi_master():
+            for key, value in restarted_results['response_functions'].items():
+                assert value == pytest.approx(fresh_results['response_functions'][key],
+                                              abs=1.0e-8)
+
+            solution_file = Path(f'{filename}.h5')
+            checkpoint_file = Path(f'{filename}_rsp.h5')
+
+            assert solution_file.is_file()
+            assert checkpoint_file.is_file()
+
+            with h5py.File(solution_file, 'r') as h5file:
+                assert 'rsp' in h5file
+                assert 'x_x_0.05000000' in h5file['rsp']
+                assert 'z_z_0.06000000' in h5file['rsp']
+
+    def test_compute_with_external_rhs_returns_solutions_only(self):
+
+        xyz_string = """3
+        xyz
+        O   -0.1858140  -1.1749469   0.7662596
+        H   -0.1285513  -0.8984365   1.6808606
+        H   -0.0582782  -0.3702550   0.2638279
+        """
+        mol = Molecule.read_xyz_string(xyz_string)
+        bas = MolecularBasis.read(mol, 'sto-3g', ostream=None)
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_results = scf_drv.compute(mol, bas)
+
+        lr_drv = LinearResponseSolver()
+        lr_drv.ostream.mute()
+        lr_drv.frequencies = [0.0]
+
+        b_grad = lr_drv.get_prop_grad('electric dipole', 'xyz', mol, bas,
+                                      scf_results)
+        v_grad = {(op, 0.0): vec for op, vec in zip('xyz', b_grad)}
+
+        results = lr_drv.compute(mol, bas, scf_results, v_grad=v_grad)
+
+        assert 'solutions' in results
+        assert 'response_functions' not in results

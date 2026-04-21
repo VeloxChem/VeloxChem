@@ -43,7 +43,8 @@ from .subcommunicators import SubCommunicators
 from .linearsolver import LinearSolver
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            ri_sanity_check, dft_sanity_check, pe_sanity_check)
-from .errorhandler import assert_msg_critical, safe_solve
+from .errorhandler import assert_msg_critical
+from .mathutils import safe_solve
 from .inputparser import parse_input
 from .checkpoint import write_rsp_hdf5, check_rsp_hdf5
 from .batchsize import get_batch_size
@@ -125,27 +126,20 @@ class CphfSolver(LinearSolver):
             of the CPHF equations.
         """
 
-        # TODO: enable ECP
         assert_msg_critical(
             not basis.has_ecp(),
-            f'{type(self).__name__}.compute: ECP is not yet supported')
+            f'{type(self).__name__}.compute_solution_vectors: ECP is not supported')
 
         if self.norm_thresh is None:
             self.norm_thresh = self.conv_thresh * 1.0e-6
         if self.lindep_thresh is None:
             self.lindep_thresh = self.conv_thresh * 1.0e-2
 
-        # sanity check
-        nalpha = molecule.number_of_alpha_electrons()
-        nbeta = molecule.number_of_beta_electrons()
-        assert_msg_critical(
-            nalpha == nbeta,
-            'CphfSolver: not implemented for unrestricted case')
-
         self.start_time = tm.time()
 
         # check molecule
-        molecule_sanity_check(molecule)
+        # this special method is only implemented for restricted case
+        molecule_sanity_check(molecule, 'restricted', type(self).__name__)
 
         # check SCF results
         scf_results_sanity_check(self, scf_results)
@@ -178,7 +172,7 @@ class CphfSolver(LinearSolver):
             # nmo is sometimes different than nao (because of linear
             # dependencies which get removed during SCF)
             nmo = mo_energies.shape[0]
-            nocc = molecule.number_of_alpha_electrons()
+            nocc = molecule.number_of_alpha_occupied_orbitals(basis)
             nvir = nmo - nocc
             nao = scf_results['C_alpha'].shape[0]
             eocc = mo_energies[:nocc]
@@ -194,7 +188,7 @@ class CphfSolver(LinearSolver):
         nao = self.comm.bcast(nao, root=mpi_master())
 
         nmo = mo_energies.shape[0]
-        nocc = molecule.number_of_alpha_electrons()
+        nocc = molecule.number_of_alpha_occupied_orbitals(basis)
         nvir = nmo - nocc
 
         dof = len(dist_rhs)
@@ -331,11 +325,6 @@ class CphfSolver(LinearSolver):
             contracted with the two-electron integrals).
         """
 
-        # TODO: enable ECP
-        assert_msg_critical(
-            not basis.has_ecp(),
-            f'{type(self).__name__}.compute: ECP is not yet supported')
-
         if self.norm_thresh is None:
             self.norm_thresh = self.conv_thresh * 1.0e-6
         if self.lindep_thresh is None:
@@ -368,6 +357,11 @@ class CphfSolver(LinearSolver):
             'memory_profiling': self.memory_profiling,
             'memory_tracing': self.memory_tracing,
         })
+
+        if self.norm_thresh is None:
+            self.norm_thresh = self.conv_thresh * 1.0e-6
+        if self.lindep_thresh is None:
+            self.lindep_thresh = self.conv_thresh * 1.0e-2
 
         self.start_time = tm.time()
 
@@ -404,7 +398,7 @@ class CphfSolver(LinearSolver):
         pe_dict = self._init_pe(molecule, basis)
 
         # CPCM_information
-        self._init_cpcm(molecule)
+        self._init_cpcm(molecule, basis)
 
         cphf_rhs_dict = self.compute_rhs(molecule, basis, scf_results, eri_dict,
                                          dft_dict, pe_dict, *args)
@@ -437,6 +431,8 @@ class CphfSolver(LinearSolver):
                 self.restart = check_rsp_hdf5(self.checkpoint_file,
                                               orbrsp_vector_labels, molecule,
                                               basis, dft_dict, pe_dict)
+                if self.restart:
+                    self.restart = self.match_settings(self.checkpoint_file)
             self.restart = self.comm.bcast(self.restart, root=mpi_master())
 
         # read initial guess from restart file
@@ -689,7 +685,7 @@ class CphfSolver(LinearSolver):
             # nmo is sometimes different than nao (because of linear
             # dependencies which get removed during SCF)
             nmo = mo_energies.shape[0]
-            nocc = molecule.number_of_alpha_electrons()
+            nocc = molecule.number_of_alpha_occupied_orbitals(basis)
             nvir = nmo - nocc
             mo_occ = mo[:, :nocc].copy()
             mo_vir = mo[:, nocc:].copy()
@@ -998,7 +994,7 @@ class CphfSolver(LinearSolver):
             # nmo is sometimes different than nao (because of linear
             # dependencies which get removed during SCF)
             nmo = mo_energies.shape[0]
-            nocc = molecule.number_of_alpha_electrons()
+            nocc = molecule.number_of_alpha_occupied_orbitals(basis)
             nvir = nmo - nocc
             mo_occ = mo[:, :nocc]
             mo_vir = mo[:, nocc:]
@@ -1147,8 +1143,8 @@ class CphfSolver(LinearSolver):
             nao = basis.get_dimension_of_basis()
             orb_ene_a = scf_results['E_alpha']
             orb_ene_b = scf_results['E_beta']
-            nocc_a = molecule.number_of_alpha_electrons()
-            nocc_b = molecule.number_of_beta_electrons()
+            nocc_a = molecule.number_of_alpha_occupied_orbitals(basis)
+            nocc_b = molecule.number_of_beta_occupied_orbitals(basis)
             mo_occ_a = mo_a[:, :nocc_a]
             mo_occ_b = mo_b[:, :nocc_b]
             mo_vir_a = mo_a[:, nocc_a:]
@@ -1316,8 +1312,8 @@ class CphfSolver(LinearSolver):
         if self.rank == mpi_master():
             orb_ene_a = scf_results['E_alpha']
             orb_ene_b = scf_results['E_beta']
-            nocc_a = molecule.number_of_alpha_electrons()
-            nocc_b = molecule.number_of_beta_electrons()
+            nocc_a = molecule.number_of_alpha_occupied_orbitals(basis)
+            nocc_b = molecule.number_of_beta_occupied_orbitals(basis)
             eocc_a = orb_ene_a[:nocc_a]
             eocc_b = orb_ene_b[:nocc_b]
             evir_a = orb_ene_a[nocc_a:]
@@ -1401,7 +1397,10 @@ class CphfSolver(LinearSolver):
 
         # remove linear dependencies and orthonormalize trial vectors
         if renormalize:
-            if dist_trials.data.ndim > 0 and dist_trials.shape(0) > 0:
+            has_global_rows = self.comm.allreduce(
+                int(dist_trials.data.ndim > 0 and dist_trials.shape(0) > 0),
+                op=MPI.SUM) > 0
+            if has_global_rows:
                 dist_trials = self._remove_linear_dependence_half_size(
                     dist_trials, self.lindep_thresh)
                 dist_trials = (

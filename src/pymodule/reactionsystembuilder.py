@@ -51,7 +51,8 @@ from .mmforcefieldgenerator import MMForceFieldGenerator
 from .atomtypeidentifier import AtomTypeIdentifier
 from .solvationbuilder import SolvationBuilder
 from .molecule import Molecule
-from .errorhandler import assert_msg_critical, safe_arccos
+from .errorhandler import assert_msg_critical
+from .mathutils import safe_arccos
 from .waterparameters import get_water_parameters
 from .openmmdynamics import OpenMMDynamics
 

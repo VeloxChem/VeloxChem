@@ -188,7 +188,7 @@ get_lda_values_rec_f(const CGtoBlock&            gto_block,
                 const auto fnorm = gto_norms[j * ncgtos + i];
 
 #pragma omp simd
-                for (int k = 0; k < ncols; k++)
+                for (int k = 0; k < static_cast<int>(ncols); k++)
                 {
                     const auto gr_x = g_x[k] - r_x;
 

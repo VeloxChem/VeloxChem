@@ -2,6 +2,7 @@ target_sources(vlxobjs
   PRIVATE
     CorePotentialDriver.cpp
     CorePotentialGradientDriver.cpp
+    CorePotentialHessianDriver.cpp
     ProjectedCorePotentialDriver.cpp
     ProjectedCorePotentialPrimRecDDForD.cpp
     ProjectedCorePotentialPrimRecDDForF.cpp
