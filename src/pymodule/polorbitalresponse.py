@@ -1459,6 +1459,81 @@ class PolOrbitalResponse(CphfSolver):
 
         return dm_oo, dm_vv
 
+    def calculate_1pdm_red_dim(self, molecule, basis, scf_tensors, x_plus_y,
+                       x_minus_y):
+        """
+        Calculates the unrelaxed one-particle density matrices in MO basis.
+
+        :param molecule:
+            The molecule.
+        :param scf_tensors:
+            The tensors from the converged SCF calculation.
+        :param x_plus_y:
+            The X+Y response vectors in MO basis.
+        :param x_minus_y:
+            The X-Y response vectors in MO basis.
+
+        :return dm_oo:
+            Occ/Occ block of unrelaxed one-particle density matrix in MO basis.
+        :return dm_vv:
+            Vir/vir block of unrelaxed one-particle density matrix in MO basis.
+        """
+
+        # degrees of freedom
+        dof = len(self.vector_components)
+        xy_pairs = [(x,y) for x in range(dof) for y in range(x, dof)]
+        dof_red = len(xy_pairs)
+
+        # MO coefficients
+        mo = scf_tensors['C_alpha']  # only alpha part
+        nocc = molecule.number_of_alpha_occupied_orbitals(basis)
+        mo_vir = mo[:, nocc:].copy()
+        nvir = mo_vir.shape[1]
+
+        # determine data type of RHS
+        if self.is_complex:
+            rhs_dt = np.dtype('complex128')
+        else:
+            rhs_dt = np.dtype('float64')
+
+        # calculate the one-particle density matrices
+        #dm_oo = np.zeros((dof, dof, nocc, nocc), dtype=rhs_dt)
+        #dm_vv = np.zeros((dof, dof, nvir, nvir), dtype=rhs_dt)
+        dm_oo = np.zeros((dof_red, nocc, nocc), dtype=rhs_dt)
+        dm_vv = np.zeros((dof_red, nvir, nvir), dtype=rhs_dt)
+
+        #for x in range(dof):
+        #    for y in range(x, dof):
+        for idx, xy in enumerate(xy_pairs):
+            x = xy[0]
+            y = xy[1]
+            #dm_vv[x, y] = 0.25 * (
+            dm_vv[idx] = 0.25 * (
+                # xib,yia->xyab
+                np.linalg.multi_dot([x_plus_y[y].T, x_plus_y[x]])
+                # xib,yia->xyab
+                + np.linalg.multi_dot([x_minus_y[y].T, x_minus_y[x]])
+                # yib,xia->xyab
+                + np.linalg.multi_dot([x_plus_y[x].T, x_plus_y[y]])
+                # yib,xia->xyab
+                + np.linalg.multi_dot([x_minus_y[x].T, x_minus_y[y]]))
+
+            dm_oo[idx] = -0.25 * (
+                # xja,yia->xyij
+                np.linalg.multi_dot([x_plus_y[x], x_plus_y[y].T])
+                # xja,yia->xyij
+                + np.linalg.multi_dot([x_minus_y[x], x_minus_y[y].T])
+                # yja,xia->xyij
+                + np.linalg.multi_dot([x_plus_y[y], x_plus_y[x].T])
+                # yja,xia->xyij
+                + np.linalg.multi_dot([x_minus_y[y], x_minus_y[x].T]))
+
+            #if y != x:
+            #    dm_vv[y,x] = dm_vv[x,y]
+            #    dm_oo[y,x] = dm_oo[x,y]
+
+        return dm_oo, dm_vv
+
     def calculate_unrel_dm(self, molecule, basis, scf_tensors, x_plus_y,
                            x_minus_y):
         """
@@ -2704,24 +2779,33 @@ class PolOrbitalResponse(CphfSolver):
                 for x in self.vector_components
             ]
 
+            # NOTE WIP
             if self.rank == mpi_master():
-                cphf_ov = np.zeros((dof, dof, nocc * nvir))
+                #cphf_ov = np.zeros((dof, dof, nocc * nvir))
+                cphf_ov = np.zeros((dof_red, nocc * nvir))
             else:
                 cphf_ov = None
 
-            for idx, xy in enumerate(xy_pairs):
+            # NOTE WIP
+            #for idx, xy in enumerate(xy_pairs):
+            #    # get lambda multipliers from distributed array
+            #    tmp_cphf_ov = self.cphf_results['dist_cphf_ov'][dof_red * f + idx].get_full_vector()
+
+            #    # TODO don't unpack dimensions
+            #    if self.rank == mpi_master():
+            #        x = xy[0]
+            #        y = xy[1]
+
+            #        cphf_ov[x, y] += tmp_cphf_ov
+
+            #        if y != x:
+            #            cphf_ov[y, x] += cphf_ov[x, y]
+
+            for xy in range(dof_red):
                 # get lambda multipliers from distributed array
-                tmp_cphf_ov = self.cphf_results['dist_cphf_ov'][dof_red * f + idx].get_full_vector()
+                tmp_cphf_ov = self.cphf_results['dist_cphf_ov'][dof_red * f + xy].get_full_vector()
+                cphf_ov[xy] += tmp_cphf_ov
 
-                # TODO don't unpack dimensions
-                if self.rank == mpi_master():
-                    x = xy[0]
-                    y = xy[1]
-
-                    cphf_ov[x, y] += tmp_cphf_ov
-
-                    if y != x:
-                        cphf_ov[y, x] += cphf_ov[x, y]
             del tmp_cphf_ov
 
             if self.rank == mpi_master():
@@ -2738,7 +2822,8 @@ class PolOrbitalResponse(CphfSolver):
                 fock_gxc_ao = []
 
                 # TODO don't unpack dimensions
-                cphf_ov = cphf_ov.reshape(dof**2, nocc, nvir)
+                #cphf_ov = cphf_ov.reshape(dof**2, nocc, nvir)
+                cphf_ov = cphf_ov.reshape(dof_red, nocc, nvir)
 
                 # create response vectors in MO basis
                 sqrt2 = np.sqrt(2.0)
@@ -2754,7 +2839,6 @@ class PolOrbitalResponse(CphfSolver):
 
                 del exc_vec, deexc_vec
 
-                # TODO don't unpack dimensions
                 # transform to AO basis: mi,xia,na->xmn
                 x_plus_y_ao = np.array([
                     np.linalg.multi_dot([mo_occ, x_plus_y_mo[x], mo_vir.T])
@@ -2766,16 +2850,21 @@ class PolOrbitalResponse(CphfSolver):
                 ])
 
                 # calculate the one-particle density matrices in MO
+                # NOTE now reduced dimensions
                 profiler.start_timer('1PDM')
-                dm_oo, dm_vv = self.calculate_1pdm(molecule, basis,
+                dm_oo, dm_vv = self.calculate_1pdm_red_dim(molecule, basis,
                                                    scf_tensors, x_plus_y_mo,
                                                    x_minus_y_mo)
                 profiler.stop_timer('1PDM')
 
                 # calculate dipole contribution to omega
                 profiler.start_timer('dipole')
-                omega_dipole_contrib_ao = self.calculate_omega_dipole_contrib(
+
+                # NOTE reduced dimensions
+                #omega_dipole_contrib_ao = self.calculate_omega_dipole_contrib(
+                omega_dipole_contrib_ao = self.calculate_omega_dipole_contrib_red_dim(
                     molecule, basis, scf_tensors, x_minus_y_mo)
+
                 profiler.stop_timer('dipole')
 
                 # calculate the density matrices, alpha block only
@@ -2785,16 +2874,18 @@ class PolOrbitalResponse(CphfSolver):
                 # transform to AO basis: mi,xia,na->xmn
                 cphf_ao = np.array([
                     np.linalg.multi_dot([mo_occ, cphf_ov[xy], mo_vir.T])
-                    for xy in range(dof**2)
+                    #for xy in range(dof**2)
+                    for xy in range(dof_red)
                 ])
 
-                cphf_ao_list = [cphf_ao[x] for x in range(dof**2)]
+                #cphf_ao_list = [cphf_ao[x] for x in range(dof**2)]
+                cphf_ao_list = [cphf_ao[x] for x in range(dof_red)]
 
                 del x_plus_y_mo, x_minus_y_mo, cphf_ao
             else:
                 cphf_ao_list = None
 
-            # TODO keep in reduced dimensions
+            # NOTE cphf_ao now in reduced dimensions
             fock_cphf = self._comp_lr_fock(cphf_ao_list, molecule, basis,
                                            eri_dict, dft_dict, pe_dict,
                                            profiler)
@@ -2833,13 +2924,16 @@ class PolOrbitalResponse(CphfSolver):
             if self.rank == mpi_master():
                 cphf_ao_list.clear()
 
-                omega = np.zeros((dof, dof, nao, nao))
-
                 # construct epsilon density matrix
-                epsilon_dm_ao = self.calculate_epsilon_dm(molecule, basis,
+                # NOTE now in reduced dimensions
+                #epsilon_dm_ao = self.calculate_epsilon_dm(molecule, basis,
+                epsilon_dm_ao = self.calculate_epsilon_dm_red_dim(molecule, basis,
                                                           scf_tensors, dm_oo,
                                                           dm_vv, cphf_ov)
                 del dm_oo, dm_vv
+
+                #omega = np.zeros((dof, dof, nao, nao))
+                omega = np.zeros((dof_red, nao, nao))
 
                 #for m in range(dof):
                 #    for n in range(m, dof):
@@ -2867,9 +2961,13 @@ class PolOrbitalResponse(CphfSolver):
                         fock_ao_rhs_1_n = fock_ao_rhs[dof_red + n]  # x_plus_y
                         fock_ao_rhs_2_n = fock_ao_rhs[dof_red + dof + n]  # x_minus_y
 
-                        fmat = (fock_cphf[m * dof + n] +
-                                fock_cphf[m * dof + n].T +
-                                #fock_ao_rhs[m * dof + n])
+                        #fmat = (fock_cphf[m * dof + n] +
+                        #        fock_cphf[m * dof + n].T +
+                        #        fock_ao_rhs[m * dof + n])
+                        
+                        # NOTE WIP
+                        fmat = (fock_cphf[idx] +
+                                fock_cphf[idx].T +
                                 fock_ao_rhs[idx])
                         # TODO remove debug print
                         print("fmat")
@@ -2881,7 +2979,7 @@ class PolOrbitalResponse(CphfSolver):
                         # calculate the contributions from 2PDM and relaxed 1PDM
                         profiler.start_timer('2PDM')
 
-                        # TODO reduce dimensions
+                        # NOTE cannot be reduced
                         omega_1pdm_2pdm_contrib_mn = self.calculate_omega_1pdm_2pdm_contrib(
                             molecule, basis, scf_tensors, x_plus_y_ao[m],
                             x_plus_y_ao[n], x_minus_y_ao[m], x_minus_y_ao[n],
@@ -2891,22 +2989,26 @@ class PolOrbitalResponse(CphfSolver):
                         profiler.stop_timer('2PDM')
 
                         # sum contributions to omega
-                        omega[m, n] = (epsilon_dm_ao[m, n] + omega_1pdm_2pdm_contrib_mn
-                                       + omega_dipole_contrib_ao[m, n])
+                        #omega[m, n] = (epsilon_dm_ao[m, n] + omega_1pdm_2pdm_contrib_mn
+                        omega[idx] = (epsilon_dm_ao[idx] + omega_1pdm_2pdm_contrib_mn
+                                       + omega_dipole_contrib_ao[idx])
                         if self._dft:
                             # NOTE WIP
                             omega_gxc_contrib = self.calculate_omega_gxc_contrib_real(
                                 #fock_gxc_ao[2 * (m * dof + n)], D_occ)
                                 fock_gxc_ao[2 * idx], D_occ)
 
-                            # TODO reduce dimensions
-                            omega[m, n] += omega_gxc_contrib
+                            # NOTE reduced dimensions
+                            #omega[m, n] += omega_gxc_contrib
+                            omega[idx] += omega_gxc_contrib
 
                 # reduce dimensions
-                omega_red = []
-                for x, y in xy_pairs:
-                    omega_red.append(omega[x, y].copy())
-                omega_red = np.array(omega_red)
+                #omega_red = []
+                #for x, y in xy_pairs:
+                #    omega_red.append(omega[x, y].copy())
+                #omega_red = np.array(omega_red)
+                
+                omega_red = omega
 
                 # TODO remove debug print
                 print("\nomega_red")
@@ -2945,6 +3047,8 @@ class PolOrbitalResponse(CphfSolver):
             valstr += f'{(tm.time() - loop_start_time):.2f} sec **'
             self.ostream.print_header(valstr)
             self.ostream.print_blank()
+            self.ostream.flush()
+
     def compute_omega_complex(self, molecule, basis, scf_tensors, lr_results):
         """
         Calculates the complex polarizability Lagrange multipliers for the
@@ -3381,6 +3485,113 @@ class PolOrbitalResponse(CphfSolver):
 
         return omega_dipole_contrib
 
+    def calculate_omega_dipole_contrib_red_dim(self, molecule, basis, scf_tensors, x_minus_y_mo):
+        """
+        Calculates the dipole contribution to the omega multipliers.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param scf_tensors:
+            The tensors from the converged SCF calculation.
+        :param x_minus_y_mo:
+            The X-Y response vectors in MO basis.
+
+        :return omega_dipole_contrib:
+            The dipole moment contribution to omega multipliers
+        """
+
+        # degrees of freedom
+        dof = len(self.vector_components)
+
+        # unique permutations of operator components
+        xy_pairs = [(x,y) for x in range(dof) for y in range(x, dof)]
+        dof_red = len(xy_pairs)
+
+        # MO coefficients
+        mo = scf_tensors['C_alpha']  # only alpha part
+        nocc = molecule.number_of_alpha_occupied_orbitals(basis)
+        mo_occ = mo[:, :nocc].copy()
+        mo_vir = mo[:, nocc:].copy()
+
+        # number of AOs
+        nao = mo.shape[0]
+
+        # determine data type of the omega multipliers
+        if self.is_complex:
+            omega_dt = np.dtype('complex128')
+        else:
+            omega_dt = np.dtype('float64')
+
+        # get dipole moment integrals
+        dipole_mats = compute_electric_dipole_integrals(molecule, basis,
+                                                        [0.0, 0.0, 0.0])
+
+        dipole_ints_ao = np.zeros((dof, nao, nao))
+        k = 0
+        if 'x' in self.vector_components:
+            # Note: polorbitalresponse uses r instead of mu for dipole operator
+            dipole_ints_ao[k] = -1.0 * dipole_mats[0]
+            k += 1
+        if 'y' in self.vector_components:
+            # Note: polorbitalresponse uses r instead of mu for dipole operator
+            dipole_ints_ao[k] = -1.0 * dipole_mats[1]
+            k += 1
+        if 'z' in self.vector_components:
+            # Note: polorbitalresponse uses r instead of mu for dipole operator
+            dipole_ints_ao[k] = -1.0 * dipole_mats[2]
+
+        # transform to MO basis (oo and ov blocks only)
+        dipole_ints_oo = np.array([
+            np.linalg.multi_dot([mo_occ.T, dipole_ints_ao[x], mo_occ])
+            for x in range(dof)
+        ])
+        dipole_ints_ov = np.array([
+            np.linalg.multi_dot([mo_occ.T, dipole_ints_ao[x], mo_vir])
+            for x in range(dof)
+        ])
+
+        #omega_dipole_contrib = np.zeros((dof, dof, nao, nao), dtype=omega_dt)
+        omega_dipole_contrib = np.zeros((dof_red, nao, nao), dtype=omega_dt)
+
+        #for x in range(dof):
+        #    for y in range(x, dof):
+        for idx, xy in enumerate(xy_pairs):
+            x = xy[0]
+            y = xy[1]
+
+            tmp_oo = 0.5 * (np.linalg.multi_dot([  # xjc,yic->xyij
+                dipole_ints_ov[y], x_minus_y_mo[x].T])
+                + np.linalg.multi_dot(  # yjc,xic->xyij
+                [dipole_ints_ov[x], x_minus_y_mo[y].T]))
+
+            tmp_ov = 0.5 * (np.linalg.multi_dot([  # xka,yki->xyia
+                dipole_ints_oo[y].T, x_minus_y_mo[x]])
+                + np.linalg.multi_dot(  # yka,xki->xyia
+                [dipole_ints_oo[x].T, x_minus_y_mo[y]]))
+
+            tmp_vv = 0.5 * (np.linalg.multi_dot([  # xkb,yka->xyab
+                dipole_ints_ov[y].T, x_minus_y_mo[x]])
+                + np.linalg.multi_dot(  # ykb,xka->xyab
+                [dipole_ints_ov[x].T, x_minus_y_mo[y]]))
+
+            #omega_dipole_contrib[x, y] = (
+            omega_dipole_contrib[idx] = (
+                # mi,xyij,nj->xymn
+                np.linalg.multi_dot([mo_occ, tmp_oo, mo_occ.T]) +
+                # mi,xyia,na->xymn
+                np.linalg.multi_dot([mo_occ, tmp_ov, mo_vir.T]) +
+                # mi,xyia,na->xymn
+                np.linalg.multi_dot([mo_occ, tmp_ov, mo_vir.T]).T +
+                # ma,xyab,nb->xymn
+                np.linalg.multi_dot([mo_vir, tmp_vv, mo_vir.T]))
+
+            #if y != x:
+            #    omega_dipole_contrib[y, x] = omega_dipole_contrib[x, y]
+
+        return omega_dipole_contrib
+
     def calculate_epsilon_dm(self, molecule, basis, scf_tensors, dm_oo, dm_vv,
                              lambda_ov):
         """
@@ -3451,6 +3662,96 @@ class PolOrbitalResponse(CphfSolver):
 
         # symmetrize (OV + VO)
         epsilon_dm -= (epsilon_lambda + epsilon_lambda.transpose(0, 1, 3, 2))
+
+        return epsilon_dm
+
+# WIP
+    def calculate_epsilon_dm_red_dim(self, molecule, basis, scf_tensors, dm_oo, dm_vv,
+                             lambda_ov):
+        """
+        Calculates the epsilon density matrix for the omega multipliers
+
+        :param molecule:
+            The molecule.
+        :param scf_tensors:
+            The tensors from the converged SCF calculation.
+        :param dm_oo:
+            Occ/occ block of the one-particle density matrix.
+        :param dm_vv:
+            Vir/vir block of the one-particle density matrix.
+        :param lambda_ov:
+            The lambda multipliers in MO basis.
+
+        :return epsilon_dm:
+            The epsilon density matrix in AO basis in reduced dimensions.
+        """
+
+        # degrees of freedom
+        dof = len(self.vector_components)
+
+        # unique permutations of operator components
+        xy_pairs = [(x,y) for x in range(dof) for y in range(x, dof)]
+        dof_red = len(xy_pairs)
+
+        # MO coefficients
+        mo = scf_tensors['C_alpha']  # only alpha part
+        nocc = molecule.number_of_alpha_occupied_orbitals(basis)
+        mo_occ = mo[:, :nocc].copy()
+        mo_vir = mo[:, nocc:].copy()
+        nvir = mo_vir.shape[1]
+
+        # number of AOs
+        nao = mo.shape[0]
+
+        # orbital energies
+        mo_energies = scf_tensors['E_alpha']
+        eocc = mo_energies[:nocc]
+        evir = mo_energies[nocc:]
+        eo_diag = np.diag(eocc)
+        ev_diag = np.diag(evir)
+
+        # determine data type of the density matrix
+        if self.is_complex:
+            epsilon_dt = np.dtype('complex128')
+        else:
+            epsilon_dt = np.dtype('float64')
+
+        # construct epsilon density matrix
+        #epsilon_dm = np.zeros((dof, dof, nao, nao), dtype=epsilon_dt)
+        #epsilon_lambda = np.zeros((dof, dof, nao, nao), dtype=epsilon_dt)
+        epsilon_dm = np.zeros((dof_red, nao, nao), dtype=epsilon_dt)
+        epsilon_lambda = np.zeros((dof_red, nao, nao), dtype=epsilon_dt)
+
+        #for x in range(dof):
+        #    for y in range(x, dof):
+        # TODO don't enumerate, just range of dof_red
+        for idx, xy in enumerate(xy_pairs):
+            x = xy[0]
+            y = xy[1]
+
+            # mi,ii,xyij,nj->xymn
+            epsilon_dm[idx] = -1.0 * np.linalg.multi_dot(
+                #[mo_occ, eo_diag, dm_oo[x, y], mo_occ.T])
+                [mo_occ, eo_diag, dm_oo[idx], mo_occ.T])
+
+            # ma,aa,xyab,nb->xymn
+            epsilon_dm[idx] -= np.linalg.multi_dot(
+                #[mo_vir, ev_diag, dm_vv[x, y], mo_vir.T])
+                [mo_vir, ev_diag, dm_vv[idx], mo_vir.T])
+
+            # mi,ii,xyia,na->xymn
+            epsilon_lambda[idx] = np.linalg.multi_dot([
+                mo_occ, eo_diag,
+                #lambda_ov.reshape(dof, dof, nocc, nvir)[x, y],
+                lambda_ov.reshape(dof_red, nocc, nvir)[idx],
+                mo_vir.T])
+
+            #if y != x:
+            #    epsilon_dm[y, x] = epsilon_dm[x, y]
+
+        # symmetrize (OV + VO)
+        #epsilon_dm -= (epsilon_lambda + epsilon_lambda.transpose(0, 1, 3, 2))
+        epsilon_dm -= (epsilon_lambda + epsilon_lambda.transpose(0, 2, 1))
 
         return epsilon_dm
 
