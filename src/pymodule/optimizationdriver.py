@@ -235,10 +235,10 @@ class OptimizationDriver:
                             ScfRestrictedOpenDriver)):
             grad_drv = ScfGradientDriver(drv)
         
-        if isinstance(drv, SerenityScfDriver):
+        elif isinstance(drv, SerenityScfDriver):
             grad_drv = SerenityGradientDriver(drv)
 
-        if isinstance(drv, SerenityExcitedStateGradientDriver):
+        elif isinstance(drv, SerenityExcitedStateGradientDriver):
             grad_drv = drv
 
         elif isinstance(drv, XtbDriver):

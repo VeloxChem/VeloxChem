@@ -168,6 +168,7 @@ class SerenityLinearResponseSolver:
 
         if 'spinflip' in rsp_dict:
             self.spinflip = rsp_dict.get('spinflip', False)
+            self._invalidate_rsp_cache()
 
         for key in ('nstates', 'nroots', 'n_eigen', 'neigen', 'nEigen'):
             if key in rsp_dict:

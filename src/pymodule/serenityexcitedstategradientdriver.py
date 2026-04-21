@@ -236,7 +236,7 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
         gradient = np.array(self.serenity_driver._system.getGeometry().getGradients(),
                             dtype=float)
         self.total_energy = float(self.serenity_driver.get_energy() +
-                                  self.excited_state_energy[self.state_deriv_index])
+                                  self.excited_state_energy[self.state_deriv_index - 1])
 
         return gradient
 
@@ -279,6 +279,10 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
                 self.rsp_driver.small_grid_accuracy)
         if self.rsp_driver.spinflip:
             grad_task.settings.excMethod = 'sftda'
+            if hasattr(grad_task.settings.lrscfSettings, 'scfstab'):
+                grad_task.settings.lrscfSettings.scfstab = 'spinflip'
+            elif hasattr(grad_task.settings, 'scfstab'):
+                grad_task.settings.scfstab = 'spinflip'
 
     def _extract_excitation_energy(self, rsp_results):
         eig = rsp_results['eigenvalues']
@@ -290,4 +294,4 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
         errmsg += f'{state} but only {nst} state(s) are available.'
         assert_msg_critical(state <= nst, errmsg)
 
-        return float(eig[state])
+        return float(eig[state - 1])
