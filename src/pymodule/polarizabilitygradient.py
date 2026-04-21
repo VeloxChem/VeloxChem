@@ -329,6 +329,7 @@ class PolarizabilityGradient:
                 for x in self.vector_components
             ]
 
+            # TODO reduce dimensions
             if 'dist_cphf_ov' in orbrsp_results.keys():
                 # get lambda multipliers from distributed arrays
                 cphf_ov = self.get_lambda_response_vector(
@@ -336,6 +337,7 @@ class PolarizabilityGradient:
                     f)
 
             else:
+                # TODO reduce dimensions
                 if self.rank == mpi_master():
                     # TODO get conj. gradient solver to also return dist. array
                     # get lambda multipliers from array in orbrsp dict
@@ -364,6 +366,7 @@ class PolarizabilityGradient:
                             if y != x:
                                 cphf_ov[y, x] += cphf_ov[x, y]
 
+            # TODO reduce dimensions
             # get omega Lagrangian multipliers
             omega_ao = self.get_omega_response_vector(
                 basis, orbrsp_results['dist_omega_ao'], f
@@ -409,17 +412,21 @@ class PolarizabilityGradient:
 
                 gs_dm = scf_tensors['D_alpha']  # only alpha part
 
+                # TODO reduce dimensions
                 cphf_ov = cphf_ov.reshape((dof**2, nocc, nvir))
 
+                # TODO reduce dimensions
                 lambda_ao = np.array([
                     np.linalg.multi_dot([mo_occ, cphf_ov[xy], mo_vir.T])
                     for xy in range(dof**2)
                 ])
 
+                # TODO reduce dimensions
                 lambda_ao = lambda_ao.reshape((dof, dof, nao, nao))
                 lambda_ao += lambda_ao.transpose(0, 1, 3, 2)
 
                 # calculate symmetrized unrelaxed density matrix
+                # TODO reduce dimensions
                 unrel_dm_ao = self.calculate_unrel_dm(molecule, basis,
                                                       scf_tensors, x_plus_y_mo,
                                                       x_minus_y_mo)
@@ -442,6 +449,7 @@ class PolarizabilityGradient:
             rel_dm_ao = self.comm.bcast(rel_dm_ao, root=mpi_master())
 
             # initiate polarizability gradient variable with data type set in init()
+            # TODO reduce dimensions
             pol_gradient = np.zeros((dof, dof, natm, 3), dtype=self.grad_dt)
 
             # kinetic energy gradient driver
@@ -468,6 +476,7 @@ class PolarizabilityGradient:
                     gmat_hcore -= gmat_npot_100 + gmat_npot_100.T + gmat_npot_010
 
                     # loop over operator components
+                    # TODO rel_dm_ao will have reduced dimensions
                     for x, y in xy_pairs:
                         pol_gradient[x, y, iatom, icoord] += (
                             np.linalg.multi_dot([  # xymn,amn->xya
@@ -553,6 +562,7 @@ class PolarizabilityGradient:
             if self._dft:
                 profiler.start_timer("XC")
 
+                # TODO reduce dimensions
                 # compute the XC contribution
                 polgrad_xc_contrib = self.compute_polgrad_xc_contrib(
                     molecule, basis, gs_dm, rel_dm_ao, x_minus_y_ao, profiler)
@@ -567,6 +577,7 @@ class PolarizabilityGradient:
 
             pol_gradient = self.comm.reduce(pol_gradient, root=mpi_master())
 
+            # TODO here we unravel the dimensions
             if self.rank == mpi_master():
                 for x in range(dof):
                     for y in range(x + 1, dof):
@@ -696,6 +707,7 @@ class PolarizabilityGradient:
         # operator component combinations
         xy_pairs = [(x,y) for x in range(dof) for y in range(x,dof)]
 
+        # TODO reduce dimensions
         eri_deriv_contrib = np.zeros((dof, dof, natm, 3), dtype=self.grad_dt)
 
         # ERI gradient
@@ -884,6 +896,7 @@ class PolarizabilityGradient:
         # operator component combinations
         xy_pairs = [(x, y) for x in range(dof) for y in range(x, dof)]
 
+        # TODO reduce dimensions
         eri_deriv_contrib = np.zeros((dof, dof, natm, 3), dtype=self.grad_dt)
 
         for iatom in local_atoms:
