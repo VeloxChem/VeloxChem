@@ -1212,15 +1212,15 @@ class PolOrbitalResponse(CphfSolver):
                 ])
 
                 # NOTE temporary unpacking for debug
-                tmp_1pdm_red = fock_mo_rhs_1pdm.copy()
-                tmp_1pdm = np.zeros((dof, dof, nocc, nvir))
-                for i_tmp, xy_tmp in enumerate(xy_pairs):
-                    dim0 = xy_tmp[0]
-                    dim1 = xy_tmp[1]
-                    tmp_1pdm[dim0, dim1] = tmp_1pdm_red[i_tmp]
-                    if dim1 != dim0:
-                       tmp_1pdm[dim1, dim0] = tmp_1pdm_red[i_tmp]
-                fock_mo_rhs_1pdm = tmp_1pdm.copy().reshape(dof**2, nocc, nvir)
+                #tmp_1pdm_red = fock_mo_rhs_1pdm.copy()
+                #tmp_1pdm = np.zeros((dof, dof, nocc, nvir))
+                #for i_tmp, xy_tmp in enumerate(xy_pairs):
+                #    dim0 = xy_tmp[0]
+                #    dim1 = xy_tmp[1]
+                #    tmp_1pdm[dim0, dim1] = tmp_1pdm_red[i_tmp]
+                #    if dim1 != dim0:
+                #       tmp_1pdm[dim1, dim0] = tmp_1pdm_red[i_tmp]
+                #fock_mo_rhs_1pdm = tmp_1pdm.copy().reshape(dof**2, nocc, nvir)
 
                 # extract the x_plus_y and x_minus_y contributions
                 fock_ao_rhs_x_plus_y = np.zeros((dof, nao, nao))
@@ -1244,25 +1244,28 @@ class PolOrbitalResponse(CphfSolver):
                                                                    fock_ao_rhs_x_minus_y)
                 profiler.stop_timer('2PDM')
                 # NOTE temporary unpacking for debug
-                tmp_2pdm_red = fock_mo_rhs_2pdm.copy()
-                tmp_2pdm = np.zeros((dof, dof, nocc, nvir))
-                for i_tmp, xy_tmp in enumerate(xy_pairs):
-                    dim0 = xy_tmp[0]
-                    dim1 = xy_tmp[1]
-                    tmp_2pdm[dim0, dim1] = tmp_2pdm_red[i_tmp]
-                    if dim1 != dim0:
-                       tmp_2pdm[dim1, dim0] = tmp_2pdm_red[i_tmp]
-                fock_mo_rhs_2pdm = tmp_2pdm.copy().reshape(dof**2, nocc, nvir)
+                #tmp_2pdm_red = fock_mo_rhs_2pdm.copy()
+                #tmp_2pdm = np.zeros((dof, dof, nocc, nvir))
+                #for i_tmp, xy_tmp in enumerate(xy_pairs):
+                #    dim0 = xy_tmp[0]
+                #    dim1 = xy_tmp[1]
+                #    tmp_2pdm[dim0, dim1] = tmp_2pdm_red[i_tmp]
+                #    if dim1 != dim0:
+                #       tmp_2pdm[dim1, dim0] = tmp_2pdm_red[i_tmp]
+                #fock_mo_rhs_2pdm = tmp_2pdm.copy().reshape(dof**2, nocc, nvir)
 
                 # calculate dipole contribution
                 profiler.start_timer('dipole')
 
-                rhs_dipole_contrib = self.calculate_rhs_dipole_contrib(
+                # NOTE reduced dimensions
+                #rhs_dipole_contrib = self.calculate_rhs_dipole_contrib(
+                rhs_dipole_contrib = self.calculate_rhs_dipole_contrib_red_dim(
                     molecule, basis, scf_tensors, x_minus_y)
 
                 profiler.stop_timer('dipole')
 
                 # sum RHS contributions
+                # NOTE reduced dimensions
                 rhs_mo = fock_mo_rhs_1pdm + fock_mo_rhs_2pdm + rhs_dipole_contrib
 
                 # add DFT E[3] contribution to the RHS
@@ -1283,27 +1286,30 @@ class PolOrbitalResponse(CphfSolver):
                     ])
 
                     # NOTE temporary unpacking
-                    gxc_mo_tmp = np.zeros((dof, dof, nocc, nvir))
-                    for i_tmp, xy_tmp in enumerate(xy_pairs):
-                        dim0 = xy_tmp[0]
-                        dim1 = xy_tmp[1]
-                        gxc_mo_tmp[dim0, dim1] = gxc_mo[i_tmp]
-                        if dim0 != dim1:
-                            gxc_mo_tmp[dim1, dim0] = gxc_mo[i_tmp]
-                    gxc_mo = gxc_mo_tmp.copy().reshape(dof**2, nocc, nvir)
+                    #gxc_mo_tmp = np.zeros((dof, dof, nocc, nvir))
+                    #for i_tmp, xy_tmp in enumerate(xy_pairs):
+                    #    dim0 = xy_tmp[0]
+                    #    dim1 = xy_tmp[1]
+                    #    gxc_mo_tmp[dim0, dim1] = gxc_mo[i_tmp]
+                    #    if dim0 != dim1:
+                    #        gxc_mo_tmp[dim1, dim0] = gxc_mo[i_tmp]
+                    #gxc_mo = gxc_mo_tmp.copy().reshape(dof**2, nocc, nvir)
                         
                     # different factor compared to TDDFT orbital response
                     # because here vectors are scaled by 1/sqrt(2)
+                    # NOTE reduced dimensions
                     rhs_mo += 0.5 * gxc_mo
 
+                # NOTE not necessary anymore
                 # reduce dimensions of RHS to unique operator component combinations
-                rhs_red = []
-                rhs_tmp = rhs_mo.reshape(dof, dof, nocc, nvir).copy()
+                #rhs_red = []
+                #rhs_tmp = rhs_mo.reshape(dof, dof, nocc, nvir).copy()
 
-                for x, y in xy_pairs:
-                    rhs_red.append(rhs_tmp[x, y].copy())
-                rhs_red = np.array(rhs_red)
-                # FIXME debug print
+                #for x, y in xy_pairs:
+                #    rhs_red.append(rhs_tmp[x, y].copy())
+                #rhs_red = np.array(rhs_red)
+                ## FIXME debug print
+                rhs_red = rhs_mo
                 print(rhs_red)
 
                 # array with RHS (only relevant when using conjugate gradient solver)
@@ -1996,6 +2002,104 @@ class PolOrbitalResponse(CphfSolver):
                     rhs_dipole_contrib[y, x] = rhs_dipole_contrib[x, y]
 
         rhs_dipole_contrib = rhs_dipole_contrib.reshape(dof**2, nocc, nvir)
+
+        return rhs_dipole_contrib
+
+# NOTE WIP
+    def calculate_rhs_dipole_contrib_red_dim(self, molecule, basis, scf_tensors,
+                                     x_minus_y):
+        """
+        Calculates the dipole contribution to the RHS.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param scf_tensors:
+            The tensors from the converged SCF calculation.
+        :param x_minus_y:
+            The X-Y response vectors in MO basis.
+
+        :return rsh_dipole_contrib:
+            The dipole contribution to the RHS in reduced dimensions.
+        """
+
+        # degrees of freedom
+        dof = len(self.vector_components)
+
+        # unique permutations of operator components
+        xy_pairs = [(x, y) for x in range(dof) for y in range(x, dof)]
+
+        # reduced dimensions
+        dof_red = len(xy_pairs)
+
+        # MO coefficients
+        mo = scf_tensors['C_alpha']  # only alpha part
+        nocc = molecule.number_of_alpha_occupied_orbitals(basis)
+        mo_occ = mo[:, :nocc].copy()
+        mo_vir = mo[:, nocc:].copy()
+        nvir = mo_vir.shape[1]
+
+        # number of AOs
+        nao = mo.shape[0]
+
+        # determine data type of RHS
+        if self.is_complex:
+            rhs_dt = np.dtype('complex128')
+        else:
+            rhs_dt = np.dtype('float64')
+
+        # get the dipole integrals in AO basis
+        dipole_mats = compute_electric_dipole_integrals(molecule, basis, [0.0, 0.0, 0.0])
+
+        dipole_ints_ao = np.zeros((dof, nao, nao))
+        k = 0
+        if 'x' in self.vector_components:
+            # Note: polorbitalresponse uses r instead of mu for dipole operator
+            dipole_ints_ao[k] = -1.0*dipole_mats[0]
+            k += 1
+        if 'y' in self.vector_components:
+            # Note: polorbitalresponse uses r instead of mu for dipole operator
+            dipole_ints_ao[k] = -1.0*dipole_mats[1]
+            k += 1
+        if 'z' in self.vector_components:
+            # Note: polorbitalresponse uses r instead of mu for dipole operator
+            dipole_ints_ao[k] = -1.0*dipole_mats[2]
+
+        # transform to MO basis (oo and vv blocks only)
+        dipole_ints_oo = np.array([
+            np.linalg.multi_dot([mo_occ.T, dipole_ints_ao[x], mo_occ])
+            for x in range(dof)
+        ])
+        dipole_ints_vv = np.array([
+            np.linalg.multi_dot([mo_vir.T, dipole_ints_ao[x], mo_vir])
+            for x in range(dof)
+        ])
+
+        #rhs_dipole_contrib = np.zeros((dof, dof, nocc, nvir), dtype=rhs_dt)
+        rhs_dipole_contrib = np.zeros((dof_red, nocc, nvir), dtype=rhs_dt)
+
+        # calculate dipole contributions to the RHS
+        #for x in range(dof):
+        #    for y in range(x, dof):
+        for idx, xy in enumerate(xy_pairs):
+            x = xy[0]
+            y = xy[1]
+            #rhs_dipole_contrib[x, y] = (
+            rhs_dipole_contrib[idx] = (
+                0.5 * (np.linalg.multi_dot(  # xja,yji->xyia
+                    [dipole_ints_oo[y].T, x_minus_y[x]])
+                       + np.linalg.multi_dot(  # yja,xji->xyia
+                           [dipole_ints_oo[x], x_minus_y[y]]))
+                - 0.5 * (np.linalg.multi_dot(  # xib,yab->xyia
+                    [x_minus_y[x], dipole_ints_vv[y]])
+                         + np.linalg.multi_dot(  # yib,xab->xyia
+                             [x_minus_y[y], dipole_ints_vv[x].T])))
+
+            #if y != x:
+            #    rhs_dipole_contrib[y, x] = rhs_dipole_contrib[x, y]
+
+        #rhs_dipole_contrib = rhs_dipole_contrib.reshape(dof**2, nocc, nvir)
 
         return rhs_dipole_contrib
 
