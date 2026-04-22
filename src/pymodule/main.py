@@ -43,7 +43,6 @@ from .mmforcefieldgenerator import MMForceFieldGenerator
 from .respchargesdriver import RespChargesDriver
 from .espchargesdriver import EspChargesDriver
 from .excitondriver import ExcitonModelDriver
-from .rixsdriver import RixsDriver
 from .numerovdriver import NumerovDriver
 from .mp2driver import Mp2Driver
 from .peforcefieldgenerator import PEForceFieldGenerator
@@ -66,6 +65,8 @@ from .rsptpatransition import TpaTransition
 from .rspdoublerestrans import DoubleResTransition
 from .rspthreepatransition import ThreePATransition
 from .rsptpa import TPA
+from .lrsolver import LinearResponseSolver
+from .cppsolver import ComplexResponseSolver
 from .polarizabilitygradient import PolarizabilityGradient
 from .vibrationalanalysis import VibrationalAnalysis
 from .visualizationdriver import VisualizationDriver
@@ -380,7 +381,7 @@ def main():
             xtb_drv = XtbDriver(task.mpi_comm, task.ostream)
             xtb_drv.set_method(method_dict['xtb'].lower())
             xtb_drv.xtb_verbose = True
-            xtb_results = xtb_drv.compute(task.molecule)
+            xtb_results_not_used = xtb_drv.compute(task.molecule)
         else:
             scf_drv = select_scf_driver(task, scf_type)
             scf_drv.update_settings(scf_dict, method_dict)
@@ -398,10 +399,12 @@ def main():
                 if 'response' not in task.input_dict:
                     # restart is default or True for optimization driver
                     if ('restart' not in opt_dict) or opt_dict['restart']:
-                        # check validity of checkpoint
-                        use_checkpoint_geometry = scf_drv.validate_checkpoint(
-                            task.molecule.get_element_ids(),
-                            task.ao_basis.get_label(), scf_drv.scf_type)
+                        # not an irc
+                        if not ('irc' in opt_dict and opt_dict['irc']):
+                            # check validity of checkpoint
+                            use_checkpoint_geometry = scf_drv.validate_checkpoint(
+                                task.molecule.get_element_ids(),
+                                task.ao_basis.get_label(), scf_drv.scf_type)
 
             if not use_checkpoint_geometry:
                 scf_results = scf_drv.compute(task.molecule, task.ao_basis,
@@ -521,14 +524,15 @@ def main():
                 opt_drv = OptimizationDriver(grad_drv)
                 opt_drv.keep_files = True
                 opt_drv.update_settings(opt_dict)
-                opt_results = opt_drv.compute(task.molecule)
+                opt_results_not_used = opt_drv.compute(task.molecule)
 
             else:
                 grad_drv = ScfGradientDriver(scf_drv)
                 opt_drv = OptimizationDriver(grad_drv)
                 opt_drv.keep_files = True
                 opt_drv.update_settings(opt_dict)
-                opt_results = opt_drv.compute(task.molecule, task.ao_basis)
+                opt_results_not_used = opt_drv.compute(task.molecule,
+                                                       task.ao_basis)
 
         elif run_excited_state_gradient:
 
@@ -559,9 +563,10 @@ def main():
             opt_drv = OptimizationDriver(tddftgrad_drv)
             opt_drv.keep_files = True
             opt_drv.update_settings(opt_dict)
-            opt_results = opt_drv.compute(task.molecule, task.ao_basis, scf_drv,
-                                          rsp_prop._rsp_driver,
-                                          rsp_prop._rsp_property)
+            opt_results_not_used = opt_drv.compute(task.molecule, task.ao_basis,
+                                                   scf_drv,
+                                                   rsp_prop._rsp_driver,
+                                                   rsp_prop._rsp_property)
 
     # Vibrational analysis
 
@@ -636,11 +641,10 @@ def main():
                                                 rsp_dict=rsp_dict,
                                                 polgrad_dict=polgrad_dict)
 
-        vib_results = vibrational_drv.compute(task.molecule, task.ao_basis)
+        vib_results_not_used = vibrational_drv.compute(task.molecule,
+                                                       task.ao_basis)
 
     # Polarizability gradient
-# TODO this task is bugged: rsp property not set
-# TODO setup for complex and real
 
     if task_type == 'polarizability_gradient':
 
@@ -655,15 +659,25 @@ def main():
         rsp_dict['filename'] = task.input_dict['filename']
         rsp_dict = updated_dict_with_eri_settings(rsp_dict, scf_drv)
 
-        rsp_prop = select_rsp_property(task, mol_orbs, rsp_dict, method_dict)
-        rsp_prop.init_driver(task.mpi_comm, task.ostream)
-        rsp_prop.compute(task.molecule, task.ao_basis, scf_results)
-
         polgrad_drv = PolarizabilityGradient(scf_drv, task.mpi_comm,
                                              task.ostream)
         polgrad_drv.update_settings(polgrad_dict, orbrsp_dict, method_dict)
+
+        polgrad_drv.print_level = 2
+        polgrad_drv.do_print_polgrad = True
+
+        if polgrad_drv.is_complex:
+            lr_drv = ComplexResponseSolver()
+        else:
+            lr_drv = LinearResponseSolver()
+        lr_drv.a_operator = "electric dipole"
+        lr_drv.b_operator = "electric dipole"
+        lr_drv.update_settings(rsp_dict, method_dict)
+        lr_drv.frequencies = polgrad_drv.frequencies
+        lr_results = lr_drv.compute(task.molecule, task.ao_basis, scf_results)
+
         polgrad_drv.compute(task.molecule, task.ao_basis, scf_drv.scf_results,
-                            rsp_prop._rsp_property)
+                            lr_results)
 
     # Response
 
@@ -759,8 +773,8 @@ def main():
                                                 rsp_dict=rsp_dict,
                                                 polgrad_dict=polgrad_dict)
 
-                vib_results = vibrational_drv.compute(task.molecule,
-                                                      task.ao_basis)
+                vib_results_not_used = vibrational_drv.compute(
+                    task.molecule, task.ao_basis)
 
             # Excited state optimization
             if 'optimize_excited_state' in task.input_dict:

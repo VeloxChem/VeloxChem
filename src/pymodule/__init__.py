@@ -171,6 +171,7 @@ from .rsptpa import TPA
 from .rspthg import THG
 from .rspthgred import ThgReduced
 from .rixsdriver import RixsDriver
+from .xpsdriver import XPSDriver
 from .localizationdriver import LocalizationDriver
 from .mpitask import MpiTask
 from .subcommunicators import SubCommunicators
@@ -219,6 +220,7 @@ from .tsguesser import TransitionStateGuesser
 from .reactionmatcher import ReactionMatcher
 from .smddriver import SmdDriver
 from .atombdedriver import AtomBdeDriver
+from .orbitallocalization import OrbitalLocalization
 # for backward compatibility only
 from .cppsolver import ComplexResponseSolver as ComplexResponse
 from .tdacppsolver import ComplexResponseTdaSolver as ComplexResponseTDA

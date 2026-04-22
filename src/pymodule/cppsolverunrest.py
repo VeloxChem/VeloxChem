@@ -748,6 +748,7 @@ class ComplexResponseUnrestrictedSolver(ComplexResponseSolverBase):
                             'Response solution vectors written to file: ' +
                             final_h5_fname)
                         self.ostream.print_blank()
+                        self.ostream.flush()
 
                     ret_dict = {
                         'a_operator': self.a_operator,

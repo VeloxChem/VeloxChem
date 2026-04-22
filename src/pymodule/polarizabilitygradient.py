@@ -128,7 +128,7 @@ class PolarizabilityGradient:
         self.vector_components = 'xyz'
 
         self._input_keywords = {
-            'polarizabilitygradient': {
+            'polarizability_gradient': {
                 'vector_components': ('str_lower', 'Cartesian components of operator'),
                 'frequencies': ('seq_range', 'frequencies'),
                 'numerical': ('bool', 'do numerical integration'),
@@ -168,7 +168,7 @@ class PolarizabilityGradient:
 
         grad_keywords = {
             key: val[0] for key, val in
-            self._input_keywords['polarizabilitygradient'].items()
+            self._input_keywords['polarizability_gradient'].items()
         }
 
         parse_input(self, grad_keywords, grad_dict)
@@ -566,7 +566,7 @@ class PolarizabilityGradient:
 
             profiler.stop_timer('total')
 
-        profiler.print_memory_subspace({
+        profiler.print_memory_dictionary({
             'polgrad dict': polgrad_results
         }, self.ostream)
         profiler.check_memory_usage('End of polgrad')
