@@ -554,7 +554,7 @@ class PolarizabilityGradient:
 
             if self.rank == mpi_master():
                 # unravel the reduced dimensions to full dof*dof tensor
-                pol_gradient_unrav = np.zeros((dof, dof, 3, natm), dtype=self.grad_dt)
+                pol_gradient_unrav = np.zeros((dof, dof, natm, 3), dtype=self.grad_dt)
                 for idx, (x,y) in enumerate(xy_pairs):
                     #x = xy[0]
                     #y = xy[1]
