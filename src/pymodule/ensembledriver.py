@@ -1108,6 +1108,10 @@ class EnsembleDriver:
             scf_all.append((frame, scf_results))
 
             if do_rsp:
+                # Ensure response driver picks PE input from current frame's
+                # SCF results (scf_results_sanity_check only imports potfile
+                # when rsp_driver.potfile is None).
+                rsp_driver.potfile = None
                 rsp_results = rsp_driver.compute(molecule, basis, scf_results)
                 rsp_all.append((frame, rsp_results))
 
