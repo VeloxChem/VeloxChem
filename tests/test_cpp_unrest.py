@@ -7,6 +7,7 @@ from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
 from veloxchem.cppsolverunrest import ComplexResponseUnrestrictedSolver
+from veloxchem.resultsio import read_results
 
 
 @pytest.mark.solvers
@@ -162,7 +163,7 @@ class TestCppUnrestricted:
         self.run_cpp_with_ecp(xcfun_label, cpp_property, ref_x_data, ref_y_data,
                               1.0e-6)
 
-    def test_cpp_prop_dens_absorption(self):
+    def test_cpp_prop_dens_absorption(self, tmp_path):
 
         xyz_string = """3
         xyz
@@ -176,41 +177,52 @@ class TestCppUnrestricted:
 
         bas = MolecularBasis.read(mol, 'sto-3g', verbose=False)
 
+        filename = self._bcast_path_string(
+            MPI.COMM_WORLD, str(tmp_path / 'cpp_unrest_prop_dens_absorption'))
+
         scf_drv = ScfUnrestrictedDriver()
         scf_drv.ostream.mute()
+        scf_drv.filename = filename
         scf_results = scf_drv.compute(mol, bas)
 
         cpp_drv = ComplexResponseUnrestrictedSolver()
         cpp_drv.frequencies = [0.40]
         cpp_drv.property = 'absorption'
         cpp_drv.ostream.mute()
-        cpp_results = cpp_drv.compute(mol, bas, scf_results)
-
-        raw_density_dict = cpp_drv.get_cpp_property_densities(
-            mol, bas, scf_results, cpp_results, 0.40, normalize_densities=False)
-        density_dict = cpp_drv.get_cpp_property_densities(
-            mol, bas, scf_results, cpp_results, 0.40, normalize_densities=True)
+        cpp_results_orig = cpp_drv.compute(mol, bas, scf_results)
 
         if scf_drv.rank == mpi_master():
-            overlap = scf_results['S']
+            cpp_results_read = read_results(filename + '.h5', 'rsp')
+        else:
+            cpp_results_read = {}
 
-            raw_detachment = raw_density_dict['property_density_detachment']
-            raw_attachment = raw_density_dict['property_density_attachment']
+        for cpp_results in [cpp_results_orig, cpp_results_read]:
 
-            raw_detachment_int = -np.sum(raw_detachment * overlap)
-            raw_attachment_int = np.sum(raw_attachment * overlap)
+            raw_density_dict = cpp_drv.get_cpp_property_densities(
+                mol, bas, scf_results, cpp_results, 0.40, normalize_densities=False)
+            density_dict = cpp_drv.get_cpp_property_densities(
+                mol, bas, scf_results, cpp_results, 0.40, normalize_densities=True)
 
-            assert raw_detachment_int > 0.0
-            assert raw_detachment_int == pytest.approx(raw_attachment_int,
-                                                       abs=1.0e-8)
+            if scf_drv.rank == mpi_master():
+                overlap = scf_results['S']
 
-            detachment = density_dict['property_density_detachment']
-            attachment = density_dict['property_density_attachment']
+                raw_detachment = raw_density_dict['property_density_detachment']
+                raw_attachment = raw_density_dict['property_density_attachment']
 
-            assert -np.sum(detachment * overlap) == pytest.approx(1.0,
-                                                                  abs=1.0e-8)
-            assert np.sum(attachment * overlap) == pytest.approx(1.0,
-                                                                 abs=1.0e-8)
+                raw_detachment_int = -np.sum(raw_detachment * overlap)
+                raw_attachment_int = np.sum(raw_attachment * overlap)
+
+                assert raw_detachment_int > 0.0
+                assert raw_detachment_int == pytest.approx(raw_attachment_int,
+                                                           abs=1.0e-8)
+
+                detachment = density_dict['property_density_detachment']
+                attachment = density_dict['property_density_attachment']
+
+                assert -np.sum(detachment * overlap) == pytest.approx(1.0,
+                                                                      abs=1.0e-8)
+                assert np.sum(attachment * overlap) == pytest.approx(1.0,
+                                                                     abs=1.0e-8)
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='skip pytest.raises for multiple MPI processes')

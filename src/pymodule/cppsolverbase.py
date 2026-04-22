@@ -34,7 +34,6 @@ from mpi4py import MPI
 import numpy as np
 import math
 import sys
-import h5py
 
 from .veloxchemlib import (mpi_master, hartree_in_wavenumber, hartree_in_ev,
                            hartree_in_inverse_nm, fine_structure_constant,
