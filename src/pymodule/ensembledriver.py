@@ -1034,26 +1034,16 @@ class EnsembleDriver:
 
         if write_pe_potfiles and has_any_pe:
             self.write_pot_files(snapshots, outdir=potdir)
-        
-        # SCF driver from scf_options
-        scf_driver = self._build_scf_driver(scf_options)
-        self._apply_options_to_driver(scf_driver, scf_options, skip_keys={"scf_type"})
 
-        # Property/response driver from property_options
-        rsp_driver = self._build_property_driver(property_options)
-        do_rsp = (rsp_driver is not None)
-        if do_rsp:
-            # property is routing metadata; do not setattr it on the driver
-            self._apply_options_to_driver(
-                rsp_driver,
-                property_options,
-                skip_keys={"property"},
-            )
+        do_rsp = bool(property_options)
 
         scf_all = []
         rsp_all = [] if do_rsp else None
 
         for snap in snapshots:
+            scf_driver = self._build_scf_driver(scf_options)
+            self._apply_options_to_driver(scf_driver, scf_options, skip_keys={"scf_type"})
+
             frame = int(snap["frame"])
 
             labels = [str(x) for x in snap["qm_elements"]]
@@ -1108,10 +1098,13 @@ class EnsembleDriver:
             scf_all.append((frame, scf_results))
 
             if do_rsp:
-                # Ensure response driver picks PE input from current frame's
-                # SCF results (scf_results_sanity_check only imports potfile
-                # when rsp_driver.potfile is None).
-                rsp_driver.potfile = None
+                rsp_driver = self._build_property_driver(property_options)
+                # property is routing metadata; do not setattr it on the driver
+                self._apply_options_to_driver(
+                    rsp_driver,
+                    property_options,
+                    skip_keys={"property"},
+                )
                 rsp_results = rsp_driver.compute(molecule, basis, scf_results)
                 rsp_all.append((frame, rsp_results))
 
