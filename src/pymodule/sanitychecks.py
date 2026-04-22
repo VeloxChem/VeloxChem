@@ -749,13 +749,48 @@ def write_pe_jsonfile(molecule, potfile):
     }
 
     # MM atoms
+    # Build exclusion lists with peptide-neighbor handling:
+    # - own residue
+    # - previous residue: CA/C/O/OXT (+ HA*)
+    # - next residue: N/H*/CA (+ HA*)
+    # This matches expected CP3 behavior for amino-acid chains.
 
     classical_fragments = []
 
-    mm_atom_count = 0
+    sorted_resids = sorted(list(residues.keys()))
+    residue_infos = []
+    atom_counter = 0
+    for resid in sorted_resids:
+        natoms = len(residues[resid]['atoms'])
+        start_idx = atom_counter + 1
+        end_idx = atom_counter + natoms
+        residue_infos.append({
+            'resid': resid,
+            'start_idx': start_idx,
+            'end_idx': end_idx,
+            'atom_names': [str(a[0]).upper() for a in residues[resid]['atoms']],
+        })
+        atom_counter = end_idx
 
-    for res_count, resid in enumerate(sorted(list(residues.keys()))):
+    prev_neighbor_names = {
+        'CA', 'C', 'O', 'OXT', 'OT1', 'OT2', 'OC1', 'OC2',
+        'HA', 'HA1', 'HA2', 'HA3', '1HA', '2HA', '3HA',
+    }
+    next_neighbor_names = {
+        'N', 'HN', 'H', 'H1', 'H2', 'H3', '1H', '2H', '3H',
+        'HN1', 'HN2', 'HN3', 'HT1', 'HT2', 'HT3',
+        'CA', 'HA', 'HA1', 'HA2', 'HA3', '1HA', '2HA', '3HA',
+    }
+
+    def _select_indices(info, selected_names):
+        return [
+            info['start_idx'] + i for i, name in enumerate(info['atom_names'])
+            if name in selected_names
+        ]
+
+    for res_count, resid in enumerate(sorted_resids):
         resname = residues[resid]['resname']
+        info = residue_infos[res_count]
 
         classical_fragments.append({
             "index": res_count + 1,
@@ -784,15 +819,21 @@ def write_pe_jsonfile(molecule, potfile):
                           for p in range(6)]
                          for x in range(len(residues[resid]['atoms']))]
 
-        # coordinates
-
-        res_atom_start = mm_atom_count
+        # coordinates + exclusions
+        exclusions = list(range(info['start_idx'], info['end_idx'] + 1))
+        if res_count > 0:
+            exclusions.extend(
+                _select_indices(residue_infos[res_count - 1], prev_neighbor_names))
+        if res_count + 1 < len(residue_infos):
+            exclusions.extend(
+                _select_indices(residue_infos[res_count + 1], next_neighbor_names))
+        exclusions = sorted(set(exclusions))
 
         for atom_idx, atom in enumerate(residues[resid]['atoms']):
             # Note: make sure all elements in classical_fragments
             # are serializable by json
             classical_fragments[-1]["atoms"].append({
-                "index": mm_atom_count + 1,
+                "index": info['start_idx'] + atom_idx,
                 "element": atom[0].capitalize(),
                 "coordinate": [
                     float(atom[1]) / bohr_in_angstroms(),
@@ -802,16 +843,12 @@ def write_pe_jsonfile(molecule, potfile):
                 "multipoles": {
                     "elements": [atom_chgs[atom_idx]],
                 },
-                "exclusions": list(
-                    range(res_atom_start + 1,
-                          res_atom_start + 1 + len(residues[resid]['atoms']))),
+                "exclusions": list(exclusions),
                 "polarizabilities": {
                     "elements": ([0.0, 0.0, 0.0, 0.0] + atom_pols[atom_idx]),
                     "order": [1, 1],
                 },
             })
-
-            mm_atom_count += 1
 
     embedding_json.update({
         "classical_subsystems": [{
