@@ -2840,7 +2840,7 @@ class PolOrbitalResponse(CphfSolver):
             #valstr += f'for {n_freqs} frequencies: '
             #valstr += f'{(tm.time() - loop_start_time):.2f} sec **'
             valstr = 'CPHF multipliers for '
-            valstr += f'for {n_freqs} frequencies computed in '
+            valstr += f'{n_freqs} frequencies computed in '
             valstr += f'{(tm.time() - loop_start_time):.2f} sec.'
             self.ostream.print_info(valstr)
             self.ostream.print_blank()
@@ -3109,7 +3109,7 @@ class PolOrbitalResponse(CphfSolver):
             #valstr += f'for {n_freqs} frequencies: '
             #valstr += f'{(tm.time() - loop_start_time):.2f} sec **'
             valstr = 'CPHF multipliers for '
-            valstr += f'for {n_freqs} frequencies computed in '
+            valstr += f'{n_freqs} frequencies computed in '
             valstr += f'{(tm.time() - loop_start_time):.2f} sec.'
             self.ostream.print_info(valstr)
             self.ostream.print_blank()
@@ -3452,7 +3452,7 @@ class PolOrbitalResponse(CphfSolver):
             #valstr += f'for {n_freqs} frequencies: '
             #valstr += f'{(tm.time() - loop_start_time):.2f} sec **'
             valstr = 'CPHF multipliers for '
-            valstr += f'for {n_freqs} frequencies computed in '
+            valstr += f'{n_freqs} frequencies computed in '
             valstr += f'{(tm.time() - loop_start_time):.2f} sec.'
             self.ostream.print_info(valstr)
             self.ostream.print_blank()
@@ -3783,7 +3783,7 @@ class PolOrbitalResponse(CphfSolver):
             #valstr += f'for {n_freqs} frequencies: '
             #valstr += f'{(tm.time() - loop_start_time):.2f} sec **'
             valstr = 'CPHF multipliers for '
-            valstr += f'for {n_freqs} frequencies computed in '
+            valstr += f'{n_freqs} frequencies computed in '
             valstr += f'{(tm.time() - loop_start_time):.2f} sec.'
             self.ostream.print_info(valstr)
             self.ostream.print_blank()
