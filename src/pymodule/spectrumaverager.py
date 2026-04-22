@@ -33,26 +33,19 @@
 import sys
 from mpi4py import MPI
 import numpy as np
-from .veloxchemlib import mpi_master
-from .outputstream import OutputStream
 
+from .veloxchemlib import mpi_master
+from .veloxchemlib import (hartree_in_ev, fine_structure_constant,
+                           avogadro_constant, bohr_in_angstrom,
+                           hartree_in_wavenumber)
+from .outputstream import OutputStream
 from .spectrumplot import lorentzian_absorption, gaussian_absorption
-from .veloxchemlib import (
-    hartree_in_ev,
-    fine_structure_constant,
-    avogadro_constant,
-    bohr_in_angstrom,
-    hartree_in_wavenumber,
-)
 
 try:
     import matplotlib.pyplot as plt
 except ImportError:
     plt = None
 
-au2ev = hartree_in_ev()
-ev2au = 1.0 / au2ev
-au2nm = 1.0e7 / hartree_in_wavenumber()
 
 class SpectrumAverager:
     """
@@ -154,6 +147,11 @@ class SpectrumAverager:
               - transitions_au: excitation energies per snapshot (a.u.)
               - oscillator_strengths: oscillator strengths per snapshot
         """
+
+        au2ev = hartree_in_ev()
+        ev2au = 1.0 / au2ev
+        auxnm = 1.0e7 / hartree_in_wavenumber()
+
         frames, results = self.unpack_snapshots(rsp_all)
 
         if len(results) == 0:
@@ -237,7 +235,7 @@ class SpectrumAverager:
 
         # Wavelength directly from a.u. grid: wl_nm = (nm * a.u.) / a.u.
         with np.errstate(divide="ignore", invalid="ignore"):
-            wl_nm = au2nm / xgrid_au
+            wl_nm = auxnm / xgrid_au
 
         # Drop non-finite wavelength points (e.g. xgrid_au == 0)
         mask = np.isfinite(wl_nm)
@@ -314,6 +312,9 @@ class SpectrumAverager:
         :raises ImportError:
             If matplotlib is not available.
         """
+
+        auxnm = 1.0e7 / hartree_in_wavenumber()
+
         if plt is None:
             raise ImportError("matplotlib is required for plotting")
 
@@ -334,7 +335,7 @@ class SpectrumAverager:
         if show_individual:
             xgrid_au = spectrum["xgrid_au"]
             with np.errstate(divide="ignore", invalid="ignore"):
-                wl_forward = au2nm / xgrid_au  # forward (same ordering as eps arrays)
+                wl_forward = auxnm / xgrid_au  # forward (same ordering as eps arrays)
 
             if mask is None:
                 mask = np.isfinite(wl_forward)
@@ -364,7 +365,7 @@ class SpectrumAverager:
             for e_au, f in zip(spectrum["transitions_au"], spectrum["oscillator_strengths"]):
                 e_au = np.asarray(e_au, dtype=float)
                 with np.errstate(divide="ignore", invalid="ignore"):
-                    wl_t = au2nm / e_au
+                    wl_t = auxnm / e_au
                 ax2.vlines(wl_t, 0.0, f, alpha=0.35, linewidth=2, color=self.stick_color)
 
             ax2.set_ylim(0.0, max(0.2, ax2.get_ylim()[1]))

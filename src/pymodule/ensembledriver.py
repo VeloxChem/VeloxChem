@@ -42,7 +42,6 @@ from .outputstream import OutputStream
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 from .scfrestdriver import ScfRestrictedDriver
-from .scfrestopendriver import ScfRestrictedOpenDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .lreigensolver import LinearResponseEigenSolver
 from .cppsolver import ComplexResponseSolver
@@ -889,19 +888,16 @@ class EnsembleDriver:
         Build SCF driver from scf_options['scf_type'].
         Allowed values:
             - 'scf'   : ScfRestrictedDriver
-            - 'roscf' : ScfRestrictedOpenDriver
             - 'uscf'  : ScfUnrestrictedDriver
         """
         scf_type = str(scf_options.get("scf_type", "scf")).lower()
         if scf_type == "scf":
             return ScfRestrictedDriver()
-        if scf_type == "roscf":
-            return ScfRestrictedOpenDriver()
         if scf_type == "uscf":
             return ScfUnrestrictedDriver()
         raise ValueError(
             "Invalid scf_type in scf_options. "
-            "Expected one of: 'scf', 'roscf', 'uscf'."
+            "Expected one of: 'scf', 'uscf'."
         )
 
     @staticmethod
@@ -969,7 +965,7 @@ class EnsembleDriver:
             Basis set.
         :param scf_options: (dict)
             SCF/method options merged in one dictionary.
-            Includes optional key 'scf_type' in {'scf', 'roscf', 'uscf'} to select the SCF driver.
+            Includes optional key 'scf_type' in {'scf', 'uscf'} to select the SCF driver.
         :param property_options: (dict)
             Property options dictionary with keys:
             'property' ('absorption' or 'ecd') + ('nstates' or 'frequencies').
@@ -1094,6 +1090,8 @@ class EnsembleDriver:
             scf_driver.potfile = None
             scf_driver.point_charges = None
             
+            # TODO: double check the handling of pe and npe regions
+
             if has_pe:
                 scf_driver.potfile = str(potdir / f"pe_frame_{frame:06d}.pot")
 

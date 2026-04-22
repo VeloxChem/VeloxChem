@@ -33,11 +33,17 @@
 from mpi4py import MPI
 import sys
 import numpy as np
+
 from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
-import MDAnalysis as mda
-import MDAnalysis.transformations as transform
-from MDAnalysis.guesser.default_guesser import DefaultGuesser
+
+try:
+    import MDAnalysis as mda
+    import MDAnalysis.transformations as mda_transform
+    from MDAnalysis.guesser.default_guesser import DefaultGuesser as mda_DefaultGuesser
+except ImportError:
+    pass
+
 
 class EnsembleParser:
     """
@@ -149,7 +155,7 @@ class EnsembleParser:
 
         return False
     
-    def _terminal_resname_map(self):
+    def _terminal_resname_map(self, mda_universe):
         """
         Identifies N- and C-terminal protein residues and returns a renaming map.
 
@@ -162,6 +168,8 @@ class EnsembleParser:
         residue in the Universe) and can be used to update per-atom `resnames`
         arrays (e.g. `AtomGroup.resnames`) based on `AtomGroup.resindices`.
 
+        :param mda_universe
+            The MDAnalysis universe object.
         :return dict[int, str]
             Dictionary mapping residue `resindex` to the renamed residue name
             with terminal prefix. Only protein terminal residues are included.
@@ -173,7 +181,7 @@ class EnsembleParser:
         are present but the topology does not distinguish them cleanly.
         """
         # Restrict to protein residues
-        prot = self.universe.select_atoms("protein")
+        prot = mda_universe.select_atoms("protein")
         if len(prot) == 0:
             return {}
 
@@ -376,17 +384,17 @@ class EnsembleParser:
             raise ValueError("qm_multiplicity must be a positive integer")
 
         if trajectory_file.lower().endswith(".pdb"):
-            self.universe = mda.Universe(trajectory_file, guess_bonds=True)
+            mda_universe = mda.Universe(trajectory_file, guess_bonds=True)
         else:
             if topology_file is None:
                 raise ValueError("topology_file is required unless trajectory_file is a .pdb")
             # Refresh XDR offsets to avid stale .xtc_offsets cache warinings
             # when trajectory metadata changes between runs/environments:
-            self.universe = mda.Universe(
+            mda_universe = mda.Universe(
                 topology_file, trajectory_file, refresh_offsets=True
             )
 
-        total_frames = len(self.universe.trajectory)
+        total_frames = len(mda_universe.trajectory)
         self.ostream.print_blank()
 
         if last_snapshot_only:
@@ -399,11 +407,11 @@ class EnsembleParser:
                     "time-resilved trajectories (e.g. .ztc), not .pdb input."
                 )
             if use_time_window:
-                self.universe.trajectory[0]
-                traj_start = float(self.universe.trajectory.ts.time)
+                mda_universe.trajectory[0]
+                traj_start = float(mda_universe.trajectory.ts.time)
 
-                self.universe.trajectory[total_frames - 1]
-                traj_end = float(self.universe.trajectory.ts.time)
+                mda_universe.trajectory[total_frames - 1]
+                traj_end = float(mda_universe.trajectory.ts.time)
 
                 if start is None:
                     start = traj_start
@@ -415,8 +423,8 @@ class EnsembleParser:
 
                 window_frames = []
                 for iframe in range(total_frames):
-                    self.universe.trajectory[iframe]
-                    t = float(self.universe.trajectory.ts.time)
+                    mda_universe.trajectory[iframe]
+                    t = float(mda_universe.trajectory.ts.time)
                     if float(start) <= t <= float(end):
                         window_frames.append(iframe)
 
@@ -452,7 +460,7 @@ class EnsembleParser:
                 )
                 frame_indices = available_frames[sample_idx]
 
-        qm_atoms = self.universe.select_atoms(qm_region)
+        qm_atoms = mda_universe.select_atoms(qm_region)
         if len(qm_atoms) == 0:
             raise ValueError(f"QM region '{qm_region}' selection is empty")
 
@@ -461,20 +469,20 @@ class EnsembleParser:
         else:
             env_region_sel = str(env_region)
 
-        env_atoms = self.universe.select_atoms(env_region_sel).difference(qm_atoms)
+        env_atoms = mda_universe.select_atoms(env_region_sel).difference(qm_atoms)
 
         # Identify terminal protein residues (if any) and assign N*/C* residue names
         # so that terminal variants can be treated as separate residue types downstream.
         prot_map = self._protonation_resname_map(env_atoms)
-        term_map = self._terminal_resname_map()
+        term_map = self._terminal_resname_map(mda_universe)
 
         # MDAnalysis transforms require valid box dimensions (ts.dimensions)
         # (e.g. unwrap/center_in_box/wrap). For single PDBs without box info,
         # skip transformations.
         has_box = False
         try:
-            self.universe.trajectory[0]
-            dims = getattr(self.universe.trajectory.ts, "dimensions", None)
+            mda_universe.trajectory[0]
+            dims = getattr(mda_universe.trajectory.ts, "dimensions", None)
             if dims is not None:
                 dims = np.asarray(dims, dtype=float)
                 if dims.size > 3 and np.all(dims[:3] > 0):
@@ -484,42 +492,38 @@ class EnsembleParser:
 
         if has_box:
             transforms = [
-                transform.unwrap(qm_atoms),
-                transform.center_in_box(qm_atoms, wrap=True),
-                transform.wrap(env_atoms),
+                mda_transform.unwrap(qm_atoms),
+                mda_transform.center_in_box(qm_atoms, wrap=True),
+                mda_transform.wrap(env_atoms),
             ]
-            self.universe.trajectory.add_transformations(*transforms)
+            mda_universe.trajectory.add_transformations(*transforms)
 
-        empty_xyz = np.empty((0, 3), dtype=float)
-        empty_obj = np.empty((0,), dtype=object)
-        empty_int = np.empty((0,), dtype=int)
-
-        atom_guesser = DefaultGuesser(self.universe)
+        atom_guesser = mda_DefaultGuesser(mda_universe)
 
         snapshots = []
         for iframe in frame_indices:
-            self.universe.trajectory[iframe]
+            mda_universe.trajectory[iframe]
 
             qm_coords = np.asarray(qm_atoms.positions, dtype=float).copy()
             qm_elements = np.asarray(
                 [atom_guesser.guess_atom_element(n) for n in qm_atoms.names], dtype=object
             )
 
-            pe_coords = empty_xyz
-            pe_elements = empty_obj
-            pe_resids = empty_int
-            pe_resindices = empty_int
-            pe_resnames = empty_obj
+            pe_coords = None
+            pe_elements = None
+            pe_resids = None
+            pe_resindices = None
+            pe_resnames = None
             number_residues_pe = 0
-            pe_atom_names = empty_obj
+            pe_atom_names = None
 
-            npe_coords = empty_xyz
-            npe_elements = empty_obj
-            npe_resids = empty_int
-            npe_resindices = empty_int
-            npe_resnames = empty_obj
+            npe_coords = None
+            npe_elements = None
+            npe_resids = None
+            npe_resindices = None
+            npe_resnames = None
             number_residues_npe = 0
-            npe_atom_names = empty_obj
+            npe_atom_names = None
 
             pe_region = None
 
@@ -527,7 +531,7 @@ class EnsembleParser:
 
             # PE selection
             if pe_cutoff is not None:
-                pe_touch = self.universe.select_atoms(
+                pe_touch = mda_universe.select_atoms(
                     f"({env_region_sel} and around {float(pe_cutoff)} group qm)",
                     qm=qm_atoms,
                 ).difference(qm_atoms)
@@ -564,7 +568,7 @@ class EnsembleParser:
 
             # NPE selection
             if npe_cutoff is not None:
-                npe_touch = self.universe.select_atoms(
+                npe_touch = mda_universe.select_atoms(
                     f"({env_region_sel} and around {float(npe_cutoff)} group qm)",
                     qm=qm_atoms,
                 ).difference(qm_atoms)
@@ -607,7 +611,7 @@ class EnsembleParser:
             # If neither cutoff is set, interpret as all-qm
 
             snapshot = {
-                    "frame": int(self.universe.trajectory.frame),
+                    "frame": int(mda_universe.trajectory.frame),
 
                     "qm_coords": qm_coords,
                     "qm_elements": qm_elements,

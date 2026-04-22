@@ -56,7 +56,7 @@ class TestEnsembleDriverOptions:
             "nto": True,
         }
 
-        potdir = tmp_path / "pot_frames"
+        potdir = data_dir
         results = ens_drv.compute(
             ensemble,
             basis_set="6-31G",
@@ -123,6 +123,10 @@ class TestEnsembleDriverOptions:
 
             # cleanup
             (data_dir / ".alpha-helix-acetone-water.xtc_offsets.npz").unlink(missing_ok=True)
+            (data_dir / "pe_frame_000000.pot").unlink(missing_ok=True)
+            (data_dir / "pe_frame_000000.json").unlink(missing_ok=True)
+            (data_dir / "pe_frame_000100.pot").unlink(missing_ok=True)
+            (data_dir / "pe_frame_000100.json").unlink(missing_ok=True)
 
             # Ensemble-averaged spectra output
             try:
