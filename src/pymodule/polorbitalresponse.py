@@ -636,9 +636,10 @@ class PolOrbitalResponse(CphfSolver):
         profiler.check_memory_usage('End of RHS')
 
         if self.rank == mpi_master():
-            valstr = '** Time spent on constructing the orbrsp RHS for '
-            valstr += f'{len(self.frequencies)} frequencies: '
-            valstr += f'{(tm.time() - loop_start_time):.2f} sec **'
+            #valstr = '** Time spent on constructing the orbrsp RHS for '
+            valstr = 'CPHF/CPKS right-hand side for '
+            valstr += f'{len(self.frequencies)} frequencies computed in '
+            valstr += f'{(tm.time() - loop_start_time):.2f} sec.'
             self.ostream.print_info(valstr)
             self.ostream.print_blank()
             self.ostream.flush()
@@ -1112,9 +1113,12 @@ class PolOrbitalResponse(CphfSolver):
         profiler.check_memory_usage('End of RHS')
 
         if self.rank == mpi_master():
-            valstr = '** Time spent on constructing the orbrsp RHS for '
-            valstr += f'{len(self.frequencies)} frequencies: '
-            valstr += f'{(tm.time() - loop_start_time):.2f} sec **'
+            #valstr = '** Time spent on constructing the orbrsp RHS for '
+            #valstr += f'{len(self.frequencies)} frequencies: '
+            #valstr += f'{(tm.time() - loop_start_time):.2f} sec **'
+            valstr = 'CPHF/CPKS right-hand side for '
+            valstr += f'{len(self.frequencies)} frequencies computed in '
+            valstr += f'{(tm.time() - loop_start_time):.2f} sec.'
             self.ostream.print_info(valstr)
             self.ostream.print_blank()
             self.ostream.flush()
@@ -1447,9 +1451,12 @@ class PolOrbitalResponse(CphfSolver):
         profiler.print_profiling_summary(self.ostream)
 
         if self.rank == mpi_master():
-            valstr = '** Time spent on constructing the orbrsp RHS for '
-            valstr += f'{len(self.frequencies)} frequencies: '
-            valstr += f'{(tm.time() - loop_start_time):.2f} sec **'
+            #valstr = '** Time spent on constructing the orbrsp RHS for '
+            #valstr += f'{len(self.frequencies)} frequencies: '
+            #valstr += f'{(tm.time() - loop_start_time):.2f} sec **'
+            valstr = 'CPHF/CPKS right-hand side for '
+            valstr += f'{len(self.frequencies)} frequencies computed in '
+            valstr += f'{(tm.time() - loop_start_time):.2f} sec.'
             self.ostream.print_info(valstr)
             self.ostream.print_blank()
             self.ostream.flush()
@@ -1768,9 +1775,12 @@ class PolOrbitalResponse(CphfSolver):
         profiler.print_profiling_summary(self.ostream)
 
         if self.rank == mpi_master():
-            valstr = '** Time spent on constructing the orbrsp RHS for '
-            valstr += f'{len(self.frequencies)} frequencies: '
-            valstr += f'{(tm.time() - loop_start_time):.2f} sec **'
+            #valstr = '** Time spent on constructing the orbrsp RHS for '
+            #valstr += f'{len(self.frequencies)} frequencies: '
+            #valstr += f'{(tm.time() - loop_start_time):.2f} sec **'
+            valstr = 'CPHF/CPKS right-hand side for '
+            valstr += f'{len(self.frequencies)} frequencies computed in '
+            valstr += f'{(tm.time() - loop_start_time):.2f} sec.'
             self.ostream.print_info(valstr)
             self.ostream.print_blank()
             self.ostream.flush()
@@ -2826,10 +2836,13 @@ class PolOrbitalResponse(CphfSolver):
 
         if self.rank == mpi_master():
             self.ostream.print_blank()
-            valstr = '** Time spent on constructing omega multipliers '
-            valstr += f'for {n_freqs} frequencies: '
-            valstr += f'{(tm.time() - loop_start_time):.2f} sec **'
-            self.ostream.print_header(valstr)
+            #valstr = '** Time spent on constructing omega multipliers '
+            #valstr += f'for {n_freqs} frequencies: '
+            #valstr += f'{(tm.time() - loop_start_time):.2f} sec **'
+            valstr = 'CPHF multipliers for '
+            valstr += f'for {n_freqs} frequencies computed in '
+            valstr += f'{(tm.time() - loop_start_time):.2f} sec.'
+            self.ostream.print_info(valstr)
             self.ostream.print_blank()
             self.ostream.flush()
 
@@ -3092,10 +3105,13 @@ class PolOrbitalResponse(CphfSolver):
 
         if self.rank == mpi_master():
             self.ostream.print_blank()
-            valstr = '** Time spent on constructing omega multipliers '
-            valstr += f'for {n_freqs} frequencies: '
-            valstr += f'{(tm.time() - loop_start_time):.2f} sec **'
-            self.ostream.print_header(valstr)
+            #valstr = '** Time spent on constructing omega multipliers '
+            #valstr += f'for {n_freqs} frequencies: '
+            #valstr += f'{(tm.time() - loop_start_time):.2f} sec **'
+            valstr = 'CPHF multipliers for '
+            valstr += f'for {n_freqs} frequencies computed in '
+            valstr += f'{(tm.time() - loop_start_time):.2f} sec.'
+            self.ostream.print_info(valstr)
             self.ostream.print_blank()
             self.ostream.flush()
 
@@ -3432,10 +3448,13 @@ class PolOrbitalResponse(CphfSolver):
         profiler.print_profiling_summary(self.ostream)
 
         if self.rank == mpi_master():
-            valstr = '** Time spent on constructing omega multipliers '
-            valstr += f'for {n_freqs} frequencies: '
-            valstr += f'{(tm.time() - loop_start_time):.2f} sec **'
-            self.ostream.print_header(valstr)
+            #valstr = '** Time spent on constructing omega multipliers '
+            #valstr += f'for {n_freqs} frequencies: '
+            #valstr += f'{(tm.time() - loop_start_time):.2f} sec **'
+            valstr = 'CPHF multipliers for '
+            valstr += f'for {n_freqs} frequencies computed in '
+            valstr += f'{(tm.time() - loop_start_time):.2f} sec.'
+            self.ostream.print_info(valstr)
             self.ostream.print_blank()
             self.ostream.flush()
 
@@ -3760,10 +3779,13 @@ class PolOrbitalResponse(CphfSolver):
         profiler.print_profiling_summary(self.ostream)
 
         if self.rank == mpi_master():
-            valstr = '** Time spent on constructing omega multipliers '
-            valstr += f'for {n_freqs} frequencies: '
-            valstr += f'{(tm.time() - loop_start_time):.2f} sec **'
-            self.ostream.print_header(valstr)
+            #valstr = '** Time spent on constructing omega multipliers '
+            #valstr += f'for {n_freqs} frequencies: '
+            #valstr += f'{(tm.time() - loop_start_time):.2f} sec **'
+            valstr = 'CPHF multipliers for '
+            valstr += f'for {n_freqs} frequencies computed in '
+            valstr += f'{(tm.time() - loop_start_time):.2f} sec.'
+            self.ostream.print_info(valstr)
             self.ostream.print_blank()
             self.ostream.flush()
 
