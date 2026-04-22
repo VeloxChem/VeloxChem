@@ -500,7 +500,24 @@ def pe_sanity_check(obj, method_dict=None, molecule=None):
                 },
             }
         else:
-            potfile = obj.embedding['inputs']['json_file']
+            # If current-frame potfile is explicitly provided, it must take
+            # precedence over any embedding object carried from a previous frame.
+            if obj.potfile:
+                potfile = None
+                if obj.rank == mpi_master():
+                    potfile = obj.potfile
+                    if not Path(potfile).is_file():
+                        potfile = str(
+                            Path(obj.filename).parent / Path(potfile).name)
+                    assert_msg_critical(
+                        Path(potfile).is_file(),
+                        'PE sanity check: potfile does not exist')
+                
+                potfile = obj.comm.bcast(potfile, root=mpi_master())
+                obj.embedding['inputs']['json_file'] = potfile
+            else:
+                potfile = obj.embedding['inputs']['json_file']
+
             obj.pe_options['potfile'] = potfile
 
         # update potfile in case it is not in json format
