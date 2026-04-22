@@ -166,7 +166,9 @@ class PolOrbitalResponse(CphfSolver):
     def compute_rhs(self, molecule, basis, scf_tensors, eri_dict, dft_dict, pe_dict, lr_results):
 
         if self.is_complex:
-            return self.compute_rhs_complex(molecule, basis, scf_tensors, eri_dict,
+            #return self.compute_rhs_complex(molecule, basis, scf_tensors, eri_dict,
+            #                                dft_dict, pe_dict, lr_results)
+            return self.compute_rhs_complex_red_dim(molecule, basis, scf_tensors, eri_dict,
                                             dft_dict, pe_dict, lr_results)
         else:
             #return self.compute_rhs_real(molecule, basis, scf_tensors, eri_dict,
@@ -610,6 +612,535 @@ class PolOrbitalResponse(CphfSolver):
                 if self.rank == mpi_master():
                     cphf_rhs_k_re = rhs_red[k].real.copy().reshape(nocc * nvir)
                     cphf_rhs_k_im = rhs_red[k].imag.copy().reshape(nocc * nvir)
+                else:
+                    cphf_rhs_k_re = None
+                    cphf_rhs_k_im = None
+                dist_cphf_rhs_re.append(DistributedArray(cphf_rhs_k_re, self.comm,
+                                                         root=mpi_master()))
+                dist_cphf_rhs_im.append(DistributedArray(cphf_rhs_k_im, self.comm,
+                                                         root=mpi_master()))
+
+            dist_cphf_rhs.extend(dist_cphf_rhs_re + dist_cphf_rhs_im)
+
+            del dist_cphf_rhs_re, dist_cphf_rhs_im
+
+            profiler.stop_timer('total')
+            profiler.check_memory_usage(f'RHS w={w:.4f}')
+
+        profiler.print_memory_subspace({
+            'dist_cphf_rhs': dist_cphf_rhs,
+            'dist_fock_ao_rhs': dist_fock_ao_rhs,
+            'dist_fock_gxc_ao': dist_fock_gxc_ao  # empty list if not DFT
+        }, self.ostream)
+        profiler.check_memory_usage('End of RHS')
+
+        if self.rank == mpi_master():
+            valstr = '** Time spent on constructing the orbrsp RHS for '
+            valstr += f'{len(self.frequencies)} frequencies: '
+            valstr += f'{(tm.time() - loop_start_time):.2f} sec **'
+            self.ostream.print_info(valstr)
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+        profiler.print_timing(self.ostream)
+        profiler.print_memory_usage(self.ostream)
+        profiler.print_profiling_summary(self.ostream)
+
+        if self.rank == mpi_master():
+            orbrsp_rhs['dist_cphf_rhs'] = dist_cphf_rhs
+            orbrsp_rhs['dist_fock_ao_rhs'] = dist_fock_ao_rhs
+            orbrsp_rhs['dist_fock_gxc_ao'] = dist_fock_gxc_ao  # empty list if not DFT
+
+            return orbrsp_rhs
+        else:
+            return {
+                'dist_cphf_rhs': dist_cphf_rhs,
+                'dist_fock_ao_rhs': dist_fock_ao_rhs,
+                'dist_fock_gxc_ao': dist_fock_gxc_ao  # empty list if not DFT
+            }
+
+    def compute_rhs_complex_red_dim(self, molecule, basis, scf_tensors, eri_dict, dft_dict, pe_dict, lr_results):
+        """
+        Computes the complex right-hand side (RHS) of the polarizability
+        orbital response equation including the necessary density matrices
+        using molecular data.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param scf_tensors:
+            The dictionary of tensors from converged SCF calculation.
+        :param lr_results:
+            The results from converged CPP calculation.
+
+        :return:
+            A dictionary containing the orbital-response RHS
+        """
+
+        profiler = Profiler({
+            'timing': self.timing,
+            'profiling': self.profiling,
+            'memory_profiling': self.memory_profiling,
+            'memory_tracing': self.memory_tracing,
+        })
+
+        # check if zero is in self.frequencies
+        polorbrsp_sanity_check_1(self)
+
+        loop_start_time = tm.time()
+
+        # number of vector components
+        dof = len(self.vector_components)
+
+        if self.rank == mpi_master():
+            # check if response vectors exist for desired frequency of gradient
+            polorbrsp_sanity_check_2(self, self.flag, lr_results)
+
+            density = scf_tensors['D_alpha']
+
+            # number of AOs
+            nao = basis.get_dimensions_of_basis()
+
+            # number of occupied orbitals
+            nocc = molecule.number_of_alpha_occupied_orbitals(basis)
+
+            # MO coefficients
+            mo = scf_tensors['C_alpha']  # only alpha part
+            mo_occ = mo[:, :nocc].copy()
+            mo_vir = mo[:, nocc:].copy()
+
+            # number of virtual orbitals
+            nvir = mo_vir.shape[1]
+
+            # reduce dimensions of RHS to unique operator component combinations
+            xy_pairs = [(x,y) for x in range(dof) for y in range(x, dof)]
+            dof_red = len(xy_pairs)
+
+            # dictionary for RHS and Fock matrices
+            orbrsp_rhs = {}
+        else:
+            density = None
+            dof_red = None
+
+        density = self.comm.bcast(density, root=mpi_master())
+        dof_red = self.comm.bcast(dof_red, root=mpi_master())
+
+        # TODO: double check dft_dict['gs_density']
+        molgrid = dft_dict['molgrid']
+        gs_density = [density]
+
+        # list for distributed arrays
+        dist_cphf_rhs = []
+        dist_fock_ao_rhs = []
+        dist_fock_gxc_ao = []
+
+        for f, w in enumerate(self.frequencies):
+            profiler.set_timing_key(f'RHS w={w:.4f}')
+            profiler.start_timer('total')
+
+            if self.rank == mpi_master():
+                self.ostream.print_info(f'Building RHS for w = {w:4.3f}')
+                self.ostream.flush()
+
+            full_vec = [
+                self.get_full_solution_vector(lr_results['solutions'][x, w])
+                for x in self.vector_components
+            ]
+
+            if self.rank == mpi_master():
+
+                # Note: polorbitalresponse uses r instead of mu for dipole operator
+                for idx, tmp in enumerate(full_vec):
+                    full_vec[idx] *= -1.0
+
+                # extract the excitation and de-excitation components
+                # from the full solution vector.
+                sqrt2 = np.sqrt(2.0)
+                exc_vec = (1.0 / sqrt2 *
+                           np.array(full_vec)[:, :nocc * nvir].reshape(
+                               dof, nocc, nvir))
+                deexc_vec = (1.0 / sqrt2 *
+                             np.array(full_vec)[:, nocc * nvir:].reshape(
+                                 dof, nocc, nvir))
+
+                # construct plus/minus combinations of excitation and
+                # de-excitation part
+                x_plus_y = exc_vec + deexc_vec
+                x_minus_y = exc_vec - deexc_vec
+
+                del exc_vec, deexc_vec
+
+                # transform to AO basis: mi,xia,na->xmn
+                x_plus_y_ao = np.array([
+                    np.linalg.multi_dot([mo_occ, x_plus_y[x], mo_vir.T])
+                    for x in range(x_plus_y.shape[0])
+                ])
+                x_minus_y_ao = np.array([
+                    np.linalg.multi_dot([mo_occ, x_minus_y[x], mo_vir.T])
+                    for x in range(x_minus_y.shape[0])
+                ])
+
+                # turn them into a list for AODensityMatrix
+                xpmy_ao_list_real = list(np.array(x_plus_y_ao.real)) + list(
+                    np.array(x_minus_y_ao.real))
+                xpmy_ao_list_imag = list(np.array(x_plus_y_ao.imag)) + list(
+                    np.array(x_minus_y_ao.imag))
+
+                # calculate symmetrized unrelaxed one-particle density matrix
+                profiler.start_timer('1PDM')
+
+                # TODO reduce dimensions
+                #unrel_dm_ao = self.calculate_unrel_dm(molecule, basis,
+                unrel_dm_ao = self.calculate_unrel_dm_red_dim(molecule, basis,
+                                                      scf_tensors, x_plus_y,
+                                                      x_minus_y)
+
+                profiler.stop_timer('1PDM')
+
+                # create lists
+                # TODO reduce dimensions (remove reshape)
+                dm_ao_list_real = list(
+                    #np.array(unrel_dm_ao.real).reshape(dof**2, nao, nao))
+                    np.array(unrel_dm_ao.real).reshape(dof_red, nao, nao))
+                dm_ao_list_imag = list(
+                    #np.array(unrel_dm_ao.imag).reshape(dof**2, nao, nao))
+                    np.array(unrel_dm_ao.imag).reshape(dof_red, nao, nao))
+
+                # density matrix for RHS
+                dm_ao_rhs_real_list = dm_ao_list_real + xpmy_ao_list_real
+                dm_ao_rhs_imag_list = dm_ao_list_imag + xpmy_ao_list_imag
+
+                if self._dft:
+                    # construct density matrices for E[3] term
+                    perturbed_dm_ao_list_rere = []
+                    perturbed_dm_ao_list_imim = []
+                    perturbed_dm_ao_list_reim = []
+                    perturbed_dm_ao_list_imre = []
+                    zero_dm_ao_list = []
+
+                    # TODO reduce dimensions
+                    for x in range(dof):
+                        #for y in range(dof):
+                        for y in range(x, dof):
+                            perturbed_dm_ao_list_rere.extend([
+                                np.array(x_minus_y_ao[x].real),
+                                np.array(0 * x_minus_y_ao[x].real),
+                                np.array(x_minus_y_ao[y].real),
+                                np.array(0 * x_minus_y_ao[y].real)])
+                            perturbed_dm_ao_list_imim.extend([
+                                np.array(x_minus_y_ao[x].imag),
+                                np.array(0 * x_minus_y_ao[x].imag),
+                                np.array(x_minus_y_ao[y].imag),
+                                np.array(0 * x_minus_y_ao[y].imag)])
+
+                            # complex cross-terms
+                            perturbed_dm_ao_list_reim.extend([
+                                np.array(x_minus_y_ao[x].real),
+                                np.array(0 * x_minus_y_ao[x].real),
+                                np.array(x_minus_y_ao[y].imag),
+                                np.array(0 * x_minus_y_ao[y].imag)])
+                            perturbed_dm_ao_list_imre.extend([
+                                np.array(x_minus_y_ao[x].imag),
+                                np.array(0 * x_minus_y_ao[x].imag),
+                                np.array(x_minus_y_ao[y].real),
+                                np.array(0 * x_minus_y_ao[y].real)])
+
+                            zero_dm_ao_list.extend([
+                                np.array(0 * x_minus_y_ao[x].real),
+                                np.array(0 * x_minus_y_ao[y].real)])
+            else:
+                dm_ao_rhs_real_list = None
+                dm_ao_rhs_imag_list = None
+
+                if self._dft:
+                    perturbed_dm_ao_list_rere = None
+                    perturbed_dm_ao_list_imim = None
+                    perturbed_dm_ao_list_reim = None
+                    perturbed_dm_ao_list_imre = None
+                    zero_dm_ao_list = None
+
+            dm_ao_rhs_real_list = self.comm.bcast(dm_ao_rhs_real_list, root=mpi_master())
+            dm_ao_rhs_imag_list = self.comm.bcast(dm_ao_rhs_imag_list, root=mpi_master())
+
+            if self._dft:
+                perturbed_dm_ao_list_rere = self.comm.bcast(perturbed_dm_ao_list_rere,
+                                                            root=mpi_master())
+                perturbed_dm_ao_list_imim = self.comm.bcast(perturbed_dm_ao_list_imim,
+                                                            root=mpi_master())
+                perturbed_dm_ao_list_reim = self.comm.bcast(perturbed_dm_ao_list_reim,
+                                                            root=mpi_master())
+                perturbed_dm_ao_list_imre = self.comm.bcast(perturbed_dm_ao_list_imre,
+                                                            root=mpi_master())
+                zero_dm_ao_list = self.comm.bcast(zero_dm_ao_list, root=mpi_master())
+
+                # Fock matrices with corresponding type
+                # set the vector-related components to general Fock matrix
+                # (not 1PDM part)
+            #if self._dft:
+                profiler.start_timer('kXC')
+                # FIXME: use deepcopy
+                fock_gxc_ao_rere = []
+                fock_gxc_ao_imim = []
+                fock_gxc_ao_reim = []
+                fock_gxc_ao_imre = []
+                for dm_i_mat in zero_dm_ao_list:
+                    fock_gxc_ao_rere.append(dm_i_mat.copy())
+                    fock_gxc_ao_imim.append(dm_i_mat.copy())
+                    fock_gxc_ao_reim.append(dm_i_mat.copy())
+                    fock_gxc_ao_imre.append(dm_i_mat.copy())
+
+                xc_drv = XCIntegrator()
+                xc_drv.integrate_kxc_fock(fock_gxc_ao_rere, molecule, basis,
+                                          perturbed_dm_ao_list_rere, zero_dm_ao_list,
+                                          gs_density, molgrid,
+                                          self.xcfun.get_func_label(), "qrf")
+                xc_drv.integrate_kxc_fock(fock_gxc_ao_imim, molecule, basis,
+                                          perturbed_dm_ao_list_imim, zero_dm_ao_list,
+                                          gs_density, molgrid,
+                                          self.xcfun.get_func_label(), "qrf")
+                xc_drv.integrate_kxc_fock(fock_gxc_ao_reim, molecule, basis,
+                                          perturbed_dm_ao_list_reim, zero_dm_ao_list,
+                                          gs_density, molgrid,
+                                          self.xcfun.get_func_label(), "qrf")
+                xc_drv.integrate_kxc_fock(fock_gxc_ao_imre, molecule, basis,
+                                          perturbed_dm_ao_list_imre, zero_dm_ao_list,
+                                          gs_density, molgrid,
+                                          self.xcfun.get_func_label(), "qrf")
+
+                for idx, tmp in enumerate(fock_gxc_ao_rere):
+                    fock_gxc_ao_rere[idx] = self.comm.reduce(fock_gxc_ao_rere[idx],
+                                                             root=mpi_master())
+                for idx, tmp in enumerate(fock_gxc_ao_imim):
+                    fock_gxc_ao_imim[idx] = self.comm.reduce(fock_gxc_ao_imim[idx],
+                                                             root=mpi_master())
+                for idx, tmp in enumerate(fock_gxc_ao_reim):
+                    fock_gxc_ao_reim[idx] = self.comm.reduce(fock_gxc_ao_reim[idx],
+                                                             root=mpi_master())
+                for idx, tmp in enumerate(fock_gxc_ao_imre):
+                    fock_gxc_ao_imre[idx] = self.comm.reduce(fock_gxc_ao_imre[idx],
+                                                             root=mpi_master())
+                profiler.stop_timer('kXC')
+            else:
+                fock_gxc_ao_rere = None
+                fock_gxc_ao_imim = None
+                fock_gxc_ao_reim = None
+                fock_gxc_ao_imre = None
+
+            # TODO will we reduced dimensions
+            fock_ao_rhs_real = self._comp_lr_fock(dm_ao_rhs_real_list, molecule,
+                                                  basis, eri_dict, dft_dict, pe_dict,
+                                                  profiler)
+            fock_ao_rhs_imag = self._comp_lr_fock(dm_ao_rhs_imag_list, molecule,
+                                                  basis, eri_dict, dft_dict, pe_dict,
+                                                  profiler)
+
+            # calculate the RHS
+            if self.rank == mpi_master():
+                # extract the 1PDM contributions
+                # TODO reduce dimensions
+                #fock_ao_rhs_1pdm = np.zeros((dof**2, nao, nao),
+                #                            dtype=np.dtype('complex128'))
+                #fock_ao_rhs_1pdm_real = np.zeros((dof**2, nao, nao))
+                #fock_ao_rhs_1pdm_imag = np.zeros((dof**2, nao, nao))
+                fock_ao_rhs_1pdm = np.zeros((dof_red, nao, nao),
+                                            dtype=np.dtype('complex128'))
+                fock_ao_rhs_1pdm_real = np.zeros((dof_red, nao, nao))
+                fock_ao_rhs_1pdm_imag = np.zeros((dof_red, nao, nao))
+
+                # TODO reduce dimensions
+                #for i in range(dof**2):
+                for i in range(dof_red):
+                    fock_ao_rhs_1pdm_real[i] = fock_ao_rhs_real[i].copy()
+                    fock_ao_rhs_1pdm_imag[i] = fock_ao_rhs_imag[i].copy()
+
+                # combine to complex array
+                fock_ao_rhs_1pdm = fock_ao_rhs_1pdm_real + 1j * fock_ao_rhs_1pdm_imag
+
+                # transform to MO basis: mi,xmn,na->xia
+                # TODO reduce dimensions
+                fock_mo_rhs_1pdm = np.array([
+                    np.linalg.multi_dot([mo_occ.T, fock_ao_rhs_1pdm[x], mo_vir])
+                    #for x in range(dof**2)
+                    for x in range(dof_red)
+                ])
+
+                # extract the x_plus_y and x_minus_y contributions
+                fock_ao_rhs_x_plus_y_real = np.zeros((dof, nao, nao))
+                fock_ao_rhs_x_minus_y_real = np.zeros((dof, nao, nao))
+                fock_ao_rhs_x_plus_y_imag = np.zeros((dof, nao, nao))
+                fock_ao_rhs_x_minus_y_imag = np.zeros((dof, nao, nao))
+                for i in range(dof):
+                     # TODO change index to reduced dimensions
+                    #fock_ao_rhs_x_plus_y_real[i] = fock_ao_rhs_real[dof**2 + i].copy()
+                    #fock_ao_rhs_x_minus_y_real[i] = fock_ao_rhs_real[dof**2 + dof + i].copy()
+                    #fock_ao_rhs_x_plus_y_imag[i] = fock_ao_rhs_imag[dof**2 + i].copy()
+                    #fock_ao_rhs_x_minus_y_imag[i] = fock_ao_rhs_imag[dof**2 + dof + i].copy()
+                    fock_ao_rhs_x_plus_y_real[i] = fock_ao_rhs_real[dof_red + i].copy()
+                    fock_ao_rhs_x_minus_y_real[i] = fock_ao_rhs_real[dof_red + dof + i].copy()
+                    fock_ao_rhs_x_plus_y_imag[i] = fock_ao_rhs_imag[dof_red + i].copy()
+                    fock_ao_rhs_x_minus_y_imag[i] = fock_ao_rhs_imag[dof_red + dof + i].copy()
+
+                # combine to complex
+                fock_ao_rhs_x_plus_y = (fock_ao_rhs_x_plus_y_real +
+                                        1j * fock_ao_rhs_x_plus_y_imag)
+                fock_ao_rhs_x_minus_y = (fock_ao_rhs_x_minus_y_real +
+                                         1j * fock_ao_rhs_x_minus_y_imag)
+
+                # calculate 2-particle density matrix contribution
+                profiler.start_timer('2PDM')
+                # TODO reduce dimensions (call the _red_dim function)
+                #fock_mo_rhs_2pdm = self.calculate_rhs_2pdm_contrib(molecule,
+                fock_mo_rhs_2pdm = self.calculate_rhs_2pdm_contrib_red_dim(molecule,
+                                                                   basis,
+                                                                   scf_tensors,
+                                                                   x_plus_y_ao,
+                                                                   x_minus_y_ao,
+                                                                   fock_ao_rhs_x_plus_y,
+                                                                   fock_ao_rhs_x_minus_y
+                                                                   )
+                profiler.stop_timer('2PDM')
+
+                # Calculate dipole contribution
+                profiler.start_timer('dipole')
+
+                # TODO reduce dimensions (call the _red_dim function)
+                #rhs_dipole_contrib = self.calculate_rhs_dipole_contrib(
+                rhs_dipole_contrib = self.calculate_rhs_dipole_contrib_red_dim(
+                    molecule, basis, scf_tensors, x_minus_y)
+
+                profiler.stop_timer('dipole')
+
+                # sum RHS contributions
+                rhs_mo = fock_mo_rhs_1pdm + fock_mo_rhs_2pdm + rhs_dipole_contrib
+
+                # add DFT E[3] contribution to the RHS
+                if self._dft:
+                    # TODO reduce dimensions
+                    #gxc_ao = np.zeros((dof**2, nao, nao), dtype=np.dtype('complex128'))
+                    gxc_ao = np.zeros((dof_red, nao, nao), dtype=np.dtype('complex128'))
+
+                    # TODO reduce dimensions
+                    #for i in range(dof**2):
+                    for i in range(dof_red):
+                        gxc_ao[i] = (fock_gxc_ao_rere[2 * i]
+                                     - fock_gxc_ao_imim[2 * i]
+                                     + 1j * (fock_gxc_ao_reim[2 * i]
+                                     + fock_gxc_ao_imre[2 * i])
+                                     )
+
+                    # transform to MO basis: mi,xmn,na->xia
+                    # TODO reduce dimensions
+                    gxc_mo = np.array([
+                        np.linalg.multi_dot([mo_occ.T, gxc_ao[x], mo_vir])
+                        #for x in range(dof**2)
+                        for x in range(dof_red)
+                    ])
+                    # different factor compared to TDDFT orbital response
+                    # because here vectors are scaled by 1/sqrt(2)
+                    rhs_mo += 0.5 * (gxc_mo)
+
+                # reduce dimensions of RHS to unique operator component combinations
+                # TODO remove this
+                #rhs_tmp = rhs_mo.reshape(dof, dof, nocc, nvir).copy()
+                #rhs_red = []
+
+                #for x, y in xy_pairs:
+                #    rhs_red.append(rhs_tmp[x, y].copy())
+                #rhs_red = np.array(rhs_red)
+
+                # array with RHS (only relevant when using conjugate gradient solver)
+                # TODO change to rhs_mo directly
+                if (f == 0):
+                    #tot_rhs_mo = np.concatenate((rhs_red.real, rhs_red.imag))
+                    tot_rhs_mo = np.concatenate((rhs_mo.real, rhs_mo.imag))
+                else:
+                    tot_rhs_mo = np.concatenate(
+                        #(tot_rhs_mo, rhs_red.real, rhs_red.imag))
+                        (tot_rhs_mo, rhs_mo.real, rhs_mo.imag))
+
+                profiler.print_memory_subspace(
+                    {
+                        'fock_ao_rhs_real': fock_ao_rhs_real,
+                        'fock_ao_rhs_imag': fock_ao_rhs_imag,
+                        'fock_gxc_ao_rere': fock_gxc_ao_rere,
+                        'fock_gxc_ao_reim': fock_gxc_ao_reim,
+                        'fock_gxc_ao_imim': fock_gxc_ao_imim,
+                        'fock_gxc_ao_imre': fock_gxc_ao_imre,
+                    }, self.ostream)
+
+            # save intermediates in distributed array
+            dist_fock_ao_rhs_re = []
+            dist_fock_ao_rhs_im = []
+            # TODO reduce dimensions
+            #for k in range(dof**2 + 2 * dof):
+            for k in range(dof_red + 2 * dof):
+                if self.rank == mpi_master():
+                    fock_ao_rhs_re_k = fock_ao_rhs_real[k].reshape(nao * nao)
+                    fock_ao_rhs_im_k = fock_ao_rhs_imag[k].reshape(nao * nao)
+                else:
+                    fock_ao_rhs_re_k = None
+                    fock_ao_rhs_im_k = None
+                dist_fock_ao_rhs_re.append(DistributedArray(fock_ao_rhs_re_k,
+                                                            self.comm,
+                                                            root=mpi_master()))
+                dist_fock_ao_rhs_im.append(DistributedArray(fock_ao_rhs_im_k,
+                                                            self.comm,
+                                                            root=mpi_master()))
+            dist_fock_ao_rhs.extend(dist_fock_ao_rhs_re + dist_fock_ao_rhs_im)
+
+            del dist_fock_ao_rhs_re, dist_fock_ao_rhs_im
+
+            if self._dft:
+                dist_fock_gxc_ao_rere = []
+                dist_fock_gxc_ao_imim = []
+                dist_fock_gxc_ao_reim = []
+                dist_fock_gxc_ao_imre = []
+                # TODO reduce dimensions
+                #for k in range(2 * dof**2):
+                for k in range(2 * dof_red):
+                    if self.rank == mpi_master():
+                        fock_gxc_ao_rere_k = fock_gxc_ao_rere[k].reshape(nao * nao)
+                        fock_gxc_ao_imim_k = fock_gxc_ao_imim[k].reshape(nao * nao)
+                        fock_gxc_ao_reim_k = fock_gxc_ao_reim[k].reshape(nao * nao)
+                        fock_gxc_ao_imre_k = fock_gxc_ao_imre[k].reshape(nao * nao)
+                    else:
+                        fock_gxc_ao_rere_k = None
+                        fock_gxc_ao_imim_k = None
+                        fock_gxc_ao_reim_k = None
+                        fock_gxc_ao_imre_k = None
+
+                    dist_fock_gxc_ao_rere.append(DistributedArray(fock_gxc_ao_rere_k,
+                                                                  self.comm,
+                                                                  root=mpi_master()))
+                    dist_fock_gxc_ao_imim.append(DistributedArray(fock_gxc_ao_imim_k,
+                                                                  self.comm,
+                                                                  root=mpi_master()))
+                    dist_fock_gxc_ao_reim.append(DistributedArray(fock_gxc_ao_reim_k,
+                                                                  self.comm,
+                                                                  root=mpi_master()))
+                    dist_fock_gxc_ao_imre.append(DistributedArray(fock_gxc_ao_imre_k,
+                                                                  self.comm,
+                                                                  root=mpi_master()))
+                dist_fock_gxc_ao.extend(dist_fock_gxc_ao_rere
+                                        + dist_fock_gxc_ao_imim
+                                        + dist_fock_gxc_ao_reim
+                                        + dist_fock_gxc_ao_imre
+                                        )
+
+                del dist_fock_gxc_ao_rere, dist_fock_gxc_ao_imim
+                del dist_fock_gxc_ao_reim, dist_fock_gxc_ao_imre
+
+            # save RHS in distributed array
+            dist_cphf_rhs_re = []
+            dist_cphf_rhs_im = []
+            # TODO change to rhs_mo instead of rhs_red
+            for k in range(dof_red):
+                if self.rank == mpi_master():
+                    #cphf_rhs_k_re = rhs_red[k].real.copy().reshape(nocc * nvir)
+                    #cphf_rhs_k_im = rhs_red[k].imag.copy().reshape(nocc * nvir)
+                    cphf_rhs_k_re = rhs_mo[k].real.copy().reshape(nocc * nvir)
+                    cphf_rhs_k_im = rhs_mo[k].imag.copy().reshape(nocc * nvir)
                 else:
                     cphf_rhs_k_re = None
                     cphf_rhs_k_im = None
@@ -2079,7 +2610,10 @@ class PolOrbitalResponse(CphfSolver):
         """
 
         if self.is_complex:
-            return self.compute_omega_complex(molecule, basis, scf_tensors,
+            #return self.compute_omega_complex(molecule, basis, scf_tensors,
+            #                                  lr_results)
+            # TODO reduced dimensions
+            return self.compute_omega_complex_red_dim(molecule, basis, scf_tensors,
                                               lr_results)
         else:
             #return self.compute_omega_real(molecule, basis, scf_tensors,
@@ -2939,6 +3473,406 @@ class PolOrbitalResponse(CphfSolver):
                 if self.rank == mpi_master():
                     polorb_omega_xy_re = omega_red[xy].real.copy().reshape(nao * nao)
                     polorb_omega_xy_im = omega_red[xy].imag.copy().reshape(nao * nao)
+                else:
+                    polorb_omega_xy_re = None
+                    polorb_omega_xy_im = None
+
+                dist_polorb_omega_re.append(
+                    DistributedArray(polorb_omega_xy_re, self.comm, root=mpi_master())
+                )
+                dist_polorb_omega_im.append(
+                    DistributedArray(polorb_omega_xy_im, self.comm, root=mpi_master())
+                )
+
+            dist_omega.extend(dist_polorb_omega_re + dist_polorb_omega_im)
+            del dist_polorb_omega_re, dist_polorb_omega_im
+
+            profiler.stop_timer('total')
+            profiler.check_memory_usage(f'omega w={w:.4f}')
+
+        self.cphf_results['dist_omega_ao'] = dist_omega
+
+        profiler.print_memory_subspace({
+            'dist_omega_ao': dist_omega
+        }, self.ostream)
+        profiler.check_memory_usage('End of omega')
+
+        profiler.print_timing(self.ostream)
+        profiler.print_memory_usage(self.ostream)
+        profiler.print_profiling_summary(self.ostream)
+
+        if self.rank == mpi_master():
+            valstr = '** Time spent on constructing omega multipliers '
+            valstr += f'for {n_freqs} frequencies: '
+            valstr += f'{(tm.time() - loop_start_time):.2f} sec **'
+            self.ostream.print_header(valstr)
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+    def compute_omega_complex_red_dim(self, molecule, basis, scf_tensors, lr_results):
+        """
+        Calculates the complex polarizability Lagrange multipliers for the
+        overlap matrix.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param scf_tensors:
+            The tensors from the converged SCF calculation.
+        :param lr_results:
+            The results from the CPP calculation.
+        """
+
+        profiler = Profiler({
+            'timing': self.timing,
+            'profiling': self.profiling,
+            'memory_profiling': self.memory_profiling,
+            'memory_tracing': self.memory_tracing,
+        })
+
+        # ERI information
+        eri_dict = self._init_eri(molecule, basis)
+        # DFT information
+        dft_dict = self._init_dft(molecule, scf_tensors)
+        # PE information
+        pe_dict = self._init_pe(molecule, basis)
+
+        # number of vector components
+        dof = len(self.vector_components)
+
+        # unique permutations of operator components
+        xy_pairs = [(x, y) for x in range(dof) for y in range(x, dof)]
+
+        # reduced dimensions
+        dof_red = len(xy_pairs)
+
+        if self.rank == mpi_master():
+            # number of atomic orbitals
+            nao = basis.get_dimensions_of_basis()
+
+            # number of occupied MOs
+            nocc = molecule.number_of_alpha_occupied_orbitals(basis)
+
+            # MO coefficients
+            mo = scf_tensors['C_alpha']
+            mo_occ = mo[:, :nocc].copy()
+            mo_vir = mo[:, nocc:].copy()
+            nvir = mo_vir.shape[1]
+
+            # number of frequencies
+            n_freqs = len(self.frequencies)
+
+        # timings
+        loop_start_time = tm.time()
+
+        # list for omega distributeed arrays
+        dist_omega = []
+
+        for f, w in enumerate(self.frequencies):
+            profiler.set_timing_key(f'omega w={w:.4f}')
+            profiler.start_timer('total')
+
+            full_vec = [
+                self.get_full_solution_vector(lr_results['solutions'][x, w])
+                for x in self.vector_components
+            ]
+
+            if self.rank == mpi_master():
+                # TODO reduce dimensions
+                #cphf_ov = np.zeros((dof, dof, nocc * nvir), dtype=np.dtype('complex128'))
+                cphf_ov = np.zeros((dof_red, nocc * nvir), dtype=np.dtype('complex128'))
+
+            #for idx, xy in enumerate(xy_pairs):
+            for idx in range(dof_red):
+                tmp_cphf_re = self.cphf_results['dist_cphf_ov'][
+                    2 * dof_red * f + idx].get_full_vector()
+
+                tmp_cphf_im = self.cphf_results['dist_cphf_ov'][
+                    2 * dof_red * f + dof_red + idx].get_full_vector()
+
+                # TODO don't unpack dimensions
+                if self.rank == mpi_master():
+                    #x = xy[0]
+                    #y = xy[1]
+
+                    #cphf_ov[x, y] += tmp_cphf_re + 1j * tmp_cphf_im
+                    cphf_ov[idx] += tmp_cphf_re + 1j * tmp_cphf_im
+
+                    #if y != x:
+                    #    cphf_ov[y, x] += cphf_ov[x, y]
+
+            del tmp_cphf_re, tmp_cphf_im
+
+            if self.rank == mpi_master():
+
+                self.ostream.print_info(f'Building omega for w = {w:4.3f}')
+                self.ostream.flush()
+
+                # Note: polorbitalresponse uses r instead of mu for dipole operator
+                for idx, tmp in enumerate(full_vec):
+                    full_vec[idx] *= -1.0
+
+                # for fock matrices to be read from distributed arrays
+                fock_ao_rhs_real = []
+                fock_ao_rhs_imag = []
+                fock_gxc_ao_rere = []
+                fock_gxc_ao_imim = []
+                fock_gxc_ao_reim = []
+                fock_gxc_ao_imre = []
+
+                # TODO reduce dimensions
+                #cphf_ov = cphf_ov.reshape(dof**2, nocc, nvir)
+                cphf_ov = cphf_ov.reshape(dof_red, nocc, nvir)
+
+                # extract the excitation and de-excitation components
+                # from the full solution vector.
+                sqrt2 = np.sqrt(2.0)
+                exc_vec = (1.0 / sqrt2 * np.array(full_vec)[:, :nocc * nvir].reshape(
+                    dof, nocc, nvir))
+                deexc_vec = (1.0 / sqrt2 * np.array(full_vec)[:, nocc * nvir:].reshape(
+                    dof, nocc, nvir))
+
+                x_plus_y_mo = exc_vec + deexc_vec
+                x_minus_y_mo = exc_vec - deexc_vec
+
+                del exc_vec, deexc_vec
+
+                # transform to AO basis: mi,xia,na->xmn
+                x_plus_y_ao = np.array([
+                    np.linalg.multi_dot([mo_occ, x_plus_y_mo[x], mo_vir.T])
+                    for x in range(x_plus_y_mo.shape[0])
+                ])
+                x_minus_y_ao = np.array([
+                    np.linalg.multi_dot([mo_occ, x_minus_y_mo[x], mo_vir.T])
+                    for x in range(x_minus_y_mo.shape[0])
+                ])
+
+                # calculate the one-particle density matrices
+                profiler.start_timer('1PDM')
+
+                # TODO call red_dim function
+                #dm_oo, dm_vv = self.calculate_1pdm(molecule, basis,
+                dm_oo, dm_vv = self.calculate_1pdm_red_dim(molecule, basis,
+                                                   scf_tensors, x_plus_y_mo,
+                                                   x_minus_y_mo)
+
+                profiler.stop_timer('1PDM')
+
+                # calculate dipole contribution to omega
+                profiler.start_timer('dipole')
+
+                # TODO call red_dim function
+                #omega_dipole_contrib_ao = self.calculate_omega_dipole_contrib(
+                omega_dipole_contrib_ao = self.calculate_omega_dipole_contrib_red_dim(
+                    molecule, basis, scf_tensors, x_minus_y_mo)
+
+                profiler.stop_timer('dipole')
+
+                # calculate the density matrices, alpha block only
+                D_occ = np.matmul(mo_occ, mo_occ.T)
+
+                # construct fock_lambda (or fock_cphf)
+                # transform to AO basis: mi,xia,na->xmn
+                # TODO reduce dimensions
+                cphf_ao = np.array([
+                    np.linalg.multi_dot([mo_occ, cphf_ov[x], mo_vir.T])
+                    #for x in range(dof**2)
+                    for x in range(dof_red)
+                ])
+
+                # TODO reduce dimensions
+                cphf_ao_list_real = list(
+                    #np.array([cphf_ao[x].real for x in range(dof**2)]))
+                    np.array([cphf_ao[x].real for x in range(dof_red)]))
+                cphf_ao_list_imag = list(
+                    #np.array([cphf_ao[x].imag for x in range(dof**2)]))
+                    np.array([cphf_ao[x].imag for x in range(dof_red)]))
+
+                del x_plus_y_mo, x_minus_y_mo, cphf_ao
+            else:
+                cphf_ao_list_real = None
+                cphf_ao_list_imag = None
+
+            fock_cphf_real = self._comp_lr_fock(cphf_ao_list_real, molecule, basis,
+                                                eri_dict, dft_dict, pe_dict,
+                                                profiler)
+            fock_cphf_imag = self._comp_lr_fock(cphf_ao_list_imag, molecule, basis,
+                                                eri_dict, dft_dict, pe_dict,
+                                                profiler)
+
+            # get Fock matrix intermediates from distributed arrays
+            # Notes: fock_ao_rhs is a list with dof**2 matrices corresponding to
+            # the contraction of the 1PDMs with ERIs; dof matrices corresponding
+            # to the contraction of x_plus_y; and other dof matrices corresponding to
+            # the contraction of x_minus_y.
+
+            # TODO reduce dimensions
+            #dim_fock_rhs = dof**2 + 2 * dof
+            dim_fock_rhs = dof_red + 2 * dof
+
+            for idx in range(dim_fock_rhs):
+                fock_rhs_re_i = self.cphf_results['dist_fock_ao_rhs'][
+                    2 * dim_fock_rhs * f + idx].get_full_vector()
+                fock_rhs_im_i = self.cphf_results['dist_fock_ao_rhs'][
+                    2 * dim_fock_rhs * f + dim_fock_rhs + idx].get_full_vector()
+
+                if self.rank == mpi_master():
+                    fock_ao_rhs_real.append(fock_rhs_re_i.reshape(nao, nao))
+                    fock_ao_rhs_imag.append(fock_rhs_im_i.reshape(nao, nao))
+
+            if self._dft:
+                # dist_fock_gxc_ao contains all combinations of the complex
+                # vectors: Re/Re, Im/Im, Re/Im, Im/Re (in that order)
+                # TODO reduce dimensions
+                #dim_fock_gxc = 2 * dof**2
+                dim_fock_gxc = 2 * dof_red
+                for idx in range(dim_fock_gxc):
+                    fock_gxc_rere_i = self.cphf_results['dist_fock_gxc_ao'][
+                        dim_fock_gxc * 4 * f + idx].get_full_vector()
+                    fock_gxc_imim_i = self.cphf_results['dist_fock_gxc_ao'][
+                        dim_fock_gxc * 4 * f + dim_fock_gxc + idx].get_full_vector()
+                    fock_gxc_reim_i = self.cphf_results['dist_fock_gxc_ao'][
+                        dim_fock_gxc * 4 * f + 2 * dim_fock_gxc + idx].get_full_vector()
+                    fock_gxc_imre_i = self.cphf_results['dist_fock_gxc_ao'][
+                        dim_fock_gxc * 4 * f + 3 * dim_fock_gxc + idx].get_full_vector()
+
+                    if self.rank == mpi_master():
+                        fock_gxc_ao_rere.append(fock_gxc_rere_i.reshape(nao, nao))
+                        fock_gxc_ao_imim.append(fock_gxc_imim_i.reshape(nao, nao))
+                        fock_gxc_ao_reim.append(fock_gxc_reim_i.reshape(nao, nao))
+                        fock_gxc_ao_imre.append(fock_gxc_imre_i.reshape(nao, nao))
+
+            if self.rank == mpi_master():
+                # TODO reduce dimensions
+                #omega = np.zeros((dof, dof, nao, nao), dtype=np.dtype('complex128'))
+                omega = np.zeros((dof_red, nao, nao), dtype=np.dtype('complex128'))
+
+                # construct epsilon density matrix
+                # TODO reduce dimensions
+                #epsilon_dm_ao = self.calculate_epsilon_dm(molecule, basis,
+                epsilon_dm_ao = self.calculate_epsilon_dm_red_dim(molecule, basis,
+                                                          scf_tensors, dm_oo,
+                                                          dm_vv, cphf_ov)
+                del dm_oo, dm_vv
+
+                # TODO change to xypair loop
+                #for m in range(dof):
+                #    for n in range(m, dof):
+                for idx, xy in enumerate(xy_pairs):
+                    m = xy[0]
+                    n = xy[1]
+                    # TODO: move outside for-loop when all Fock matrices can be
+                    # extracted into a numpy array at the same time.
+
+                    # Because the excitation vector is not symmetric,
+                    # we need both the matrix (OO block in omega, and probably VO)
+                    # and its transpose (VV, OV blocks)
+                    # this comes from the transformation of the 2PDM contribution
+                    # from MO to AO basis
+                    # TODO change index to reduced dimensions
+                    fock_ao_rhs_1_m = (
+                        #fock_ao_rhs_real[dof**2 + m] + 1j * fock_ao_rhs_imag[dof**2 + m]
+                        fock_ao_rhs_real[dof_red + m] + 1j * fock_ao_rhs_imag[dof_red + m]
+                    )  # x_plus_y
+                    fock_ao_rhs_2_m = (
+                        #fock_ao_rhs_real[dof**2 + dof + m] +
+                        #1j * fock_ao_rhs_imag[dof**2 + dof + m]
+                        fock_ao_rhs_real[dof_red + dof + m] +
+                        1j * fock_ao_rhs_imag[dof_red + dof + m]
+                    )  # x_minus_y
+
+                    fock_ao_rhs_1_n = (
+                        #fock_ao_rhs_real[dof**2 + n] +
+                        #1j * fock_ao_rhs_imag[dof**2 + n]
+                        fock_ao_rhs_real[dof_red + n] +
+                        1j * fock_ao_rhs_imag[dof_red + n]
+                    )  # x_plus_y
+                    fock_ao_rhs_2_n = (
+                        #fock_ao_rhs_real[dof**2 + dof + n] +
+                        #1j * fock_ao_rhs_imag[dof**2 + dof + n]
+                        fock_ao_rhs_real[dof_red + dof + n] +
+                        1j * fock_ao_rhs_imag[dof_red + dof + n]
+                    )  # x_minus_y
+
+                    # TODO change index to component index
+                    #fmat = ((fock_cphf_real[m * dof + n] +
+                    #         fock_cphf_real[m * dof + n].T +
+                    #         fock_ao_rhs_real[m * dof + n]) +
+                    #        1j *
+                    #        (fock_cphf_imag[m * dof + n] +
+                    #         fock_cphf_imag[m * dof + n].T +
+                    #         fock_ao_rhs_imag[m * dof + n]))
+                    fmat = ((fock_cphf_real[idx] +
+                             fock_cphf_real[idx].T +
+                             fock_ao_rhs_real[idx]) +
+                            1j *
+                            (fock_cphf_imag[idx] +
+                             fock_cphf_imag[idx].T +
+                             fock_ao_rhs_imag[idx]))
+
+                    # dof=3  (0,0), (0,1), (0,2); (1,0), (1,1), (1,2),
+                    #        (2,0), (2,1), (2,2) * dof
+
+                    # compute the contributions from 2PDM and relaxed 1PDM
+                    profiler.start_timer('2PDM')
+
+                    omega_1pdm_2pdm_contrib_mn = self.calculate_omega_1pdm_2pdm_contrib(
+                        molecule, basis, scf_tensors, x_plus_y_ao[m],
+                        x_plus_y_ao[n], x_minus_y_ao[m], x_minus_y_ao[n],
+                        fock_ao_rhs_1_m, fock_ao_rhs_2_m, fock_ao_rhs_1_n,
+                        fock_ao_rhs_2_n, fmat)
+
+                    profiler.stop_timer('2PDM')
+
+                    # sum contributions to omega
+                    # TODO reduce dimensions to idx
+                    #omega[m, n] = (epsilon_dm_ao[m, n] +
+                    #               omega_1pdm_2pdm_contrib +
+                    #               omega_dipole_contrib_ao[m, n])
+                    omega[idx] = (epsilon_dm_ao[idx] +
+                                   omega_1pdm_2pdm_contrib_mn +
+                                   omega_dipole_contrib_ao[idx])
+
+                    if self._dft:
+                        # TODO reduce dimensions to idx
+                        fock_gxc_ao_mn_list = [
+                            #fock_gxc_ao_rere[2 * (m * dof + n)],
+                            #fock_gxc_ao_imim[2 * (m * dof + n)],
+                            #fock_gxc_ao_reim[2 * (m * dof + n)],
+                            #fock_gxc_ao_imre[2 * (m * dof + n)],
+                            fock_gxc_ao_rere[2 * idx],
+                            fock_gxc_ao_imim[2 * idx],
+                            fock_gxc_ao_reim[2 * idx],
+                            fock_gxc_ao_imre[2 * idx],
+                        ]
+                        omega_gxc_contrib = self.calculate_omega_gxc_contrib_complex(
+                            fock_gxc_ao_mn_list, D_occ
+                        )
+                        # TODO reduce dimensions
+                        #omega[m, n] += omega_gxc_contrib
+                        omega[idx] += omega_gxc_contrib
+
+                # TODO remove this
+                # reduce dimensions for storage
+                #omega_red = []
+                #for x, y in xy_pairs:
+                #    omega_red.append(omega[x, y].copy())
+                #omega_red = np.array(omega_red)
+
+                #del omega
+
+            # save omega in distributed array
+            dist_polorb_omega_re = []
+            dist_polorb_omega_im = []
+
+            # TODO use omega instead of omega_red
+            for xy in range(dof_red):
+                if self.rank == mpi_master():
+                    #polorb_omega_xy_re = omega_red[xy].real.copy().reshape(nao * nao)
+                    #polorb_omega_xy_im = omega_red[xy].imag.copy().reshape(nao * nao)
+                    polorb_omega_xy_re = omega[xy].real.copy().reshape(nao * nao)
+                    polorb_omega_xy_im = omega[xy].imag.copy().reshape(nao * nao)
                 else:
                     polorb_omega_xy_re = None
                     polorb_omega_xy_im = None
