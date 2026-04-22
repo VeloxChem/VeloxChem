@@ -329,47 +329,26 @@ class PolarizabilityGradient:
                 for x in self.vector_components
             ]
 
-            # NOTE reduced dimensions
             if 'dist_cphf_ov' in orbrsp_results.keys():
                 # get lambda multipliers from distributed arrays
                 cphf_ov = self.get_lambda_response_vector(
-                    molecule, basis, scf_tensors, orbrsp_results['dist_cphf_ov'],
-                    f)
+                    molecule, basis, scf_tensors, orbrsp_results['dist_cphf_ov'], f
+                )
 
             else:
-                # NOTE reduced dimensions
                 if self.rank == mpi_master():
                     # TODO get conj. gradient solver to also return dist. array
                     # get lambda multipliers from array in orbrsp dict
                     cphf_ov_red = all_cphf_red[f]
-                    #cphf_ov = np.zeros((dof, dof, nocc * nvir),
                     cphf_ov = np.zeros((dof_red, nocc * nvir),
                                        dtype=self.grad_dt)
 
                     if self.is_complex:
-                        #tmp_cphf_ov = cphf_ov_red[:dof_red] + 1j * cphf_ov_red[dof_red:]
                         cphf_ov = cphf_ov_red[:dof_red] + 1j * cphf_ov_red[dof_red:]
 
-                        #for idx, xy in enumerate(xy_pairs):
-                            #x = xy[0]
-                            #y = xy[1]
-
-                            #cphf_ov[x, y] = tmp_cphf_ov[idx]
-
-                            #if y != x:
-                            #    cphf_ov[y, x] += cphf_ov[x, y]
                     else:
                         cphf_ov = cphf_ov_red
-                        #for idx, xy in enumerate(xy_pairs):
-                        #    x = xy[0]
-                        #    y = xy[1]
 
-                        #    cphf_ov[x, y] = cphf_ov_red[idx]
-
-                        #    if y != x:
-                        #        cphf_ov[y, x] += cphf_ov[x, y]
-
-            # NOTE reduced dimensions
             # get omega Lagrangian multipliers
             omega_ao = self.get_omega_response_vector(
                 basis, orbrsp_results['dist_omega_ao'], f
@@ -414,30 +393,20 @@ class PolarizabilityGradient:
 
                 gs_dm = scf_tensors['D_alpha']  # only alpha part
 
-                # NOTE reduced dimensions
-                #cphf_ov = cphf_ov.reshape((dof**2, nocc, nvir))
                 cphf_ov = cphf_ov.reshape((dof_red, nocc, nvir))
 
-                # NOTE reduced dimensions
                 lambda_ao = np.array([
                     np.linalg.multi_dot([mo_occ, cphf_ov[xy], mo_vir.T])
-                    #for xy in range(dof**2)
                     for xy in range(dof_red)
                 ])
 
-                # NOTE reduced dimensions
-                #lambda_ao = lambda_ao.reshape((dof, dof, nao, nao))
-                #lambda_ao += lambda_ao.transpose(0, 1, 3, 2)
-                #lambda_ao = lambda_ao.reshape((dof_red, nao, nao))
                 lambda_ao += lambda_ao.transpose(0, 2, 1)
 
                 # calculate symmetrized unrelaxed density matrix
-                # NOTE reduced dimensions
                 unrel_dm_ao = self.calculate_unrel_dm(molecule, basis,
                                                       scf_tensors, x_plus_y_mo,
                                                       x_minus_y_mo)
 
-                # NOTE reduced dimensions
                 # calculate relaxed density matrix
                 rel_dm_ao = unrel_dm_ao + lambda_ao
 
@@ -456,8 +425,6 @@ class PolarizabilityGradient:
             rel_dm_ao = self.comm.bcast(rel_dm_ao, root=mpi_master())
 
             # initiate polarizability gradient variable with data type set in init()
-            # NOTE reduced dimensions
-            #pol_gradient = np.zeros((dof, dof, natm, 3), dtype=self.grad_dt)
             pol_gradient = np.zeros((dof_red, natm, 3), dtype=self.grad_dt)
 
             # kinetic energy gradient driver
@@ -484,14 +451,7 @@ class PolarizabilityGradient:
                     gmat_hcore -= gmat_npot_100 + gmat_npot_100.T + gmat_npot_010
 
                     # loop over operator components
-                    # NOTE reduced dimensions
-                    #for x, y in xy_pairs:
                     for idx in range(dof_red):
-                        #pol_gradient[x, y, iatom, icoord] += (
-                        #    np.linalg.multi_dot([  # xymn,amn->xya
-                        #        2.0 * rel_dm_ao[x, y].reshape(nao**2),
-                        #        gmat_hcore.reshape(nao**2)])
-                        #)
                         pol_gradient[idx, iatom, icoord] += (
                             np.linalg.multi_dot([  # xymn,amn->xya
                                 2.0 * rel_dm_ao[idx].reshape(nao**2),
@@ -511,13 +471,6 @@ class PolarizabilityGradient:
                     gmat_ovlp = gmats_ovlp.matrix_to_numpy(label)
                     gmat_ovlp += gmat_ovlp.T
                     # loop over operator components
-                    #for x, y in xy_pairs:
-                    #    pol_gradient[x, y, iatom, icoord] += (
-                    #        1.0 * np.linalg.multi_dot([  # xymn,amn->xya
-                    #            2.0 * omega_ao[x, y],
-                    #            gmat_ovlp.reshape(nao**2)])
-                    #    )
-                    # NOTE reduced dimensions
                     for idx in range(dof_red):
                         pol_gradient[idx, iatom, icoord] += (
                             1.0 * np.linalg.multi_dot([  # xymn,amn->xya
@@ -551,14 +504,11 @@ class PolarizabilityGradient:
                     # reorder indices to first is operator comp, second is coord
                     d_dipole[icomp, icoord] += gmat_dip
 
-                # NOTE reduced dimensions
                 for icoord in range(3):
                     # loop over operator components
-                    #for x, y in xy_pairs:
-                    for idx, xy in enumerate(xy_pairs):
-                        x = xy[0]
-                        y = xy[1]
-                        #pol_gradient[x, y, iatom, icoord] += (
+                    for idx, (x,y) in enumerate(xy_pairs):
+                        #x = xy[0]
+                        #y = xy[1]
                         pol_gradient[idx, iatom, icoord] += (
                             - 2.0 * np.linalg.multi_dot([  # xmn,yamn->xya
                                 x_minus_y_ao[x].reshape(nao**2),
@@ -581,7 +531,6 @@ class PolarizabilityGradient:
             profiler.stop_timer("ERI")
             profiler.check_memory_usage(f"ERI grad")
 
-            # NOTE reduced dimensions
             pol_gradient += eri_contrib
 
             del eri_contrib
@@ -589,7 +538,6 @@ class PolarizabilityGradient:
             if self._dft:
                 profiler.start_timer("XC")
 
-                # NOTE reduced dimensions
                 # compute the XC contribution
                 polgrad_xc_contrib = self.compute_polgrad_xc_contrib(
                     molecule, basis, gs_dm, rel_dm_ao, x_minus_y_ao, profiler)
@@ -605,20 +553,15 @@ class PolarizabilityGradient:
             pol_gradient = self.comm.reduce(pol_gradient, root=mpi_master())
 
             if self.rank == mpi_master():
-                #for x in range(dof):
-                #    for y in range(x + 1, dof):
-                #        pol_gradient[y, x] += pol_gradient[x, y]
-
                 # unravel the reduced dimensions to full dof*dof tensor
                 pol_gradient_unrav = np.zeros((dof, dof, 3, natm), dtype=self.grad_dt)
-                for idx, xy in enumerate(xy_pairs):
-                    x = xy[0]
-                    y = xy[1]
+                for idx, (x,y) in enumerate(xy_pairs):
+                    #x = xy[0]
+                    #y = xy[1]
                     pol_gradient_unrav[x, y] += pol_gradient[idx]
                     if y != x:
                         pol_gradient_unrav[y, x] += pol_gradient[idx]
 
-                #polgrad_results[w] = pol_gradient.reshape(dof, dof, 3 * natm)
                 polgrad_results[w] = pol_gradient_unrav.reshape(dof, dof, 3 * natm)
 
             profiler.stop_timer('total')
@@ -640,7 +583,6 @@ class PolarizabilityGradient:
             self.ostream.print_blank()
             self.ostream.flush()
 
-        # NOTE distributed?
         return polgrad_results
 
     def compute_eri_contrib(self, molecule, basis, gs_dm, rel_dm_ao,
@@ -746,8 +688,6 @@ class PolarizabilityGradient:
         # reduced dimensions
         dof_red = len(xy_pairs)
 
-        # NOTE reduce dimensions
-        #eri_deriv_contrib = np.zeros((dof, dof, natm, 3), dtype=self.grad_dt)
         eri_deriv_contrib = np.zeros((dof_red, natm, 3), dtype=self.grad_dt)
 
         # ERI gradient
@@ -756,15 +696,12 @@ class PolarizabilityGradient:
             screener_atom = T4CScreener()
             screener_atom.partition_atom(basis, molecule, 'eri', iatom)
 
-            # NOTE reduced dimensions
             # contraction with density matrices
-            #for x in range(dof):
-            for idx, xy in enumerate(xy_pairs):
-                x = xy[0]
-                y = xy[1]
+            for idx, (x,y) in enumerate(xy_pairs):
+                #x = xy[0]
+                #y = xy[1]
                 # relaxed DM
                 den_mat_for_fock_rel_xy = make_matrix(basis, mat_t.general)
-                #den_mat_for_fock_rel_xy.set_values(2.0 * rel_dm_ao[x,y])
                 den_mat_for_fock_rel_xy.set_values(2.0 * rel_dm_ao[idx])
 
                 # (X+Y)_x
@@ -832,13 +769,6 @@ class PolarizabilityGradient:
                                                            exchange_scaling_factor,
                                                            0.0, thresh_int)
 
-               # eri_deriv_contrib[x, y, iatom] += np.array(erigrad_rel)
-               # eri_deriv_contrib[x, y, iatom] += 0.5 * np.array(erigrad_xpy_xy)
-               # eri_deriv_contrib[x, y, iatom] += 0.5 * np.array(erigrad_xpy_yx)
-               # eri_deriv_contrib[x, y, iatom] += 0.5 * np.array(erigrad_xmy_xy)
-               # eri_deriv_contrib[x, y, iatom] += 0.5 * np.array(erigrad_xmy_yx)
-               # eri_deriv_contrib[x, y, iatom] *= factor
-                # NOTE reduced dimensions
                 eri_deriv_contrib[idx, iatom] += np.array(erigrad_rel)
                 eri_deriv_contrib[idx, iatom] += 0.5 * np.array(erigrad_xpy_xy)
                 eri_deriv_contrib[idx, iatom] += 0.5 * np.array(erigrad_xpy_yx)
@@ -877,12 +807,7 @@ class PolarizabilityGradient:
                                                                den_mat_for_fock_xmy_y,
                                                                iatom, 'kx_rs', erf_k_coef,
                                                                omega, thresh_int)
-                   # eri_deriv_contrib[x, y, iatom] -= np.array(erigrad_rel_rs)
-                   # eri_deriv_contrib[x, y, iatom] -= 0.5 * np.array(erigrad_xpy_xy_rs)
-                   # eri_deriv_contrib[x, y, iatom] -= 0.5 * np.array(erigrad_xpy_yx_rs)
-                   # eri_deriv_contrib[x, y, iatom] -= 0.5 * np.array(erigrad_xmy_xy_rs)
-                   # eri_deriv_contrib[x, y, iatom] -= 0.5 * np.array(erigrad_xmy_yx_rs)
-                    # NOTE reduced dimensions
+
                     eri_deriv_contrib[idx, iatom] -= np.array(erigrad_rel_rs)
                     eri_deriv_contrib[idx, iatom] -= 0.5 * np.array(erigrad_xpy_xy_rs)
                     eri_deriv_contrib[idx, iatom] -= 0.5 * np.array(erigrad_xpy_yx_rs)
@@ -953,13 +878,11 @@ class PolarizabilityGradient:
         dof = len(self.vector_components)
 
         # operator component combinations
-        xy_pairs = [(x, y) for x in range(dof) for y in range(x, dof)]
+        xy_pairs = [(x,y) for x in range(dof) for y in range(x, dof)]
 
         # reduced dimensions
         dof_red = len(xy_pairs)
 
-        # NOTE reduced dimensions
-        #eri_deriv_contrib = np.zeros((dof, dof, natm, 3), dtype=self.grad_dt)
         eri_deriv_contrib = np.zeros((dof_red, natm, 3), dtype=self.grad_dt)
 
         for iatom in local_atoms:
@@ -968,18 +891,16 @@ class PolarizabilityGradient:
             screener_atom.partition_atom(basis, molecule, 'eri', iatom)
 
             # contraction with density matrices
-            #for x in range(dof):
-            for idx, xy in enumerate(xy_pairs):
-                x = xy[0]
-                y = xy[1]
+            for idx, (x,y) in enumerate(xy_pairs):
+                #x = xy[0]
+                #y = xy[1]
 
                 # relaxed DM
                 den_mat_for_fock_rel_real_xy = make_matrix(basis, mat_t.general)
-                #den_mat_for_fock_rel_real_xy.set_values(2.0 * rel_dm_ao[x,y].real)
                 den_mat_for_fock_rel_real_xy.set_values(2.0 * rel_dm_ao[idx].real)
                 den_mat_for_fock_rel_imag_xy = make_matrix(basis, mat_t.general)
-                #den_mat_for_fock_rel_imag_xy.set_values(2.0 * rel_dm_ao[x,y].imag)
                 den_mat_for_fock_rel_imag_xy.set_values(2.0 * rel_dm_ao[idx].imag)
+
                 # (X+Y)_x
                 den_mat_for_fock_xpy_x_real = make_matrix(basis, mat_t.general)
                 den_mat_for_fock_xpy_x_real.set_values(x_plus_y_ao[x].real)
@@ -1370,8 +1291,6 @@ class PolarizabilityGradient:
                     erigrad_imag -= 0.5 * np.array(erigrad_xmy_yx_imre_rs)  # ImRe
 
                 # add to complex variable
-                #eri_deriv_contrib[x, y, iatom] += erigrad_real + 1j * erigrad_imag
-                # NOTE reduced dimensions
                 eri_deriv_contrib[idx, iatom] += erigrad_real + 1j * erigrad_imag
 
         return eri_deriv_contrib
@@ -1465,9 +1384,6 @@ class PolarizabilityGradient:
             xy_pairs = [(x, y) for x in range(dof) for y in range(x, dof)]
             dof_red = len(xy_pairs)
 
-            # NOTE WIP
-            #lambda_ov = np.zeros((dof, dof, nocc * nvir),
-            #                     dtype=self.grad_dt)
             lambda_ov = np.zeros((dof_red, nocc * nvir),
                                  dtype=self.grad_dt)
         else:
@@ -1477,9 +1393,7 @@ class PolarizabilityGradient:
 
         dof_red, xy_pairs = self.comm.bcast((dof_red, xy_pairs), root=mpi_master())
 
-        # NOTE WIP
         if self.is_complex:
-            #for idx, xy in enumerate(xy_pairs):
             for idx in range(dof_red):
                 tmp_lambda_re = lambda_list[
                     2 * dof_red * fdx + idx].get_full_vector()
@@ -1487,28 +1401,14 @@ class PolarizabilityGradient:
                     2 * dof_red * fdx + dof_red + idx].get_full_vector()
 
                 if self.rank == mpi_master():
-                    #x = xy[0]
-                    #y = xy[1]
-
-                    #lambda_ov[x, y] += tmp_lambda_re + 1j * tmp_lambda_im
                     lambda_ov[idx] += tmp_lambda_re + 1j * tmp_lambda_im
 
-                    #if y != x:
-                    #    lambda_ov[y, x] += lambda_ov[x, y]
         else:
-            #for idx, xy in enumerate(xy_pairs):
             for idx in range(dof_red):
                 tmp_lambda_ov = lambda_list[dof_red * fdx + idx].get_full_vector()
 
                 if self.rank == mpi_master():
-                    #x = xy[0]
-                    #y = xy[1]
-
-                    #lambda_ov[x, y] += tmp_lambda_ov
                     lambda_ov[idx] += tmp_lambda_ov
-
-                    #if y != x:
-                    #    lambda_ov[y, x] += lambda_ov[x, y]
 
         return lambda_ov
 
@@ -1532,8 +1432,6 @@ class PolarizabilityGradient:
 
             nao = basis.get_dimensions_of_basis()
 
-            # NOTE reduced dimensions
-            #omega_ao = np.zeros((dof, dof, nao * nao), dtype=self.grad_dt)
             omega_ao = np.zeros((dof_red, nao * nao), dtype=self.grad_dt)
         else:
             dof_red = None
@@ -1542,9 +1440,7 @@ class PolarizabilityGradient:
 
         dof_red, xy_pairs = self.comm.bcast((dof_red, xy_pairs), root=mpi_master())
 
-        # NOTE WIP
         if self.is_complex:
-            #for idx, xy in enumerate(xy_pairs):
             for idx in range(dof_red):
                 tmp_omega_re = omega_list[
                     2 * dof_red * fdx + idx].get_full_vector()
@@ -1552,27 +1448,14 @@ class PolarizabilityGradient:
                     2 * dof_red * fdx + dof_red + idx].get_full_vector()
 
                 if self.rank == mpi_master():
-                    #x = xy[0]
-                    #y = xy[1]
-
-                    #omega_ao[x, y] += tmp_omega_re + 1j * tmp_omega_im
                     omega_ao[idx] += tmp_omega_re + 1j * tmp_omega_im
 
-                    #if y != x:
-                    #    omega_ao[y, x] += omega_ao[x, y]
         else:
-            #for idx, xy in enumerate(xy_pairs):
             for idx in range(dof_red):
                 tmp_omega_ao = omega_list[dof_red * fdx + idx].get_full_vector()
 
                 if self.rank == mpi_master():
-                    #x = xy[0]
-                    #y = xy[1]
-                    #omega_ao[x, y] += tmp_omega_ao
                     omega_ao[idx] += tmp_omega_ao
-
-                    #if y != x:
-                    #    omega_ao[y, x] += omega_ao[x, y]
 
         return omega_ao
 
@@ -1733,20 +1616,13 @@ class PolarizabilityGradient:
         # reduced dimensions
         dof_red = len(xy_pairs)
 
-        # NOTE reduced dimensions
-        #xc_pol_gradient = np.zeros((dof, dof, natm, 3))
-        #xc_pol_gradient = np.zeros((dof, dof, natm, 3))
         xc_pol_gradient = np.zeros((dof_red, natm, 3))
         xc_pol_gradient = np.zeros((dof_red, natm, 3))
 
-        #for m in range(dof):
-        #    for n in range(m, dof):
-        # NOTE reduced dimensions
-        for idx, xy in enumerate(xy_pairs):
-            m = xy[0]
-            n = xy[1]
+        for idx, (m,n) in enumerate(xy_pairs):
+            #m = xy[0]
+            #n = xy[1]
             if self.rank == mpi_master():
-                #rhow_dm = 1.0 * rel_dm_ao[m, n]
                 rhow_dm = 1.0 * rel_dm_ao[idx]
                 rhow_dm_sym = 0.5 * (rhow_dm + rhow_dm.T)
                 del rhow_dm
@@ -1796,8 +1672,6 @@ class PolarizabilityGradient:
                     molecule, ao_basis, [x_minus_y_sym_n], [x_minus_y_sym_m], [gs_dm],
                     mol_grid, xcfun_label)
 
-            # NOTE reduced dimensions
-            #xc_pol_gradient[m, n] += polgrad_xcgrad + polgrad_fxc_mn + polgrad_kxc_mn + polgrad_fxc_nm + polgrad_kxc_nm
             xc_pol_gradient[idx] += polgrad_xcgrad + polgrad_fxc_mn + polgrad_kxc_mn + polgrad_fxc_nm + polgrad_kxc_nm
 
         return xc_pol_gradient
@@ -1832,24 +1706,17 @@ class PolarizabilityGradient:
         dof = len(self.vector_components)
 
         # unique permutations of operator components
-        xy_pairs = [(x, y) for x in range(dof) for y in range(x, dof)]
+        xy_pairs = [(x,y) for x in range(dof) for y in range(x, dof)]
 
         # reduced dimensions
         dof_red = len(xy_pairs)
 
-        # NOTE reduced dimensions
-        #xc_pol_gradient = np.zeros((dof, dof, natm, 3), dtype=np.dtype('complex128'))
         xc_pol_gradient = np.zeros((dof_red, natm, 3), dtype=np.dtype('complex128'))
 
-        # FIXME change "m,n" to "x,y" for consistency
-        #for m in range(dof):
-        #    for n in range(m, dof):
-        # NOTE reduced dimensions
-        for idx, xy in enumerate(xy_pairs):
-            m = xy[0]
-            n = xy[1]
+        for idx, (m,n) in enumerate(xy_pairs):
+            #m = xy[0]
+            #n = xy[1]
             if self.rank == mpi_master():
-                #rhow_dm = 1.0 * rel_dm_ao[m, n]
                 rhow_dm = 1.0 * rel_dm_ao[idx]
                 rhow_dm_sym = 0.5 * (rhow_dm + rhow_dm.T)
 
@@ -1985,165 +1852,9 @@ class PolarizabilityGradient:
             # combiner to complex array
             polgrad_xcgrad = polgrad_xcgrad_real + 1j * polgrad_xcgrad_imag
 
-            #xc_pol_gradient[m, n] += polgrad_xcgrad
             xc_pol_gradient[idx] += polgrad_xcgrad
 
         return xc_pol_gradient
-
-# TODO remove this unused function
-    def calculate_xc_mn_contrib_real(self, molecule, ao_basis, rhow_den,
-                                     x_minus_y_den_m, x_minus_y_den_n,
-                                     gs_density, xcfun_label, profiler):
-        """
-        Calculates exchange-correlation contribution to the (m,n) component of
-        the real polarizability gradient.
-
-        :param molecule:
-            The molecule.
-        :param ao_basis:
-            The AO basis set.
-        :param rhow_den:
-            The perturbed density.
-        :param x_minus_y_den(_m/n):
-            The X-Y density.
-        :param gs_density:
-            The ground state density.
-        :param xcfun_label:
-            The label of the xc functional.
-
-        :return:
-            The exchange-correlation contribution to polarizability gradient.
-        """
-
-        mol_grid = self._scf_drv._mol_grid
-
-        xcgrad_drv = XCMolecularGradient()
-
-        polgrad_xcgrad = xcgrad_drv.integrate_vxc_gradient(
-            molecule, ao_basis, rhow_den, gs_density, mol_grid, xcfun_label)
-
-        polgrad_xcgrad += xcgrad_drv.integrate_fxc_gradient(
-            molecule, ao_basis, rhow_den, gs_density, gs_density, mol_grid,
-            xcfun_label)
-
-        polgrad_xcgrad += 0.5 * xcgrad_drv.integrate_fxc_gradient(
-            molecule, ao_basis, x_minus_y_den_m, x_minus_y_den_n, gs_density,
-            mol_grid, xcfun_label)
-
-        polgrad_xcgrad += 0.5 * xcgrad_drv.integrate_kxc_gradient(
-            molecule, ao_basis, x_minus_y_den_m, x_minus_y_den_n, gs_density,
-            mol_grid, xcfun_label)
-
-        polgrad_xcgrad += 0.5 * xcgrad_drv.integrate_fxc_gradient(
-            molecule, ao_basis, x_minus_y_den_n, x_minus_y_den_m, gs_density,
-            mol_grid, xcfun_label)
-
-        polgrad_xcgrad += 0.5 * xcgrad_drv.integrate_kxc_gradient(
-            molecule, ao_basis, x_minus_y_den_n, x_minus_y_den_m, gs_density,
-            mol_grid, xcfun_label)
-
-        return polgrad_xcgrad
-
-# TODO remove this unused function
-    def calculate_xc_mn_contrib_complex(self, molecule, ao_basis, rhow_den_real,
-                                        rhow_den_imag, x_minus_y_den_real_m,
-                                        x_minus_y_den_real_n, x_minus_y_den_imag_m,
-                                        x_minus_y_den_imag_n, gs_density, xcfun_label,
-                                        profiler):
-        """
-        Calculates exchange-correlation contribution to the (m,n) component of
-        the complex polarizability gradient.
-
-        :param molecule:
-            The molecule.
-        :param ao_basis:
-            ehe AO basis set.
-        :param rhow_den(_real/_imag):
-            The (Real/Imaginary) perturbed density.
-        :param x_minus_y_den(_real/_imag):
-            The (Real/Imaginary) X-Y density.
-        :param gs_density:
-            The ground state density.
-        :param xcfun_label:
-            The label of the xc functional.
-
-        :return:
-            The exchange-correlation contribution to complex polarizability gradient.
-        """
-
-        mol_grid = self._scf_drv._mol_grid
-
-        xcgrad_drv = XCMolecularGradient()
-
-        # real contribution
-        polgrad_xcgrad_real = xcgrad_drv.integrate_vxc_gradient(  # Re DM
-            molecule, ao_basis, rhow_den_real, gs_density, mol_grid,
-            xcfun_label)
-        polgrad_xcgrad_real += xcgrad_drv.integrate_fxc_gradient(  # Re DM
-            molecule, ao_basis, rhow_den_real, gs_density, gs_density, mol_grid,
-            xcfun_label)
-
-        polgrad_xcgrad_real += 0.5 * xcgrad_drv.integrate_fxc_gradient(  # ReRe
-            molecule, ao_basis, x_minus_y_den_real_m, x_minus_y_den_real_n,
-            gs_density, mol_grid, xcfun_label)
-        polgrad_xcgrad_real += 0.5 * xcgrad_drv.integrate_fxc_gradient(  # ReRe
-            molecule, ao_basis, x_minus_y_den_real_n, x_minus_y_den_real_m,
-            gs_density, mol_grid, xcfun_label)
-        polgrad_xcgrad_real += 0.5 * xcgrad_drv.integrate_kxc_gradient(  # ReRe
-            molecule, ao_basis, x_minus_y_den_real_m, x_minus_y_den_real_n,
-            gs_density, mol_grid, xcfun_label)
-        polgrad_xcgrad_real += 0.5 * xcgrad_drv.integrate_kxc_gradient(  # ReRe
-            molecule, ao_basis, x_minus_y_den_real_n, x_minus_y_den_real_m,
-            gs_density, mol_grid, xcfun_label)
-
-        polgrad_xcgrad_real -= 0.5 * xcgrad_drv.integrate_fxc_gradient(  # ImIm
-            molecule, ao_basis, x_minus_y_den_imag_m, x_minus_y_den_imag_n,
-            gs_density, mol_grid, xcfun_label)
-        polgrad_xcgrad_real -= 0.5 * xcgrad_drv.integrate_fxc_gradient(  # ImIm
-            molecule, ao_basis, x_minus_y_den_imag_n, x_minus_y_den_imag_m,
-            gs_density, mol_grid, xcfun_label)
-        polgrad_xcgrad_real -= 0.5 * xcgrad_drv.integrate_kxc_gradient(  # ImIm
-            molecule, ao_basis, x_minus_y_den_imag_m, x_minus_y_den_imag_n,
-            gs_density, mol_grid, xcfun_label)
-        polgrad_xcgrad_real -= 0.5 * xcgrad_drv.integrate_kxc_gradient(  # ImIm
-            molecule, ao_basis, x_minus_y_den_imag_n, x_minus_y_den_imag_m,
-            gs_density, mol_grid, xcfun_label)
-
-        # imaginary contribution
-        polgrad_xcgrad_imag = xcgrad_drv.integrate_vxc_gradient(  # Im DM
-            molecule, ao_basis, rhow_den_imag, gs_density, mol_grid,
-            xcfun_label)
-        polgrad_xcgrad_imag += xcgrad_drv.integrate_fxc_gradient(  # Im DM
-            molecule, ao_basis, rhow_den_imag, gs_density, gs_density, mol_grid,
-            xcfun_label)
-
-        polgrad_xcgrad_imag += 0.5 * xcgrad_drv.integrate_fxc_gradient(  # ReIm
-            molecule, ao_basis, x_minus_y_den_real_m, x_minus_y_den_imag_n,
-            gs_density, mol_grid, xcfun_label)
-        polgrad_xcgrad_imag += 0.5 * xcgrad_drv.integrate_fxc_gradient(  # ReIm
-            molecule, ao_basis, x_minus_y_den_real_n, x_minus_y_den_imag_m,
-            gs_density, mol_grid, xcfun_label)
-        polgrad_xcgrad_imag += 0.5 * xcgrad_drv.integrate_kxc_gradient(  # ReIm
-            molecule, ao_basis, x_minus_y_den_real_m, x_minus_y_den_imag_n,
-            gs_density, mol_grid, xcfun_label)
-        polgrad_xcgrad_imag += 0.5 * xcgrad_drv.integrate_kxc_gradient(  # ReIm
-            molecule, ao_basis, x_minus_y_den_real_n, x_minus_y_den_imag_m,
-            gs_density, mol_grid, xcfun_label)
-
-        polgrad_xcgrad_imag += 0.5 * xcgrad_drv.integrate_fxc_gradient(  # ImRe
-            molecule, ao_basis, x_minus_y_den_imag_m, x_minus_y_den_real_n,
-            gs_density, mol_grid, xcfun_label)
-        polgrad_xcgrad_imag += 0.5 * xcgrad_drv.integrate_fxc_gradient(  # ImRe
-            molecule, ao_basis, x_minus_y_den_imag_n, x_minus_y_den_real_m,
-            gs_density, mol_grid, xcfun_label)
-        polgrad_xcgrad_imag += 0.5 * xcgrad_drv.integrate_kxc_gradient(  # ImRe
-            molecule, ao_basis, x_minus_y_den_imag_m, x_minus_y_den_real_n,
-            gs_density, mol_grid, xcfun_label)
-        polgrad_xcgrad_imag += 0.5 * xcgrad_drv.integrate_kxc_gradient(  # ImRe
-            molecule, ao_basis, x_minus_y_den_imag_n, x_minus_y_den_real_m,
-            gs_density, mol_grid, xcfun_label)
-
-        return polgrad_xcgrad_real + 1j * polgrad_xcgrad_imag
 
     def get_fock_type_and_x_frac(self):
         """
@@ -2192,7 +1903,7 @@ class PolarizabilityGradient:
         dof = len(self.vector_components)
 
         # unique permutations of operator components
-        xy_pairs = [(x, y) for x in range(dof) for y in range(x, dof)]
+        xy_pairs = [(x,y) for x in range(dof) for y in range(x, dof)]
 
         # reduced dimensions
         dof_red = len(xy_pairs)
@@ -2207,20 +1918,14 @@ class PolarizabilityGradient:
         # number of AOs
         nao = mo.shape[0]
 
-        # NOTE WIP
         # calculate the symmetrized unrelaxed one-particle density matrix
         # in MO basis
-        #dm_oo = np.zeros((dof, dof, nocc, nocc), dtype=self.grad_dt)
-        #dm_vv = np.zeros((dof, dof, nvir, nvir), dtype=self.grad_dt)
         dm_oo = np.zeros((dof_red, nocc, nocc), dtype=self.grad_dt)
         dm_vv = np.zeros((dof_red, nvir, nvir), dtype=self.grad_dt)
 
-        #for x in range(dof):
-        #    for y in range(x, dof):
-        for idx, xy in enumerate(xy_pairs):
-            x = xy[0]
-            y = xy[1]
-            #dm_vv[x, y] = 0.25 * (
+        for idx, (x,y) in enumerate(xy_pairs):
+            #x = xy[0]
+            #y = xy[1]
             dm_vv[idx] = 0.25 * (
                 # xib,yia->xyab
                 np.linalg.multi_dot([x_plus_y_mo[y].T, x_plus_y_mo[x]])
@@ -2231,7 +1936,6 @@ class PolarizabilityGradient:
                 # yib,xia->xyab
                 + np.linalg.multi_dot([x_minus_y_mo[x].T, x_minus_y_mo[y]]))
 
-            #dm_oo[x, y] = -0.25 * (
             dm_oo[idx] = -0.25 * (
                 # xja,yia->xyij
                 np.linalg.multi_dot([x_plus_y_mo[x], x_plus_y_mo[y].T])
@@ -2242,30 +1946,15 @@ class PolarizabilityGradient:
                 # yja,xia->xyij
                 + np.linalg.multi_dot([x_minus_y_mo[y], x_minus_y_mo[x].T]))
 
-            #if y != x:
-            #    dm_vv[y,x] = dm_vv[x,y]
-            #    dm_oo[y,x] = dm_oo[x,y]
-
-        # NOTE WIP
         # transform to AO basis: mi,xia,na->xmn
-        #unrel_dm_ao = np.zeros((dof, dof, nao, nao), dtype=self.grad_dt)
         unrel_dm_ao = np.zeros((dof_red, nao, nao), dtype=self.grad_dt)
-        #for x in range(dof):
-        #    for y in range(x, dof):
+
         for idx in range(dof_red):
-            #unrel_dm_ao[x, y] = (
-            #    # mi,xyij,nj->xymn
-            #    np.linalg.multi_dot([mo_occ, dm_oo[x, y], mo_occ.T])
-            #    # ma,xyab,nb->xymn
-            #    + np.linalg.multi_dot([mo_vir, dm_vv[x, y], mo_vir.T]))
             unrel_dm_ao[idx] = (
                 # mi,xyij,nj->xymn
                 np.linalg.multi_dot([mo_occ, dm_oo[idx], mo_occ.T])
                 # ma,xyab,nb->xymn
                 + np.linalg.multi_dot([mo_vir, dm_vv[idx], mo_vir.T]))
-
-            #if y != x:
-            #    unrel_dm_ao[y, x] = unrel_dm_ao[x, y]
 
         return unrel_dm_ao
 
