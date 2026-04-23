@@ -766,7 +766,13 @@ class EnsembleDriver:
 
         if isinstance(snapshots, dict):
             snapshots = [snapshots]
-
+        
+        # Write PE files only on master rank for now.
+        # Other ranks wait at the barrier.
+        if self.rank != mpi_master():
+            self.comm.barrier()
+            return
+        
         outdir = Path(outdir)
         outdir.mkdir(parents=True, exist_ok=True)
 
@@ -863,6 +869,9 @@ class EnsembleDriver:
                             f"{pol[3]:12.8f} {pol[4]:12.8f} {pol[5]:12.8f}  {resn}\n"
                         )
                 fh.write("@end\n")
+
+        # Ensure all ranks proceed only after master finished writing
+        self.comm.barrier()    
 
     @staticmethod
     def _apply_options_to_driver(driver, options: dict, skip_keys: set[str] | None = None):
