@@ -128,7 +128,7 @@ class TpaDriver(NonlinearSolver):
             self.lindep_thresh = self.conv_thresh * 1.0e-6
 
         # check molecule
-        molecule_sanity_check(molecule)
+        molecule_sanity_check(molecule, 'restricted', type(self).__name__)
 
         # check SCF results
         scf_results_sanity_check(self, scf_results)
@@ -158,13 +158,6 @@ class TpaDriver(NonlinearSolver):
         eri_dict = self._init_eri(molecule, ao_basis)
 
         dft_dict = self._init_dft(molecule, scf_results)
-
-        # sanity check
-        nalpha = molecule.number_of_alpha_electrons()
-        nbeta = molecule.number_of_beta_electrons()
-        assert_msg_critical(
-            nalpha == nbeta,
-            'TPA Driver: not implemented for unrestricted case')
 
         if self.rank == mpi_master():
             S = scf_results['S']
@@ -336,7 +329,7 @@ class TpaDriver(NonlinearSolver):
         F0 = self.comm.bcast(F0, root=mpi_master())
         norb = self.comm.bcast(norb, root=mpi_master())
 
-        nocc = molecule.number_of_alpha_electrons()
+        nocc = molecule.number_of_alpha_occupied_orbitals(ao_basis)
 
         # computing all compounded first-order densities
         density_list1, density_list2, density_list3 = self.get_densities(
@@ -944,7 +937,7 @@ class TpaDriver(NonlinearSolver):
         alpha = fine_structure_constant()
         a0_in_cm = bohr_in_angstrom() * 1.0e-8
         c_in_cm_per_s = speed_of_light_in_vacuum_in_SI() * 100.0
-        au2gm = (8.0 * np.pi**2 * alpha * a0_in_cm**5) / c_in_cm_per_s * 1.0e+50
+        au2gm = (4.0 * np.pi**2 * alpha * a0_in_cm**5) / c_in_cm_per_s * 1.0e+50
 
         gamma = rsp_results['gamma']
 

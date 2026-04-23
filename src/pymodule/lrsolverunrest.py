@@ -42,7 +42,8 @@ from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            solvation_model_sanity_check)
 from .errorhandler import assert_msg_critical
 from .mathutils import safe_solve
-from .checkpoint import (check_rsp_hdf5, write_rsp_solution_with_multiple_keys)
+from .checkpoint import check_rsp_hdf5
+from .resultsio import write_rsp_solution_with_multiple_keys
 
 
 class LinearResponseUnrestrictedSolver(LinearResponseSolverBase):
@@ -161,6 +162,10 @@ class LinearResponseUnrestrictedSolver(LinearResponseSolverBase):
         nocc_a = molecule.number_of_alpha_occupied_orbitals(basis)
         nocc_b = molecule.number_of_beta_occupied_orbitals(basis)
 
+        self._check_mpi_oversubscription(
+            self._get_excitation_space_dimension_unrestricted(
+                nocc_a, nocc_b, norb), 'response space')
+
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
 
@@ -270,6 +275,8 @@ class LinearResponseUnrestrictedSolver(LinearResponseSolverBase):
                 self.restart = check_rsp_hdf5(self.checkpoint_file,
                                               rsp_vector_labels, molecule,
                                               basis, dft_dict, pe_dict)
+                if self.restart:
+                    self.restart = self.match_settings(self.checkpoint_file)
             self.restart = self.comm.bcast(self.restart, root=mpi_master())
 
         # read initial guess from restart file
@@ -678,6 +685,7 @@ class LinearResponseUnrestrictedSolver(LinearResponseSolverBase):
                             'Response solution vectors written to file: ' +
                             final_h5_fname)
                         self.ostream.print_blank()
+                        self.ostream.flush()
 
                     self._print_results(rsp_funcs, self.ostream)
 

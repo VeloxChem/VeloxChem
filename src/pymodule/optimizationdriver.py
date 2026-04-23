@@ -39,9 +39,8 @@ import numpy as np
 import time as tm
 import tempfile
 import math
-import h5py
 
-from .veloxchemlib import mpi_master, hartree_in_kjpermol
+from .veloxchemlib import mpi_master, hartree_in_kjpermol, bohr_in_angstrom
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 from .outputstream import OutputStream
@@ -62,8 +61,8 @@ from .mmgradientdriver import MMGradientDriver
 from .inputparser import (parse_input, print_keywords,
                           get_random_string_parallel, unparse_input,
                           read_unparsed_input_from_hdf5)
-from .checkpoint import read_molecule_and_basis
 from .errorhandler import assert_msg_critical
+from .resultsio import read_molecule_and_basis, write_opt_results_to_hdf5
 
 with redirect_stderr(StringIO()) as fg_err:
     import geometric
@@ -271,8 +270,10 @@ class OptimizationDriver:
         # update hessian option for transition state search
         if self.hessian == 'never' and (self.transition or self.irc):
             self.hessian = 'first'
+        elif self.hessian == 'last' and (self.transition or self.irc):
+            self.hessian = 'first+last'
 
-        if self.hessian or (self.transition or self.irc):
+        if (self.hessian != 'never') or (self.transition or self.irc):
             err_msg = (
                 'The installed geometric package does not support\n' +
                 '  Hessian or transition state search. Please install\n' +
@@ -400,6 +401,7 @@ class OptimizationDriver:
             constr_filename = None
 
         optinp_filename = Path(filename + '.optinp').as_posix()
+        basis = args[0] if args and isinstance(args[0], MolecularBasis) else None
 
         # prepare for post-opt Hessian
 
@@ -523,27 +525,42 @@ class OptimizationDriver:
                     opt_results['scan_energies'] = [
                         opt_energies[-1] for opt_energies in all_energies
                     ]
+                    opt_results['scan_coordinates_au'] = np.array(
+                        [opt_coords_au[-1] for opt_coords_au in all_coords_au])
 
-                    opt_results['scan_geometries'] = []
-                    labels = molecule.get_labels()
-                    for opt_coords_au in all_coords_au:
-                        mol = Molecule(labels, opt_coords_au[-1], 'au',
-                                       atom_basis_labels)
-                        opt_results['scan_geometries'].append(
-                            mol.get_xyz_string())
+                    opt_results['scan_geometries'] = [
+                        self._get_xyz_string(labels, opt_coords_au[-1])
+                        for opt_coords_au in all_coords_au
+                    ]
+
+                elif self.irc:
+                    self.print_irc_result(m)
+
+                    opt_results['irc_energies'] = list(m.qm_energies)
+                    opt_results['ts_index'] = int(np.argmax(m.qm_energies))
+
+                    opt_coordinates_au = [
+                        xyz / geometric.nifty.bohr2ang for xyz in m.xyzs
+                    ]
+                    opt_results['irc_geometries'] = [
+                        self._get_xyz_string(labels, coords_au)
+                        for coords_au in opt_coordinates_au
+                    ]
 
                 else:
                     self.print_opt_result(m)
 
                     opt_results['opt_energies'] = list(m.qm_energies)
 
-                    opt_results['opt_geometries'] = []
-                    labels = molecule.get_labels()
-                    for xyz in m.xyzs:
-                        mol = Molecule(labels, xyz / geometric.nifty.bohr2ang,
-                                       'au', atom_basis_labels)
-                        opt_results['opt_geometries'].append(
-                            mol.get_xyz_string())
+                    opt_coordinates_au = [
+                        xyz / geometric.nifty.bohr2ang for xyz in m.xyzs
+                    ]
+                    opt_results['opt_geometries'] = [
+                        self._get_xyz_string(labels, coords_au)
+                        for coords_au in opt_coordinates_au
+                    ]
+                    opt_results['opt_coordinates_au'] = np.array(
+                        opt_coordinates_au)
 
                     if self.ref_xyz:
                         self.print_ic_rmsd(final_mol, self.ref_xyz)
@@ -641,6 +658,33 @@ class OptimizationDriver:
                 extfile.unlink()
             except PermissionError:
                 pass
+
+    @staticmethod
+    def _get_xyz_string(labels, coords_au, precision=12):
+        """
+        Formats an xyz string from labels and Bohr coordinates.
+
+        :param labels:
+            The atomic labels.
+        :param coords_au:
+            Atomic coordinates in Bohr.
+        :param precision:
+            Decimal precision for coordinates in Angstrom.
+
+        :return:
+            The xyz string.
+        """
+
+        coords_angstrom = coords_au * bohr_in_angstrom()
+        xyz = f'{len(labels)}\n\n'
+
+        for label, (xa, ya, za) in zip(labels, coords_angstrom):
+            xyz += f'{label:<6s}'
+            xyz += f' {xa:{precision + 10}.{precision}f}'
+            xyz += f' {ya:{precision + 10}.{precision}f}'
+            xyz += f' {za:{precision + 10}.{precision}f}\n'
+
+        return xyz
 
     @staticmethod
     def get_ic_rmsd(opt_mol, ref_mol):
@@ -816,6 +860,81 @@ class OptimizationDriver:
         self.ostream.print_blank()
         self.ostream.flush()
 
+    def print_irc_result(self, progress):
+        """
+        Prints summary of IRC calculation.
+
+        :param progress:
+            The geomeTRIC progress of IRC calculation.
+        """
+
+        self.ostream.print_blank()
+        self.ostream.print_header('Summary of IRC Calculation')
+        self.ostream.print_header('=' * 28)
+        self.ostream.print_blank()
+
+        energies = list(progress.qm_energies)
+        coords = [xyz / geometric.nifty.bohr2ang for xyz in progress.xyzs]
+
+        ts_index = np.argmax(energies)
+        e_ts = energies[ts_index]
+
+        line = '{:>8s}{:>21s}{:>25s}{:>23s}{:>28s}{:>7s}'.format(
+            'IRC Pt.', 'Energy (a.u.)', 'Energy Change (a.u.)',
+            'E - E(TS) (kJ/mol)', 'Displacement (RMS, Max)', '')
+        self.ostream.print_header(line)
+        self.ostream.print_header('-' * len(line))
+
+        for i in range(len(energies)):
+            if i > 0:
+                delta_e = energies[i] - energies[i - 1]
+                rmsd, maxd = geometric.optimize.calc_drms_dmax(
+                    coords[i], coords[i - 1])
+            else:
+                delta_e = 0.0
+                rmsd, maxd = 0.0, 0.0
+            
+            rel_e_ts = (energies[i] - e_ts) * hartree_in_kjpermol()
+            status = '<- TS' if i == ts_index else ''
+
+            line = ('{:>5d}   {:22.12f}{:22.12f}   {:13.3f}'
+                    '     {:15.3e}{:15.3e}{:>7s}').format(
+                        i, energies[i], delta_e, rel_e_ts, rmsd, maxd,
+                        status)
+            self.ostream.print_header(line)
+
+        self.ostream.print_blank()
+
+        # Print summary statistics
+        e_reactant = energies[0]
+        e_product = energies[-1]
+        barrier_fwd = (e_ts - e_reactant) * hartree_in_kjpermol()
+        barrier_bwd = (e_ts - e_product) * hartree_in_kjpermol()
+        reaction_energy = (e_product - e_reactant) * hartree_in_kjpermol()
+
+        title = 'IRC Path Summary'
+        self.ostream.print_header(title)
+        self.ostream.print_header('-' * (len(title) + 2))
+
+        summary_items = [
+            ('Transition State Point', f'{ts_index:12d}'),
+            ('Forward Barrier (TS - Reactant)',
+             f'{barrier_fwd:12.3f} kJ/mol'),
+            ('Backward Barrier (TS - Product)',
+             f'{barrier_bwd:12.3f} kJ/mol'),
+            ('Reaction Energy (Product - Reactant)',
+             f'{reaction_energy:12.3f} kJ/mol'),
+        ]
+        lines = [
+            f'{label:<38s} :    {value}' for label, value in summary_items
+        ]
+        maxlen = max(len(line) for line in lines)
+        for line in lines:
+            self.ostream.print_header(line.ljust(maxlen))
+
+        self.ostream.print_blank()
+        self.ostream.flush()
+
     def print_vib_analysis(self, filename, vdata_label):
         """
         Prints summary of vibrational analysis.
@@ -953,6 +1072,54 @@ class OptimizationDriver:
 
         return 'L.-P. Wang and C.C. Song, J. Chem. Phys. 2016, 144, 214108'
 
+    def plot_convergence(self, opt_results):
+        """
+        Plot the convergence of the optimization (energy plot only).
+
+        :param opt_results:
+            The dictionary of optimize results.
+        """
+
+        try:
+            import matplotlib.pyplot as plt
+        except ImportError:
+            raise ImportError('matplotlib is required for this functionality.')
+
+        energies = opt_results['opt_energies']
+        total_steps = len(energies) - 1
+
+        min_energy = np.min(energies)
+        rel_energies = energies - min_energy
+        rel_energies_kJ = rel_energies * hartree_in_kjpermol()
+
+        steps = range(len(rel_energies_kJ))
+        x = np.linspace(0, total_steps, 100)
+        y = np.interp(x, steps, rel_energies_kJ)
+
+        plt.figure(figsize=(6.5, 4))
+        plt.plot(x,
+                 y,
+                 color='black',
+                 alpha=0.9,
+                 linewidth=2.5,
+                 ls='-',
+                 zorder=0)
+        plt.scatter(steps,
+                    rel_energies_kJ,
+                    color='black',
+                    alpha=1.0,
+                    s=120 / math.log(total_steps, 10),
+                    facecolors="darkcyan",
+                    edgecolor="darkcyan",
+                    zorder=1)
+        plt.xlabel('Iteration')
+        plt.ylabel('Relative energy [kJ/mol]')
+        plt.title("Geometry optimization")
+        # Ensure x-axis displays as integers
+        plt.xticks(np.arange(0, total_steps + 1, max(1, total_steps // 10)))
+        plt.tight_layout()
+        plt.show()
+
     def show_convergence(self, opt_results, atom_indices=False):
         """
         Plot the convergence of the optimization
@@ -1031,9 +1198,319 @@ class OptimizationDriver:
         mol = Molecule.read_xyz_string(xyz_data_i)
         mol.show(atom_indices=atom_indices, width=640, height=360)
 
+    def plot_scan(self, opt_results):
+        """
+        Plot the scan energies (energy plot only).
+
+        :param opt_results:
+            The dictionary of optimize results.
+        """
+
+        try:
+            import matplotlib.pyplot as plt
+            from scipy.interpolate import CubicSpline
+        except ImportError:
+            raise ImportError('matplotlib and scipy are required for this functionality.')
+
+        energies = opt_results['scan_energies']
+        total_points = len(energies)
+
+        min_energy = np.min(energies)
+        rel_energies = energies - min_energy
+        rel_energies_kJ = rel_energies * hartree_in_kjpermol()
+
+        scan_points = np.array(range(total_points))
+
+        plt.figure(figsize=(6.5, 4))
+        if len(scan_points) > 3:
+            cs = CubicSpline(scan_points, rel_energies_kJ)
+            x = np.linspace(0, total_points - 1, 300)
+            y = cs(x)
+            plt.plot(x, y, color='black', alpha=0.9, linewidth=2.5, ls='-', zorder=0)
+        else:
+            plt.plot(scan_points, rel_energies_kJ, color='black', alpha=0.9, linewidth=2.5, ls='-', zorder=0)
+        plt.scatter(scan_points,
+                    rel_energies_kJ,
+                    color='black',
+                    alpha=1.0,
+                    s=120,
+                    facecolors='darkcyan',
+                    edgecolor='darkcyan',
+                    zorder=1)
+        plt.xlabel('Scan point')
+        plt.ylabel('Relative energy [kJ/mol]')
+        plt.title("Geometry scan")
+        # Ensure x-axis displays as integers
+        plt.xticks(np.arange(0, total_points, max(1, total_points // 10)))
+        plt.tight_layout()
+        plt.show()
+
+    def show_scan(self, opt_results, atom_indices=False):
+        """
+        Plot the scan energies with interactive molecular visualization
+
+        :param opt_results:
+            The dictionary of optimize results.
+        :param atom_indices:
+            Flag for displaying atom indices.
+        """
+
+        try:
+            import ipywidgets
+        except ImportError:
+            raise ImportError('ipywidgets is required for this functionality.')
+
+        energies = opt_results['scan_energies']
+        geometries = opt_results['scan_geometries']
+        total_points = len(energies)
+        ipywidgets.interact(self.show_scan_point,
+                            energies=ipywidgets.fixed(energies),
+                            geometries=ipywidgets.fixed(geometries),
+                            point=ipywidgets.IntSlider(min=0,
+                                                       max=total_points - 1,
+                                                       step=1,
+                                                       value=0),
+                            atom_indices=ipywidgets.fixed(atom_indices))
+
+    def show_scan_point(self, energies, geometries, point=0, atom_indices=False):
+        """
+        Show the geometry at a specific scan point.
+
+        :param energies:
+            The energies at each scan point.
+        :param geometries:
+            The geometries at each scan point.
+        :param point:
+            The scan point to display.
+        :param atom_indices:
+            Flag for displaying atom indices.
+        """
+
+        try:
+            import matplotlib.pyplot as plt
+            from scipy.interpolate import CubicSpline
+        except ImportError:
+            raise ImportError('matplotlib and scipy are required for this functionality.')
+
+        min_energy = np.min(energies)
+        rel_energies = energies - min_energy
+        rel_energies_kJ = rel_energies * hartree_in_kjpermol()
+
+        xyz_data_i = geometries[point]
+        scan_points = np.array(range(len(rel_energies_kJ)))
+        total_points = len(rel_energies_kJ)
+
+        plt.figure(figsize=(6.5, 4))
+        if len(scan_points) > 3:
+            cs = CubicSpline(scan_points, rel_energies_kJ)
+            x = np.linspace(0, total_points - 1, 300)
+            y = cs(x)
+            plt.plot(x, y, color='black', alpha=0.9, linewidth=2.5, ls='-', zorder=0)
+        else:
+            plt.plot(scan_points, rel_energies_kJ, color='black', alpha=0.9, linewidth=2.5, ls='-', zorder=0)
+        plt.scatter(scan_points,
+                    rel_energies_kJ,
+                    color='black',
+                    alpha=0.7,
+                    s=120,
+                    facecolors="none",
+                    edgecolor="darkcyan",
+                    zorder=1)
+        plt.scatter(point,
+                    rel_energies_kJ[point],
+                    marker='o',
+                    color='darkcyan',
+                    alpha=1.0,
+                    s=120,
+                    zorder=2)
+        plt.xlabel('Scan point')
+        plt.ylabel('Relative energy [kJ/mol]')
+        plt.title("Geometry scan")
+        # Ensure x-axis displays as integers
+        plt.xticks(np.arange(0, total_points, max(1, total_points // 10)))
+        plt.tight_layout()
+        plt.show()
+
+        mol = Molecule.read_xyz_string(xyz_data_i)
+        mol.show(atom_indices=atom_indices, width=640, height=360)
+
+    def plot_irc(self, opt_results):
+        """
+        Plot the IRC energies (energy plot only).
+
+        :param opt_results:
+            The dictionary of optimize results.
+        """
+
+        try:
+            import matplotlib.pyplot as plt
+            from scipy.interpolate import CubicSpline
+        except ImportError:
+            raise ImportError('matplotlib and scipy are required for this functionality.')
+
+        energies = opt_results['irc_energies']
+        ts_index = opt_results['ts_index']
+        total_points = len(energies)
+
+        e_ts = energies[ts_index]
+        rel_energies = np.array(energies) - e_ts
+        rel_energies_kJ = rel_energies * hartree_in_kjpermol()
+
+        irc_points = np.array(range(total_points))
+
+        plt.figure(figsize=(6.5, 4))
+        if len(irc_points) > 3:
+            cs = CubicSpline(irc_points, rel_energies_kJ)
+            x = np.linspace(0, total_points - 1, 300)
+            y = cs(x)
+            plt.plot(x, y, color='black', alpha=0.9, linewidth=2.5, ls='-', zorder=0)
+        else:
+            plt.plot(irc_points, rel_energies_kJ, color='black', alpha=0.9, linewidth=2.5, ls='-', zorder=0)
+        
+        # Plot all IRC points
+        plt.scatter(irc_points,
+                    rel_energies_kJ,
+                    color='black',
+                    alpha=0.7,
+                    s=80,
+                    facecolors='darkcyan',
+                    edgecolor='darkcyan',
+                    zorder=1)
+        
+        # Highlight transition state
+        plt.scatter(ts_index,
+                rel_energies_kJ[ts_index],
+                color='#993399',
+                alpha=0.7,
+                s=80,
+                edgecolor='#993399',
+                linewidth=1.5,
+                zorder=2,
+                label='TS')
+        
+        plt.xlabel('IRC point')
+        plt.ylabel('Energy - E(TS) [kJ/mol]')
+        plt.title("Intrinsic Reaction Coordinate")
+        plt.legend(frameon=False)
+        plt.axhline(y=0, color='gray', linestyle='--', alpha=0.3)
+        # Ensure x-axis displays as integers
+        plt.xticks(np.arange(0, total_points, max(1, total_points // 10)))
+        plt.tight_layout()
+        plt.show()
+
+    def show_irc(self, opt_results, atom_indices=False):
+        """
+        Plot the IRC energies with interactive molecular visualization
+
+        :param opt_results:
+            The dictionary of optimize results.
+        :param atom_indices:
+            Flag for displaying atom indices.
+        """
+
+        try:
+            import ipywidgets
+        except ImportError:
+            raise ImportError('ipywidgets is required for this functionality.')
+
+        energies = opt_results['irc_energies']
+        geometries = opt_results['irc_geometries']
+        ts_index = opt_results['ts_index']
+        total_points = len(energies)
+        ipywidgets.interact(self.show_irc_point,
+                            energies=ipywidgets.fixed(energies),
+                            geometries=ipywidgets.fixed(geometries),
+                            ts_index=ipywidgets.fixed(ts_index),
+                            point=ipywidgets.IntSlider(min=0,
+                                                       max=total_points - 1,
+                                                       step=1,
+                                                       value=ts_index),
+                            atom_indices=ipywidgets.fixed(atom_indices))
+
+    def show_irc_point(self, energies, geometries, ts_index, point=0, atom_indices=False):
+        """
+        Show the geometry at a specific IRC point.
+
+        :param energies:
+            The energies at each IRC point.
+        :param geometries:
+            The geometries at each IRC point.
+        :param ts_index:
+            The index of the transition state.
+        :param point:
+            The IRC point to display.
+        :param atom_indices:
+            Flag for displaying atom indices.
+        """
+
+        try:
+            import matplotlib.pyplot as plt
+            from scipy.interpolate import CubicSpline
+        except ImportError:
+            raise ImportError('matplotlib and scipy are required for this functionality.')
+
+        e_ts = energies[ts_index]
+        rel_energies = np.array(energies) - e_ts
+        rel_energies_kJ = rel_energies * hartree_in_kjpermol()
+
+        xyz_data_i = geometries[point]
+        irc_points = np.array(range(len(rel_energies_kJ)))
+        total_points = len(rel_energies_kJ)
+
+        plt.figure(figsize=(6.5, 4))
+        if len(irc_points) > 3:
+            cs = CubicSpline(irc_points, rel_energies_kJ)
+            x = np.linspace(0, total_points - 1, 300)
+            y = cs(x)
+            plt.plot(x, y, color='black', alpha=0.9, linewidth=2.5, ls='-', zorder=0)
+        else:
+            plt.plot(irc_points, rel_energies_kJ, color='black', alpha=0.9, linewidth=2.5, ls='-', zorder=0)
+        
+        # Plot all IRC points
+        plt.scatter(irc_points,
+                    rel_energies_kJ,
+                    color='black',
+                    alpha=0.5,
+                    s=80,
+                    facecolors="none",
+                    edgecolor="darkcyan",
+                    zorder=1)
+        
+        # Highlight transition state
+        plt.scatter(ts_index,
+                rel_energies_kJ[ts_index],
+                color='#993399',
+                alpha=0.7,
+                s=80,
+                edgecolor='#993399',
+                linewidth=1.5,
+                zorder=2,
+                label='TS')
+        
+        # Highlight current point
+        plt.scatter(point,
+                    rel_energies_kJ[point],
+                    marker='o',
+                    color='darkcyan',
+                    alpha=1.0,
+                    s=120,
+                    zorder=3)
+        
+        plt.xlabel('IRC point')
+        plt.ylabel('Energy - E(TS) [kJ/mol]')
+        plt.title("Intrinsic Reaction Coordinate")
+        plt.axhline(y=0, color='gray', linestyle='--', alpha=0.3)
+        # Ensure x-axis displays as integers
+        plt.xticks(np.arange(0, total_points, max(1, total_points // 10)))
+        plt.tight_layout()
+        plt.show()
+
+        mol = Molecule.read_xyz_string(xyz_data_i)
+        mol.show(atom_indices=atom_indices, width=640, height=360)
+
     def _write_final_hdf5(self, fname, molecule, opt_results, basis=None):
         """
-        Creats a HDF5 file and saves the optimization results.
+        Creates a HDF5 file entry and saves the optimization results.
 
         :param fname:
             Name of the HDF5 file.
@@ -1046,53 +1523,19 @@ class OptimizationDriver:
         """
 
         if (fname and isinstance(fname, str) and Path(fname).is_file()):
-
-            hf = h5py.File(fname, 'a')
-
-            opt_group = 'opt/'
-
-            # Check if it is a scan job or not
-            if 'scan_energies' in opt_results.keys():
-                hf.create_dataset(opt_group + 'scan_energies',
-                                  data=opt_results['scan_energies'])
-
-                nuclear_repulsion_energies = []
-                scan_coordinates_au = []
-                for xyzstr in opt_results['scan_geometries']:
-                    mol = Molecule.read_xyz_string(xyzstr)
-                    nuclear_repulsion_energies.append(
-                        mol.effective_nuclear_repulsion_energy(basis))
-                    scan_coordinates_au.append(mol.get_coordinates_in_bohr())
-
-                hf.create_dataset(opt_group + 'scan_coordinates_au',
-                                  data=np.array(scan_coordinates_au))
-
-            else:
-                hf.create_dataset(opt_group + 'opt_energies',
-                                  data=opt_results['opt_energies'])
-
-                nuclear_repulsion_energies = []
-                opt_coordinates_au = []
-                for xyzstr in opt_results['opt_geometries']:
-                    mol = Molecule.read_xyz_string(xyzstr)
-                    nuclear_repulsion_energies.append(
-                        mol.effective_nuclear_repulsion_energy(basis))
-                    opt_coordinates_au.append(mol.get_coordinates_in_bohr())
-
-                hf.create_dataset(opt_group + 'opt_coordinates_au',
-                                  data=np.array(opt_coordinates_au))
-
-            # TODO: reconsider saving this
-            hf.create_dataset(opt_group + 'nuclear_repulsion_energies',
-                              data=np.array(nuclear_repulsion_energies))
+            # Keep Molecule as an in-memory convenience object, and serialize
+            # only data-backed optimization results.
+            h5_opt_results = {
+                key: value
+                for key, value in opt_results.items() if key != 'final_molecule'
+            }
+            write_opt_results_to_hdf5(fname, h5_opt_results)
 
             valstr = 'Optimization results written to file: '
             valstr += fname
             self.ostream.print_info(valstr)
             self.ostream.print_blank()
             self.ostream.flush()
-
-            hf.close()
 
     def __deepcopy__(self, memo):
         """

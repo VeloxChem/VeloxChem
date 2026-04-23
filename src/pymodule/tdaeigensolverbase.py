@@ -42,7 +42,7 @@ from .oneeints import (compute_electric_dipole_integrals,
                        compute_linear_momentum_integrals,
                        compute_angular_momentum_integrals)
 from .errorhandler import assert_msg_critical
-from .checkpoint import write_rsp_solution
+from .resultsio import write_rsp_solution
 from .spectrumplot import (plot_uv_vis_spectrum, plot_xas_spectrum,
                            plot_ecd_spectrum, plot_xcd_spectrum)
 
@@ -298,6 +298,7 @@ class TdaEigenSolverBase(LinearSolver):
         self.ostream.print_info('Response solution vectors written to file: ' +
                                 final_h5_fname)
         self.ostream.print_blank()
+        self.ostream.flush()
 
     def _print_results(self, results):
         """

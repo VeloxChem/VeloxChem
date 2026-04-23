@@ -216,7 +216,7 @@ class PolOrbitalResponse(CphfSolver):
             nao = basis.get_dimensions_of_basis()
 
             # number of occupied orbitals
-            nocc = molecule.number_of_alpha_electrons()
+            nocc = molecule.number_of_alpha_occupied_orbitals(basis)
 
             # MO coefficients
             mo = scf_tensors['C_alpha']  # only alpha part
@@ -303,8 +303,9 @@ class PolOrbitalResponse(CphfSolver):
                 # calculate symmetrized unrelaxed one-particle density matrix
                 profiler.start_timer('1PDM')
 
-                unrel_dm_ao = self.calculate_unrel_dm(molecule, scf_tensors,
-                                                      x_plus_y, x_minus_y)
+                unrel_dm_ao = self.calculate_unrel_dm(molecule, basis,
+                                                      scf_tensors, x_plus_y,
+                                                      x_minus_y)
 
                 profiler.stop_timer('1PDM')
 
@@ -480,6 +481,7 @@ class PolOrbitalResponse(CphfSolver):
                 # calculate 2-particle density matrix contribution
                 profiler.start_timer('2PDM')
                 fock_mo_rhs_2pdm = self.calculate_rhs_2pdm_contrib(molecule,
+                                                                   basis,
                                                                    scf_tensors,
                                                                    x_plus_y_ao,
                                                                    x_minus_y_ao,
@@ -532,7 +534,7 @@ class PolOrbitalResponse(CphfSolver):
                     tot_rhs_mo = np.concatenate(
                         (tot_rhs_mo, rhs_red.real, rhs_red.imag))
 
-                profiler.print_memory_subspace(
+                profiler.print_memory_dictionary(
                     {
                         'fock_ao_rhs_real': fock_ao_rhs_real,
                         'fock_ao_rhs_imag': fock_ao_rhs_imag,
@@ -622,7 +624,7 @@ class PolOrbitalResponse(CphfSolver):
             profiler.stop_timer('total')
             profiler.check_memory_usage(f'RHS w={w:.4f}')
 
-        profiler.print_memory_subspace({
+        profiler.print_memory_dictionary({
             'dist_cphf_rhs': dist_cphf_rhs,
             'dist_fock_ao_rhs': dist_fock_ao_rhs,
             'dist_fock_gxc_ao': dist_fock_gxc_ao  # empty list if not DFT
@@ -699,7 +701,7 @@ class PolOrbitalResponse(CphfSolver):
             nao = basis.get_dimensions_of_basis()
 
             # number of occupied MOs
-            nocc = molecule.number_of_alpha_electrons()
+            nocc = molecule.number_of_alpha_occupied_orbitals(basis)
 
             # MO coefficients
             mo = scf_tensors['C_alpha']  # only alpha part
@@ -780,8 +782,9 @@ class PolOrbitalResponse(CphfSolver):
 
                 # calculate symmetrized unrelaxed one-particle density matrix
                 profiler.start_timer('1PDM')
-                unrel_dm_ao = self.calculate_unrel_dm(molecule, scf_tensors,
-                                                      x_plus_y, x_minus_y)
+                unrel_dm_ao = self.calculate_unrel_dm(molecule, basis,
+                                                      scf_tensors, x_plus_y,
+                                                      x_minus_y)
                 profiler.stop_timer('1PDM')
                 # create lists
                 dm_ao_list = list(unrel_dm_ao.reshape(dof**2, nao, nao))
@@ -852,6 +855,7 @@ class PolOrbitalResponse(CphfSolver):
                 # calculate 2-particle density matrix contribution
                 profiler.start_timer('2PDM')
                 fock_mo_rhs_2pdm = self.calculate_rhs_2pdm_contrib(molecule,
+                                                                   basis,
                                                                    scf_tensors,
                                                                    x_plus_y_ao,
                                                                    x_minus_y_ao,
@@ -900,7 +904,7 @@ class PolOrbitalResponse(CphfSolver):
                 else:
                     tot_rhs_mo = np.append(tot_rhs_mo, rhs_red, axis=0)
 
-                profiler.print_memory_subspace(
+                profiler.print_memory_dictionary(
                     {
                         'fock_ao_rhs': fock_ao_rhs,
                         'fock_gxc_ao': fock_gxc_ao,
@@ -938,7 +942,7 @@ class PolOrbitalResponse(CphfSolver):
             profiler.stop_timer('total')
             profiler.check_memory_usage(f'RHS w={w:.4f}')
 
-        profiler.print_memory_subspace({
+        profiler.print_memory_dictionary({
             'dist_cphf_rhs': dist_cphf_rhs,
             'dist_fock_ao_rhs': dist_fock_ao_rhs,
             'dist_fock_gxc_ao': dist_fock_gxc_ao
@@ -971,7 +975,8 @@ class PolOrbitalResponse(CphfSolver):
                 'dist_fock_gxc_ao': dist_fock_gxc_ao  # empty list if not DFT
             }
 
-    def calculate_1pdm(self, molecule, scf_tensors, x_plus_y, x_minus_y):
+    def calculate_1pdm(self, molecule, basis, scf_tensors, x_plus_y,
+                       x_minus_y):
         """
         Calculates the unrelaxed one-particle density matrices in MO basis.
 
@@ -995,7 +1000,7 @@ class PolOrbitalResponse(CphfSolver):
 
         # MO coefficients
         mo = scf_tensors['C_alpha']  # only alpha part
-        nocc = molecule.number_of_alpha_electrons()
+        nocc = molecule.number_of_alpha_occupied_orbitals(basis)
         mo_vir = mo[:, nocc:].copy()
         nvir = mo_vir.shape[1]
 
@@ -1037,7 +1042,8 @@ class PolOrbitalResponse(CphfSolver):
 
         return dm_oo, dm_vv
 
-    def calculate_unrel_dm(self, molecule, scf_tensors, x_plus_y, x_minus_y):
+    def calculate_unrel_dm(self, molecule, basis, scf_tensors, x_plus_y,
+                           x_minus_y):
         """
         Calculates the symmetrized unrelaxed one-particle density matrix
         in AO basis.
@@ -1060,7 +1066,7 @@ class PolOrbitalResponse(CphfSolver):
 
         # MO coefficients
         mo = scf_tensors['C_alpha']  # only alpha part
-        nocc = molecule.number_of_alpha_electrons()
+        nocc = molecule.number_of_alpha_occupied_orbitals(basis)
         mo_occ = mo[:, :nocc].copy()
         mo_vir = mo[:, nocc:].copy()
 
@@ -1074,7 +1080,8 @@ class PolOrbitalResponse(CphfSolver):
             rhs_dt = np.dtype('float64')
 
         # calculate the symmetrized unrelaxed one-particle density matrix
-        dm_oo, dm_vv = self.calculate_1pdm(molecule, scf_tensors, x_plus_y, x_minus_y)
+        dm_oo, dm_vv = self.calculate_1pdm(molecule, basis, scf_tensors,
+                                           x_plus_y, x_minus_y)
 
         # transform to AO basis: mi,xia,na->xmn
         unrel_dm_ao = np.zeros((dof, dof, nao, nao), dtype=rhs_dt)
@@ -1091,8 +1098,9 @@ class PolOrbitalResponse(CphfSolver):
 
         return unrel_dm_ao
 
-    def calculate_rhs_2pdm_contrib(self, molecule, scf_tensors, x_plus_y_ao,
-                                   x_minus_y_ao, fock_ao_rhs_x_plus_y,
+    def calculate_rhs_2pdm_contrib(self, molecule, basis, scf_tensors,
+                                   x_plus_y_ao, x_minus_y_ao,
+                                   fock_ao_rhs_x_plus_y,
                                    fock_ao_rhs_x_minus_y):
         """
         Calculates the 2-particle density matrix contribution to the RHS.
@@ -1122,7 +1130,7 @@ class PolOrbitalResponse(CphfSolver):
 
         # MO coefficients
         mo = scf_tensors['C_alpha']  # only alpha part
-        nocc = molecule.number_of_alpha_electrons()
+        nocc = molecule.number_of_alpha_occupied_orbitals(basis)
         mo_occ = mo[:, :nocc].copy()
         mo_vir = mo[:, nocc:].copy()
         nvir = mo_vir.shape[1]
@@ -1263,7 +1271,7 @@ class PolOrbitalResponse(CphfSolver):
 
         # MO coefficients
         mo = scf_tensors['C_alpha']  # only alpha part
-        nocc = molecule.number_of_alpha_electrons()
+        nocc = molecule.number_of_alpha_occupied_orbitals(basis)
         mo_occ = mo[:, :nocc].copy()
         mo_vir = mo[:, nocc:].copy()
         nvir = mo_vir.shape[1]
@@ -1602,7 +1610,7 @@ class PolOrbitalResponse(CphfSolver):
 
         if self.rank == mpi_master():
             # number of occupied MOs
-            nocc = molecule.number_of_alpha_electrons()
+            nocc = molecule.number_of_alpha_occupied_orbitals(basis)
 
             # MO coefficients
             mo = scf_tensors['C_alpha']
@@ -1653,6 +1661,7 @@ class PolOrbitalResponse(CphfSolver):
             if self.rank == mpi_master():
 
                 self.ostream.print_info(f'Building omega for w = {w:4.3f}')
+                self.ostream.print_blank()
                 self.ostream.flush()
 
                 # Note: polorbitalresponse uses r instead of mu for dipole operator
@@ -1691,8 +1700,9 @@ class PolOrbitalResponse(CphfSolver):
 
                 # calculate the one-particle density matrices in MO
                 profiler.start_timer('1PDM')
-                dm_oo, dm_vv = self.calculate_1pdm(molecule, scf_tensors,
-                                                   x_plus_y_mo, x_minus_y_mo)
+                dm_oo, dm_vv = self.calculate_1pdm(molecule, basis,
+                                                   scf_tensors, x_plus_y_mo,
+                                                   x_minus_y_mo)
                 profiler.stop_timer('1PDM')
 
                 # calculate dipole contribution to omega
@@ -1750,8 +1760,9 @@ class PolOrbitalResponse(CphfSolver):
                 omega = np.zeros((dof, dof, nao, nao))
 
                 # construct epsilon density matrix
-                epsilon_dm_ao = self.calculate_epsilon_dm(molecule, scf_tensors,
-                                                          dm_oo, dm_vv, cphf_ov)
+                epsilon_dm_ao = self.calculate_epsilon_dm(molecule, basis,
+                                                          scf_tensors, dm_oo,
+                                                          dm_vv, cphf_ov)
                 del dm_oo, dm_vv
 
                 for m in range(dof):
@@ -1781,9 +1792,10 @@ class PolOrbitalResponse(CphfSolver):
                         profiler.start_timer('2PDM')
 
                         omega_1pdm_2pdm_contrib_mn = self.calculate_omega_1pdm_2pdm_contrib(
-                            molecule, scf_tensors, x_plus_y_ao[m], x_plus_y_ao[n],
-                            x_minus_y_ao[m], x_minus_y_ao[n], fock_ao_rhs_1_m,
-                            fock_ao_rhs_2_m, fock_ao_rhs_1_n, fock_ao_rhs_2_n, fmat)
+                            molecule, basis, scf_tensors, x_plus_y_ao[m],
+                            x_plus_y_ao[n], x_minus_y_ao[m], x_minus_y_ao[n],
+                            fock_ao_rhs_1_m, fock_ao_rhs_2_m, fock_ao_rhs_1_n,
+                            fock_ao_rhs_2_n, fmat)
 
                         profiler.stop_timer('2PDM')
 
@@ -1820,7 +1832,7 @@ class PolOrbitalResponse(CphfSolver):
 
         self.cphf_results['dist_omega_ao'] = dist_omega
 
-        profiler.print_memory_subspace({
+        profiler.print_memory_dictionary({
             'dist_omega_ao': dist_omega
         }, self.ostream)
         profiler.check_memory_usage('End of omega')
@@ -1881,7 +1893,7 @@ class PolOrbitalResponse(CphfSolver):
             nao = basis.get_dimensions_of_basis()
 
             # number of occupied MOs
-            nocc = molecule.number_of_alpha_electrons()
+            nocc = molecule.number_of_alpha_occupied_orbitals(basis)
 
             # MO coefficients
             mo = scf_tensors['C_alpha']
@@ -1931,6 +1943,7 @@ class PolOrbitalResponse(CphfSolver):
             if self.rank == mpi_master():
 
                 self.ostream.print_info(f'Building omega for w = {w:4.3f}')
+                self.ostream.print_blank()
                 self.ostream.flush()
 
                 # Note: polorbitalresponse uses r instead of mu for dipole operator
@@ -1974,8 +1987,9 @@ class PolOrbitalResponse(CphfSolver):
                 # calculate the one-particle density matrices
                 profiler.start_timer('1PDM')
 
-                dm_oo, dm_vv = self.calculate_1pdm(molecule, scf_tensors,
-                                                   x_plus_y_mo, x_minus_y_mo)
+                dm_oo, dm_vv = self.calculate_1pdm(molecule, basis,
+                                                   scf_tensors, x_plus_y_mo,
+                                                   x_minus_y_mo)
 
                 profiler.stop_timer('1PDM')
 
@@ -2055,8 +2069,9 @@ class PolOrbitalResponse(CphfSolver):
                 omega = np.zeros((dof, dof, nao, nao), dtype=np.dtype('complex128'))
 
                 # construct epsilon density matrix
-                epsilon_dm_ao = self.calculate_epsilon_dm(molecule, scf_tensors,
-                                                          dm_oo, dm_vv, cphf_ov)
+                epsilon_dm_ao = self.calculate_epsilon_dm(molecule, basis,
+                                                          scf_tensors, dm_oo,
+                                                          dm_vv, cphf_ov)
 
                 for m in range(dof):
                     for n in range(m, dof):
@@ -2103,9 +2118,10 @@ class PolOrbitalResponse(CphfSolver):
                         profiler.start_timer('2PDM')
 
                         omega_1pdm_2pdm_contrib = self.calculate_omega_1pdm_2pdm_contrib(
-                            molecule, scf_tensors, x_plus_y_ao[m], x_plus_y_ao[n],
-                            x_minus_y_ao[m], x_minus_y_ao[n], fock_ao_rhs_1_m,
-                            fock_ao_rhs_2_m, fock_ao_rhs_1_n, fock_ao_rhs_2_n, fmat)
+                            molecule, basis, scf_tensors, x_plus_y_ao[m],
+                            x_plus_y_ao[n], x_minus_y_ao[m], x_minus_y_ao[n],
+                            fock_ao_rhs_1_m, fock_ao_rhs_2_m, fock_ao_rhs_1_n,
+                            fock_ao_rhs_2_n, fmat)
 
                         profiler.stop_timer('2PDM')
 
@@ -2161,7 +2177,7 @@ class PolOrbitalResponse(CphfSolver):
 
         self.cphf_results['dist_omega_ao'] = dist_omega
 
-        profiler.print_memory_subspace({
+        profiler.print_memory_dictionary({
             'dist_omega_ao': dist_omega
         }, self.ostream)
         profiler.check_memory_usage('End of omega')
@@ -2197,7 +2213,7 @@ class PolOrbitalResponse(CphfSolver):
 
         # MO coefficients
         mo = scf_tensors['C_alpha']  # only alpha part
-        nocc = molecule.number_of_alpha_electrons()
+        nocc = molecule.number_of_alpha_occupied_orbitals(basis)
         mo_occ = mo[:, :nocc].copy()
         mo_vir = mo[:, nocc:].copy()
 
@@ -2271,7 +2287,8 @@ class PolOrbitalResponse(CphfSolver):
 
         return omega_dipole_contrib
 
-    def calculate_epsilon_dm(self, molecule, scf_tensors, dm_oo, dm_vv, lambda_ov):
+    def calculate_epsilon_dm(self, molecule, basis, scf_tensors, dm_oo, dm_vv,
+                             lambda_ov):
         """
         Calculates the epsilon density matrix for the omega multipliers
 
@@ -2295,7 +2312,7 @@ class PolOrbitalResponse(CphfSolver):
 
         # MO coefficients
         mo = scf_tensors['C_alpha']  # only alpha part
-        nocc = molecule.number_of_alpha_electrons()
+        nocc = molecule.number_of_alpha_occupied_orbitals(basis)
         mo_occ = mo[:, :nocc].copy()
         mo_vir = mo[:, nocc:].copy()
         nvir = mo_vir.shape[1]
@@ -2343,7 +2360,7 @@ class PolOrbitalResponse(CphfSolver):
 
         return epsilon_dm
 
-    def calculate_omega_1pdm_2pdm_contrib(self, molecule, scf_tensors,
+    def calculate_omega_1pdm_2pdm_contrib(self, molecule, basis, scf_tensors,
                                           x_plus_y_ao_m, x_plus_y_ao_n,
                                           x_minus_y_ao_m, x_minus_y_ao_n,
                                           fock_ao_rhs_1_m, fock_ao_rhs_2_m,
@@ -2376,7 +2393,7 @@ class PolOrbitalResponse(CphfSolver):
 
         # MO coefficients
         mo = scf_tensors['C_alpha']  # only alpha part
-        nocc = molecule.number_of_alpha_electrons()
+        nocc = molecule.number_of_alpha_occupied_orbitals(basis)
         mo_occ = mo[:, :nocc].copy()
         mo_vir = mo[:, nocc:].copy()
 
