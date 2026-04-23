@@ -1046,6 +1046,15 @@ class EnsembleDriver:
 
         do_rsp = bool(property_options)
 
+        # Guard against open-shell response requests for now:
+        if do_rsp:
+            scf_type = str(scf_options.get("scf_type", "scf")).lower()
+            if scf_type in {"roscf", "uscf"}:
+                raise NotImplementedError(
+                    "Open-shell response is not yet supported in EnsembleDriver.compute. "
+                    "Use scf_type='scf' for response calculations."
+                )
+
         scf_all = []
         rsp_all = [] if do_rsp else None
 
