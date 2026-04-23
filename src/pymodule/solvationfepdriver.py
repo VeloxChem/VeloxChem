@@ -163,8 +163,8 @@ class SolvationFepDriver:
         self.lambdas_stage2 = [1.0, 0.8, 0.6, 0.4, 0.3, 0.2, 0.15, 0.10, 0.05, 0.03, 0.0]
         # Fixed lambda vector for stage 3 with 6 lambdas
         self.lambdas_stage3 = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
-        # Fixed lambda vector for stage 4 with 3 lambdas
-        self.lambdas_stage4 = [1.0, 0.5, 0.0] 
+        # Fixed lambda vector for stage 4 with 5 lambdas
+        self.lambdas_stage4 = [1.0, 0.8, 0.5, 0.2, 0.0] 
 
         # Storage for potential energies across stages
         self.u_kn_matrices = []

@@ -119,6 +119,17 @@ class SmdDriver:
 
         return atom_radii
 
+    def print_available_solvents(self):
+        """
+        Print the available solvents for SMD calculations.
+        """
+
+        if self.rank == mpi_master():
+            self.ostream.print_info('Available solvents for SMD calculations:')
+            for solvent in self.smd_solvent_parameters.keys():
+                print(f' {solvent}')
+            self.ostream.flush()
+            
     def get_CDS_contribution(self):
         """
         Get the Cavity-Dispersion-Solvent-Structure (CDS) contribution to the solvation energy.
