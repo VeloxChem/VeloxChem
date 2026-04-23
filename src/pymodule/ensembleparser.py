@@ -490,10 +490,6 @@ class EnsembleParser:
             ]
             self.universe.trajectory.add_transformations(*transforms)
 
-        empty_xyz = np.empty((0, 3), dtype=float)
-        empty_obj = np.empty((0,), dtype=object)
-        empty_int = np.empty((0,), dtype=int)
-
         atom_guesser = DefaultGuesser(self.universe)
 
         snapshots = []
@@ -505,21 +501,21 @@ class EnsembleParser:
                 [atom_guesser.guess_atom_element(n) for n in qm_atoms.names], dtype=object
             )
 
-            pe_coords = empty_xyz
-            pe_elements = empty_obj
-            pe_resids = empty_int
-            pe_resindices = empty_int
-            pe_resnames = empty_obj
+            pe_coords = None
+            pe_elements = None
+            pe_resids = None
+            pe_resindices = None
+            pe_resnames = None
             number_residues_pe = 0
-            pe_atom_names = empty_obj
+            pe_atom_names = None
 
-            npe_coords = empty_xyz
-            npe_elements = empty_obj
-            npe_resids = empty_int
-            npe_resindices = empty_int
-            npe_resnames = empty_obj
+            npe_coords = None
+            npe_elements = None
+            npe_resids = None
+            npe_resindices = None
+            npe_resnames = None
             number_residues_npe = 0
-            npe_atom_names = empty_obj
+            npe_atom_names = None
 
             pe_region = None
 
@@ -603,6 +599,24 @@ class EnsembleParser:
                         npe_resnames[npe_resindices == ridx] = newname
 
                 number_residues_npe = int(npe_region.residues.n_residues)
+
+            # Normalize missing PE/NPE selections to fresh empty arrays
+            # per snapshot
+            if pe_coords is None:
+                pe_coords = np.empty((0, 3), dtype=float)
+                pe_atom_names = np.empty((0,), dtype=object)
+                pe_elements = np.empty((0,), dtype=object)
+                pe_resids = np.empty((0,), dtype=int)
+                pe_resindices = np.empty((0,), dtype=int)
+                pe_resnames = np.empty((0,), dtype=object)
+
+            if npe_coords is None:
+                npe_coords = np.empty((0, 3), dtype=float)
+                npe_atom_names = np.empty((0,), dtype=object)
+                npe_elements = np.empty((0,), dtype=object)
+                npe_resids = np.empty((0,), dtype=int)
+                npe_resindices = np.empty((0,), dtype=int)
+                npe_resnames = np.empty((0,), dtype=object)
 
             # If neither cutoff is set, interpret as all-qm
 
