@@ -31,7 +31,7 @@ class TestEnsembleDriverOptions:
         - property='absorption' + nstates routes to TD-DFT/LR path
         - PE potfile is frame-specific for each snapshot
         - compare SCF energies and LR eigenvalues to validated reference output
-        - compare generated PE .pot files against reference files line-by-line
+        - compare generated PE+NPE .pot files against reference files line-by-line
         """
         data_dir = Path(__file__).parent / "data"
         traj = str(data_dir / "alpha-helix-acetone-water.xtc")
@@ -84,14 +84,14 @@ class TestEnsembleDriverOptions:
         # Reference values from validated output (frames 0 and 100)
         ref_frames = [0, 100]
         ref_scf = np.array([
-            -193.034378284178,
-            -193.022765784082,
+            -193.065221296142,
+            -193.066191060731,
         ])
         ref_eigs = {
-            0: np.array([0.16030358, 0.30713928, 0.32441467, 0.32455422, 0.35082897,
-                         0.35414124, 0.38336963, 0.38622911, 0.40231618, 0.40592835]),
-            100: np.array([0.15687836, 0.29063852, 0.31321987, 0.32178156, 0.35215034,
-                           0.36103362, 0.37527631, 0.38275914, 0.39484004, 0.40571256]),
+            0: np.array([0.16054420, 0.30291201, 0.32230194, 0.32374070, 0.34621892,
+                         0.35811233, 0.38296122, 0.39039569, 0.39859124, 0.40813756]),
+            100: np.array([0.15879634, 0.28945558, 0.31257123, 0.32000411, 0.35065285,
+                           0.36276382, 0.37488666, 0.38134798, 0.39323165, 0.40966114]),
         }
 
         got_frames = [int(frame) for frame, _ in results["scf_all"]]
@@ -108,7 +108,7 @@ class TestEnsembleDriverOptions:
             assert expected_path.is_file()
             assert str(scf_res.get("potfile", "")).endswith(expected_name)
 
-            # Reference .pot regression (writer stability)
+            # Reference .pot regression for mixed PE+NPE writer stability
             reference_name = f"ensemble_alphahelix_reference_{expected_name}"
             reference_path = data_dir / reference_name
             assert reference_path.is_file(), f"Missing reference file: {reference_path}"
@@ -116,7 +116,7 @@ class TestEnsembleDriverOptions:
             generated_lines = expected_path.read_text().splitlines()
             reference_lines = reference_path.read_text().splitlines()
             assert generated_lines == reference_lines, (
-                f"PE pot mismatch for frame {frame}: {expected_name}"
+                f"PE+NPE pot mismatch for frame {frame}: {expected_name}"
             )
 
         for frame, rsp_res in results["rsp_all"]:

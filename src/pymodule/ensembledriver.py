@@ -312,6 +312,33 @@ class EnsembleDriver:
                 rdb[atom] = {"element": elem, "charge": q}
         return db
 
+    def _get_npe_params(self, atom_name: str, resname: str) -> dict:
+        """
+        Resolve an NPE residue/atom name and return the corresponding parameters.
+        """
+        if self.npe_model is None:
+            raise RuntimeError("NPE model is not set. Call set_env_models(npe_model=...).")
+
+        db = self.npe_model["db"]
+        raw_resn = str(resname)
+        raw_atom = str(atom_name)
+        db_resn = self._normalize_resname_for_npe_db(db, raw_resn)
+
+        if db_resn not in db:
+            raise KeyError(
+                f"No NPE parameters for residue name '{raw_resn}' "
+                f"(normalized to '{db_resn}')."
+            )
+
+        resolved_atom = self._resolve_atom_name_for_npe_db(raw_atom, db[db_resn].keys())
+        if resolved_atom is None:
+            raise KeyError(
+                f"No NPE charge for {raw_resn}/{raw_atom}. "
+                f"Available: {sorted(db[db_resn].keys())}"
+            )
+
+        return db[db_resn][resolved_atom]
+
     @staticmethod
     def _normalize_model_names(model_names):
         """
@@ -785,30 +812,11 @@ class EnsembleDriver:
 
         atom_names = np.asarray(atom_names, dtype=object)
         resnames = np.asarray(resnames, dtype=object)
-        db = self.npe_model["db"]
 
         q = np.empty(atom_names.size, dtype=float)
 
         for i, (atom, resn) in enumerate(zip(atom_names, resnames)):
-            raw_resn = str(resn)
-            raw_atom = str(atom)
-
-            resn = self._normalize_resname_for_npe_db(db, raw_resn)
-
-            if resn not in db:
-                raise KeyError(
-                    f"No NPE parameters for residue name '{raw_resn}' "
-                    f"(normalized to '{resn}')."
-                )
-
-            resolved_atom = self._resolve_atom_name_for_npe_db(raw_atom, db[resn].keys())
-            if resolved_atom is None:
-                raise KeyError(
-                    f"No NPE charge for {raw_resn}/{raw_atom}. "
-                    f"Available: {sorted(db[resn].keys())}"
-                )
-
-            q[i] = db[resn][resolved_atom]["charge"]
+            q[i] = self._get_npe_params(atom, resn)["charge"]
 
         pc = np.zeros((6, coords_ang.shape[0]), dtype=float)
         pc[0:3, :] = coords_ang.T / bohr_in_angstrom()
@@ -866,36 +874,84 @@ class EnsembleDriver:
             pe_resnames = np.asarray(snap.get("pe_resnames", []), dtype=object)
             pe_atom_names = np.asarray(snap.get("pe_atom_names", []), dtype=object)
 
-            if pe_coords.size == 0:
+            npe_coords = np.asarray(snap.get("npe_coords", []), dtype=float)
+            npe_elements = np.asarray(snap.get("npe_elements", []), dtype=object)
+            npe_resids = np.asarray(snap.get("npe_resids", []), dtype=int)
+            npe_resindices = np.asarray(
+                snap.get("npe_resindices", snap.get("npe_resids", [])),
+                dtype=int,
+            )
+            npe_resnames = np.asarray(snap.get("npe_resnames", []), dtype=object)
+            npe_atom_names = np.asarray(snap.get("npe_atom_names", []), dtype=object)
+ 
+            if pe_coords.size == 0 and npe_coords.size == 0:                
                 continue
 
-            if pe_atom_names.size != pe_coords.shape[0]:
+            if pe_coords.size > 0 and pe_atom_names.size != pe_coords.shape[0]:
                 raise ValueError(
                     "pe_atom_names is missing or wrong length in snapshots. "
                     "Required for CP3/SEP when same element has different parameters."
                 )
 
-            if pe_resindices.size != pe_coords.shape[0]:
+            if pe_coords.size > 0 and pe_elements.size != pe_coords.shape[0]:
+                raise ValueError("pe_elements is missing or wrong length in snapshots.")
+
+            if pe_coords.size > 0 and pe_resids.size != pe_coords.shape[0]:
+                raise ValueError("pe_resids is missing or wrong length in snapshots.")
+            
+            if pe_coords.size > 0 and pe_resnames.size != pe_coords.shape[0]:
+                raise ValueError("pe_resnames is missing or wrong length in snapshots.")            
+
+            if pe_coords.size > 0 and pe_resindices.size != pe_coords.shape[0]:
                 raise ValueError(
                     "pe_resindices is missing or wrong length in snapshots. "
                     "Required for robust residue-based PE validation and writing."
                 )
+            
+            if npe_coords.size > 0 and npe_atom_names.size != npe_coords.shape[0]:
+                raise ValueError(
+                    "npe_atom_names is missing or wrong length in snapshots. "
+                    "Required for NPE charges in mixed PE/NPE pot files."
+                )
 
+            if npe_coords.size > 0 and npe_elements.size != npe_coords.shape[0]:
+                raise ValueError("npe_elements is missing or wrong length in snapshots.")
+
+            if npe_coords.size > 0 and npe_resids.size != npe_coords.shape[0]:
+                raise ValueError("npe_resids is missing or wrong length in snapshots.")
+
+            if npe_coords.size > 0 and npe_resnames.size != npe_coords.shape[0]:
+                raise ValueError("npe_resnames is missing or wrong length in snapshots.")
+
+            if npe_coords.size > 0 and npe_resindices.size != npe_coords.shape[0]:
+                raise ValueError(
+                    "npe_resindices is missing or wrong length in snapshots. "
+                    "Required for robust residue-based NPE validation and writing."
+                )
+            
             self._ensure_no_split_residues_between_pe_and_npe(snap)
-            self._validate_pe_residue_atom_patterns(
-                pe_atom_names,
-                pe_resindices,
-                pe_resnames,
-            )
+            if pe_coords.size > 0:
+                self._validate_pe_residue_atom_patterns(
+                    pe_atom_names,
+                    pe_resindices,
+                    pe_resnames,
+                )
 
-            # Unique residue names
-            resname_set = []
+            pe_resname_set = []
             seen = set()
             for r in pe_resnames.tolist():
                 r = str(r)
                 if r not in seen:
                     seen.add(r)
-                    resname_set.append(r)
+                    pe_resname_set.append(r)
+
+            npe_resname_set = []
+            seen = set()
+            for r in npe_resnames.tolist():
+                r = str(r)
+                if r not in seen:
+                    seen.add(r)
+                    npe_resname_set.append(r)
 
             pot_path = outdir / f"pe_frame_{frame:06d}.pot"
             
@@ -905,12 +961,13 @@ class EnsembleDriver:
                 fh.write("units: angstrom\n")
                 fh.write("xyz:\n")
                 for (x, y, z), elem, resn, resid in zip(pe_coords, pe_elements, pe_resnames, pe_resids):
-                    # print (resid)
-                    fh.write(f"{str(elem):<2} {x:12.6f} {y:12.6f} {z:12.6f}  {str(resn):>3}  {int(resid)}\n")
+                    fh.write(f"{str(elem):<2} {x:12.6f} {y:12.6f} {z:12.6f}  {str(resn)}_pe  {int(resid)}\n")
+                for (x, y, z), elem, resn, resid in zip(npe_coords, npe_elements, npe_resnames, npe_resids):
+                    fh.write(f"{str(elem):<2} {x:12.6f} {y:12.6f} {z:12.6f}  {str(resn)}_npe  {int(resid)}\n")
                 fh.write("@end\n\n")
 
                 fh.write("@charges\n")
-                for resn in resname_set:
+                for resn in pe_resname_set:
                     if resn not in pe_db:
                         raise KeyError(f"No PE parameters for residue name '{resn}'")
                     pattern_atoms = self._first_residue_atom_pattern(
@@ -923,11 +980,18 @@ class EnsembleDriver:
                                 f"No PE params for {resn}/{atom}. Available: {sorted(pe_db[resn].keys())}"
                             )
                         p = pe_db[resn][resolved_atom]
-                        fh.write(f"{p['element']:<2} {p['charge']:12.8f}  {resn}\n")
+                        fh.write(f"{p['element']:<2} {p['charge']:12.8f}  {resn}_pe\n")
+                for resn in npe_resname_set:
+                    pattern_atoms = self._first_residue_atom_pattern(
+                        npe_atom_names, npe_resindices, npe_resnames, resn
+                    )
+                    for atom in pattern_atoms:
+                        p = self._get_npe_params(atom, resn)
+                        fh.write(f"{p['element']:<2} {p['charge']:12.8f}  {resn}_npe\n")
                 fh.write("@end\n\n")
 
                 fh.write("@polarizabilities\n")
-                for resn in resname_set:
+                for resn in pe_resname_set:
                     pattern_atoms = self._first_residue_atom_pattern(
                         pe_atom_names, pe_resindices, pe_resnames, resn
                     )
@@ -941,7 +1005,7 @@ class EnsembleDriver:
                         pol = p["polar"]
                         fh.write(
                             f"{p['element']:<2} {pol[0]:12.8f} {pol[1]:12.8f} {pol[2]:12.8f} "
-                            f"{pol[3]:12.8f} {pol[4]:12.8f} {pol[5]:12.8f}  {resn}\n"
+                            f"{pol[3]:12.8f} {pol[4]:12.8f} {pol[5]:12.8f}  {resn}_pe\n"
                         )
                 fh.write("@end\n")
 
@@ -1177,7 +1241,7 @@ class EnsembleDriver:
             if has_pe:
                 scf_driver.potfile = str(potdir / f"pe_frame_{frame:06d}.pot")
 
-            if has_npe:
+            if has_npe and not has_pe:
                 npe_atom_names = snap.get("npe_atom_names", [])
                 npe_resnames = snap.get("npe_resnames", [])
                 if len(npe_atom_names) == 0:
