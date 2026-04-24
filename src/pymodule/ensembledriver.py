@@ -114,8 +114,8 @@ class EnsembleDriver:
         ff19sb_parameters_file = db_dir / "npe_ff19sb.csv"
 
         if self.rank == mpi_master():
-            self._sep_db = self._load_pe_db(sep_parameters_file)
-            self._cp3_db = self._load_pe_db(cp3_parameters_file)
+            self._sep_db = self._load_sep_db(sep_parameters_file)
+            self._cp3_db = self._load_cp3_db(cp3_parameters_file)
             self._tip3p_db = self._load_npe_db(tip3p_parameters_file)
             self._ff19sb_db = self._load_npe_db(ff19sb_parameters_file)
         else:
@@ -158,19 +158,19 @@ class EnsembleDriver:
         return [float(x) for x in parts]
     
     @staticmethod
-    def _load_pe_db(csv_path: Path) -> dict:
+    def _load_sep_db(csv_path: Path) -> dict:
         """
-        Loads PE-like table:
+        Loads SEP-like table:
             molecule,res_name,atom_name,element,M0,P11
 
         :param csv_path:
-            Path to the CSV file containing PE parameters.
+            Path to the CSV file containing SEP parameters.
 
         :return:
             db[res_name][atom_name] = {"element": str, "charge": float, "polar": [6 floats]}
         """
         if not csv_path.is_file():
-            raise FileNotFoundError(f"PE parameter file not found: {csv_path}")
+            raise FileNotFoundError(f"SEP parameter file not found: {csv_path}")
 
         db: dict[str, dict[str, dict]] = {}
 
@@ -198,6 +198,81 @@ class EnsembleDriver:
                 rdb[atom] = {"element": elem, "charge": q, "polar": pol6}
 
         return db
+
+    @staticmethod
+    def _load_cp3_db(csv_path: Path) -> dict:
+        """
+        Loads the raw CP3 parameter table:
+            RESNAME,ATOMTYPE,q,axx,axy,axz,ayy,ayz,azz
+
+        :param csv_path:
+            Path to the raw CP3 parameter file.
+
+        :return:
+            db[res_name][atom_name] = {"element": str, "charge": float, "polar": [6 floats]}
+        """
+        if not csv_path.is_file():
+            raise FileNotFoundError(f"CP3 parameter file not found: {csv_path}")
+
+        db: dict[str, dict[str, dict]] = {}
+
+        with csv_path.open("r", newline="") as fh:
+            reader = csv.DictReader(fh)
+            for row in reader:
+                resn = str(row["RESNAME"]).strip()
+                atom = str(row["ATOMTYPE"]).strip()
+                if not resn or not atom:
+                    continue
+
+                elem = EnsembleDriver._guess_cp3_element(atom)
+                q = float(row["q"])
+                pol6 = [
+                    float(row["axx"]),
+                    float(row["axy"]),
+                    float(row["axz"]),
+                    float(row["ayy"]),
+                    float(row["ayz"]),
+                    float(row["azz"]),
+                ]
+
+                rdb = db.setdefault(resn, {})
+                if atom in rdb:
+                    old = rdb[atom]
+                    if abs(old["charge"] - q) > 1e-12 or any(
+                        abs(a - b) > 1e-12 for a, b in zip(old["polar"], pol6)
+                    ):
+                        raise ValueError(
+                            f"Inconsistent duplicate entries for {resn}/{atom} in {csv_path}"
+                        )
+                rdb[atom] = {"element": elem, "charge": q, "polar": pol6}
+
+        return db
+
+    @staticmethod
+    def _guess_cp3_element(atom_type: str) -> str:
+        """
+        Guess the chemical element from a CP3 atom type.
+
+        CP3 atom types follow common biomolecular atom-name conventions where
+        the element is encoded by the first alphabetic character after any
+        leading multiplicity digit, e.g. 1HB -> H, CA -> C, OD1 -> O.
+
+        :param atom_type:
+            CP3 atom type.
+
+        :return:
+            Element symbol.
+        """
+        atom_type = str(atom_type).strip().upper()
+        match = re.search(r"[A-Z]", atom_type)
+        if match is None:
+            raise ValueError(f"Could not infer element from CP3 atom type: {atom_type!r}")
+
+        elem = match.group(0)
+        if elem not in {"H", "C", "N", "O", "S"}:
+            raise ValueError(f"Unexpected CP3 element guess '{elem}' from atom type: {atom_type!r}")
+
+        return elem
 
     @staticmethod
     def _load_npe_db(csv_path: Path) -> dict:
