@@ -167,6 +167,8 @@ class ScfDriver:
         self.density_thresh = 1.0e-10
         self.prelink_thresh = 5.0e-6
 
+        self.mixed_prec_thresh = 1.0e-6
+
         # iterations data
         self._history = None
         self._iter_data = None
@@ -274,6 +276,7 @@ class ScfDriver:
                 'eri_thresh': ('float', 'ERI screening threshold'),
                 'eri_thresh_tight':
                     ('float', 'tightened ERI screening threshold'),
+                'mixed_prec_thresh': ('float', 'mixed-precision ERI threshold'),
                 'ovl_thresh': ('float', 'AO linear dependency threshold'),
                 'pair_thresh': ('float', 'GTO pair screening threshold'),
                 'density_thresh': ('float', 'density screening threshold'),
@@ -1980,6 +1983,7 @@ class ScfDriver:
                         molecule, basis, dmat, 2.0, [full_k_coef, erf_k_coef],
                         [0.0, omega], 'symm', self.eri_thresh,
                         self.prelink_thresh,
+                        self.mixed_prec_thresh,
                         q_prime_row_inds, q_prime_col_inds, screener)
                     fock_mat_local = fock_mat.to_numpy()
 
@@ -2006,6 +2010,7 @@ class ScfDriver:
                         molecule, basis, dmat, 2.0,
                         [self.xcfun.get_frac_exact_exchange()], [0.0], 'symm',
                         self.eri_thresh, self.prelink_thresh,
+                        self.mixed_prec_thresh,
                         q_prime_row_inds, q_prime_col_inds, screener)
                     fock_mat_local = fock_mat.to_numpy()
 
@@ -2031,6 +2036,7 @@ class ScfDriver:
                 fock_mat = compute_fock_gpu(
                     molecule, basis, dmat, 2.0, [0.0], [0.0], 'symm',
                     self.eri_thresh, self.prelink_thresh,
+                    self.mixed_prec_thresh,
                     q_prime_row_inds, q_prime_col_inds, screener)
                 fock_mat_local = fock_mat.to_numpy()
 
@@ -2056,6 +2062,7 @@ class ScfDriver:
             fock_mat = compute_fock_gpu(
                 molecule, basis, dmat, 2.0, [1.0], [0.0], 'symm',
                 self.eri_thresh, self.prelink_thresh,
+                self.mixed_prec_thresh,
                 q_prime_row_inds, q_prime_col_inds, screener)
             fock_mat_local = fock_mat.to_numpy()
 
@@ -2288,6 +2295,7 @@ class ScfDriver:
                         molecule, basis, dmat_total, 1.0, [0.0],
                         [0.0], 'symm', self.eri_thresh,
                         self.prelink_thresh,
+                        self.mixed_prec_thresh,
                         q_prime_row_inds_a, q_prime_col_inds_a, screener)
                     fock_mat_local_a = fock_mat.to_numpy()
                     fock_mat_local_b = fock_mat.to_numpy()
@@ -2298,6 +2306,7 @@ class ScfDriver:
                         molecule, basis, dmat_Ka, 0.0, [full_k_coef, erf_k_coef],
                         [0.0, omega], 'symm', self.eri_thresh,
                         self.prelink_thresh,
+                        self.mixed_prec_thresh,
                         q_prime_row_inds_a, q_prime_col_inds_a, screener)
                     fock_mat_local_a += fock_mat.to_numpy()
                     self._update_timer_summary(screener, timer_summary, gpu_timer_summary)
@@ -2307,6 +2316,7 @@ class ScfDriver:
                         molecule, basis, dmat_Kb, 0.0, [full_k_coef, erf_k_coef],
                         [0.0, omega], 'symm', self.eri_thresh,
                         self.prelink_thresh,
+                        self.mixed_prec_thresh,
                         q_prime_row_inds_b, q_prime_col_inds_b, screener)
                     fock_mat_local_b += fock_mat.to_numpy()
                     self._update_timer_summary(screener, timer_summary, gpu_timer_summary)
@@ -2319,6 +2329,7 @@ class ScfDriver:
                         molecule, basis, dmat_total, 1.0,
                         [0.0], [0.0], 'symm',
                         self.eri_thresh, self.prelink_thresh,
+                        self.mixed_prec_thresh,
                         q_prime_row_inds_a, q_prime_col_inds_a, screener)
                     fock_mat_local_a = fock_mat.to_numpy()
                     fock_mat_local_b = fock_mat.to_numpy()
@@ -2329,6 +2340,7 @@ class ScfDriver:
                         molecule, basis, dmat_Ka, 0.0,
                         [self.xcfun.get_frac_exact_exchange()], [0.0], 'symm',
                         self.eri_thresh, self.prelink_thresh,
+                        self.mixed_prec_thresh,
                         q_prime_row_inds_a, q_prime_col_inds_a, screener)
                     fock_mat_local_a += fock_mat.to_numpy()
                     self._update_timer_summary(screener, timer_summary, gpu_timer_summary)
@@ -2338,6 +2350,7 @@ class ScfDriver:
                         molecule, basis, dmat_Kb, 0.0,
                         [self.xcfun.get_frac_exact_exchange()], [0.0], 'symm',
                         self.eri_thresh, self.prelink_thresh,
+                        self.mixed_prec_thresh,
                         q_prime_row_inds_b, q_prime_col_inds_b, screener)
                     fock_mat_local_b += fock_mat.to_numpy()
                     self._update_timer_summary(screener, timer_summary, gpu_timer_summary)
@@ -2349,6 +2362,7 @@ class ScfDriver:
                 fock_mat = compute_fock_gpu(
                     molecule, basis, dmat_total, 1.0, [0.0], [0.0], 'symm',
                     self.eri_thresh, self.prelink_thresh,
+                    self.mixed_prec_thresh,
                     q_prime_row_inds_a, q_prime_col_inds_a, screener)
                 fock_mat_local_a = fock_mat.to_numpy()
                 fock_mat_local_b = fock_mat.to_numpy()
@@ -2361,6 +2375,7 @@ class ScfDriver:
             fock_mat = compute_fock_gpu(
                 molecule, basis, dmat_total, 1.0, [0.0], [0.0], 'symm',
                 self.eri_thresh, self.prelink_thresh,
+                self.mixed_prec_thresh,
                 q_prime_row_inds_a, q_prime_col_inds_a, screener)
             fock_mat_local_a = fock_mat.to_numpy()
             fock_mat_local_b = fock_mat.to_numpy()
@@ -2370,6 +2385,7 @@ class ScfDriver:
             fock_mat = compute_fock_gpu(
                 molecule, basis, dmat_Ka, 0.0, [1.0], [0.0], 'symm',
                 self.eri_thresh, self.prelink_thresh,
+                self.mixed_prec_thresh,
                 q_prime_row_inds_a, q_prime_col_inds_a, screener)
             fock_mat_local_a += fock_mat.to_numpy()
             self._update_timer_summary(screener, timer_summary, gpu_timer_summary)
@@ -2378,6 +2394,7 @@ class ScfDriver:
             fock_mat = compute_fock_gpu(
                 molecule, basis, dmat_Kb, 0.0, [1.0], [0.0], 'symm',
                 self.eri_thresh, self.prelink_thresh,
+                self.mixed_prec_thresh,
                 q_prime_row_inds_b, q_prime_col_inds_b, screener)
             fock_mat_local_b += fock_mat.to_numpy()
             self._update_timer_summary(screener, timer_summary, gpu_timer_summary)

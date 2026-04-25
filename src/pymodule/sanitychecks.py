@@ -64,6 +64,9 @@ def scf_results_sanity_check(obj, scf_results):
         if scf_results.get('eri_thresh', None) is not None:
             updated_scf_info['eri_thresh'] = scf_results['eri_thresh']
 
+        if scf_results.get('mixed_prec_thresh', None) is not None:
+            updated_scf_info['mixed_prec_thresh'] = scf_results['mixed_prec_thresh']
+
         if scf_results.get('restart', None) is not None:
             # do not restart if scf is not restarted from checkpoint
             if not scf_results['restart']:

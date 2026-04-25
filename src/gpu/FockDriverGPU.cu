@@ -4232,6 +4232,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                  const std::string& flag_K,
                  const double       eri_threshold,
                  const double       prelink_threshold,
+                 const double       mixed_prec_threshold,
                  const int32_t*     Q_prime_row_ptr,
                  const int32_t*     Q_prime_col_ptr,
                  const int32_t      Q_prime_ind_count,
@@ -4930,7 +4931,7 @@ computeFockOnGPU(const              CMolecule& molecule,
     if (std::fabs(prefac_coulomb) > 1.0e-13)
     {
 
-    const double tau_precision = 1e-6;
+    const double tau_precision = mixed_prec_threshold;
 
     // J: S-S block
 
