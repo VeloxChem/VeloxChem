@@ -52,6 +52,8 @@ class ExcitedStateAnalysisDriver:
 
     Instance variables
         - fragment_dict: dictionary of indices for atoms in each fragment.
+        - analysis_type: type of analysis for the transition
+                         density matrix (mulliken or lowdin)
     """
 
     def __init__(self, ostream=None):
@@ -63,6 +65,8 @@ class ExcitedStateAnalysisDriver:
             ostream = OutputStream(sys.stdout)
 
         self.fragment_dict = None
+
+        self.analysis_type = "lowdin"
 
         # output stream
         self.ostream = ostream
@@ -124,6 +128,13 @@ class ExcitedStateAnalysisDriver:
         self.ostream.print_blank()
 
         tmp_start_time = tm.time()
+
+        self.ostream.print_info(
+            "Charge transfer matrix computed using " +
+            "{:s} analysis.".format(self.analysis_type.capitalize()))
+
+        self.ostream.print_blank()
+
         ct_matrix = self.compute_ct_matrix(molecule, basis, scf_results,
                                            tdens_ao, self.fragment_dict)
         ret_dict['ct_matrix'] = ct_matrix
@@ -348,7 +359,46 @@ class ExcitedStateAnalysisDriver:
     def compute_ct_matrix(self, molecule, basis, scf_results, T, fragment_dict):
         """
         Computes the charge transfer (CT) matrix from the
-        transition density matrix (TDM).
+        transition density matrix (TDM)
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param scf_results:
+            The dictionary of results from converged SCF wavefunction.
+        :param T:
+            The transition density matrix in AO basis.
+        :param fragment_dict:
+            The dictionary containing the indices of atoms in each fragment.
+
+        :return:
+            The CT matrix.
+        """
+
+        if self.analysis_type in ["mulliken", "Mulliken"]:
+            return self.compute_ct_matrix_mulliken(molecule, basis, scf_results,
+                                                   T, fragment_dict)
+        elif self.analysis_type in ["lowdin", "Lowdin"]:
+            return self.compute_ct_matrix_lowdin(molecule, basis, scf_results,
+                                                 T, fragment_dict)
+        else:
+            self.ostream.print_warning(
+                "Unrecognized analysis type: {:s} analysis. ".format(
+                    self.analysis_type.capitalize()) +
+                "Reverting to Lowdin analysis.")
+            self.ostream.print_blank()
+            return self.compute_ct_matrix_lowdin(molecule, basis, scf_results,
+                                                 T, fragment_dict)
+
+    def compute_ct_matrix_mulliken(self, molecule, basis, scf_results, T,
+                                   fragment_dict):
+        """
+        Computes the charge transfer (CT) matrix from the
+        transition density matrix (TDM) using a Mulliken partitioning
+        of the transition density.
+
+        Eq. B4 in J. Chem. Phys. 141, 024106 (2014)
 
         :param molecule:
             The molecule.
@@ -385,6 +435,57 @@ class ExcitedStateAnalysisDriver:
                 ct_matrix[a, b] = np.sum(TSST_AB + T_STS_AB)
 
         return 0.5 * ct_matrix
+
+    def compute_ct_matrix_lowdin(self, molecule, basis, scf_results, T,
+                                 fragment_dict):
+        """
+        Computes the charge transfer (CT) matrix from the
+        transition density matrix (TDM) using a Lowdin partitioning
+        of the transition density.
+
+        Eqs. 15 and 16 Coord. Chem. Rev. 361 (2018) 74–97
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param scf_results:
+            The dictionary of results from converged SCF wavefunction.
+        :param T:
+            The transition density matrix in AO basis.
+        :param fragment_dict:
+            The dictionary containing the indices of atoms in each fragment.
+
+        :return:
+            The CT matrix.
+        """
+
+        ao_map_fragments = self.map_fragments_to_atomic_orbitals(
+            molecule, basis, fragment_dict)
+
+        S = scf_results["S"]
+
+        # Diagonalize S
+        lam, U = np.linalg.eigh(S)
+        sqrt_lam_mat = np.diag(np.sqrt(lam))
+
+        # Calculate S^1/2
+        sqrt_S = np.linalg.multi_dot([U, sqrt_lam_mat, U.T])
+
+        # Calculate tilde_T as S^1/2 T S^1/2
+        tilde_T = np.linalg.multi_dot([sqrt_S, T, sqrt_S])
+
+        # Sum tilde_T**2 over the different fragments
+        n_fragments = len(fragment_dict.keys())
+        ct_matrix = np.zeros((n_fragments, n_fragments))
+        for a, A in enumerate(fragment_dict.keys()):
+            for b, B in enumerate(fragment_dict.keys()):
+                tilde_T_AB = tilde_T[ao_map_fragments[A]][:,
+                                                          ao_map_fragments[B]]
+                tilde_T_AB2 = tilde_T_AB**2
+                ct_matrix[a, b] = np.sum(tilde_T_AB2)
+
+        return ct_matrix
 
     def compute_participation_ratios(self, ct_matrix):
         """
@@ -667,6 +768,7 @@ class ExcitedStateAnalysisDriver:
         self.ostream.print_reference('Reference: ' + self.get_reference())
         self.ostream.print_reference('Reference: ' +
                                      self.get_second_reference())
+        self.ostream.print_reference('Reference: ' + self.get_third_reference())
         self.ostream.print_blank()
 
         self.ostream.flush()
@@ -781,5 +883,16 @@ class ExcitedStateAnalysisDriver:
 
         ref_str = "F. Plasser, H. Lischka, "
         ref_str += "J. Chem. Theory Comput., 2012, 8, 2777"
+
+        return ref_str
+
+    def get_third_reference(self):
+        """
+        Gets reference string for the method to compute the
+        CT matrix based on Lowdin analysis.
+        """
+
+        ref_str = "S. Mai, et al., "
+        ref_str += "Coord. Chem. Rev., 2018, 361, 74–97"
 
         return ref_str
