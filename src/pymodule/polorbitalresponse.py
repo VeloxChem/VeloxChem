@@ -2640,6 +2640,8 @@ class PolOrbitalResponse(CphfSolver):
             else:
                 cphf_ov = None
 
+            tmp_cphf_ov = None
+
             for idx, (x,y) in enumerate(xy_pairs):
                 # get lambda multipliers from distributed array
                 tmp_cphf_ov = self.cphf_results['dist_cphf_ov'][dof_red * f + idx].get_full_vector()
@@ -2920,10 +2922,13 @@ class PolOrbitalResponse(CphfSolver):
             else:
                 cphf_ov = None
 
+            tmp_cphf_ov = None
+
             for xy in range(dof_red):
                 # get lambda multipliers from distributed array
                 tmp_cphf_ov = self.cphf_results['dist_cphf_ov'][dof_red * f + xy].get_full_vector()
-                cphf_ov[xy] += tmp_cphf_ov
+                if self.rank == mpi_master():
+                    cphf_ov[xy] += tmp_cphf_ov
 
             del tmp_cphf_ov
 
@@ -3186,6 +3191,8 @@ class PolOrbitalResponse(CphfSolver):
 
             if self.rank == mpi_master():
                 cphf_ov = np.zeros((dof, dof, nocc * nvir), dtype=np.dtype('complex128'))
+
+            tmp_cphf_re, tmp_cphf_im = None, None
 
             for idx, (x,y) in enumerate(xy_pairs):
                 tmp_cphf_re = self.cphf_results['dist_cphf_ov'][
@@ -3529,6 +3536,8 @@ class PolOrbitalResponse(CphfSolver):
 
             if self.rank == mpi_master():
                 cphf_ov = np.zeros((dof_red, nocc * nvir), dtype=np.dtype('complex128'))
+
+            tmp_cphf_re, tmp_cphf_im = None, None
 
             #for idx, xy in enumerate(xy_pairs):
             for idx in range(dof_red):
