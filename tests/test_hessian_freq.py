@@ -94,3 +94,33 @@ class TestHessianFrequencies:
         ref_vib_freqs = np.array([1349.11, 2556.18, 2662.01])
         isotopes_input = 'H (2.01410177812)'
         self.run_hessian_freq_with_isotopes(isotopes_input, ref_vib_freqs)
+
+    def run_hessian_freq_with_ecp(self, ref_vib_freqs, ref_ir_intens):
+
+        mol = Molecule.read_xyz_string("""2
+        xyz
+        Ag  0.0  0.0  0.0
+        Cl  0.0  2.8  0.0
+        """)
+        bas = MolecularBasis.read(mol, 'def2-svp')
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_drv.compute(mol, bas)
+
+        vib_drv = VibrationalAnalysis(scf_drv)
+        vib_drv.ostream.mute()
+        vib_results = vib_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            assert np.max(np.abs(vib_results['vib_frequencies'] -
+                                 ref_vib_freqs)) < 0.1
+            assert np.max(np.abs(vib_results['ir_intensities'] -
+                                 ref_ir_intens)) < 0.1
+
+    @pytest.mark.solvers
+    def test_hessian_freq_with_ecp(self):
+
+        ref_vib_freqs = np.array([108.96])
+        ref_ir_intens = np.array([37.4141])
+        self.run_hessian_freq_with_ecp(ref_vib_freqs, ref_ir_intens)

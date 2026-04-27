@@ -1,24 +1,18 @@
 from pathlib import Path
 import pytest
-import sys
 
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.mpitask import MpiTask
 from veloxchem.mmforcefieldgenerator import MMForceFieldGenerator
 
-try:
-    import scipy
-except ImportError:
-    pass
-
 
 class TestForceField:
 
-    @pytest.mark.skipif('scipy' not in sys.modules,
-                        reason='scipy not available')
     def test_force_field(self):
 
         # vlxtag: RKS, MM_Force_Field_Generation
+
+        pytest.importorskip('scipy')
 
         here = Path(__file__).parent
         inpfile = str(here / 'data' / 'butane.inp')

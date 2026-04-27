@@ -27,13 +27,14 @@ dependencies:
   - python>=3.10
   - psutil
   - pytest
+  - pytest-cov
   - mdanalysis
   - openmm
   - scipy
   - rdkit
   - dftd4-python
   - geometric
-  - libxc
+  - libxc>=7.0.0
   - clang-format
   - yapf
   - toml

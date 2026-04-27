@@ -7,7 +7,10 @@ import pytest
 
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.inputparser import (InputParser, parse_seq_range,
-                                   parse_seq_fixed, parse_bool, parse_str)
+                                   parse_seq_fixed, parse_bool, parse_str,
+                                   parse_input, unparse_input,
+                                   write_unparsed_input_to_hdf5,
+                                   read_unparsed_input_from_hdf5)
 
 
 @patch.object(InputParser, 'parse')
@@ -127,3 +130,70 @@ def test_parse_str(input_str, flag, expected):
 
     if MPI.COMM_WORLD.Get_rank() == mpi_master():
         assert parse_str(input_str, flag) == expected
+
+
+def test_unparse_input_roundtrip():
+
+    if MPI.COMM_WORLD.Get_rank() != mpi_master():
+        return
+
+    class Dummy:
+        pass
+
+    keyword_types = {
+        'name': 'str',
+        'acc_type': 'str_upper',
+        'coordsys': 'str_lower',
+        'max_iter': 'int',
+        'eri_thresh': 'float',
+        'restart': 'bool',
+        'constraints': 'list',
+        'atom_types': 'seq_fixed_str',
+        'cube_points': 'seq_fixed_int',
+        'cube_origin': 'seq_fixed',
+        'frequencies': 'seq_range',
+    }
+
+    input_dictionary = {
+        'name': 'checkpoint.h5',
+        'acc_type': 'Diis',
+        'coordsys': 'TrIc',
+        'max_iter': '300',
+        'eri_thresh': '1.0e-12',
+        'restart': 'Y',
+        'constraints': ['bond 1 2', 'angle 1 2 3'],
+        'atom_types': 'c3,c3,hc',
+        'cube_points': '80, 80, 80',
+        'cube_origin': '0.0, 0.1, 0.2',
+        'frequencies': '0.0 - 0.1 (0.05), 0.5 - 1.0 (0.1), 2.0',
+    }
+
+    parsed = Dummy()
+    parse_input(parsed, keyword_types, input_dictionary)
+
+    roundtrip_dictionary = unparse_input(parsed, keyword_types)
+
+    reparsed = Dummy()
+    parse_input(reparsed, keyword_types, roundtrip_dictionary)
+
+    for key in keyword_types:
+        assert getattr(reparsed, key) == getattr(parsed, key)
+
+
+def test_unparsed_input_hdf5_roundtrip(tmpdir):
+
+    if MPI.COMM_WORLD.Get_rank() != mpi_master():
+        return
+
+    input_dictionary = {
+        'label': 'checkpoint.h5',
+        'constraints': ['bond 1 2', 'angle 1 2 3'],
+        'optional': None,
+    }
+
+    h5file = str(Path(tmpdir) / 'input.h5')
+
+    write_unparsed_input_to_hdf5(h5file, input_dictionary, group_name='test')
+    recovered = read_unparsed_input_from_hdf5(h5file, group_name='test')
+
+    assert recovered == input_dictionary

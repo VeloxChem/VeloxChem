@@ -110,7 +110,7 @@ class TestRestrictedSubspace:
 
         scf_results = scf_drv.compute(mol, bas)
 
-        nocc = mol.number_of_alpha_electrons()
+        nocc = mol.number_of_alpha_occupied_orbitals(bas)
 
         if scf_drv.rank == mpi_master():
             norb = scf_results['C_alpha'].shape[0]

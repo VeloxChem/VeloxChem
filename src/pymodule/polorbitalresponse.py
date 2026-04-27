@@ -166,10 +166,14 @@ class PolOrbitalResponse(CphfSolver):
     def compute_rhs(self, molecule, basis, scf_tensors, eri_dict, dft_dict, pe_dict, lr_results):
 
         if self.is_complex:
-            return self.compute_rhs_complex(molecule, basis, scf_tensors, eri_dict,
+            #return self.compute_rhs_complex(molecule, basis, scf_tensors, eri_dict,
+            #                                dft_dict, pe_dict, lr_results)
+            return self.compute_rhs_complex_red_dim(molecule, basis, scf_tensors, eri_dict,
                                             dft_dict, pe_dict, lr_results)
         else:
-            return self.compute_rhs_real(molecule, basis, scf_tensors, eri_dict,
+            #return self.compute_rhs_real(molecule, basis, scf_tensors, eri_dict,
+            #                             dft_dict, pe_dict, lr_results)
+            return self.compute_rhs_real_red_dim(molecule, basis, scf_tensors, eri_dict,
                                          dft_dict, pe_dict, lr_results)
 
     def compute_rhs_complex(self, molecule, basis, scf_tensors, eri_dict, dft_dict, pe_dict, lr_results):
@@ -216,7 +220,7 @@ class PolOrbitalResponse(CphfSolver):
             nao = basis.get_dimensions_of_basis()
 
             # number of occupied orbitals
-            nocc = molecule.number_of_alpha_electrons()
+            nocc = molecule.number_of_alpha_occupied_orbitals(basis)
 
             # MO coefficients
             mo = scf_tensors['C_alpha']  # only alpha part
@@ -303,8 +307,9 @@ class PolOrbitalResponse(CphfSolver):
                 # calculate symmetrized unrelaxed one-particle density matrix
                 profiler.start_timer('1PDM')
 
-                unrel_dm_ao = self.calculate_unrel_dm(molecule, scf_tensors,
-                                                      x_plus_y, x_minus_y)
+                unrel_dm_ao = self.calculate_unrel_dm(molecule, basis,
+                                                      scf_tensors, x_plus_y,
+                                                      x_minus_y)
 
                 profiler.stop_timer('1PDM')
 
@@ -480,6 +485,7 @@ class PolOrbitalResponse(CphfSolver):
                 # calculate 2-particle density matrix contribution
                 profiler.start_timer('2PDM')
                 fock_mo_rhs_2pdm = self.calculate_rhs_2pdm_contrib(molecule,
+                                                                   basis,
                                                                    scf_tensors,
                                                                    x_plus_y_ao,
                                                                    x_minus_y_ao,
@@ -532,7 +538,7 @@ class PolOrbitalResponse(CphfSolver):
                     tot_rhs_mo = np.concatenate(
                         (tot_rhs_mo, rhs_red.real, rhs_red.imag))
 
-                profiler.print_memory_subspace(
+                profiler.print_memory_dictionary(
                     {
                         'fock_ao_rhs_real': fock_ao_rhs_real,
                         'fock_ao_rhs_imag': fock_ao_rhs_imag,
@@ -622,6 +628,483 @@ class PolOrbitalResponse(CphfSolver):
             profiler.stop_timer('total')
             profiler.check_memory_usage(f'RHS w={w:.4f}')
 
+        profiler.print_memory_dictionary({
+            'dist_cphf_rhs': dist_cphf_rhs,
+            'dist_fock_ao_rhs': dist_fock_ao_rhs,
+            'dist_fock_gxc_ao': dist_fock_gxc_ao  # empty list if not DFT
+        }, self.ostream)
+        profiler.check_memory_usage('End of RHS')
+
+        if self.rank == mpi_master():
+            #valstr = '** Time spent on constructing the orbrsp RHS for '
+            valstr = 'CPHF/CPKS right-hand side for '
+            valstr += f'{len(self.frequencies)} frequencies computed in '
+            valstr += f'{(tm.time() - loop_start_time):.2f} sec.'
+            self.ostream.print_info(valstr)
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+        profiler.print_timing(self.ostream)
+        profiler.print_memory_usage(self.ostream)
+        profiler.print_profiling_summary(self.ostream)
+
+        if self.rank == mpi_master():
+            orbrsp_rhs['dist_cphf_rhs'] = dist_cphf_rhs
+            orbrsp_rhs['dist_fock_ao_rhs'] = dist_fock_ao_rhs
+            orbrsp_rhs['dist_fock_gxc_ao'] = dist_fock_gxc_ao  # empty list if not DFT
+
+            return orbrsp_rhs
+        else:
+            return {
+                'dist_cphf_rhs': dist_cphf_rhs,
+                'dist_fock_ao_rhs': dist_fock_ao_rhs,
+                'dist_fock_gxc_ao': dist_fock_gxc_ao  # empty list if not DFT
+            }
+
+    def compute_rhs_complex_red_dim(self, molecule, basis, scf_tensors, eri_dict, dft_dict, pe_dict, lr_results):
+        """
+        Computes the complex right-hand side (RHS) of the polarizability
+        orbital response equation including the necessary density matrices
+        using molecular data.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param scf_tensors:
+            The dictionary of tensors from converged SCF calculation.
+        :param lr_results:
+            The results from converged CPP calculation.
+
+        :return:
+            A dictionary containing the orbital-response RHS
+        """
+
+        profiler = Profiler({
+            'timing': self.timing,
+            'profiling': self.profiling,
+            'memory_profiling': self.memory_profiling,
+            'memory_tracing': self.memory_tracing,
+        })
+
+        # check if zero is in self.frequencies
+        polorbrsp_sanity_check_1(self)
+
+        loop_start_time = tm.time()
+
+        # number of vector components
+        dof = len(self.vector_components)
+
+        if self.rank == mpi_master():
+            # check if response vectors exist for desired frequency of gradient
+            polorbrsp_sanity_check_2(self, self.flag, lr_results)
+
+            density = scf_tensors['D_alpha']
+
+            # number of AOs
+            nao = basis.get_dimensions_of_basis()
+
+            # number of occupied orbitals
+            nocc = molecule.number_of_alpha_occupied_orbitals(basis)
+
+            # MO coefficients
+            mo = scf_tensors['C_alpha']  # only alpha part
+            mo_occ = mo[:, :nocc].copy()
+            mo_vir = mo[:, nocc:].copy()
+
+            # number of virtual orbitals
+            nvir = mo_vir.shape[1]
+
+            # reduce dimensions of RHS to unique operator component combinations
+            xy_pairs = [(x,y) for x in range(dof) for y in range(x, dof)]
+            dof_red = len(xy_pairs)
+
+            # dictionary for RHS and Fock matrices
+            orbrsp_rhs = {}
+        else:
+            density = None
+            dof_red = None
+
+        density = self.comm.bcast(density, root=mpi_master())
+        dof_red = self.comm.bcast(dof_red, root=mpi_master())
+
+        # TODO: double check dft_dict['gs_density']
+        molgrid = dft_dict['molgrid']
+        gs_density = [density]
+
+        # list for distributed arrays
+        dist_cphf_rhs = []
+        dist_fock_ao_rhs = []
+        dist_fock_gxc_ao = []
+
+        for f, w in enumerate(self.frequencies):
+            profiler.set_timing_key(f'RHS w={w:.4f}')
+            profiler.start_timer('total')
+
+            if self.rank == mpi_master():
+                self.ostream.print_info(f'Building RHS for w = {w:4.3f}')
+                self.ostream.flush()
+
+            full_vec = [
+                self.get_full_solution_vector(lr_results['solutions'][x, w])
+                for x in self.vector_components
+            ]
+
+            if self.rank == mpi_master():
+
+                # Note: polorbitalresponse uses r instead of mu for dipole operator
+                for idx, tmp in enumerate(full_vec):
+                    full_vec[idx] *= -1.0
+
+                # extract the excitation and de-excitation components
+                # from the full solution vector.
+                sqrt2 = np.sqrt(2.0)
+                exc_vec = (1.0 / sqrt2 *
+                           np.array(full_vec)[:, :nocc * nvir].reshape(
+                               dof, nocc, nvir))
+                deexc_vec = (1.0 / sqrt2 *
+                             np.array(full_vec)[:, nocc * nvir:].reshape(
+                                 dof, nocc, nvir))
+
+                # construct plus/minus combinations of excitation and
+                # de-excitation part
+                x_plus_y = exc_vec + deexc_vec
+                x_minus_y = exc_vec - deexc_vec
+
+                del exc_vec, deexc_vec
+
+                # transform to AO basis: mi,xia,na->xmn
+                x_plus_y_ao = np.array([
+                    np.linalg.multi_dot([mo_occ, x_plus_y[x], mo_vir.T])
+                    for x in range(x_plus_y.shape[0])
+                ])
+                x_minus_y_ao = np.array([
+                    np.linalg.multi_dot([mo_occ, x_minus_y[x], mo_vir.T])
+                    for x in range(x_minus_y.shape[0])
+                ])
+
+                # turn them into a list for AODensityMatrix
+                xpmy_ao_list_real = list(np.array(x_plus_y_ao.real)) + list(
+                    np.array(x_minus_y_ao.real))
+                xpmy_ao_list_imag = list(np.array(x_plus_y_ao.imag)) + list(
+                    np.array(x_minus_y_ao.imag))
+
+                # calculate symmetrized unrelaxed one-particle density matrix
+                profiler.start_timer('1PDM')
+
+                unrel_dm_ao = self.calculate_unrel_dm_red_dim(molecule, basis,
+                                                      scf_tensors, x_plus_y,
+                                                      x_minus_y)
+                profiler.stop_timer('1PDM')
+
+                # create lists
+                dm_ao_list_real = list(
+                    np.array(unrel_dm_ao.real).reshape(dof_red, nao, nao))
+                dm_ao_list_imag = list(
+                    np.array(unrel_dm_ao.imag).reshape(dof_red, nao, nao))
+
+                # density matrix for RHS
+                dm_ao_rhs_real_list = dm_ao_list_real + xpmy_ao_list_real
+                dm_ao_rhs_imag_list = dm_ao_list_imag + xpmy_ao_list_imag
+
+                if self._dft:
+                    # construct density matrices for E[3] term
+                    perturbed_dm_ao_list_rere = []
+                    perturbed_dm_ao_list_imim = []
+                    perturbed_dm_ao_list_reim = []
+                    perturbed_dm_ao_list_imre = []
+                    zero_dm_ao_list = []
+
+                    for x in range(dof):
+                        for y in range(x, dof):
+                            perturbed_dm_ao_list_rere.extend([
+                                np.array(x_minus_y_ao[x].real),
+                                np.array(0 * x_minus_y_ao[x].real),
+                                np.array(x_minus_y_ao[y].real),
+                                np.array(0 * x_minus_y_ao[y].real)])
+                            perturbed_dm_ao_list_imim.extend([
+                                np.array(x_minus_y_ao[x].imag),
+                                np.array(0 * x_minus_y_ao[x].imag),
+                                np.array(x_minus_y_ao[y].imag),
+                                np.array(0 * x_minus_y_ao[y].imag)])
+
+                            # complex cross-terms
+                            perturbed_dm_ao_list_reim.extend([
+                                np.array(x_minus_y_ao[x].real),
+                                np.array(0 * x_minus_y_ao[x].real),
+                                np.array(x_minus_y_ao[y].imag),
+                                np.array(0 * x_minus_y_ao[y].imag)])
+                            perturbed_dm_ao_list_imre.extend([
+                                np.array(x_minus_y_ao[x].imag),
+                                np.array(0 * x_minus_y_ao[x].imag),
+                                np.array(x_minus_y_ao[y].real),
+                                np.array(0 * x_minus_y_ao[y].real)])
+
+                            zero_dm_ao_list.extend([
+                                np.array(0 * x_minus_y_ao[x].real),
+                                np.array(0 * x_minus_y_ao[y].real)])
+            else:
+                dm_ao_rhs_real_list = None
+                dm_ao_rhs_imag_list = None
+
+                if self._dft:
+                    perturbed_dm_ao_list_rere = None
+                    perturbed_dm_ao_list_imim = None
+                    perturbed_dm_ao_list_reim = None
+                    perturbed_dm_ao_list_imre = None
+                    zero_dm_ao_list = None
+
+            dm_ao_rhs_real_list = self.comm.bcast(dm_ao_rhs_real_list, root=mpi_master())
+            dm_ao_rhs_imag_list = self.comm.bcast(dm_ao_rhs_imag_list, root=mpi_master())
+
+            if self._dft:
+                perturbed_dm_ao_list_rere = self.comm.bcast(perturbed_dm_ao_list_rere,
+                                                            root=mpi_master())
+                perturbed_dm_ao_list_imim = self.comm.bcast(perturbed_dm_ao_list_imim,
+                                                            root=mpi_master())
+                perturbed_dm_ao_list_reim = self.comm.bcast(perturbed_dm_ao_list_reim,
+                                                            root=mpi_master())
+                perturbed_dm_ao_list_imre = self.comm.bcast(perturbed_dm_ao_list_imre,
+                                                            root=mpi_master())
+                zero_dm_ao_list = self.comm.bcast(zero_dm_ao_list, root=mpi_master())
+
+                # Fock matrices with corresponding type
+                # set the vector-related components to general Fock matrix
+                # (not 1PDM part)
+                profiler.start_timer('kXC')
+                # FIXME: use deepcopy
+                fock_gxc_ao_rere = []
+                fock_gxc_ao_imim = []
+                fock_gxc_ao_reim = []
+                fock_gxc_ao_imre = []
+                for dm_i_mat in zero_dm_ao_list:
+                    fock_gxc_ao_rere.append(dm_i_mat.copy())
+                    fock_gxc_ao_imim.append(dm_i_mat.copy())
+                    fock_gxc_ao_reim.append(dm_i_mat.copy())
+                    fock_gxc_ao_imre.append(dm_i_mat.copy())
+
+                xc_drv = XCIntegrator()
+                xc_drv.integrate_kxc_fock(fock_gxc_ao_rere, molecule, basis,
+                                          perturbed_dm_ao_list_rere, zero_dm_ao_list,
+                                          gs_density, molgrid,
+                                          self.xcfun.get_func_label(), "qrf")
+                xc_drv.integrate_kxc_fock(fock_gxc_ao_imim, molecule, basis,
+                                          perturbed_dm_ao_list_imim, zero_dm_ao_list,
+                                          gs_density, molgrid,
+                                          self.xcfun.get_func_label(), "qrf")
+                xc_drv.integrate_kxc_fock(fock_gxc_ao_reim, molecule, basis,
+                                          perturbed_dm_ao_list_reim, zero_dm_ao_list,
+                                          gs_density, molgrid,
+                                          self.xcfun.get_func_label(), "qrf")
+                xc_drv.integrate_kxc_fock(fock_gxc_ao_imre, molecule, basis,
+                                          perturbed_dm_ao_list_imre, zero_dm_ao_list,
+                                          gs_density, molgrid,
+                                          self.xcfun.get_func_label(), "qrf")
+
+                for idx, tmp in enumerate(fock_gxc_ao_rere):
+                    fock_gxc_ao_rere[idx] = self.comm.reduce(fock_gxc_ao_rere[idx],
+                                                             root=mpi_master())
+                for idx, tmp in enumerate(fock_gxc_ao_imim):
+                    fock_gxc_ao_imim[idx] = self.comm.reduce(fock_gxc_ao_imim[idx],
+                                                             root=mpi_master())
+                for idx, tmp in enumerate(fock_gxc_ao_reim):
+                    fock_gxc_ao_reim[idx] = self.comm.reduce(fock_gxc_ao_reim[idx],
+                                                             root=mpi_master())
+                for idx, tmp in enumerate(fock_gxc_ao_imre):
+                    fock_gxc_ao_imre[idx] = self.comm.reduce(fock_gxc_ao_imre[idx],
+                                                             root=mpi_master())
+                profiler.stop_timer('kXC')
+            else:
+                fock_gxc_ao_rere = None
+                fock_gxc_ao_imim = None
+                fock_gxc_ao_reim = None
+                fock_gxc_ao_imre = None
+
+            fock_ao_rhs_real = self._comp_lr_fock(dm_ao_rhs_real_list, molecule,
+                                                  basis, eri_dict, dft_dict, pe_dict,
+                                                  profiler)
+            fock_ao_rhs_imag = self._comp_lr_fock(dm_ao_rhs_imag_list, molecule,
+                                                  basis, eri_dict, dft_dict, pe_dict,
+                                                  profiler)
+
+            # calculate the RHS
+            if self.rank == mpi_master():
+                # extract the 1PDM contributions
+                fock_ao_rhs_1pdm = np.zeros((dof_red, nao, nao),
+                                            dtype=np.dtype('complex128'))
+                fock_ao_rhs_1pdm_real = np.zeros((dof_red, nao, nao))
+                fock_ao_rhs_1pdm_imag = np.zeros((dof_red, nao, nao))
+
+                for i in range(dof_red):
+                    fock_ao_rhs_1pdm_real[i] = fock_ao_rhs_real[i].copy()
+                    fock_ao_rhs_1pdm_imag[i] = fock_ao_rhs_imag[i].copy()
+
+                # combine to complex array
+                fock_ao_rhs_1pdm = fock_ao_rhs_1pdm_real + 1j * fock_ao_rhs_1pdm_imag
+
+                # transform to MO basis: mi,xmn,na->xia
+                fock_mo_rhs_1pdm = np.array([
+                    np.linalg.multi_dot([mo_occ.T, fock_ao_rhs_1pdm[x], mo_vir])
+                    for x in range(dof_red)
+                ])
+
+                # extract the x_plus_y and x_minus_y contributions
+                fock_ao_rhs_x_plus_y_real = np.zeros((dof, nao, nao))
+                fock_ao_rhs_x_minus_y_real = np.zeros((dof, nao, nao))
+                fock_ao_rhs_x_plus_y_imag = np.zeros((dof, nao, nao))
+                fock_ao_rhs_x_minus_y_imag = np.zeros((dof, nao, nao))
+                for i in range(dof):
+                    fock_ao_rhs_x_plus_y_real[i] = fock_ao_rhs_real[dof_red + i].copy()
+                    fock_ao_rhs_x_minus_y_real[i] = fock_ao_rhs_real[dof_red + dof + i].copy()
+                    fock_ao_rhs_x_plus_y_imag[i] = fock_ao_rhs_imag[dof_red + i].copy()
+                    fock_ao_rhs_x_minus_y_imag[i] = fock_ao_rhs_imag[dof_red + dof + i].copy()
+
+                # combine to complex
+                fock_ao_rhs_x_plus_y = (fock_ao_rhs_x_plus_y_real +
+                                        1j * fock_ao_rhs_x_plus_y_imag)
+                fock_ao_rhs_x_minus_y = (fock_ao_rhs_x_minus_y_real +
+                                         1j * fock_ao_rhs_x_minus_y_imag)
+
+                # calculate 2-particle density matrix contribution
+                profiler.start_timer('2PDM')
+                fock_mo_rhs_2pdm = self.calculate_rhs_2pdm_contrib_red_dim(molecule,
+                                                                   basis,
+                                                                   scf_tensors,
+                                                                   x_plus_y_ao,
+                                                                   x_minus_y_ao,
+                                                                   fock_ao_rhs_x_plus_y,
+                                                                   fock_ao_rhs_x_minus_y
+                                                                   )
+                profiler.stop_timer('2PDM')
+
+                # Calculate dipole contribution
+                profiler.start_timer('dipole')
+
+                rhs_dipole_contrib = self.calculate_rhs_dipole_contrib_red_dim(
+                    molecule, basis, scf_tensors, x_minus_y)
+
+                profiler.stop_timer('dipole')
+
+                # sum RHS contributions
+                rhs_mo = fock_mo_rhs_1pdm + fock_mo_rhs_2pdm + rhs_dipole_contrib
+
+                # add DFT E[3] contribution to the RHS
+                if self._dft:
+                    gxc_ao = np.zeros((dof_red, nao, nao), dtype=np.dtype('complex128'))
+
+                    for i in range(dof_red):
+                        gxc_ao[i] = (fock_gxc_ao_rere[2 * i]
+                                     - fock_gxc_ao_imim[2 * i]
+                                     + 1j * (fock_gxc_ao_reim[2 * i]
+                                     + fock_gxc_ao_imre[2 * i])
+                                     )
+
+                    # transform to MO basis: mi,xmn,na->xia
+                    gxc_mo = np.array([
+                        np.linalg.multi_dot([mo_occ.T, gxc_ao[x], mo_vir])
+                        for x in range(dof_red)
+                    ])
+                    # different factor compared to TDDFT orbital response
+                    # because here vectors are scaled by 1/sqrt(2)
+                    rhs_mo += 0.5 * (gxc_mo)
+
+                # array with RHS (only relevant when using conjugate gradient solver)
+                if (f == 0):
+                    tot_rhs_mo = np.concatenate((rhs_mo.real, rhs_mo.imag))
+                else:
+                    tot_rhs_mo = np.concatenate(
+                        (tot_rhs_mo, rhs_mo.real, rhs_mo.imag))
+
+                profiler.print_memory_subspace(
+                    {
+                        'fock_ao_rhs_real': fock_ao_rhs_real,
+                        'fock_ao_rhs_imag': fock_ao_rhs_imag,
+                        'fock_gxc_ao_rere': fock_gxc_ao_rere,
+                        'fock_gxc_ao_reim': fock_gxc_ao_reim,
+                        'fock_gxc_ao_imim': fock_gxc_ao_imim,
+                        'fock_gxc_ao_imre': fock_gxc_ao_imre,
+                    }, self.ostream)
+
+            # save intermediates in distributed array
+            dist_fock_ao_rhs_re = []
+            dist_fock_ao_rhs_im = []
+            for k in range(dof_red + 2 * dof):
+                if self.rank == mpi_master():
+                    fock_ao_rhs_re_k = fock_ao_rhs_real[k].reshape(nao * nao)
+                    fock_ao_rhs_im_k = fock_ao_rhs_imag[k].reshape(nao * nao)
+                else:
+                    fock_ao_rhs_re_k = None
+                    fock_ao_rhs_im_k = None
+                dist_fock_ao_rhs_re.append(DistributedArray(fock_ao_rhs_re_k,
+                                                            self.comm,
+                                                            root=mpi_master()))
+                dist_fock_ao_rhs_im.append(DistributedArray(fock_ao_rhs_im_k,
+                                                            self.comm,
+                                                            root=mpi_master()))
+            dist_fock_ao_rhs.extend(dist_fock_ao_rhs_re + dist_fock_ao_rhs_im)
+
+            del dist_fock_ao_rhs_re, dist_fock_ao_rhs_im
+
+            if self._dft:
+                dist_fock_gxc_ao_rere = []
+                dist_fock_gxc_ao_imim = []
+                dist_fock_gxc_ao_reim = []
+                dist_fock_gxc_ao_imre = []
+                for k in range(2 * dof_red):
+                    if self.rank == mpi_master():
+                        fock_gxc_ao_rere_k = fock_gxc_ao_rere[k].reshape(nao * nao)
+                        fock_gxc_ao_imim_k = fock_gxc_ao_imim[k].reshape(nao * nao)
+                        fock_gxc_ao_reim_k = fock_gxc_ao_reim[k].reshape(nao * nao)
+                        fock_gxc_ao_imre_k = fock_gxc_ao_imre[k].reshape(nao * nao)
+                    else:
+                        fock_gxc_ao_rere_k = None
+                        fock_gxc_ao_imim_k = None
+                        fock_gxc_ao_reim_k = None
+                        fock_gxc_ao_imre_k = None
+
+                    dist_fock_gxc_ao_rere.append(DistributedArray(fock_gxc_ao_rere_k,
+                                                                  self.comm,
+                                                                  root=mpi_master()))
+                    dist_fock_gxc_ao_imim.append(DistributedArray(fock_gxc_ao_imim_k,
+                                                                  self.comm,
+                                                                  root=mpi_master()))
+                    dist_fock_gxc_ao_reim.append(DistributedArray(fock_gxc_ao_reim_k,
+                                                                  self.comm,
+                                                                  root=mpi_master()))
+                    dist_fock_gxc_ao_imre.append(DistributedArray(fock_gxc_ao_imre_k,
+                                                                  self.comm,
+                                                                  root=mpi_master()))
+                dist_fock_gxc_ao.extend(dist_fock_gxc_ao_rere
+                                        + dist_fock_gxc_ao_imim
+                                        + dist_fock_gxc_ao_reim
+                                        + dist_fock_gxc_ao_imre
+                                        )
+
+                del dist_fock_gxc_ao_rere, dist_fock_gxc_ao_imim
+                del dist_fock_gxc_ao_reim, dist_fock_gxc_ao_imre
+
+            # save RHS in distributed array
+            dist_cphf_rhs_re = []
+            dist_cphf_rhs_im = []
+            for k in range(dof_red):
+                if self.rank == mpi_master():
+                    cphf_rhs_k_re = rhs_mo[k].real.copy().reshape(nocc * nvir)
+                    cphf_rhs_k_im = rhs_mo[k].imag.copy().reshape(nocc * nvir)
+                else:
+                    cphf_rhs_k_re = None
+                    cphf_rhs_k_im = None
+                dist_cphf_rhs_re.append(DistributedArray(cphf_rhs_k_re, self.comm,
+                                                         root=mpi_master()))
+                dist_cphf_rhs_im.append(DistributedArray(cphf_rhs_k_im, self.comm,
+                                                         root=mpi_master()))
+
+            dist_cphf_rhs.extend(dist_cphf_rhs_re + dist_cphf_rhs_im)
+
+            del dist_cphf_rhs_re, dist_cphf_rhs_im
+
+            profiler.stop_timer('total')
+            profiler.check_memory_usage(f'RHS w={w:.4f}')
+
         profiler.print_memory_subspace({
             'dist_cphf_rhs': dist_cphf_rhs,
             'dist_fock_ao_rhs': dist_fock_ao_rhs,
@@ -630,9 +1113,12 @@ class PolOrbitalResponse(CphfSolver):
         profiler.check_memory_usage('End of RHS')
 
         if self.rank == mpi_master():
-            valstr = '** Time spent on constructing the orbrsp RHS for '
-            valstr += f'{len(self.frequencies)} frequencies: '
-            valstr += f'{(tm.time() - loop_start_time):.2f} sec **'
+            #valstr = '** Time spent on constructing the orbrsp RHS for '
+            #valstr += f'{len(self.frequencies)} frequencies: '
+            #valstr += f'{(tm.time() - loop_start_time):.2f} sec **'
+            valstr = 'CPHF/CPKS right-hand side for '
+            valstr += f'{len(self.frequencies)} frequencies computed in '
+            valstr += f'{(tm.time() - loop_start_time):.2f} sec.'
             self.ostream.print_info(valstr)
             self.ostream.print_blank()
             self.ostream.flush()
@@ -699,7 +1185,7 @@ class PolOrbitalResponse(CphfSolver):
             nao = basis.get_dimensions_of_basis()
 
             # number of occupied MOs
-            nocc = molecule.number_of_alpha_electrons()
+            nocc = molecule.number_of_alpha_occupied_orbitals(basis)
 
             # MO coefficients
             mo = scf_tensors['C_alpha']  # only alpha part
@@ -780,8 +1266,9 @@ class PolOrbitalResponse(CphfSolver):
 
                 # calculate symmetrized unrelaxed one-particle density matrix
                 profiler.start_timer('1PDM')
-                unrel_dm_ao = self.calculate_unrel_dm(molecule, scf_tensors,
-                                                      x_plus_y, x_minus_y)
+                unrel_dm_ao = self.calculate_unrel_dm(molecule, basis,
+                                                      scf_tensors, x_plus_y,
+                                                      x_minus_y)
                 profiler.stop_timer('1PDM')
                 # create lists
                 dm_ao_list = list(unrel_dm_ao.reshape(dof**2, nao, nao))
@@ -791,7 +1278,18 @@ class PolOrbitalResponse(CphfSolver):
 
                 if self._dft:
                     # construct density matrices for E[3] term:
-                    perturbed_dm_ao_list, zero_dm_ao_list = self.construct_dft_e3_dm_real(x_minus_y_ao)
+                    perturbed_dm_ao_list = []
+                    zero_dm_ao_list = []
+
+                    for x in range(dof):
+                        for y in range(dof):
+                            perturbed_dm_ao_list.extend([
+                                x_minus_y_ao[x], 0 * x_minus_y_ao[x],
+                                x_minus_y_ao[y], 0 * x_minus_y_ao[y]
+                            ])
+                            zero_dm_ao_list.extend(
+                                [0 * x_minus_y_ao[x], 0 * x_minus_y_ao[y]])
+
             else:
                 dm_ao_rhs_list = None
 
@@ -805,7 +1303,7 @@ class PolOrbitalResponse(CphfSolver):
                 perturbed_dm_ao_list = self.comm.bcast(perturbed_dm_ao_list, root=mpi_master())
                 zero_dm_ao_list = self.comm.bcast(zero_dm_ao_list, root=mpi_master())
 
-            if self._dft:
+            #if self._dft:
                 profiler.start_timer('kXC')
                 fock_gxc_ao = []
                 for dm_i_mat in zero_dm_ao_list:
@@ -826,6 +1324,7 @@ class PolOrbitalResponse(CphfSolver):
 
             # vector-related components to general Fock matrix
             # (not 1PDM part)
+
             fock_ao_rhs = self._comp_lr_fock(dm_ao_rhs_list, molecule, basis,
                                              eri_dict, dft_dict, pe_dict, profiler)
 
@@ -852,6 +1351,7 @@ class PolOrbitalResponse(CphfSolver):
                 # calculate 2-particle density matrix contribution
                 profiler.start_timer('2PDM')
                 fock_mo_rhs_2pdm = self.calculate_rhs_2pdm_contrib(molecule,
+                                                                   basis,
                                                                    scf_tensors,
                                                                    x_plus_y_ao,
                                                                    x_minus_y_ao,
@@ -900,7 +1400,7 @@ class PolOrbitalResponse(CphfSolver):
                 else:
                     tot_rhs_mo = np.append(tot_rhs_mo, rhs_red, axis=0)
 
-                profiler.print_memory_subspace(
+                profiler.print_memory_dictionary(
                     {
                         'fock_ao_rhs': fock_ao_rhs,
                         'fock_gxc_ao': fock_gxc_ao,
@@ -938,6 +1438,330 @@ class PolOrbitalResponse(CphfSolver):
             profiler.stop_timer('total')
             profiler.check_memory_usage(f'RHS w={w:.4f}')
 
+        profiler.print_memory_dictionary({
+            'dist_cphf_rhs': dist_cphf_rhs,
+            'dist_fock_ao_rhs': dist_fock_ao_rhs,
+            'dist_fock_gxc_ao': dist_fock_gxc_ao
+        }, self.ostream)
+
+        profiler.check_memory_usage('End of RHS')
+
+        profiler.print_timing(self.ostream)
+        profiler.print_memory_usage(self.ostream)
+        profiler.print_profiling_summary(self.ostream)
+
+        if self.rank == mpi_master():
+            #valstr = '** Time spent on constructing the orbrsp RHS for '
+            #valstr += f'{len(self.frequencies)} frequencies: '
+            #valstr += f'{(tm.time() - loop_start_time):.2f} sec **'
+            valstr = 'CPHF/CPKS right-hand side for '
+            valstr += f'{len(self.frequencies)} frequencies computed in '
+            valstr += f'{(tm.time() - loop_start_time):.2f} sec.'
+            self.ostream.print_info(valstr)
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+            orbrsp_rhs['dist_cphf_rhs'] = dist_cphf_rhs
+            orbrsp_rhs['dist_fock_ao_rhs'] = dist_fock_ao_rhs
+            orbrsp_rhs['dist_fock_gxc_ao'] = dist_fock_gxc_ao  # empty list if not DFT
+
+            return orbrsp_rhs
+        else:
+            return {
+                'dist_cphf_rhs': dist_cphf_rhs,
+                'dist_fock_ao_rhs': dist_fock_ao_rhs,
+                'dist_fock_gxc_ao': dist_fock_gxc_ao  # empty list if not DFT
+            }
+
+    def compute_rhs_real_red_dim(self, molecule, basis, scf_tensors, eri_dict, dft_dict, pe_dict, lr_results):
+        """
+        Computes the right-hand side (RHS) of the Real polarizability
+        orbital response equation including the necessary density matrices
+        using molecular data.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param scf_tensors:
+            The dictionary of tensors from converged SCF calculation.
+        :param lr_results:
+            The results from converged linear response calculation.
+
+        :return:
+            A dictionary containing the orbital-response RHS and
+            unrelaxed one-particle density.
+        """
+
+        profiler = Profiler({
+            'timing': self.timing,
+            'profiling': self.profiling,
+            'memory_profiling': self.memory_profiling,
+            'memory_tracing': self.memory_tracing,
+        })
+
+        # check if zero is in self.frequencies
+        polorbrsp_sanity_check_1(self)
+
+        loop_start_time = tm.time()
+
+        # number of vector components
+        dof = len(self.vector_components)
+
+        if self.rank == mpi_master():
+            # check if response vectors exist for desired frequency of gradient
+            polorbrsp_sanity_check_2(self, self.flag, lr_results)
+
+            density = scf_tensors['D_alpha']
+
+            # number of atomic orbitals
+            nao = basis.get_dimensions_of_basis()
+
+            # number of occupied MOs
+            nocc = molecule.number_of_alpha_occupied_orbitals(basis)
+
+            # MO coefficients
+            mo = scf_tensors['C_alpha']  # only alpha part
+            mo_occ = mo[:, :nocc].copy()
+            mo_vir = mo[:, nocc:].copy()
+            nvir = mo_vir.shape[1]
+
+            # reduce dimensions of RHS to unique operator component combinations
+            xy_pairs = [(x,y) for x in range(dof) for y in range(x, dof)]
+            dof_red = len(xy_pairs)
+
+            # dictionary for RHS and intermediates
+            orbrsp_rhs = {}
+        else:
+            density = None
+            dof_red = None
+
+        density = self.comm.bcast(density, root=mpi_master())
+        dof_red = self.comm.bcast(dof_red, root=mpi_master())
+
+        # TODO: double check dft_dict['gs_density']
+        molgrid = dft_dict['molgrid']
+        gs_density = [density]
+
+        # list for RHS distributed arrays
+        dist_cphf_rhs = []
+        dist_fock_ao_rhs = []
+        dist_fock_gxc_ao = []
+
+        for f, w in enumerate(self.frequencies):
+            profiler.set_timing_key(f'RHS w={w:.4f}')
+            profiler.start_timer('total')
+
+            if self.rank == mpi_master():
+                self.ostream.print_info(f'Building RHS for w = {w:4.3f}')
+                self.ostream.flush()
+
+            full_vec = [
+                self.get_full_solution_vector(lr_results['solutions'][x, w])
+                for x in self.vector_components
+            ]
+
+            if self.rank == mpi_master():
+
+                # Note: polorbitalresponse uses r instead of mu for dipole operator
+                for idx, tmp in enumerate(full_vec):
+                    full_vec[idx] *= -1.0
+
+                # extract the excitation and de-excitation components
+                # from the full solution vector.
+                sqrt2 = np.sqrt(2.0)
+                exc_vec = (1.0 / sqrt2 *
+                           np.array(full_vec)[:, :nocc * nvir].reshape(
+                               dof, nocc, nvir))
+                deexc_vec = (1.0 / sqrt2 *
+                             np.array(full_vec)[:, nocc * nvir:].reshape(
+                                 dof, nocc, nvir))
+
+                # construct plus/minus combinations of excitation and
+                # de-excitation part
+                x_plus_y = exc_vec + deexc_vec
+                x_minus_y = exc_vec - deexc_vec
+
+                del exc_vec, deexc_vec
+
+                # transform to AO basis: mi,xia,na->xmn
+                x_plus_y_ao = np.array([
+                    np.linalg.multi_dot([mo_occ, x_plus_y[x], mo_vir.T])
+                    for x in range(dof)
+                ])
+                x_minus_y_ao = np.array([
+                    np.linalg.multi_dot([mo_occ, x_minus_y[x], mo_vir.T])
+                    for x in range(dof)
+                ])
+
+                # turn them into a list for AODensityMatrix
+                xpmy_ao_list = list(x_plus_y_ao) + list(x_minus_y_ao)
+
+                # calculate symmetrized unrelaxed one-particle density matrix
+                profiler.start_timer('1PDM')
+                unrel_dm_ao = self.calculate_unrel_dm_red_dim(molecule, basis,
+                                                      scf_tensors, x_plus_y,
+                                                      x_minus_y)
+                profiler.stop_timer('1PDM')
+                # create lists
+                dm_ao_list = list(unrel_dm_ao)
+
+                # density matrix for RHS
+                dm_ao_rhs_list = dm_ao_list + xpmy_ao_list
+
+                if self._dft:
+                    # construct density matrices for E[3] term:
+                    perturbed_dm_ao_list = []
+                    zero_dm_ao_list = []
+
+                    for x in range(dof):
+                        for y in range(x, dof):
+                            perturbed_dm_ao_list.extend([
+                                x_minus_y_ao[x], 0 * x_minus_y_ao[x],
+                                x_minus_y_ao[y], 0 * x_minus_y_ao[y]
+                            ])
+                            zero_dm_ao_list.extend(
+                                [0 * x_minus_y_ao[x], 0 * x_minus_y_ao[y]])
+
+            else:
+                dm_ao_rhs_list = None
+
+                if self._dft:
+                    perturbed_dm_ao_list = None
+                    zero_dm_ao_list = None
+
+            dm_ao_rhs_list = self.comm.bcast(dm_ao_rhs_list, root=mpi_master())
+
+            if self._dft:
+                perturbed_dm_ao_list = self.comm.bcast(perturbed_dm_ao_list, root=mpi_master())
+                zero_dm_ao_list = self.comm.bcast(zero_dm_ao_list, root=mpi_master())
+
+                profiler.start_timer('kXC')
+                fock_gxc_ao = []
+                for dm_i_mat in zero_dm_ao_list:
+                    fock_gxc_ao.append(dm_i_mat.copy())
+
+                xc_drv = XCIntegrator()
+                xc_drv.integrate_kxc_fock(fock_gxc_ao, molecule, basis,
+                                          perturbed_dm_ao_list, zero_dm_ao_list,
+                                          gs_density, molgrid,
+                                          self.xcfun.get_func_label(), "qrf")
+
+                for idx, tmp in enumerate(fock_gxc_ao):
+                    fock_gxc_ao[idx] = self.comm.reduce(fock_gxc_ao[idx],
+                                                        root=mpi_master())
+                profiler.stop_timer('kXC')
+            else:
+                fock_gxc_ao = None
+
+            # vector-related components to general Fock matrix
+            # (not 1PDM part)
+            fock_ao_rhs = self._comp_lr_fock(dm_ao_rhs_list, molecule, basis,
+                                             eri_dict, dft_dict, pe_dict, profiler)
+
+            # calculate the RHS
+            if self.rank == mpi_master():
+                # extract the 1PDM contributions
+                fock_ao_rhs_1pdm = np.zeros((dof_red, nao, nao))
+                for i in range(dof_red):
+                    fock_ao_rhs_1pdm[i] = fock_ao_rhs[i].copy()
+
+                # transform to MO basis: mi,xmn,na->xia
+                fock_mo_rhs_1pdm = np.array([
+                    np.linalg.multi_dot([mo_occ.T, fock_ao_rhs_1pdm[x], mo_vir])
+                    for x in range(dof_red)
+                ])
+
+                # extract the x_plus_y and x_minus_y contributions
+                fock_ao_rhs_x_plus_y = np.zeros((dof, nao, nao))
+                fock_ao_rhs_x_minus_y = np.zeros((dof, nao, nao))
+                for i in range(dof):
+                    fock_ao_rhs_x_plus_y[i] = fock_ao_rhs[dof_red + i].copy()
+                    fock_ao_rhs_x_minus_y[i] = fock_ao_rhs[dof_red + dof + i].copy()
+
+                # calculate 2-particle density matrix contribution
+                profiler.start_timer('2PDM')
+                fock_mo_rhs_2pdm = self.calculate_rhs_2pdm_contrib_red_dim(molecule,
+                                                                   basis,
+                                                                   scf_tensors,
+                                                                   x_plus_y_ao,
+                                                                   x_minus_y_ao,
+                                                                   fock_ao_rhs_x_plus_y,
+                                                                   fock_ao_rhs_x_minus_y)
+                profiler.stop_timer('2PDM')
+
+                # calculate dipole contribution
+                profiler.start_timer('dipole')
+
+                rhs_dipole_contrib = self.calculate_rhs_dipole_contrib_red_dim(
+                    molecule, basis, scf_tensors, x_minus_y)
+
+                profiler.stop_timer('dipole')
+
+                # sum RHS contributions
+                rhs_mo = fock_mo_rhs_1pdm + fock_mo_rhs_2pdm + rhs_dipole_contrib
+
+                # add DFT E[3] contribution to the RHS
+                if self._dft:
+                    gxc_ao = np.zeros((dof_red, nao, nao))
+
+                    for i in range(dof_red):
+                        gxc_ao[i] = fock_gxc_ao[2 * i]
+
+                    # mi,xmn,na->xia
+                    gxc_mo = np.array([
+                        np.linalg.multi_dot([mo_occ.T, gxc_ao[x], mo_vir])
+                        for x in range(dof_red)
+                    ])
+
+                    # different factor compared to TDDFT orbital response
+                    # because here vectors are scaled by 1/sqrt(2)
+                    rhs_mo += 0.5 * gxc_mo
+
+                # array with RHS (only relevant when using conjugate gradient solver)
+                if f == 0:
+                    tot_rhs_mo = rhs_mo
+                else:
+                    tot_rhs_mo = np.append(tot_rhs_mo, rhs_mo, axis=0)
+
+                profiler.print_memory_subspace(
+                    {
+                        'fock_ao_rhs': fock_ao_rhs,
+                        'fock_gxc_ao': fock_gxc_ao,
+                    }, self.ostream)
+
+            # save RHS in distributed array
+            for k in range(dof_red):
+                if self.rank == mpi_master():
+                    cphf_rhs_k = rhs_mo[k].reshape(nocc * nvir)
+                else:
+                    cphf_rhs_k = None
+
+                dist_cphf_rhs.append(DistributedArray(cphf_rhs_k, self.comm,
+                                                      root=mpi_master()))
+
+            for k in range(dof_red + 2 * dof):
+                if self.rank == mpi_master():
+                    fock_ao_rhs_k = fock_ao_rhs[k].reshape(nao * nao)
+                else:
+                    fock_ao_rhs_k = None
+
+                dist_fock_ao_rhs.append(DistributedArray(fock_ao_rhs_k, self.comm,
+                                                         root=mpi_master()))
+            if self._dft:
+                for k in range(2 * dof_red):
+                    if self.rank == mpi_master():
+                        fock_gxc_ao_k = fock_gxc_ao[k].copy().reshape(nao * nao)
+                    else:
+                        fock_gxc_ao_k = None
+
+                    dist_fock_gxc_ao.append(DistributedArray(fock_gxc_ao_k,
+                                                             self.comm,
+                                                             root=mpi_master()))
+
+            profiler.stop_timer('total')
+            profiler.check_memory_usage(f'RHS w={w:.4f}')
+
         profiler.print_memory_subspace({
             'dist_cphf_rhs': dist_cphf_rhs,
             'dist_fock_ao_rhs': dist_fock_ao_rhs,
@@ -951,14 +1775,16 @@ class PolOrbitalResponse(CphfSolver):
         profiler.print_profiling_summary(self.ostream)
 
         if self.rank == mpi_master():
-            valstr = '** Time spent on constructing the orbrsp RHS for '
-            valstr += f'{len(self.frequencies)} frequencies: '
-            valstr += f'{(tm.time() - loop_start_time):.2f} sec **'
+            #valstr = '** Time spent on constructing the orbrsp RHS for '
+            #valstr += f'{len(self.frequencies)} frequencies: '
+            #valstr += f'{(tm.time() - loop_start_time):.2f} sec **'
+            valstr = 'CPHF/CPKS right-hand side for '
+            valstr += f'{len(self.frequencies)} frequencies computed in '
+            valstr += f'{(tm.time() - loop_start_time):.2f} sec.'
             self.ostream.print_info(valstr)
             self.ostream.print_blank()
             self.ostream.flush()
 
-#        if self.rank == mpi_master():
             orbrsp_rhs['dist_cphf_rhs'] = dist_cphf_rhs
             orbrsp_rhs['dist_fock_ao_rhs'] = dist_fock_ao_rhs
             orbrsp_rhs['dist_fock_gxc_ao'] = dist_fock_gxc_ao  # empty list if not DFT
@@ -971,7 +1797,8 @@ class PolOrbitalResponse(CphfSolver):
                 'dist_fock_gxc_ao': dist_fock_gxc_ao  # empty list if not DFT
             }
 
-    def calculate_1pdm(self, molecule, scf_tensors, x_plus_y, x_minus_y):
+    def calculate_1pdm(self, molecule, basis, scf_tensors, x_plus_y,
+                       x_minus_y):
         """
         Calculates the unrelaxed one-particle density matrices in MO basis.
 
@@ -995,7 +1822,7 @@ class PolOrbitalResponse(CphfSolver):
 
         # MO coefficients
         mo = scf_tensors['C_alpha']  # only alpha part
-        nocc = molecule.number_of_alpha_electrons()
+        nocc = molecule.number_of_alpha_occupied_orbitals(basis)
         mo_vir = mo[:, nocc:].copy()
         nvir = mo_vir.shape[1]
 
@@ -1037,7 +1864,76 @@ class PolOrbitalResponse(CphfSolver):
 
         return dm_oo, dm_vv
 
-    def calculate_unrel_dm(self, molecule, scf_tensors, x_plus_y, x_minus_y):
+    def calculate_1pdm_red_dim(self, molecule, basis, scf_tensors, x_plus_y,
+                       x_minus_y):
+        """
+        Calculates the unrelaxed one-particle density matrices in MO basis.
+
+        :param molecule:
+            The molecule.
+        :param scf_tensors:
+            The tensors from the converged SCF calculation.
+        :param x_plus_y:
+            The X+Y response vectors in MO basis.
+        :param x_minus_y:
+            The X-Y response vectors in MO basis.
+
+        :return dm_oo:
+            Occ/Occ block of unrelaxed one-particle density matrix in MO basis.
+        :return dm_vv:
+            Vir/vir block of unrelaxed one-particle density matrix in MO basis.
+        """
+
+        # degrees of freedom
+        dof = len(self.vector_components)
+
+        # unique permutations of operator components
+        xy_pairs = [(x,y) for x in range(dof) for y in range(x, dof)]
+
+        # reduced dimensions
+        dof_red = len(xy_pairs)
+
+        # MO coefficients
+        mo = scf_tensors['C_alpha']  # only alpha part
+        nocc = molecule.number_of_alpha_occupied_orbitals(basis)
+        mo_vir = mo[:, nocc:].copy()
+        nvir = mo_vir.shape[1]
+
+        # determine data type of RHS
+        if self.is_complex:
+            rhs_dt = np.dtype('complex128')
+        else:
+            rhs_dt = np.dtype('float64')
+
+        # calculate the one-particle density matrices
+        dm_oo = np.zeros((dof_red, nocc, nocc), dtype=rhs_dt)
+        dm_vv = np.zeros((dof_red, nvir, nvir), dtype=rhs_dt)
+
+        for idx, (x,y) in enumerate(xy_pairs):
+            dm_vv[idx] = 0.25 * (
+                # xib,yia->xyab
+                np.linalg.multi_dot([x_plus_y[y].T, x_plus_y[x]])
+                # xib,yia->xyab
+                + np.linalg.multi_dot([x_minus_y[y].T, x_minus_y[x]])
+                # yib,xia->xyab
+                + np.linalg.multi_dot([x_plus_y[x].T, x_plus_y[y]])
+                # yib,xia->xyab
+                + np.linalg.multi_dot([x_minus_y[x].T, x_minus_y[y]]))
+
+            dm_oo[idx] = -0.25 * (
+                # xja,yia->xyij
+                np.linalg.multi_dot([x_plus_y[x], x_plus_y[y].T])
+                # xja,yia->xyij
+                + np.linalg.multi_dot([x_minus_y[x], x_minus_y[y].T])
+                # yja,xia->xyij
+                + np.linalg.multi_dot([x_plus_y[y], x_plus_y[x].T])
+                # yja,xia->xyij
+                + np.linalg.multi_dot([x_minus_y[y], x_minus_y[x].T]))
+
+        return dm_oo, dm_vv
+
+    def calculate_unrel_dm(self, molecule, basis, scf_tensors, x_plus_y,
+                           x_minus_y):
         """
         Calculates the symmetrized unrelaxed one-particle density matrix
         in AO basis.
@@ -1060,7 +1956,7 @@ class PolOrbitalResponse(CphfSolver):
 
         # MO coefficients
         mo = scf_tensors['C_alpha']  # only alpha part
-        nocc = molecule.number_of_alpha_electrons()
+        nocc = molecule.number_of_alpha_occupied_orbitals(basis)
         mo_occ = mo[:, :nocc].copy()
         mo_vir = mo[:, nocc:].copy()
 
@@ -1074,7 +1970,8 @@ class PolOrbitalResponse(CphfSolver):
             rhs_dt = np.dtype('float64')
 
         # calculate the symmetrized unrelaxed one-particle density matrix
-        dm_oo, dm_vv = self.calculate_1pdm(molecule, scf_tensors, x_plus_y, x_minus_y)
+        dm_oo, dm_vv = self.calculate_1pdm(molecule, basis, scf_tensors,
+                                           x_plus_y, x_minus_y)
 
         # transform to AO basis: mi,xia,na->xmn
         unrel_dm_ao = np.zeros((dof, dof, nao, nao), dtype=rhs_dt)
@@ -1091,8 +1988,68 @@ class PolOrbitalResponse(CphfSolver):
 
         return unrel_dm_ao
 
-    def calculate_rhs_2pdm_contrib(self, molecule, scf_tensors, x_plus_y_ao,
-                                   x_minus_y_ao, fock_ao_rhs_x_plus_y,
+    def calculate_unrel_dm_red_dim(self, molecule, basis, scf_tensors, x_plus_y,
+                           x_minus_y):
+        """
+        Calculates the symmetrized unrelaxed one-particle density matrix
+        in AO basis.
+
+        :param molecule:
+            The molecule.
+        :param scf_tensors:
+            The tensors from the converged SCF calculation.
+        :param x_plus_y:
+            The X+Y response vectors in MO basis.
+        :param x_minus_y:
+            The X-Y response vectors in MO basis.
+
+        :return unrel_dm_ao:
+            Unrelaxed one-particle density matrix in AO basis in reduced dimensions.
+        """
+
+        # degrees of freedom
+        dof = len(self.vector_components)
+
+        # unique permutations of operator components
+        xy_pairs = [(x,y) for x in range(dof) for y in range(x, dof)]
+
+        # reduced dimensions
+        dof_red = len(xy_pairs)
+
+        # MO coefficients
+        mo = scf_tensors['C_alpha']  # only alpha part
+        nocc = molecule.number_of_alpha_occupied_orbitals(basis)
+        mo_occ = mo[:, :nocc].copy()
+        mo_vir = mo[:, nocc:].copy()
+
+        # number of AOs
+        nao = mo.shape[0]
+
+        # determine data type of RHS
+        if self.is_complex:
+            rhs_dt = np.dtype('complex128')
+        else:
+            rhs_dt = np.dtype('float64')
+
+        # calculate the symmetrized unrelaxed one-particle density matrix
+        dm_oo, dm_vv = self.calculate_1pdm(molecule, basis, scf_tensors,
+                                           x_plus_y, x_minus_y)
+
+        # transform to AO basis: mi,xia,na->xmn
+        unrel_dm_ao = np.zeros((dof_red, nao, nao), dtype=rhs_dt)
+
+        for i, (x,y) in enumerate(xy_pairs):
+            unrel_dm_ao[i] = (
+                # mi,xyij,nj->xymn
+                np.linalg.multi_dot([mo_occ, dm_oo[x, y], mo_occ.T])
+                # ma,xyab,nb->xymn
+                + np.linalg.multi_dot([mo_vir, dm_vv[x, y], mo_vir.T]))
+
+        return unrel_dm_ao
+
+    def calculate_rhs_2pdm_contrib(self, molecule, basis, scf_tensors,
+                                   x_plus_y_ao, x_minus_y_ao,
+                                   fock_ao_rhs_x_plus_y,
                                    fock_ao_rhs_x_minus_y):
         """
         Calculates the 2-particle density matrix contribution to the RHS.
@@ -1122,7 +2079,7 @@ class PolOrbitalResponse(CphfSolver):
 
         # MO coefficients
         mo = scf_tensors['C_alpha']  # only alpha part
-        nocc = molecule.number_of_alpha_electrons()
+        nocc = molecule.number_of_alpha_occupied_orbitals(basis)
         mo_occ = mo[:, :nocc].copy()
         mo_vir = mo[:, nocc:].copy()
         nvir = mo_vir.shape[1]
@@ -1149,6 +2106,7 @@ class PolOrbitalResponse(CphfSolver):
                 # cl,ti,la,xytc->xyia
                 fock_mo_rhs_2pdm[x, y] += -1.0 * np.linalg.multi_dot(
                     [mo_occ.T, tmp, ovlp, mo_vir])
+
                 # ymt,xmc->xytc
                 tmp = np.linalg.multi_dot(
                     [fock_ao_rhs_x_plus_y[y], x_plus_y_ao[x]])
@@ -1161,6 +2119,7 @@ class PolOrbitalResponse(CphfSolver):
                 # cl,ti,la,xytc->xyia
                 fock_mo_rhs_2pdm[x, y] += -1.0 * np.linalg.multi_dot(
                     [mo_occ.T, tmp, ovlp, mo_vir])
+
                 # xtm,ymc->xytc
                 tmp = np.linalg.multi_dot(
                     [fock_ao_rhs_x_plus_y[x].T, x_plus_y_ao[y]])
@@ -1173,6 +2132,7 @@ class PolOrbitalResponse(CphfSolver):
                 # cl,ti,la,xytc->xyia
                 fock_mo_rhs_2pdm[x, y] += -1.0 * np.linalg.multi_dot(
                     [mo_occ.T, tmp, ovlp, mo_vir])
+
                 # ytm,xmc->xytc
                 tmp = np.linalg.multi_dot(
                     [fock_ao_rhs_x_plus_y[y].T, x_plus_y_ao[x]])
@@ -1185,6 +2145,7 @@ class PolOrbitalResponse(CphfSolver):
                 # cl,ti,la,xytc->xyia
                 fock_mo_rhs_2pdm[x, y] += -1.0 * np.linalg.multi_dot(
                     [mo_occ.T, tmp, ovlp, mo_vir])
+
                 # xmt,ycm->xyct
                 tmp = np.linalg.multi_dot(
                     [x_plus_y_ao[y], fock_ao_rhs_x_plus_y[x].T])
@@ -1197,6 +2158,7 @@ class PolOrbitalResponse(CphfSolver):
                 # cl,li,ta,xyct->xyia
                 fock_mo_rhs_2pdm[x, y] += np.linalg.multi_dot(
                     [mo_occ.T, ovlp.T, tmp, mo_vir])
+
                 # ymt,xcm->xyct
                 tmp = np.linalg.multi_dot(
                     [x_plus_y_ao[x], fock_ao_rhs_x_plus_y[y].T])
@@ -1209,6 +2171,7 @@ class PolOrbitalResponse(CphfSolver):
                 # cl,li,ta,xyct->xyia
                 fock_mo_rhs_2pdm[x, y] += np.linalg.multi_dot(
                     [mo_occ.T, ovlp.T, tmp, mo_vir])
+
                 # xtm,ycm->xytc
                 tmp = np.linalg.multi_dot(
                     [x_plus_y_ao[y], fock_ao_rhs_x_plus_y[x]]).T
@@ -1221,6 +2184,7 @@ class PolOrbitalResponse(CphfSolver):
                 # cl,li,ta,xytc->xyia
                 fock_mo_rhs_2pdm[x, y] += np.linalg.multi_dot(
                     [mo_vir.T, tmp, ovlp, mo_occ]).T
+
                 # ytm,xcm->xytc
                 tmp = np.linalg.multi_dot(
                     [x_plus_y_ao[x], fock_ao_rhs_x_plus_y[y]]).T
@@ -1240,6 +2204,171 @@ class PolOrbitalResponse(CphfSolver):
 
         fock_mo_rhs_2pdm = 0.25 * fock_mo_rhs_2pdm.reshape(
             dof**2, nocc, nvir)
+
+        return fock_mo_rhs_2pdm
+
+    def calculate_rhs_2pdm_contrib_red_dim(self, molecule, basis, scf_tensors,
+                                   x_plus_y_ao, x_minus_y_ao,
+                                   fock_ao_rhs_x_plus_y,
+                                   fock_ao_rhs_x_minus_y):
+        """
+        Calculates the 2-particle density matrix contribution to the RHS.
+
+        :param molecule:
+            The molecule.
+        :param scf_tensors:
+            The tensors from the converged SCF calculation.
+        :param x_plus_y_ao:
+            The X+Y response vectors in AO basis.
+        :param x_minus_y_ao:
+            The X-Y response vectors in AO basis.
+        :param fock_ao_rhs_x_plus_y:
+            Fock matrix from unrel. DM and X+Y response vectors in AO basis.
+        :param fock_ao_rhs_x_minus_y:
+            Fock matrix from unrel. DM and X-Y response vectors in AO basis.
+
+        :return fock_mo_rhs_2pdm:
+            The Fock 2-particle DM contribution to RHS in MO basis in reduced 
+            dimensions.
+        """
+
+        # degrees of freedom
+        dof = len(self.vector_components)
+
+        # unique permutations of operator components
+        xy_pairs = [(x, y) for x in range(dof) for y in range(x, dof)]
+
+        # reduced dimensions
+        dof_red = len(xy_pairs)
+
+        # overlap
+        ovlp = scf_tensors['S']
+
+        # MO coefficients
+        mo = scf_tensors['C_alpha']  # only alpha part
+        nocc = molecule.number_of_alpha_occupied_orbitals(basis)
+        mo_occ = mo[:, :nocc].copy()
+        mo_vir = mo[:, nocc:].copy()
+        nvir = mo_vir.shape[1]
+
+        # determine data type of RHS
+        if self.is_complex:
+            rhs_dt = np.dtype('complex128')
+        else:
+            rhs_dt = np.dtype('float64')
+
+        fock_mo_rhs_2pdm = np.zeros((dof_red, nocc, nvir), dtype=rhs_dt)
+
+        for idx, (x,y) in enumerate(xy_pairs):
+            # xmt,ymc->xytc
+            tmp = np.linalg.multi_dot(
+                [fock_ao_rhs_x_plus_y[x], x_plus_y_ao[y]])
+            # cl,ti,la,xytc->xyia
+            fock_mo_rhs_2pdm[idx] += np.linalg.multi_dot(
+                [mo_occ.T, tmp, ovlp, mo_vir])
+            # xmt,ymc->xytc
+            tmp = np.linalg.multi_dot(
+                [fock_ao_rhs_x_minus_y[x], x_minus_y_ao[y]])
+            # cl,ti,la,xytc->xyia
+            fock_mo_rhs_2pdm[idx] += -1.0 * np.linalg.multi_dot(
+                [mo_occ.T, tmp, ovlp, mo_vir])
+
+            # xtm,ymc->xytc
+            tmp = np.linalg.multi_dot(
+                [fock_ao_rhs_x_plus_y[x].T, x_plus_y_ao[y]])
+            # cl,ti,la,xytc->xyia
+            fock_mo_rhs_2pdm[idx] += -1.0 * np.linalg.multi_dot(
+                [mo_occ.T, tmp, ovlp, mo_vir])
+            # xtm,ymc->xytc
+            tmp = np.linalg.multi_dot(
+                [fock_ao_rhs_x_minus_y[x].T, x_minus_y_ao[y]])
+            # cl,ti,la,xytc->xyia
+            fock_mo_rhs_2pdm[idx] += -1.0 * np.linalg.multi_dot(
+                [mo_occ.T, tmp, ovlp, mo_vir])
+
+            # xmt,ycm->xyct
+            tmp = np.linalg.multi_dot(
+                [x_plus_y_ao[y], fock_ao_rhs_x_plus_y[x].T])
+            # cl,li,ta,xyct->xyia
+            fock_mo_rhs_2pdm[idx] += np.linalg.multi_dot(
+                [mo_occ.T, ovlp.T, tmp, mo_vir])
+            # xmt,ycm->xyct
+            tmp = np.linalg.multi_dot(
+                [x_minus_y_ao[y], fock_ao_rhs_x_minus_y[x].T])
+            # cl,li,ta,xyct->xyia
+            fock_mo_rhs_2pdm[idx] += np.linalg.multi_dot(
+                [mo_occ.T, ovlp.T, tmp, mo_vir])
+
+            # xtm,ycm->xytc
+            tmp = np.linalg.multi_dot(
+                [x_plus_y_ao[y], fock_ao_rhs_x_plus_y[x]]).T
+            # cl,li,ta,xytc->xyia
+            fock_mo_rhs_2pdm[idx] += -1.0 * np.linalg.multi_dot(
+                [mo_vir.T, tmp, ovlp, mo_occ]).T
+            # xtm,ymc->xytc
+            tmp = np.linalg.multi_dot(
+                [x_minus_y_ao[y], fock_ao_rhs_x_minus_y[x]]).T
+            # cl,li,ta,xytc->xyia
+            fock_mo_rhs_2pdm[idx] += np.linalg.multi_dot(
+                [mo_vir.T, tmp, ovlp, mo_occ]).T 
+
+            # if diagonal, avoid double computation
+            if y == x:
+                fock_mo_rhs_2pdm[idx] *= 2.0
+            else:
+                # ymt,xmc->xytc
+                tmp = np.linalg.multi_dot(
+                    [fock_ao_rhs_x_plus_y[y], x_plus_y_ao[x]])
+                # cl,ti,la,xytc->xyia
+                fock_mo_rhs_2pdm[idx] += np.linalg.multi_dot(
+                    [mo_occ.T, tmp, ovlp, mo_vir])
+                # ymt,xmc->xytc
+                tmp = np.linalg.multi_dot(
+                    [fock_ao_rhs_x_minus_y[y], x_minus_y_ao[x]])
+                # cl,ti,la,xytc->xyia
+                fock_mo_rhs_2pdm[idx] += -1.0 * np.linalg.multi_dot(
+                    [mo_occ.T, tmp, ovlp, mo_vir])
+
+                # ytm,xmc->xytc
+                tmp = np.linalg.multi_dot(
+                    [fock_ao_rhs_x_plus_y[y].T, x_plus_y_ao[x]])
+                # cl,ti,la,xytc->xyia
+                fock_mo_rhs_2pdm[idx] += -1.0 * np.linalg.multi_dot(
+                    [mo_occ.T, tmp, ovlp, mo_vir])
+                # ytm,xmc->xytc
+                tmp = np.linalg.multi_dot(
+                    [fock_ao_rhs_x_minus_y[y].T, x_minus_y_ao[x]])
+                # cl,ti,la,xytc->xyia
+                fock_mo_rhs_2pdm[idx] += -1.0 * np.linalg.multi_dot(
+                    [mo_occ.T, tmp, ovlp, mo_vir])
+
+                # ymt,xcm->xyct
+                tmp = np.linalg.multi_dot(
+                    [x_plus_y_ao[x], fock_ao_rhs_x_plus_y[y].T])
+                # cl,li,ta,xyct->xyia
+                fock_mo_rhs_2pdm[idx] += np.linalg.multi_dot(
+                    [mo_occ.T, ovlp.T, tmp, mo_vir])
+                # ymt,xcm->xyct
+                tmp = np.linalg.multi_dot(
+                    [x_minus_y_ao[x], fock_ao_rhs_x_minus_y[y].T])
+                # cl,li,ta,xyct->xyia
+                fock_mo_rhs_2pdm[idx] += np.linalg.multi_dot(
+                    [mo_occ.T, ovlp.T, tmp, mo_vir])
+
+                # ytm,xcm->xytc
+                tmp = np.linalg.multi_dot(
+                    [x_plus_y_ao[x], fock_ao_rhs_x_plus_y[y]]).T
+                # cl,li,ta,xytc->xyia
+                fock_mo_rhs_2pdm[idx] += -1.0 * np.linalg.multi_dot(
+                    [mo_vir.T, tmp, ovlp, mo_occ]).T
+                # ytm,xcm->xytc
+                tmp = np.linalg.multi_dot(
+                    [x_minus_y_ao[x], fock_ao_rhs_x_minus_y[y]]).T
+                # cl,li,ta,xytc->xyia
+                fock_mo_rhs_2pdm[idx] += np.linalg.multi_dot(
+                    [mo_vir.T, tmp, ovlp, mo_occ]).T
+
+        fock_mo_rhs_2pdm = 0.25 * fock_mo_rhs_2pdm
 
         return fock_mo_rhs_2pdm
 
@@ -1263,7 +2392,7 @@ class PolOrbitalResponse(CphfSolver):
 
         # MO coefficients
         mo = scf_tensors['C_alpha']  # only alpha part
-        nocc = molecule.number_of_alpha_electrons()
+        nocc = molecule.number_of_alpha_occupied_orbitals(basis)
         mo_occ = mo[:, :nocc].copy()
         mo_vir = mo[:, nocc:].copy()
         nvir = mo_vir.shape[1]
@@ -1326,219 +2455,91 @@ class PolOrbitalResponse(CphfSolver):
 
         return rhs_dipole_contrib
 
-    def construct_dft_e3_dm_real(self, x_minus_y_ao):
+    def calculate_rhs_dipole_contrib_red_dim(self, molecule, basis, scf_tensors,
+                                     x_minus_y):
         """
-        Constructs the density matrices for E[3] term
-        for the real RHS.
-
-        :param x_minus_y_ao:
-            the X-Y response vectors in AO basis.
-
-        :return perturbed_dm_ao:
-            Perturbed density matrix as an AODensityMatrix.
-        :return zero_dm_ao:
-            Empty matrix same size as perturbed density matrix as an AODensityMatrix.
-        """
-
-        # degrees of freedom
-        dof = len(self.vector_components)
-
-        # sanity check: should not be carried out in parallel
-        if self.rank != mpi_master():
-            return
-
-        # XCIntegrator expects a DM with real and imaginary part,
-        # so we set the imaginary part to zero.
-
-        perturbed_dm_ao_list = []
-        zero_dm_ao_list = []
-
-        for x in range(dof):
-            for y in range(dof):
-                perturbed_dm_ao_list.extend([
-                    x_minus_y_ao[x], 0 * x_minus_y_ao[x],
-                    x_minus_y_ao[y], 0 * x_minus_y_ao[y]
-                ])
-                zero_dm_ao_list.extend(
-                    [0 * x_minus_y_ao[x], 0 * x_minus_y_ao[y]])
-
-        return perturbed_dm_ao_list, zero_dm_ao_list
-
-    def construct_dft_e3_dm_complex(self, x_minus_y_ao):
-        """
-        Constructs the density matrices for E[3] term
-        for the complex RHS.
-
-        :param x_minus_y_ao:
-            the X-Y response vectors in AO basis.
-
-        :return perturbed_dm_ao_rere:
-            The perturbed density matrix from Re/Re parts of the
-            X-Y response vectors as an AODensityMatrix.
-        :return perturbed_dm_ao_imim:
-            The perturbed density matrix from Im/Im parts of the
-            X-Y response vectors as an AODensityMatrix.
-        :return perturbed_dm_ao_reim:
-            The perturbed density matrix from Re/Im parts of the
-            X-Y response vectors as an AODensityMatrix.
-        :return perturbed_dm_ao_imre:
-            The perturbed density matrix from Im/Re parts of the
-            X-Y response vectors as an AODensityMatrix.
-        :return zero_dm_ao:
-            Empty matrix same size as perturbed density matrices as an AODensityMatrix.
-        """
-
-        # sanity check: should not be carried out in parallel
-        if self.rank != mpi_master():
-            return
-
-        # degrees of freedom
-        dof = len(self.vector_components)
-
-        perturbed_dm_ao_list_rere = []
-        perturbed_dm_ao_list_imim = []
-        perturbed_dm_ao_list_reim = []
-        perturbed_dm_ao_list_imre = []
-        zero_dm_ao_list = []
-
-        for x in range(dof):
-            for y in range(dof):
-                perturbed_dm_ao_list_rere.extend([
-                    np.array(x_minus_y_ao[x].real),
-                    np.array(0 * x_minus_y_ao[x].real),
-                    np.array(x_minus_y_ao[y].real),
-                    np.array(0 * x_minus_y_ao[y].real)])
-                perturbed_dm_ao_list_imim.extend([
-                    np.array(x_minus_y_ao[x].imag),
-                    np.array(0 * x_minus_y_ao[x].imag),
-                    np.array(x_minus_y_ao[y].imag),
-                    np.array(0 * x_minus_y_ao[y].imag)])
-                # complex cross-terms
-                perturbed_dm_ao_list_reim.extend([
-                    np.array(x_minus_y_ao[x].real),
-                    np.array(0 * x_minus_y_ao[x].real),
-                    np.array(x_minus_y_ao[y].imag),
-                    np.array(0 * x_minus_y_ao[y].imag)])
-                perturbed_dm_ao_list_imre.extend([
-                    np.array(x_minus_y_ao[x].imag),
-                    np.array(0 * x_minus_y_ao[x].imag),
-                    np.array(x_minus_y_ao[y].real),
-                    np.array(0 * x_minus_y_ao[y].real)])
-
-                zero_dm_ao_list.extend([
-                    np.array(0 * x_minus_y_ao[x].real),
-                    np.array(0 * x_minus_y_ao[y].real)])
-
-        perturbed_dm_ao_rere = AODensityMatrix(perturbed_dm_ao_list_rere,
-                                               denmat.rest)
-        perturbed_dm_ao_imim = AODensityMatrix(perturbed_dm_ao_list_imim,
-                                               denmat.rest)
-        perturbed_dm_ao_reim = AODensityMatrix(perturbed_dm_ao_list_reim,
-                                               denmat.rest)
-        perturbed_dm_ao_imre = AODensityMatrix(perturbed_dm_ao_list_imre,
-                                               denmat.rest)
-
-        # corresponds to rho^{omega_b,omega_c} in quadratic response,
-        # which is zero for orbital response
-        zero_dm_ao = AODensityMatrix(zero_dm_ao_list, denmat.rest)
-
-        return (perturbed_dm_ao_rere, perturbed_dm_ao_imim,
-                perturbed_dm_ao_reim, perturbed_dm_ao_imre, zero_dm_ao)
-
-    def integrate_gxc_real(self, molecule, basis, molgrid, gs_density,
-                           zero_dm_ao, perturbed_dm_ao, fock_gxc_ao):
-        """
-        Drives the integration of the real XC Fock thingything.
+        Calculates the dipole contribution to the RHS.
 
         :param molecule:
             The molecule.
         :param basis:
             The AO basis set.
-        :param molgrid:
-            The grid level for the DFT calculation.
-        :param gs_density:
-            The ground-state density.
-        :param zero_dm_ao:
-            AODensityMatrix with zeros.
-        :param perturbed_dm_ao:
-            Perturbed density matrix in AO basis.
-        :param fock_gxc_ao:
-            The g^xc Fock matrix in AO basis.
+        :param scf_tensors:
+            The tensors from the converged SCF calculation.
+        :param x_minus_y:
+            The X-Y response vectors in MO basis.
 
-        :return fock_gxc_ao:
-            The g^xc Fock matrix after integration.
+        :return rsh_dipole_contrib:
+            The dipole contribution to the RHS in reduced dimensions.
         """
 
-        xc_drv = XCIntegrator(self.comm)
-        xc_drv.integrate_kxc_fock(fock_gxc_ao, molecule, basis,
-                                  perturbed_dm_ao, zero_dm_ao,
-                                  gs_density, molgrid,
-                                  self.xcfun.get_func_label(), "qrf")
-        return fock_gxc_ao
+        # degrees of freedom
+        dof = len(self.vector_components)
 
-    def integrate_gxc_complex(self, molecule, basis, molgrid, gs_density, zero_dm_ao,
-                              perturbed_dm_ao_list, fock_gxc_ao_list):
-        """
-        Drives the integration of the complex XC Fock thingything.
+        # unique permutations of operator components
+        xy_pairs = [(x, y) for x in range(dof) for y in range(x, dof)]
 
-        :param molecule:
-            The molecule.
-        :param basis:
-            The AO basis set.
-        :param molegrid:
-            The grid level for the DFT calculation.
-        :param gs_density:
-            The ground-state density.
-        :param zero_dm_ao:
-            AODensityMatrix with zeros.
-        :param perturbed_dm_ao_list:
-            List with the rere/imim/reim/imre parts of the perturbed
-            density matrix in AO basis.
-        :param fock_gxc_ao_list:
-            List with the rere/imim/reim/imre parts of the g^xc Fock matrix in AO basis.
+        # reduced dimensions
+        dof_red = len(xy_pairs)
 
-        :return fock_gxc_ao_rere/imim/reim/imre:
-            The g^xc Fock matrix after integration.
-        """
+        # MO coefficients
+        mo = scf_tensors['C_alpha']  # only alpha part
+        nocc = molecule.number_of_alpha_occupied_orbitals(basis)
+        mo_occ = mo[:, :nocc].copy()
+        mo_vir = mo[:, nocc:].copy()
+        nvir = mo_vir.shape[1]
 
-        # unpack perturbed dm list
-        perturbed_dm_ao_rere = perturbed_dm_ao_list[0]
-        perturbed_dm_ao_imim = perturbed_dm_ao_list[1]
-        perturbed_dm_ao_reim = perturbed_dm_ao_list[2]
-        perturbed_dm_ao_imre = perturbed_dm_ao_list[3]
+        # number of AOs
+        nao = mo.shape[0]
 
-        # unpack XC Fock matrix list
-        fock_gxc_ao_rere = fock_gxc_ao_list[0]
-        fock_gxc_ao_imim = fock_gxc_ao_list[1]
-        fock_gxc_ao_reim = fock_gxc_ao_list[2]
-        fock_gxc_ao_imre = fock_gxc_ao_list[3]
+        # determine data type of RHS
+        if self.is_complex:
+            rhs_dt = np.dtype('complex128')
+        else:
+            rhs_dt = np.dtype('float64')
 
-        if not self.xcfun.is_hybrid():
-            for ifock in range(fock_gxc_ao_rere.number_of_fock_matrices()):
-                fock_gxc_ao_rere.scale(2.0, ifock)
-                fock_gxc_ao_imim.scale(2.0, ifock)
-                fock_gxc_ao_reim.scale(2.0, ifock)
-                fock_gxc_ao_imre.scale(2.0, ifock)
-               
-        xc_drv = XCIntegrator(self.comm)
-        xc_drv.integrate_kxc_fock(fock_gxc_ao_rere, molecule, basis,
-                                  perturbed_dm_ao_rere, zero_dm_ao,
-                                  gs_density, molgrid,
-                                  self.xcfun.get_func_label(), "qrf")
-        xc_drv.integrate_kxc_fock(fock_gxc_ao_imim, molecule, basis,
-                                  perturbed_dm_ao_imim, zero_dm_ao,
-                                  gs_density, molgrid,
-                                  self.xcfun.get_func_label(), "qrf")
-        xc_drv.integrate_kxc_fock(fock_gxc_ao_reim, molecule, basis,
-                                  perturbed_dm_ao_reim, zero_dm_ao,
-                                  gs_density, molgrid,
-                                  self.xcfun.get_func_label(), "qrf")
-        xc_drv.integrate_kxc_fock(fock_gxc_ao_imre, molecule, basis,
-                                  perturbed_dm_ao_imre, zero_dm_ao,
-                                  gs_density, molgrid,
-                                  self.xcfun.get_func_label(), "qrf")
+        # get the dipole integrals in AO basis
+        dipole_mats = compute_electric_dipole_integrals(molecule, basis, [0.0, 0.0, 0.0])
 
-        return fock_gxc_ao_rere, fock_gxc_ao_imim, fock_gxc_ao_reim, fock_gxc_ao_imre
+        dipole_ints_ao = np.zeros((dof, nao, nao))
+        k = 0
+        if 'x' in self.vector_components:
+            # Note: polorbitalresponse uses r instead of mu for dipole operator
+            dipole_ints_ao[k] = -1.0*dipole_mats[0]
+            k += 1
+        if 'y' in self.vector_components:
+            # Note: polorbitalresponse uses r instead of mu for dipole operator
+            dipole_ints_ao[k] = -1.0*dipole_mats[1]
+            k += 1
+        if 'z' in self.vector_components:
+            # Note: polorbitalresponse uses r instead of mu for dipole operator
+            dipole_ints_ao[k] = -1.0*dipole_mats[2]
+
+        # transform to MO basis (oo and vv blocks only)
+        dipole_ints_oo = np.array([
+            np.linalg.multi_dot([mo_occ.T, dipole_ints_ao[x], mo_occ])
+            for x in range(dof)
+        ])
+        dipole_ints_vv = np.array([
+            np.linalg.multi_dot([mo_vir.T, dipole_ints_ao[x], mo_vir])
+            for x in range(dof)
+        ])
+
+        rhs_dipole_contrib = np.zeros((dof_red, nocc, nvir), dtype=rhs_dt)
+
+        # calculate dipole contributions to the RHS
+        for idx, (x,y) in enumerate(xy_pairs):
+            rhs_dipole_contrib[idx] = (
+                0.5 * (np.linalg.multi_dot(  # xja,yji->xyia
+                    [dipole_ints_oo[y].T, x_minus_y[x]])
+                       + np.linalg.multi_dot(  # yja,xji->xyia
+                           [dipole_ints_oo[x], x_minus_y[y]]))
+                - 0.5 * (np.linalg.multi_dot(  # xib,yab->xyia
+                    [x_minus_y[x], dipole_ints_vv[y]])
+                         + np.linalg.multi_dot(  # yib,xab->xyia
+                             [x_minus_y[y], dipole_ints_vv[x].T])))
+
+        return rhs_dipole_contrib
 
     def compute_omega(self, molecule, basis, scf_tensors, lr_results):
         """
@@ -1556,10 +2557,13 @@ class PolOrbitalResponse(CphfSolver):
         """
 
         if self.is_complex:
-            return self.compute_omega_complex(molecule, basis, scf_tensors,
+            #return self.compute_omega_complex(molecule, basis, scf_tensors,
+            #                                  lr_results)
+            return self.compute_omega_complex_red_dim(molecule, basis, scf_tensors,
                                               lr_results)
         else:
-            return self.compute_omega_real(molecule, basis, scf_tensors,
+            #return self.compute_omega_real(molecule, basis, scf_tensors,
+            return self.compute_omega_real_red_dim(molecule, basis, scf_tensors,
                                            lr_results)
 
     def compute_omega_real(self, molecule, basis, scf_tensors, lr_results):
@@ -1602,7 +2606,7 @@ class PolOrbitalResponse(CphfSolver):
 
         if self.rank == mpi_master():
             # number of occupied MOs
-            nocc = molecule.number_of_alpha_electrons()
+            nocc = molecule.number_of_alpha_occupied_orbitals(basis)
 
             # MO coefficients
             mo = scf_tensors['C_alpha']
@@ -1636,14 +2640,13 @@ class PolOrbitalResponse(CphfSolver):
             else:
                 cphf_ov = None
 
-            for idx, xy in enumerate(xy_pairs):
+            tmp_cphf_ov = None
+
+            for idx, (x,y) in enumerate(xy_pairs):
                 # get lambda multipliers from distributed array
                 tmp_cphf_ov = self.cphf_results['dist_cphf_ov'][dof_red * f + idx].get_full_vector()
 
                 if self.rank == mpi_master():
-                    x = xy[0]
-                    y = xy[1]
-
                     cphf_ov[x, y] += tmp_cphf_ov
 
                     if y != x:
@@ -1653,6 +2656,7 @@ class PolOrbitalResponse(CphfSolver):
             if self.rank == mpi_master():
 
                 self.ostream.print_info(f'Building omega for w = {w:4.3f}')
+                self.ostream.print_blank()
                 self.ostream.flush()
 
                 # Note: polorbitalresponse uses r instead of mu for dipole operator
@@ -1691,8 +2695,9 @@ class PolOrbitalResponse(CphfSolver):
 
                 # calculate the one-particle density matrices in MO
                 profiler.start_timer('1PDM')
-                dm_oo, dm_vv = self.calculate_1pdm(molecule, scf_tensors,
-                                                   x_plus_y_mo, x_minus_y_mo)
+                dm_oo, dm_vv = self.calculate_1pdm(molecule, basis,
+                                                   scf_tensors, x_plus_y_mo,
+                                                   x_minus_y_mo)
                 profiler.stop_timer('1PDM')
 
                 # calculate dipole contribution to omega
@@ -1750,8 +2755,9 @@ class PolOrbitalResponse(CphfSolver):
                 omega = np.zeros((dof, dof, nao, nao))
 
                 # construct epsilon density matrix
-                epsilon_dm_ao = self.calculate_epsilon_dm(molecule, scf_tensors,
-                                                          dm_oo, dm_vv, cphf_ov)
+                epsilon_dm_ao = self.calculate_epsilon_dm(molecule, basis,
+                                                          scf_tensors, dm_oo,
+                                                          dm_vv, cphf_ov)
                 del dm_oo, dm_vv
 
                 for m in range(dof):
@@ -1781,9 +2787,10 @@ class PolOrbitalResponse(CphfSolver):
                         profiler.start_timer('2PDM')
 
                         omega_1pdm_2pdm_contrib_mn = self.calculate_omega_1pdm_2pdm_contrib(
-                            molecule, scf_tensors, x_plus_y_ao[m], x_plus_y_ao[n],
-                            x_minus_y_ao[m], x_minus_y_ao[n], fock_ao_rhs_1_m,
-                            fock_ao_rhs_2_m, fock_ao_rhs_1_n, fock_ao_rhs_2_n, fmat)
+                            molecule, basis, scf_tensors, x_plus_y_ao[m],
+                            x_plus_y_ao[n], x_minus_y_ao[m], x_minus_y_ao[n],
+                            fock_ao_rhs_1_m, fock_ao_rhs_2_m, fock_ao_rhs_1_n,
+                            fock_ao_rhs_2_n, fmat)
 
                         profiler.stop_timer('2PDM')
 
@@ -1820,6 +2827,278 @@ class PolOrbitalResponse(CphfSolver):
 
         self.cphf_results['dist_omega_ao'] = dist_omega
 
+        profiler.print_memory_dictionary({
+            'dist_omega_ao': dist_omega
+        }, self.ostream)
+        profiler.check_memory_usage('End of omega')
+
+        profiler.print_timing(self.ostream)
+        profiler.print_memory_usage(self.ostream)
+        profiler.print_profiling_summary(self.ostream)
+
+        if self.rank == mpi_master():
+            self.ostream.print_blank()
+            #valstr = '** Time spent on constructing omega multipliers '
+            #valstr += f'for {n_freqs} frequencies: '
+            #valstr += f'{(tm.time() - loop_start_time):.2f} sec **'
+            valstr = 'CPHF multipliers for '
+            valstr += f'{n_freqs} frequencies computed in '
+            valstr += f'{(tm.time() - loop_start_time):.2f} sec.'
+            self.ostream.print_info(valstr)
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+    def compute_omega_real_red_dim(self, molecule, basis, scf_tensors, lr_results):
+        """
+        Calculates the real  polarizability Lagrange multipliers for the
+        overlap matrix.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param scf_tensors:
+            The tensors from the converged SCF calculation.
+        :param lr_results:
+            The results from the linear response calculation.
+        """
+
+        profiler = Profiler({
+            'timing': self.timing,
+            'profiling': self.profiling,
+            'memory_profiling': self.memory_profiling,
+            'memory_tracing': self.memory_tracing,
+        })
+
+        # ERI information
+        eri_dict = self._init_eri(molecule, basis)
+        # DFT information
+        dft_dict = self._init_dft(molecule, scf_tensors)
+        # PE information
+        pe_dict = self._init_pe(molecule, basis)
+
+        # number of vector components
+        dof = len(self.vector_components)
+
+        # unique permutations of operator components
+        xy_pairs = [(x, y) for x in range(dof) for y in range(x, dof)]
+
+        # reduced dimensions
+        dof_red = len(xy_pairs)
+
+        if self.rank == mpi_master():
+            # number of occupied MOs
+            nocc = molecule.number_of_alpha_occupied_orbitals(basis)
+
+            # MO coefficients
+            mo = scf_tensors['C_alpha']
+            mo_occ = mo[:, :nocc].copy()
+            mo_vir = mo[:, nocc:].copy()
+            nvir = mo_vir.shape[1]
+
+            # number of atomic orbitals
+            nao = basis.get_dimensions_of_basis()
+
+            # number of frequencies
+            n_freqs = len(self.frequencies)
+
+        # timings
+        loop_start_time = tm.time()
+
+        # list for distributed arrays
+        dist_omega = []
+
+        for f, w in enumerate(self.frequencies):
+            profiler.set_timing_key(f'omega w={w:.4f}')
+            profiler.start_timer('total')
+
+            full_vec = [
+                self.get_full_solution_vector(lr_results['solutions'][x, w])
+                for x in self.vector_components
+            ]
+
+            if self.rank == mpi_master():
+                cphf_ov = np.zeros((dof_red, nocc * nvir))
+            else:
+                cphf_ov = None
+
+            tmp_cphf_ov = None
+
+            for xy in range(dof_red):
+                # get lambda multipliers from distributed array
+                tmp_cphf_ov = self.cphf_results['dist_cphf_ov'][dof_red * f + xy].get_full_vector()
+                if self.rank == mpi_master():
+                    cphf_ov[xy] += tmp_cphf_ov
+
+            del tmp_cphf_ov
+
+            if self.rank == mpi_master():
+
+                self.ostream.print_info(f'Building omega for w = {w:4.3f}')
+                self.ostream.flush()
+
+                # Note: polorbitalresponse uses r instead of mu for dipole operator
+                for idx, tmp in enumerate(full_vec):
+                    full_vec[idx] *= -1.0
+
+                # lists for reading Fock matrices from distributed arrays
+                fock_ao_rhs = []
+                fock_gxc_ao = []
+
+                cphf_ov = cphf_ov.reshape(dof_red, nocc, nvir)
+
+                # create response vectors in MO basis
+                sqrt2 = np.sqrt(2.0)
+                exc_vec = (1.0 / sqrt2 *
+                           np.array(full_vec)[:, :nocc * nvir].reshape(
+                               dof, nocc, nvir))
+                deexc_vec = (1.0 / sqrt2 *
+                             np.array(full_vec)[:, nocc * nvir:].reshape(
+                                 dof, nocc, nvir))
+
+                x_plus_y_mo = exc_vec + deexc_vec
+                x_minus_y_mo = exc_vec - deexc_vec
+
+                del exc_vec, deexc_vec
+
+                # transform to AO basis: mi,xia,na->xmn
+                x_plus_y_ao = np.array([
+                    np.linalg.multi_dot([mo_occ, x_plus_y_mo[x], mo_vir.T])
+                    for x in range(x_plus_y_mo.shape[0])
+                ])
+                x_minus_y_ao = np.array([
+                    np.linalg.multi_dot([mo_occ, x_minus_y_mo[x], mo_vir.T])
+                    for x in range(x_minus_y_mo.shape[0])
+                ])
+
+                # calculate the one-particle density matrices in MO
+                profiler.start_timer('1PDM')
+                dm_oo, dm_vv = self.calculate_1pdm_red_dim(molecule, basis,
+                                                   scf_tensors, x_plus_y_mo,
+                                                   x_minus_y_mo)
+                profiler.stop_timer('1PDM')
+
+                # calculate dipole contribution to omega
+                profiler.start_timer('dipole')
+
+                omega_dipole_contrib_ao = self.calculate_omega_dipole_contrib_red_dim(
+                    molecule, basis, scf_tensors, x_minus_y_mo)
+
+                profiler.stop_timer('dipole')
+
+                # calculate the density matrices, alpha block only
+                D_occ = np.matmul(mo_occ, mo_occ.T)
+
+                # construct fock_lambda (or fock_cphf)
+                # transform to AO basis: mi,xia,na->xmn
+                cphf_ao = np.array([
+                    np.linalg.multi_dot([mo_occ, cphf_ov[xy], mo_vir.T])
+                    for xy in range(dof_red)
+                ])
+
+                cphf_ao_list = [cphf_ao[x] for x in range(dof_red)]
+
+                del x_plus_y_mo, x_minus_y_mo, cphf_ao
+            else:
+                cphf_ao_list = None
+
+            fock_cphf = self._comp_lr_fock(cphf_ao_list, molecule, basis,
+                                           eri_dict, dft_dict, pe_dict,
+                                           profiler)
+
+            # get Fock matrices from distributed arrays
+            # Notes: fock_ao_rhs is a list with dof**2 matrices corresponding to
+            # the contraction of the 1PDMs with ERIs; dof matrices corresponding
+            # to the contraction of x_plus_y; and other dof matrices corresponding to
+            # the contraction of x_minus_y.
+
+            dim_fock_rhs = dof_red + 2 * dof
+
+            for idx in range(dim_fock_rhs):
+                fock_rhs_i = self.cphf_results['dist_fock_ao_rhs'][
+                    dim_fock_rhs * f + idx].get_full_vector()
+
+                if self.rank == mpi_master():
+                    fock_ao_rhs.append(fock_rhs_i.reshape(nao, nao))
+
+            if self._dft:
+                for idx in range(2 * dof_red):
+                    fock_gxc_i = self.cphf_results['dist_fock_gxc_ao'][
+                        (2 * dof_red) * f + idx
+                    ].get_full_vector()
+
+                    if self.rank == mpi_master():
+                        fock_gxc_ao.append(fock_gxc_i.reshape(nao, nao))
+
+            if self.rank == mpi_master():
+                cphf_ao_list.clear()
+
+                # construct epsilon density matrix
+                epsilon_dm_ao = self.calculate_epsilon_dm_red_dim(molecule, basis,
+                                                          scf_tensors, dm_oo,
+                                                          dm_vv, cphf_ov)
+                del dm_oo, dm_vv
+
+                omega = np.zeros((dof_red, nao, nao))
+
+                for idx, (m,n) in enumerate(xy_pairs):
+                        # TODO: move outside for-loop when all Fock matrices can be
+                        # extracted into a numpy array at the same time.
+
+                        # since the excitation vector is not symmetric,
+                        # we need both the matrix (OO block in omega, and probably VO)
+                        # and its transpose (VV, OV blocks)
+                        # this comes from the transformation of the 2PDM contribution
+                        # from MO to AO basis
+                        fock_ao_rhs_1_m = fock_ao_rhs[dof_red + m]  # x_plus_y
+                        fock_ao_rhs_2_m = fock_ao_rhs[dof_red + dof + m]  # x_minus_y
+
+                        fock_ao_rhs_1_n = fock_ao_rhs[dof_red + n]  # x_plus_y
+                        fock_ao_rhs_2_n = fock_ao_rhs[dof_red + dof + n]  # x_minus_y
+
+                        fmat = (fock_cphf[idx] +
+                                fock_cphf[idx].T +
+                                fock_ao_rhs[idx])
+
+                        # dof=3  (0,0), (0,1), (0,2); (1,0), (1,1), (1,2),
+                        #        (2,0), (2,1), (2,2) * dof
+
+                        # calculate the contributions from 2PDM and relaxed 1PDM
+                        profiler.start_timer('2PDM')
+
+                        omega_1pdm_2pdm_contrib_mn = self.calculate_omega_1pdm_2pdm_contrib(
+                            molecule, basis, scf_tensors, x_plus_y_ao[m],
+                            x_plus_y_ao[n], x_minus_y_ao[m], x_minus_y_ao[n],
+                            fock_ao_rhs_1_m, fock_ao_rhs_2_m, fock_ao_rhs_1_n,
+                            fock_ao_rhs_2_n, fmat)
+
+                        profiler.stop_timer('2PDM')
+
+                        # sum contributions to omega
+                        omega[idx] = (epsilon_dm_ao[idx] + omega_1pdm_2pdm_contrib_mn
+                                       + omega_dipole_contrib_ao[idx])
+                        if self._dft:
+                            omega_gxc_contrib = self.calculate_omega_gxc_contrib_real(
+                                fock_gxc_ao[2 * idx], D_occ)
+
+                            omega[idx] += omega_gxc_contrib
+
+            # save omega in distributed array
+            for xy in range(dof_red):
+                if self.rank == mpi_master():
+                    polorb_omega_xy = omega[xy].reshape(nao * nao)
+                else:
+                    polorb_omega_xy = None
+
+                dist_omega.append(
+                    DistributedArray(polorb_omega_xy, self.comm, root=mpi_master())
+                )
+
+            profiler.stop_timer('total')
+            profiler.check_memory_usage(f'omega w={w:.4f}')
+
+        self.cphf_results['dist_omega_ao'] = dist_omega
+
         profiler.print_memory_subspace({
             'dist_omega_ao': dist_omega
         }, self.ostream)
@@ -1831,10 +3110,13 @@ class PolOrbitalResponse(CphfSolver):
 
         if self.rank == mpi_master():
             self.ostream.print_blank()
-            valstr = '** Time spent on constructing omega multipliers '
-            valstr += f'for {n_freqs} frequencies: '
-            valstr += f'{(tm.time() - loop_start_time):.2f} sec **'
-            self.ostream.print_header(valstr)
+            #valstr = '** Time spent on constructing omega multipliers '
+            #valstr += f'for {n_freqs} frequencies: '
+            #valstr += f'{(tm.time() - loop_start_time):.2f} sec **'
+            valstr = 'CPHF multipliers for '
+            valstr += f'{n_freqs} frequencies computed in '
+            valstr += f'{(tm.time() - loop_start_time):.2f} sec.'
+            self.ostream.print_info(valstr)
             self.ostream.print_blank()
             self.ostream.flush()
 
@@ -1881,7 +3163,7 @@ class PolOrbitalResponse(CphfSolver):
             nao = basis.get_dimensions_of_basis()
 
             # number of occupied MOs
-            nocc = molecule.number_of_alpha_electrons()
+            nocc = molecule.number_of_alpha_occupied_orbitals(basis)
 
             # MO coefficients
             mo = scf_tensors['C_alpha']
@@ -1910,7 +3192,9 @@ class PolOrbitalResponse(CphfSolver):
             if self.rank == mpi_master():
                 cphf_ov = np.zeros((dof, dof, nocc * nvir), dtype=np.dtype('complex128'))
 
-            for idx, xy in enumerate(xy_pairs):
+            tmp_cphf_re, tmp_cphf_im = None, None
+
+            for idx, (x,y) in enumerate(xy_pairs):
                 tmp_cphf_re = self.cphf_results['dist_cphf_ov'][
                     2 * dof_red * f + idx].get_full_vector()
 
@@ -1918,9 +3202,6 @@ class PolOrbitalResponse(CphfSolver):
                     2 * dof_red * f + dof_red + idx].get_full_vector()
 
                 if self.rank == mpi_master():
-                    x = xy[0]
-                    y = xy[1]
-
                     cphf_ov[x, y] += tmp_cphf_re + 1j * tmp_cphf_im
 
                     if y != x:
@@ -1931,13 +3212,13 @@ class PolOrbitalResponse(CphfSolver):
             if self.rank == mpi_master():
 
                 self.ostream.print_info(f'Building omega for w = {w:4.3f}')
+                self.ostream.print_blank()
                 self.ostream.flush()
 
                 # Note: polorbitalresponse uses r instead of mu for dipole operator
                 for idx, tmp in enumerate(full_vec):
                     full_vec[idx] *= -1.0
 
-                # FIXME remove "tmp"
                 # for fock matrices to be read from distributed arrays
                 fock_ao_rhs_real = []
                 fock_ao_rhs_imag = []
@@ -1974,8 +3255,9 @@ class PolOrbitalResponse(CphfSolver):
                 # calculate the one-particle density matrices
                 profiler.start_timer('1PDM')
 
-                dm_oo, dm_vv = self.calculate_1pdm(molecule, scf_tensors,
-                                                   x_plus_y_mo, x_minus_y_mo)
+                dm_oo, dm_vv = self.calculate_1pdm(molecule, basis,
+                                                   scf_tensors, x_plus_y_mo,
+                                                   x_minus_y_mo)
 
                 profiler.stop_timer('1PDM')
 
@@ -2055,8 +3337,9 @@ class PolOrbitalResponse(CphfSolver):
                 omega = np.zeros((dof, dof, nao, nao), dtype=np.dtype('complex128'))
 
                 # construct epsilon density matrix
-                epsilon_dm_ao = self.calculate_epsilon_dm(molecule, scf_tensors,
-                                                          dm_oo, dm_vv, cphf_ov)
+                epsilon_dm_ao = self.calculate_epsilon_dm(molecule, basis,
+                                                          scf_tensors, dm_oo,
+                                                          dm_vv, cphf_ov)
 
                 for m in range(dof):
                     for n in range(m, dof):
@@ -2103,9 +3386,10 @@ class PolOrbitalResponse(CphfSolver):
                         profiler.start_timer('2PDM')
 
                         omega_1pdm_2pdm_contrib = self.calculate_omega_1pdm_2pdm_contrib(
-                            molecule, scf_tensors, x_plus_y_ao[m], x_plus_y_ao[n],
-                            x_minus_y_ao[m], x_minus_y_ao[n], fock_ao_rhs_1_m,
-                            fock_ao_rhs_2_m, fock_ao_rhs_1_n, fock_ao_rhs_2_n, fmat)
+                            molecule, basis, scf_tensors, x_plus_y_ao[m],
+                            x_plus_y_ao[n], x_minus_y_ao[m], x_minus_y_ao[n],
+                            fock_ao_rhs_1_m, fock_ao_rhs_2_m, fock_ao_rhs_1_n,
+                            fock_ao_rhs_2_n, fmat)
 
                         profiler.stop_timer('2PDM')
 
@@ -2161,6 +3445,339 @@ class PolOrbitalResponse(CphfSolver):
 
         self.cphf_results['dist_omega_ao'] = dist_omega
 
+        profiler.print_memory_dictionary({
+            'dist_omega_ao': dist_omega
+        }, self.ostream)
+        profiler.check_memory_usage('End of omega')
+
+        profiler.print_timing(self.ostream)
+        profiler.print_memory_usage(self.ostream)
+        profiler.print_profiling_summary(self.ostream)
+
+        if self.rank == mpi_master():
+            #valstr = '** Time spent on constructing omega multipliers '
+            #valstr += f'for {n_freqs} frequencies: '
+            #valstr += f'{(tm.time() - loop_start_time):.2f} sec **'
+            valstr = 'CPHF multipliers for '
+            valstr += f'{n_freqs} frequencies computed in '
+            valstr += f'{(tm.time() - loop_start_time):.2f} sec.'
+            self.ostream.print_info(valstr)
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+    def compute_omega_complex_red_dim(self, molecule, basis, scf_tensors, lr_results):
+        """
+        Calculates the complex polarizability Lagrange multipliers for the
+        overlap matrix.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param scf_tensors:
+            The tensors from the converged SCF calculation.
+        :param lr_results:
+            The results from the CPP calculation.
+        """
+
+        profiler = Profiler({
+            'timing': self.timing,
+            'profiling': self.profiling,
+            'memory_profiling': self.memory_profiling,
+            'memory_tracing': self.memory_tracing,
+        })
+
+        # ERI information
+        eri_dict = self._init_eri(molecule, basis)
+        # DFT information
+        dft_dict = self._init_dft(molecule, scf_tensors)
+        # PE information
+        pe_dict = self._init_pe(molecule, basis)
+
+        # number of vector components
+        dof = len(self.vector_components)
+
+        # unique permutations of operator components
+        xy_pairs = [(x, y) for x in range(dof) for y in range(x, dof)]
+
+        # reduced dimensions
+        dof_red = len(xy_pairs)
+
+        if self.rank == mpi_master():
+            # number of atomic orbitals
+            nao = basis.get_dimensions_of_basis()
+
+            # number of occupied MOs
+            nocc = molecule.number_of_alpha_occupied_orbitals(basis)
+
+            # MO coefficients
+            mo = scf_tensors['C_alpha']
+            mo_occ = mo[:, :nocc].copy()
+            mo_vir = mo[:, nocc:].copy()
+            nvir = mo_vir.shape[1]
+
+            # number of frequencies
+            n_freqs = len(self.frequencies)
+
+        # timings
+        loop_start_time = tm.time()
+
+        # list for omega distributeed arrays
+        dist_omega = []
+
+        for f, w in enumerate(self.frequencies):
+            profiler.set_timing_key(f'omega w={w:.4f}')
+            profiler.start_timer('total')
+
+            full_vec = [
+                self.get_full_solution_vector(lr_results['solutions'][x, w])
+                for x in self.vector_components
+            ]
+
+            if self.rank == mpi_master():
+                cphf_ov = np.zeros((dof_red, nocc * nvir), dtype=np.dtype('complex128'))
+
+            tmp_cphf_re, tmp_cphf_im = None, None
+
+            #for idx, xy in enumerate(xy_pairs):
+            for idx in range(dof_red):
+                tmp_cphf_re = self.cphf_results['dist_cphf_ov'][
+                    2 * dof_red * f + idx].get_full_vector()
+
+                tmp_cphf_im = self.cphf_results['dist_cphf_ov'][
+                    2 * dof_red * f + dof_red + idx].get_full_vector()
+
+                if self.rank == mpi_master():
+                    cphf_ov[idx] += tmp_cphf_re + 1j * tmp_cphf_im
+
+            del tmp_cphf_re, tmp_cphf_im
+
+            if self.rank == mpi_master():
+
+                self.ostream.print_info(f'Building omega for w = {w:4.3f}')
+                self.ostream.flush()
+
+                # Note: polorbitalresponse uses r instead of mu for dipole operator
+                for idx, tmp in enumerate(full_vec):
+                    full_vec[idx] *= -1.0
+
+                # for fock matrices to be read from distributed arrays
+                fock_ao_rhs_real = []
+                fock_ao_rhs_imag = []
+                fock_gxc_ao_rere = []
+                fock_gxc_ao_imim = []
+                fock_gxc_ao_reim = []
+                fock_gxc_ao_imre = []
+
+                cphf_ov = cphf_ov.reshape(dof_red, nocc, nvir)
+
+                # extract the excitation and de-excitation components
+                # from the full solution vector.
+                sqrt2 = np.sqrt(2.0)
+                exc_vec = (1.0 / sqrt2 * np.array(full_vec)[:, :nocc * nvir].reshape(
+                    dof, nocc, nvir))
+                deexc_vec = (1.0 / sqrt2 * np.array(full_vec)[:, nocc * nvir:].reshape(
+                    dof, nocc, nvir))
+
+                x_plus_y_mo = exc_vec + deexc_vec
+                x_minus_y_mo = exc_vec - deexc_vec
+
+                del exc_vec, deexc_vec
+
+                # transform to AO basis: mi,xia,na->xmn
+                x_plus_y_ao = np.array([
+                    np.linalg.multi_dot([mo_occ, x_plus_y_mo[x], mo_vir.T])
+                    for x in range(x_plus_y_mo.shape[0])
+                ])
+                x_minus_y_ao = np.array([
+                    np.linalg.multi_dot([mo_occ, x_minus_y_mo[x], mo_vir.T])
+                    for x in range(x_minus_y_mo.shape[0])
+                ])
+
+                # calculate the one-particle density matrices
+                profiler.start_timer('1PDM')
+
+                dm_oo, dm_vv = self.calculate_1pdm_red_dim(molecule, basis,
+                                                   scf_tensors, x_plus_y_mo,
+                                                   x_minus_y_mo)
+
+                profiler.stop_timer('1PDM')
+
+                # calculate dipole contribution to omega
+                profiler.start_timer('dipole')
+
+                omega_dipole_contrib_ao = self.calculate_omega_dipole_contrib_red_dim(
+                    molecule, basis, scf_tensors, x_minus_y_mo)
+
+                profiler.stop_timer('dipole')
+
+                # calculate the density matrices, alpha block only
+                D_occ = np.matmul(mo_occ, mo_occ.T)
+
+                # construct fock_lambda (or fock_cphf)
+                # transform to AO basis: mi,xia,na->xmn
+                cphf_ao = np.array([
+                    np.linalg.multi_dot([mo_occ, cphf_ov[x], mo_vir.T])
+                    for x in range(dof_red)
+                ])
+
+                cphf_ao_list_real = list(
+                    np.array([cphf_ao[x].real for x in range(dof_red)]))
+                cphf_ao_list_imag = list(
+                    np.array([cphf_ao[x].imag for x in range(dof_red)]))
+
+                del x_plus_y_mo, x_minus_y_mo, cphf_ao
+            else:
+                cphf_ao_list_real = None
+                cphf_ao_list_imag = None
+
+            fock_cphf_real = self._comp_lr_fock(cphf_ao_list_real, molecule, basis,
+                                                eri_dict, dft_dict, pe_dict,
+                                                profiler)
+            fock_cphf_imag = self._comp_lr_fock(cphf_ao_list_imag, molecule, basis,
+                                                eri_dict, dft_dict, pe_dict,
+                                                profiler)
+
+            # get Fock matrix intermediates from distributed arrays
+            # Notes: fock_ao_rhs is a list with dof**2 matrices corresponding to
+            # the contraction of the 1PDMs with ERIs; dof matrices corresponding
+            # to the contraction of x_plus_y; and other dof matrices corresponding to
+            # the contraction of x_minus_y.
+
+            dim_fock_rhs = dof_red + 2 * dof
+
+            for idx in range(dim_fock_rhs):
+                fock_rhs_re_i = self.cphf_results['dist_fock_ao_rhs'][
+                    2 * dim_fock_rhs * f + idx].get_full_vector()
+                fock_rhs_im_i = self.cphf_results['dist_fock_ao_rhs'][
+                    2 * dim_fock_rhs * f + dim_fock_rhs + idx].get_full_vector()
+
+                if self.rank == mpi_master():
+                    fock_ao_rhs_real.append(fock_rhs_re_i.reshape(nao, nao))
+                    fock_ao_rhs_imag.append(fock_rhs_im_i.reshape(nao, nao))
+
+            if self._dft:
+                # dist_fock_gxc_ao contains all combinations of the complex
+                # vectors: Re/Re, Im/Im, Re/Im, Im/Re (in that order)
+                dim_fock_gxc = 2 * dof_red
+                for idx in range(dim_fock_gxc):
+                    fock_gxc_rere_i = self.cphf_results['dist_fock_gxc_ao'][
+                        dim_fock_gxc * 4 * f + idx].get_full_vector()
+                    fock_gxc_imim_i = self.cphf_results['dist_fock_gxc_ao'][
+                        dim_fock_gxc * 4 * f + dim_fock_gxc + idx].get_full_vector()
+                    fock_gxc_reim_i = self.cphf_results['dist_fock_gxc_ao'][
+                        dim_fock_gxc * 4 * f + 2 * dim_fock_gxc + idx].get_full_vector()
+                    fock_gxc_imre_i = self.cphf_results['dist_fock_gxc_ao'][
+                        dim_fock_gxc * 4 * f + 3 * dim_fock_gxc + idx].get_full_vector()
+
+                    if self.rank == mpi_master():
+                        fock_gxc_ao_rere.append(fock_gxc_rere_i.reshape(nao, nao))
+                        fock_gxc_ao_imim.append(fock_gxc_imim_i.reshape(nao, nao))
+                        fock_gxc_ao_reim.append(fock_gxc_reim_i.reshape(nao, nao))
+                        fock_gxc_ao_imre.append(fock_gxc_imre_i.reshape(nao, nao))
+
+            if self.rank == mpi_master():
+                omega = np.zeros((dof_red, nao, nao), dtype=np.dtype('complex128'))
+
+                # construct epsilon density matrix
+                epsilon_dm_ao = self.calculate_epsilon_dm_red_dim(molecule, basis,
+                                                          scf_tensors, dm_oo,
+                                                          dm_vv, cphf_ov)
+                del dm_oo, dm_vv
+
+                for idx, (m,n) in enumerate(xy_pairs):
+                    # TODO: move outside for-loop when all Fock matrices can be
+                    # extracted into a numpy array at the same time.
+
+                    # Because the excitation vector is not symmetric,
+                    # we need both the matrix (OO block in omega, and probably VO)
+                    # and its transpose (VV, OV blocks)
+                    # this comes from the transformation of the 2PDM contribution
+                    # from MO to AO basis
+                    fock_ao_rhs_1_m = (
+                        fock_ao_rhs_real[dof_red + m] + 
+                       1j * fock_ao_rhs_imag[dof_red + m]
+                    )  # x_plus_y
+                    fock_ao_rhs_2_m = (
+                        fock_ao_rhs_real[dof_red + dof + m] +
+                        1j * fock_ao_rhs_imag[dof_red + dof + m]
+                    )  # x_minus_y
+
+                    fock_ao_rhs_1_n = (
+                        fock_ao_rhs_real[dof_red + n] +
+                        1j * fock_ao_rhs_imag[dof_red + n]
+                    )  # x_plus_y
+                    fock_ao_rhs_2_n = (
+                        fock_ao_rhs_real[dof_red + dof + n] +
+                        1j * fock_ao_rhs_imag[dof_red + dof + n]
+                    )  # x_minus_y
+
+                    fmat = ((fock_cphf_real[idx] +
+                             fock_cphf_real[idx].T +
+                             fock_ao_rhs_real[idx]) +
+                            1j *
+                            (fock_cphf_imag[idx] +
+                             fock_cphf_imag[idx].T +
+                             fock_ao_rhs_imag[idx]))
+
+                    # dof=3  (0,0), (0,1), (0,2); (1,0), (1,1), (1,2),
+                    #        (2,0), (2,1), (2,2) * dof
+
+                    # compute the contributions from 2PDM and relaxed 1PDM
+                    profiler.start_timer('2PDM')
+
+                    omega_1pdm_2pdm_contrib_mn = self.calculate_omega_1pdm_2pdm_contrib(
+                        molecule, basis, scf_tensors, x_plus_y_ao[m],
+                        x_plus_y_ao[n], x_minus_y_ao[m], x_minus_y_ao[n],
+                        fock_ao_rhs_1_m, fock_ao_rhs_2_m, fock_ao_rhs_1_n,
+                        fock_ao_rhs_2_n, fmat)
+
+                    profiler.stop_timer('2PDM')
+
+                    # sum contributions to omega
+                    omega[idx] = (epsilon_dm_ao[idx] +
+                                   omega_1pdm_2pdm_contrib_mn +
+                                   omega_dipole_contrib_ao[idx])
+
+                    if self._dft:
+                        fock_gxc_ao_mn_list = [
+                            fock_gxc_ao_rere[2 * idx],
+                            fock_gxc_ao_imim[2 * idx],
+                            fock_gxc_ao_reim[2 * idx],
+                            fock_gxc_ao_imre[2 * idx],
+                        ]
+                        omega_gxc_contrib = self.calculate_omega_gxc_contrib_complex(
+                            fock_gxc_ao_mn_list, D_occ
+                        )
+                        omega[idx] += omega_gxc_contrib
+
+            # save omega in distributed array
+            dist_polorb_omega_re = []
+            dist_polorb_omega_im = []
+
+            for xy in range(dof_red):
+                if self.rank == mpi_master():
+                    polorb_omega_xy_re = omega[xy].real.copy().reshape(nao * nao)
+                    polorb_omega_xy_im = omega[xy].imag.copy().reshape(nao * nao)
+                else:
+                    polorb_omega_xy_re = None
+                    polorb_omega_xy_im = None
+
+                dist_polorb_omega_re.append(
+                    DistributedArray(polorb_omega_xy_re, self.comm, root=mpi_master())
+                )
+                dist_polorb_omega_im.append(
+                    DistributedArray(polorb_omega_xy_im, self.comm, root=mpi_master())
+                )
+
+            dist_omega.extend(dist_polorb_omega_re + dist_polorb_omega_im)
+            del dist_polorb_omega_re, dist_polorb_omega_im
+
+            profiler.stop_timer('total')
+            profiler.check_memory_usage(f'omega w={w:.4f}')
+
+        self.cphf_results['dist_omega_ao'] = dist_omega
+
         profiler.print_memory_subspace({
             'dist_omega_ao': dist_omega
         }, self.ostream)
@@ -2171,10 +3788,13 @@ class PolOrbitalResponse(CphfSolver):
         profiler.print_profiling_summary(self.ostream)
 
         if self.rank == mpi_master():
-            valstr = '** Time spent on constructing omega multipliers '
-            valstr += f'for {n_freqs} frequencies: '
-            valstr += f'{(tm.time() - loop_start_time):.2f} sec **'
-            self.ostream.print_header(valstr)
+            #valstr = '** Time spent on constructing omega multipliers '
+            #valstr += f'for {n_freqs} frequencies: '
+            #valstr += f'{(tm.time() - loop_start_time):.2f} sec **'
+            valstr = 'CPHF multipliers for '
+            valstr += f'{n_freqs} frequencies computed in '
+            valstr += f'{(tm.time() - loop_start_time):.2f} sec.'
+            self.ostream.print_info(valstr)
             self.ostream.print_blank()
             self.ostream.flush()
 
@@ -2197,7 +3817,7 @@ class PolOrbitalResponse(CphfSolver):
 
         # MO coefficients
         mo = scf_tensors['C_alpha']  # only alpha part
-        nocc = molecule.number_of_alpha_electrons()
+        nocc = molecule.number_of_alpha_occupied_orbitals(basis)
         mo_occ = mo[:, :nocc].copy()
         mo_vir = mo[:, nocc:].copy()
 
@@ -2271,7 +3891,115 @@ class PolOrbitalResponse(CphfSolver):
 
         return omega_dipole_contrib
 
-    def calculate_epsilon_dm(self, molecule, scf_tensors, dm_oo, dm_vv, lambda_ov):
+    def calculate_omega_dipole_contrib_red_dim(self, molecule, basis, scf_tensors, x_minus_y_mo):
+        """
+        Calculates the dipole contribution to the omega multipliers.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param scf_tensors:
+            The tensors from the converged SCF calculation.
+        :param x_minus_y_mo:
+            The X-Y response vectors in MO basis.
+
+        :return omega_dipole_contrib:
+            The dipole moment contribution to omega multipliers
+        """
+
+        # degrees of freedom
+        dof = len(self.vector_components)
+
+        # unique permutations of operator components
+        xy_pairs = [(x,y) for x in range(dof) for y in range(x, dof)]
+
+        # reduced dimensions
+        dof_red = len(xy_pairs)
+
+        # MO coefficients
+        mo = scf_tensors['C_alpha']  # only alpha part
+        nocc = molecule.number_of_alpha_occupied_orbitals(basis)
+        mo_occ = mo[:, :nocc].copy()
+        mo_vir = mo[:, nocc:].copy()
+
+        # number of AOs
+        nao = mo.shape[0]
+
+        # determine data type of the omega multipliers
+        if self.is_complex:
+            omega_dt = np.dtype('complex128')
+        else:
+            omega_dt = np.dtype('float64')
+
+        # get dipole moment integrals
+        dipole_mats = compute_electric_dipole_integrals(molecule, basis,
+                                                        [0.0, 0.0, 0.0])
+
+        dipole_ints_ao = np.zeros((dof, nao, nao))
+        k = 0
+        if 'x' in self.vector_components:
+            # Note: polorbitalresponse uses r instead of mu for dipole operator
+            dipole_ints_ao[k] = -1.0 * dipole_mats[0]
+            k += 1
+        if 'y' in self.vector_components:
+            # Note: polorbitalresponse uses r instead of mu for dipole operator
+            dipole_ints_ao[k] = -1.0 * dipole_mats[1]
+            k += 1
+        if 'z' in self.vector_components:
+            # Note: polorbitalresponse uses r instead of mu for dipole operator
+            dipole_ints_ao[k] = -1.0 * dipole_mats[2]
+
+        # transform to MO basis (oo and ov blocks only)
+        dipole_ints_oo = np.array([
+            np.linalg.multi_dot([mo_occ.T, dipole_ints_ao[x], mo_occ])
+            for x in range(dof)
+        ])
+        dipole_ints_ov = np.array([
+            np.linalg.multi_dot([mo_occ.T, dipole_ints_ao[x], mo_vir])
+            for x in range(dof)
+        ])
+
+        #omega_dipole_contrib = np.zeros((dof, dof, nao, nao), dtype=omega_dt)
+        omega_dipole_contrib = np.zeros((dof_red, nao, nao), dtype=omega_dt)
+
+        #for x in range(dof):
+        #    for y in range(x, dof):
+        for idx, (x,y) in enumerate(xy_pairs):
+
+            tmp_oo = 0.5 * (np.linalg.multi_dot([  # xjc,yic->xyij
+                dipole_ints_ov[y], x_minus_y_mo[x].T])
+                + np.linalg.multi_dot(  # yjc,xic->xyij
+                [dipole_ints_ov[x], x_minus_y_mo[y].T]))
+
+            tmp_ov = 0.5 * (np.linalg.multi_dot([  # xka,yki->xyia
+                dipole_ints_oo[y].T, x_minus_y_mo[x]])
+                + np.linalg.multi_dot(  # yka,xki->xyia
+                [dipole_ints_oo[x].T, x_minus_y_mo[y]]))
+
+            tmp_vv = 0.5 * (np.linalg.multi_dot([  # xkb,yka->xyab
+                dipole_ints_ov[y].T, x_minus_y_mo[x]])
+                + np.linalg.multi_dot(  # ykb,xka->xyab
+                [dipole_ints_ov[x].T, x_minus_y_mo[y]]))
+
+            #omega_dipole_contrib[x, y] = (
+            omega_dipole_contrib[idx] = (
+                # mi,xyij,nj->xymn
+                np.linalg.multi_dot([mo_occ, tmp_oo, mo_occ.T]) +
+                # mi,xyia,na->xymn
+                np.linalg.multi_dot([mo_occ, tmp_ov, mo_vir.T]) +
+                # mi,xyia,na->xymn
+                np.linalg.multi_dot([mo_occ, tmp_ov, mo_vir.T]).T +
+                # ma,xyab,nb->xymn
+                np.linalg.multi_dot([mo_vir, tmp_vv, mo_vir.T]))
+
+            #if y != x:
+            #    omega_dipole_contrib[y, x] = omega_dipole_contrib[x, y]
+
+        return omega_dipole_contrib
+
+    def calculate_epsilon_dm(self, molecule, basis, scf_tensors, dm_oo, dm_vv,
+                             lambda_ov):
         """
         Calculates the epsilon density matrix for the omega multipliers
 
@@ -2295,7 +4023,7 @@ class PolOrbitalResponse(CphfSolver):
 
         # MO coefficients
         mo = scf_tensors['C_alpha']  # only alpha part
-        nocc = molecule.number_of_alpha_electrons()
+        nocc = molecule.number_of_alpha_occupied_orbitals(basis)
         mo_occ = mo[:, :nocc].copy()
         mo_vir = mo[:, nocc:].copy()
         nvir = mo_vir.shape[1]
@@ -2343,7 +4071,84 @@ class PolOrbitalResponse(CphfSolver):
 
         return epsilon_dm
 
-    def calculate_omega_1pdm_2pdm_contrib(self, molecule, scf_tensors,
+    def calculate_epsilon_dm_red_dim(self, molecule, basis, scf_tensors, dm_oo, dm_vv,
+                             lambda_ov):
+        """
+        Calculates the epsilon density matrix for the omega multipliers
+
+        :param molecule:
+            The molecule.
+        :param scf_tensors:
+            The tensors from the converged SCF calculation.
+        :param dm_oo:
+            Occ/occ block of the one-particle density matrix.
+        :param dm_vv:
+            Vir/vir block of the one-particle density matrix.
+        :param lambda_ov:
+            The lambda multipliers in MO basis.
+
+        :return epsilon_dm:
+            The epsilon density matrix in AO basis in reduced dimensions.
+        """
+
+        # degrees of freedom
+        dof = len(self.vector_components)
+
+        # unique permutations of operator components
+        xy_pairs = [(x,y) for x in range(dof) for y in range(x, dof)]
+
+        # reduced dimensions
+        dof_red = len(xy_pairs)
+
+        # MO coefficients
+        mo = scf_tensors['C_alpha']  # only alpha part
+        nocc = molecule.number_of_alpha_occupied_orbitals(basis)
+        mo_occ = mo[:, :nocc].copy()
+        mo_vir = mo[:, nocc:].copy()
+        nvir = mo_vir.shape[1]
+
+        # number of AOs
+        nao = mo.shape[0]
+
+        # orbital energies
+        mo_energies = scf_tensors['E_alpha']
+        eocc = mo_energies[:nocc]
+        evir = mo_energies[nocc:]
+        eo_diag = np.diag(eocc)
+        ev_diag = np.diag(evir)
+
+        # determine data type of the density matrix
+        if self.is_complex:
+            epsilon_dt = np.dtype('complex128')
+        else:
+            epsilon_dt = np.dtype('float64')
+
+        # construct epsilon density matrix
+        epsilon_dm = np.zeros((dof_red, nao, nao), dtype=epsilon_dt)
+        epsilon_lambda = np.zeros((dof_red, nao, nao), dtype=epsilon_dt)
+
+        #for idx, xy in enumerate(xy_pairs):
+        for idx in range(dof_red):
+            # mi,ii,xyij,nj->xymn
+            epsilon_dm[idx] = -1.0 * np.linalg.multi_dot(
+                [mo_occ, eo_diag, dm_oo[idx], mo_occ.T])
+
+            # ma,aa,xyab,nb->xymn
+            epsilon_dm[idx] -= np.linalg.multi_dot(
+                [mo_vir, ev_diag, dm_vv[idx], mo_vir.T])
+
+            # mi,ii,xyia,na->xymn
+            epsilon_lambda[idx] = np.linalg.multi_dot([
+                mo_occ, eo_diag,
+                lambda_ov.reshape(dof_red, nocc, nvir)[idx],
+                mo_vir.T])
+
+        # symmetrize (OV + VO)
+        epsilon_dm -= (epsilon_lambda + epsilon_lambda.transpose(0, 2, 1))
+
+        return epsilon_dm
+
+    def calculate_omega_1pdm_2pdm_contrib(self, molecule, basis, scf_tensors,
                                           x_plus_y_ao_m, x_plus_y_ao_n,
                                           x_minus_y_ao_m, x_minus_y_ao_n,
                                           fock_ao_rhs_1_m, fock_ao_rhs_2_m,
@@ -2376,7 +4181,7 @@ class PolOrbitalResponse(CphfSolver):
 
         # MO coefficients
         mo = scf_tensors['C_alpha']  # only alpha part
-        nocc = molecule.number_of_alpha_electrons()
+        nocc = molecule.number_of_alpha_occupied_orbitals(basis)
         mo_occ = mo[:, :nocc].copy()
         mo_vir = mo[:, nocc:].copy()
 

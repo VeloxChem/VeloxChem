@@ -40,7 +40,7 @@ import re
 from .veloxchemlib import mpi_master
 from .veloxchemlib import chemical_element_identifier
 from .outputstream import OutputStream
-from .errorhandler import safe_arccos
+from .mathutils import safe_arccos
 
 
 class AtomTypeIdentifier:
@@ -1542,7 +1542,11 @@ class AtomTypeIdentifier:
                 #        for carbon in carbons):
                 #     ...
 
-                oxygen_type = {'opls': 'opls_XXX', 'gaff': 'o'}
+                if connected_symbols == {'H'}:
+                    # oxygen in OH
+                    oxygen_type = {'opls': 'opls_154', 'gaff': 'oh'}
+                else:
+                    oxygen_type = {'opls': 'opls_XXX', 'gaff': 'o'}
 
         # Cyclic
 

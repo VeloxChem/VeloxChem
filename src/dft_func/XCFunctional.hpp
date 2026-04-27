@@ -92,11 +92,13 @@ class CXCFunctional
      * @param[in] labels list of labels of functional components.
      * @param[in] coeffs list of coefficients for functional components.
      * @param[in] fractionOfExactExchange fraction of exact exchange.
+     * @param[in] rangeSeparatedParameters range-separated parameters.
      */
     CXCFunctional(const std::string&              nameOfFunctional,
                   const std::vector<std::string>& labels,
                   const std::vector<double>&      coeffs,
-                  const double                    fractionOfExactExchange = 0.0);
+                  const double                    fractionOfExactExchange = 0.0,
+                  const std::vector<double>&      rangeSeparatedParameters = std::vector<double>());
 
     /**
      Creates an XC functional object by copying other XC functional object.
@@ -590,12 +592,6 @@ class CXCFunctional
      * @return dimension of derivatives.
      */
     const int getDimensionOfDerivatives() const;
-
-    /** Sets omega range-separation parameter of functional.
-     *
-     * @omega the value of omega parameter.
-     */
-    auto setRangeSeparatedParameterOmega(const double omega) -> void;
 
     /** Gets Libxc version.
      *

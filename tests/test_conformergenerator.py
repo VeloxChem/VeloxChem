@@ -1,23 +1,16 @@
 from pathlib import Path
 from mpi4py import MPI
 import pytest
-import sys
 
 from veloxchem.conformergenerator import ConformerGenerator
 from veloxchem.molecule import Molecule
 
-try:
-    import openmm
-    import rdkit
-except ImportError:
-    pass
+pytest.importorskip("openmm")
+pytest.importorskip("rdkit")
 
 
 class TestConformerGenerator:
 
-    @pytest.mark.skipif("openmm" not in sys.modules or
-                        "rdkit" not in sys.modules,
-                        reason="openmm or rdkit not available")
     def test_conformergenerator(self):
 
         molecule = Molecule.read_xyz_string("""
@@ -118,6 +111,35 @@ class TestConformerGenerator:
             assert (conf.global_minimum_energy > -65.0 and
                     conf.global_minimum_energy < -60.0)
 
+            if conf.use_gromacs_files:
+                for suffix in ['.top', '.itp', '.gro']:
+                    top_fpath.with_suffix(suffix).unlink()
+            else:
+                for suffix in ['.xml', '.pdb']:
+                    top_fpath.with_suffix(suffix).unlink()
+
+    def test_conformergenerator_with_macrocycle(self):
+
+        # PubChem CID 6000
+        smiles_str = "CN1CCC2=CC(=C3C=C2[C@@H]1CC4=CC=C(C=C4)OC5=C6[C@@H](CC7=CC(=C(C=C7)O)O3)[N+](CCC6=CC(=C5O)OC)(C)C)OC"
+
+        molecule = Molecule.read_smiles(smiles_str)
+
+        here = Path(__file__).parent
+        top_fpath = here / 'data' / 'vlx_conf_gen_macrocycle.top'
+
+        conf = ConformerGenerator()
+        conf.top_file_name = str(top_fpath)
+        conf.use_gromacs_files = True
+        conf.save_xyz_files = False
+        conf.resp_charges = False
+
+        conf.ostream.mute()
+        conf_results_not_used = conf.generate(molecule)
+
+        if MPI.COMM_WORLD.Get_rank() == 0:
+            # This test is to verify that conformergenerator work with
+            # macrocycle. No assertion on actual energy numbers.
             if conf.use_gromacs_files:
                 for suffix in ['.top', '.itp', '.gro']:
                     top_fpath.with_suffix(suffix).unlink()

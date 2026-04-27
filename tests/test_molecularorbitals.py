@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 import h5py
 import numpy as np
 import pytest
@@ -78,6 +80,39 @@ class TestMolecularOrbitals:
         assert np.array_equal(mol_orbs.eb_to_numpy(), mol_orbs.ea_to_numpy())
         assert np.array_equal(mol_orbs.occb_to_numpy(),
                               mol_orbs.occa_to_numpy())
+
+    @pytest.mark.parametrize(
+        'factory_name,expected_type',
+        [
+            ('make_restricted', molorb.rest),
+            ('make_unrestricted', molorb.unrest),
+            ('make_restricted_openshell', molorb.restopen),
+        ],
+    )
+    def test_deepcopy_returns_independent_copy(self, factory_name,
+                                               expected_type):
+
+        mol_orbs = getattr(self, factory_name)()
+        copied = deepcopy(mol_orbs)
+
+        assert not copied.is_empty()
+        assert copied.get_orbitals_type() == expected_type
+        assert np.array_equal(copied.alpha_to_numpy(), mol_orbs.alpha_to_numpy())
+        assert np.array_equal(copied.ea_to_numpy(), mol_orbs.ea_to_numpy())
+        assert np.array_equal(copied.occa_to_numpy(), mol_orbs.occa_to_numpy())
+
+        copied_alpha = copied.alpha_to_numpy()
+        copied_alpha[0, 0] += 1.0
+        assert not np.array_equal(copied_alpha, mol_orbs.alpha_to_numpy())
+
+        if expected_type == molorb.unrest:
+            assert np.array_equal(copied.beta_to_numpy(),
+                                  mol_orbs.beta_to_numpy())
+            assert np.array_equal(copied.eb_to_numpy(), mol_orbs.eb_to_numpy())
+
+        if expected_type != molorb.rest:
+            assert np.array_equal(copied.occb_to_numpy(),
+                                  mol_orbs.occb_to_numpy())
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='skip pytest.raises for multiple MPI processes')

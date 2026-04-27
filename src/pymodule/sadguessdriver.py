@@ -34,6 +34,7 @@ import numpy as np
 
 from .veloxchemlib import OverlapDriver
 from .errorhandler import assert_msg_critical
+from .mathutils import symmetric_matrix_function
 
 
 class SadGuessDriver:
@@ -996,22 +997,16 @@ class SadGuessDriver:
             # projection of C in minimal basis to target basis
             # based on S_22 C_2 == S_21 C_1 and orthonormality
 
-            eigvals, eigvecs = np.linalg.eigh(block_22)
-            block_22_inv = np.linalg.multi_dot(
-                [eigvecs, np.diag(1.0 / eigvals), eigvecs.T])
+            block_22_inv = symmetric_matrix_function(block_22,
+                                                     lambda x: 1.0 / x,
+                                                     thresh=1.0e-12)
 
             # overlap after direct projection using S_22^-1 S_21
             mat_s = np.linalg.multi_dot([block_12, block_22_inv, block_12.T])
 
-            eigvals, eigvecs = np.linalg.eigh(mat_s)
-
-            num_eigs = sum(eigvals > 1e-12)  # hard-coded threshold
-            if num_eigs < eigvals.size:
-                eigvals = eigvals[-num_eigs:]
-                eigvecs = eigvecs[:, -num_eigs:]
-
-            mat_m = np.linalg.multi_dot(
-                [eigvecs, np.diag(1.0 / np.sqrt(eigvals)), eigvecs.T])
+            mat_m = symmetric_matrix_function(mat_s,
+                                              lambda x: 1.0 / np.sqrt(x),
+                                              thresh=1.0e-12)
 
             mat_c2 = np.linalg.multi_dot([block_22_inv, block_12.T, mat_m])
 
