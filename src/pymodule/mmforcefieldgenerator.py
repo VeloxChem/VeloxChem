@@ -2695,7 +2695,7 @@ class MMForceFieldGenerator:
                 non_rotatable_bonds.add((atom1, atom2))
                 non_rotatable_bonds.add((atom2, atom1))
         for atom1 in ['c ']:
-            for atom2 in ['n ', 'ns']:
+            for atom2 in ['n ', 'ns', 'os', 'cd']: # note check with xin if that change is okay!
                 non_rotatable_bonds.add((atom1, atom2))
                 non_rotatable_bonds.add((atom2, atom1))
         non_rotatable_bonds = list(non_rotatable_bonds)

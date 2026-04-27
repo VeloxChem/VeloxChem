@@ -44,10 +44,7 @@ import copy
 from contextlib import redirect_stderr
 from io import StringIO
 from .interpolationdatapoint import InterpolationDatapoint
-import multiprocessing as mp
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 
-from .molecule import Molecule
 from .outputstream import OutputStream
 from .veloxchemlib import mpi_master
 
@@ -56,136 +53,10 @@ from .inputparser import (parse_input)
 
 from .imrotorbuilder import build_runtime_cluster_set
 
-from .imlocalengine import InterpolationLocalPreloadEngine
-from .immpiengine import (
-    InterpolationMPIPreloadEngine,
-    StepPacket,
-    evaluate_candidate_taylor,
-)
 
 with redirect_stderr(StringIO()) as fg_err:
     import geometric
 
-class _OuterShepardWorkerRuntime:
-    """Process-local runtime for outer-label evaluation."""
-    driver = None
-    label_lookup = None
-
-    @classmethod
-    def initialize(cls, payload):
-        settings = dict(payload["settings"])
-        settings["use_mpi_preload"] = False
-        settings["use_outer_parallel"] = False
-
-
-        zmat = payload.get("z_matrix", None)
-        assert_msg_critical(
-            isinstance(zmat, dict),
-            "Outer worker expected canonical z-matrix dict."
-        )
-
-        drv = InterpolationDriver(z_matrix=zmat, comm=MPI.COMM_SELF, ostream=None)
-        drv.update_settings(settings)
-        drv.symmetry_information = payload.get("symmetry_information", None)
-
-        # Outer workers should not instantiate local process preload backend.
-        # Cluster thread parallel remains controlled by use_local_preload/local_preload_*.
-        drv.local_preload_enabled = False
-        drv.local_engine = None
-        drv._apply_local_thread_env()
-
-        inv_sqrt = payload.get("inv_sqrt_masses", None)
-        if inv_sqrt is not None:
-            inv_sqrt = np.asarray(inv_sqrt, dtype=np.float64).copy()
-        drv.impes_coordinate.inv_sqrt_masses = inv_sqrt
-
-        labels, _ = drv.read_labels()
-        qm_data_points = []
-        qm_symmetry_data_points = {}
-        old_label = None
-
-        for label in labels:
-            dp = InterpolationDatapoint(zmat)
-            dp.update_settings(settings)
-            dp.read_hdf5(settings["imforcefield_file"], label)
-            dp.inv_sqrt_masses = inv_sqrt
-
-            if dp.bank_role == "core" or ("cluster" not in dp.point_label and "symmetry" not in dp.point_label):
-                qm_data_points.append(dp)
-                old_label = dp.point_label
-                qm_symmetry_data_points[old_label] = [dp]
-            elif dp.bank_role == "symmetry" and old_label is not None:
-                qm_symmetry_data_points[old_label].append(dp)
-
-        if qm_data_points:
-            drv.impes_coordinate.eq_bond_lengths = qm_data_points[0].eq_bond_lengths
-
-        drv.qm_data_points = qm_data_points
-        drv.qm_symmetry_data_points = qm_symmetry_data_points
-        drv.labels = [dp.point_label for dp in qm_data_points]
-        drv.qm_rotor_cluster_banks = payload.get("rotor_cluster_banks", {}) or {}
-
-        cls.driver = drv
-        suffixes = (
-            "_rinv_cosine", "_rinv_dihedral",
-            "_eq_cosine", "_eq_dihedral",
-            "_r_cosine", "_r_dihedral",
-        )
-
-        lookup = {}
-        for dp in qm_data_points:
-            lbl = str(dp.point_label)
-            lookup[lbl] = dp
-            for sfx in suffixes:
-                if lbl.endswith(sfx):
-                    lookup.setdefault(lbl[:-len(sfx)], dp)
-                    break
-
-        cls.label_lookup = lookup
-
-    @classmethod
-    def evaluate_chunk(cls, task_payload):
-        if cls.driver is None or cls.label_lookup is None:
-            raise RuntimeError("Outer worker runtime is not initialized.")
-
-        coords_bohr, label_chunk = task_payload
-        drv = cls.driver
-
-        drv.bond_rmsd = []
-        drv.angle_rmsd = []
-        drv.dihedral_rmsd = []
-
-        drv.define_impes_coordinate(np.asarray(coords_bohr, dtype=np.float64))
-        org_int = np.asarray(drv.impes_coordinate.internal_coordinates_values, dtype=np.float64)
-
-        out = []
-        for seq_idx, label in label_chunk:
-            dp = cls.label_lookup[label]
-
-            b0 = len(drv.bond_rmsd)
-            a0 = len(drv.angle_rmsd)
-            d0 = len(drv.dihedral_rmsd)
-
-            potential, gradient_mw, r_i = drv.compute_potential(dp, org_int)
-
-            out.append({
-                "seq": int(seq_idx),
-                "potential": float(potential),
-                "gradient_mw": np.asarray(gradient_mw, dtype=np.float64),
-                "r_i": r_i,
-                "bond_rmsd": drv.bond_rmsd[b0:],
-                "angle_rmsd": drv.angle_rmsd[a0:],
-                "dihedral_rmsd": drv.dihedral_rmsd[d0:],
-            })
-        return out
-
-
-def _outer_shepard_worker_init(payload):
-    _OuterShepardWorkerRuntime.initialize(payload)
-
-
-def _outer_shepard_eval_chunk(task_payload):
-    return _OuterShepardWorkerRuntime.evaluate_chunk(task_payload)
 
 class InterpolationDriver():
     """
@@ -313,36 +184,6 @@ class InterpolationDriver():
         # core-label keyed cache of (datapoint, mask0, mask) symmetry tasks
         self._symmetry_task_cache = {}
 
-        # parallelization_local for the old symmetry path
-        self.local_preload_enabled = False # This local preload is used for the old symmetry path using the MPI infrastructure
-        self.local_preload_workers = 0
-        self.local_preload_min_tasks = 8
-        self.local_preload_omp_threads = 1
-        self.local_engine = None
-
-        self.use_outer_parallel = False # This section is setting the variables for the outer shepard loop!
-        self.outer_parallel_workers = 0
-        self.outer_parallel_min_labels = 8
-        self.outer_parallel_chunk_size = 0
-
-        self._outer_parallel_pool = None
-        self._outer_parallel_pool_workers = 0
-        self._outer_parallel_pool_dirty = True
-
-        # Cluster thread-pool runtime + diagnostics
-        self._cluster_local_executor = None
-        self._cluster_local_executor_workers = 0
-        self.cluster_parallel_fallback_count = 0
-
-        self._cluster_local_executor = None
-
-        self.mpi_preload_enabled = True
-        self.mpi_preload_force_fallback_serial = True
-        # True only while root/worker synchronized timestep compute is running.
-        # Root-only helper computations must not enter MPI collectives.
-        self.mpi_collective_compute_active = False
-        self.mpi_engine = None
-
 
 
         self._input_keywords = {
@@ -361,20 +202,10 @@ class InterpolationDriver():
                     'eq_bond_symmetry_mode': ('str', 'eq-bond symmetry mode: masked_exact or symmetrized'),
                     'use_cosine_dihedral':('bool', 'wether to use cosine and sin for the diehdral in the Z-matrix'),
                     'use_tc_weights':('bool', 'weither to use target coustomized weights'),
-                    'use_mpi_preload': ('bool', 'enable MPI preload backend for compute_potential'),
+                    # 'use_mpi_preload': ('bool', 'enable MPI preload backend for compute_potential'),
                     'use_symmetry': ('bool', 'enable symmetry-expanded candidate evaluation'),
                 'labels': ('seq_fixed_str', 'the list of QM data point labels'),
-            },
-            'paral_settings': {'use_mpi_preload': ('bool', 'enable MPI preload backend for compute_potential'),
-                'use_local_preload': ('bool', 'enable local (single-node) preload backend for compute_potential'),
-                'local_preload_workers': ('int', 'local preload worker count (0 = auto cpu_count)'),
-                'local_preload_min_tasks': ('int', 'minimum number of tasks before process parallelization'),
-                'local_preload_omp_threads': ('int', 'OMP/MKL/OpenBLAS threads per local worker'),
-                'use_outer_parallel': ('bool', 'enable outer Shepard label-level process parallelization'),
-                'outer_parallel_workers': ('int', 'number of outer Shepard worker processes (0 = auto cpu_count)'),
-                'outer_parallel_min_labels': ('int', 'minimum number of labels before outer parallelization is used'),
-                'outer_parallel_chunk_size': ('int', 'labels per outer-worker chunk (0 = auto)'),
-                }
+            }
         }
 
 
@@ -412,26 +243,12 @@ class InterpolationDriver():
 
         parse_input(self, im_keywords, impes_dict)
 
-        paral_keywords = {
-            key: val[0]
-            for key, val in self._input_keywords['paral_settings'].items()
-        }
-
-        parse_input(self, paral_keywords, impes_dict)
                 
         if self.interpolation_type == 'simple':
             AssertionError("simple interpolation scheme is not supported as it is considered worse then shepard interpolation.")
 
         if self.interpolation_type == 'shepard' and self.exponent_q is None:
             self.exponent_q = self.exponent_p / 2.0
-        
-        self.set_outer_parallel_engine(
-            enabled=bool(getattr(self, 'use_outer_parallel', False)),
-            n_workers=int(getattr(self, 'outer_parallel_workers', 0)),
-            min_labels=int(getattr(self, 'outer_parallel_min_labels', 8)),
-            chunk_size=int(getattr(self, 'outer_parallel_chunk_size', 0)),
-            force_rebuild=False,
-        )
 
     def enable_runtime_profiling(self, enabled=True, reset=True, print_summary=False):
         """
@@ -483,214 +300,6 @@ class InterpolationDriver():
             'last': dict(self.runtime_profile_last),
         }
 
-    def set_outer_parallel_engine(
-        self,
-        enabled=False,
-        n_workers=0,
-        min_labels=8,
-        chunk_size=0,
-        force_rebuild=False,
-    ):
-        self.use_outer_parallel = bool(enabled)
-        self.outer_parallel_workers = int(n_workers)
-        self.outer_parallel_min_labels = int(min_labels)
-        self.outer_parallel_chunk_size = int(chunk_size)
-
-        if force_rebuild:
-            self._close_outer_parallel_pool()
-        else:
-            self._outer_parallel_pool_dirty = True
-
-    def _close_outer_parallel_pool(self):
-        if self._outer_parallel_pool is not None:
-            self._outer_parallel_pool.shutdown(wait=True, cancel_futures=True)
-            self._outer_parallel_pool = None
-            self._outer_parallel_pool_workers = 0
-        self._outer_parallel_pool_dirty = True
-
-    def _resolve_outer_parallel_workers(self, n_labels):
-        n_labels = int(max(1, n_labels))
-        cpu_count = max(1, int(os.cpu_count() or 1))
-        workers = int(getattr(self, 'outer_parallel_workers', 0))
-        if workers <= 0:
-            workers = cpu_count
-        return max(1, min(workers, n_labels))
-
-    def _can_use_outer_parallel(self, n_labels):
-        if not bool(getattr(self, 'use_outer_parallel', False)):
-            return False
-        if self.comm is not None and self.comm.Get_size() > 1:
-            return False
-        if int(n_labels) < int(getattr(self, 'outer_parallel_min_labels', 8)):
-            return False
-        return self._resolve_outer_parallel_workers(n_labels) > 1
-
-    def _build_outer_parallel_worker_payload(self):
-        settings = dict(self.impes_dict or {})
-        settings['imforcefield_file'] = self.imforcefield_file
-        settings['use_mpi_preload'] = False
-        settings['use_outer_parallel'] = False
-
-        # Keep shared inner-parallel knobs available for cluster path in workers.
-        settings['use_local_preload'] = bool(
-            getattr(self, 'use_local_preload', False)
-            or getattr(self, 'local_preload_enabled', False)
-        )
-        settings['local_preload_workers'] = int(getattr(self, 'local_preload_workers', 0))
-        settings['local_preload_min_tasks'] = int(getattr(self, 'local_preload_min_tasks', 8))
-        settings['local_preload_omp_threads'] = int(getattr(self, 'local_preload_omp_threads', 1))
-
-
-        zmat_dict = copy.deepcopy(getattr(self, 'z_matrix', None))
-        if not isinstance(zmat_dict, dict):
-            zmat_dict = copy.deepcopy(getattr(self.impes_coordinate, 'z_matrix_dict', None))
-
-        assert_msg_critical(
-            isinstance(zmat_dict, dict),
-            "Outer parallel worker payload requires canonical z-matrix dict."
-        )
-
-        inv_sqrt = getattr(self.impes_coordinate, "inv_sqrt_masses", None)
-        if inv_sqrt is not None:
-            inv_sqrt = np.asarray(inv_sqrt, dtype=np.float64).copy()
-
-        return {
-            "settings": settings,
-            "z_matrix": zmat_dict,
-            "symmetry_information": copy.deepcopy(self.symmetry_information),
-            "rotor_cluster_banks": copy.deepcopy(self.qm_rotor_cluster_banks or {}),
-            "inv_sqrt_masses": inv_sqrt,
-        }
-
-
-    def _ensure_outer_parallel_pool(self, n_workers):
-        n_workers = int(max(1, n_workers))
-        if (
-            self._outer_parallel_pool is not None
-            and self._outer_parallel_pool_workers == n_workers
-            and (not self._outer_parallel_pool_dirty)
-        ):
-            return self._outer_parallel_pool
-
-        self._close_outer_parallel_pool()
-
-        payload = self._build_outer_parallel_worker_payload()
-
-        if "fork" in mp.get_all_start_methods():
-            mp_ctx = mp.get_context("fork")
-        else:
-            mp_ctx = mp.get_context()
-
-        self._outer_parallel_pool = ProcessPoolExecutor(
-            max_workers=n_workers,
-            initializer=_outer_shepard_worker_init,
-            initargs=(payload,),
-            mp_context=mp_ctx,
-        )
-        self._outer_parallel_pool_workers = n_workers
-        self._outer_parallel_pool_dirty = False
-        return self._outer_parallel_pool
-
-    def _evaluate_close_distances_outer_parallel(self, close_distances):
-        n_labels = len(close_distances)
-        n_workers = self._resolve_outer_parallel_workers(n_labels)
-        pool = self._ensure_outer_parallel_pool(n_workers)
-
-        label_items = [(idx, dp.point_label) for idx, (dp, *_rest) in enumerate(close_distances)]
-
-        chunk_size = int(getattr(self, 'outer_parallel_chunk_size', 0))
-
-        if chunk_size <= 0:
-            chunk_size = max(1, int(math.ceil(len(label_items) / max(1, n_workers))))
-
-        chunks = [
-            label_items[i:i + chunk_size]
-            for i in range(0, len(label_items), chunk_size)
-        ]
-
-        coords_bohr = np.asarray(self.impes_coordinate.cartesian_coordinates, dtype=np.float64)
-        packets = [(coords_bohr, chunk) for chunk in chunks]
-
-        part_results = list(pool.map(_outer_shepard_eval_chunk, packets, chunksize=1))
-
-        flat = {}
-        for part in part_results:
-            for rec in part:
-                flat[int(rec["seq"])] = rec
-
-        if len(flat) != len(close_distances):
-            raise RuntimeError(
-                f"Outer Shepard parallel returned {len(flat)} results for {len(close_distances)} labels."
-            )
-
-        summary = {
-            "enabled": True,
-            "n_workers": int(n_workers),
-            "n_labels": int(n_labels),
-            "chunk_size": int(chunk_size),
-            "n_chunks": int(len(chunks)),
-            "fallback_serial": False,
-        }
-        return flat, summary
-    
-    def set_local_preload_engine(
-        self,
-        enabled=False,
-        n_workers=0,
-        min_tasks=8,
-        omp_threads=1,
-        force_rebuild=True,
-    ):
-        prev_cfg = (
-            bool(getattr(self, 'local_preload_enabled', False)),
-            int(getattr(self, 'local_preload_workers', 0)),
-            int(getattr(self, 'local_preload_min_tasks', 8)),
-            int(getattr(self, 'local_preload_omp_threads', 1)),
-        )
-
-        self.local_preload_enabled = bool(enabled)
-        self.local_preload_workers = int(n_workers)
-        self.local_preload_min_tasks = int(min_tasks)
-        self.local_preload_omp_threads = int(omp_threads)
-
-        curr_cfg = (
-            self.local_preload_enabled,
-            self.local_preload_workers,
-            self.local_preload_min_tasks,
-            self.local_preload_omp_threads,
-        )
-
-        # Cluster path shares these knobs; rebuild thread executor only if knobs changed.
-        if curr_cfg != prev_cfg:
-            self._close_cluster_local_executor()
-
-        # Keep BLAS/OpenMP caps aligned with shared inner-parallel knobs.
-        self._apply_local_thread_env()
-
-        # Local preload backend is single-rank only.
-        if (not self.local_preload_enabled) or self.comm is None or self.comm.Get_size() > 1:
-            if self.local_engine is not None:
-                self.local_engine.close()
-                self.local_engine = None
-            return
-
-        if self.local_engine is None:
-            self.local_engine = InterpolationLocalPreloadEngine(
-                self,
-                n_workers=self.local_preload_workers,
-                min_tasks=self.local_preload_min_tasks,
-                omp_threads=self.local_preload_omp_threads,
-            )
-        else:
-            self.local_engine.n_workers = self.local_preload_workers
-            self.local_engine.min_tasks = self.local_preload_min_tasks
-            self.local_engine.omp_threads = self.local_preload_omp_threads
-
-        if force_rebuild:
-            self.local_engine.preload_static_data(force=True)
-        else:
-            self.local_engine.mark_dirty()
-
     def _cluster_weight_metric_worker(self, payload):
         cluster_id, datapoint, org_int_coords, base_cache = payload
         d2_i, grad_d2_i = self._cluster_state_signature_metric(
@@ -705,28 +314,6 @@ class InterpolationDriver():
 
         self._runtime_data_cache_dirty = True
 
-        if self.mpi_engine is not None:
-            self.mpi_engine.mark_dirty()
-        if self.local_engine is not None:
-            self.local_engine.mark_dirty()
-        self._close_outer_parallel_pool()
-    
-    def set_mpi_preload_engine(self, comm=None, enabled=True, force_rebuild=True):
-
-        if comm is None:
-            comm = self.comm
-        self.mpi_preload_enabled = bool(enabled)
-
-        if (not self.mpi_preload_enabled) or comm is None or comm.Get_size() <= 1:
-            self.mpi_engine = None
-            return
-        
-        self.mpi_engine = InterpolationMPIPreloadEngine(self, comm)
-        if force_rebuild:
-            self.mpi_engine.preload_static_data(force=True)
-        else:
-            # Defer collective preload to first synchronized compute call.
-            self.mpi_engine.mark_dirty()
 
     def prepare_runtime_data_cache(self, force=False):
         """
@@ -770,104 +357,6 @@ class InterpolationDriver():
         self._symmetry_task_cache = cache
         self._runtime_data_cache_dirty = False
   
-        if self.mpi_engine is not None:
-            self.mpi_engine.mark_dirty()
-    
-    def compute_potential_local(self, data_point, org_int_coords):
-        # Rotor-cluster model is handled by the dedicated clustered path.
-        clustered_out = self._compute_potential_clustered(data_point, org_int_coords)
-        if clustered_out is not None:
-            return clustered_out
-
-        if (not self.local_preload_enabled) or self.local_engine is None:
-            return self.compute_potential(data_point, org_int_coords)
-
-        # Keep same safety rule as MPI preload.
-        if (
-            self.impes_coordinate.use_eq_bond_length
-            and self._use_symmetry_for_label(data_point.point_label)
-            and self._get_eq_symmetry_mode() == 'masked_exact'
-        ):
-            force_fallback_serial = bool(
-                getattr(
-                    self,
-                    'local_preload_force_fallback_serial',
-                    getattr(self, 'local_preload_force_fallbacl_serial', True),
-                )
-            )
-            if force_fallback_serial:
-                return self.compute_potential(data_point, org_int_coords)
-            raise RuntimeError(
-                "Local preload requested for masked_exact path, which requires "
-                "candidate-local current charts."
-            )
-
-        packet = StepPacket(
-            org_int_coords=np.asarray(org_int_coords, dtype=np.float64),
-            b_matrix=np.asarray(self.impes_coordinate.b_matrix, dtype=np.float64),
-            use_cosine_dihedral=bool(self.use_cosine_dihedral),
-        )
-
-        local_t0 = time()
-        pes, grad, rmsd_diag = self.local_engine.compute_label(
-            data_point.point_label,
-            packet,
-        )
-        self._add_runtime_timing('compute.local.compute_label', time() - local_t0)
-
-        if isinstance(rmsd_diag, dict):
-            self.bond_rmsd.append(float(rmsd_diag.get('bond_mean', 0.0)))
-            self.angle_rmsd.append(float(rmsd_diag.get('angle_mean', 0.0)))
-            self.dihedral_rmsd.append(float(rmsd_diag.get('dihedral_mean', 0.0)))
-
-        return pes, grad, 0.0
-
-    def compute_potential_mpi(self, data_point, org_int_coords):
-        """
-        MPI-preload path for one datapoint label.
-        Falls back to serial compute_potential when MPI preload is not active.
-        """
-        # Rotor-cluster model currently has its own compute path.
-        clustered_out = self._compute_potential_clustered(data_point, org_int_coords)
-        if clustered_out is not None:
-            return clustered_out
-
-        if self.mpi_preload_enabled and self.mpi_engine is not None:
-            packet = None
-            if self.rank == mpi_master():
-                packet = StepPacket(
-                    org_int_coords=np.asarray(org_int_coords, dtype=np.float64),
-                    b_matrix=np.asarray(self.impes_coordinate.b_matrix, dtype=np.float64),
-                    use_cosine_dihedral=bool(self.use_cosine_dihedral),
-                )
-
-            mpi_t0 = time()
-            pes, grad, rmsd_diag = self.mpi_engine.compute_label_bcast(
-                data_point.point_label,
-                packet,
-                root=mpi_master(),
-            )
-            self._add_runtime_timing('compute.mpi.compute_label', time() - mpi_t0)
-
-            if self.rank == mpi_master() and isinstance(rmsd_diag, dict):
-                self.bond_rmsd.append(float(rmsd_diag.get('bond_mean', 0.0)))
-                self.angle_rmsd.append(float(rmsd_diag.get('angle_mean', 0.0)))
-                self.dihedral_rmsd.append(float(rmsd_diag.get('dihedral_mean', 0.0)))
-
-            return pes, grad, 0.0
-
-        # 2) Single-node local preload branch
-        if (
-            self.local_preload_enabled
-            and self.local_engine is not None
-            and self.comm is not None
-            and self.comm.Get_size() <= 1
-        ):
-            return self.compute_potential_local(data_point, org_int_coords)
-
-        # 3) Serial fallback
-        return self.compute_potential(data_point, org_int_coords)
-
     def _use_symmetry_for_label(self, dp_label):
         sym_list = (self.qm_symmetry_data_points or {}).get(dp_label, [])
         return bool(len(sym_list) > 1)
@@ -1061,114 +550,6 @@ class InterpolationDriver():
                     f'compute.define_impes_coordinate.{key}', dt)
         else:
             self.impes_coordinate.reset_coordinates_impes_driver(coordinates)
-
-
-    ###### Define cluster information rewriting a lot of the functions ##############
-    def _apply_local_thread_env(self):
-        """
-        Apply thread limits for the main process based on local_preload_omp_threads.
-        This makes cluster ThreadPool path honor the same variable set.
-        """
-        n = str(max(1, int(getattr(self, 'local_preload_omp_threads', 1))))
-        os.environ["OMP_NUM_THREADS"] = n
-        os.environ["MKL_NUM_THREADS"] = n
-        os.environ["OPENBLAS_NUM_THREADS"] = n
-        os.environ["NUMEXPR_NUM_THREADS"] = n
-
-    def _close_cluster_local_executor(self):
-        if self._cluster_local_executor is not None:
-            self._cluster_local_executor.shutdown(wait=True)
-            self._cluster_local_executor = None
-        self._cluster_local_executor_workers = 0
-
-    def _cluster_parallel_enabled_from_local_settings(self):
-        # Same controls as existing local-preload path.
-        if bool(getattr(self, 'use_local_preload', False)):
-            return True
-        return bool(getattr(self, 'local_preload_enabled', False))
-
-
-    def _resolve_cluster_local_workers(self, n_work_items):
-        n_work_items = int(max(1, n_work_items))
-
-        cpu_count = max(1, int(os.cpu_count() or 1))
-        omp_threads = max(1, int(getattr(self, 'local_preload_omp_threads', 1)))
-        hard_cap = max(1, cpu_count // omp_threads)
-
-        workers = int(getattr(self, 'local_preload_workers', 0))
-        if workers <= 0:
-            workers = hard_cap
-
-        workers = min(workers, hard_cap)
-        return max(1, min(workers, n_work_items))
-
-    def _estimate_cluster_work_items(self, states):
-        """
-        Estimate effective work = number of masked candidates, not just number of states.
-        """
-        total = 0
-        for _, dp in states:
-            masks = getattr(dp, "mapping_masks", None)
-            if masks is None:
-                total += 1
-                continue
-            arr = np.asarray(masks, dtype=np.int64)
-            if arr.ndim == 1:
-                total += 1
-            else:
-                total += max(1, int(arr.shape[0]))
-        return max(1, total)
-
-    def _can_use_cluster_local_parallel(self, n_work_items, eq_mode):
-        if not self._cluster_parallel_enabled_from_local_settings():
-            return False
-
-        if self.comm is not None and self.comm.Get_size() > 1:
-            return False
-
-        n_work_items = int(max(1, n_work_items))
-        if n_work_items <= 1:
-            return False
-
-        if n_work_items < int(getattr(self, 'local_preload_min_tasks', 8)):
-            return False
-
-        return self._resolve_cluster_local_workers(n_work_items) > 1
-
-    def _ensure_cluster_local_executor(self, n_workers):
-        n_workers = int(max(1, n_workers))
-
-        if (
-            self._cluster_local_executor is not None
-            and self._cluster_local_executor_workers == n_workers
-        ):
-            return self._cluster_local_executor
-
-        self._close_cluster_local_executor()
-        self._cluster_local_executor = ThreadPoolExecutor(max_workers=n_workers)
-        self._cluster_local_executor_workers = n_workers
-        return self._cluster_local_executor
-
-    def _cluster_weight_metric_worker(self, payload):
-        cluster_id, datapoint, org_int_coords, base_cache = payload
-        d2_i, grad_d2_i = self._cluster_state_signature_metric(
-            cluster_id, datapoint, org_int_coords, base_cache=base_cache
-        )
-        return float(d2_i), np.asarray(grad_d2_i, dtype=np.float64)
-
-    def _cluster_state_eval_worker(self, payload):
-        cluster_id, datapoint, projector, org_int_coords, base_cache = payload
-
-        E_state, G_state = self._evaluate_masked_cluster_state(
-            cluster_id=cluster_id,
-            datapoint=datapoint,
-            projector=projector,
-            org_int_coords=org_int_coords,
-            base_cache=base_cache,
-        )
-        return float(E_state), np.asarray(G_state, dtype=np.float64)
-
-
 
     def _ensure_rotor_cluster_runtime(self):
         if self.rotor_cluster_information is None:
@@ -1536,26 +917,6 @@ class InterpolationDriver():
         local_G = core_G.copy()
         org_coords = np.asarray(org_int_coords, dtype=np.float64)
 
-        total_work_hint = 0
-        for _, cluster_bank in family_bank["clusters"].items():
-            populated_hint = [
-                (sid, dp) for sid, dp in sorted(cluster_bank["expected_states"].items())
-                if dp is not None
-            ]
-            total_work_hint += self._estimate_cluster_work_items(populated_hint)
-
-        can_parallel = self._can_use_cluster_local_parallel(total_work_hint, eq_mode)
-        n_workers = self._resolve_cluster_local_workers(total_work_hint) if can_parallel else 1
-        executor = self._ensure_cluster_local_executor(n_workers) if (can_parallel and n_workers > 1) else None
-
-        self.cluster_parallel_last_summary = {
-            "enabled": bool(executor is not None),
-            "n_workers": int(n_workers),
-            "total_work_hint": int(total_work_hint),
-            "min_tasks": int(getattr(self, 'local_preload_min_tasks', 8)),
-            "eq_mode": str(eq_mode),
-        }
-
         for cid, cluster_bank in family_bank["clusters"].items():
             projector = self._get_cluster_projector(cid)
   
@@ -1564,7 +925,7 @@ class InterpolationDriver():
                 cluster_bank,
                 org_coords,
                 base_cache=candidate_base_cache,
-                executor=executor,
+                # executor=executor,
                 eq_mode=eq_mode,
             )
 
@@ -1574,46 +935,18 @@ class InterpolationDriver():
             dE_list = []
             dG_list = []
 
-            state_work_items = self._estimate_cluster_work_items(states)
-
-            use_parallel_states = (
-                executor is not None
-                and self._can_use_cluster_local_parallel(state_work_items, eq_mode)
-            )
-
-            if use_parallel_states:
-                payloads = [
-                    (cid, dp, projector, org_coords, candidate_base_cache)
-                    for _, dp in states
-                ]
-                try:
-                    t0 = time()
-                    state_results = list(executor.map(self._cluster_state_eval_worker, payloads))
-                    self._add_runtime_timing('compute.cluster.state_eval_parallel', time() - t0)
-                except Exception as exc:
-                    self.cluster_parallel_last_error = repr(exc)
-                    self.cluster_parallel_fallback_count += 1
-                    t0 = time()
-                    state_results = [self._cluster_state_eval_worker(p) for p in payloads]
-                    self._add_runtime_timing('compute.cluster.state_eval_parallel_fallback_serial', time() - t0)
-
-                for E_state, G_state in state_results:
-                    dE_list.append(E_state - core_E)
-                    dG_list.append(G_state - core_G)
-
-            else:
-                t0 = time()
-                for _, dp in states:
-                    E_state, G_state = self._evaluate_masked_cluster_state(
-                        cluster_id=cid,
-                        datapoint=dp,
-                        projector=projector,
-                        org_int_coords=org_coords,
-                        base_cache=candidate_base_cache,
-                    )
-                    dE_list.append(E_state - core_E)
-                    dG_list.append(G_state - core_G)
-                self._add_runtime_timing('compute.cluster.state_eval_serial', time() - t0)
+            t0 = time()
+            for _, dp in states:
+                E_state, G_state = self._evaluate_masked_cluster_state(
+                    cluster_id=cid,
+                    datapoint=dp,
+                    projector=projector,
+                    org_int_coords=org_coords,
+                    base_cache=candidate_base_cache,
+                )
+                dE_list.append(E_state - core_E)
+                dG_list.append(G_state - core_G)
+            self._add_runtime_timing('compute.cluster.state_eval_serial', time() - t0)
 
             dE = np.asarray(dE_list, dtype=np.float64)
             dG = np.asarray(dG_list, dtype=np.float64)
@@ -1633,7 +966,7 @@ class InterpolationDriver():
         cluster_bank,
         org_int_coords,
         base_cache=None,
-        executor=None,
+        # executor=None,
         eq_mode=None,
     ):
         populated = [
@@ -1648,43 +981,46 @@ class InterpolationDriver():
                 np.zeros((0, natm, 3), dtype=np.float64),
                 [],
             )
-
-        work_items = self._estimate_cluster_work_items(populated)
-        use_parallel_metrics = (
-            executor is not None
-            and self._can_use_cluster_local_parallel(work_items, eq_mode)
-        )
-
-        if use_parallel_metrics:
-            payloads = [
-                (cluster_id, dp, org_int_coords, base_cache)
-                for _, dp in populated
-            ]
-            try:
-                t0 = time()
-                metric_results = list(executor.map(self._cluster_weight_metric_worker, payloads))
-    
-                self._add_runtime_timing('compute.cluster.weight_eval_parallel', time() - t0)
-            except Exception as exc:
-                t0 = time()
-                metric_results = [self._cluster_weight_metric_worker(p) for p in payloads]
-                self._add_runtime_timing('compute.cluster.weight_eval_parallel_fallback_serial', time() - t0)
-        else:
-            t0 = time()
-            metric_results = [
-                self._cluster_weight_metric_worker((cluster_id, dp, org_int_coords, base_cache))
-                for _, dp in populated
-            ]
-            self._add_runtime_timing('compute.cluster.weight_eval_serial', time() - t0)
+        t0 = time()
+        metric_results = [
+            self._cluster_weight_metric_worker((cluster_id, dp, org_int_coords, base_cache))
+            for _, dp in populated
+        ]
+        self._add_runtime_timing('compute.cluster.weight_eval_serial', time() - t0)
 
         raw = []
         raw_grad = []
 
-        for (_, _dp), (d2_i, grad_d2_i) in zip(populated, metric_results):
-            rho2 = 1.0
-            x = d2_i / rho2 + 1.0e-12
-            w_i = 1.0 / (2.0 * x**2)
-            dw_dd2 = -(2.0 / (2.0 * rho2)) * x**(-3)
+        # for (_, _dp), (d2_i, grad_d2_i) in zip(populated, metric_results):
+        #     rho2 = 1.0
+        #     x = d2_i / rho2 + 1.0e-12
+        #     w_i = 1.0 / (2.0 * x**2)
+        #     dw_dd2 = -(2.0 / (2.0 * rho2)) * x**(-3)
+        #     grad_w_i = dw_dd2 * grad_d2_i
+
+        #     raw.append(w_i)
+        #     raw_grad.append(grad_w_i.reshape(natm, 3))
+
+        for (_, dp), (d2_i, grad_d2_i) in zip(populated, metric_results):
+            R = getattr(dp, "confidence_radius", 1.0)
+            if R is None:
+                R = 1.0
+            R = float(np.asarray(R, dtype=np.float64).reshape(-1)[0])
+            R = max(R, 1.0e-8)
+
+            rho2 = R * R
+            u = max(float(d2_i) / rho2, 1.0e-12)
+
+            p = float(self.exponent_p if self.exponent_p is not None else 2.0)
+            q = float(self.exponent_q if self.exponent_q is not None else p / 2.0)
+
+            denom = u**p + u**q
+            w_i = 1.0 / denom
+
+            ddenom_du = p * u**(p - 1.0) + q * u**(q - 1.0)
+            du_dd2 = 1.0 / rho2
+            dw_dd2 = -(ddenom_du * du_dd2) / (denom * denom)
+
             grad_w_i = dw_dd2 * grad_d2_i
 
             raw.append(w_i)
@@ -1692,7 +1028,7 @@ class InterpolationDriver():
 
         raw = np.asarray(raw, dtype=np.float64)
         raw_grad = np.asarray(raw_grad, dtype=np.float64)
-
+        
         S = raw.sum()
         if S < 1.0e-14:
             idx = int(np.argmax(raw))
@@ -1768,11 +1104,7 @@ class InterpolationDriver():
             self.prepare_runtime_data_cache()
             self._add_runtime_timing('compute.prepare_runtime_cache', time() - cache_t0)
 
-        if self.interpolation_type == 'simple':
-            interp_t0 = time()
-            self.simple_interpolation()
-            self._add_runtime_timing('compute.simple_interpolation', time() - interp_t0)
-        elif self.interpolation_type == 'shepard':
+        if self.interpolation_type == 'shepard':
             interp_t0 = time()
             self.shepard_interpolation()
             self._add_runtime_timing('compute.shepard_interpolation', time() - interp_t0)
@@ -1827,7 +1159,7 @@ class InterpolationDriver():
         min_distance = float('inf')
         self.time_step_reducer = False
         
-        self.calc_optim_trust_radius = True
+        # self.calc_optim_trust_radius = True
         
         distance_scan_t0 = time()
 
@@ -1866,53 +1198,18 @@ class InterpolationDriver():
         eval_loop_t0 = time()
         compute_potential_acc = 0.0
 
-        outer_results = None
-        outer_summary = {
-            "enabled": False,
-            "n_workers": 0,
-            "n_labels": int(len(close_distances)),
-            "chunk_size": 0,
-            "n_chunks": 0,
-            "fallback_serial": False,
-        }
-
-        self.outer_parallel_last_error = None
-
-        if self._can_use_outer_parallel(len(close_distances)):
-            try:
-                t_outer = time()
-                outer_results, outer_summary = self._evaluate_close_distances_outer_parallel(close_distances)
-                compute_potential_acc += (time() - t_outer)
-            except Exception as exc:
-                self.outer_parallel_last_error = repr(exc)
-                self.cluster_parallel_fallback_count += 1
-                outer_summary["fallback_serial"] = True
-                outer_results = None
-                # Important: do not keep a broken pool alive
-                self._close_outer_parallel_pool()
-
-        self.outer_parallel_last_summary = outer_summary
-
         for seq, (qm_data_point, distance, dihedral_dist, denominator_cart, weight_grad_cart, _, label_idx) in enumerate(close_distances):
 
             weight_cart = 1.0 / (denominator_cart)
 
-            if outer_results is None:
-                potential_t0 = time()
-                potential, gradient_mw, r_i = self.compute_potential_mpi(
-                    qm_data_point,
-                    self.impes_coordinate.internal_coordinates_values,
-                )
-                compute_potential_acc += time() - potential_t0
-            else:
-                rec = outer_results[seq]
-                potential = rec["potential"]
-                gradient_mw = rec["gradient_mw"]
-                r_i = rec["r_i"]
-                self.bond_rmsd.extend(rec["bond_rmsd"])
-                self.angle_rmsd.extend(rec["angle_rmsd"])
-                self.dihedral_rmsd.extend(rec["dihedral_rmsd"])
-
+            # if outer_results is None:
+            potential_t0 = time()
+            potential, gradient_mw, r_i = self.compute_potential(
+                qm_data_point,
+                self.impes_coordinate.internal_coordinates_values,
+            )
+            compute_potential_acc += time() - potential_t0
+        
             gradient = sqrt_masses * gradient_mw.reshape(-1)
             gradient = gradient.reshape(gradient_mw.shape)
             gradients.append(gradient)
@@ -1963,11 +1260,11 @@ class InterpolationDriver():
         self.impes_coordinate.energy   = np.dot(W_i, potentials)     # Σ Wᵢ Uᵢ
 
         self.impes_coordinate.gradient = (np.tensordot(W_i, gradients, axes=1) + np.tensordot(potentials, grad_W_i, axes=1))
-
+        
         # --- 4.  book-keeping (optional) ---------------------------------------------
         for lbl, Wi in zip(used_labels, W_i):
             self.weights[lbl] = Wi
-
+        # print(self.weights)
         self.averaged_int_dist   = np.tensordot(W_i, averaged_int_dists, axes=1)
         self._add_runtime_timing('shepard.assembly', time() - assembly_t0)
         self._add_runtime_timing('shepard.total', time() - shepard_t0)
@@ -2365,6 +1662,60 @@ class InterpolationDriver():
             reference_eq_bond_lengths=eq_ref,
             mask=mask,
         )
+    
+    def _evaluate_candidate_taylor(
+            self,
+            *,
+            energy: float,
+            grad: np.ndarray,
+            hess: np.ndarray,
+            ref_coords: np.ndarray,
+            mask0: np.ndarray,
+            mask: np.ndarray,
+            org_int_coords: np.ndarray,
+            b_matrix: np.ndarray,
+            use_cosine_dihedral: bool,
+            dihedral_start: int,
+            dihedral_end: int) -> Tuple[float, np.ndarray, np.ndarray, np.ndarray]:
+        """
+        Evaluates one masked Taylor candidate in a parity-safe way shared by
+        serial and MPI preload paths.
+        """
+        grad_eff = np.asarray(grad, dtype=np.float64).copy()
+        hess_eff = np.asarray(hess, dtype=np.float64).copy()
+        ref = np.asarray(ref_coords, dtype=np.float64)
+        mask0_arr = np.asarray(mask0, dtype=np.int64)
+        mask_arr = np.asarray(mask, dtype=np.int64)
+        org = np.asarray(org_int_coords, dtype=np.float64)
+        bmat = np.asarray(b_matrix, dtype=np.float64)
+
+        grad_eff[mask0_arr] = grad_eff[mask_arr]
+        hess_eff[np.ix_(mask0_arr, mask0_arr)] = hess_eff[np.ix_(mask_arr, mask_arr)]
+
+        dist_org = org - ref[mask_arr]
+        dist_check = dist_org.copy()
+        if not use_cosine_dihedral:
+            dist_check[dihedral_start:dihedral_end] = np.sin(
+                dist_org[dihedral_start:dihedral_end])
+
+        dist_correlation = dist_check.copy()
+
+        U_i = float(
+            energy
+            + dist_check @ grad_eff
+            + 0.5 * np.linalg.multi_dot([dist_check, hess_eff, dist_check])
+        )
+
+        dist_hess = dist_check @ hess_eff
+        if not use_cosine_dihedral:
+            c = np.cos(dist_org[dihedral_start:dihedral_end])
+            grad_eff[dihedral_start:dihedral_end] *= c
+            dist_hess[dihedral_start:dihedral_end] *= c
+
+        natm = bmat.shape[1] // 3
+        dU_i = (bmat.T @ (grad_eff + dist_hess)).reshape(natm, 3)
+
+        return U_i, dU_i, dist_org, dist_correlation
 
     def compute_potential(self, data_point, org_int_coords):
         """Calculates the potential energy surface at self.impes_coordinate
@@ -2376,8 +1727,6 @@ class InterpolationDriver():
         
         clustered_out = self._compute_potential_clustered(data_point, org_int_coords)
         if clustered_out is not None:
-            # print(clustered_out)
-            # exit()
             return clustered_out
         
 
@@ -2447,7 +1796,7 @@ class InterpolationDriver():
                     base_cache=candidate_base_cache,
                 )
                 
-                pes_i, pes_prime_i, dist_org, dist_correlation = evaluate_candidate_taylor(
+                pes_i, pes_prime_i, dist_org, dist_correlation = self._evaluate_candidate_taylor(
                     energy=energy,
                     grad=symmetry_data_point.internal_gradient,
                     hess=symmetry_data_point.internal_hessian,

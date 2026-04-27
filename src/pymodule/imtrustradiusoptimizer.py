@@ -30,15 +30,11 @@
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-from math import cos
 
-from networkx import node_clique_number
 from mpi4py import MPI
 import numpy as np
-from scipy.optimize import minimize
 import scipy
 import h5py
-import itertools
 import re
 import os, copy, math
 
