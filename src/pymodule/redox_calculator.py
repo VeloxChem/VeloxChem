@@ -258,7 +258,6 @@ class RedoxProfile:
     MH_rad:        Optional[GibbsResult] = None
     M_deprot:      Optional[GibbsResult] = None
     M_deprot_rad:  Optional[GibbsResult] = None
-    
 
     # Reduction potentials (V vs SHE)
     E_ox:        Optional[float] = None
@@ -383,10 +382,6 @@ class RedoxProfile:
         return new
 
 
-# ---------------------------------------------------------------------------
-# Private helpers
-# ---------------------------------------------------------------------------
-
 def _mol_formula(mol_obj) -> str:
     """Hill-ordered molecular formula from a VeloxChem Molecule."""
     counts = Counter(mol_obj.get_labels())
@@ -434,7 +429,8 @@ def _skeleton_smiles(input_data) -> str:
     except Exception as exc:
         log.debug("Skeleton identifier failed: %s", exc)
         return "Unknown"
-    
+
+
 def _connectivity_payload(input_data) -> tuple[str, str]:
     """
     Return atom symbols and bond edges in a stable, index-preserving form.
@@ -460,6 +456,7 @@ def _connectivity_payload(input_data) -> tuple[str, str]:
     atom_symbols = ",".join(labels)
     bond_edges = str(bonds)
     return atom_symbols, bond_edges
+
 
 def _valid_multiplicity(mol_obj, charge: int) -> int:
     """Return 1 (singlet) or 2 (doublet); warn on TM detection."""
@@ -512,7 +509,7 @@ def _save_to_h5(path: str, result: GibbsResult) -> None:
 
 def _run_sp(mol_obj, basis_name: str, xcfun: str, ri_jk: bool,
             dispersion: bool, solvation: Optional[str],
-            mult: int, tmp_prefix: str) -> dict:
+            mult: int, tmp_prefix: str, solvent: Optional[str] = None) -> dict:
     """Run one DFT single-point and return the SCF result dictionary."""
     drv = vlx.ScfUnrestrictedDriver() if mult > 1 else vlx.ScfRestrictedDriver()
     drv.xcfun           = xcfun
@@ -521,6 +518,7 @@ def _run_sp(mol_obj, basis_name: str, xcfun: str, ri_jk: bool,
     drv.max_iter        = 200
     drv.dispersion      = dispersion
     drv.solvation_model = solvation   # None -> vacuum
+    
     if mult > 1:
         drv.level_shifting = 0.3
     drv.filename = tmp_prefix
@@ -1178,9 +1176,7 @@ class RedoxCalculator:
     # Protonation / deprotonation site handling
     # ------------------------------------------------------------------
 
-    def find_protic_sites(
-        self, mol_obj
-    ) -> tuple[list[int], list[int]]:
+    def find_protic_sites(self, mol_obj) -> tuple[list[int], list[int]]:
         """
         Identify acidic H atoms and basic heavy atoms (O, N, S, P).
 
@@ -1268,11 +1264,7 @@ class RedoxCalculator:
     # Core QC: composite Gibbs energy for one state
     # ------------------------------------------------------------------
 
-    def compute_gibbs(
-        self,
-        mol_obj,
-        label: str = "",
-    ) -> Optional[GibbsResult]:
+    def compute_gibbs(self, mol_obj, label: str = "",) -> Optional[GibbsResult]:
         """
         Compute the composite Gibbs free energy for one electronic state.
 
@@ -1337,6 +1329,46 @@ class RedoxCalculator:
         # OptimizationDriver) does not yet support RI-JK in VeloxChem and will
         # raise an AssertionError if it is enabled.  RI-JK is still used for
         # the single-point steps below where no gradient is needed.
+
+        def _components_and_graph(xyz_or_mol):
+                """
+                Return (n_components, nx.Graph) for a geometry.
+                Accepts either an XYZ string or a VeloxChem Molecule.
+                """
+                import networkx as nx
+
+                if isinstance(xyz_or_mol, str):
+                    tmp_mol = vlx.Molecule.read_xyz_string(xyz_or_mol)
+                else:
+                    tmp_mol = xyz_or_mol
+
+                bonds = _geometry_bonds(tmp_mol)
+                n     = tmp_mol.number_of_atoms()
+                labels_tmp = tmp_mol.get_labels()
+
+                G = nx.Graph()
+                for i, sym in enumerate(labels_tmp):
+                    G.add_node(i, element=sym)
+                for i, j in bonds:
+                    G.add_edge(i, j)
+
+                return nx.number_connected_components(G), G
+        
+        def _heavy_graph(G):
+                import networkx as nx
+                H = nx.Graph()
+                mapping = {}
+                new_idx = 0
+                for node, data in G.nodes(data=True):
+                    if data["element"] != "H":
+                        H.add_node(new_idx, element=data["element"])
+                        mapping[node] = new_idx
+                        new_idx += 1
+                for u, v in G.edges():
+                    if u in mapping and v in mapping:
+                        H.add_edge(mapping[u], mapping[v])
+                return H
+
         scf_opt = (
             vlx.ScfUnrestrictedDriver() if mult > 1
             else vlx.ScfRestrictedDriver()
@@ -1351,7 +1383,7 @@ class RedoxCalculator:
             scf_opt.level_shifting = 0.3
         scf_opt.filename = os.path.join(tmpdir, "opt")
         scf_opt.ostream.mute()
-
+        
         try:
             log.info("  [%s] Step 1: reading basis %s", label, self.basis_opt)
             basis_opt            = vlx.MolecularBasis.read(mol_obj, self.basis_opt)
@@ -1380,29 +1412,6 @@ class RedoxCalculator:
             # This correctly handles protonation/deprotonation states whose
             # formula legitimately differs from M.
 
-            def _components_and_graph(xyz_or_mol):
-                """
-                Return (n_components, nx.Graph) for a geometry.
-                Accepts either an XYZ string or a VeloxChem Molecule.
-                """
-                import networkx as nx
-                if isinstance(xyz_or_mol, str):
-                    tmp_mol = vlx.Molecule.read_xyz_string(xyz_or_mol)
-                else:
-                    tmp_mol = xyz_or_mol
-
-                bonds = _geometry_bonds(tmp_mol)
-                n     = tmp_mol.number_of_atoms()
-                labels_tmp = tmp_mol.get_labels()
-
-                G = nx.Graph()
-                for i, sym in enumerate(labels_tmp):
-                    G.add_node(i, element=sym)
-                for i, j in bonds:
-                    G.add_edge(i, j)
-
-                return nx.number_connected_components(G), G
-
             n_comp_in,  g_in  = _components_and_graph(mol_obj)
             n_comp_opt, g_opt = _components_and_graph(final_xyz)
 
@@ -1411,21 +1420,7 @@ class RedoxCalculator:
 
             # Check 2: heavy-atom graph not isomorphic to input
             # (catches bond rearrangements / isomerisations)
-            def _heavy_graph(G):
-                import networkx as nx
-                H = nx.Graph()
-                mapping = {}
-                new_idx = 0
-                for node, data in G.nodes(data=True):
-                    if data["element"] != "H":
-                        H.add_node(new_idx, element=data["element"])
-                        mapping[node] = new_idx
-                        new_idx += 1
-                for u, v in G.edges():
-                    if u in mapping and v in mapping:
-                        H.add_edge(mapping[u], mapping[v])
-                return H
-
+            
             from networkx.algorithms import isomorphism
             nm = isomorphism.categorical_node_match("element", None)
             hg_in  = _heavy_graph(g_in)
@@ -1991,15 +1986,22 @@ def _smiles_to_graph(smiles: str) -> Optional[nx.Graph]:
 def _load_completed_graphs(output_folder: str) -> list:
     """
     Scan ``output_folder`` for completed HDF5 files (_M.h5) and return a
-    list of heavy-atom molecular graphs for deduplication.
+    list of deduplication tuples:
 
-    Builds graphs from the stored geometry_xyz using VeloxChem +
+        (heavy_graph, h_count, full_formula)
+
+    This makes deduplication stricter than graph topology alone, so molecules
+    such as C(C)C and C#CC no longer collapse to the same 3-carbon scaffold.
+
+    Builds entries from the stored geometry_xyz using VeloxChem +
     _geometry_bonds -- no SMILES parsing required.
     """
-    graphs: list = []
+    items: list = []
     if not os.path.exists(output_folder):
-        return graphs
+        return items
+
     log.info("Building graph database from %s ...", output_folder)
+
     for fname in os.listdir(output_folder):
         if not fname.endswith("_M.h5"):
             continue
@@ -2008,29 +2010,52 @@ def _load_completed_graphs(output_folder: str) -> list:
                 if "geometry_xyz" not in f:
                     continue
                 xyz = f["geometry_xyz"][()].decode("utf-8")
+
             mol = vlx.Molecule.read_xyz_string(xyz)
-            G   = _mol_to_graph(mol)
-            graphs.append(G)
+            G = _mol_to_graph(mol)
+            formula = _mol_formula(mol)
+            h_count = sum(1 for sym in mol.get_labels() if sym == "H")
+            items.append((G, h_count, formula))
+
         except Exception as exc:
             log.debug("Could not read %s: %s", fname, exc)
-    log.info("Graph database: %d unique scaffold(s).", len(graphs))
-    return graphs
+
+    log.info("Graph database: %d unique scaffold(s).", len(items))
+    return items
 
 
-def _is_isomorphic(query_g: nx.Graph, existing: list) -> bool:
-    """True if ``query_g`` is graph-isomorphic to any member of ``existing``."""
+def _is_isomorphic(
+    query_g: nx.Graph,
+    query_h: int,
+    query_formula: str,
+    existing: list,
+) -> bool:
+    """
+    True if ``query_g`` matches any completed entry by:
+      1) total H count,
+      2) full molecular formula,
+      3) heavy-atom graph isomorphism.
+    """
     nm = isomorphism.categorical_node_match("element", None)
-    for target in existing:
-        if len(target) != len(query_g):
+
+    for target_g, target_h, target_formula in existing:
+        if target_h != query_h:
             continue
-        if isomorphism.GraphMatcher(target, query_g, node_match=nm).is_isomorphic():
+        if target_formula != query_formula:
+            continue
+        if len(target_g) != len(query_g):
+            continue
+        if isomorphism.GraphMatcher(target_g, query_g, node_match=nm).is_isomorphic():
             return True
     return False
 
 
 def process_csv(df: pd.DataFrame, calc: RedoxCalculator) -> None:
     """
-    Process a DataFrame of molecules using graph-isomorphism deduplication.
+    Process a DataFrame of molecules using stricter deduplication based on:
+      - heavy-atom graph,
+      - total H count,
+      - full molecular formula.
 
     Expected columns
     ----------------
@@ -2048,10 +2073,10 @@ def process_csv(df: pd.DataFrame, calc: RedoxCalculator) -> None:
         smiles = str(row.get("smiles", "")).strip()
         if not smiles:
             continue
-        charge    = int(row.get("charge", 0))
-        # Read multiplicity from CSV if present; None means auto-infer
-        mult_raw  = row.get("multiplicity", None)
-        mult      = int(mult_raw) if pd.notna(mult_raw) else None
+
+        charge = int(row.get("charge", 0))
+        mult_raw = row.get("multiplicity", None)
+        mult = int(mult_raw) if pd.notna(mult_raw) else None
         force_run = (
             str(row.get("force_run", "False")).lower() in ("true", "1", "yes")
         )
@@ -2064,16 +2089,29 @@ def process_csv(df: pd.DataFrame, calc: RedoxCalculator) -> None:
             continue
 
         query_g = _mol_to_graph(mol)
+        query_formula = _mol_formula(mol)
+        query_h = sum(1 for sym in mol.get_labels() if sym == "H")
 
-        if _is_isomorphic(query_g, existing) and not force_run:
+        if _is_isomorphic(query_g, query_h, query_formula, existing) and not force_run:
             log.info("Skip (graph exists): %.40s", smiles)
             continue
 
-        log.info("%s Processing: %s (charge=%d, mult=%s)",
-                 reason, smiles, charge, mult if mult is not None else "auto")
+        log.info(
+            "%s Processing: %s (charge=%d, mult=%s)",
+            reason,
+            smiles,
+            charge,
+            mult if mult is not None else "auto",
+        )
         try:
-            calc.run(mol)
-            existing.append(query_g)
+            profile = calc.run(mol)
+            if profile is not None and profile.M is not None:
+                existing.append((query_g, query_h, query_formula))
+            else:
+                log.warning(
+                    "Run returned no anchor state for %s; not adding to existing.",
+                    smiles,
+                )
         except Exception as exc:
             log.error("Failed for %s: %s", smiles, exc, exc_info=True)
 
