@@ -10,7 +10,7 @@ pytest.importorskip("MDAnalysis")
 pytest.importorskip("pyframe")
 
 
-@pytest.mark.solvers
+@pytest.mark.timeconsuming
 class TestEnsembleDriverOptions:
 
     def test_compute_with_scf_and_property_options(self, tmp_path):

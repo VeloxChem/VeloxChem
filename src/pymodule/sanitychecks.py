@@ -777,10 +777,9 @@ def write_pe_jsonfile(molecule, potfile):
 
     classical_fragments = []
 
-    sorted_resids = sorted(list(residues.keys()))
     residue_infos = []
     atom_counter = 0
-    for resid in sorted_resids:
+    for resid in residues:
         natoms = len(residues[resid]['atoms'])
         start_idx = atom_counter + 1
         end_idx = atom_counter + natoms
@@ -815,7 +814,7 @@ def write_pe_jsonfile(molecule, potfile):
             if name in selected_names
         ]
 
-    for res_count, resid in enumerate(sorted_resids):
+    for res_count, resid in enumerate(residues):
         resname = residues[resid]['resname']
         info = residue_infos[res_count]
 
