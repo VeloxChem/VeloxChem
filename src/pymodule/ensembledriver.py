@@ -48,6 +48,7 @@ from .lreigensolver import LinearResponseEigenSolver
 from .cppsolver import ComplexResponseSolver
 from .spectrumaverager import SpectrumAverager
 from .environment import get_data_path
+from .errorhandler import assert_msg_critical
 
 
 class EnsembleDriver:
@@ -90,7 +91,7 @@ class EnsembleDriver:
         Initializes the ensemble driver.
 
         PE (SEP/CP3) and NPE (TIP3P/ff19sb) parameter tables are read from the
-       ``database/environment_parameters`` directory.
+        ``database/environment_parameters`` directory.
 
         See this reference, Figure 4, for a summary of 
         an overview of SEP/CP3 parametrizations:
@@ -117,8 +118,8 @@ class EnsembleDriver:
         ff19sb_parameters_file = db_dir / "npe_ff19sb.csv"
 
         if self.rank == mpi_master():
-            self._sep_db = self._load_sep_db(sep_parameters_file)
-            self._cp3_db = self._load_cp3_db(cp3_parameters_file)
+            self._sep_db = self._load_pe_db(sep_parameters_file)
+            self._cp3_db = self._load_pe_db(cp3_parameters_file)
             self._tip3p_db = self._load_npe_db(tip3p_parameters_file)
             self._ff19sb_db = self._load_npe_db(ff19sb_parameters_file)
         else:
@@ -144,91 +145,54 @@ class EnsembleDriver:
         self.pe_model = None
         self.npe_model = None
 
-    @staticmethod
-    def _parse_six_floats(field: str) -> list[float]:
+    def _load_pe_db(self, csv_path: Path) -> dict:
         """
-        Parse a six-component polarizability field from a CSV entry.
-
-        :param field:
-            Unoyt field containing six floating-point numbers.
-
-        :return:
-            List of six floats.
-        """
-        parts = [p for p in str(field).replace(",", " ").split() if p]
-        if len(parts) != 6:
-            raise ValueError(f"Expected 6 floats in P11, got {len(parts)} from: {field!r}")
-        return [float(x) for x in parts]
-    
-    @staticmethod
-    def _load_sep_db(csv_path: Path) -> dict:
-        """
-        Loads SEP-like table:
-            molecule,res_name,atom_name,element,M0,P11
+        Loads the raw PE parameter table:
+            RESNAME,ATOMNAME,q,axx,axy,axz,ayy,ayz,azz
 
         :param csv_path:
-            Path to the CSV file containing SEP parameters.
+            Path to the raw PE parameter file.
 
         :return:
             db[res_name][atom_name] = {"element": str, "charge": float, "polar": [6 floats]}
         """
+
+        txt_path = csv_path.with_suffix(".txt")
+
         if not csv_path.is_file():
-            raise FileNotFoundError(f"SEP parameter file not found: {csv_path}")
+            raise FileNotFoundError(f"Parameter file not found: {csv_path}")
+        if not txt_path.is_file():
+            raise FileNotFoundError(f"Parameter file not found: {txt_path}")
 
-        db: dict[str, dict[str, dict]] = {}
+        db = {}
 
-        with csv_path.open("r", newline="") as fh:
+        with csv_path.open("r", newline="") as fh, txt_path.open("r", newline="") as fh_txt:
+            # Skip first few lines of comments, up to "----"
+            while True:
+                line = fh.readline()
+                if line.startswith("----") and line.rstrip().endswith("----"):
+                    break
+
             reader = csv.DictReader(fh)
-            for row in reader:
-                resn = str(row["res_name"]).strip()
-                atom = str(row["atom_name"]).strip()
-                elem = str(row["element"]).strip()
-                if not resn or not atom or not elem:
-                    continue
+            txt_reader = csv.DictReader(fh_txt)
 
-                q = float(row["M0"])
-                pol6 = EnsembleDriver._parse_six_floats(row["P11"])
-
-                rdb = db.setdefault(resn, {})
-                if atom in rdb:
-                    old = rdb[atom]
-                    if abs(old["charge"] - q) > 1e-12 or any(
-                        abs(a - b) > 1e-12 for a, b in zip(old["polar"], pol6)
-                    ):
-                        raise ValueError(
-                            f"Inconsistent duplicate entries for {resn}/{atom} in {csv_path}"
-                        )
-                rdb[atom] = {"element": elem, "charge": q, "polar": pol6}
-
-        return db
-
-    @staticmethod
-    def _load_cp3_db(csv_path: Path) -> dict:
-        """
-        Loads the raw CP3 parameter table:
-            RESNAME,ATOMTYPE,q,axx,axy,axz,ayy,ayz,azz
-
-        :param csv_path:
-            Path to the raw CP3 parameter file.
-
-        :return:
-            db[res_name][atom_name] = {"element": str, "charge": float, "polar": [6 floats]}
-        """
-        if not csv_path.is_file():
-            raise FileNotFoundError(f"CP3 parameter file not found: {csv_path}")
-
-        db: dict[str, dict[str, dict]] = {}
-
-        with csv_path.open("r", newline="") as fh:
-            reader = csv.DictReader(fh)
-            for row in reader:
+            for row, txt_row in zip(reader, txt_reader):
                 resn = str(row["RESNAME"]).strip()
-                atom = str(row["ATOMTYPE"]).strip()
+                atom = str(row["ATOMNAME"]).strip()
                 if not resn or not atom:
                     continue
 
-                elem = EnsembleDriver._guess_cp3_element(atom)
+                resn_from_txt = str(txt_row["res_name"]).strip()
+                atom_from_txt = str(txt_row["atom_name"]).strip()
+                assert_msg_critical(
+                    resn == resn_from_txt and atom == atom_from_txt,
+                    f'{type(self).__name__}: Inconsistent residue name or ' +
+                    'atom name in parameter files')
+
+                elem = str(txt_row["element"]).strip()
+
                 q = float(row["q"])
+
                 pol6 = [
                     float(row["axx"]),
                     float(row["axy"]),
@@ -238,44 +202,12 @@ class EnsembleDriver:
                     float(row["azz"]),
                 ]
 
-                rdb = db.setdefault(resn, {})
-                if atom in rdb:
-                    old = rdb[atom]
-                    if abs(old["charge"] - q) > 1e-12 or any(
-                        abs(a - b) > 1e-12 for a, b in zip(old["polar"], pol6)
-                    ):
-                        raise ValueError(
-                            f"Inconsistent duplicate entries for {resn}/{atom} in {csv_path}"
-                        )
-                rdb[atom] = {"element": elem, "charge": q, "polar": pol6}
+                if resn not in db:
+                    db[resn] = {}
+
+                db[resn][atom] = {"element": elem, "charge": q, "polar": pol6}
 
         return db
-
-    @staticmethod
-    def _guess_cp3_element(atom_type: str) -> str:
-        """
-        Guess the chemical element from a CP3 atom type.
-
-        CP3 atom types follow common biomolecular atom-name conventions where
-        the element is encoded by the first alphabetic character after any
-        leading multiplicity digit, e.g. 1HB -> H, CA -> C, OD1 -> O.
-
-        :param atom_type:
-            CP3 atom type.
-
-        :return:
-            Element symbol.
-        """
-        atom_type = str(atom_type).strip().upper()
-        match = re.search(r"[A-Z]", atom_type)
-        if match is None:
-            raise ValueError(f"Could not infer element from CP3 atom type: {atom_type!r}")
-
-        elem = match.group(0)
-        if elem not in {"H", "C", "N", "O", "S"}:
-            raise ValueError(f"Unexpected CP3 element guess '{elem}' from atom type: {atom_type!r}")
-
-        return elem
 
     @staticmethod
     def _load_npe_db(csv_path: Path) -> dict:

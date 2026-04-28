@@ -31,11 +31,12 @@
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from mpi4py import MPI
-import sys
 import numpy as np
+import sys
 
 from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
+from .errorhandler import assert_msg_critical
 
 try:
     import MDAnalysis as mda
@@ -372,6 +373,10 @@ class EnsembleParser:
             - number_residues_npe (int):
                 Number of residues in the NPE region.
         """
+
+        assert_msg_critical(
+            'MDAnalysis' in sys.modules,
+            'MDAnalysis is required for EnsembleParser.')
 
         if pe_cutoff is not None and npe_cutoff is not None:
             if float(npe_cutoff) < float(pe_cutoff):

@@ -27,6 +27,8 @@ class TestTrajectory:
         top = str(data_dir / "bithio.tpr")
 
         ens_parser = EnsembleParser()
+        ens_parser.ostream.mute()
+
         ensemble = ens_parser.structures(
             trajectory_file=traj,
             topology_file=top,
@@ -39,6 +41,8 @@ class TestTrajectory:
         )
 
         ens_drv = EnsembleDriver()
+        ens_drv.ostream.mute()
+
         ens_drv.set_env_models(
             pe_model=["CP3", "SEP"],
             npe_model=["ff19sb", "tip3p"],
@@ -55,8 +59,6 @@ class TestTrajectory:
         }
 
         potdir = data_dir
-
-        ens_drv.ostream.mute()
         results = ens_drv.compute(
             ensemble,
             basis_set="sto-3g",

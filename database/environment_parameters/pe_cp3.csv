@@ -1,4 +1,11 @@
-RESNAME,ATOMTYPE,q,axx,axy,axz,ayy,ayz,azz
+This file contains data from the dataset for the article
+"Cost-effective Potential for Accurate Polarizable Embedding Calculations in Protein Environments",
+by P. Reinholdt, E. R. Kjellgren, C. Steinmann, and J. M. H. Olsen,
+DOI: 10.5281/zenodo.3553833.
+Licensed under CC BY 4.0:
+https://creativecommons.org/licenses/by/4.0/
+--------------------------------------------
+RESNAME,ATOMNAME,q,axx,axy,axz,ayy,ayz,azz
 ALA,N,-0.43072574648916273,7.432288641015653,0.0,0.0,7.432288641015653,0.0,7.432288641015653
 ALA,HN,0.26596082094628026,1.395527170821023,0.0,0.0,1.395527170821023,0.0,1.395527170821023
 ALA,H,0.26596082094628026,1.395527170821023,0.0,0.0,1.395527170821023,0.0,1.395527170821023

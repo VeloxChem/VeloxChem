@@ -121,8 +121,8 @@ CYSH,CYSH,CB,C
 cysteine,CYS,C,C
 CYSH,CYSH,C,C
 cysteine,CYS,HB,H
-cysteine,CYS,HB1,H
 CYSH,CYSH,HB,H
+cysteine,CYS,HB1,H
 CYSH,CYSH,HB1,H
 cysteine,CYS,1HB,H
 CYSH,CYSH,1HB,H
