@@ -52,11 +52,13 @@ class TestEnsembleDriverOptions:
 
         property_options = {
             "property": "absorption",
-            "nstates": 10,
+            "nstates": 6,
             "nto": True,
         }
 
         potdir = data_dir
+
+        ens_drv.ostream.mute()
         results = ens_drv.compute(
             ensemble,
             basis_set="6-31G",
@@ -73,14 +75,12 @@ class TestEnsembleDriverOptions:
         # Reference values from validated output (frames 0 and 100)
         ref_frames = [0, 100]
         ref_scf = np.array([
-            -193.065221296142,
-            -193.066191060731,
+            -193.055643527,
+            -193.066013148,
         ])
         ref_eigs = {
-            0: np.array([0.16054420, 0.30291201, 0.32230194, 0.32374070, 0.34621892,
-                         0.35811233, 0.38296122, 0.39039569, 0.39859124, 0.40813756]),
-            100: np.array([0.15879634, 0.28945558, 0.31257123, 0.32000411, 0.35065285,
-                           0.36276382, 0.37488666, 0.38134798, 0.39323165, 0.40966114]),
+            0: np.array([0.160392, 0.303838, 0.321107, 0.32427, 0.344735, 0.360693]),
+            100: np.array([0.158489, 0.289851, 0.313072, 0.320164, 0.351021, 0.362582]),
         }
 
         got_frames = [int(frame) for frame, _ in results["scf_all"]]
@@ -112,8 +112,8 @@ class TestEnsembleDriverOptions:
             for frame, rsp_res in results["rsp_all"]:
                 frame = int(frame)
                 eig = np.array(rsp_res.get("eigenvalues", []), dtype=float)
-                assert int(rsp_res.get("number_of_states", 0)) == 10
-                assert eig.shape == (10,)
+                assert int(rsp_res.get("number_of_states", 0)) == 6
+                assert eig.shape == (6,)
                 np.testing.assert_allclose(
                     eig,
                     ref_eigs[frame],

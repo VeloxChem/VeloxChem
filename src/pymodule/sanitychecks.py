@@ -777,9 +777,11 @@ def write_pe_jsonfile(molecule, potfile):
 
     classical_fragments = []
 
+    # sorting res_ids for later identification of peptide bonds
+    sorted_resids = sorted(list(residues.keys()))
     residue_infos = []
     atom_counter = 0
-    for resid in residues:
+    for resid in sorted_resids:
         natoms = len(residues[resid]['atoms'])
         start_idx = atom_counter + 1
         end_idx = atom_counter + natoms
@@ -791,10 +793,15 @@ def write_pe_jsonfile(molecule, potfile):
             'resid': resid,
             'start_idx': start_idx,
             'end_idx': end_idx,
+            'atoms': residues[resid]['atoms'],
             'atom_names': atom_names,
             'has_atom_names': all(name is not None for name in atom_names),
         })
         atom_counter = end_idx
+
+    # Residue atom coordinates are stored in Angstrom at this point.
+    peptide_bond_cutoff = 1.55
+    peptide_bond_cutoff_sq = peptide_bond_cutoff**2
 
     prev_neighbor_names = {
         'CA', 'C', 'O', 'OXT', 'OT1', 'OT2', 'OC1', 'OC2',
@@ -814,7 +821,30 @@ def write_pe_jsonfile(molecule, potfile):
             if name in selected_names
         ]
 
-    for res_count, resid in enumerate(residues):
+    def _atom_distance_sq(atom_i, atom_j):
+        return sum((atom_i[k] - atom_j[k])**2 for k in range(1, 4))
+
+    def _has_peptide_bond(left_info, right_info):
+        if (not left_info['has_atom_names'] or
+                not right_info['has_atom_names']):
+            return False
+
+        left_c_atoms = [
+            atom for atom, name in zip(left_info['atoms'],
+                                       left_info['atom_names'])
+            if name == 'C'
+        ]
+        right_n_atoms = [
+            atom for atom, name in zip(right_info['atoms'],
+                                       right_info['atom_names'])
+            if name == 'N'
+        ]
+
+        return any(
+            _atom_distance_sq(c_atom, n_atom) <= peptide_bond_cutoff_sq
+            for c_atom in left_c_atoms for n_atom in right_n_atoms)
+
+    for res_count, resid in enumerate(sorted_resids):
         resname = residues[resid]['resname']
         info = residue_infos[res_count]
 
@@ -847,10 +877,12 @@ def write_pe_jsonfile(molecule, potfile):
 
         # coordinates + exclusions
         exclusions = list(range(info['start_idx'], info['end_idx'] + 1))
-        if info['has_atom_names'] and res_count > 0:
+        if res_count > 0 and _has_peptide_bond(residue_infos[res_count - 1],
+                                               info):
             exclusions.extend(
                 _select_indices(residue_infos[res_count - 1], prev_neighbor_names))
-        if info['has_atom_names'] and res_count + 1 < len(residue_infos):
+        if (res_count + 1 < len(residue_infos) and
+                _has_peptide_bond(info, residue_infos[res_count + 1])):
             exclusions.extend(
                 _select_indices(residue_infos[res_count + 1], next_neighbor_names))
         exclusions = sorted(set(exclusions))
