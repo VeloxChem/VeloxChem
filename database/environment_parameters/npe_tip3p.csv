@@ -1,0 +1,56 @@
+molecule,res_name,atom_name,element,M0
+water,HOH,O,O,-0.834
+water,HOH,OW,O,-0.834
+water,HOH,H,H,0.417
+water,HOH,H1,H,0.417
+water,HOH,H2,H,0.417
+water,HOH,HW,H,0.417
+water,HOH,HW1,H,0.417
+water,HOH,HW2,H,0.417
+water,WAT,O,O,-0.834
+water,WAT,OW,O,-0.834
+water,WAT,H,H,0.417
+water,WAT,H1,H,0.417
+water,WAT,H2,H,0.417
+water,WAT,HW,H,0.417
+water,WAT,HW1,H,0.417
+water,WAT,HW2,H,0.417
+T3P,T3P,O,O,-0.834
+T3P,T3P,OW,O,-0.834
+T3P,T3P,H,H,0.417
+T3P,T3P,H1,H,0.417
+T3P,T3P,H2,H,0.417
+T3P,T3P,HW,H,0.417
+T3P,T3P,HW1,H,0.417
+T3P,T3P,HW2,H,0.417
+water,SOL,O,O,-0.834
+water,SOL,OW,O,-0.834
+water,SOL,H,H,0.417
+water,SOL,H1,H,0.417
+water,SOL,H2,H,0.417
+water,SOL,HW,H,0.417
+water,SOL,HW1,H,0.417
+water,SOL,HW2,H,0.417
+sodium ion,Na+,Na+,Na,1.0
+sodium ion,Na,Na,Na,1.0
+sodium ion,NA,NA,Na,1.0
+sodium ion,SOD,SOD,Na,1.0
+chloride ion,Cl-,Cl-,Cl,-1.0
+chloride ion,Cl,Cl,Cl,-1.0
+chloride ion,CL,CL,Cl,-1.0
+chloride ion,CLA,CLA,Cl,-1.0
+potassium ion,K+,K+,K,1.0
+potassium ion,K,K,K,1.0
+potassium ion,POT,POT,K,1.0
+calcium ion,Ca2+,Ca2+,Ca,2.0
+calcium ion,Ca,Ca,Ca,2.0
+calcium ion,CA,CA,Ca,2.0
+magnesium ion,Mg2+,Mg2+,Mg,2.0
+magnesium ion,Mg,Mg,Mg,2.0
+magnesium ion,MG,MG,Mg,2.0
+zinc ion,Zn2+,Zn2+,Zn,2.0
+zinc ion,Zn,Zn,Zn,2.0
+zinc ion,ZN,ZN,Zn,2.0
+bromide ion,Br-,Br-,Br,-1.0
+bromide ion,Br,Br,Br,-1.0
+bromide ion,BR,BR,Br,-1.0
