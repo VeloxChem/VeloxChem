@@ -7,7 +7,7 @@ The central design choice is separation of layers:
 $$
 \mathrm{AO/SCF}\;\longrightarrow\;\mathrm{NAO/NPA}\;\longrightarrow\;
 \mathrm{MO\ analysis}\;\longrightarrow\;\mathrm{NBO\ candidates}\;\longrightarrow\;
-\mathrm{Lewis/resonance\ assignment}.
+\mathrm{Lewis/resonance\ assignment}\;\longrightarrow\;\mathrm{NRA/NRT\ density\ fit}.
 $$
 
 Each layer stores structured data in `results`, rather than mixing analysis, assignment, and printing.
@@ -512,7 +512,65 @@ $$
 
 These are development weights for ranking Lewis alternatives, not final VB amplitudes.
 
-## 11. Report formatting
+## 11. NRA/NRT density-fit layer
+
+The current NRA/NRT layer is optional and runs only when `include_nra=True`. It is implemented as post-processing on the already enumerated `alternatives` list, so it does not affect candidate generation, primary assignment, or the existing score/ranking weights.
+
+For each alternative $k$, the selected NBO coefficient lists are reconstructed into normalized NAO-space vectors $v_{ki}$. The first implementation assumes closed-shell pair occupation for all selected candidates:
+
+$$
+D_k^{\mathrm{Lewis}} = 2\sum_i v_{ki}v_{ki}^T.
+$$
+
+The target is the actual NAO density $D^{\mathrm{NAO}}$. The fit chooses nonnegative weights that sum to one:
+
+$$
+\min_w \left\|D^{\mathrm{NAO}} - \sum_k w_kD_k^{\mathrm{Lewis}}\right\|_F^2,
+\qquad
+w_k \ge 0,
+\qquad
+\sum_k w_k = 1.
+$$
+
+The dependency-free active-set solver first solves the equality-constrained least-squares problem, removes structures with negative provisional weights, and refits on the remaining active set until all weights are nonnegative. A one-structure pool returns weight 1.0 by construction.
+
+The implemented subspaces are:
+
+| `nra_subspace` | Current behavior |
+| --- | --- |
+| `"selected"` | Uses the union of NAOs appearing in the selected alternatives. |
+| `"pi"` | Uses p-type NAOs on atoms involved in alternative pi bonds; falls back to `"selected"` if empty. |
+| `"valence"` | Uses selected non-core candidate support. |
+| `"full"` | Uses the full NAO density. |
+
+For the Frobenius metric, symmetric matrix blocks are vectorized over the upper triangle with off-diagonal entries scaled by $\sqrt{2}$, so the vector norm matches the full symmetric-matrix Frobenius norm.
+
+The `results["nra"]` dictionary contains:
+
+```python
+{
+      "subspace": "pi",
+      "fit_metric": "frobenius",
+      "weights": [...],
+      "residual_norm": ...,
+      "relative_residual": ...,
+      "structures": [
+            {
+                  "rank": ...,
+                  "pi_bonds": [...],
+                  "nra_weight": ...,
+                  "score_weight": ...,
+                  "score": ...,
+                  "residual_norm": ...,
+            },
+      ],
+      "warnings": [...],
+}
+```
+
+The layer currently targets closed-shell singlet alternatives. Open-shell/radical NRA is intentionally deferred until one-electron candidates and spin-resolved assignment are available.
+
+## 12. Report formatting
 
 The NBO report separates candidate counts from primary counts.  It sorts selected NBOs by chemical reporting priority:
 
@@ -523,7 +581,9 @@ $$
 
 For a bond candidate between atoms $A$ and $B$, atom labels are reported heavier-to-lighter.  This keeps reports visually stable, for example reporting C-H rather than H-C.
 
-## 12. Important invariants
+There is not yet a public `nra_report()` formatter. NRA/NRT results are inspected directly through `results["nra"]`.
+
+## 13. Important invariants
 
 The following identities are expected for a healthy run:
 
@@ -564,7 +624,19 @@ $$
 \sum_A q_A = Q_{\mathrm{mol}}.
 $$
 
-## 13. Current limitations
+### NRA/NRT simplex weights
+
+When NRA is requested for a closed-shell structure pool,
+
+$$
+w_k^{\mathrm{NRA}} \ge 0,
+\qquad
+\sum_k w_k^{\mathrm{NRA}} = 1,
+$$
+
+and the residual norms should be finite.
+
+## 14. Current limitations
 
 The implementation is a clean development scaffold, not the final scientific endpoint.  Known limitations include:
 
@@ -572,11 +644,13 @@ The implementation is a clean development scaffold, not the final scientific end
 2. Formal charges are stored in `NboConstraints` but are not yet deeply coupled into scoring.
 3. `fixed_lone_pairs`, `fixed_core`, and `fragment_locks` are reserved hooks.
 4. Radical/open-shell alternatives are still mostly pair-based diagnostics.
-5. Resonance weights are softmax ranking weights, not rigorous valence-bond weights.
-6. Antibonding NBOs and Rydberg complements are not yet constructed as a full NBO basis.
-7. NHO/hybrid directionality is not yet a separate layer; current candidates are density-block natural orbitals in NAO space.
+5. `alternatives[*]["weight"]` values are softmax ranking weights, not NRA or VB weights.
+6. NRA/NRT density weights are implemented only as a first closed-shell density fit; there is no spin-resolved radical NRA yet.
+7. There is no public `nra_report()` formatter yet.
+8. Antibonding NBOs and Rydberg complements are not yet constructed as a full NBO basis.
+9. NHO/hybrid directionality is not yet a separate layer; current candidates are density-block natural orbitals in NAO space.
 
-## 14. Suggested next implementation steps
+## 15. Suggested next implementation steps
 
 The natural next steps are:
 
@@ -605,10 +679,13 @@ $$
 n(v) \approx 2.
 $$
 
-5. Separate sigma framework selection from pi-resonance enumeration.
-6. Replace the current softmax score with a documented VB/BOND-inspired model when available.
+5. Add `nra_report(level="summary")` and `nra_report(level="full")` formatters.
+6. Expand NRA validation to carboxylate, nitrate, ozone, nitrobenzene, and amides.
+7. Separate sigma framework selection from pi-resonance enumeration.
+8. Add optional prior-regularized NRA weights.
+9. Replace or supplement the current softmax score with a documented VB/BOND-inspired model when available.
 
-## 15. Developer checklist
+## 16. Developer checklist
 
 When changing the implementation, verify at least:
 
@@ -626,6 +703,16 @@ Also inspect:
 results["diagnostics"]["nbo_candidate_counts"]
 results["diagnostics"]["primary_nbo_counts"]
 results["alternatives"]
+```
+
+When `include_nra=True`, also verify:
+
+```python
+weights = np.array(results["nra"]["weights"])
+assert np.all(weights >= -1.0e-12)
+assert abs(float(np.sum(weights)) - 1.0) < 1.0e-10
+assert np.isfinite(results["nra"]["residual_norm"])
+assert np.isfinite(results["nra"]["relative_residual"])
 ```
 
 For benchmark-style development examples, keep checking H2C=O, water, methane, ethylene, benzene, allyl cation, allyl radical, allyl anion, and constrained benzene Kekulé/Dewar alternatives.

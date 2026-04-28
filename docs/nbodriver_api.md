@@ -6,9 +6,10 @@ This document describes the current clean-restart `NboDriver` API in VeloxChem. 
 2. molecular-orbital composition in the NAO basis,
 3. first-pass NBO candidate generation,
 4. a deterministic primary Lewis-like assignment,
-5. first-pass Lewis/resonance alternatives over compatible pi-bond matchings.
+5. first-pass Lewis/resonance alternatives over compatible pi-bond matchings,
+6. optional first-pass NRA/NRT density-fit weights for closed-shell alternatives.
 
-The present code is intentionally transparent and conservative.  It is not yet a complete replacement for all mature NBO/VB functionality.
+The present code is intentionally transparent and conservative.  It is not yet a complete replacement for all mature NBO/NRT/VB functionality.
 
 ## Public import
 
@@ -36,7 +37,8 @@ The normal workflow is:
 2. build a `MolecularBasis`,
 3. run SCF,
 4. call `NboDriver.compute(molecule, basis, scf.mol_orbs)`,
-5. print or inspect NPA, MO, and NBO reports.
+5. print or inspect NPA, MO, and NBO reports,
+6. optionally inspect `results["nra"]` when `include_nra=True`.
 
 Mathematically, the driver starts from the AO overlap matrix $S$ and an AO density matrix $P$.  For restricted closed-shell SCF,
 
@@ -116,7 +118,8 @@ results = nbo.compute(
 | `nbo_candidates` | Full generated candidate pool. |
 | `nbo_list` | Current selected primary NBO list. |
 | `primary` | Primary Lewis-like assignment metadata. |
-| `alternatives` | Lewis/resonance alternatives and weights. |
+| `alternatives` | Lewis/resonance alternatives and current score/ranking weights. |
+| `nra` | Optional Natural Resonance Analysis density-fit weights, present only when `include_nra=True`. |
 | `diagnostics` | Electron count, orthonormality, equivalence groups, constraint summary, and other checks. |
 | `provenance` | API version, mode, options, and constraints used. |
 
@@ -139,6 +142,9 @@ options = {
     "conjugated_pi_max_path": 2,
     "max_alternatives": 12,
     "lewis_weight_beta": 4.0,
+    "include_nra": False,
+    "nra_subspace": "selected",
+    "nra_fit_metric": "frobenius",
 }
 ```
 
@@ -152,7 +158,7 @@ $$
 
 where $n(c)$ is the occupation of a normalized one- or two-center candidate vector $c$ in the NAO basis.
 
-The resonance-weight sharpness parameter `lewis_weight_beta` enters the current softmax model:
+The score-weight sharpness parameter `lewis_weight_beta` enters the current softmax ranking model:
 
 $$
 w_k = \frac{\exp\{\beta(s_k - s_{\max})\}}
@@ -161,7 +167,38 @@ w_k = \frac{\exp\{\beta(s_k - s_{\max})\}}
 s_{\max} = \max_l s_l.
 $$
 
-Larger $\beta$ gives more weight to the highest-scoring alternatives.
+Larger $\beta$ gives more score/ranking weight to the highest-scoring alternatives.
+
+The optional NRA layer is a post-processing fit of ideal closed-shell Lewis
+density matrices from `alternatives` to the actual NAO density. It does not
+replace the current score/ranking weights. The first implemented fit metric is
+`"frobenius"`. The available subspace choices are:
+
+| `nra_subspace` | Meaning |
+| --- | --- |
+| `"selected"` | Fit only NAOs used by the selected alternatives. |
+| `"pi"` | Fit p-type NAOs on atoms participating in alternative pi bonds. |
+| `"valence"` | Fit selected non-core NBO support. |
+| `"full"` | Fit the full NAO density matrix. |
+
+When `include_nra=True`, the result contains:
+
+```python
+results["nra"] = {
+    "subspace": "selected",
+    "fit_metric": "frobenius",
+    "weights": [...],
+    "residual_norm": ...,
+    "relative_residual": ...,
+    "structures": [...],
+    "warnings": [...],
+}
+```
+
+Each NRA structure reports its `nra_weight`, the corresponding current
+`score_weight`, the underlying `score`, its `pi_bonds`, and a single-structure
+residual norm. The NRA implementation currently targets closed-shell singlet
+Lewis alternatives.
 
 ## Constraints
 
@@ -265,6 +302,20 @@ $$
 \rightarrow \mathrm{LP} \rightarrow \mathrm{RY} \rightarrow \mathrm{BD^*}/\mathrm{other}.
 $$
 
+### NRA/NRT density-fit data
+
+The first NRA/NRT implementation is exposed as structured data in `results["nra"]`, not as a formatted public report yet. Use `include_nra=True` and inspect the returned dictionary directly:
+
+```python
+nra = results["nra"]
+print(nra["weights"])
+print(nra["residual_norm"], nra["relative_residual"])
+for structure in nra["structures"]:
+    print(structure["nra_weight"], structure["score_weight"], structure["pi_bonds"])
+```
+
+The next reporting step is to add `nbo.nra_report(level="summary")` and `nbo.nra_report(level="full")`.
+
 ## Example notebook cell: H2C=O
 
 This is a complete notebook-style Python cell for a restricted HF/STO-3G calculation followed by NBO analysis.
@@ -358,21 +409,70 @@ for alt in res["alternatives"]:
     pi_text = ", ".join(f"{i}-{j}" for i, j in alt["pi_bonds"])
     print(
         f"rank={alt['rank']:2d} "
-        f"weight={100.0 * alt['weight']:7.2f}% "
+        f"score_weight={100.0 * alt['weight']:7.2f}% "
         f"score={alt['score']:10.5f} "
         f"pi={pi_text}"
     )
 ```
 
-## Interpreting current resonance weights
+## Example notebook cell: first NRA/NRT density-fit check
 
-The current alternatives are first-pass Lewis-like alternatives, not full VB state mixing.  If an alternative has score $s_k$, its printed weight is the softmax model
+This example uses the same benzene pi-structure pool but requests NRA/NRT density-fit weights in the pi subspace. The resulting `nra_weight` values are density-fit weights; `score_weight` remains the existing Lewis-ranking weight.
+
+```python
+import numpy as np
+import veloxchem as vlx
+
+# Reuse the benzene geometry, basis, SCF result, and pi-bond lists from the previous example.
+nbo = vlx.NboDriver()
+nbo.verbose = False
+res = nbo.compute(
+    mol,
+    bas,
+    scf.mol_orbs,
+    constraints={"allowed_pi_bonds": ring_pi_bonds + dewar_para_pi_bonds},
+    options={
+        "include_nra": True,
+        "nra_subspace": "pi",
+        "nra_fit_metric": "frobenius",
+        "max_alternatives": 24,
+        "pi_min_occupation": 0.05,
+        "conjugated_pi_max_path": 2,
+    },
+)
+
+nra = res["nra"]
+weights = np.array(nra["weights"])
+
+assert np.all(weights >= -1.0e-12)
+assert abs(float(np.sum(weights)) - 1.0) < 1.0e-10
+assert np.isfinite(nra["residual_norm"])
+assert np.isfinite(nra["relative_residual"])
+
+print(
+    f"subspace={nra['subspace']} metric={nra['fit_metric']} "
+    f"relative_residual={nra['relative_residual']:.6e}"
+)
+
+for structure in nra["structures"]:
+    pi_text = ", ".join(f"{i}-{j}" for i, j in structure["pi_bonds"])
+    print(
+        f"rank={structure['rank']:2d} "
+        f"nra_weight={100.0 * structure['nra_weight']:7.3f}% "
+        f"score_weight={100.0 * structure['score_weight']:7.3f}% "
+        f"pi={pi_text}"
+    )
+```
+
+## Interpreting current resonance score weights
+
+The current alternatives are first-pass Lewis-like alternatives, not Natural Resonance Analysis weights and not full VB state mixing.  If an alternative has score $s_k$, its printed score/ranking weight is the softmax model
 
 $$
 w_k = \frac{e^{\beta(s_k-s_{\max})}}{\sum_l e^{\beta(s_l-s_{\max})}}.
 $$
 
-This is useful for development and ranking, but it should be described as a heuristic resonance-selection weight until a more rigorous valence-bond/BOND-style model is implemented.
+This is useful for development and ranking, but it should be described as a heuristic score/ranking weight, not as a physical NRA or VB weight.
 
 ## Common diagnostics
 
@@ -386,6 +486,10 @@ print(diag["mo_nao_max_normalization_error"])
 print(diag["nbo_candidate_counts"])
 print(diag["primary_nbo_counts"])
 print(diag["constraint_summary"])
+
+if "nra" in results:
+    print(results["nra"]["residual_norm"])
+    print(results["nra"]["relative_residual"])
 ```
 
 Expected identities are:

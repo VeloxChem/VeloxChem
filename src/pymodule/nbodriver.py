@@ -52,6 +52,9 @@ class NboComputeOptions:
     conjugated_pi_max_path: int = 2
     max_alternatives: int = 12
     lewis_weight_beta: float = 4.0
+    include_nra: bool = False
+    nra_subspace: str = 'selected'
+    nra_fit_metric: str = 'frobenius'
 
 
 @dataclass(frozen=True)
@@ -1271,6 +1274,209 @@ def _enumerate_lewis_alternatives(molecule,
     return alternatives
 
 
+def _candidate_vector_from_coefficients(candidate, norb):
+    """Rebuild a normalized NAO-space candidate vector from report data."""
+
+    vector = np.zeros(norb)
+    for item in candidate.get('coefficients', []):
+        vector[int(item['nao_index']) - 1] = float(item['coefficient'])
+    norm = float(np.linalg.norm(vector))
+    if norm > 1.0e-14:
+        vector /= norm
+    return vector
+
+
+def _lewis_density_from_nbos(nbo_list, norb):
+    """Build a closed-shell ideal Lewis density from selected NBO vectors."""
+
+    density = np.zeros((norb, norb))
+    for candidate in nbo_list:
+        vector = _candidate_vector_from_coefficients(candidate, norb)
+        if np.linalg.norm(vector) < 1.0e-14:
+            continue
+        density += 2.0 * np.outer(vector, vector)
+    return 0.5 * (density + density.T)
+
+
+def _nra_subspace_indices(subspace, alternatives, atom_map, angular_map, norb):
+    """Return NAO indices used for the requested first-pass NRA fit."""
+
+    subspace = str(subspace).lower()
+    if subspace == 'full':
+        return np.arange(norb, dtype=int), []
+
+    if subspace == 'pi':
+        atoms = set()
+        for alternative in alternatives:
+            for pair in alternative.get('pi_bonds', []):
+                atoms.update(int(atom) - 1 for atom in pair)
+        indices = [
+            idx for idx in range(norb)
+            if int(angular_map[idx]) == 1 and int(atom_map[idx]) in atoms
+        ]
+        if indices:
+            return np.array(indices, dtype=int), []
+        return _nra_subspace_indices('selected', alternatives, atom_map,
+                                     angular_map, norb)
+
+    selected = set()
+    for alternative in alternatives:
+        for candidate in alternative.get('nbo_list', []):
+            if subspace == 'valence' and candidate.get('type') == 'CR':
+                continue
+            for item in candidate.get('coefficients', []):
+                selected.add(int(item['nao_index']) - 1)
+
+    if subspace in {'selected', 'valence'}:
+        if selected:
+            return np.array(sorted(selected), dtype=int), []
+        return np.arange(norb, dtype=int), [
+            f'NRA {subspace} subspace was empty; full NAO space was used.'
+        ]
+
+    return np.arange(norb, dtype=int), [
+        f"Unknown NRA subspace '{subspace}'; full NAO space was used."
+    ]
+
+
+def _vectorize_symmetric_block(matrix, indices):
+    """Vectorize the upper triangle of a selected symmetric matrix block."""
+
+    block = matrix[np.ix_(indices, indices)]
+    upper = np.triu_indices(len(indices))
+    vector = np.array(block[upper], dtype=float)
+    off_diagonal = upper[0] != upper[1]
+    vector[off_diagonal] *= np.sqrt(2.0)
+    return vector
+
+
+def _equality_constrained_least_squares(matrix, target):
+    """Fit simplex weights with a small active-set least-squares solver."""
+
+    ncols = matrix.shape[1]
+    if ncols == 0:
+        return np.array([], dtype=float)
+    if ncols == 1:
+        return np.array([1.0], dtype=float)
+
+    active = list(range(ncols))
+    weights = np.zeros(ncols)
+
+    while active:
+        active_matrix = matrix[:, active]
+        gram = active_matrix.T @ active_matrix
+        rhs = active_matrix.T @ target
+        ones = np.ones(len(active))
+        kkt = np.block([
+            [gram, ones[:, np.newaxis]],
+            [ones[np.newaxis, :], np.zeros((1, 1))],
+        ])
+        krhs = np.concatenate([rhs, np.array([1.0])])
+        solution = np.linalg.lstsq(kkt, krhs, rcond=None)[0][:-1]
+
+        if np.all(solution >= -1.0e-12):
+            weights[active] = np.maximum(solution, 0.0)
+            break
+
+        remove_local = int(np.argmin(solution))
+        del active[remove_local]
+
+    total = float(np.sum(weights))
+    if total < 1.0e-14:
+        weights[:] = 1.0 / float(ncols)
+    else:
+        weights /= total
+    return weights
+
+
+def _build_nra_results(molecule, nao_data, alternatives, subspace, fit_metric):
+    """Fit ideal Lewis densities to the actual NAO density."""
+
+    fit_metric = str(fit_metric).lower()
+    warnings = []
+    norb = nao_data.density.shape[0]
+
+    if fit_metric != 'frobenius':
+        warnings.append(
+            f"Unknown NRA fit metric '{fit_metric}'; Frobenius metric was used."
+        )
+        fit_metric = 'frobenius'
+
+    if molecule.get_multiplicity() != 1:
+        return {
+            'subspace': str(subspace).lower(),
+            'fit_metric': fit_metric,
+            'weights': [],
+            'residual_norm': None,
+            'relative_residual': None,
+            'structures': [],
+            'warnings': [
+                'NRA is currently implemented only for closed-shell singlet alternatives.'
+            ],
+        }
+
+    if not alternatives:
+        return {
+            'subspace': str(subspace).lower(),
+            'fit_metric': fit_metric,
+            'weights': [],
+            'residual_norm': None,
+            'relative_residual': None,
+            'structures': [],
+            'warnings': ['No Lewis alternatives were available for NRA fitting.'],
+        }
+
+    indices, subspace_warnings = _nra_subspace_indices(
+        subspace,
+        alternatives,
+        nao_data.atom_map,
+        nao_data.angular_momentum_map,
+        norb,
+    )
+    warnings.extend(subspace_warnings)
+
+    target = _vectorize_symmetric_block(nao_data.density, indices)
+    lewis_densities = [
+        _lewis_density_from_nbos(alternative.get('nbo_list', []), norb)
+        for alternative in alternatives
+    ]
+    fit_matrix = np.column_stack([
+        _vectorize_symmetric_block(density, indices)
+        for density in lewis_densities
+    ])
+    weights = _equality_constrained_least_squares(fit_matrix, target)
+    model = fit_matrix @ weights if len(weights) else np.zeros_like(target)
+    residual = target - model
+    residual_norm = float(np.linalg.norm(residual))
+    target_norm = float(np.linalg.norm(target))
+    relative_residual = (residual_norm / target_norm
+                         if target_norm > 1.0e-14 else 0.0)
+
+    structures = []
+    for alternative, weight, lewis_density in zip(alternatives,
+                                                  weights,
+                                                  lewis_densities):
+        structure_vector = _vectorize_symmetric_block(lewis_density, indices)
+        structures.append({
+            'rank': int(alternative.get('rank', 0)),
+            'pi_bonds': list(alternative.get('pi_bonds', [])),
+            'nra_weight': float(weight),
+            'score_weight': float(alternative.get('weight', 0.0)),
+            'score': float(alternative.get('score', 0.0)),
+            'residual_norm': float(np.linalg.norm(target - structure_vector)),
+        })
+
+    return {
+        'subspace': str(subspace).lower(),
+        'fit_metric': fit_metric,
+        'weights': [float(weight) for weight in weights],
+        'residual_norm': residual_norm,
+        'relative_residual': relative_residual,
+        'structures': structures,
+        'warnings': warnings,
+    }
+
+
 class NboDriver:
     """Natural Bond Orbital analysis driver restart scaffold."""
 
@@ -1416,6 +1622,13 @@ class NboDriver:
                         primary_assignment['rank'] = alternative.get('rank', 0)
                         break
             primary_counts = primary_assignment['counts']
+            nra_results = (_build_nra_results(
+                molecule,
+                nao_data,
+                alternatives,
+                compute_options.nra_subspace,
+                compute_options.nra_fit_metric,
+            ) if compute_options.include_nra else None)
 
             natural_charges = nuclear_charges.copy()
             for nao_index, atom in enumerate(nao_data.atom_map):
@@ -1460,6 +1673,8 @@ class NboDriver:
                     'constraints': asdict(compute_constraints),
                 },
             }
+            if nra_results is not None:
+                results['nra'] = nra_results
 
             self._last_molecule = molecule
             self._last_results = results

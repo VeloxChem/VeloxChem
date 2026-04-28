@@ -1,6 +1,20 @@
 # NboDriver improvement plan and Natural Resonance Analysis roadmap
 
-This document collects proposed improvements for the clean-restart `NboDriver`, with special focus on a future Natural Resonance Analysis (NRA) layer.
+This document collects proposed improvements for the clean-restart `NboDriver`, with special focus on a Natural Resonance Analysis (NRA) layer.
+
+The NRA API elements described here are partly implemented. The current `NboDriver` API supports `include_nra`, `nra_subspace`, `nra_fit_metric`, and `results["nra"]` as a first closed-shell density-fitting layer. Higher-level interfaces such as `nra_report()` and chemically richer NRA/NRT options remain proposed next-step interfaces, not implemented API.
+
+Current implementation status:
+
+| Area | Status |
+| --- | --- |
+| NAO/NPA invariants | Implemented and covered by automated tests. |
+| NBO count sanity checks | Implemented for water, methane, ethylene, and benzene. |
+| Bond and pi-bond constraints | Implemented for required/forbidden bonds and required/allowed/forbidden pi bonds. |
+| Lewis/resonance alternatives | Implemented as compatible pi-bond matchings with score/ranking weights. |
+| NRA/NRT density weights | Implemented as optional closed-shell nonnegative density fitting in selected/pi/valence/full subspaces. |
+| NRA reporting | Not implemented; inspect `results["nra"]` directly. |
+| Radical/open-shell NRA | Not implemented; current radical behavior is diagnostic only. |
 
 The guiding principle is to preserve the current clean architecture:
 
@@ -53,7 +67,7 @@ Recommended priorities:
 1. Keep NAO/NPA conservative and deterministic.
 2. Make candidate generation broader but transparent.
 3. Improve Lewis assignment scoring.
-4. Add NRA as a separate density-fitting layer.
+4. Keep NRA as a separate density-fitting layer and expand it incrementally.
 
 ## 2. Immediate NBO improvements
 
@@ -375,7 +389,7 @@ The current `alternatives[*]["weight"]` should eventually be renamed or document
 
 ## 7. NRA implementation stages
 
-### Stage NRA-1: structure pool
+### Stage NRA-1: structure pool implemented
 
 Use current `alternatives` as the first resonance-structure pool:
 
@@ -392,19 +406,21 @@ Each alternative already contains:
 5. electron-pair count,
 6. occupation sum.
 
-Add a new results section:
+The implemented results section is:
 
 ```python
 results["nra"] = {
-    "structures": [],
-    "weights": [],
-    "residual_norm": None,
-    "relative_residual": None,
     "subspace": "pi",
+    "fit_metric": "frobenius",
+    "weights": [...],
+    "residual_norm": ...,
+    "relative_residual": ...,
+    "structures": [...],
+    "warnings": [...],
 }
 ```
 
-### Stage NRA-2: ideal Lewis densities
+### Stage NRA-2: ideal Lewis densities implemented for closed-shell alternatives
 
 For each alternative, construct
 
@@ -424,11 +440,11 @@ o_i =
 \end{cases}
 $$
 
-The first version can use $o_i=2$ for all selected pair candidates.
+The current version uses $o_i=2$ for all selected pair candidates. Open-shell/SOMO support is still future work.
 
-### Stage NRA-3: constrained least squares
+### Stage NRA-3: constrained least squares implemented
 
-Implement a small dependency-free constrained least-squares solver.  A practical first approach is:
+The implemented dependency-free constrained least-squares solver follows this approach:
 
 1. solve equality-constrained least squares with $\sum_k w_k=1$,
 2. set negative weights to zero,
@@ -438,7 +454,7 @@ Implement a small dependency-free constrained least-squares solver.  A practical
 
 This is sufficient for small resonance pools.
 
-### Stage NRA-4: chemically restricted fitting
+### Stage NRA-4: chemically restricted fitting implemented at first-pass level
 
 Full-density fitting can be dominated by core and sigma density.  For resonance, pi-subspace fitting is often more meaningful.
 
@@ -477,7 +493,9 @@ Useful subspace choices:
 | `"pi"` | Fit p-type/pi-capable subspace. |
 | `"selected"` | Fit only NAOs used by the resonance alternatives. |
 
-### Stage NRA-5: reporting
+The current Frobenius implementation vectorizes symmetric blocks with $\sqrt{2}$ off-diagonal scaling so the vector norm matches the matrix Frobenius norm.
+
+### Stage NRA-5: reporting not implemented
 
 Add a public report method:
 
@@ -537,13 +555,21 @@ This allows user guidance while still making the final weights density-aware.
 
 ### Short term
 
-1. Clearly label current alternative weights as ranking weights.
+Completed:
+
+1. Clearly label current alternative weights as score/ranking weights.
+2. Add `include_nra`, `nra_subspace`, and `nra_fit_metric` options.
+3. Add `results["nra"]` for optional closed-shell density-fit NRA/NRT weights.
+4. Build ideal closed-shell Lewis densities from current alternatives.
+5. Fit constrained nonnegative weights in selected/pi/valence/full subspaces.
+6. Add automated regression tests for NAO invariants, NBO counts, constraints, and benzene NRA weights.
+
+Still short term:
+
+1. Add `nra_report()` summary/full formatters.
 2. Add active formal-charge and octet penalties.
 3. Improve radical/open-shell handling.
-4. Add `include_nra` and `nra_subspace` options.
-5. Add `results["nra"]` skeleton.
-6. Build ideal Lewis densities from current alternatives.
-7. Fit constrained weights in the pi subspace.
+4. Expand NRA regression examples beyond benzene.
 
 ### Medium term
 
@@ -573,9 +599,9 @@ This allows user guidance while still making the final weights density-aware.
 
 The best next implementation task is:
 
-> Add Natural Resonance Analysis as an optional post-processing layer that fits idealized alternative Lewis densities to the actual NAO density in a selected subspace.
+> Add a public NRA report and expand closed-shell NRA validation beyond benzene.
 
-The first implementation should target closed-shell pi systems:
+Good next targets are closed-shell pi systems where the resonance pool is chemically interpretable:
 
 1. allyl cation,
 2. allyl anion,
@@ -584,7 +610,7 @@ The first implementation should target closed-shell pi systems:
 5. nitrate,
 6. ozone.
 
-The first API sketch is:
+The implemented API is:
 
 ```python
 options = {
@@ -607,4 +633,4 @@ results["nra"] = {
 }
 ```
 
-This would turn the current resonance layer from a ranking heuristic into a density-aware resonance analysis while preserving the existing architecture.
+The next report should present these data as a compact table with NRA weight, score/ranking weight, residual contribution, pi-bond pattern, and an automatic label where available. After that, the main scientific work is improving the structure pool and scoring model: formal-charge/octet penalties, sigma/pi separation, and radical/open-shell support.
