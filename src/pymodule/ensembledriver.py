@@ -963,10 +963,18 @@ class EnsembleDriver:
                 fh.write("@environment\n")
                 fh.write("units: angstrom\n")
                 fh.write("xyz:\n")
-                for (x, y, z), elem, resn, resid in zip(pe_coords, pe_elements, pe_resnames, pe_resids):
-                    fh.write(f"{str(elem):<2} {x:12.6f} {y:12.6f} {z:12.6f}  {str(resn)}_pe  {int(resid)}\n")
-                for (x, y, z), elem, resn, resid in zip(npe_coords, npe_elements, npe_resnames, npe_resids):
-                    fh.write(f"{str(elem):<2} {x:12.6f} {y:12.6f} {z:12.6f}  {str(resn)}_npe  {int(resid)}\n")
+                for (x, y, z), elem, resn, resid, atom_name in zip(
+                        pe_coords, pe_elements, pe_resnames, pe_resids,
+                        pe_atom_names):
+                    fh.write(
+                        f"{str(elem):<2} {x:12.6f} {y:12.6f} {z:12.6f}  "
+                        f"{str(resn)}_pe  {int(resid)}  {str(atom_name)}\n")
+                for (x, y, z), elem, resn, resid, atom_name in zip(
+                        npe_coords, npe_elements, npe_resnames, npe_resids,
+                        npe_atom_names):
+                    fh.write(
+                        f"{str(elem):<2} {x:12.6f} {y:12.6f} {z:12.6f}  "
+                        f"{str(resn)}_npe  {int(resid)}  {str(atom_name)}\n")
                 fh.write("@end\n\n")
 
                 fh.write("@charges\n")

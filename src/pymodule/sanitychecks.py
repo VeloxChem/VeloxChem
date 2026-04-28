@@ -715,6 +715,7 @@ def write_pe_jsonfile(molecule, potfile):
             float(val[1]) * prefac,
             float(val[2]) * prefac,
             float(val[3]) * prefac,
+            val[6] if len(val) > 6 else None,
         ])
 
     # process charges (a dictionary with residue name as key)
@@ -770,7 +771,9 @@ def write_pe_jsonfile(molecule, potfile):
     # - own residue
     # - previous residue: CA/C/O/OXT (+ HA*)
     # - next residue: N/H*/CA (+ HA*)
-    # This matches expected CP3 behavior for amino-acid chains.
+    # This matches expected CP3 behavior for amino-acid chains. Neighbor
+    # handling requires force-field atom names from the optional 7th column in
+    # @environment; if absent, use intramolecular exclusions only.
 
     classical_fragments = []
 
@@ -781,11 +784,16 @@ def write_pe_jsonfile(molecule, potfile):
         natoms = len(residues[resid]['atoms'])
         start_idx = atom_counter + 1
         end_idx = atom_counter + natoms
+        atom_names = [
+            str(a[4]).upper() if a[4] is not None else None
+            for a in residues[resid]['atoms']
+        ]
         residue_infos.append({
             'resid': resid,
             'start_idx': start_idx,
             'end_idx': end_idx,
-            'atom_names': [str(a[0]).upper() for a in residues[resid]['atoms']],
+            'atom_names': atom_names,
+            'has_atom_names': all(name is not None for name in atom_names),
         })
         atom_counter = end_idx
 
@@ -800,6 +808,8 @@ def write_pe_jsonfile(molecule, potfile):
     }
 
     def _select_indices(info, selected_names):
+        if any(name is None for name in info['atom_names']):
+            return []
         return [
             info['start_idx'] + i for i, name in enumerate(info['atom_names'])
             if name in selected_names
@@ -838,10 +848,10 @@ def write_pe_jsonfile(molecule, potfile):
 
         # coordinates + exclusions
         exclusions = list(range(info['start_idx'], info['end_idx'] + 1))
-        if res_count > 0:
+        if info['has_atom_names'] and res_count > 0:
             exclusions.extend(
                 _select_indices(residue_infos[res_count - 1], prev_neighbor_names))
-        if res_count + 1 < len(residue_infos):
+        if info['has_atom_names'] and res_count + 1 < len(residue_infos):
             exclusions.extend(
                 _select_indices(residue_infos[res_count + 1], next_neighbor_names))
         exclusions = sorted(set(exclusions))
