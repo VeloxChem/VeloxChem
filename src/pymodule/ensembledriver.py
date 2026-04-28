@@ -1039,8 +1039,7 @@ class EnsembleDriver:
                 )
             setattr(driver, key, val)
 
-    @staticmethod
-    def _build_scf_driver(scf_options: dict):
+    def _build_scf_driver(self, scf_options: dict):
         """
         Build SCF driver from scf_options['scf_type'].
         Allowed values:
@@ -1050,18 +1049,17 @@ class EnsembleDriver:
         """
         scf_type = str(scf_options.get("scf_type", "restricted")).lower()
         if scf_type == "restricted":
-            return ScfRestrictedDriver()
+            return ScfRestrictedDriver(self.comm, self.ostream)
         if scf_type == "unrestricted":
-            return ScfUnrestrictedDriver()
+            return ScfUnrestrictedDriver(self.comm, self.ostream)
         if scf_type == "restricted_openshell":
-            return ScfRestrictedOpenDriver()
+            return ScfRestrictedOpenDriver(self.comm, self.ostream)
         raise ValueError(
             "Invalid scf_type in scf_options. "
             "Expected one of: 'restricted', 'unrestricted', 'restricted_openshell'."
         )
 
-    @staticmethod
-    def _build_property_driver(property_options: dict):
+    def _build_property_driver(self, property_options: dict):
         """
         Build response driver from property_options using rules:
         - property='absorption' or 'ecd' + nstates      -> LinearResponseEigenSolver
@@ -1089,12 +1087,12 @@ class EnsembleDriver:
             )
  
         if has_freqs:
-            drv = ComplexResponseSolver()
+            drv = ComplexResponseSolver(self.comm, self.ostream)
             drv.set_cpp_property("absorption" if prop == "absorption" else "ecd")
             return drv
  
         if has_nstates:
-            return LinearResponseEigenSolver()
+            return LinearResponseEigenSolver(self.comm, self.ostream)
  
         raise ValueError(
             "property_options must define either 'nstates' (TD-DFT) "
